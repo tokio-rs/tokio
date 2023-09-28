@@ -239,8 +239,8 @@ impl<T> Receiver<T> {
     /// not yet been closed, this method will sleep until a message is sent or
     /// the channel is closed.
     ///
-    /// Asserts that the passed-in buffer has capacity greater than its
-    /// length.
+    /// If at the time of the call the buffer has no unused capacity,
+    /// `BLOCK_CAP` additional elements are reserved.
     ///
     /// # Example
     /// ```
@@ -256,15 +256,16 @@ impl<T> Receiver<T> {
     ///
     ///     // At most 2 at a time
     ///     let mut buffer : Vec<&str> = Vec::with_capacity(2);
-    ///     assert_eq!(2, rx.recv_many(&mut buffer).await, "did not fill to capacity");
+    ///     assert_eq!(2, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(vec!["first","second"], buffer);
     ///     buffer.clear();  // Reuse the buffer
     ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(vec!["third"], buffer);
     ///     tx.send("fourth").await.unwrap();
+    ///     tx.send("fifth").await.unwrap();
     ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
-    ///     assert_eq!(vec!["third","fourth"], buffer);
-    ///     // assert_eq!(2, rx.recv_many(&mut buffer).await); // 'buffer must have non-zero unused capacity'
+    ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
+    ///     assert_eq!(vec!["third","fourth","fifth"], buffer);
     /// }
     /// ```
     pub async fn recv_many(&mut self, buffer: &mut Vec<T>) -> usize {

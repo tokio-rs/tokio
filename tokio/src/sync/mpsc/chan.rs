@@ -297,14 +297,13 @@ impl<T, S: Semaphore> Rx<T, S> {
 
     /// Receives values into `buffer` up to its capacity
     ///
-    /// If the buffer initially has 0 capacity, reserves `super::BLOCK_CAP` elements
+    /// If the buffer initially has 0 remaining capacity, reserves `super::BLOCK_CAP` elements
     pub(crate) fn recv_many(&mut self, cx: &mut Context<'_>, buffer: &mut Vec<T>) -> Poll<usize> {
         use super::block::Read;
 
-        assert!(
-            buffer.capacity() > buffer.len(),
-            "buffer must have non-zero unused capacity"
-        );
+        if buffer.len() == buffer.capacity() {
+            buffer.reserve(super::BLOCK_CAP);
+        }
 
         let initial_length = buffer.len();
 

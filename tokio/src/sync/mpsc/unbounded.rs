@@ -181,8 +181,8 @@ impl<T> UnboundedReceiver<T> {
     /// not yet been closed, this method will sleep until a message is sent or
     /// the channel is closed.
     ///
-    /// Asserts that the passed-in buffer has capacity greater than its
-    /// length.
+    /// If at the time of the call the buffer has no unused capacity,
+    /// `BLOCK_CAP` additional elements are reserved.
     ///
     /// # Example:
     ///
@@ -201,7 +201,6 @@ impl<T> UnboundedReceiver<T> {
     ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(vec!["hello"], buffer);
     ///     assert_eq!(0, rx.recv_many(&mut buffer).await);
-    ///     // assert_eq!(vec!["hello"], buffer);
     /// }
     pub async fn recv_many(&mut self, buffer: &mut Vec<T>) -> usize {
         use crate::future::poll_fn;

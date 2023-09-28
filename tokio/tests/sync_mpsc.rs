@@ -122,17 +122,6 @@ async fn async_send_recv_with_buffer() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
-#[should_panic(expected = "buffer must have non-zero unused capacity")]
-async fn async_send_recv_many_zero() {
-    let (tx, mut rx) = mpsc::channel(2);
-    assert_ok!(tx.send(7).await);
-    let mut buffer = vec![0; 0];
-    assert_eq!(0, buffer.capacity());
-    assert_eq!(1, rx.recv_many(&mut buffer).await);
-}
-
-#[tokio::test]
-#[cfg(feature = "full")]
 async fn async_send_recv_many_with_buffer() {
     let (tx, mut rx) = mpsc::channel(2);
 
@@ -222,7 +211,7 @@ async fn send_recv_many_unbounded() {
     assert_ok!(tx.send(100));
     assert_ok!(tx.send(1002));
 
-    let mut buffer: Vec<i32> = Vec::with_capacity(4);
+    let mut buffer: Vec<i32> = Vec::with_capacity(0);
     let mut count = 0;
     while count < 4 {
         count += rx.recv_many(&mut buffer).await;
