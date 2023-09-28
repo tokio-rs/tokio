@@ -1160,7 +1160,7 @@ impl Handle {
             return;
         }
 
-        debug_assert!(self.shared.owned.is_closed());
+        debug_assert!(self.shared.owned.is_shutdown());
         debug_assert!(self.shared.owned.is_empty());
 
         for mut core in cores.drain(..) {

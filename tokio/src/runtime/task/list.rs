@@ -8,10 +8,10 @@
 
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Mutex, MutexGuard};
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
+use std::sync::atomic::AtomicUsize;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use std::marker::PhantomData;
@@ -61,7 +61,8 @@ cfg_not_has_atomic_u64! {
 pub(crate) struct OwnedTasks<S: 'static> {
     lists: Box<[Mutex<ListSement<S>>]>,
     pub(crate) id: NonZeroU64,
-    closed: AtomicBool,
+    closing: AtomicBool,
+    shutdown: AtomicBool,
     pub(crate) segment_size: u32,
     segment_mask: u32,
     count: AtomicUsize,
@@ -94,7 +95,8 @@ impl<S: 'static> OwnedTasks<S> {
         }
         Self {
             lists: lists.into_boxed_slice(),
-            closed: AtomicBool::new(false),
+            closing: AtomicBool::new(false),
+            shutdown: AtomicBool::new(false),
             id: get_next_id(),
             segment_size,
             segment_mask,
@@ -144,7 +146,7 @@ impl<S: 'static> OwnedTasks<S> {
 
         // check close flag,
         // it must be checked in the lock, for ensuring all tasks will shutdown after OwnedTasks has been closed
-        if self.closed.load(Ordering::Acquire) {
+        if self.closing.load(Ordering::Acquire) {
             drop(lock);
             task.shutdown();
             return None;
@@ -178,7 +180,7 @@ impl<S: 'static> OwnedTasks<S> {
     where
         S: Schedule,
     {
-        self.closed.store(true, Ordering::Release);
+        self.closing.store(true, Ordering::Release);
         for i in start..self.segment_size as usize + start {
             loop {
                 let mut lock = self.segment_inner(i);
@@ -192,6 +194,8 @@ impl<S: 'static> OwnedTasks<S> {
                 };
             }
         }
+        // we have shut down all tasks
+        self.shutdown.store(true, Ordering::Release)
     }
 
     pub(crate) fn active_tasks_count(&self) -> usize {
@@ -226,8 +230,8 @@ impl<S: 'static> OwnedTasks<S> {
         self.lists[id & (self.segment_mask) as usize].lock()
     }
 
-    pub(crate) fn is_closed(&self) -> bool {
-        self.closed.load(Ordering::Acquire)
+    pub(crate) fn is_shutdown(&self) -> bool {
+        self.shutdown.load(Ordering::Acquire)
     }
 
     pub(crate) fn is_empty(&self) -> bool {

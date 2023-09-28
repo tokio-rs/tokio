@@ -264,7 +264,7 @@ fn shutdown2(mut core: Box<Core>, handle: &Handle) -> Box<Core> {
         drop(task);
     }
 
-    assert!(handle.shared.owned.is_closed());
+    assert!(handle.shared.owned.is_shutdown());
     assert!(handle.shared.owned.is_empty());
 
     // Submit metrics
@@ -547,10 +547,10 @@ cfg_metrics! {
 }
 
 cfg_unstable! {
-    use std::num::NonZeroU32;
+    use std::num::NonZeroU64;
 
     impl Handle {
-        pub(crate) fn owned_id(&self) -> NonZeroU32 {
+        pub(crate) fn owned_id(&self) -> NonZeroU64 {
             self.shared.owned.id
         }
     }

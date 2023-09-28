@@ -74,11 +74,22 @@ impl fmt::Display for Id {
 
 impl Id {
     pub(crate) fn next() -> Self {
-        use crate::loom::sync::atomic::{Ordering::Relaxed, StaticAtomicU64};
+        use crate::loom::sync::atomic::Ordering::Relaxed;
+        use crate::loom::sync::atomic::StaticAtomicU64;
 
-        static NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
+        #[cfg(all(test, loom))]
+        {
+            crate::loom::lazy_static! {
+                static ref NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
+            }
+            Self(NEXT_ID.fetch_add(1, Relaxed))
+        }
 
-        Self(NEXT_ID.fetch_add(1, Relaxed))
+        #[cfg(not(all(test, loom)))]
+        {
+            static NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
+            Self(NEXT_ID.fetch_add(1, Relaxed))
+        }
     }
 
     pub(crate) fn as_u64(&self) -> u64 {
