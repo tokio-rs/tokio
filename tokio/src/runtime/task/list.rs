@@ -15,7 +15,7 @@ use crate::util::linked_list::{Link, LinkedList};
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use std::marker::PhantomData;
-use std::num::NonZeroU32;
+use std::num::NonZeroU64;
 
 use super::core::Header;
 
@@ -28,20 +28,39 @@ use super::core::Header;
 // bug in Tokio, so we accept that certain bugs would not be caught if the two
 // mixed up runtimes happen to have the same id.
 
-static NEXT_OWNED_TASKS_ID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
+cfg_has_atomic_u64! {
+    use std::sync::atomic::AtomicU64;
 
-fn get_next_id() -> NonZeroU32 {
-    loop {
-        let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
-        if let Some(id) = NonZeroU32::new(id) {
-            return id;
+    static NEXT_OWNED_TASKS_ID: AtomicU64 = AtomicU64::new(1);
+
+    fn get_next_id() -> NonZeroU64 {
+        loop {
+            let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
+            if let Some(id) = NonZeroU64::new(id) {
+                return id;
+            }
+        }
+    }
+}
+
+cfg_not_has_atomic_u64! {
+    use std::sync::atomic::AtomicU32;
+
+    static NEXT_OWNED_TASKS_ID: AtomicU32 = AtomicU32::new(1);
+
+    fn get_next_id() -> NonZeroU64 {
+        loop {
+            let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
+            if let Some(id) = NonZeroU64::new(u64::from(id)) {
+                return id;
+            }
         }
     }
 }
 
 pub(crate) struct OwnedTasks<S: 'static> {
     lists: Box<[Mutex<ListSement<S>>]>,
-    pub(crate) id: NonZeroU32,
+    pub(crate) id: NonZeroU64,
     closed: AtomicBool,
     pub(crate) segment_size: u32,
     segment_mask: u32,
@@ -52,7 +71,7 @@ type ListSement<S> = LinkedList<Task<S>, <Task<S> as Link>::Target>;
 
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
-    pub(crate) id: NonZeroU32,
+    pub(crate) id: NonZeroU64,
     _not_send_or_sync: PhantomData<*const ()>,
 }
 struct OwnedTasksInner<S: 'static> {
@@ -194,7 +213,7 @@ impl<S: 'static> OwnedTasks<S> {
     #[inline]
     unsafe fn remove_inner(&self, task: &Task<S>) -> Option<Task<S>> {
         // Safety: it is safe, because every task has one task_id
-        let task_id = unsafe{Header::get_id(task.header_ptr())};
+        let task_id = unsafe { Header::get_id(task.header_ptr()) };
         let mut lock = self.segment_inner(task_id.0 as usize);
         let task = lock.remove(task.header_ptr())?;
         drop(lock);
