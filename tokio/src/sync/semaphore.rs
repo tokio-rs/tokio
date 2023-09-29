@@ -123,6 +123,117 @@ use std::sync::Arc;
 /// # }
 /// ```
 ///
+/// ## Prevent tests from running in parallel
+///
+/// By default, Rust runs tests in the same file in parallel. However, in some cases, running two tests in parallel may lead to problems.
+/// For example, this can happen when tests use the same database.
+///
+/// Consider the following scenario:
+/// 1. `test_insert`: Inserts a key-value pair into the database, then retrieves the value using the same key to verify the insertion.
+/// 2. `test_update`: Inserts a key, then updates the key to a new value and verifies that the value has been accurately updated.
+/// 3. `test_others`: A third test that doesn't modify the database state. It can run in parallel with the other tests.
+///
+/// In this example, `test_insert` and `test_update` need to run in sequence to work, but it doesn't matter which test runs first.
+/// We can leverage a semaphore with a single permit to address this challenge.
+///
+/// ```
+/// use tokio::sync::Semaphore;
+/// # use tokio::sync::Mutex;
+/// # use std::collections::BTreeMap;
+/// # struct Database {
+/// #   map: Mutex<BTreeMap<String, i32>>,
+/// # }
+/// # impl Database {
+/// #    pub const fn setup() -> Database {
+/// #        Database {
+/// #            map: Mutex::const_new(BTreeMap::new()),
+/// #        }
+/// #    }
+/// #    pub async fn insert(&self, key: &str, value: i32) {
+/// #        self.map.lock().await.insert(key.to_string(), value);
+/// #    }
+/// #    pub async fn update(&self, key: &str, value: i32) {
+/// #        self.map.lock().await
+/// #            .entry(key.to_string())
+/// #            .and_modify(|origin| *origin = value);
+/// #    }
+/// #    pub async fn delete(&self, key: &str) {
+/// #        self.map.lock().await.remove(key);
+/// #    }
+/// #    pub async fn get(&self, key: &str) -> i32 {
+/// #        *self.map.lock().await.get(key).unwrap()
+/// #    }
+/// # }
+///
+/// // Initialize a static semaphore with only one permit, which is used to
+/// // prevent test_insert and test_update from running in parallel.
+/// static PERMIT: Semaphore = Semaphore::const_new(1);
+///
+/// // Initialize the database that will be used by the subsequent tests.
+/// static DB: Database = Database::setup();
+///
+/// #[tokio::test]
+/// # async fn fake_test() {}
+/// async fn test_insert() {
+///     // Acquire permit before proceeding. Since the semaphore has only one permit,
+///     // the test will wait if the permit is already acquired by other tests.
+///     let permit = PERMIT.acquire().await.unwrap();
+///
+///     // Do the actual test stuff with database
+///
+///     // Insert a key-value pair to database
+///     let (key, value) = ("name", 0);
+///     DB.insert(key, value).await;
+///
+///     // Verify that the value has been inserted correctly.
+///     assert_eq!(DB.get(key).await, value);
+///
+///     // Undo the insertion, so the database is empty at the end of the test.
+///     DB.delete(key).await;
+///
+///     // Drop permit. This allows the other test to start running.
+///     drop(permit);
+/// }
+///
+/// #[tokio::test]
+/// # async fn fake_test() {}
+/// async fn test_update() {
+///     // Acquire permit before proceeding. Since the semaphore has only one permit,
+///     // the test will wait if the permit is already acquired by other tests.
+///     let permit = PERMIT.acquire().await.unwrap();
+///
+///     // Do the same insert.
+///     let (key, value) = ("name", 0);
+///     DB.insert(key, value).await;
+///
+///     // Update the existing value with a new one.
+///     let new_value = 1;
+///     DB.update(key, new_value).await;
+///
+///     // Verify that the value has been updated correctly.
+///     assert_eq!(DB.get(key).await, new_value);
+///
+///     // Undo any modificattion.
+///     DB.delete(key).await;
+///
+///     // Drop permit. This allows the other test to start running.
+///     drop(permit);
+/// }
+///
+/// #[tokio::test]
+/// # async fn fake_test() {}
+/// async fn test_others() {
+///     // This test can run in parallel with test_insert and test_update,
+///     // so it does not use PERMIT.
+/// }
+/// # #[tokio::main]
+/// # async fn main() {
+/// #   test_insert().await;
+/// #   test_update().await;
+/// #   test_others().await;
+/// # }
+/// ```
+///
 /// ## Rate limiting using a token bucket
 ///
 /// Many applications and systems have constraints on the rate at which certain
