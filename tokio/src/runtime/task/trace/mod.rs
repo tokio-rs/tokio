@@ -100,6 +100,16 @@ impl Context {
             Self::try_with_current(|context| f(&context.collector)).expect(FAIL_NO_THREAD_LOCAL)
         }
     }
+
+    /// Produces `true` if the current task is being traced; otherwise false.
+    pub(crate) fn is_tracing() -> bool {
+        Self::with_current_collector(|maybe_collector| {
+            let collector = maybe_collector.take();
+            let result = collector.is_some();
+            maybe_collector.set(collector);
+            result
+        })
+    }
 }
 
 impl Trace {
@@ -334,11 +344,6 @@ cfg_rt_multi_thread! {
             .map(|task| {
                 // trace the task
                 let ((), trace) = Trace::capture(|| task.poll());
-
-                // reschedule the task
-                let _ = task.state().transition_to_notified_by_ref();
-                task.schedule();
-
                 trace
             })
             .collect()

@@ -543,6 +543,14 @@ cfg_taskdump! {
                 scheduler::Handle::MultiThreadAlt(_) => panic!("task dump not implemented for this runtime flavor"),
             }
         }
+
+        /// Produces `true` if the current task is being traced for a dump;
+        /// otherwise false. This function is only public for integration
+        /// testing purposes. Do not rely on it.
+        #[doc(hidden)]
+        pub fn is_tracing() -> bool {
+            super::task::trace::Context::is_tracing()
+        }
     }
 
     cfg_rt_multi_thread! {
