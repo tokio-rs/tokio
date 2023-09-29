@@ -246,13 +246,17 @@ cfg_taskdump! {
         where
             F: FnMut(&Task<S>),
         {
-            for i in 0 .. self.lists.len()  {
-                self.lists[i].lock().for_each(&mut f);
+            // while tracing, new tasks are not allowed to add, so we get all locks first
+            let mut guards = Vec::with_capacity(self.segment_size as usize);
+            for list in self.lists.as_ref()  {
+                guards.push(list.lock());
+            }
+            for guard in &mut guards{
+                guard.for_each(&mut f);
             }
         }
     }
 }
-
 impl<S: 'static> LocalOwnedTasks<S> {
     pub(crate) fn new() -> Self {
         Self {
