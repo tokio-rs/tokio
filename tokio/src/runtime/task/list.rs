@@ -63,7 +63,6 @@ pub(crate) struct OwnedTasks<S: 'static> {
     pub(crate) id: NonZeroU64,
     closing: AtomicBool,
     shutdown: AtomicBool,
-    pub(crate) segment_size: u32,
     segment_mask: u32,
     count: AtomicUsize,
 }
@@ -98,7 +97,6 @@ impl<S: 'static> OwnedTasks<S> {
             closing: AtomicBool::new(false),
             shutdown: AtomicBool::new(false),
             id: get_next_id(),
-            segment_size,
             segment_mask,
             count: AtomicUsize::new(0),
         }
@@ -181,7 +179,7 @@ impl<S: 'static> OwnedTasks<S> {
         S: Schedule,
     {
         self.closing.store(true, Ordering::Release);
-        for i in start..self.segment_size as usize + start {
+        for i in start..self.get_segment_size() + start {
             loop {
                 let mut lock = self.segment_inner(i);
                 match lock.pop_back() {
@@ -196,6 +194,11 @@ impl<S: 'static> OwnedTasks<S> {
         }
         // we have shut down all tasks
         self.shutdown.store(true, Ordering::Release)
+    }
+
+    #[inline]
+    pub(crate) fn get_segment_size(&self) -> usize {
+        self.lists.len()
     }
 
     pub(crate) fn active_tasks_count(&self) -> usize {
@@ -247,7 +250,7 @@ cfg_taskdump! {
             F: FnMut(&Task<S>),
         {
             // while tracing, new tasks are not allowed to add, so we get all locks first
-            let mut guards = Vec::with_capacity(self.segment_size as usize);
+            let mut guards = Vec::with_capacity(self.get_segment_size() as usize);
             for list in self.lists.as_ref()  {
                 guards.push(list.lock());
             }
