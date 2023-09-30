@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio_test::{assert_pending, assert_ready, task};
-use tokio_util::sync::TaskTracker;
+use tokio_util::task::TaskTracker;
 
 #[test]
 fn open_close() {

@@ -60,7 +60,7 @@ use tokio::{
 /// This is a simple example. For this case, you should probably use a [`JoinSet`] instead.
 ///
 /// ```
-/// use tokio_util::sync::TaskTracker;
+/// use tokio_util::task::TaskTracker;
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -86,7 +86,8 @@ use tokio::{
 /// This example shows the intended use-case of `TaskTracker`. It is used together with
 /// [`CancellationToken`] to implement graceful shutdown.
 /// ```
-/// use tokio_util::sync::{CancellationToken, TaskTracker};
+/// use tokio_util::sync::CancellationToken;
+/// use tokio_util::task::TaskTracker;
 /// use tokio::time::{self, Duration};
 ///
 /// async fn background_task(num: u64) {
@@ -479,7 +480,7 @@ impl TaskTracker {
     /// ```
     /// # async fn my_async_fn() {}
     /// use tokio::task::JoinSet;
-    /// use tokio_util::sync::TaskTracker;
+    /// use tokio_util::task::TaskTracker;
     ///
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
