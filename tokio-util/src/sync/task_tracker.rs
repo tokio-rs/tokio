@@ -206,7 +206,7 @@ impl TaskTrackerInner {
     }
 
     #[inline]
-    fn is_done(&self) -> bool {
+    fn is_closed_and_empty(&self) -> bool {
         // If empty and closed bit set, then we are done.
         //
         // The acquire load will synchronize with the release store of any previous call to
@@ -282,6 +282,7 @@ impl TaskTracker {
     /// Create a new `TaskTracker`.
     ///
     /// The `TaskTracker` will start out as open.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             inner: Arc::new(TaskTrackerInner::new()),
@@ -297,7 +298,7 @@ impl TaskTracker {
     pub fn wait(&self) -> TaskTrackerWaitFuture<'_> {
         TaskTrackerWaitFuture {
             future: self.inner.on_last_exit.notified(),
-            inner: if self.inner.is_done() {
+            inner: if self.inner.is_closed_and_empty() {
                 None
             } else {
                 Some(&self.inner)
@@ -317,9 +318,11 @@ impl TaskTracker {
 
     /// Reopen this `TaskTracker`.
     ///
-    /// This prevents `wait` futures from completing even if the `TaskTracker` is empty.
+    /// This prevents [`wait`] futures from completing even if the `TaskTracker` is empty.
     ///
     /// Returns `true` if this reopened the `TaskTracker`, or `false` if it was already open.
+    ///
+    /// [`wait`]: Self::wait
     #[inline]
     pub fn reopen(&self) -> bool {
         self.inner.set_open()
@@ -327,29 +330,35 @@ impl TaskTracker {
 
     /// Returns true if this `TaskTracker` is closed.
     #[inline]
+    #[must_use]
     pub fn is_closed(&self) -> bool {
         (self.inner.state.load(Ordering::Acquire) & 1) != 0
     }
 
     /// Returns true if this `TaskTracker` is open.
     #[inline]
+    #[must_use]
     pub fn is_open(&self) -> bool {
         !self.is_closed()
     }
 
     /// Returns the number of tasks tracked by this `TaskTracker`.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.inner.state.load(Ordering::Acquire) >> 1
     }
 
     /// Returns true if there are no tasks in this `TaskTracker`.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.inner.state.load(Ordering::Acquire) <= 1
     }
 
     /// Spawn the provided future on the Tokio runtime, and track it in this `TaskTracker`.
+    ///
+    /// This is equivalent to `tokio::spawn(tracker.track_future(task))`.
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]
@@ -363,6 +372,8 @@ impl TaskTracker {
     }
 
     /// Spawn the provided future on the Tokio runtime, and track it in this `TaskTracker`.
+    ///
+    /// This is equivalent to `handle.spawn(tracker.track_future(task))`.
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]
@@ -376,6 +387,8 @@ impl TaskTracker {
     }
 
     /// Spawn the provided future on the current [`LocalSet`], and track it in this `TaskTracker`.
+    ///
+    /// This is equivalent to `tokio::task::spawn_local(tracker.track_future(task))`.
     ///
     /// [`LocalSet`]: tokio::task::LocalSet
     #[inline]
@@ -392,6 +405,8 @@ impl TaskTracker {
 
     /// Spawn the provided future on the provided [`LocalSet`], and track it in this `TaskTracker`.
     ///
+    /// This is equivalent to `local_set.spawn_local(tracker.track_future(task))`.
+    ///
     /// [`LocalSet`]: tokio::task::LocalSet
     #[inline]
     #[track_caller]
@@ -406,6 +421,8 @@ impl TaskTracker {
     }
 
     /// Spawn the provided blocking task on the current Tokio runtime, and track it in this `TaskTracker`.
+    ///
+    /// This is equivalent to `tokio::task::spawn_blocking(tracker.track_future(task))`.
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]
@@ -426,6 +443,8 @@ impl TaskTracker {
     }
 
     /// Spawn the provided blocking task on the provided Tokio runtime, and track it in this `TaskTracker`.
+    ///
+    /// This is equivalent to `handle.spawn_blocking(tracker.track_future(task))`.
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]
@@ -454,9 +473,27 @@ impl TaskTracker {
     /// when [`poll`] returns [`Poll::Pending`]. You have to actually run the destructor for it to
     /// be removed.)
     ///
-    /// [`wait`]: Self::wait
-    /// [`poll`]: std::future::Future::poll
+    /// # Examples
+    ///
+    /// Track a future spawned on a [`JoinSet`].
+    /// ```
+    /// # async fn my_async_fn() {}
+    /// use tokio::task::JoinSet;
+    /// use tokio_util::sync::TaskTracker;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let tracker = TaskTracker::new();
+    /// let mut join_set = JoinSet::new();
+    ///
+    /// join_set.spawn(tracker.track_future(my_async_fn()));
+    /// # }
+    /// ```
+    ///
+    /// [`JoinSet`]: tokio::task::JoinSet
     /// [`Poll::Pending`]: std::task::Poll::Pending
+    /// [`poll`]: std::future::Future::poll
+    /// [`wait`]: Self::wait
     #[inline]
     pub fn track_future<F: Future>(&self, future: F) -> TrackedFuture<F> {
         TrackedFuture {
@@ -563,8 +600,8 @@ impl<'a> Future for TaskTrackerWaitFuture<'a> {
             Some(inner) => inner,
         };
 
-        let is_done = inner.is_done() || me.future.poll(cx).is_ready();
-        if is_done {
+        let ready = inner.is_closed_and_empty() || me.future.poll(cx).is_ready();
+        if ready {
             *me.inner = None;
             Poll::Ready(())
         } else {
