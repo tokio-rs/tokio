@@ -254,16 +254,27 @@ impl<T> Receiver<T> {
     ///     tx.send("second").await.unwrap();
     ///     tx.send("third").await.unwrap();
     ///
-    ///     // At most 2 at a time
+    ///     // The initial capacity allows up to 2 messages
+    ///     // to be placed in the buffer.
     ///     let mut buffer : Vec<&str> = Vec::with_capacity(2);
     ///     assert_eq!(2, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(vec!["first","second"], buffer);
-    ///     buffer.clear();  // Reuse the buffer
+    ///
+    ///     buffer.clear();
     ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(vec!["third"], buffer);
+    ///
     ///     tx.send("fourth").await.unwrap();
     ///     tx.send("fifth").await.unwrap();
+    ///
+    ///     // As the passed-in buffer has unused capacity
+    ///     // recv_many will use it up, but it will not
+    ///     // increase the buffer's capacity.
     ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
+    ///     assert_eq!(2, buffer.capacity());
+    ///
+    ///     // With the buffer full, the next call to recv_many
+    ///     // reserves additional capacity.
     ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(vec!["third","fourth","fifth"], buffer);
     /// }
