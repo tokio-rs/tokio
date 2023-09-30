@@ -232,17 +232,35 @@ impl<T> Receiver<T> {
 
     /// Receives the next values for this receiver and extends `buffer`.
     ///
-    /// This method returns the number of values populated in `buffer`;
-    /// it returns 0 if the channel has been closed and there
-    /// are no remaining messages in the channel.
-    /// If there are no messages in the channel's buffer, but the channel has
+    /// This method returns the number of values populated in `buffer`.
+    ///
+    /// This method returns 0 if the channel has been closed and there are
+    /// no remaining messages in the channel's queue. This indicates that no
+    /// further values can ever be received from this `Receiver`. The channel is
+    /// closed when all senders have been dropped, or when [`close`] is called.
+    ///
+    /// If there are no messages in the channel's queue, but the channel has
     /// not yet been closed, this method will sleep until a message is sent or
-    /// the channel is closed.
+    /// the channel is closed.  Note that if [`close`] is called, but there are
+    /// still outstanding [`Permits`] from before it was closed, the channel is
+    /// not considered closed by `recv` until the permits are released.
     ///
-    /// If at the time of the call the buffer has no unused capacity,
-    /// `BLOCK_CAP` additional elements are reserved.
+    /// If at the time of the call `buffer` has no unused capacity,
+    /// additional elements are reserved. Otherwise `recv_many` populates
+    /// `buffer` with no more elements than its unused capacity.
     ///
-    /// # Example
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// channel.
+    ///
+    /// [`close`]: Self::close
+    /// [`Permits`]: struct@crate::sync::mpsc::Permit///
+    ///
+    /// # Examples
+    ///
     /// ```
     /// use tokio::sync::mpsc;
     ///
@@ -268,12 +286,12 @@ impl<T> Receiver<T> {
     ///     tx.send("fifth").await.unwrap();
     ///
     ///     // As the passed-in buffer has unused capacity
-    ///     // recv_many will use it up, but it will not
+    ///     // recv_many will use it up; it will not
     ///     // increase the buffer's capacity.
     ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(2, buffer.capacity());
     ///
-    ///     // With the buffer full, the next call to recv_many
+    ///     // With the buffer full, the next call to `recv_many`
     ///     // reserves additional capacity.
     ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(vec!["third","fourth","fifth"], buffer);

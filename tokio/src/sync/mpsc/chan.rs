@@ -344,9 +344,7 @@ impl<T, S: Semaphore> Rx<T, S> {
                     }
                     let number_added = buffer.len() - initial_length;
                     if number_added > 0 {
-                        if number_added > 0 {
-                            self.inner.semaphore.add_permits(number_added);
-                        }
+                        self.inner.semaphore.add_permits(number_added);
                         coop.made_progress();
                         return Ready(number_added);
                     }

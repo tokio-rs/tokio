@@ -174,17 +174,31 @@ impl<T> UnboundedReceiver<T> {
 
     /// Receives the next values for this receiver and extends `buffer`.
     ///
-    /// This method returns the number of values populated in `buffer`;
-    /// it returns 0 if the channel has been closed and there
-    /// are no remaining messages in the channel.
-    /// If there are no messages in the channel's buffer, but the channel has
+    /// This method returns the number of values populated in `buffer`.
+    ///
+    /// This method returns 0 if the channel has been closed and there are
+    /// no remaining messages in the channel's queue. This indicates that no
+    /// further values can ever be received from this `Receiver`. The channel is
+    /// closed when all senders have been dropped, or when [`close`] is called.
+    ///
+    /// If there are no messages in the channel's queue, but the channel has
     /// not yet been closed, this method will sleep until a message is sent or
     /// the channel is closed.
     ///
-    /// If at the time of the call the buffer has no unused capacity,
-    /// `BLOCK_CAP` additional elements are reserved.
+    /// If at the time of the call `buffer` has no unused capacity,
+    /// additional elements are reserved. Otherwise `recv_many` populates
+    /// `buffer` with no more elements than its unused capacity.
     ///
-    /// # Example:
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// channel.
+    ///
+    /// [`close`]: Self::close
+    ///
+    /// # Examples
     ///
     /// ```
     /// use tokio::sync::mpsc;
@@ -202,6 +216,7 @@ impl<T> UnboundedReceiver<T> {
     ///     assert_eq!(vec!["hello"], buffer);
     ///     assert_eq!(0, rx.recv_many(&mut buffer).await);
     /// }
+    /// ```
     pub async fn recv_many(&mut self, buffer: &mut Vec<T>) -> usize {
         use crate::future::poll_fn;
         poll_fn(|cx| self.chan.recv_many(cx, buffer)).await
