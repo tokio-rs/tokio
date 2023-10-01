@@ -259,7 +259,7 @@ impl<T> Receiver<T> {
     /// channel.
     ///
     /// [`close`]: Self::close
-    /// [`Permits`]: struct@crate::sync::mpsc::Permit///
+    /// [`Permits`]: struct@crate::sync::mpsc::Permit
     ///
     /// # Examples
     ///
