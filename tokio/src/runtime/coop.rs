@@ -196,6 +196,17 @@ cfg_coop! {
         }).unwrap_or(Poll::Ready(RestoreOnPending(Cell::new(Budget::unconstrained()))))
     }
 
+    #[inline]
+    pub(crate) fn try_decrement() {
+        let _ = context::budget(|cell| {
+            let mut budget = cell.get();
+
+            budget.decrement();
+
+            cell.set(budget);
+         });
+    }
+
     cfg_rt! {
         cfg_metrics! {
             #[inline(always)]

@@ -7,7 +7,7 @@ use std::task::Poll;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
 use tokio::net::{UnixListener, UnixStream};
-use tokio_test::{assert_ok, assert_pending, task};
+use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 
 use futures::future::{poll_fn, try_join};
 
@@ -92,6 +92,10 @@ async fn try_read_write() -> std::io::Result<()> {
 
     // Fill the write buffer using non-vectored I/O
     loop {
+        // Still ready
+        let mut writable = task::spawn(client.writable());
+        assert_ready_ok!(writable.poll());
+
         match client.try_write(msg) {
             Ok(n) => written.extend(&msg[..n]),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -129,6 +133,10 @@ async fn try_read_write() -> std::io::Result<()> {
     // Fill the write buffer using vectored I/O
     let msg_bufs: Vec<_> = msg.chunks(3).map(io::IoSlice::new).collect();
     loop {
+        // Still ready
+        let mut writable = task::spawn(client.writable());
+        assert_ready_ok!(writable.poll());
+
         match client.try_write_vectored(&msg_bufs) {
             Ok(n) => written.extend(&msg[..n]),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -321,6 +329,10 @@ async fn try_read_buf() -> std::io::Result<()> {
 
     // Fill the write buffer
     loop {
+        // Still ready
+        let mut writable = task::spawn(client.writable());
+        assert_ready_ok!(writable.poll());
+
         match client.try_write(msg) {
             Ok(n) => written.extend(&msg[..n]),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {

@@ -223,7 +223,11 @@ impl Registration {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.clear_readiness(event);
                 }
-                x => return x,
+                x => {
+                    crate::runtime::coop::try_decrement();
+
+                    return x;
+                }
             }
         }
     }

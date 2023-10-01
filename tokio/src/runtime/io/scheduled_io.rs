@@ -159,6 +159,8 @@ struct Readiness<'a> {
 
     /// Entry in the waiter `LinkedList`.
     waiter: UnsafeCell<Waiter>,
+
+    is_waiter_registered: bool,
 }
 
 enum State {
@@ -429,6 +431,7 @@ impl ScheduledIo {
                 interest,
                 _p: PhantomPinned,
             }),
+            is_waiter_registered: false,
         }
     }
 }
@@ -458,12 +461,45 @@ impl Future for Readiness<'_> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         use std::sync::atomic::Ordering::SeqCst;
 
-        let (scheduled_io, state, waiter) = unsafe {
+        let (scheduled_io, state, waiter, is_waiter_registered) = unsafe {
             let me = self.get_unchecked_mut();
-            (&me.scheduled_io, &mut me.state, &me.waiter)
+            (
+                &me.scheduled_io,
+                &mut me.state,
+                &me.waiter,
+                &mut me.is_waiter_registered,
+            )
         };
 
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        if !crate::runtime::coop::has_budget_remaining() {
+            // Wasn't ready, take the lock (and check again while locked).
+            let mut waiters = scheduled_io.waiters.lock();
+
+            let w = unsafe { &mut *waiter.get() };
+
+            if *is_waiter_registered {
+                // Update the waker, if necessary.
+                if !w.waker.as_ref().unwrap().will_wake(cx.waker()) {
+                    w.waker = Some(cx.waker().clone());
+                }
+            } else {
+                // Safety: called while locked
+                w.waker = Some(cx.waker().clone());
+
+                // Insert the waiter into the linked list
+                //
+                // safety: pointers from `UnsafeCell` are never null.
+                waiters
+                    .list
+                    .push_front(unsafe { NonNull::new_unchecked(waiter.get()) });
+
+                *is_waiter_registered = true;
+            }
+
+            drop(waiters);
+
+            return Poll::Pending;
+        }
 
         loop {
             match *state {
@@ -481,7 +517,6 @@ impl Future for Readiness<'_> {
                         // Currently ready!
                         let tick = TICK.unpack(curr) as u8;
                         *state = State::Done;
-                        coop.made_progress();
                         return Poll::Ready(ReadyEvent {
                             tick,
                             ready,
@@ -506,7 +541,6 @@ impl Future for Readiness<'_> {
                         // Currently ready!
                         let tick = TICK.unpack(curr) as u8;
                         *state = State::Done;
-                        coop.made_progress();
                         return Poll::Ready(ReadyEvent {
                             tick,
                             ready,
@@ -516,17 +550,22 @@ impl Future for Readiness<'_> {
 
                     // Not ready even after locked, insert into list...
 
-                    // Safety: called while locked
-                    unsafe {
-                        (*waiter.get()).waker = Some(cx.waker().clone());
+                    if !*is_waiter_registered {
+                        // Safety: called while locked
+                        unsafe {
+                            (*waiter.get()).waker = Some(cx.waker().clone());
+                        }
+
+                        // Insert the waiter into the linked list
+                        //
+                        // safety: pointers from `UnsafeCell` are never null.
+                        waiters
+                            .list
+                            .push_front(unsafe { NonNull::new_unchecked(waiter.get()) });
+
+                        *is_waiter_registered = true;
                     }
 
-                    // Insert the waiter into the linked list
-                    //
-                    // safety: pointers from `UnsafeCell` are never null.
-                    waiters
-                        .list
-                        .push_front(unsafe { NonNull::new_unchecked(waiter.get()) });
                     *state = State::Waiting;
                 }
                 State::Waiting => {
@@ -576,7 +615,6 @@ impl Future for Readiness<'_> {
                     let curr_ready = Ready::from_usize(READINESS.unpack(curr));
                     let ready = curr_ready.intersection(w.interest);
 
-                    coop.made_progress();
                     return Poll::Ready(ReadyEvent {
                         tick,
                         ready,
