@@ -240,10 +240,11 @@ impl<T> Receiver<T> {
     /// still outstanding [`Permits`] from before it was closed, the channel is
     /// not considered closed by `recv` until the permits are released.
     ///
-    /// This method returns 0 only if the channel has been closed and there are
-    /// no remaining messages in the channel's queue. This indicates that no
-    /// further values can ever be received from this `Receiver`. The channel is
-    /// closed when all senders have been dropped, or when [`close`] is called.
+    /// This method will never return 0 unless the channel has been closed and
+    /// there are no remaining messages in the channel's queue. This indicates
+    /// that no further values can ever be received from this `Receiver`. The
+    /// channel is closed when all senders have been dropped, or when [`close`]
+    /// is called.
     ///
     /// If at the time of the call `buffer` has unused capacity,
     /// `recv_many` extends the buffer with no more elements than

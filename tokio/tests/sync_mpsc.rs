@@ -228,6 +228,90 @@ async fn send_recv_many_unbounded() {
 
 #[tokio::test]
 #[cfg(feature = "full")]
+async fn send_recv_many_bounded_capacity() {
+    let mut expected: Vec<String>;
+    let mut buffer: Vec<String> = Vec::with_capacity(9); // capacity >= 9
+    let (tx, mut rx) = mpsc::channel(100);
+
+    expected = (0..buffer.capacity())
+        .map(|x: usize| format!("{x}"))
+        .collect::<Vec<_>>();
+    for x in expected.clone() {
+        tx.send(x).await.unwrap()
+    }
+    tx.send("one more".to_string()).await.unwrap();
+
+    // With unused buffer capacity, `recv_may` uses as most
+    // the unused capacity -- so "one more" isn't received in
+    // the next call
+    assert_eq!(buffer.capacity(), rx.recv_many(&mut buffer).await);
+    assert_eq!(expected, buffer);
+
+    // The buffer is now full and `recv_many` will reserve capacity
+    // on the next call.
+    assert_eq!(1, rx.recv_many(&mut buffer).await);
+    expected.push("one more".to_string());
+    assert_eq!(expected, buffer);
+
+    tokio::spawn(async move {
+        tx.send("final".to_string()).await.unwrap();
+    });
+
+    // 'tx' is dropped, but `recv_many` is guaranteed not
+    // to return 0 as the channel has outstanding permits
+    assert_eq!(1, rx.recv_many(&mut buffer).await);
+    expected.push("final".to_string());
+    assert_eq!(expected, buffer);
+    // The channel is now closed and `recv_many` returns 0.
+    assert_eq!(0, rx.recv_many(&mut buffer).await);
+    assert_eq!(expected, buffer);
+}
+
+#[tokio::test]
+#[cfg(feature = "full")]
+async fn send_recv_many_unbounded_capacity() {
+    let mut expected: Vec<String>;
+    let mut buffer: Vec<String> = Vec::with_capacity(9); // capacity >= 9
+    let (tx, mut rx) = mpsc::unbounded_channel();
+
+    let initial_capacity = buffer.capacity();
+    expected = (0..initial_capacity)
+        .map(|x: usize| format!("{x}"))
+        .collect::<Vec<_>>();
+    for x in expected.clone() {
+        tx.send(x).unwrap()
+    }
+    tx.send("one more".to_string()).unwrap();
+
+    // With unused buffer capacity, `recv_may` uses as most
+    // the unused capacity -- so "one more" isn't received in
+    // the next call
+    assert_eq!(initial_capacity, buffer.capacity());
+    assert_eq!(buffer.capacity(), rx.recv_many(&mut buffer).await);
+    assert_eq!(expected, buffer);
+
+    // The buffer is now full and `recv_many` will reserve capacity
+    // on the next call.
+    assert_eq!(1, rx.recv_many(&mut buffer).await);
+    expected.push("one more".to_string());
+    assert_eq!(expected, buffer);
+
+    tokio::spawn(async move {
+        tx.send("final".to_string()).unwrap();
+    });
+
+    // 'tx' is dropped, but `recv_many` is guaranteed not
+    // to return 0 as the channel has outstanding permits
+    assert_eq!(1, rx.recv_many(&mut buffer).await);
+    expected.push("final".to_string());
+    assert_eq!(expected, buffer);
+    // The channel is now closed and `recv_many` returns 0.
+    assert_eq!(0, rx.recv_many(&mut buffer).await);
+    assert_eq!(expected, buffer);
+}
+
+#[tokio::test]
+#[cfg(feature = "full")]
 async fn async_send_recv_unbounded() {
     let (tx, mut rx) = mpsc::unbounded_channel();
 
