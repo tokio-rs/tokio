@@ -186,10 +186,11 @@ impl<T> UnboundedReceiver<T> {
     /// channel is closed when all senders have been dropped, or when [`close`]
     /// is called.
     ///
-    /// If at the time of the call `buffer` has unused capacity,
-    /// `recv_many` extends the buffer with no more elements than
-    /// its unused capacity. Should `buffer` have no initial unused
-    /// capacity, additional elements are first reserved.
+    /// If `buffer` has unused capacity, then this call will not reserve
+    /// additional space in `buffer`. This means that the maximum number of
+    /// received messages is `buffer.capacity() - buffer.len()`. However, if
+    /// the capacity is equal to the length, then this call will increase the
+    /// capacity to make space for additional elements.
     ///
     /// # Cancel safety
     ///
