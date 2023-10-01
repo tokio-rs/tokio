@@ -191,7 +191,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv` is used as the event in a
+    /// This method is cancel safe. If `recv_many` is used as the event in a
     /// [`tokio::select!`](crate::select) statement and some other branch
     /// completes first, it is guaranteed that no messages were received on this
     /// channel.
