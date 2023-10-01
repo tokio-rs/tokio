@@ -238,7 +238,7 @@ impl<T> Receiver<T> {
     /// not yet been closed, this method will sleep until a message is sent or
     /// the channel is closed.  Note that if [`close`] is called, but there are
     /// still outstanding [`Permits`] from before it was closed, the channel is
-    /// not considered closed by `recv` until the permits are released.
+    /// not considered closed by `recv_many` until the permits are released.
     ///
     /// This method will never return 0 unless the channel has been closed and
     /// there are no remaining messages in the channel's queue. This indicates
