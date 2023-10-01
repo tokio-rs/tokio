@@ -746,11 +746,33 @@ mod unstable {
 
     #[test]
     fn test_disable_lifo_slot() {
+        use std::sync::mpsc::{channel, RecvTimeoutError};
+
         let rt = runtime::Builder::new_multi_thread()
             .disable_lifo_slot()
             .worker_threads(2)
             .build()
             .unwrap();
+
+        // Spawn a background thread to poke the runtime periodically.
+        //
+        // This is necessary because we may end up triggering the issue in:
+        // <https://github.com/tokio-rs/tokio/issues/4730>
+        //
+        // Spawning a task will wake up the second worker, which will then steal
+        // the task. However, the steal will fail if the task is in the LIFO
+        // slot, because the LIFO slot cannot be stolen.
+        //
+        // Note that this only happens rarely. Most of the time, this thread is
+        // not necessary.
+        let (kill_bg_thread, recv) = channel::<()>();
+        let handle = rt.handle().clone();
+        let bg_thread = std::thread::spawn(move || {
+            let one_sec = std::time::Duration::from_secs(1);
+            while recv.recv_timeout(one_sec) == Err(RecvTimeoutError::Timeout) {
+                handle.spawn(async {});
+            }
+        });
 
         rt.block_on(async {
             tokio::spawn(async {
@@ -760,7 +782,10 @@ mod unstable {
             })
             .await
             .unwrap();
-        })
+        });
+
+        drop(kill_bg_thread);
+        bg_thread.join().unwrap();
     }
 
     #[test]
