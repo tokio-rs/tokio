@@ -174,7 +174,7 @@ impl<T> UnboundedReceiver<T> {
 
     /// Receives the next values for this receiver and extends `buffer`.
     ///
-    /// This method returns the number of values populated in `buffer`.
+    /// This method returns the number of values added to `buffer`.
     ///
     /// This method returns 0 if the channel has been closed and there are
     /// no remaining messages in the channel's queue. This indicates that no
