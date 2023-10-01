@@ -249,8 +249,9 @@ impl<T> Receiver<T> {
     /// If `buffer` has unused capacity, then this call will not reserve
     /// additional space in `buffer`. This means that the maximum number of
     /// received messages is `buffer.capacity() - buffer.len()`. However, if
-    /// the capacity is equal to the length, then this call will increase the
-    /// capacity to make space for additional elements.
+    /// the capacity is equal to the length and there is at least one message
+    /// in the channel's queue, then this call will increase the capacity
+    /// to make space for additional elements.
     ///
     /// # Cancel safety
     ///
@@ -291,7 +292,7 @@ impl<T> Receiver<T> {
     ///     assert_eq!(vec!["first", "second", "third"], buffer);
     ///
     ///     // Once the last sender is dropped, the channel is
-    ///     // closed and `recv_many` returns 0.
+    ///     // closed and `recv_many` returns 0, capacity unchanged.
     ///     drop(tx2);
     ///     assert_eq!(0, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(vec!["first", "second", "third"], buffer);

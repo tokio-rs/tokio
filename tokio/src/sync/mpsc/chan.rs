@@ -297,14 +297,11 @@ impl<T, S: Semaphore> Rx<T, S> {
 
     /// Receives values into `buffer` up to its capacity
     ///
-    /// If the buffer initially has 0 remaining capacity, reserves `super::BLOCK_CAP` elements
+    /// If the buffer 0 remaining capacity but a value is received, reserves `super::BLOCK_CAP` elements
     pub(crate) fn recv_many(&mut self, cx: &mut Context<'_>, buffer: &mut Vec<T>) -> Poll<usize> {
         use super::block::Read;
 
-        if buffer.len() == buffer.capacity() {
-            buffer.reserve(super::BLOCK_CAP);
-        }
-
+        let mut insufficient_capacity = buffer.capacity() == buffer.len();
         let initial_length = buffer.len();
 
         ready!(crate::trace::trace_leaf(cx));
@@ -315,9 +312,13 @@ impl<T, S: Semaphore> Rx<T, S> {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
             macro_rules! try_recv {
                 () => {
-                    while (buffer.len() < buffer.capacity()) {
+                    while (buffer.len() < buffer.capacity() || insufficient_capacity) {
                         match rx_fields.list.pop(&self.inner.tx) {
                             Some(Read::Value(value)) => {
+                                if insufficient_capacity {
+                                    buffer.reserve(super::BLOCK_CAP);
+                                    insufficient_capacity = false;
+                                }
                                 buffer.push(value);
                             }
 
