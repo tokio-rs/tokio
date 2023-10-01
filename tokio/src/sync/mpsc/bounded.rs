@@ -270,25 +270,28 @@ impl<T> Receiver<T> {
     /// async fn main() {
     ///     let mut buffer: Vec<&str> = Vec::with_capacity(2);
     ///     let (tx, mut rx) = mpsc::channel(100);
-    ///     {
-    ///         let tx2 = tx.clone();
-    ///         tx2.send("first").await.unwrap();
-    ///         tx2.send("second").await.unwrap();
-    ///         // Initial capacity ensures both values
-    ///         // can be added to the buffer.
-    ///         assert_eq!(2, rx.recv_many(&mut buffer).await);
-    ///         assert_eq!(vec!["first", "second"], buffer);
-    ///         tokio::spawn(async move {
-    ///             tx.send("third").await.unwrap();
-    ///         });
-    ///         // The 'tx' is dropped, but `recv_many`
-    ///         // is guaranteed not to return 0 as the channel
-    ///         // is not yet closed.  If the buffer is full, the next
-    ///         // call to `recv_many` reserves additional capacity.
-    ///         assert_eq!(1, rx.recv_many(&mut buffer).await);
-    ///         assert_eq!(vec!["first", "second", "third"], buffer);
-    ///     }
-    ///     // The channel is now closed and `recv_many` returns 0.
+    ///     let tx2 = tx.clone();
+    ///     tx2.send("first").await.unwrap();
+    ///     tx2.send("second").await.unwrap();
+    ///     // Initial capacity ensures both values
+    ///     // can be added to the buffer.
+    ///     assert_eq!(2, rx.recv_many(&mut buffer).await);
+    ///     assert_eq!(vec!["first", "second"], buffer);
+    ///
+    ///     tokio::spawn(async move {
+    ///         tx.send("third").await.unwrap();
+    ///     });
+    ///
+    ///     // The 'tx' is dropped, but `recv_many`
+    ///     // is guaranteed not to return 0 as the channel
+    ///     // is not yet closed.  If the buffer is full, the next
+    ///     // call to `recv_many` reserves additional capacity.
+    ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
+    ///     assert_eq!(vec!["first", "second", "third"], buffer);
+    ///
+    ///     // Once the last sender is dropped, the channel is
+    ///     // closed and `recv_many` returns 0.
+    ///     drop(tx2);
     ///     assert_eq!(0, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(vec!["first", "second", "third"], buffer);
     /// }

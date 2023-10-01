@@ -233,7 +233,8 @@ async fn send_recv_many_bounded_capacity() {
     let mut buffer: Vec<String> = Vec::with_capacity(9); // capacity >= 9
     let (tx, mut rx) = mpsc::channel(100);
 
-    expected = (0..buffer.capacity())
+    let initial_capacity = buffer.capacity();
+    expected = (0..initial_capacity)
         .map(|x: usize| format!("{x}"))
         .collect::<Vec<_>>();
     for x in expected.clone() {
@@ -244,6 +245,7 @@ async fn send_recv_many_bounded_capacity() {
     // With unused buffer capacity, `recv_may` uses as most
     // the unused capacity -- so "one more" isn't received in
     // the next call
+    assert_eq!(initial_capacity, buffer.capacity());
     assert_eq!(buffer.capacity(), rx.recv_many(&mut buffer).await);
     assert_eq!(expected, buffer);
 
