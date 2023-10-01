@@ -61,8 +61,7 @@ cfg_not_has_atomic_u64! {
 pub(crate) struct OwnedTasks<S: 'static> {
     lists: Box<[Mutex<ListSement<S>>]>,
     pub(crate) id: NonZeroU64,
-    closing: AtomicBool,
-    shutdown: AtomicBool,
+    closed: AtomicBool,
     segment_mask: u32,
     count: AtomicUsize,
 }
@@ -94,8 +93,7 @@ impl<S: 'static> OwnedTasks<S> {
         }
         Self {
             lists: lists.into_boxed_slice(),
-            closing: AtomicBool::new(false),
-            shutdown: AtomicBool::new(false),
+            closed: AtomicBool::new(false),
             id: get_next_id(),
             segment_mask,
             count: AtomicUsize::new(0),
@@ -144,7 +142,7 @@ impl<S: 'static> OwnedTasks<S> {
 
         // check close flag,
         // it must be checked in the lock, for ensuring all tasks will shutdown after OwnedTasks has been closed
-        if self.closing.load(Ordering::Acquire) {
+        if self.closed.load(Ordering::Acquire) {
             drop(lock);
             task.shutdown();
             return None;
@@ -178,7 +176,7 @@ impl<S: 'static> OwnedTasks<S> {
     where
         S: Schedule,
     {
-        self.closing.store(true, Ordering::Release);
+        self.closed.store(true, Ordering::Release);
         for i in start..self.get_segment_size() + start {
             loop {
                 let mut lock = self.segment_inner(i);
@@ -189,11 +187,9 @@ impl<S: 'static> OwnedTasks<S> {
                         task.shutdown();
                     }
                     None => break,
-                };
+                }
             }
         }
-        // we have shut down all tasks
-        self.shutdown.store(true, Ordering::Release)
     }
 
     #[inline]
@@ -231,10 +227,6 @@ impl<S: 'static> OwnedTasks<S> {
     #[inline]
     fn segment_inner(&self, id: usize) -> MutexGuard<'_, ListSement<S>> {
         self.lists[id & (self.segment_mask) as usize].lock()
-    }
-
-    pub(crate) fn is_shutdown(&self) -> bool {
-        self.shutdown.load(Ordering::Acquire)
     }
 
     pub(crate) fn is_empty(&self) -> bool {

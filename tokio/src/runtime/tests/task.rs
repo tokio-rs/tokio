@@ -315,7 +315,6 @@ impl Runtime {
         }
 
         drop(core);
-        assert!(self.0.owned.is_shutdown());
         assert!(self.0.owned.is_empty());
     }
 }
