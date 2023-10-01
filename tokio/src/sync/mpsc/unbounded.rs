@@ -212,8 +212,8 @@ impl<T> UnboundedReceiver<T> {
     ///         let tx2 = tx.clone();
     ///         tx2.send("first").unwrap();
     ///         tx2.send("second").unwrap();
-    ///         // Initial capacity allows up to 2 values
-    ///         // to be added to the buffer.
+    ///         // Initial capacity ensures both values
+    ///         // can be added to the buffer.
     ///         assert_eq!(2, rx.recv_many(&mut buffer).await);
     ///         assert_eq!(vec!["first", "second"], buffer);
     ///         tokio::spawn(async move {
@@ -221,13 +221,12 @@ impl<T> UnboundedReceiver<T> {
     ///         });
     ///         // The 'tx' is dropped, but `recv_many`
     ///         // is guaranteed not to return 0 as the channel
-    ///         // is not yet closed.  With the buffer full, the next
+    ///         // is not yet closed.  If the buffer is full, the next
     ///         // call to `recv_many` reserves additional capacity.
     ///         assert_eq!(1, rx.recv_many(&mut buffer).await);
     ///         assert_eq!(vec!["first", "second", "third"], buffer);
     ///     }
-    ///     // The channel is now closed and `recv_many` returns 0;
-    ///     // the buffer is unchanged.
+    ///     // The channel is now closed and `recv_many` returns 0.
     ///     assert_eq!(0, rx.recv_many(&mut buffer).await);
     ///     assert_eq!(vec!["first", "second", "third"], buffer);
     /// }
