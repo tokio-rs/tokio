@@ -85,10 +85,3 @@ harness = false
 name = "time_now"
 path = "time_now.rs"
 harness = false
-
-[[bench]]
-name = "spawn_concurrent"
-path = "spawn_concurrent.rs"
-harness = false
-
-
