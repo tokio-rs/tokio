@@ -93,7 +93,7 @@ fn contention_bounded_recv_many(g: &mut BenchmarkGroup<WallTime>) {
                 let mut buffer = Vec::<usize>::with_capacity(5_000);
                 let mut total = 0;
                 while total < 1_000 * 5 {
-                    total += rx.recv_many(&mut buffer).await;
+                    total += rx.recv_many(&mut buffer, 5_000).await;
                 }
             })
         })
@@ -145,7 +145,7 @@ fn contention_bounded_full_recv_many(g: &mut BenchmarkGroup<WallTime>) {
                 let mut buffer = Vec::<usize>::with_capacity(5_000);
                 let mut total = 0;
                 while total < 1_000 * 5 {
-                    total += rx.recv_many(&mut buffer).await;
+                    total += rx.recv_many(&mut buffer, 5_000).await;
                 }
             })
         })
@@ -197,7 +197,7 @@ fn contention_unbounded_recv_many(g: &mut BenchmarkGroup<WallTime>) {
                 let mut buffer = Vec::<usize>::with_capacity(5_000);
                 let mut total = 0;
                 while total < 1_000 * 5 {
-                    total += rx.recv_many(&mut buffer).await;
+                    total += rx.recv_many(&mut buffer, 5_000).await;
                 }
             })
         })
@@ -239,7 +239,7 @@ fn uncontented_bounded_recv_many(g: &mut BenchmarkGroup<WallTime>) {
                 let mut buffer = Vec::<usize>::with_capacity(5_000);
                 let mut total = 0;
                 while total < 1_000 * 5 {
-                    total += rx.recv_many(&mut buffer).await;
+                    total += rx.recv_many(&mut buffer, 5_000).await;
                 }
             })
         })
@@ -281,7 +281,7 @@ fn uncontented_unbounded_recv_many(g: &mut BenchmarkGroup<WallTime>) {
                 let mut buffer = Vec::<usize>::with_capacity(5_000);
                 let mut total = 0;
                 while total < 1_000 * 5 {
-                    total += rx.recv_many(&mut buffer).await;
+                    total += rx.recv_many(&mut buffer, 5_000).await;
                 }
             })
         })

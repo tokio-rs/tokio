@@ -232,7 +232,10 @@ impl<T> Receiver<T> {
 
     /// Receives the next values for this receiver and extends `buffer`.
     ///
-    /// This method returns the number of values added to `buffer`.
+    /// This method extends `buffer` by no more than a fixed number
+    /// of values as specified by `limit`.  If `limit` is zero,
+    /// then a default is used. The return value is the number
+    /// of values added to `buffer`.
     ///
     /// If there are no messages in the channel's queue, but the channel has
     /// not yet been closed, this method will sleep until a message is sent or
@@ -246,12 +249,7 @@ impl<T> Receiver<T> {
     /// channel is closed when all senders have been dropped, or when [`close`]
     /// is called.
     ///
-    /// If `buffer` has unused capacity, then this call will not reserve
-    /// additional space in `buffer`. This means that the maximum number of
-    /// received messages is `buffer.capacity() - buffer.len()`. However, if
-    /// the capacity is equal to the length and there is at least one message
-    /// in the channel's queue, then this call will increase the capacity
-    /// to make space for additional elements.
+    /// The capacity of `buffer` is increased as needed.
     ///
     /// # Cancel safety
     ///
@@ -271,36 +269,41 @@ impl<T> Receiver<T> {
     /// #[tokio::main]
     /// async fn main() {
     ///     let mut buffer: Vec<&str> = Vec::with_capacity(2);
+    ///     let limit = 2;
     ///     let (tx, mut rx) = mpsc::channel(100);
     ///     let tx2 = tx.clone();
     ///     tx2.send("first").await.unwrap();
     ///     tx2.send("second").await.unwrap();
-    ///     // Initial capacity ensures both values
-    ///     // can be added to the buffer.
-    ///     assert_eq!(2, rx.recv_many(&mut buffer).await);
+    ///     tx2.send("third").await.unwrap();
+    ///
+    ///     // Call `recv_many` to receive up to `limit` (2) values.
+    ///     assert_eq!(2, rx.recv_many(&mut buffer, limit).await);
     ///     assert_eq!(vec!["first", "second"], buffer);
     ///
+    ///     // If the buffer is full, the next call to `recv_many`
+    ///     // reserves additional capacity.
+    ///     assert_eq!(1, rx.recv_many(&mut buffer, 1).await);
+    ///
     ///     tokio::spawn(async move {
-    ///         tx.send("third").await.unwrap();
+    ///         tx.send("fourth").await.unwrap();
     ///     });
     ///
-    ///     // The 'tx' is dropped, but `recv_many`
+    ///     // 'tx' is dropped, but `recv_many`
     ///     // is guaranteed not to return 0 as the channel
-    ///     // is not yet closed.  If the buffer is full, the next
-    ///     // call to `recv_many` reserves additional capacity.
-    ///     assert_eq!(1, rx.recv_many(&mut buffer).await);
-    ///     assert_eq!(vec!["first", "second", "third"], buffer);
+    ///     // is not yet closed.
+    ///     assert_eq!(1, rx.recv_many(&mut buffer, 1).await);
+    ///     assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
     ///
     ///     // Once the last sender is dropped, the channel is
     ///     // closed and `recv_many` returns 0, capacity unchanged.
     ///     drop(tx2);
-    ///     assert_eq!(0, rx.recv_many(&mut buffer).await);
-    ///     assert_eq!(vec!["first", "second", "third"], buffer);
+    ///     assert_eq!(0, rx.recv_many(&mut buffer, limit).await);
+    ///     assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
     /// }
     /// ```
-    pub async fn recv_many(&mut self, buffer: &mut Vec<T>) -> usize {
+    pub async fn recv_many(&mut self, buffer: &mut Vec<T>, limit: usize) -> usize {
         use crate::future::poll_fn;
-        poll_fn(|cx| self.chan.recv_many(cx, buffer)).await
+        poll_fn(|cx| self.chan.recv_many(cx, buffer, limit)).await
     }
 
     /// Tries to receive the next value for this receiver.

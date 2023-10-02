@@ -131,10 +131,11 @@ async fn async_send_recv_many_with_buffer() {
         assert_ok!(tx.send(7).await);
     });
 
+    let limit = 3;
     let mut buffer = Vec::<i32>::with_capacity(3);
     let mut recv_count = 0usize;
     while recv_count < 3 {
-        let n = rx.recv_many(&mut buffer).await;
+        let n = rx.recv_many(&mut buffer, limit).await;
         recv_count += n;
         assert_eq!(buffer.len(), recv_count);
         assert!(buffer.iter().sum::<i32>() <= 10);
@@ -205,36 +206,51 @@ async fn send_recv_unbounded() {
 async fn send_recv_many_unbounded() {
     let (tx, mut rx) = mpsc::unbounded_channel::<i32>();
 
-    // Using `try_send`
     assert_ok!(tx.send(7));
     assert_ok!(tx.send(13));
     assert_ok!(tx.send(100));
     assert_ok!(tx.send(1002));
 
-    let mut buffer: Vec<i32> = Vec::with_capacity(0);
+    let mut buffer: Vec<i32> = Vec::new();
     let mut count = 0;
     while count < 4 {
-        count += rx.recv_many(&mut buffer).await;
+        count += rx.recv_many(&mut buffer, 0).await;
     }
     assert_eq!(count, 4);
-    assert_eq!(count, buffer.len());
-    assert_eq!(buffer.iter().sum::<i32>(), 1122);
-    assert!(buffer.capacity() > 0);
+    assert_eq!(vec![7, 13, 100, 1002], buffer);
+    let final_capacity = buffer.capacity();
+    assert!(final_capacity > 0);
+
+    buffer.clear();
+
+    assert_ok!(tx.send(5));
+    assert_ok!(tx.send(6));
+    assert_ok!(tx.send(7));
+    assert_ok!(tx.send(2));
+
+    count = rx.recv_many(&mut buffer, 4).await;
+
+    assert_eq!(final_capacity, buffer.capacity());
+    assert_eq!(count, 4);
+    assert_eq!(vec![5, 6, 7, 2], buffer);
 
     drop(tx);
 
+    // recv_many will immediately return zero if the channel
+    // is closed and no more messages are waiting
+    assert_eq!(0, rx.recv_many(&mut buffer, 4).await);
+    assert_eq!(0, rx.recv_many(&mut buffer, 4).await);
     assert!(rx.recv().await.is_none());
 }
 
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn send_recv_many_bounded_capacity() {
-    let mut expected: Vec<String>;
-    let mut buffer: Vec<String> = Vec::with_capacity(9); // capacity >= 9
+    let mut buffer: Vec<String> = Vec::with_capacity(9);
+    let limit = buffer.capacity();
     let (tx, mut rx) = mpsc::channel(100);
 
-    let initial_capacity = buffer.capacity();
-    expected = (0..initial_capacity)
+    let mut expected: Vec<String> = (0..limit)
         .map(|x: usize| format!("{x}"))
         .collect::<Vec<_>>();
     for x in expected.clone() {
@@ -242,16 +258,16 @@ async fn send_recv_many_bounded_capacity() {
     }
     tx.send("one more".to_string()).await.unwrap();
 
-    // With unused buffer capacity, `recv_may` uses as most
-    // the unused capacity -- so "one more" isn't received in
-    // the next call
-    assert_eq!(initial_capacity, buffer.capacity());
-    assert_eq!(buffer.capacity(), rx.recv_many(&mut buffer).await);
+    // Here `recv_may` receives all but the last value;
+    // the initial capacity is adequate, so the buffer does
+    // not increase in side.
+    assert_eq!(buffer.capacity(), rx.recv_many(&mut buffer, limit).await);
     assert_eq!(expected, buffer);
+    assert_eq!(limit, buffer.capacity());
 
-    // The buffer is now full and `recv_many` will reserve capacity
-    // on the next call.
-    assert_eq!(1, rx.recv_many(&mut buffer).await);
+    // Receive up more values:
+    assert_eq!(1, rx.recv_many(&mut buffer, limit).await);
+    assert!(buffer.capacity() > limit);
     expected.push("one more".to_string());
     assert_eq!(expected, buffer);
 
@@ -261,23 +277,22 @@ async fn send_recv_many_bounded_capacity() {
 
     // 'tx' is dropped, but `recv_many` is guaranteed not
     // to return 0 as the channel has outstanding permits
-    assert_eq!(1, rx.recv_many(&mut buffer).await);
+    assert_eq!(1, rx.recv_many(&mut buffer, limit).await);
     expected.push("final".to_string());
     assert_eq!(expected, buffer);
     // The channel is now closed and `recv_many` returns 0.
-    assert_eq!(0, rx.recv_many(&mut buffer).await);
+    assert_eq!(0, rx.recv_many(&mut buffer, limit).await);
     assert_eq!(expected, buffer);
 }
 
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn send_recv_many_unbounded_capacity() {
-    let mut expected: Vec<String>;
     let mut buffer: Vec<String> = Vec::with_capacity(9); // capacity >= 9
+    let limit = buffer.capacity();
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let initial_capacity = buffer.capacity();
-    expected = (0..initial_capacity)
+    let mut expected: Vec<String> = (0..limit)
         .map(|x: usize| format!("{x}"))
         .collect::<Vec<_>>();
     for x in expected.clone() {
@@ -285,16 +300,16 @@ async fn send_recv_many_unbounded_capacity() {
     }
     tx.send("one more".to_string()).unwrap();
 
-    // With unused buffer capacity, `recv_may` uses as most
-    // the unused capacity -- so "one more" isn't received in
-    // the next call
-    assert_eq!(initial_capacity, buffer.capacity());
-    assert_eq!(buffer.capacity(), rx.recv_many(&mut buffer).await);
+    // Here `recv_may` receives all but the last value;
+    // the initial capacity is adequate, so the buffer does
+    // not increase in side.
+    assert_eq!(buffer.capacity(), rx.recv_many(&mut buffer, limit).await);
     assert_eq!(expected, buffer);
+    assert_eq!(limit, buffer.capacity());
 
-    // The buffer is now full and `recv_many` will reserve capacity
-    // on the next call.
-    assert_eq!(1, rx.recv_many(&mut buffer).await);
+    // Receive up more values:
+    assert_eq!(1, rx.recv_many(&mut buffer, limit).await);
+    assert!(buffer.capacity() > limit);
     expected.push("one more".to_string());
     assert_eq!(expected, buffer);
 
@@ -304,11 +319,11 @@ async fn send_recv_many_unbounded_capacity() {
 
     // 'tx' is dropped, but `recv_many` is guaranteed not
     // to return 0 as the channel has outstanding permits
-    assert_eq!(1, rx.recv_many(&mut buffer).await);
+    assert_eq!(1, rx.recv_many(&mut buffer, limit).await);
     expected.push("final".to_string());
     assert_eq!(expected, buffer);
     // The channel is now closed and `recv_many` returns 0.
-    assert_eq!(0, rx.recv_many(&mut buffer).await);
+    assert_eq!(0, rx.recv_many(&mut buffer, limit).await);
     assert_eq!(expected, buffer);
 }
 
