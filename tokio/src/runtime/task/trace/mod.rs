@@ -278,24 +278,8 @@ pub(in crate::runtime) fn trace_current_thread(
         drop(task);
     }
 
-    // notify each task
-    let mut tasks = vec![];
-    owned.for_each(|task| {
-        // set the notified bit
-        task.as_raw().state().transition_to_notified_for_tracing();
-        // store the raw tasks into a vec
-        tasks.push(task.as_raw());
-        // do NOT poll `task` here, since we hold a lock on `owned` and the task
-        // may complete and need to remove itself from `owned`.
-    });
-
-    tasks
-        .into_iter()
-        .map(|task| {
-            let ((), trace) = Trace::capture(|| task.poll());
-            trace
-        })
-        .collect()
+    // precondition: We have drained the tasks from the injection queue.
+    trace_owned(owned)
 }
 
 cfg_rt_multi_thread! {
@@ -328,24 +312,35 @@ cfg_rt_multi_thread! {
 
         drop(synced);
 
-        // notify each task
-        let mut tasks = vec![];
-        owned.for_each(|task| {
-            // set the notified bit
-            task.as_raw().state().transition_to_notified_for_tracing();
-            // store the raw tasks into a vec
-            tasks.push(task.as_raw());
-            // do NOT poll `task` here, since we hold a lock on `owned` and the task
-            // may complete and need to remove itself from `owned`.
-        });
-
-        tasks
-            .into_iter()
-            .map(|task| {
-                // trace the task
-                let ((), trace) = Trace::capture(|| task.poll());
-                trace
-            })
-            .collect()
+        // precondition: we have drained the tasks from the local and injection
+        // queues.
+        trace_owned(owned)
     }
+}
+
+/// Trace the `OwnedTasks`.
+///
+/// # Preconditions
+///
+/// This helper presumes exclusive access to each task. The tasks must not exist
+/// in any other queue.
+fn trace_owned<S>(owned: &OwnedTasks<Arc<S>>) -> Vec<Trace> {
+    // notify each task
+    let mut tasks = vec![];
+    owned.for_each(|task| {
+        // set the notified bit
+        task.as_raw().state().transition_to_notified_for_tracing();
+        // store the tasks into a vec
+        tasks.push(task.clone());
+        // do NOT poll `task` here, since we hold a lock on `owned` and the task
+        // may complete and need to remove itself from `owned`.
+    });
+
+    tasks
+        .into_iter()
+        .map(|task| {
+            let ((), trace) = Trace::capture(|| task.as_raw().poll());
+            trace
+        })
+        .collect()
 }
