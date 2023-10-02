@@ -307,7 +307,7 @@ impl<T, S: Semaphore> Rx<T, S> {
     ) -> Poll<usize> {
         use super::block::Read;
 
-        let mut to_go = if limit > 0 { limit } else { super::BLOCK_CAP };
+        let mut remaining = if limit > 0 { limit } else { super::BLOCK_CAP };
         let initial_length = buffer.len();
 
         ready!(crate::trace::trace_leaf(cx));
@@ -318,10 +318,10 @@ impl<T, S: Semaphore> Rx<T, S> {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
             macro_rules! try_recv {
                 () => {
-                    while (to_go > 0) {
+                    while (remaining > 0) {
                         match rx_fields.list.pop(&self.inner.tx) {
                             Some(Read::Value(value)) => {
-                                to_go = to_go - 1;
+                                remaining -= 1;
                                 buffer.push(value);
                             }
 
