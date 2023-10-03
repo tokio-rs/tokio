@@ -476,7 +476,7 @@ unsafe impl<T: Send> Sync for Receiver<T> {}
 impl<T> Sender<T> {
     /// Creates the sending-half of the [`broadcast`] channel.
     ///
-    /// See documentation of [`broadcast::channel`] for more information on this method.
+    /// See the documentation of [`broadcast::channel`] for more information on this method.
     ///
     /// [`broadcast`]: crate::sync::broadcast
     /// [`broadcast::channel`]: crate::sync::broadcast
