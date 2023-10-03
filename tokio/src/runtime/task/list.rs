@@ -226,7 +226,12 @@ impl<S: 'static> OwnedTasks<S> {
 
     #[inline]
     fn segment_inner(&self, id: usize) -> MutexGuard<'_, ListSement<S>> {
-        self.lists[id & (self.segment_mask) as usize].lock()
+        // Safety: this modulo operation ensures it is safe here.
+        unsafe {
+            self.lists
+                .get_unchecked(id & (self.segment_mask) as usize)
+                .lock()
+        }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
