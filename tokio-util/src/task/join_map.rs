@@ -626,6 +626,19 @@ where
         }
     }
 
+    /// Returns an iterator visiting all keys in this `JoinMap` in arbitrary order.
+    /// If a task has completed, but its output hasn't yet been consumed by a
+    /// call to [`join_next`], this method will still return its key.
+    ///
+    /// [`join_next`]: fn@Self::join_next
+    pub fn keys<Q: ?Sized>(&self) -> impl Iterator<Item = &K>
+    where
+        Q: Hash,
+        K: Borrow<Q>,
+    {
+        self.tasks_by_key.keys().map(|key| &key.key)
+    }
+
     /// Returns `true` if this `JoinMap` contains a task for the provided key.
     ///
     /// If the task has completed, but its output hasn't yet been consumed by a
