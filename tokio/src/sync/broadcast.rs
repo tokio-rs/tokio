@@ -407,6 +407,8 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 /// Create a bounded, multi-producer, multi-consumer channel where each sent
 /// value is broadcasted to all active receivers.
 ///
+/// **Note:** The actual capacity may be greater than the provided `capacity`.
+///
 /// All data sent on [`Sender`] will become available on every active
 /// [`Receiver`] in the same order as it was sent.
 ///
@@ -474,7 +476,7 @@ unsafe impl<T: Send> Sync for Receiver<T> {}
 impl<T> Sender<T> {
     /// Creates the sending-half of the [`broadcast`] channel.
     ///
-    /// See documentation of [`broadcast::channel`] for errors when calling this function.
+    /// See the documentation of [`broadcast::channel`] for more information on this method.
     ///
     /// [`broadcast`]: crate::sync::broadcast
     /// [`broadcast::channel`]: crate::sync::broadcast

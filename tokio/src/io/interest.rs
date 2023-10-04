@@ -163,6 +163,7 @@ impl Interest {
     ///
     /// assert!(BOTH.is_readable());
     /// assert!(BOTH.is_writable());
+    #[must_use = "this returns the result of the operation, without modifying the original"]
     pub const fn add(self, other: Interest) -> Interest {
         Self(self.0 | other.0)
     }
