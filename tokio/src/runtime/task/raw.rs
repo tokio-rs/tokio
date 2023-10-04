@@ -236,7 +236,8 @@ impl RawTask {
 
     /// Increment the task's reference count.
     ///
-    /// Currently, this is used only when creating an `AbortHandle`.
+    /// Currently, this is used only when creating an `AbortHandle`,
+    /// and when cloning a `Task`.
     pub(super) fn ref_inc(self) {
         self.header().state.ref_inc();
     }

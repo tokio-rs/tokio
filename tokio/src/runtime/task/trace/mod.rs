@@ -18,7 +18,7 @@ mod tree;
 use symbol::Symbol;
 use tree::Tree;
 
-use super::{Notified, OwnedTasks};
+use super::{Notified, OwnedTasks, Schedule};
 
 type Backtrace = Vec<BacktraceFrame>;
 type SymbolTrace = Vec<Symbol>;
@@ -324,22 +324,21 @@ cfg_rt_multi_thread! {
 ///
 /// This helper presumes exclusive access to each task. The tasks must not exist
 /// in any other queue.
-fn trace_owned<S>(owned: &OwnedTasks<Arc<S>>) -> Vec<Trace> {
+fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>) -> Vec<Trace> {
     // notify each task
     let mut tasks = vec![];
     owned.for_each(|task| {
-        // set the notified bit
-        task.as_raw().state().transition_to_notified_for_tracing();
-        // store the tasks into a vec
-        tasks.push(task.clone());
-        // do NOT poll `task` here, since we hold a lock on `owned` and the task
+        // notify the task (and thus make it poll-able) and stash it
+        tasks.push(task.notify_for_tracing());
+        // we do not poll it here since we hold a lock on `owned` and the task
         // may complete and need to remove itself from `owned`.
     });
 
     tasks
         .into_iter()
         .map(|task| {
-            let ((), trace) = Trace::capture(|| task.as_raw().poll());
+            let local_notified = owned.assert_owner(task);
+            let ((), trace) = Trace::capture(|| local_notified.run());
             trace
         })
         .collect()
