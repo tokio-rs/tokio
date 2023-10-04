@@ -394,7 +394,9 @@ const REMOTE_FIRST_INTERVAL: u8 = 31;
 pub struct LocalEnterGuard {
     ctx: Option<Rc<Context>>,
 
-    /// Distinguishes whether the context was entered or polled.
+    /// Distinguishes whether the context was entered or being polled.
+    /// When we enter it, the value `entered` is set. In this case
+    /// `spawn_local` refers the context, whereas it is not being polled now.
     entered: bool,
 }
 
@@ -975,6 +977,9 @@ impl Shared {
     fn schedule(&self, task: task::Notified<Arc<Self>>) {
         CURRENT.with(|localdata| {
             match localdata.ctx.get() {
+                // If the current `LocalSet` is being polled, we don't need to wake it.
+                // When we `enter` it, then the value `entered` is set to be true.
+                // In this case it is not being polled, so we need to wake it.
                 Some(cx) if cx.shared.ptr_eq(self) && !localdata.entered.get() => unsafe {
                     // Safety: if the current `LocalSet` context points to this
                     // `LocalSet`, then we are on the thread that owns it.
