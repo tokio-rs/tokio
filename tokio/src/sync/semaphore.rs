@@ -292,8 +292,11 @@ use std::sync::Arc;
 ///
 ///     async fn acquire(&self) {
 ///         // This can return an error if the semaphore is closed, but we
-///         // never close it, so just ignore errors.
-///         let _ = self.sem.acquire().await;
+///         // never close it, so this error can never happen.
+///         let permit = self.sem.acquire().await.unwrap();
+///         // To avoid releasing the permit back to the semaphore, we use
+///         // the `Permit::forget` method.
+///         permit.forget();
 ///     }
 /// }
 ///
