@@ -125,16 +125,21 @@ use std::sync::Arc;
 ///
 /// ## Prevent tests from running in parallel
 ///
-/// By default, Rust runs tests in the same file in parallel. However, in some cases, running two tests in parallel may lead to problems.
-/// For example, this can happen when tests use the same database.
+/// By default, Rust runs tests in the same file in parallel. However, in some
+/// cases, running two tests in parallel may lead to problems. For example, this
+/// can happen when tests use the same database.
 ///
 /// Consider the following scenario:
-/// 1. `test_insert`: Inserts a key-value pair into the database, then retrieves the value using the same key to verify the insertion.
-/// 2. `test_update`: Inserts a key, then updates the key to a new value and verifies that the value has been accurately updated.
-/// 3. `test_others`: A third test that doesn't modify the database state. It can run in parallel with the other tests.
+/// 1. `test_insert`: Inserts a key-value pair into the database, then retrieves
+///    the value using the same key to verify the insertion.
+/// 2. `test_update`: Inserts a key, then updates the key to a new value and
+///    verifies that the value has been accurately updated.
+/// 3. `test_others`: A third test that doesn't modify the database state. It
+///    can run in parallel with the other tests.
 ///
-/// In this example, `test_insert` and `test_update` need to run in sequence to work, but it doesn't matter which test runs first.
-/// We can leverage a semaphore with a single permit to address this challenge.
+/// In this example, `test_insert` and `test_update` need to run in sequence to
+/// work, but it doesn't matter which test runs first. We can leverage a
+/// semaphore with a single permit to address this challenge.
 ///
 /// ```
 /// # use tokio::sync::Mutex;
