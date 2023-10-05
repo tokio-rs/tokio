@@ -47,7 +47,7 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
-/// ## Limit the number of simultaneously opened files in your program.
+/// ## Limit the number of simultaneously opened files in your program
 ///
 /// Most operating systems have limits on the number of open file
 /// handles. Even in systems without explicit limits, resource constraints
@@ -76,7 +76,7 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
-/// ## Limit the number of incoming requests being handled at the same time.
+/// ## Limit the number of incoming requests being handled at the same time
 ///
 /// Similar to limiting the number of simultaneously opened files, network handles
 /// are a limited resource. Allowing an unbounded amount of requests to be processed
@@ -137,7 +137,6 @@ use std::sync::Arc;
 /// We can leverage a semaphore with a single permit to address this challenge.
 ///
 /// ```
-/// use tokio::sync::Semaphore;
 /// # use tokio::sync::Mutex;
 /// # use std::collections::BTreeMap;
 /// # struct Database {
@@ -164,6 +163,7 @@ use std::sync::Arc;
 /// #        *self.map.lock().await.get(key).unwrap()
 /// #    }
 /// # }
+/// use tokio::sync::Semaphore;
 ///
 /// // Initialize a static semaphore with only one permit, which is used to
 /// // prevent test_insert and test_update from running in parallel.
@@ -173,7 +173,7 @@ use std::sync::Arc;
 /// static DB: Database = Database::setup();
 ///
 /// #[tokio::test]
-/// # async fn fake_test() {}
+/// # async fn fake_test_insert() {}
 /// async fn test_insert() {
 ///     // Acquire permit before proceeding. Since the semaphore has only one permit,
 ///     // the test will wait if the permit is already acquired by other tests.
@@ -196,7 +196,7 @@ use std::sync::Arc;
 /// }
 ///
 /// #[tokio::test]
-/// # async fn fake_test() {}
+/// # async fn fake_test_update() {}
 /// async fn test_update() {
 ///     // Acquire permit before proceeding. Since the semaphore has only one permit,
 ///     // the test will wait if the permit is already acquired by other tests.
@@ -221,12 +221,12 @@ use std::sync::Arc;
 /// }
 ///
 /// #[tokio::test]
-/// # async fn fake_test() {}
+/// # async fn fake_test_others() {}
 /// async fn test_others() {
 ///     // This test can run in parallel with test_insert and test_update,
 ///     // so it does not use PERMIT.
 /// }
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() {
 /// #   test_insert().await;
 /// #   test_update().await;
