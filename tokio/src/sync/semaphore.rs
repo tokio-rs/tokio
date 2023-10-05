@@ -304,7 +304,7 @@ use std::sync::Arc;
 ///         // never close it, so this error can never happen.
 ///         let permit = self.sem.acquire().await.unwrap();
 ///         // To avoid releasing the permit back to the semaphore, we use
-///         // the `Permit::forget` method.
+///         // the `SemaphorePermit::forget` method.
 ///         permit.forget();
 ///     }
 /// }
