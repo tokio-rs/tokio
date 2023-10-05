@@ -241,6 +241,8 @@ use std::sync::Arc;
 ///
 /// ## Rate limiting using a token bucket
 ///
+/// This example showcases the [`add_permits`] and [`SemaphorePermit::forget`] methods.
+///
 /// Many applications and systems have constraints on the rate at which certain
 /// operations should occur. Exceeding this rate can result in suboptimal
 /// performance or even errors.
@@ -261,6 +263,8 @@ use std::sync::Arc;
 /// lot of cpu constantly looping and sleeping.
 ///
 /// [token bucket]: https://en.wikipedia.org/wiki/Token_bucket
+/// [`add_permits`]: crate::sync::Semaphore::add_permits
+/// [`SemaphorePermit::forget`]: crate::sync::SemaphorePermit::forget
 /// ```
 /// use std::sync::Arc;
 /// use tokio::sync::Semaphore;
