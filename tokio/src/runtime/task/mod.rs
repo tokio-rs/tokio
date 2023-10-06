@@ -452,16 +452,6 @@ impl<S: Schedule> UnownedTask<S> {
     }
 }
 
-impl<S: 'static> Clone for Task<S> {
-    fn clone(&self) -> Task<S> {
-        // SAFETY: We increment the ref count.
-        unsafe {
-            self.raw.ref_inc();
-            Task::new(self.raw)
-        }
-    }
-}
-
 impl<S: 'static> Drop for Task<S> {
     fn drop(&mut self) {
         // Decrement the ref count
