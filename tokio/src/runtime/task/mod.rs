@@ -361,6 +361,14 @@ impl<S: 'static> Task<S> {
     fn header_ptr(&self) -> NonNull<Header> {
         self.raw.header_ptr()
     }
+
+    cfg_taskdump! {
+        pub(super) fn notify_for_tracing(&self) -> Notified<S> {
+            self.as_raw().state().transition_to_notified_for_tracing();
+            // SAFETY: `transition_to_notified_for_tracing` increments the refcount.
+            unsafe { Notified(Task::new(self.raw)) }
+        }
+    }
 }
 
 impl<S: 'static> Notified<S> {
