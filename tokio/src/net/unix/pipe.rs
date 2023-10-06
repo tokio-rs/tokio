@@ -22,13 +22,12 @@ cfg_io_util! {
 /// Generally speaking, when using `OpenOptions`, you'll first call [`new`],
 /// then chain calls to methods to set each option, then call either
 /// [`open_receiver`] or [`open_sender`], passing the path of the FIFO file you
-/// are trying to open. This will give you a [`io::Result`][result] with a pipe
-/// end inside that you can further operate on.
+/// are trying to open. This will give you a [`io::Result`] with a pipe end
+/// inside that you can further operate on.
 ///
 /// [`new`]: OpenOptions::new
 /// [`open_receiver`]: OpenOptions::open_receiver
 /// [`open_sender`]: OpenOptions::open_sender
-/// [result]: std::io::Result
 ///
 /// # Examples
 ///
