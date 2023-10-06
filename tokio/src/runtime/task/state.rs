@@ -281,6 +281,7 @@ impl State {
     pub(super) fn transition_to_notified_for_tracing(&self) {
         self.fetch_update_action(|mut snapshot| {
             snapshot.set_notified();
+            snapshot.ref_inc();
             ((), Some(snapshot))
         });
     }

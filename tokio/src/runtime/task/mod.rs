@@ -363,9 +363,10 @@ impl<S: 'static> Task<S> {
     }
 
     cfg_taskdump! {
-        pub(super) fn notify_for_tracing(self) -> Notified<S> {
+        pub(super) fn notify_for_tracing(&self) -> Notified<S> {
             self.as_raw().state().transition_to_notified_for_tracing();
-            Notified(self)
+            // SAFETY: `transition_to_notified_for_tracing` increments the refcount.
+            unsafe { Notified(Task::new(self.raw)) }
         }
     }
 }
