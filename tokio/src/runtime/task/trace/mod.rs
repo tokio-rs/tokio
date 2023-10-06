@@ -329,7 +329,7 @@ fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>) -> Vec<Trace> {
     let mut tasks = vec![];
     owned.for_each(|task| {
         // notify the task (and thus make it poll-able) and stash it
-        tasks.push(task.notify_for_tracing());
+        tasks.push(task.clone().notify_for_tracing());
         // we do not poll it here since we hold a lock on `owned` and the task
         // may complete and need to remove itself from `owned`.
     });
