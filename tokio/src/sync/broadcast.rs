@@ -1325,6 +1325,7 @@ impl<T: Clone> Receiver<T> {
     ///     let _ = tx.send(10);
     ///     sync_code.join().unwrap();
     /// }
+    /// ```
     pub fn blocking_recv(&mut self) -> Result<T, RecvError> {
         crate::future::block_on(self.recv())
     }
