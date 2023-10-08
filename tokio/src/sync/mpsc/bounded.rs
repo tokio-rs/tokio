@@ -244,7 +244,7 @@ impl<T> Receiver<T> {
     /// still outstanding [`Permits`] from before it was closed, the channel is
     /// not considered closed by `recv_many` until the permits are released.
     ///
-    /// For non-zero values `limit`, this method will never return `0` unless
+    /// For non-zero values of `limit`, this method will never return `0` unless
     /// the channel has been closed and there are no remaining messages in the
     /// channel's queue. This indicates that no further values can ever
     /// be received from this `Receiver`. The channel is closed when all senders
