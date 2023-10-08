@@ -234,19 +234,21 @@ impl<T> Receiver<T> {
     ///
     /// This method extends `buffer` by no more than a fixed number
     /// of values as specified by `limit`.  If `limit` is zero,
-    /// then a default is used. The return value is the number
-    /// of values added to `buffer`.
+    /// the function returns immediately with `0`.
+    /// The return value is the number of values added to `buffer`.
     ///
-    /// If there are no messages in the channel's queue, but the channel has
-    /// not yet been closed, this method will sleep until a message is sent or
-    /// the channel is closed.  Note that if [`close`] is called, but there are
+    /// For `limit > 0`, if there are no messages in the
+    /// channel's queue, but the channel has not yet been closed, this
+    /// method will sleep until a message is sent or the channel is closed.
+    /// Note that if [`close`] is called, but there are
     /// still outstanding [`Permits`] from before it was closed, the channel is
     /// not considered closed by `recv_many` until the permits are released.
     ///
-    /// This method will never return 0 unless the channel has been closed and
-    /// there are no remaining messages in the channel's queue. This indicates
-    /// that no further values can ever be received from this `Receiver`. The
-    /// channel is closed when all senders have been dropped, or when [`close`]
+    /// For non-zero values `limit`, this method will never return `0` unless
+    /// the channel has been closed and there are no remaining messages in the
+    /// channel's queue. This indicates that no further values can ever
+    /// be received from this `Receiver`. The channel is closed when all senders
+    /// have been dropped, or when [`close`]
     /// is called.
     ///
     /// The capacity of `buffer` is increased as needed.

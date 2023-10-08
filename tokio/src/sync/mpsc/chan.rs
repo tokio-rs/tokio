@@ -298,7 +298,7 @@ impl<T, S: Semaphore> Rx<T, S> {
     /// Receives values into `buffer` up to its capacity
     ///
     /// For `limit` > 0, receives up to limit values into `buffer`.
-    /// For `limit` = 0, receives at most `super::BLOCK_CAP` values.
+    /// For `limit` = 0, immediately returns Ready(0).
     pub(crate) fn recv_many(
         &mut self,
         cx: &mut Context<'_>,
@@ -307,7 +307,11 @@ impl<T, S: Semaphore> Rx<T, S> {
     ) -> Poll<usize> {
         use super::block::Read;
 
-        let mut remaining = if limit > 0 { limit } else { super::BLOCK_CAP };
+        if limit == 0 {
+            return Ready(0usize);
+        }
+
+        let mut remaining = limit;
         let initial_length = buffer.len();
 
         ready!(crate::trace::trace_leaf(cx));

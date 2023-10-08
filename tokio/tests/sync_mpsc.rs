@@ -124,6 +124,10 @@ async fn async_send_recv_with_buffer() {
 #[cfg(feature = "full")]
 async fn async_send_recv_many_with_buffer() {
     let (tx, mut rx) = mpsc::channel(2);
+    let mut buffer = Vec::<i32>::with_capacity(3);
+
+    // With `limit=0` does not sleep, returns immediately
+    assert_eq!(0, rx.recv_many(&mut buffer, 0).await);
 
     tokio::spawn(async move {
         assert_ok!(tx.send(1).await);
@@ -132,7 +136,6 @@ async fn async_send_recv_many_with_buffer() {
     });
 
     let limit = 3;
-    let mut buffer = Vec::<i32>::with_capacity(3);
     let mut recv_count = 0usize;
     while recv_count < 3 {
         let n = rx.recv_many(&mut buffer, limit).await;
@@ -206,15 +209,23 @@ async fn send_recv_unbounded() {
 async fn send_recv_many_unbounded() {
     let (tx, mut rx) = mpsc::unbounded_channel::<i32>();
 
+    let mut buffer: Vec<i32> = Vec::new();
+
+    // With `limit=0` does not sleep, returns immediately
+    rx.recv_many(&mut buffer, 0).await;
+    assert_eq!(0, buffer.len());
+
     assert_ok!(tx.send(7));
     assert_ok!(tx.send(13));
     assert_ok!(tx.send(100));
     assert_ok!(tx.send(1002));
 
-    let mut buffer: Vec<i32> = Vec::new();
+    rx.recv_many(&mut buffer, 0).await;
+    assert_eq!(0, buffer.len());
+
     let mut count = 0;
     while count < 4 {
-        count += rx.recv_many(&mut buffer, 0).await;
+        count += rx.recv_many(&mut buffer, 1).await;
     }
     assert_eq!(count, 4);
     assert_eq!(vec![7, 13, 100, 1002], buffer);
@@ -258,7 +269,7 @@ async fn send_recv_many_bounded_capacity() {
     }
     tx.send("one more".to_string()).await.unwrap();
 
-    // Here `recv_may` receives all but the last value;
+    // Here `recv_many` receives all but the last value;
     // the initial capacity is adequate, so the buffer does
     // not increase in side.
     assert_eq!(buffer.capacity(), rx.recv_many(&mut buffer, limit).await);
@@ -300,7 +311,7 @@ async fn send_recv_many_unbounded_capacity() {
     }
     tx.send("one more".to_string()).unwrap();
 
-    // Here `recv_may` receives all but the last value;
+    // Here `recv_many` receives all but the last value;
     // the initial capacity is adequate, so the buffer does
     // not increase in side.
     assert_eq!(buffer.capacity(), rx.recv_many(&mut buffer, limit).await);
