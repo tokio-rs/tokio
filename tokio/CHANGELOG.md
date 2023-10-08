@@ -5,7 +5,6 @@
 - fix cache line size for RISC-V ([#5994])
 - fs: add vectored writes to `tokio::fs::File` ([#5958])
 - io: mark `Interest::add` with `#[must_use]` ([#6037])
-- io: use memchr from libc ([#5960])
 - io: support vectored writes for `DuplexStream` ([#5985])
 - io: add `SyncIOBridge::into_inner` ([#5971])
 - macros: use `::core` imports instead of `::std` in `tokio::test` ([#5973])
