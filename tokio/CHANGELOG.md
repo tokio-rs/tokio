@@ -6,7 +6,6 @@
 - fs: add vectored writes to `tokio::fs::File` ([#5958])
 - io: mark `Interest::add` with `#[must_use]` ([#6037])
 - io: support vectored writes for `DuplexStream` ([#5985])
-- io: add `SyncIOBridge::into_inner` ([#5971])
 - macros: use `::core` imports instead of `::std` in `tokio::test` ([#5973])
 - sync: use Acquire/Release orderings instead of SeqCst in `watch` ([#6018])
 - sync: prevent lock poisoning in `watch::Receiver::wait_for` ([#6021])
@@ -15,7 +14,6 @@
 ### Added
 
 - io: add `Interest::remove` method ([#5906])
-- io: implement `Seek` for `SyncIoBridge` ([#6058])
 - net: add Apple tvOS support ([#6045])
 - sync: add `?Sized` bound to `{MutexGuard,OwnedMutexGuard}::map` ([#5997])
 - sync: add const fn `OnceCell::from_value` ([#5903])
