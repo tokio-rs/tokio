@@ -1,3 +1,86 @@
+# 1.33.0 (October 9, 2023)
+
+### Fixed
+
+- io: mark `Interest::add` with `#[must_use]` ([#6037])
+- runtime: fix cache line size for RISC-V ([#5994])
+- sync: prevent lock poisoning in `watch::Receiver::wait_for` ([#6021])
+- task: fix `spawn_local` source location ([#5984])
+
+### Changed
+
+- macros: use `::core` imports instead of `::std` in `tokio::test` ([#5973])
+- sync: use Acquire/Release orderings instead of SeqCst in `watch` ([#6018])
+
+### Added
+
+- fs: add vectored writes to `tokio::fs::File` ([#5958])
+- io: add `Interest::remove` method ([#5906])
+- io: add vectored writes to `DuplexStream` ([#5985])
+- net: add Apple tvOS support ([#6045])
+- sync: add `?Sized` bound to `{MutexGuard,OwnedMutexGuard}::map` ([#5997])
+- sync: add `watch::Receiver::mark_unseen` ([#5962], [#6014], [#6017])
+- sync: add `watch::Sender::new` ([#5998])
+- sync: add const fn `OnceCell::from_value` ([#5903])
+
+### Removed
+
+- remove unused `stats` feature ([#5952])
+
+### Documented
+
+- add missing backticks in code examples ([#5938], [#6056])
+- fix typos ([#5988], [#6030])
+- process: document that `Child::wait` is cancel safe ([#5977])
+- sync: add examples for `Semaphore` ([#5939], [#5956], [#5978], [#6031], [#6032], [#6050])
+- sync: document that `broadcast` capacity is a lower bound ([#6042])
+- sync: document that `const_new` is not instrumented ([#6002])
+- sync: improve cancel-safety documentation for `mpsc::Sender::send` ([#5947])
+- sync: improve docs for `watch` channel ([#5954])
+- taskdump: render taskdump documentation on docs.rs ([#5972])
+
+### Unstable
+
+- taskdump: fix potential deadlock ([#6036])
+
+[#5903]: https://github.com/tokio-rs/tokio/pull/5903
+[#5906]: https://github.com/tokio-rs/tokio/pull/5906
+[#5938]: https://github.com/tokio-rs/tokio/pull/5938
+[#5939]: https://github.com/tokio-rs/tokio/pull/5939
+[#5947]: https://github.com/tokio-rs/tokio/pull/5947
+[#5952]: https://github.com/tokio-rs/tokio/pull/5952
+[#5954]: https://github.com/tokio-rs/tokio/pull/5954
+[#5956]: https://github.com/tokio-rs/tokio/pull/5956
+[#5958]: https://github.com/tokio-rs/tokio/pull/5958
+[#5960]: https://github.com/tokio-rs/tokio/pull/5960
+[#5962]: https://github.com/tokio-rs/tokio/pull/5962
+[#5971]: https://github.com/tokio-rs/tokio/pull/5971
+[#5972]: https://github.com/tokio-rs/tokio/pull/5972
+[#5973]: https://github.com/tokio-rs/tokio/pull/5973
+[#5977]: https://github.com/tokio-rs/tokio/pull/5977
+[#5978]: https://github.com/tokio-rs/tokio/pull/5978
+[#5984]: https://github.com/tokio-rs/tokio/pull/5984
+[#5985]: https://github.com/tokio-rs/tokio/pull/5985
+[#5988]: https://github.com/tokio-rs/tokio/pull/5988
+[#5994]: https://github.com/tokio-rs/tokio/pull/5994
+[#5997]: https://github.com/tokio-rs/tokio/pull/5997
+[#5998]: https://github.com/tokio-rs/tokio/pull/5998
+[#6002]: https://github.com/tokio-rs/tokio/pull/6002
+[#6014]: https://github.com/tokio-rs/tokio/pull/6014
+[#6017]: https://github.com/tokio-rs/tokio/pull/6017
+[#6018]: https://github.com/tokio-rs/tokio/pull/6018
+[#6021]: https://github.com/tokio-rs/tokio/pull/6021
+[#6030]: https://github.com/tokio-rs/tokio/pull/6030
+[#6031]: https://github.com/tokio-rs/tokio/pull/6031
+[#6032]: https://github.com/tokio-rs/tokio/pull/6032
+[#6036]: https://github.com/tokio-rs/tokio/pull/6036
+[#6037]: https://github.com/tokio-rs/tokio/pull/6037
+[#6042]: https://github.com/tokio-rs/tokio/pull/6042
+[#6045]: https://github.com/tokio-rs/tokio/pull/6045
+[#6050]: https://github.com/tokio-rs/tokio/pull/6050
+[#6056]: https://github.com/tokio-rs/tokio/pull/6056
+[#6058]: https://github.com/tokio-rs/tokio/pull/6058
+
 # 1.32.0 (August 16, 2023)
 
 ### Fixed
