@@ -1,24 +1,27 @@
-# 1.33.0 (October 8, 2023)
+# 1.33.0 (October 9, 2023)
 
-### Changed
+### Fixed
 
-- fix cache line size for RISC-V ([#5994])
-- fs: add vectored writes to `tokio::fs::File` ([#5958])
 - io: mark `Interest::add` with `#[must_use]` ([#6037])
-- io: support vectored writes for `DuplexStream` ([#5985])
-- macros: use `::core` imports instead of `::std` in `tokio::test` ([#5973])
-- sync: use Acquire/Release orderings instead of SeqCst in `watch` ([#6018])
+- runtime: fix cache line size for RISC-V ([#5994])
 - sync: prevent lock poisoning in `watch::Receiver::wait_for` ([#6021])
 - task: fix `spawn_local` source location ([#5984])
 
+### Changed
+
+- macros: use `::core` imports instead of `::std` in `tokio::test` ([#5973])
+- sync: use Acquire/Release orderings instead of SeqCst in `watch` ([#6018])
+
 ### Added
 
+- fs: add vectored writes to `tokio::fs::File` ([#5958])
 - io: add `Interest::remove` method ([#5906])
+- io: add vectored writes to `DuplexStream` ([#5985])
 - net: add Apple tvOS support ([#6045])
 - sync: add `?Sized` bound to `{MutexGuard,OwnedMutexGuard}::map` ([#5997])
-- sync: add const fn `OnceCell::from_value` ([#5903])
-- sync: add `watch::Sender::new` ([#5998])
 - sync: add `watch::Receiver::mark_unseen` ([#5962], [#6014], [#6017])
+- sync: add `watch::Sender::new` ([#5998])
+- sync: add const fn `OnceCell::from_value` ([#5903])
 
 ### Removed
 
