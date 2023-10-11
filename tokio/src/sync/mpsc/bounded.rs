@@ -234,7 +234,7 @@ impl<T> Receiver<T> {
     ///
     /// This method extends `buffer` by no more than a fixed number
     /// of values as specified by `limit`.  If `limit` is zero,
-    /// the function returns immediately with `0`.
+    /// the function immediately returns `0`.
     /// The return value is the number of values added to `buffer`.
     ///
     /// For `limit > 0`, if there are no messages in the
