@@ -309,9 +309,11 @@ impl TaskTracker {
 
     /// Close this `TaskTracker`.
     ///
-    /// This allows `wait` futures to complete. It does not prevent you from spawning new tasks.
+    /// This allows [`wait`] futures to complete. It does not prevent you from spawning new tasks.
     ///
     /// Returns `true` if this closed the `TaskTracker`, or `false` if it was already closed.
+    ///
+    /// [`wait`]: Self::wait
     #[inline]
     pub fn close(&self) -> bool {
         self.inner.set_closed()
@@ -329,18 +331,11 @@ impl TaskTracker {
         self.inner.set_open()
     }
 
-    /// Returns true if this `TaskTracker` is closed.
+    /// Returns `true` if this `TaskTracker` is [closed](Self::close).
     #[inline]
     #[must_use]
     pub fn is_closed(&self) -> bool {
         (self.inner.state.load(Ordering::Acquire) & 1) != 0
-    }
-
-    /// Returns true if this `TaskTracker` is open.
-    #[inline]
-    #[must_use]
-    pub fn is_open(&self) -> bool {
-        !self.is_closed()
     }
 
     /// Returns the number of tasks tracked by this `TaskTracker`.
@@ -350,14 +345,14 @@ impl TaskTracker {
         self.inner.state.load(Ordering::Acquire) >> 1
     }
 
-    /// Returns true if there are no tasks in this `TaskTracker`.
+    /// Returns `true` if there are no tasks in this `TaskTracker`.
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.inner.state.load(Ordering::Acquire) <= 1
     }
 
-    /// Spawn the provided future on the Tokio runtime, and track it in this `TaskTracker`.
+    /// Spawn the provided future on the current Tokio runtime, and track it in this `TaskTracker`.
     ///
     /// This is equivalent to `tokio::spawn(tracker.track_future(task))`.
     #[inline]
@@ -372,7 +367,7 @@ impl TaskTracker {
         tokio::task::spawn(self.track_future(task))
     }
 
-    /// Spawn the provided future on the Tokio runtime, and track it in this `TaskTracker`.
+    /// Spawn the provided future on the provided Tokio runtime, and track it in this `TaskTracker`.
     ///
     /// This is equivalent to `handle.spawn(tracker.track_future(task))`.
     #[inline]
@@ -468,13 +463,27 @@ impl TaskTracker {
     /// Track the provided future.
     ///
     /// The returned [`TrackedFuture`] will count as a task tracked by this collection, and will
-    /// prevent calls to [`wait`] from returning.
+    /// prevent calls to [`wait`] from returning until the task is dropped.
     ///
-    /// The task is removed from the collection when it is dropped. (It is not removed immediately
-    /// when [`poll`] returns [`Poll::Pending`]. You have to actually run the destructor for it to
-    /// be removed.)
+    /// The task is removed from the collection when it is dropped. It is not removed immediately
+    /// when [`poll`] returns [`Poll::Ready`]. You have to actually run the destructor for it to
+    /// be removed.
     ///
     /// # Examples
+    ///
+    /// Track a future spawned with [`tokio::spawn`].
+    ///
+    /// ```
+    /// # async fn my_async_fn() {}
+    /// use tokio_util::task::TaskTracker;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let tracker = TaskTracker::new();
+    ///
+    /// tokio::spawn(tracker.track_future(my_async_fn()));
+    /// # }
+    /// ```
     ///
     /// Track a future spawned on a [`JoinSet`].
     /// ```
@@ -509,7 +518,7 @@ impl TaskTracker {
     /// correspond to a task. As long as the token exists, the `TaskTracker` cannot complete.
     /// Furthermore, the count returned by the [`len`] method will include the tokens in the count.
     ///
-    /// Dropping the token corresponds to when the task exits.
+    /// Dropping the token indicates to the `TaskTracker` that the task has exited.
     ///
     /// [`len`]: TaskTracker::len
     #[inline]

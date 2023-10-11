@@ -6,27 +6,27 @@ use tokio_util::task::TaskTracker;
 #[test]
 fn open_close() {
     let tracker = TaskTracker::new();
-    assert!(tracker.is_open());
+    assert!(!tracker.is_closed());
     assert!(tracker.is_empty());
     assert_eq!(tracker.len(), 0);
 
     tracker.close();
-    assert!(!tracker.is_open());
+    assert!(tracker.is_closed());
     assert!(tracker.is_empty());
     assert_eq!(tracker.len(), 0);
 
     tracker.reopen();
-    assert!(tracker.is_open());
+    assert!(!tracker.is_closed());
     tracker.reopen();
-    assert!(tracker.is_open());
+    assert!(!tracker.is_closed());
 
     assert!(tracker.is_empty());
     assert_eq!(tracker.len(), 0);
 
     tracker.close();
-    assert!(!tracker.is_open());
+    assert!(tracker.is_closed());
     tracker.close();
-    assert!(!tracker.is_open());
+    assert!(tracker.is_closed());
 
     assert!(tracker.is_empty());
     assert_eq!(tracker.len(), 0);
