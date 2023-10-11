@@ -295,10 +295,10 @@ impl<T, S: Semaphore> Rx<T, S> {
         })
     }
 
-    /// Receives values into `buffer` up to its capacity
+    /// Receives up to `limit` values into `buffer`
     ///
-    /// For `limit` > 0, receives up to limit values into `buffer`.
-    /// For `limit` = 0, immediately returns Ready(0).
+    /// For `limit > 0`, receives up to limit values into `buffer`.
+    /// For `limit == 0`, immediately returns Ready(0).
     pub(crate) fn recv_many(
         &mut self,
         cx: &mut Context<'_>,
