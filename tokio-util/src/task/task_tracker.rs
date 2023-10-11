@@ -540,8 +540,8 @@ impl TaskTracker {
     /// let tracker_2 = TaskTracker::new();
     /// let tracker_1_clone = tracker_1.clone();
     ///
-    /// assert!(TaskTracker::ptr_eq(&tracker_1, tracker_1_clone));
-    /// assert!(!TaskTracker::ptr_eq(&tracker_1, tracker_2));
+    /// assert!(TaskTracker::ptr_eq(&tracker_1, &tracker_1_clone));
+    /// assert!(!TaskTracker::ptr_eq(&tracker_1, &tracker_2));
     /// ```
     #[inline]
     #[must_use]
