@@ -528,6 +528,24 @@ impl TaskTracker {
             task_tracker: self.clone(),
         }
     }
+
+    /// Returns `true` if both task trackers correspond to the same set of tasks.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let tracker_1 = TaskTracker::new();
+    /// let tracker_2 = TaskTracker::new();
+    /// let tracker_1_clone = tracker_1.clone();
+    ///
+    /// assert!(TaskTracker::ptr_eq(&tracker_1, tracker_1_clone));
+    /// assert!(!TaskTracker::ptr_eq(&tracker_1, tracker_2));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn ptr_eq(left: &TaskTracker, right: &TaskTracker) -> bool {
+        Arc::ptr_eq(&left.inner, &right.inner)
+    }
 }
 
 impl Default for TaskTracker {
@@ -558,22 +576,25 @@ impl fmt::Debug for TaskTracker {
 impl TaskTrackerToken {
     /// Returns the [`TaskTracker`] that this token is associated with.
     #[inline]
+    #[must_use]
     pub fn task_tracker(&self) -> &TaskTracker {
         &self.task_tracker
     }
 }
 
 impl Clone for TaskTrackerToken {
+    /// Returns a new `TaskTrackerToken` associated with the same [`TaskTracker`].
+    ///
+    /// This is equivalent to `token.task_tracker().token()`.
     #[inline]
+    #[must_use]
     fn clone(&self) -> TaskTrackerToken {
-        self.task_tracker.inner.add_task();
-        TaskTrackerToken {
-            task_tracker: self.task_tracker.clone(),
-        }
+        self.task_tracker.token()
     }
 }
 
 impl Drop for TaskTrackerToken {
+    /// Dropping the token indicates to the [`TaskTracker`] that the task has exited.
     #[inline]
     fn drop(&mut self) {
         self.task_tracker.inner.drop_task();
