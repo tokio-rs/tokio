@@ -129,24 +129,23 @@ async fn async_send_recv_many_with_buffer() {
     // With `limit=0` does not sleep, returns immediately
     assert_eq!(0, rx.recv_many(&mut buffer, 0).await);
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         assert_ok!(tx.send(1).await);
         assert_ok!(tx.send(2).await);
         assert_ok!(tx.send(7).await);
+        assert_ok!(tx.send(0).await);
     });
 
     let limit = 3;
     let mut recv_count = 0usize;
-    while recv_count < 3 {
-        let n = rx.recv_many(&mut buffer, limit).await;
-        recv_count += n;
+    while recv_count < 4 {
+        recv_count += rx.recv_many(&mut buffer, limit).await;
         assert_eq!(buffer.len(), recv_count);
-        assert!(buffer.iter().sum::<i32>() <= 10);
     }
-    assert_eq!(buffer.iter().sum::<i32>(), 10);
-    assert_eq!(3, recv_count);
-    assert_eq!(recv_count, buffer.len());
-    assert_eq!(None, rx.recv().await);
+
+    assert_eq!(vec![1, 2, 7, 0], buffer);
+    assert_eq!(0, rx.recv_many(&mut buffer, limit).await);
+    handle.await.unwrap();
 }
 
 #[tokio::test]
@@ -239,7 +238,8 @@ async fn send_recv_many_unbounded() {
     assert_ok!(tx.send(7));
     assert_ok!(tx.send(2));
 
-    count = rx.recv_many(&mut buffer, 4).await;
+    // Re-use existing capacity
+    count = rx.recv_many(&mut buffer, 32).await;
 
     assert_eq!(final_capacity, buffer.capacity());
     assert_eq!(count, 4);
@@ -249,7 +249,6 @@ async fn send_recv_many_unbounded() {
 
     // recv_many will immediately return zero if the channel
     // is closed and no more messages are waiting
-    assert_eq!(0, rx.recv_many(&mut buffer, 4).await);
     assert_eq!(0, rx.recv_many(&mut buffer, 4).await);
     assert!(rx.recv().await.is_none());
 }
