@@ -322,7 +322,7 @@ impl<T, S: Semaphore> Rx<T, S> {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
             macro_rules! try_recv {
                 () => {
-                    while (remaining > 0) {
+                    while remaining > 0 {
                         match rx_fields.list.pop(&self.inner.tx) {
                             Some(Read::Value(value)) => {
                                 remaining -= 1;
