@@ -307,16 +307,18 @@ impl<T, S: Semaphore> Rx<T, S> {
     ) -> Poll<usize> {
         use super::block::Read;
 
+        ready!(crate::trace::trace_leaf(cx));
+
+        // Keep track of task budget
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+
         if limit == 0 {
+            coop.made_progress();
             return Ready(0usize);
         }
 
         let mut remaining = limit;
         let initial_length = buffer.len();
-
-        ready!(crate::trace::trace_leaf(cx));
-        // Keep track of task budget
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
