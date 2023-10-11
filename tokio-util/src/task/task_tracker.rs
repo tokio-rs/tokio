@@ -534,6 +534,8 @@ impl TaskTracker {
     /// # Examples
     ///
     /// ```
+    /// use tokio_util::task::TaskTracker;
+    ///
     /// let tracker_1 = TaskTracker::new();
     /// let tracker_2 = TaskTracker::new();
     /// let tracker_1_clone = tracker_1.clone();
