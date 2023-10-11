@@ -587,7 +587,6 @@ impl Clone for TaskTrackerToken {
     ///
     /// This is equivalent to `token.task_tracker().token()`.
     #[inline]
-    #[must_use]
     fn clone(&self) -> TaskTrackerToken {
         self.task_tracker.token()
     }
