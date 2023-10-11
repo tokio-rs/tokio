@@ -506,7 +506,7 @@ impl Semaphore for unbounded::Semaphore {
     fn add_permits(&self, n: usize) {
         let prev = self.0.fetch_sub(n << 1, Release);
 
-        if prev >> 1 == 0 {
+        if (prev >> 1) < n {
             // Something went wrong
             process::abort();
         }
