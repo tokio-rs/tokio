@@ -288,7 +288,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// To use the multi-threaded runtime, the macro can be configured using
 ///
 /// ```no_run
-/// #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+/// #[test(flavor = "multi_thread", worker_threads = 1)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -306,7 +306,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// separate current-thread runtime.
 ///
 /// ```no_run
-/// #[tokio::test]
+/// #[test]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -317,7 +317,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ### Using the multi-thread runtime
 ///
 /// ```no_run
-/// #[tokio::test(flavor = "multi_thread")]
+/// #[test(flavor = "multi_thread")]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -341,7 +341,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ### Using current thread runtime
 ///
 /// ```no_run
-/// #[tokio::test]
+/// #[test]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -365,7 +365,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ### Set number of worker threads
 ///
 /// ```no_run
-/// #[tokio::test(flavor ="multi_thread", worker_threads = 2)]
+/// #[test(flavor ="multi_thread", worker_threads = 2)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -390,7 +390,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ### Configure the runtime to start with time paused
 ///
 /// ```no_run
-/// #[tokio::test(start_paused = true)]
+/// #[test(start_paused = true)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -434,7 +434,7 @@ pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ## Usage
 ///
 /// ```no_run
-/// #[tokio::test]
+/// #[test]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
