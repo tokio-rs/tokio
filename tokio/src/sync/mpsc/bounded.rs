@@ -35,7 +35,7 @@ pub struct Sender<T> {
 /// [`Sender`]: Sender
 /// [`WeakSender::upgrade`]: WeakSender::upgrade
 ///
-/// #Examples
+/// # Examples
 ///
 /// ```
 /// use tokio::sync::mpsc::channel;

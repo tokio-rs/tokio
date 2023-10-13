@@ -25,7 +25,7 @@ pub struct UnboundedSender<T> {
 /// [`UnboundedSender`]: UnboundedSender
 /// [`WeakUnboundedSender::upgrade`]: WeakUnboundedSender::upgrade
 ///
-/// #Examples
+/// # Examples
 ///
 /// ```
 /// use tokio::sync::mpsc::unbounded_channel;
