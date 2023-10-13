@@ -216,9 +216,8 @@ warrants a patch release with a fix for the bug, it will be backported and
 released as a new patch release for each LTS minor version. Our current LTS
 releases are:
 
- * `1.20.x` - LTS release until September 2023. (MSRV 1.49)
  * `1.25.x` - LTS release until March 2024. (MSRV 1.49)
- * `1.32.x` - LTS release until September 2024 (MSRV 1.63)
+ * `1.32.x` - LTS release until September 2024. (MSRV 1.63)
 
 Each LTS release will continue to receive backported fixes for at least a year.
 If you wish to use a fixed minor release in your project, we recommend that you
@@ -236,6 +235,7 @@ tokio = { version = "~1.25", features = [...] }
  * `1.8.x` - LTS release until February 2022.
  * `1.14.x` - LTS release until June 2022.
  * `1.18.x` - LTS release until June 2023.
+ * `1.20.x` - LTS release until September 2023.
 
 ## License
 

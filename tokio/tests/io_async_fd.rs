@@ -579,6 +579,23 @@ fn driver_shutdown_wakes_poll() {
 }
 
 #[test]
+fn driver_shutdown_then_clear_readiness() {
+    let rt = rt();
+
+    let (a, _b) = socketpair();
+    let afd_a = {
+        let _enter = rt.enter();
+        AsyncFd::new(a).unwrap()
+    };
+
+    let mut write_ready = rt.block_on(afd_a.writable()).unwrap();
+
+    std::mem::drop(rt);
+
+    write_ready.clear_ready();
+}
+
+#[test]
 fn driver_shutdown_wakes_poll_race() {
     // TODO: make this a loom test
     for _ in 0..100 {
