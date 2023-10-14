@@ -37,27 +37,27 @@ use tokio::{
 /// # Comparison to `JoinSet`
 ///
 /// The main Tokio crate has a similar collection known as [`JoinSet`]. The `JoinSet` type has a
-/// lot more features than `TaskTracker`, so you should only use a `TaskTracker` when you need one
-/// of its unique features:
+/// lot more features than `TaskTracker`, so `TaskTracker` should only be used when one of its
+/// unique features is required:
 ///
 ///  1. When tasks exit, a `TaskTracker` will allow the task to immediately free its memory.
-///  2. By not closing the `TaskTracker`, you can prevent [`wait`] from returning even if the
-///     `TaskTracker` is empty.
+///  2. By not closing the `TaskTracker`, [`wait`] will be prevented from from returning even if
+///     the `TaskTracker` is empty.
 ///  3. A `TaskTracker` does not require mutable access to insert tasks.
 ///  4. A `TaskTracker` can be cloned to share it with many tasks.
 ///
 /// The first point is the most important one. With a [`JoinSet`], it keeps track of the return
-/// value of every task you insert into it. This means that if you keep inserting tasks and never
-/// call [`join_next`], then their return values will keep building up and take up memory, even
-/// if most of the tasks have already exited. This can cause you to run out of memory. With a
-/// `TaskTracker`, this does not happen. Once tasks exit, they are immediately removed from the
+/// value of every inserted task. This means that if the caller keeps inserting tasks and never
+/// calls [`join_next`], then their return values will keep building up and consuming memory, _even
+/// if_ most of the tasks have already exited. This can cause the process to run out of memory. With
+/// a `TaskTracker`, this does not happen. Once tasks exit, they are immediately removed from the
 /// `TaskTracker`.
 ///
 /// # Examples
 ///
 /// ## Spawn tasks and wait for them to exit
 ///
-/// This is a simple example. For this case, you should probably use a [`JoinSet`] instead.
+/// This is a simple example. For this case, [`JoinSet`] should porbably be used instead.
 ///
 /// ```
 /// use tokio_util::task::TaskTracker;
@@ -465,9 +465,8 @@ impl TaskTracker {
     /// The returned [`TrackedFuture`] will count as a task tracked by this collection, and will
     /// prevent calls to [`wait`] from returning until the task is dropped.
     ///
-    /// The task is removed from the collection when it is dropped. It is not removed immediately
-    /// when [`poll`] returns [`Poll::Ready`]. You have to actually run the destructor for it to
-    /// be removed.
+    /// The task is removed from the collection when it is dropped, not when [`poll`] returns
+    /// [`Poll::Ready`].
     ///
     /// # Examples
     ///
