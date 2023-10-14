@@ -148,7 +148,6 @@ use tokio::{
 /// [`join_next`]: tokio::task::JoinSet::join_next
 /// [`wait`]: Self::wait
 /// [graceful shutdown]: https://tokio.rs/tokio/topics/shutdown
-#[derive(Clone)]
 pub struct TaskTracker {
     inner: Arc<TaskTrackerInner>,
 }
@@ -280,7 +279,7 @@ impl TaskTrackerInner {
 }
 
 impl TaskTracker {
-    /// Create a new `TaskTracker`.
+    /// Creates a new `TaskTracker`.
     ///
     /// The `TaskTracker` will start out as open.
     #[must_use]
@@ -550,9 +549,55 @@ impl TaskTracker {
 }
 
 impl Default for TaskTracker {
+    /// Creates a new `TaskTracker`.
+    ///
+    /// The `TaskTracker` will start out as open.
     #[inline]
     fn default() -> TaskTracker {
         TaskTracker::new()
+    }
+}
+
+impl Clone for TaskTracker {
+    /// Returns a new `TaskTracker` that tracks the same set of tasks.
+    ///
+    /// Since the new `TaskTracker` shares the same set of tasks, changes to one set are visible in
+    /// all other clones.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio_util::task::TaskTracker;
+    ///
+    /// #[tokio::main]
+    /// # async fn _hidden() {}
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// async fn main() {
+    ///     let tracker = TaskTracker::new();
+    ///     let cloned = tracker.clone();
+    ///
+    ///     // Spawns on `tracker` are visible in `cloned`.
+    ///     tracker.spawn(std::future::pending::<()>());
+    ///     assert_eq!(cloned.len(), 1);
+    ///
+    ///     // Spawns on `cloned` are visible in `tracker`.
+    ///     cloned.spawn(std::future::pending::<()>());
+    ///     assert_eq!(tracker.len(), 2);
+    ///
+    ///     // Calling `close` is visible to `cloned`.
+    ///     tracker.close();
+    ///     assert!(cloned.is_closed());
+    ///
+    ///     // Calling `reopen` is visible to `tracker`.
+    ///     cloned.reopen();
+    ///     assert!(!tracker.is_closed());
+    /// }
+    /// ```
+    #[inline]
+    fn clone(&self) -> TaskTracker {
+        Self {
+            inner: self.inner.clone(),
+        }
     }
 }
 
