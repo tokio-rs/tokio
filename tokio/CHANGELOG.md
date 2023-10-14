@@ -57,7 +57,6 @@
 [#5962]: https://github.com/tokio-rs/tokio/pull/5962
 [#5971]: https://github.com/tokio-rs/tokio/pull/5971
 [#5972]: https://github.com/tokio-rs/tokio/pull/5972
-[#5973]: https://github.com/tokio-rs/tokio/pull/5973
 [#5977]: https://github.com/tokio-rs/tokio/pull/5977
 [#5978]: https://github.com/tokio-rs/tokio/pull/5978
 [#5984]: https://github.com/tokio-rs/tokio/pull/5984
