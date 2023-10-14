@@ -222,10 +222,14 @@ impl TcpStream {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let mut data = [0u8; 12];
+    /// #   if false {
     ///     let listener = TcpListener::bind("127.0.0.1:34254").await?;
-    /// #   let handle = tokio::spawn(async {
-    /// #       let mut stream: TcpStream = TcpStream::connect("127.0.0.1:34254").await.unwrap();
-    /// #       stream.write(b"Hello world!").await.unwrap();
+    /// #   }
+    /// #   let listener = TcpListener::bind("127.0.0.1:0").await?;
+    /// #   let addr = listener.local_addr().unwrap();
+    /// #   let handle = tokio::spawn(async move {
+    /// #       let mut stream: TcpStream = TcpStream::connect(addr).await.unwrap();
+    /// #       stream.write_all(b"Hello world!").await.unwrap();
     /// #   });
     ///     let (tokio_tcp_stream, _) = listener.accept().await?;
     ///     let mut std_tcp_stream = tokio_tcp_stream.into_std()?;
