@@ -1,3 +1,5 @@
+[comment]: <> (Include tokio-macros changes in next release.)
+
 # 1.33.0 (October 9, 2023)
 
 ### Fixed
@@ -9,7 +11,6 @@
 
 ### Changed
 
-- macros: use `::core` imports instead of `::std` in `tokio::test` ([#5973])
 - sync: use Acquire/Release orderings instead of SeqCst in `watch` ([#6018])
 
 ### Added
