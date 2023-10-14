@@ -55,6 +55,8 @@ use tokio::{
 ///
 /// # Examples
 ///
+/// For more examples, please see the topic page on [graceful shutdown].
+///
 /// ## Spawn tasks and wait for them to exit
 ///
 /// This is a simple example. For this case, [`JoinSet`] should probably be used instead.
