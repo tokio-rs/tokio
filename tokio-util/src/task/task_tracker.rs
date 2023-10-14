@@ -46,11 +46,11 @@ use tokio::{
 ///  3. A `TaskTracker` does not require mutable access to insert tasks.
 ///  4. A `TaskTracker` can be cloned to share it with many tasks.
 ///
-/// The first point is the most important one. A [`JoinSet`] keeps track of the return
-/// value of every inserted task. This means that if the caller keeps inserting tasks and never
-/// calls [`join_next`], then their return values will keep building up and consuming memory, _even
-/// if_ most of the tasks have already exited. This can cause the process to run out of memory. With
-/// a `TaskTracker`, this does not happen. Once tasks exit, they are immediately removed from the
+/// The first point is the most important one. A [`JoinSet`] keeps track of the return value of
+/// every inserted task. This means that if the caller keeps inserting tasks and never calls
+/// [`join_next`], then their return values will keep building up and consuming memory, _even if_
+/// most of the tasks have already exited. This can cause the process to run out of memory. With a
+/// `TaskTracker`, this does not happen. Once tasks exit, they are immediately removed from the
 /// `TaskTracker`.
 ///
 /// # Examples
