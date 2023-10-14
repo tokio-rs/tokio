@@ -628,6 +628,7 @@ where
     }
 
     /// Returns an iterator visiting all keys in this `JoinMap` in arbitrary order.
+    ///
     /// If a task has completed, but its output hasn't yet been consumed by a
     /// call to [`join_next`], this method will still return its key.
     ///
