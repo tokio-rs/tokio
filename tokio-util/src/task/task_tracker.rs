@@ -57,7 +57,7 @@ use tokio::{
 ///
 /// ## Spawn tasks and wait for them to exit
 ///
-/// This is a simple example. For this case, [`JoinSet`] should porbably be used instead.
+/// This is a simple example. For this case, [`JoinSet`] should probably be used instead.
 ///
 /// ```
 /// use tokio_util::task::TaskTracker;
