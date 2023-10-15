@@ -280,12 +280,12 @@ pin_project! {
 
 tokio_thread_local!(static CURRENT: LocalData = const { LocalData {
     ctx: RcCell::new(),
-    wake_on_spawn_local: Cell::new(false),
+    wake_on_schedule: Cell::new(false),
 } });
 
 struct LocalData {
     ctx: RcCell<Context>,
-    wake_on_spawn_local: Cell<bool>,
+    wake_on_schedule: Cell<bool>,
 }
 
 impl LocalData {
@@ -294,11 +294,11 @@ impl LocalData {
     #[must_use = "dropping this guard will reset the entered state"]
     fn enter(&self, ctx: Rc<Context>) -> LocalDataEnterGuard<'_> {
         let ctx = self.ctx.replace(Some(ctx));
-        let wake_on_spawn_local = self.wake_on_spawn_local.replace(false);
+        let wake_on_schedule = self.wake_on_schedule.replace(false);
         LocalDataEnterGuard {
             local_data_ref: self,
             ctx,
-            wake_on_spawn_local,
+            wake_on_schedule,
         }
     }
 }
@@ -307,13 +307,13 @@ impl LocalData {
 struct LocalDataEnterGuard<'a> {
     local_data_ref: &'a LocalData,
     ctx: Option<Rc<Context>>,
-    wake_on_spawn_local: bool,
+    wake_on_schedule: bool,
 }
 
 impl<'a> Drop for LocalDataEnterGuard<'a> {
     fn drop(&mut self) {
         self.local_data_ref.ctx.set(self.ctx.take());
-        self.local_data_ref.wake_on_spawn_local.set(self.wake_on_spawn_local)
+        self.local_data_ref.wake_on_schedule.set(self.wake_on_schedule)
     }
 }
 
@@ -395,16 +395,16 @@ pub struct LocalEnterGuard {
     ctx: Option<Rc<Context>>,
 
     /// Distinguishes whether the context was entered or being polled.
-    /// When we enter it, the value `wake_on_spawn_local` is set. In this case
+    /// When we enter it, the value `wake_on_schedule` is set. In this case
     /// `spawn_local` refers the context, whereas it is not being polled now.
-    wake_on_spawn_local: bool,
+    wake_on_schedule: bool,
 }
 
 impl Drop for LocalEnterGuard {
     fn drop(&mut self) {
-        CURRENT.with(|LocalData { ctx, wake_on_spawn_local }| {
+        CURRENT.with(|LocalData { ctx, wake_on_schedule }| {
             ctx.set(self.ctx.take());
-            wake_on_spawn_local.set(self.wake_on_spawn_local);
+            wake_on_schedule.set(self.wake_on_schedule);
         })
     }
 }
@@ -447,10 +447,10 @@ impl LocalSet {
     ///
     /// [`spawn_local`]: fn@crate::task::spawn_local
     pub fn enter(&self) -> LocalEnterGuard {
-        CURRENT.with(|LocalData { ctx, wake_on_spawn_local, .. }| {
+        CURRENT.with(|LocalData { ctx, wake_on_schedule, .. }| {
             let ctx = ctx.replace(Some(self.context.clone()));
-            let wake_on_spawn_local = wake_on_spawn_local.replace(true);
-            LocalEnterGuard { ctx, wake_on_spawn_local }
+            let wake_on_schedule = wake_on_schedule.replace(true);
+            LocalEnterGuard { ctx, wake_on_schedule }
         })
     }
 
@@ -978,9 +978,9 @@ impl Shared {
         CURRENT.with(|localdata| {
             match localdata.ctx.get() {
                 // If the current `LocalSet` is being polled, we don't need to wake it.
-                // When we `enter` it, then the value `wake_on_spawn_local` is set to be true.
+                // When we `enter` it, then the value `wake_on_schedule` is set to be true.
                 // In this case it is not being polled, so we need to wake it.
-                Some(cx) if cx.shared.ptr_eq(self) && !localdata.wake_on_spawn_local.get() => unsafe {
+                Some(cx) if cx.shared.ptr_eq(self) && !localdata.wake_on_schedule.get() => unsafe {
                     // Safety: if the current `LocalSet` context points to this
                     // `LocalSet`, then we are on the thread that owns it.
                     cx.shared.local_state.task_push_back(task);
