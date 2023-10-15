@@ -148,7 +148,6 @@ impl<S: 'static> OwnedTasks<S> {
             return None;
         }
         lock.push_front(task);
-        drop(lock);
         self.count.fetch_add(1, Ordering::Relaxed);
         Some(notified)
     }
@@ -181,10 +180,10 @@ impl<S: 'static> OwnedTasks<S> {
             loop {
                 let mut lock = self.segment_inner(i);
                 let task = lock.pop_back();
-                drop(lock);
                 match task {
                     Some(task) => {
                         self.count.fetch_sub(1, Ordering::Relaxed);
+                        drop(lock);
                         task.shutdown();
                     }
                     None => break,
@@ -220,7 +219,6 @@ impl<S: 'static> OwnedTasks<S> {
         let task_id = unsafe { Header::get_id(task.header_ptr()) };
         let mut lock = self.segment_inner(task_id.0 as usize);
         let task = lock.remove(task.header_ptr());
-        drop(lock);
         if task.is_some() {
             self.count.fetch_sub(1, Ordering::Relaxed);
         }
