@@ -97,3 +97,60 @@ fn multi_thread() {
         );
     });
 }
+
+/// Regression tests for #6035.
+///
+/// These tests ensure that dumping will not deadlock if a future completes
+/// during a trace.
+mod future_completes_during_trace {
+    use super::*;
+
+    use core::future::{poll_fn, Future};
+
+    /// A future that completes only during a trace.
+    fn complete_during_trace() -> impl Future<Output = ()> + Send {
+        use std::task::Poll;
+        poll_fn(|cx| {
+            if Handle::is_tracing() {
+                Poll::Ready(())
+            } else {
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        })
+    }
+
+    #[test]
+    fn current_thread() {
+        let rt = runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        async fn dump() {
+            let handle = Handle::current();
+            let _dump = handle.dump().await;
+        }
+
+        rt.block_on(async {
+            let _ = tokio::join!(tokio::spawn(complete_during_trace()), dump());
+        });
+    }
+
+    #[test]
+    fn multi_thread() {
+        let rt = runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        async fn dump() {
+            let handle = Handle::current();
+            let _dump = handle.dump().await;
+        }
+
+        rt.block_on(async {
+            let _ = tokio::join!(tokio::spawn(complete_during_trace()), dump());
+        });
+    }
+}

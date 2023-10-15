@@ -13,7 +13,10 @@ use futures::sink::SinkExt;
 use std::io;
 use std::sync::Arc;
 
-#[cfg_attr(any(target_os = "macos", target_os = "ios"), allow(unused_assignments))]
+#[cfg_attr(
+    any(target_os = "macos", target_os = "ios", target_os = "tvos"),
+    allow(unused_assignments)
+)]
 #[tokio::test]
 async fn send_framed_byte_codec() -> std::io::Result<()> {
     let mut a_soc = UdpSocket::bind("127.0.0.1:0").await?;
@@ -41,7 +44,7 @@ async fn send_framed_byte_codec() -> std::io::Result<()> {
         b_soc = b.into_inner();
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "tvos")))]
     // test sending & receiving an empty message
     {
         let mut a = UdpFramed::new(a_soc, ByteCodec);
