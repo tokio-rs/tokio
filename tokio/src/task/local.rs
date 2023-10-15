@@ -313,7 +313,9 @@ struct LocalDataEnterGuard<'a> {
 impl<'a> Drop for LocalDataEnterGuard<'a> {
     fn drop(&mut self) {
         self.local_data_ref.ctx.set(self.ctx.take());
-        self.local_data_ref.wake_on_schedule.set(self.wake_on_schedule)
+        self.local_data_ref
+            .wake_on_schedule
+            .set(self.wake_on_schedule)
     }
 }
 
@@ -402,10 +404,15 @@ pub struct LocalEnterGuard {
 
 impl Drop for LocalEnterGuard {
     fn drop(&mut self) {
-        CURRENT.with(|LocalData { ctx, wake_on_schedule }| {
-            ctx.set(self.ctx.take());
-            wake_on_schedule.set(self.wake_on_schedule);
-        })
+        CURRENT.with(
+            |LocalData {
+                 ctx,
+                 wake_on_schedule,
+             }| {
+                ctx.set(self.ctx.take());
+                wake_on_schedule.set(self.wake_on_schedule);
+            },
+        )
     }
 }
 
@@ -447,11 +454,20 @@ impl LocalSet {
     ///
     /// [`spawn_local`]: fn@crate::task::spawn_local
     pub fn enter(&self) -> LocalEnterGuard {
-        CURRENT.with(|LocalData { ctx, wake_on_schedule, .. }| {
-            let ctx = ctx.replace(Some(self.context.clone()));
-            let wake_on_schedule = wake_on_schedule.replace(true);
-            LocalEnterGuard { ctx, wake_on_schedule }
-        })
+        CURRENT.with(
+            |LocalData {
+                 ctx,
+                 wake_on_schedule,
+                 ..
+             }| {
+                let ctx = ctx.replace(Some(self.context.clone()));
+                let wake_on_schedule = wake_on_schedule.replace(true);
+                LocalEnterGuard {
+                    ctx,
+                    wake_on_schedule,
+                }
+            },
+        )
     }
 
     /// Spawns a `!Send` task onto the local task set.
