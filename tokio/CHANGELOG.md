@@ -85,7 +85,7 @@
 
 ### Fixed
 
-- sync: fix potential quadradic behavior in `broadcast::Receiver` ([#5925])
+- sync: fix potential quadratic behavior in `broadcast::Receiver` ([#5925])
 
 ### Added
 
