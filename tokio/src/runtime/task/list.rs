@@ -180,9 +180,10 @@ impl<S: 'static> OwnedTasks<S> {
         for i in start..self.get_segment_size() + start {
             loop {
                 let mut lock = self.segment_inner(i);
-                match lock.pop_back() {
+                let task = lock.pop_back();
+                drop(lock);
+                match task {
                     Some(task) => {
-                        drop(lock);
                         self.count.fetch_sub(1, Ordering::Relaxed);
                         task.shutdown();
                     }
@@ -218,10 +219,12 @@ impl<S: 'static> OwnedTasks<S> {
         // Safety: it is safe, because every task has one task_id
         let task_id = unsafe { Header::get_id(task.header_ptr()) };
         let mut lock = self.segment_inner(task_id.0 as usize);
-        let task = lock.remove(task.header_ptr())?;
+        let task = lock.remove(task.header_ptr());
         drop(lock);
-        self.count.fetch_sub(1, Ordering::Relaxed);
-        Some(task)
+        if task.is_some() {
+            self.count.fetch_sub(1, Ordering::Relaxed);
+        }
+        task
     }
 
     #[inline]
