@@ -240,6 +240,18 @@ impl TcpListener {
         Ok(TcpListener { io })
     }
 
+    /// Create a new TcpListener with the provided raw epoll flags.
+    ///
+    /// These flags replace any epoll flags would normally set when registering the fd.
+    #[cfg(all(target_os = "linux"))]
+    #[track_caller]
+    #[cfg(all(target_os = "linux", tokio_unstable))]
+    pub fn from_std_with_flags(listener: net::TcpListener, flags: u32) -> io::Result<TcpListener> {
+        let io = mio::net::TcpListener::from_std(listener);
+        let io = PollEvented::new_raw(io, flags)?;
+        Ok(TcpListener { io })
+    }
+
     /// Turns a [`tokio::net::TcpListener`] into a [`std::net::TcpListener`].
     ///
     /// The returned [`std::net::TcpListener`] will have nonblocking mode set as
