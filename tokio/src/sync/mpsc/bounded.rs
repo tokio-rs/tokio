@@ -35,7 +35,7 @@ pub struct Sender<T> {
 /// [`Sender`]: Sender
 /// [`WeakSender::upgrade`]: WeakSender::upgrade
 ///
-/// #Examples
+/// # Examples
 ///
 /// ```
 /// use tokio::sync::mpsc::channel;
@@ -522,7 +522,7 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub async fn closed(&self) {
-        self.chan.closed().await
+        self.chan.closed().await;
     }
 
     /// Attempts to immediately send a message on this `Sender`
@@ -585,7 +585,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn try_send(&self, message: T) -> Result<(), TrySendError<T>> {
         match self.chan.semaphore().semaphore.try_acquire(1) {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(message)),
             Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(message)),
         }
@@ -868,7 +868,7 @@ impl<T> Sender<T> {
         crate::trace::async_trace_leaf().await;
 
         match self.chan.semaphore().semaphore.acquire(1).await {
-            Ok(_) => Ok(()),
+            Ok(()) => Ok(()),
             Err(_) => Err(SendError(())),
         }
     }
@@ -918,7 +918,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn try_reserve(&self) -> Result<Permit<'_, T>, TrySendError<()>> {
         match self.chan.semaphore().semaphore.try_acquire(1) {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(())),
             Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(())),
         }
@@ -983,7 +983,7 @@ impl<T> Sender<T> {
     /// ```
     pub fn try_reserve_owned(self) -> Result<OwnedPermit<T>, TrySendError<Self>> {
         match self.chan.semaphore().semaphore.try_acquire(1) {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(self)),
             Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(self)),
         }
@@ -1118,7 +1118,7 @@ impl<T> Clone for WeakSender<T> {
 }
 
 impl<T> WeakSender<T> {
-    /// Tries to convert a WeakSender into a [`Sender`]. This will return `Some`
+    /// Tries to convert a `WeakSender` into a [`Sender`]. This will return `Some`
     /// if there are other `Sender` instances alive and the channel wasn't
     /// previously dropped, otherwise `None` is returned.
     pub fn upgrade(&self) -> Option<Sender<T>> {

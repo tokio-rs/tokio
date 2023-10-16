@@ -351,7 +351,7 @@ impl<T, S: Semaphore> Drop for Rx<T, S> {
             while let Some(Value(_)) = rx_fields.list.pop(&self.inner.tx) {
                 self.inner.semaphore.add_permit();
             }
-        })
+        });
     }
 }
 
@@ -386,7 +386,7 @@ impl<T, S> Drop for Chan<T, S> {
 
 impl Semaphore for bounded::Semaphore {
     fn add_permit(&self) {
-        self.semaphore.release(1)
+        self.semaphore.release(1);
     }
 
     fn is_idle(&self) -> bool {

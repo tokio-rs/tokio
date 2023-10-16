@@ -180,7 +180,7 @@ impl Default for ScheduledIo {
         ScheduledIo {
             linked_list_pointers: UnsafeCell::new(linked_list::Pointers::new()),
             readiness: AtomicUsize::new(0),
-            waiters: Mutex::new(Default::default()),
+            waiters: Mutex::new(Waiters::default()),
         }
     }
 }

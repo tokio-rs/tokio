@@ -1025,7 +1025,7 @@ impl Handle {
             // Otherwise, use the inject queue.
             self.push_remote_task(task);
             self.notify_parked_remote();
-        })
+        });
     }
 
     pub(super) fn schedule_option_task_without_yield(&self, task: Option<Notified>) {

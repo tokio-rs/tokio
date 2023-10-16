@@ -1,12 +1,12 @@
 //! This mod provides the logic for the inner tree structure of the CancellationToken.
 //!
-//! CancellationTokens are only light handles with references to TreeNode.
-//! All the logic is actually implemented in the TreeNode.
+//! CancellationTokens are only light handles with references to [`TreeNode`].
+//! All the logic is actually implemented in the [`TreeNode`].
 //!
-//! A TreeNode is part of the cancellation tree and may have one parent and an arbitrary number of
+//! A [`TreeNode`] is part of the cancellation tree and may have one parent and an arbitrary number of
 //! children.
 //!
-//! A TreeNode can receive the request to perform a cancellation through a CancellationToken.
+//! A [`TreeNode`] can receive the request to perform a cancellation through a CancellationToken.
 //! This cancellation request will cancel the node and all of its descendants.
 //!
 //! As soon as a node cannot get cancelled any more (because it was already cancelled or it has no

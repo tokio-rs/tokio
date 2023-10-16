@@ -222,7 +222,7 @@ cfg_rt! {
         }
 
         pub(crate) fn defer(&self, waker: &Waker) {
-            match_flavor!(self, Context(context) => context.defer(waker))
+            match_flavor!(self, Context(context) => context.defer(waker));
         }
 
         cfg_rt_multi_thread! {

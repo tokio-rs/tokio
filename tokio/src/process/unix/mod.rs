@@ -89,13 +89,13 @@ impl fmt::Debug for GlobalOrphanQueue {
 
 impl GlobalOrphanQueue {
     pub(crate) fn reap_orphans(handle: &SignalHandle) {
-        get_orphan_queue().reap_orphans(handle)
+        get_orphan_queue().reap_orphans(handle);
     }
 }
 
 impl OrphanQueue<StdChild> for GlobalOrphanQueue {
     fn push_orphan(&self, orphan: StdChild) {
-        get_orphan_queue().push_orphan(orphan)
+        get_orphan_queue().push_orphan(orphan);
     }
 }
 

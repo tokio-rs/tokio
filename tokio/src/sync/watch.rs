@@ -299,7 +299,7 @@ pub mod error {
 }
 
 mod big_notify {
-    use super::*;
+    use super::Notify;
     use crate::sync::notify::Notified;
 
     // To avoid contention on the lock inside the `Notify`, we store multiple
@@ -315,7 +315,7 @@ mod big_notify {
 
     pub(super) struct BigNotify {
         #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
-        next: AtomicUsize,
+        next: std::sync::atomic::AtomicUsize,
         inner: [Notify; 8],
     }
 
@@ -327,7 +327,7 @@ mod big_notify {
                     feature = "sync",
                     any(feature = "rt", feature = "macros")
                 )))]
-                next: AtomicUsize::new(0),
+                next: std::sync::atomic::AtomicUsize::new(0),
                 inner: Default::default(),
             }
         }
@@ -341,7 +341,7 @@ mod big_notify {
         /// This function implements the case where randomness is not available.
         #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
         pub(super) fn notified(&self) -> Notified<'_> {
-            let i = self.next.fetch_add(1, Relaxed) % 8;
+            let i = self.next.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 8;
             self.inner[i].notified()
         }
 

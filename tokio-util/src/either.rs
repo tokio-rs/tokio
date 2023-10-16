@@ -116,7 +116,7 @@ where
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        delegate_call!(self.consume(amt))
+        delegate_call!(self.consume(amt));
     }
 }
 

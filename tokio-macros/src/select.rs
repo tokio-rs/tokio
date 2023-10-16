@@ -73,27 +73,27 @@ fn clean_pattern(pat: &mut syn::Pat) {
             }
         }
         syn::Pat::Or(or) => {
-            for case in or.cases.iter_mut() {
+            for case in &mut or.cases {
                 clean_pattern(case);
             }
         }
         syn::Pat::Slice(slice) => {
-            for elem in slice.elems.iter_mut() {
+            for elem in &mut slice.elems {
                 clean_pattern(elem);
             }
         }
         syn::Pat::Struct(struct_pat) => {
-            for field in struct_pat.fields.iter_mut() {
+            for field in &mut struct_pat.fields {
                 clean_pattern(&mut field.pat);
             }
         }
         syn::Pat::Tuple(tuple) => {
-            for elem in tuple.elems.iter_mut() {
+            for elem in &mut tuple.elems {
                 clean_pattern(elem);
             }
         }
         syn::Pat::TupleStruct(tuple) => {
-            for elem in tuple.elems.iter_mut() {
+            for elem in &mut tuple.elems {
                 clean_pattern(elem);
             }
         }

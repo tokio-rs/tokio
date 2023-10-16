@@ -368,7 +368,7 @@ impl State {
             .map_err(|_| ())
     }
 
-    /// Tries to unset the JOIN_INTEREST flag.
+    /// Tries to unset the `JOIN_INTEREST` flag.
     ///
     /// Returns `Ok` if the operation happens before the task transitions to a
     /// completed state, `Err` otherwise.
@@ -522,11 +522,11 @@ impl Snapshot {
     }
 
     fn unset_notified(&mut self) {
-        self.0 &= !NOTIFIED
+        self.0 &= !NOTIFIED;
     }
 
     fn set_notified(&mut self) {
-        self.0 |= NOTIFIED
+        self.0 |= NOTIFIED;
     }
 
     pub(super) fn is_running(self) -> bool {
@@ -559,7 +559,7 @@ impl Snapshot {
     }
 
     fn unset_join_interested(&mut self) {
-        self.0 &= !JOIN_INTEREST
+        self.0 &= !JOIN_INTEREST;
     }
 
     pub(super) fn is_join_waker_set(self) -> bool {
@@ -571,7 +571,7 @@ impl Snapshot {
     }
 
     fn unset_join_waker(&mut self) {
-        self.0 &= !JOIN_WAKER
+        self.0 &= !JOIN_WAKER;
     }
 
     pub(super) fn ref_count(self) -> usize {
@@ -585,7 +585,7 @@ impl Snapshot {
 
     pub(super) fn ref_dec(&mut self) {
         assert!(self.ref_count() > 0);
-        self.0 -= REF_ONE
+        self.0 -= REF_ONE;
     }
 }
 

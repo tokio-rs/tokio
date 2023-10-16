@@ -363,7 +363,7 @@ trait WakerRef {
 
 impl WakerRef for Waker {
     fn wake(self) {
-        self.wake()
+        self.wake();
     }
 
     fn into_waker(self) -> Waker {
@@ -373,7 +373,7 @@ impl WakerRef for Waker {
 
 impl WakerRef for &Waker {
     fn wake(self) {
-        self.wake_by_ref()
+        self.wake_by_ref();
     }
 
     fn into_waker(self) -> Waker {

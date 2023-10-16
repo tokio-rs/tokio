@@ -586,6 +586,6 @@ impl ToTokens for Body<'_> {
             for stmt in self.stmts {
                 stmt.to_tokens(tokens);
             }
-        })
+        });
     }
 }

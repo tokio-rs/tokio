@@ -25,7 +25,7 @@ pub struct UnboundedSender<T> {
 /// [`UnboundedSender`]: UnboundedSender
 /// [`WeakUnboundedSender::upgrade`]: WeakUnboundedSender::upgrade
 ///
-/// #Examples
+/// # Examples
 ///
 /// ```
 /// use tokio::sync::mpsc::unbounded_channel;
@@ -379,7 +379,7 @@ impl<T> UnboundedSender<T> {
     /// }
     /// ```
     pub async fn closed(&self) {
-        self.chan.closed().await
+        self.chan.closed().await;
     }
 
     /// Checks if the channel has been closed. This happens when the
@@ -440,7 +440,7 @@ impl<T> Clone for WeakUnboundedSender<T> {
 }
 
 impl<T> WeakUnboundedSender<T> {
-    /// Tries to convert a WeakUnboundedSender into an [`UnboundedSender`].
+    /// Tries to convert a `WeakUnboundedSender` into an [`UnboundedSender`].
     /// This will return `Some` if there are other `Sender` instances alive and
     /// the channel wasn't previously dropped, otherwise `None` is returned.
     pub fn upgrade(&self) -> Option<UnboundedSender<T>> {

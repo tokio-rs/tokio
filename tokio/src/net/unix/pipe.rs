@@ -1188,19 +1188,19 @@ fn get_file_flags(file: &File) -> io::Result<libc::c_int> {
     }
 }
 
-/// Checks for O_RDONLY or O_RDWR access mode.
+/// Checks for `O_RDONLY` or `O_RDWR` access mode.
 fn has_read_access(flags: libc::c_int) -> bool {
     let mode = flags & libc::O_ACCMODE;
     mode == libc::O_RDONLY || mode == libc::O_RDWR
 }
 
-/// Checks for O_WRONLY or O_RDWR access mode.
+/// Checks for `O_WRONLY` or `O_RDWR` access mode.
 fn has_write_access(flags: libc::c_int) -> bool {
     let mode = flags & libc::O_ACCMODE;
     mode == libc::O_WRONLY || mode == libc::O_RDWR
 }
 
-/// Sets file's flags with O_NONBLOCK by fcntl.
+/// Sets file's flags with `O_NONBLOCK` by fcntl.
 fn set_nonblocking(file: &mut File, current_flags: libc::c_int) -> io::Result<()> {
     let fd = file.as_raw_fd();
 

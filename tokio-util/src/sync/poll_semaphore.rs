@@ -29,7 +29,7 @@ impl PollSemaphore {
 
     /// Closes the semaphore.
     pub fn close(&self) {
-        self.semaphore.close()
+        self.semaphore.close();
     }
 
     /// Obtain a clone of the inner semaphore.

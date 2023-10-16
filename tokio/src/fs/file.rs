@@ -126,7 +126,7 @@ impl File {
     ///
     /// This function will return an error if called from outside of the Tokio
     /// runtime or if path does not already exist. Other errors may also be
-    /// returned according to OpenOptions::open.
+    /// returned according to `OpenOptions::open`.
     ///
     /// # Examples
     ///
@@ -367,7 +367,7 @@ impl File {
             } else {
                 std.set_len(size)
             }
-            .map(|_| 0); // the value is discarded later
+            .map(|()| 0); // the value is discarded later
 
             // Return the result as a seek
             (Operation::Seek(res), buf)
@@ -562,7 +562,7 @@ impl AsyncRead for File {
                             inner.state = State::Idle(Some(buf));
                             return Poll::Ready(Err(e));
                         }
-                        Operation::Write(Ok(_)) => {
+                        Operation::Write(Ok(())) => {
                             assert!(buf.is_empty());
                             inner.state = State::Idle(Some(buf));
                             continue;
@@ -877,7 +877,7 @@ impl Inner {
     async fn complete_inflight(&mut self) {
         use crate::future::poll_fn;
 
-        poll_fn(|cx| self.poll_complete_inflight(cx)).await
+        poll_fn(|cx| self.poll_complete_inflight(cx)).await;
     }
 
     fn poll_complete_inflight(&mut self, cx: &mut Context<'_>) -> Poll<()> {

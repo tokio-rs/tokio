@@ -206,7 +206,7 @@ impl StateCell {
     /// Fires the timer, setting the result to the provided result.
     ///
     /// Returns:
-    /// * `Some(waker) - if fired and a waker needs to be invoked once the
+    /// * `Some(waker)` - if fired and a waker needs to be invoked once the
     ///   driver lock is released
     /// * `None` - if fired and a waker does not need to be invoked, or if
     ///   already fired
@@ -553,9 +553,11 @@ impl TimerEntry {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), super::Error>> {
-        if self.driver().is_shutdown() {
-            panic!("{}", crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR);
-        }
+        assert!(
+            !self.driver().is_shutdown(),
+            "{}",
+            crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR
+        );
 
         if !self.registered {
             let deadline = self.deadline;
@@ -639,6 +641,6 @@ impl TimerHandle {
 
 impl Drop for TimerEntry {
     fn drop(&mut self) {
-        unsafe { Pin::new_unchecked(self) }.as_mut().cancel()
+        unsafe { Pin::new_unchecked(self) }.as_mut().cancel();
     }
 }

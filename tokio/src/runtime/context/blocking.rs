@@ -115,7 +115,7 @@ impl Drop for DisallowBlockInPlaceGuard {
                         allow_block_in_place: true,
                     });
                 }
-            })
+            });
         }
     }
 }

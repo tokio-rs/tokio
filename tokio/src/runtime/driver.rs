@@ -66,15 +66,15 @@ impl Driver {
     }
 
     pub(crate) fn park(&mut self, handle: &Handle) {
-        self.inner.park(handle)
+        self.inner.park(handle);
     }
 
     pub(crate) fn park_timeout(&mut self, handle: &Handle, duration: Duration) {
-        self.inner.park_timeout(handle, duration)
+        self.inner.park_timeout(handle, duration);
     }
 
     pub(crate) fn shutdown(&mut self, handle: &Handle) {
-        self.inner.shutdown(handle)
+        self.inner.shutdown(handle);
     }
 }
 

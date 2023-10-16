@@ -379,7 +379,7 @@ impl<T: Future, S: Schedule> Core<T, S> {
 
     unsafe fn set_stage(&self, stage: Stage<T>) {
         let _guard = TaskIdGuard::enter(self.task_id);
-        self.stage.stage.with_mut(|ptr| *ptr = stage)
+        self.stage.stage.with_mut(|ptr| *ptr = stage);
     }
 }
 

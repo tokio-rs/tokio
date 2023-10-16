@@ -299,7 +299,7 @@ pub mod error {
     impl std::error::Error for TryRecvError {}
 }
 
-use self::error::*;
+use self::error::{RecvError, SendError, TryRecvError};
 
 /// Data shared between senders and receivers.
 struct Shared<T> {
@@ -817,9 +817,7 @@ impl<T> Sender<T> {
 fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     let mut tail = shared.tail.lock();
 
-    if tail.rx_cnt == MAX_RECEIVERS {
-        panic!("max receivers");
-    }
+    assert!(tail.rx_cnt != MAX_RECEIVERS, "max receivers");
 
     tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
 
