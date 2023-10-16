@@ -60,5 +60,5 @@ pub async fn yield_now() {
         }
     }
 
-    YieldNow { yielded: false }.await
+    YieldNow { yielded: false }.await;
 }

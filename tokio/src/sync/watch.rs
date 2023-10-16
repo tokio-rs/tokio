@@ -299,7 +299,7 @@ pub mod error {
 }
 
 mod big_notify {
-    use super::*;
+    use super::Notify;
     use crate::sync::notify::Notified;
 
     // To avoid contention on the lock inside the `Notify`, we store multiple

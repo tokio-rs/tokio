@@ -149,11 +149,11 @@ impl Driver {
     }
 
     pub(crate) fn park(&mut self, handle: &driver::Handle) {
-        self.park_internal(handle, None)
+        self.park_internal(handle, None);
     }
 
     pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
-        self.park_internal(handle, Some(duration))
+        self.park_internal(handle, Some(duration));
     }
 
     pub(crate) fn shutdown(&mut self, rt_handle: &driver::Handle) {
@@ -253,7 +253,7 @@ impl Handle {
     pub(self) fn process(&self, clock: &Clock) {
         let now = self.time_source().now(clock);
 
-        self.process_at_time(now)
+        self.process_at_time(now);
     }
 
     pub(self) fn process_at_time(&self, mut now: u64) {
@@ -305,7 +305,7 @@ impl Handle {
 
         drop(lock);
 
-        for waker in waker_list[0..waker_idx].iter_mut() {
+        for waker in &mut waker_list[0..waker_idx] {
             waker.take().unwrap().wake();
         }
     }

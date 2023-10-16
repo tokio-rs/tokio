@@ -35,7 +35,7 @@ impl<I> Unpin for Once<I> {}
 /// ```
 pub fn once<T>(value: T) -> Once<T> {
     Once {
-        iter: crate::iter(Some(value).into_iter()),
+        iter: crate::iter(Some(value)),
     }
 }
 

@@ -709,50 +709,47 @@ impl UnwindSafe for Notify {}
 impl RefUnwindSafe for Notify {}
 
 fn notify_locked(waiters: &mut WaitList, state: &AtomicUsize, curr: usize) -> Option<Waker> {
-    loop {
-        match get_state(curr) {
-            EMPTY | NOTIFIED => {
-                let res = state.compare_exchange(curr, set_state(curr, NOTIFIED), SeqCst, SeqCst);
+    match get_state(curr) {
+        EMPTY | NOTIFIED => {
+            let res = state.compare_exchange(curr, set_state(curr, NOTIFIED), SeqCst, SeqCst);
 
-                match res {
-                    Ok(_) => return None,
-                    Err(actual) => {
-                        let actual_state = get_state(actual);
-                        assert!(actual_state == EMPTY || actual_state == NOTIFIED);
-                        state.store(set_state(actual, NOTIFIED), SeqCst);
-                        return None;
-                    }
+            match res {
+                Ok(_) => None,
+                Err(actual) => {
+                    let actual_state = get_state(actual);
+                    assert!(actual_state == EMPTY || actual_state == NOTIFIED);
+                    state.store(set_state(actual, NOTIFIED), SeqCst);
+                    None
                 }
             }
-            WAITING => {
-                // At this point, it is guaranteed that the state will not
-                // concurrently change as holding the lock is required to
-                // transition **out** of `WAITING`.
-                //
-                // Get a pending waiter
-                let waiter = waiters.pop_back().unwrap();
-
-                // Safety: we never make mutable references to waiters.
-                let waiter = unsafe { waiter.as_ref() };
-
-                // Safety: we hold the lock, so we can access the waker.
-                let waker = unsafe { waiter.waker.with_mut(|waker| (*waker).take()) };
-
-                // This waiter is unlinked and will not be shared ever again, release it.
-                waiter.notification.store_release(Notification::One);
-
-                if waiters.is_empty() {
-                    // As this the **final** waiter in the list, the state
-                    // must be transitioned to `EMPTY`. As transitioning
-                    // **from** `WAITING` requires the lock to be held, a
-                    // `store` is sufficient.
-                    state.store(set_state(curr, EMPTY), SeqCst);
-                }
-
-                return waker;
-            }
-            _ => unreachable!(),
         }
+        WAITING => {
+            // At this point, it is guaranteed that the state will not
+            // concurrently change as holding the lock is required to
+            // transition **out** of `WAITING`.
+            //
+            // Get a pending waiter
+            let waiter = waiters.pop_back().unwrap();
+
+            // Safety: we never make mutable references to waiters.
+            let waiter = unsafe { waiter.as_ref() };
+
+            // Safety: we hold the lock, so we can access the waker.
+            let waker = unsafe { waiter.waker.with_mut(|waker| (*waker).take()) };
+
+            // This waiter is unlinked and will not be shared ever again, release it.
+            waiter.notification.store_release(Notification::One);
+
+            if waiters.is_empty() {
+                // As this the **final** waiter in the list, the state
+                // must be transitioned to `EMPTY`. As transitioning
+                // **from** `WAITING` requires the lock to be held, a
+                // `store` is sufficient.
+                state.store(set_state(curr, EMPTY), SeqCst);
+            }
+            waker
+        }
+        _ => unreachable!(),
     }
 }
 

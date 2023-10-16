@@ -412,7 +412,7 @@ impl Drop for LocalEnterGuard {
                 ctx.set(self.ctx.take());
                 wake_on_schedule.set(self.wake_on_schedule);
             },
-        )
+        );
     }
 }
 
@@ -658,9 +658,7 @@ impl LocalSet {
     fn tick(&self) -> bool {
         for _ in 0..MAX_TASKS_PER_TICK {
             // Make sure we didn't hit an unhandled panic
-            if self.context.unhandled_panic.get() {
-                panic!("a spawned task panicked and the LocalSet is configured to shutdown on unhandled panic");
-            }
+            assert!(!self.context.unhandled_panic.get(), "a spawned task panicked and the LocalSet is configured to shutdown on unhandled panic");
 
             match self.next_task() {
                 // Run the task
@@ -701,7 +699,7 @@ impl LocalSet {
                     .queue
                     .lock()
                     .as_mut()
-                    .and_then(|queue| queue.pop_front())
+                    .and_then(VecDeque::pop_front)
             })
         };
 
@@ -1092,7 +1090,7 @@ impl LocalState {
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.local_queue.with_mut(|ptr| (*ptr).push_back(task))
+        self.local_queue.with_mut(|ptr| (*ptr).push_back(task));
     }
 
     unsafe fn take_local_queue(&self) -> VecDeque<task::Notified<Arc<Shared>>> {
@@ -1136,7 +1134,7 @@ impl LocalState {
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.owned.close_and_shutdown_all()
+        self.owned.close_and_shutdown_all();
     }
 
     #[track_caller]

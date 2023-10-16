@@ -228,7 +228,7 @@ impl BlockingPool {
                     before_stop: builder.before_stop.clone(),
                     thread_cap,
                     keep_alive,
-                    metrics: Default::default(),
+                    metrics: SpawnerMetrics::default(),
                 }),
             },
             shutdown_rx,
@@ -259,14 +259,14 @@ impl BlockingPool {
         drop(shared);
 
         if self.shutdown_rx.wait(timeout) {
-            let _ = last_exited_thread.map(|th| th.join());
+            let _ = last_exited_thread.map(thread::JoinHandle::join);
 
             // Loom requires that execution be deterministic, so sort by thread ID before joining.
             // (HashMaps use a randomly-seeded hash function, so the order is nondeterministic)
             let mut workers: Vec<(usize, thread::JoinHandle<()>)> = workers.into_iter().collect();
             workers.sort_by_key(|(id, _)| *id);
 
-            for (_id, handle) in workers.into_iter() {
+            for (_id, handle) in workers {
                 let _ = handle.join();
             }
         }
@@ -499,7 +499,7 @@ fn is_temporary_os_thread_error(error: &std::io::Error) -> bool {
 impl Inner {
     fn run(&self, worker_thread_id: usize) {
         if let Some(f) = &self.after_start {
-            f()
+            f();
         }
 
         let mut shared = self.shared.lock();
@@ -575,9 +575,10 @@ impl Inner {
         // with a descriptive message if it is not the
         // case.
         let prev_idle = self.metrics.dec_num_idle_threads();
-        if prev_idle < self.metrics.num_idle_threads() {
-            panic!("num_idle_threads underflowed on thread exit")
-        }
+        assert!(
+            prev_idle >= self.metrics.num_idle_threads(),
+            "num_idle_threads underflowed on thread exit"
+        );
 
         if shared.shutdown && self.metrics.num_threads() == 0 {
             self.condvar.notify_one();
@@ -586,7 +587,7 @@ impl Inner {
         drop(shared);
 
         if let Some(f) = &self.before_stop {
-            f()
+            f();
         }
 
         if let Some(handle) = join_on_thread {

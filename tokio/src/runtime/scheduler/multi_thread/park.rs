@@ -72,7 +72,7 @@ impl Parker {
         assert_eq!(duration, Duration::from_millis(0));
 
         if let Some(mut driver) = self.inner.shared.driver.try_lock() {
-            driver.park_timeout(handle, duration)
+            driver.park_timeout(handle, duration);
         }
     }
 
@@ -219,7 +219,7 @@ impl Inner {
         // to release `lock`.
         drop(self.mutex.lock());
 
-        self.condvar.notify_one()
+        self.condvar.notify_one();
     }
 
     fn shutdown(&self, handle: &driver::Handle) {

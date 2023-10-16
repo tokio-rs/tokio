@@ -378,13 +378,13 @@ impl TcpSocket {
         self.inner.recv_buffer_size().map(|n| n as u32)
     }
 
-    /// Sets the linger duration of this socket by setting the SO_LINGER option.
+    /// Sets the linger duration of this socket by setting the `SO_LINGER` option.
     ///
     /// This option controls the action taken when a stream has unsent messages and the stream is
-    /// closed. If SO_LINGER is set, the system shall block the process until it can transmit the
+    /// closed. If `SO_LINGER` is set, the system shall block the process until it can transmit the
     /// data or until the time expires.
     ///
-    /// If SO_LINGER is not specified, and the socket is closed, the system handles the call in a
+    /// If `SO_LINGER` is not specified, and the socket is closed, the system handles the call in a
     /// way that allows the process to continue as quickly as possible.
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.inner.set_linger(dur)

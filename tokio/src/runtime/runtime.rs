@@ -450,7 +450,7 @@ impl Runtime {
     /// }
     /// ```
     pub fn shutdown_background(self) {
-        self.shutdown_timeout(Duration::from_nanos(0))
+        self.shutdown_timeout(Duration::from_nanos(0));
     }
 }
 

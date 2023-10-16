@@ -279,7 +279,7 @@ impl ops::BitOr for Interest {
 impl ops::BitOrAssign for Interest {
     #[inline]
     fn bitor_assign(&mut self, other: Self) {
-        *self = *self | other
+        *self = *self | other;
     }
 }
 

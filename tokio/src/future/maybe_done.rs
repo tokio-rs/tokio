@@ -1,4 +1,4 @@
-//! Definition of the MaybeDone combinator.
+//! Definition of the [`MaybeDone`] combinator.
 
 use std::future::Future;
 use std::mem;

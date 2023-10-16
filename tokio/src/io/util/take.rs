@@ -43,7 +43,7 @@ impl<R: AsyncRead> Take<R> {
     /// the amount of bytes read and the previous limit value don't matter when
     /// calling this method.
     pub fn set_limit(&mut self, limit: u64) {
-        self.limit_ = limit
+        self.limit_ = limit;
     }
 
     /// Gets a reference to the underlying reader.

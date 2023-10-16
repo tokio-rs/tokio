@@ -448,7 +448,7 @@ impl<S: Schedule> UnownedTask<S> {
     }
 
     pub(crate) fn shutdown(self) {
-        self.into_task().shutdown()
+        self.into_task().shutdown();
     }
 }
 

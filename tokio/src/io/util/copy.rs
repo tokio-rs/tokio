@@ -40,7 +40,7 @@ impl CopyBuffer {
         buf.set_filled(me.cap);
 
         let res = reader.poll_read(cx, &mut buf);
-        if let Poll::Ready(Ok(_)) = res {
+        if let Poll::Ready(Ok(())) = res {
             let filled_len = buf.filled().len();
             me.read_done = me.cap == filled_len;
             me.cap = filled_len;
@@ -90,7 +90,7 @@ impl CopyBuffer {
                 self.cap = 0;
 
                 match self.poll_fill_buf(cx, reader.as_mut()) {
-                    Poll::Ready(Ok(_)) => (),
+                    Poll::Ready(Ok(())) => (),
                     Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
                     Poll::Pending => {
                         // Try flushing when the reader has no progress to avoid deadlock

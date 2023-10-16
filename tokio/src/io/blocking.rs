@@ -116,7 +116,7 @@ where
 
                     self.state = State::Busy(sys::run(move || {
                         let n = buf.len();
-                        let res = buf.write_to(&mut inner).map(|_| n);
+                        let res = buf.write_to(&mut inner).map(|()| n);
 
                         (res, buf, inner)
                     }));
@@ -147,7 +147,7 @@ where
                         let mut inner = self.inner.take().unwrap();
 
                         self.state = State::Busy(sys::run(move || {
-                            let res = inner.flush().map(|_| 0);
+                            let res = inner.flush().map(|()| 0);
                             (res, buf, inner)
                         }));
 

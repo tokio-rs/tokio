@@ -742,7 +742,7 @@ impl UnixStream {
             .await
     }
 
-    /// Creates new `UnixStream` from a `std::os::unix::net::UnixStream`.
+    /// Creates new [`UnixStream`] from a [`std::os::unix::net::UnixStream`].
     ///
     /// This function is intended to be used to wrap a UnixStream from the
     /// standard library in the Tokio equivalent.
@@ -828,7 +828,7 @@ impl UnixStream {
     pub fn into_std(self) -> io::Result<std::os::unix::net::UnixStream> {
         self.io
             .into_inner()
-            .map(|io| io.into_raw_fd())
+            .map(IntoRawFd::into_raw_fd)
             .map(|raw_fd| unsafe { std::os::unix::net::UnixStream::from_raw_fd(raw_fd) })
     }
 
