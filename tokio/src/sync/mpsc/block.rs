@@ -289,7 +289,7 @@ impl<T> Block<T> {
     ///
     /// # Ordering
     ///
-    /// This performs a compare-and-swap on `next` using [`std::sync::atomic::Ordering::AcqRel`] ordering.
+    /// This performs a compare-and-swap on `next` using `AcqRel` ordering.
     ///
     /// # Safety
     ///
