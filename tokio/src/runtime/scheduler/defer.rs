@@ -8,7 +8,7 @@ pub(crate) struct Defer {
 impl Defer {
     pub(crate) fn new() -> Defer {
         Defer {
-            deferred: Default::default(),
+            deferred: RefCell::default(),
         }
     }
 

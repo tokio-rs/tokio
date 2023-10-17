@@ -39,6 +39,6 @@ impl Driver {
     }
 
     pub(crate) fn shutdown(&mut self, handle: &driver::Handle) {
-        self.park.shutdown(handle)
+        self.park.shutdown(handle);
     }
 }

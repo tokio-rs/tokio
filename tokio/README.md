@@ -56,7 +56,7 @@ Make sure you activated the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.32.0", features = ["full"] }
+tokio = { version = "1.33.0", features = ["full"] }
 ```
 Then, on your main.rs:
 
@@ -132,6 +132,8 @@ project.
 In addition to the crates in this repository, the Tokio project also maintains
 several other libraries, including:
 
+* [`axum`]: A web application framework that focuses on ergonomics and modularity.
+
 * [`hyper`]: A fast and correct HTTP/1.1 and HTTP/2 implementation for Rust.
 
 * [`tonic`]: A gRPC over HTTP/2 implementation focused on high performance, interoperability, and flexibility.
@@ -142,21 +144,18 @@ several other libraries, including:
 
 * [`tracing`] (formerly `tokio-trace`): A framework for application-level tracing and async-aware diagnostics.
 
-* [`rdbc`]: A Rust database connectivity library for MySQL, Postgres and SQLite.
-
-* [`mio`]: A low-level, cross-platform abstraction over OS I/O APIs that powers
-  `tokio`.
+* [`mio`]: A low-level, cross-platform abstraction over OS I/O APIs that powers `tokio`.
 
 * [`bytes`]: Utilities for working with bytes, including efficient byte buffers.
 
-* [`loom`]: A testing tool for concurrent Rust code
+* [`loom`]: A testing tool for concurrent Rust code.
 
+[`axum`]: https://github.com/tokio-rs/axum
 [`warp`]: https://github.com/seanmonstar/warp
 [`hyper`]: https://github.com/hyperium/hyper
 [`tonic`]: https://github.com/hyperium/tonic
 [`tower`]: https://github.com/tower-rs/tower
 [`loom`]: https://github.com/tokio-rs/loom
-[`rdbc`]: https://github.com/tokio-rs/rdbc
 [`tracing`]: https://github.com/tokio-rs/tracing
 [`mio`]: https://github.com/tokio-rs/mio
 [`bytes`]: https://github.com/tokio-rs/bytes
@@ -216,9 +215,8 @@ warrants a patch release with a fix for the bug, it will be backported and
 released as a new patch release for each LTS minor version. Our current LTS
 releases are:
 
- * `1.20.x` - LTS release until September 2023. (MSRV 1.49)
  * `1.25.x` - LTS release until March 2024. (MSRV 1.49)
- * `1.32.x` - LTS release until September 2024 (MSRV 1.63)
+ * `1.32.x` - LTS release until September 2024. (MSRV 1.63)
 
 Each LTS release will continue to receive backported fixes for at least a year.
 If you wish to use a fixed minor release in your project, we recommend that you
@@ -236,6 +234,7 @@ tokio = { version = "~1.25", features = [...] }
  * `1.8.x` - LTS release until February 2022.
  * `1.14.x` - LTS release until June 2022.
  * `1.18.x` - LTS release until June 2023.
+ * `1.20.x` - LTS release until September 2023.
 
 ## License
 

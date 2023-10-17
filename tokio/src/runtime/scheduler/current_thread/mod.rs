@@ -354,7 +354,7 @@ impl Context {
             // Incorrect lint, the closures are actually different types so `f`
             // cannot be passed as an argument to `enter`.
             #[allow(clippy::redundant_closure)]
-            let (c, _) = self.enter(core, || f());
+            let (c, ()) = self.enter(core, || f());
             core = c;
         }
 
@@ -365,7 +365,7 @@ impl Context {
             core.metrics.about_to_park();
             core.submit_metrics(handle);
 
-            let (c, _) = self.enter(core, || {
+            let (c, ()) = self.enter(core, || {
                 driver.park(&handle.driver);
                 self.defer.wake();
             });
@@ -377,7 +377,7 @@ impl Context {
             // Incorrect lint, the closures are actually different types so `f`
             // cannot be passed as an argument to `enter`.
             #[allow(clippy::redundant_closure)]
-            let (c, _) = self.enter(core, || f());
+            let (c, ()) = self.enter(core, || f());
             core = c;
         }
 
@@ -391,7 +391,7 @@ impl Context {
 
         core.submit_metrics(handle);
 
-        let (mut core, _) = self.enter(core, || {
+        let (mut core, ()) = self.enter(core, || {
             driver.park_timeout(&handle.driver, Duration::from_millis(0));
             self.defer.wake();
         });
@@ -627,7 +627,7 @@ impl Schedule for Arc<Handle> {
 
 impl Wake for Handle {
     fn wake(arc_self: Arc<Self>) {
-        Wake::wake_by_ref(&arc_self)
+        Wake::wake_by_ref(&arc_self);
     }
 
     /// Wake by reference
@@ -702,7 +702,7 @@ impl CoreGuard<'_> {
 
                     let task = context.handle.shared.owned.assert_owner(task);
 
-                    let (c, _) = context.run_task(core, || {
+                    let (c, ()) = context.run_task(core, || {
                         task.run();
                     });
 
@@ -758,7 +758,7 @@ impl Drop for CoreGuard<'_> {
             self.scheduler.core.set(core);
 
             // Wake up other possible threads that could steal the driver.
-            self.scheduler.notify.notify_one()
+            self.scheduler.notify.notify_one();
         }
     }
 }

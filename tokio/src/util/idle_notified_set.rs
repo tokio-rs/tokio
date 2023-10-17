@@ -124,7 +124,7 @@ unsafe impl<T> Send for ListEntry<T> {}
 unsafe impl<T> Sync for ListEntry<T> {}
 
 impl<T> IdleNotifiedSet<T> {
-    /// Create a new IdleNotifiedSet.
+    /// Create a new `IdleNotifiedSet`.
     pub(crate) fn new() -> Self {
         let lists = Mutex::new(ListsInner {
             notified: LinkedList::new(),
@@ -433,7 +433,7 @@ impl<T: 'static> Wake for ListEntry<T> {
     }
 
     fn wake(me: Arc<Self>) {
-        Self::wake_by_ref(&me)
+        Self::wake_by_ref(&me);
     }
 }
 

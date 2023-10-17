@@ -99,7 +99,7 @@ impl Driver {
     }
 
     pub(crate) fn shutdown(&mut self, handle: &driver::Handle) {
-        self.io.shutdown(handle)
+        self.io.shutdown(handle);
     }
 
     fn process(&mut self) {

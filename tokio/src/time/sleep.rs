@@ -60,7 +60,7 @@ use std::task::{self, Poll};
 #[cfg_attr(docsrs, doc(alias = "delay_until"))]
 #[track_caller]
 pub fn sleep_until(deadline: Instant) -> Sleep {
-    return Sleep::new_timeout(deadline, trace::caller_location());
+    Sleep::new_timeout(deadline, trace::caller_location())
 }
 
 /// Waits until `duration` has elapsed.
@@ -219,8 +219,8 @@ pin_project! {
     ///
     /// [`select!`]: ../macro.select.html
     /// [`tokio::pin!`]: ../macro.pin.html
-    // Alias for old name in 0.2
     #[project(!Unpin)]
+    // Alias for old name in 0.2
     #[cfg_attr(docsrs, doc(alias = "Delay"))]
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -351,7 +351,7 @@ impl Sleep {
     ///
     /// [`Pin::as_mut`]: fn@std::pin::Pin::as_mut
     pub fn reset(self: Pin<&mut Self>, deadline: Instant) {
-        self.reset_inner(deadline)
+        self.reset_inner(deadline);
     }
 
     /// Resets the `Sleep` instance to a new deadline without reregistering it
@@ -360,7 +360,7 @@ impl Sleep {
     /// Calling this function allows changing the instant at which the `Sleep`
     /// future completes without having to create new associated state and
     /// without having it registered. This is required in e.g. the
-    /// [crate::time::Interval] where we want to reset the internal [Sleep]
+    /// [`crate::time::Interval`] where we want to reset the internal [Sleep]
     /// without having it wake up the last task that polled it.
     pub(crate) fn reset_without_reregister(self: Pin<&mut Self>, deadline: Instant) {
         let mut me = self.project();

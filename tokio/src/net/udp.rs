@@ -251,7 +251,7 @@ impl UdpSocket {
             use std::os::unix::io::{FromRawFd, IntoRawFd};
             self.io
                 .into_inner()
-                .map(|io| io.into_raw_fd())
+                .map(IntoRawFd::into_raw_fd)
                 .map(|raw_fd| unsafe { std::net::UdpSocket::from_raw_fd(raw_fd) })
         }
 
@@ -342,7 +342,7 @@ impl UdpSocket {
 
         for addr in addrs {
             match self.io.connect(addr) {
-                Ok(_) => return Ok(()),
+                Ok(()) => return Ok(()),
                 Err(e) => last_err = Some(e),
             }
         }
@@ -1506,7 +1506,7 @@ impl UdpSocket {
     /// # Notes
     ///
     /// On Windows, if the data is larger than the buffer specified, the buffer
-    /// is filled with the first part of the data, and peek_from returns the error
+    /// is filled with the first part of the data, and `peek_from` returns the error
     /// WSAEMSGSIZE(10040). The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.

@@ -1,6 +1,7 @@
-use std::io::{BufRead, Read, Write};
+use std::io::{BufRead, Read, Seek, Write};
 use tokio::io::{
-    AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
+    AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite,
+    AsyncWriteExt,
 };
 
 /// Use a [`tokio::io::AsyncRead`] synchronously as a [`std::io::Read`] or
@@ -76,6 +77,13 @@ impl<T: AsyncWrite + Unpin> Write for SyncIoBridge<T> {
     fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
         let src = &mut self.src;
         self.rt.block_on(src.write_vectored(bufs))
+    }
+}
+
+impl<T: AsyncSeek + Unpin> Seek for SyncIoBridge<T> {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        let src = &mut self.src;
+        self.rt.block_on(AsyncSeekExt::seek(src, pos))
     }
 }
 

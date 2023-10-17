@@ -127,7 +127,7 @@ impl<T: Future> Spawn<T> {
 }
 
 impl<T: Stream> Spawn<T> {
-    /// If `T` is a [`Stream`] then poll_next it. This will handle pinning and the context
+    /// If `T` is a [`Stream`] then `poll_next` it. This will handle pinning and the context
     /// type for the stream.
     pub fn poll_next(&mut self) -> Poll<Option<T::Item>> {
         let stream = self.future.as_mut();

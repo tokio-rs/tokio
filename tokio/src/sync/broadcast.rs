@@ -299,7 +299,7 @@ pub mod error {
     impl std::error::Error for TryRecvError {}
 }
 
-use self::error::*;
+use self::error::{RecvError, SendError, TryRecvError};
 
 /// Data shared between senders and receivers.
 struct Shared<T> {
@@ -407,6 +407,8 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 /// Create a bounded, multi-producer, multi-consumer channel where each sent
 /// value is broadcasted to all active receivers.
 ///
+/// **Note:** The actual capacity may be greater than the provided `capacity`.
+///
 /// All data sent on [`Sender`] will become available on every active
 /// [`Receiver`] in the same order as it was sent.
 ///
@@ -474,7 +476,7 @@ unsafe impl<T: Send> Sync for Receiver<T> {}
 impl<T> Sender<T> {
     /// Creates the sending-half of the [`broadcast`] channel.
     ///
-    /// See documentation of [`broadcast::channel`] for errors when calling this function.
+    /// See the documentation of [`broadcast::channel`] for more information on this method.
     ///
     /// [`broadcast`]: crate::sync::broadcast
     /// [`broadcast::channel`]: crate::sync::broadcast
@@ -815,9 +817,7 @@ impl<T> Sender<T> {
 fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     let mut tail = shared.tail.lock();
 
-    if tail.rx_cnt == MAX_RECEIVERS {
-        panic!("max receivers");
-    }
+    assert!(tail.rx_cnt != MAX_RECEIVERS, "max receivers");
 
     tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
 
@@ -1323,6 +1323,7 @@ impl<T: Clone> Receiver<T> {
     ///     let _ = tx.send(10);
     ///     sync_code.join().unwrap();
     /// }
+    /// ```
     pub fn blocking_recv(&mut self) -> Result<T, RecvError> {
         crate::future::block_on(self.recv())
     }

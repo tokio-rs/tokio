@@ -22,17 +22,17 @@
 #[macro_export]
 macro_rules! assert_ready {
     ($e:expr) => {{
-        use core::task::Poll::*;
+        use core::task::Poll;
         match $e {
-            Ready(v) => v,
-            Pending => panic!("pending"),
+            Poll::Ready(v) => v,
+            Poll::Pending => panic!("pending"),
         }
     }};
     ($e:expr, $($msg:tt)+) => {{
-        use core::task::Poll::*;
+        use core::task::Poll;
         match $e {
-            Ready(v) => v,
-            Pending => {
+            Poll::Ready(v) => v,
+            Poll::Pending => {
                 panic!("pending; {}", format_args!($($msg)+))
             }
         }
@@ -127,17 +127,17 @@ macro_rules! assert_ready_err {
 #[macro_export]
 macro_rules! assert_pending {
     ($e:expr) => {{
-        use core::task::Poll::*;
+        use core::task::Poll;
         match $e {
-            Pending => {}
-            Ready(v) => panic!("ready; value = {:?}", v),
+            Poll::Pending => {}
+            Poll::Ready(v) => panic!("ready; value = {:?}", v),
         }
     }};
     ($e:expr, $($msg:tt)+) => {{
-        use core::task::Poll::*;
+        use core::task::Poll;
         match $e {
-            Pending => {}
-            Ready(v) => {
+            Poll::Pending => {}
+            Poll::Ready(v) => {
                 panic!("ready; value = {:?}; {}", v, format_args!($($msg)+))
             }
         }

@@ -22,13 +22,12 @@ cfg_io_util! {
 /// Generally speaking, when using `OpenOptions`, you'll first call [`new`],
 /// then chain calls to methods to set each option, then call either
 /// [`open_receiver`] or [`open_sender`], passing the path of the FIFO file you
-/// are trying to open. This will give you a [`io::Result`][result] with a pipe
-/// end inside that you can further operate on.
+/// are trying to open. This will give you a [`io::Result`] with a pipe end
+/// inside that you can further operate on.
 ///
 /// [`new`]: OpenOptions::new
 /// [`open_receiver`]: OpenOptions::open_receiver
 /// [`open_sender`]: OpenOptions::open_sender
-/// [result]: std::io::Result
 ///
 /// # Examples
 ///
@@ -1189,19 +1188,19 @@ fn get_file_flags(file: &File) -> io::Result<libc::c_int> {
     }
 }
 
-/// Checks for O_RDONLY or O_RDWR access mode.
+/// Checks for `O_RDONLY` or `O_RDWR` access mode.
 fn has_read_access(flags: libc::c_int) -> bool {
     let mode = flags & libc::O_ACCMODE;
     mode == libc::O_RDONLY || mode == libc::O_RDWR
 }
 
-/// Checks for O_WRONLY or O_RDWR access mode.
+/// Checks for `O_WRONLY` or `O_RDWR` access mode.
 fn has_write_access(flags: libc::c_int) -> bool {
     let mode = flags & libc::O_ACCMODE;
     mode == libc::O_WRONLY || mode == libc::O_RDWR
 }
 
-/// Sets file's flags with O_NONBLOCK by fcntl.
+/// Sets file's flags with `O_NONBLOCK` by fcntl.
 fn set_nonblocking(file: &mut File, current_flags: libc::c_int) -> io::Result<()> {
     let fd = file.as_raw_fd();
 

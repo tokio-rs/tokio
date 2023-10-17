@@ -50,9 +50,7 @@ impl Context {
         let old_handle = self.current.handle.borrow_mut().replace(handle.clone());
         let depth = self.current.depth.get();
 
-        if depth == usize::MAX {
-            panic!("reached max `enter` depth");
-        }
+        assert!(depth != usize::MAX, "reached max `enter` depth");
 
         let depth = depth + 1;
         self.current.depth.set(depth);

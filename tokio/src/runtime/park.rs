@@ -197,7 +197,7 @@ impl Inner {
         // to release `lock`.
         drop(self.mutex.lock());
 
-        self.condvar.notify_one()
+        self.condvar.notify_one();
     }
 
     fn shutdown(&self) {
@@ -243,11 +243,11 @@ impl CachedParkThread {
     }
 
     pub(crate) fn waker(&self) -> Result<Waker, AccessError> {
-        self.unpark().map(|unpark| unpark.into_waker())
+        self.unpark().map(UnparkThread::into_waker)
     }
 
     fn unpark(&self) -> Result<UnparkThread, AccessError> {
-        self.with_current(|park_thread| park_thread.unpark())
+        self.with_current(ParkThread::unpark)
     }
 
     pub(crate) fn park(&mut self) {

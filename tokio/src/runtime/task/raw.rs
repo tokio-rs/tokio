@@ -6,6 +6,7 @@ use std::ptr::NonNull;
 use std::task::{Poll, Waker};
 
 /// Raw task handle
+#[derive(Clone)]
 pub(crate) struct RawTask {
     ptr: NonNull<Header>,
 }
@@ -162,7 +163,7 @@ impl RawTask {
         S: Schedule,
     {
         let ptr = Box::into_raw(Cell::<_, S>::new(task, scheduler, State::new(), id));
-        let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
+        let ptr = unsafe { NonNull::new_unchecked(ptr.cast()) };
 
         RawTask { ptr }
     }
@@ -263,12 +264,6 @@ impl RawTask {
     }
 }
 
-impl Clone for RawTask {
-    fn clone(&self) -> Self {
-        RawTask { ptr: self.ptr }
-    }
-}
-
 impl Copy for RawTask {}
 
 unsafe fn poll<T: Future, S: Schedule>(ptr: NonNull<Header>) {
@@ -303,7 +298,7 @@ unsafe fn try_read_output<T: Future, S: Schedule>(
 
 unsafe fn drop_join_handle_slow<T: Future, S: Schedule>(ptr: NonNull<Header>) {
     let harness = Harness::<T, S>::from_raw(ptr);
-    harness.drop_join_handle_slow()
+    harness.drop_join_handle_slow();
 }
 
 unsafe fn drop_abort_handle<T: Future, S: Schedule>(ptr: NonNull<Header>) {
@@ -313,5 +308,5 @@ unsafe fn drop_abort_handle<T: Future, S: Schedule>(ptr: NonNull<Header>) {
 
 unsafe fn shutdown<T: Future, S: Schedule>(ptr: NonNull<Header>) {
     let harness = Harness::<T, S>::from_raw(ptr);
-    harness.shutdown()
+    harness.shutdown();
 }

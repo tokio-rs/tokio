@@ -103,7 +103,7 @@ use std::{fmt, mem, ptr};
 ///    threads.
 /// 2. Each spawned task obtains a lock and releases it on every iteration.
 /// 3. Mutation of the data protected by the Mutex is done by de-referencing
-///    the obtained lock as seen on lines 12 and 19.
+///    the obtained lock as seen on lines 13 and 20.
 ///
 /// Tokio's Mutex works in a simple FIFO (first in, first out) style where all
 /// calls to [`lock`] complete in the order they were performed. In that way the
@@ -664,7 +664,7 @@ impl<T: ?Sized> Mutex<T> {
     /// ```
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         match self.s.try_acquire(1) {
-            Ok(_) => {
+            Ok(()) => {
                 let guard = MutexGuard {
                     lock: self,
                     #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -735,7 +735,7 @@ impl<T: ?Sized> Mutex<T> {
     /// # }
     pub fn try_lock_owned(self: Arc<Self>) -> Result<OwnedMutexGuard<T>, TryLockError> {
         match self.s.try_acquire(1) {
-            Ok(_) => {
+            Ok(()) => {
                 let guard = OwnedMutexGuard {
                     #[cfg(all(tokio_unstable, feature = "tracing"))]
                     resource_span: self.resource_span.clone(),

@@ -121,7 +121,7 @@ impl<T> Local<T> {
 
     /// Returns false if there are any entries in the queue
     ///
-    /// Separate to is_stealable so that refactors of is_stealable to "protect"
+    /// Separate to `is_stealable` so that refactors of `is_stealable` to "protect"
     /// some tasks from stealing won't affect this
     pub(crate) fn has_tasks(&self) -> bool {
         !self.inner.is_empty()

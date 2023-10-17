@@ -28,7 +28,7 @@ impl<T> UnboundedReceiverStream<T> {
     /// This prevents any further messages from being sent on the channel while
     /// still enabling the receiver to drain messages that are buffered.
     pub fn close(&mut self) {
-        self.inner.close()
+        self.inner.close();
     }
 }
 

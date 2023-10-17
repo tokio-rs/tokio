@@ -35,7 +35,7 @@ impl DirBuilder {
     /// let builder = DirBuilder::new();
     /// ```
     pub fn new() -> Self {
-        Default::default()
+        DirBuilder::default()
     }
 
     /// Indicates whether to create directories recursively (including all parent directories).

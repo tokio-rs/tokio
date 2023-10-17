@@ -299,7 +299,7 @@ pub mod error {
 }
 
 mod big_notify {
-    use super::*;
+    use super::Notify;
     use crate::sync::notify::Notified;
 
     // To avoid contention on the lock inside the `Notify`, we store multiple
@@ -315,7 +315,7 @@ mod big_notify {
 
     pub(super) struct BigNotify {
         #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
-        next: AtomicUsize,
+        next: std::sync::atomic::AtomicUsize,
         inner: [Notify; 8],
     }
 
@@ -327,7 +327,7 @@ mod big_notify {
                     feature = "sync",
                     any(feature = "rt", feature = "macros")
                 )))]
-                next: AtomicUsize::new(0),
+                next: std::sync::atomic::AtomicUsize::new(0),
                 inner: Default::default(),
             }
         }
@@ -341,7 +341,7 @@ mod big_notify {
         /// This function implements the case where randomness is not available.
         #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
         pub(super) fn notified(&self) -> Notified<'_> {
-            let i = self.next.fetch_add(1, Relaxed) % 8;
+            let i = self.next.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 8;
             self.inner[i].notified()
         }
 
@@ -357,7 +357,7 @@ mod big_notify {
 use self::state::{AtomicState, Version};
 mod state {
     use crate::loom::sync::atomic::AtomicUsize;
-    use crate::loom::sync::atomic::Ordering::SeqCst;
+    use crate::loom::sync::atomic::Ordering;
 
     const CLOSED_BIT: usize = 1;
 
@@ -377,6 +377,11 @@ mod state {
     pub(super) struct StateSnapshot(usize);
 
     /// The state stored in an atomic integer.
+    ///
+    /// The `Sender` uses `Release` ordering for storing a new state
+    /// and the `Receiver`s use `Acquire` ordering for loading the
+    /// current state. This ensures that written values are seen by
+    /// the `Receiver`s for a proper handover.
     #[derive(Debug)]
     pub(super) struct AtomicState(AtomicUsize);
 
@@ -406,24 +411,35 @@ mod state {
 
     impl AtomicState {
         /// Create a new `AtomicState` that is not closed and which has the
-        /// version set to `Version::initial()`.
+        /// version set to `Version::INITIAL`.
         pub(super) fn new() -> Self {
             AtomicState(AtomicUsize::new(Version::INITIAL.0))
         }
 
         /// Load the current value of the state.
+        ///
+        /// Only used by the receiver and for debugging purposes.
+        ///
+        /// The receiver side (read-only) uses `Acquire` ordering for a proper handover
+        /// of the shared value with the sender side (single writer). The state is always
+        /// updated after modifying and before releasing the (exclusive) lock on the
+        /// shared value.
         pub(super) fn load(&self) -> StateSnapshot {
-            StateSnapshot(self.0.load(SeqCst))
+            StateSnapshot(self.0.load(Ordering::Acquire))
         }
 
         /// Increment the version counter.
-        pub(super) fn increment_version(&self) {
-            self.0.fetch_add(STEP_SIZE, SeqCst);
+        pub(super) fn increment_version_while_locked(&self) {
+            // Use `Release` ordering to ensure that the shared value
+            // has been written before updating the version. The shared
+            // value is still protected by an exclusive lock during this
+            // method.
+            self.0.fetch_add(STEP_SIZE, Ordering::Release);
         }
 
         /// Set the closed bit in the state.
         pub(super) fn set_closed(&self) {
-            self.0.fetch_or(CLOSED_BIT, SeqCst);
+            self.0.fetch_or(CLOSED_BIT, Ordering::Release);
         }
     }
 }
@@ -699,7 +715,7 @@ impl<T> Receiver<T> {
         changed_impl(&self.shared, &mut self.version).await
     }
 
-    /// Waits for a value that satisifes the provided condition.
+    /// Waits for a value that satisfies the provided condition.
     ///
     /// This method will call the provided closure whenever something is sent on
     /// the channel. Once the closure returns `true`, this method will return a
@@ -772,8 +788,23 @@ impl<T> Receiver<T> {
                 let has_changed = self.version != new_version;
                 self.version = new_version;
 
-                if (!closed || has_changed) && f(&inner) {
-                    return Ok(Ref { inner, has_changed });
+                if !closed || has_changed {
+                    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| f(&inner)));
+                    match result {
+                        Ok(true) => {
+                            return Ok(Ref { inner, has_changed });
+                        }
+                        Ok(false) => {
+                            // Skip the value.
+                        }
+                        Err(panicked) => {
+                            // Drop the read-lock to avoid poisoning it.
+                            drop(inner);
+                            // Forward the panic to the caller.
+                            panic::resume_unwind(panicked);
+                            // Unreachable
+                        }
+                    };
                 }
             }
 
@@ -1046,7 +1077,7 @@ impl<T> Sender<T> {
                 }
             };
 
-            self.shared.state.increment_version();
+            self.shared.state.increment_version_while_locked();
 
             // Release the write lock.
             //

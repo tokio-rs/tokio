@@ -27,7 +27,7 @@ use std::{fmt, mem, thread};
 /// # fn main() {}
 /// ```
 ///
-/// See [LocalKey documentation][`tokio::task::LocalKey`] for more
+/// See [`LocalKey` documentation][`tokio::task::LocalKey`] for more
 /// information.
 ///
 /// [`tokio::task::LocalKey`]: struct@crate::task::LocalKey

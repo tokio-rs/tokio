@@ -154,7 +154,7 @@ impl<L: Link> LinkedList<L, L::Target> {
             if let Some(prev) = L::pointers(last).as_ref().get_prev() {
                 L::pointers(prev).as_mut().set_next(None);
             } else {
-                self.head = None
+                self.head = None;
             }
 
             L::pointers(last).as_mut().set_prev(None);

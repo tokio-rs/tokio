@@ -1,6 +1,7 @@
 use crate::io::{AsyncBufRead, AsyncRead, ReadBuf};
 
 use pin_project_lite::pin_project;
+use std::convert::TryFrom;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, io};
@@ -42,7 +43,7 @@ impl<R: AsyncRead> Take<R> {
     /// the amount of bytes read and the previous limit value don't matter when
     /// calling this method.
     pub fn set_limit(&mut self, limit: u64) {
-        self.limit_ = limit
+        self.limit_ = limit;
     }
 
     /// Gets a reference to the underlying reader.
@@ -85,7 +86,7 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
         }
 
         let me = self.project();
-        let mut b = buf.take(*me.limit_ as usize);
+        let mut b = buf.take(usize::try_from(*me.limit_).unwrap_or(usize::MAX));
 
         let buf_ptr = b.filled().as_ptr();
         ready!(me.inner.poll_read(cx, &mut b))?;

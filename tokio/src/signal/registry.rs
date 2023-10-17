@@ -48,7 +48,7 @@ impl Storage for Vec<EventInfo> {
     where
         F: FnMut(&'a EventInfo),
     {
-        self.iter().for_each(f)
+        self.iter().for_each(f);
     }
 }
 
@@ -87,7 +87,7 @@ impl<S: Storage> Registry<S> {
     /// any listeners.
     fn record_event(&self, event_id: EventId) {
         if let Some(event_info) = self.storage.event_info(event_id) {
-            event_info.pending.store(true, Ordering::SeqCst)
+            event_info.pending.store(true, Ordering::SeqCst);
         }
     }
 
