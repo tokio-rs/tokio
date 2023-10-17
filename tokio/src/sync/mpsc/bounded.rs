@@ -44,10 +44,10 @@ pub struct Sender<T> {
 /// async fn main() {
 ///     let (tx, _rx) = channel::<i32>(15);
 ///     let tx_weak = tx.downgrade();
-///   
+///
 ///     // Upgrading will succeed because `tx` still exists.
 ///     assert!(tx_weak.upgrade().is_some());
-///   
+///
 ///     // If we drop `tx`, then it will fail.
 ///     drop(tx);
 ///     assert!(tx_weak.clone().upgrade().is_none());
@@ -228,6 +228,82 @@ impl<T> Receiver<T> {
     pub async fn recv(&mut self) -> Option<T> {
         use crate::future::poll_fn;
         poll_fn(|cx| self.chan.recv(cx)).await
+    }
+
+    /// Receives the next values for this receiver and extends `buffer`.
+    ///
+    /// This method extends `buffer` by no more than a fixed number of values
+    /// as specified by `limit`. If `limit` is zero, the function immediately
+    /// returns `0`. The return value is the number of values added to `buffer`.
+    ///
+    /// For `limit > 0`, if there are no messages in the channel's queue, but
+    /// the channel has not yet been closed, this method will sleep until a
+    /// message is sent or the channel is closed. Note that if [`close`] is
+    /// called, but there are still outstanding [`Permits`] from before it was
+    /// closed, the channel is not considered closed by `recv_many` until the
+    /// permits are released.
+    ///
+    /// For non-zero values of `limit`, this method will never return `0` unless
+    /// the channel has been closed and there are no remaining messages in the
+    /// channel's queue. This indicates that no further values can ever be
+    /// received from this `Receiver`. The channel is closed when all senders
+    /// have been dropped, or when [`close`] is called.
+    ///
+    /// The capacity of `buffer` is increased as needed.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv_many` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no messages were received on this
+    /// channel.
+    ///
+    /// [`close`]: Self::close
+    /// [`Permits`]: struct@crate::sync::mpsc::Permit
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut buffer: Vec<&str> = Vec::with_capacity(2);
+    ///     let limit = 2;
+    ///     let (tx, mut rx) = mpsc::channel(100);
+    ///     let tx2 = tx.clone();
+    ///     tx2.send("first").await.unwrap();
+    ///     tx2.send("second").await.unwrap();
+    ///     tx2.send("third").await.unwrap();
+    ///
+    ///     // Call `recv_many` to receive up to `limit` (2) values.
+    ///     assert_eq!(2, rx.recv_many(&mut buffer, limit).await);
+    ///     assert_eq!(vec!["first", "second"], buffer);
+    ///
+    ///     // If the buffer is full, the next call to `recv_many`
+    ///     // reserves additional capacity.
+    ///     assert_eq!(1, rx.recv_many(&mut buffer, 1).await);
+    ///
+    ///     tokio::spawn(async move {
+    ///         tx.send("fourth").await.unwrap();
+    ///     });
+    ///
+    ///     // 'tx' is dropped, but `recv_many`
+    ///     // is guaranteed not to return 0 as the channel
+    ///     // is not yet closed.
+    ///     assert_eq!(1, rx.recv_many(&mut buffer, 1).await);
+    ///     assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
+    ///
+    ///     // Once the last sender is dropped, the channel is
+    ///     // closed and `recv_many` returns 0, capacity unchanged.
+    ///     drop(tx2);
+    ///     assert_eq!(0, rx.recv_many(&mut buffer, limit).await);
+    ///     assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
+    /// }
+    /// ```
+    pub async fn recv_many(&mut self, buffer: &mut Vec<T>, limit: usize) -> usize {
+        use crate::future::poll_fn;
+        poll_fn(|cx| self.chan.recv_many(cx, buffer, limit)).await
     }
 
     /// Tries to receive the next value for this receiver.
@@ -1072,7 +1148,7 @@ impl<T> Sender<T> {
     /// #[tokio::main]
     /// async fn main() {
     ///     let (tx, _rx) = mpsc::channel::<()>(5);
-    ///      
+    ///
     ///     // both max capacity and capacity are the same at first
     ///     assert_eq!(tx.max_capacity(), 5);
     ///     assert_eq!(tx.capacity(), 5);
