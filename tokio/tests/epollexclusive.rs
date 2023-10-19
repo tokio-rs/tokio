@@ -8,12 +8,8 @@
     tokio_unstable,
 ))]
 
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use std::thread;
-use tokio::io::AsyncWriteExt;
 use tokio::sync::Barrier;
 
 const NUM_WORKERS: usize = 8;
@@ -77,7 +73,7 @@ fn count_accepts_with_flags(workers: usize, connections: u64, flags: u32) -> u64
         barrier.wait().await;
 
         for _ in 0..connections {
-            let mut s = tokio::net::TcpStream::connect(listener_addr).await.unwrap();
+            tokio::net::TcpStream::connect(listener_addr).await.unwrap();
         }
 
         barrier.wait().await;
