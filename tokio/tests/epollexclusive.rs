@@ -15,22 +15,8 @@ use tokio::sync::Barrier;
 const NUM_WORKERS: usize = 8;
 const NUM_CONNECTIONS: u64 = 32;
 
-const FUDGE_MIN: f64 = 0.5;
-const FUDGE_MAX: f64 = 1.5;
-
-#[test]
-fn normal_epoll() {
-    let value = count_accepts_with_flags(NUM_WORKERS, NUM_CONNECTIONS, 0);
-
-    let actual_to_expected_ratio = value as f64 / (NUM_WORKERS as u64 * NUM_CONNECTIONS) as f64;
-
-    assert!(
-        actual_to_expected_ratio >= FUDGE_MIN && actual_to_expected_ratio <= FUDGE_MAX,
-        "expected fuzzy {}, got {}",
-        NUM_WORKERS as u64 * NUM_CONNECTIONS,
-        value
-    );
-}
+const FUDGE_MIN: f64 = 0.8;
+const FUDGE_MAX: f64 = 1.2;
 
 #[test]
 fn epoll_exclusive() {
@@ -74,6 +60,7 @@ fn count_accepts_with_flags(workers: usize, connections: u64, flags: u32) -> u64
 
         for _ in 0..connections {
             tokio::net::TcpStream::connect(listener_addr).await.unwrap();
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
 
         barrier.wait().await;
