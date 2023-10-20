@@ -117,9 +117,16 @@ impl UnixListener {
     /// Create a new UnixListener with the provided raw epoll flags.
     ///
     /// These flags replace any epoll flags would normally set when registering the fd.
+    ///
+    ///  **Note**: This is an [unstable API][unstable]. The public API of this may break in 1.x
+    /// releases.
+    /// See [the documentation on unstable features][unstable] for details.
+    ///
+    ///  [unstable]: crate#unstable-features
     #[track_caller]
     #[cfg(all(target_os = "linux", tokio_unstable))]
-    pub fn from_std_with_flags(
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)), doc(cfg(target_os = "linux")))]
+    pub fn from_std_with_epoll_flags(
         listener: net::UnixListener,
         flags: u32,
     ) -> io::Result<UnixListener> {

@@ -243,9 +243,19 @@ impl TcpListener {
     /// Create a new TcpListener with the provided raw epoll flags.
     ///
     /// These flags replace any epoll flags would normally set when registering the fd.
+    ///
+    ///  **Note**: This is an [unstable API][unstable]. The public API of this may break in 1.x
+    /// releases.
+    /// See [the documentation on unstable features][unstable] for details.
+    ///
+    ///  [unstable]: crate#unstable-features
     #[track_caller]
     #[cfg(all(target_os = "linux", tokio_unstable))]
-    pub fn from_std_with_flags(listener: net::TcpListener, flags: u32) -> io::Result<TcpListener> {
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)), doc(cfg(target_os = "linux")))]
+    pub fn from_std_with_epoll_flags(
+        listener: net::TcpListener,
+        flags: u32,
+    ) -> io::Result<TcpListener> {
         let io = mio::net::TcpListener::from_std(listener);
         let io = PollEvented::new_raw(io, flags)?;
         Ok(TcpListener { io })

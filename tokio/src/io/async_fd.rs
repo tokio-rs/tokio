@@ -246,9 +246,16 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// Create a new AsyncFd with the provided raw epoll flags for registration.
     ///
     /// These flags replace any epoll flags would normally set when registering the fd.
+    ///
+    ///  **Note**: This is an [unstable API][unstable]. The public API of this may break in 1.x
+    /// releases.
+    /// See [the documentation on unstable features][unstable] for details.
+    ///
+    ///  [unstable]: crate#unstable-features
     #[track_caller]
     #[cfg(all(target_os = "linux", tokio_unstable))]
-    pub fn with_flags(inner: T, flags: u32) -> io::Result<Self>
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)), doc(cfg(target_os = "linux")))]
+    pub fn with_epoll_flags(inner: T, flags: u32) -> io::Result<Self>
     where
         T: AsRawFd,
     {

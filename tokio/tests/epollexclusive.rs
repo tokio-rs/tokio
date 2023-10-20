@@ -84,7 +84,7 @@ fn count_accepts(std: std::net::TcpListener, flags: u32, barrier: Arc<Barrier>) 
     rt.block_on(async {
         std.set_nonblocking(true).unwrap();
 
-        let listener = tokio::net::TcpListener::from_std_with_flags(std, flags).unwrap();
+        let listener = tokio::net::TcpListener::from_std_with_epoll_flags(std, flags).unwrap();
 
         barrier.wait().await;
 
