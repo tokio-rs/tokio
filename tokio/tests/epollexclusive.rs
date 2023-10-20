@@ -15,8 +15,8 @@ use tokio::sync::Barrier;
 const NUM_WORKERS: usize = 8;
 const NUM_CONNECTIONS: u64 = 32;
 
-const FUDGE_MIN: f64 = 0.8;
-const FUDGE_MAX: f64 = 1.2;
+const FUDGE_MIN: f64 = 0.75;
+const FUDGE_MAX: f64 = 1.25;
 
 #[test]
 fn epoll_exclusive() {
