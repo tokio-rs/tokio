@@ -119,7 +119,10 @@ impl UnixListener {
     /// These flags replace any epoll flags would normally set when registering the fd.
     #[track_caller]
     #[cfg(all(target_os = "linux", tokio_unstable))]
-    pub fn from_std_with_flags(listener: net::UnixListener, flags: u32) -> io::Result<UnixListener> {
+    pub fn from_std_with_flags(
+        listener: net::UnixListener,
+        flags: u32,
+    ) -> io::Result<UnixListener> {
         let io = mio::net::UnixListener::from_std(listener);
         let io = PollEvented::new_raw(io, flags)?;
         Ok(UnixListener { io })
