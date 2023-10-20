@@ -68,7 +68,7 @@ cfg_io_driver! {
     }
 }
 
-#[cfg(all(target_os = "linux"))]
+#[cfg(target_os = "linux")]
 impl<E: std::os::unix::io::AsRawFd + Source> PollEvented<E> {
     /// Creates a new `PollEvented` associated with the default reactor.
     ///
