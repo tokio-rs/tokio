@@ -243,6 +243,18 @@ impl<T: AsRawFd> AsyncFd<T> {
         Self::new_with_handle_and_interest(inner, scheduler::Handle::current(), interest)
     }
 
+    /// Create a new AsyncFd with the provided raw epoll flags for registration.
+    ///
+    /// These flags replace any epoll flags would normally set when registering the fd.
+    #[track_caller]
+    #[cfg(all(target_os = "linux", tokio_unstable))]
+    pub fn with_flags(inner: T, flags: u32) -> io::Result<Self>
+    where
+        T: AsRawFd,
+    {
+        Self::new_with_handle_and_flags(inner, scheduler::Handle::current(), flags)
+    }
+
     #[track_caller]
     pub(crate) fn new_with_handle_and_interest(
         inner: T,
@@ -253,6 +265,21 @@ impl<T: AsRawFd> AsyncFd<T> {
 
         let registration =
             Registration::new_with_interest_and_handle(&mut SourceFd(&fd), interest, handle)?;
+
+        Ok(AsyncFd {
+            registration,
+            inner: Some(inner),
+        })
+    }
+
+    #[track_caller]
+    #[cfg(all(target_os = "linux", tokio_unstable))]
+    pub(crate) fn new_with_handle_and_flags(
+        mut inner: T,
+        handle: scheduler::Handle,
+        flags: u32,
+    ) -> io::Result<Self> {
+        let registration = Registration::new_with_flags_and_handle(&mut inner, flags, handle)?;
 
         Ok(AsyncFd {
             registration,

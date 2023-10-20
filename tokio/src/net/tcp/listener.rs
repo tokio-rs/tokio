@@ -243,7 +243,6 @@ impl TcpListener {
     /// Create a new TcpListener with the provided raw epoll flags.
     ///
     /// These flags replace any epoll flags would normally set when registering the fd.
-    #[cfg(all(target_os = "linux"))]
     #[track_caller]
     #[cfg(all(target_os = "linux", tokio_unstable))]
     pub fn from_std_with_flags(listener: net::TcpListener, flags: u32) -> io::Result<TcpListener> {

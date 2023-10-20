@@ -122,7 +122,7 @@ impl<E: std::os::unix::io::AsRawFd + Source> PollEvented<E> {
         flags: u32,
         handle: scheduler::Handle,
     ) -> io::Result<Self> {
-        let registration = Registration::new_with_interest_and_handle_raw(&mut io, flags, handle)?;
+        let registration = Registration::new_with_flags_and_handle(&mut io, flags, handle)?;
         Ok(Self {
             io: Some(io),
             registration,

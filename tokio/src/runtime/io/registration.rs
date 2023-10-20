@@ -90,7 +90,7 @@ impl Registration {
     /// - `Ok` if the registration happened successfully
     /// - `Err` if an error was encountered during registration
     #[cfg(all(target_os = "linux", tokio_unstable))]
-    pub(crate) fn new_with_interest_and_handle_raw(
+    pub(crate) fn new_with_flags_and_handle(
         io: &mut impl std::os::unix::io::AsRawFd,
         flags: u32,
         handle: scheduler::Handle,
