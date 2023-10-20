@@ -125,7 +125,7 @@ impl UnixListener {
     ///  [unstable]: crate#unstable-features
     #[track_caller]
     #[cfg(all(target_os = "linux", tokio_unstable))]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)), doc(cfg(target_os = "linux")))]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, target_os = "linux"))))]
     pub fn from_std_with_epoll_flags(
         listener: net::UnixListener,
         flags: u32,
