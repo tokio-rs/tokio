@@ -55,6 +55,9 @@ use then::Then;
 mod try_next;
 use try_next::TryNext;
 
+mod peekable;
+use peekable::Peekable;
+
 cfg_time! {
     pub(crate) mod timeout;
     pub(crate) mod timeout_repeating;
@@ -1175,6 +1178,31 @@ pub trait StreamExt: Stream {
     {
         assert!(max_size > 0, "`max_size` must be non-zero.");
         ChunksTimeout::new(self, max_size, duration)
+    }
+
+    /// Turns the stream into a peekable stream, whose first element can be peeked at without being
+    /// consumed.
+    /// ```rust
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// #[tokio::main]
+    /// # async fn _unused() {}
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+    /// async fn main() {
+    ///     let iter = vec![1, 2, 3, 4].into_iter();
+    ///     let mut stream = stream::iter(iter).peekable();
+    ///
+    ///     assert_eq!(*stream.peek().await.unwrap(), 1);
+    ///     assert_eq!(*stream.peek().await.unwrap(), 1);
+    ///     assert_eq!(stream.next().await.unwrap(), 1);
+    ///     assert_eq!(*stream.peek().await.unwrap(), 2);
+    /// }
+    /// ```
+    fn peekable(self) -> Peekable<Self>
+    where
+        Self: Sized,
+    {
+        Peekable::new(self)
     }
 }
 
