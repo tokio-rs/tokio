@@ -296,31 +296,19 @@ impl TaskTracker {
     /// If the `TaskTracker` is already closed and empty when this method is called, then it
     /// returns immediately.
     ///
-    /// The `wait` future will resolve if the `TaskTracker` has been both closed and empty at the
-    /// same time at any point since the `wait` future was created. This is the case even if more
-    /// tasks have been spawned by the time that the `wait` future is polled.
+    /// The `wait` future is resistant against [ABA problems][aba]. That is, if the `TaskTracker`
+    /// becomes both closed and empty for a short amount of time, then it is guarantee that all
+    /// `wait` futures that were created before the short time interval will trigger, even if they
+    /// are not polled during that short time interval.
     ///
     /// # Cancel safety
     ///
     /// This method is cancel safe.
     ///
-    /// However, there is a caveat: If the `TaskTracker` becomes empty for a short amount of time,
-    /// then `wait` normally guarantees that it will catch this and return. When `wait` is used as
-    /// the event in a `tokio::select!` statement, this guarantee is lost. That is, the following
-    /// sequence of events is possible:
+    /// However, the resistance against [ABA problems][aba] is lost when using `wait` as the
+    /// condition in a `tokio::select!` loop.
     ///
-    ///  1. The task tracker becomes empty.
-    ///  2. Some other branch of the `tokio::select!` completes.
-    ///  3. A new task is added to the task tracker.
-    ///  4. The `wait` branch of the `tokio::select!` doesn't trigger.
-    ///
-    /// This is because the `wait` future is destroyed and recreated when another branch of the
-    /// `tokio::select!` triggers.
-    ///
-    /// That said, for most use-cases of `TaskTracker` this is not an issue. The third step of the
-    /// above list is necessary to avoid triggering the `wait` branch. If the `TaskTracker` stays
-    /// empty forever once it becomes empty, then the `wait` branch of a `tokio::select!` is
-    /// guaranteed to trigger once the `TaskTracker` becomes empty.
+    /// [aba]: https://en.wikipedia.org/wiki/ABA_problem
     #[inline]
     pub fn wait(&self) -> TaskTrackerWaitFuture<'_> {
         TaskTrackerWaitFuture {
