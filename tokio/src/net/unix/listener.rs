@@ -70,7 +70,7 @@ impl UnixListener {
         Ok(UnixListener { io })
     }
 
-    /// Creates new `UnixListener` from a `std::os::unix::net::UnixListener `.
+    /// Creates new [`UnixListener`] from a [`std::os::unix::net::UnixListener`].
     ///
     /// This function is intended to be used to wrap a UnixListener from the
     /// standard library in the Tokio equivalent.
@@ -137,7 +137,7 @@ impl UnixListener {
     pub fn into_std(self) -> io::Result<std::os::unix::net::UnixListener> {
         self.io
             .into_inner()
-            .map(|io| io.into_raw_fd())
+            .map(IntoRawFd::into_raw_fd)
             .map(|raw_fd| unsafe { net::UnixListener::from_raw_fd(raw_fd) })
     }
 

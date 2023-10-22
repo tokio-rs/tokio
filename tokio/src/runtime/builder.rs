@@ -312,7 +312,7 @@ impl Builder {
 
             metrics_poll_count_histogram_enable: false,
 
-            metrics_poll_count_histogram: Default::default(),
+            metrics_poll_count_histogram: HistogramBuilder::default(),
 
             disable_lifo_slot: false,
         }

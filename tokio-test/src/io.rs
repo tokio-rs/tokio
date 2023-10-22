@@ -74,7 +74,7 @@ struct Inner {
 }
 
 impl Builder {
-    /// Return a new, empty `Builder.
+    /// Return a new, empty `Builder`.
     pub fn new() -> Self {
         Self::default()
     }
@@ -478,7 +478,7 @@ impl Drop for Mock {
             Action::Read(data) => assert!(data.is_empty(), "There is still data left to read."),
             Action::Write(data) => assert!(data.is_empty(), "There is still data left to write."),
             _ => (),
-        })
+        });
     }
 }
 /*

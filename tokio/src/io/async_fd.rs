@@ -13,15 +13,15 @@ use std::{task::Context, task::Poll};
 /// `kqueue`, etc), such as a network socket or pipe, and the file descriptor
 /// must have the nonblocking mode set to true.
 ///
-/// Creating an AsyncFd registers the file descriptor with the current tokio
+/// Creating an [`AsyncFd`] registers the file descriptor with the current tokio
 /// Reactor, allowing you to directly await the file descriptor being readable
 /// or writable. Once registered, the file descriptor remains registered until
-/// the AsyncFd is dropped.
+/// the [`AsyncFd`] is dropped.
 ///
-/// The AsyncFd takes ownership of an arbitrary object to represent the IO
+/// The [`AsyncFd`] takes ownership of an arbitrary object to represent the IO
 /// object. It is intended that this object will handle closing the file
 /// descriptor when it is dropped, avoiding resource leaks and ensuring that the
-/// AsyncFd can clean up the registration before closing the file descriptor.
+/// [`AsyncFd`] can clean up the registration before closing the file descriptor.
 /// The [`AsyncFd::into_inner`] function can be used to extract the inner object
 /// to retake control from the tokio IO reactor.
 ///
@@ -204,7 +204,7 @@ pub struct AsyncFdReadyMutGuard<'a, T: AsRawFd> {
 }
 
 impl<T: AsRawFd> AsyncFd<T> {
-    /// Creates an AsyncFd backed by (and taking ownership of) an object
+    /// Creates an [`AsyncFd`] backed by (and taking ownership of) an object
     /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
     /// time of creation.
     ///
@@ -226,7 +226,7 @@ impl<T: AsRawFd> AsyncFd<T> {
         Self::with_interest(inner, Interest::READABLE | Interest::WRITABLE)
     }
 
-    /// Creates an AsyncFd backed by (and taking ownership of) an object
+    /// Creates an [`AsyncFd`] backed by (and taking ownership of) an object
     /// implementing [`AsRawFd`], with a specific [`Interest`]. The backing
     /// file descriptor is cached at the time of creation.
     ///

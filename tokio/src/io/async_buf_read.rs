@@ -92,7 +92,7 @@ where
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        self.get_mut().as_mut().consume(amt)
+        self.get_mut().as_mut().consume(amt);
     }
 }
 
@@ -112,6 +112,6 @@ impl<T: AsRef<[u8]> + Unpin> AsyncBufRead for io::Cursor<T> {
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        io::BufRead::consume(self.get_mut(), amt)
+        io::BufRead::consume(self.get_mut(), amt);
     }
 }

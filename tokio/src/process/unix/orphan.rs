@@ -70,7 +70,7 @@ impl<T> OrphanQueueImpl<T> {
     where
         T: Wait,
     {
-        self.queue.lock().push(orphan)
+        self.queue.lock().push(orphan);
     }
 
     /// Attempts to reap every process in the queue, ignoring any errors and

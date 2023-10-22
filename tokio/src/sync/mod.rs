@@ -85,7 +85,6 @@
 //! }
 //! ```
 //!
-//! [oneshot]: oneshot
 //! [`JoinHandle`]: crate::task::JoinHandle
 //!
 //! ## `mpsc` channel
@@ -175,11 +174,11 @@
 //! }
 //! ```
 //!
-//! The [`mpsc`][mpsc] and [`oneshot`][oneshot] channels can be combined to
-//! provide a request / response type synchronization pattern with a shared
-//! resource. A task is spawned to synchronize a resource and waits on commands
-//! received on a [`mpsc`][mpsc] channel. Each command includes a
-//! [`oneshot`][oneshot] `Sender` on which the result of the command is sent.
+//! The [`mpsc`] and [`oneshot`] channels can be combined to provide a request /
+//! response type synchronization pattern with a shared resource. A task is
+//! spawned to synchronize a resource and waits on commands received on a
+//! [`mpsc`] channel. Each command includes a [`oneshot`] `Sender` on which the
+//! result of the command is sent.
 //!
 //! **Example:** use a task to synchronize a `u64` counter. Each task sends an
 //! "fetch and increment" command. The counter value **before** the increment is
@@ -235,8 +234,6 @@
 //!     }
 //! }
 //! ```
-//!
-//! [mpsc]: mpsc
 //!
 //! ## `broadcast` channel
 //!
@@ -416,24 +413,24 @@
 //! operate in a similar way as their `std` counterparts but will wait
 //! asynchronously instead of blocking the thread.
 //!
-//! * [`Barrier`](Barrier) Ensures multiple tasks will wait for each other to
-//!   reach a point in the program, before continuing execution all together.
+//! * [`Barrier`] Ensures multiple tasks will wait for each other to reach a
+//!   point in the program, before continuing execution all together.
 //!
-//! * [`Mutex`](Mutex) Mutual Exclusion mechanism, which ensures that at most
-//!   one thread at a time is able to access some data.
+//! * [`Mutex`] Mutual Exclusion mechanism, which ensures that at most one
+//!   thread at a time is able to access some data.
 //!
-//! * [`Notify`](Notify) Basic task notification. `Notify` supports notifying a
+//! * [`Notify`] Basic task notification. `Notify` supports notifying a
 //!   receiving task without sending data. In this case, the task wakes up and
 //!   resumes processing.
 //!
-//! * [`RwLock`](RwLock) Provides a mutual exclusion mechanism which allows
-//!   multiple readers at the same time, while allowing only one writer at a
-//!   time. In some cases, this can be more efficient than a mutex.
+//! * [`RwLock`] Provides a mutual exclusion mechanism which allows multiple
+//!   readers at the same time, while allowing only one writer at a time. In
+//!   some cases, this can be more efficient than a mutex.
 //!
-//! * [`Semaphore`](Semaphore) Limits the amount of concurrency. A semaphore
-//!   holds a number of permits, which tasks may request in order to enter a
-//!   critical section. Semaphores are useful for implementing limiting or
-//!   bounding of any kind.
+//! * [`Semaphore`] Limits the amount of concurrency. A semaphore holds a
+//!   number of permits, which tasks may request in order to enter a critical
+//!   section. Semaphores are useful for implementing limiting or bounding of
+//!   any kind.
 
 cfg_sync! {
     /// Named future types.

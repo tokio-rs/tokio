@@ -282,7 +282,7 @@ impl<W: AsyncWrite + AsyncBufRead> AsyncBufRead for BufWriter<W> {
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        self.get_pin_mut().consume(amt)
+        self.get_pin_mut().consume(amt);
     }
 }
 

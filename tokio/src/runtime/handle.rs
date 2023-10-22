@@ -228,7 +228,7 @@ impl Handle {
     /// When this is used on a `current_thread` runtime, only the
     /// [`Runtime::block_on`] method can drive the IO and timer drivers, but the
     /// `Handle::block_on` method cannot drive them. This means that, when using
-    /// this method on a current_thread runtime, anything that relies on IO or
+    /// this method on a `current_thread` runtime, anything that relies on IO or
     /// timers will not work unless there is another thread currently calling
     /// [`Runtime::block_on`] on the same runtime.
     ///
@@ -542,6 +542,14 @@ cfg_taskdump! {
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
                 scheduler::Handle::MultiThreadAlt(_) => panic!("task dump not implemented for this runtime flavor"),
             }
+        }
+
+        /// Produces `true` if the current task is being traced for a dump;
+        /// otherwise false. This function is only public for integration
+        /// testing purposes. Do not rely on it.
+        #[doc(hidden)]
+        pub fn is_tracing() -> bool {
+            super::task::trace::Context::is_tracing()
         }
     }
 

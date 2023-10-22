@@ -573,6 +573,27 @@ async fn spawn_wakes_localset() {
     }
 }
 
+/// Checks that the task wakes up with `enter`.
+/// Reproduces <https://github.com/tokio-rs/tokio/issues/5020>.
+#[tokio::test]
+async fn sleep_with_local_enter_guard() {
+    let local = LocalSet::new();
+    let _guard = local.enter();
+
+    let (tx, rx) = oneshot::channel();
+
+    local
+        .run_until(async move {
+            tokio::task::spawn_local(async move {
+                time::sleep(Duration::ZERO).await;
+
+                tx.send(()).expect("failed to send");
+            });
+            assert_eq!(rx.await, Ok(()));
+        })
+        .await;
+}
+
 #[test]
 fn store_local_set_in_thread_local_with_runtime() {
     use tokio::runtime::Runtime;

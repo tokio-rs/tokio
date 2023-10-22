@@ -423,7 +423,7 @@ impl UnixDatagram {
         Ok((a, b))
     }
 
-    /// Creates new `UnixDatagram` from a `std::os::unix::net::UnixDatagram`.
+    /// Creates new [`UnixDatagram`] from a [`std::os::unix::net::UnixDatagram`].
     ///
     /// This function is intended to be used to wrap a UnixDatagram from the
     /// standard library in the Tokio equivalent.
@@ -498,7 +498,7 @@ impl UnixDatagram {
     pub fn into_std(self) -> io::Result<std::os::unix::net::UnixDatagram> {
         self.io
             .into_inner()
-            .map(|io| io.into_raw_fd())
+            .map(IntoRawFd::into_raw_fd)
             .map(|raw_fd| unsafe { std::os::unix::net::UnixDatagram::from_raw_fd(raw_fd) })
     }
 

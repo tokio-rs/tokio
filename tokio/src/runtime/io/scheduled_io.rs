@@ -180,7 +180,7 @@ impl Default for ScheduledIo {
         ScheduledIo {
             linked_list_pointers: UnsafeCell::new(linked_list::Pointers::new()),
             readiness: AtomicUsize::new(0),
-            waiters: Mutex::new(Default::default()),
+            waiters: Mutex::new(Waiters::default()),
         }
     }
 }
@@ -210,8 +210,8 @@ impl ScheduledIo {
     pub(super) fn set_readiness(&self, tick: Tick, f: impl Fn(Ready) -> Ready) {
         let mut current = self.readiness.load(Acquire);
 
-        // The shutdown bit should not be set
-        debug_assert_eq!(0, SHUTDOWN.unpack(current));
+        // If the io driver is shut down, then you are only allowed to clear readiness.
+        debug_assert!(SHUTDOWN.unpack(current) == 0 || matches!(tick, Tick::Clear(_)));
 
         loop {
             // Mask out the tick bits so that the modifying function doesn't see

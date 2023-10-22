@@ -140,6 +140,7 @@ impl ReadDir {
                     target_os = "illumos",
                     target_os = "haiku",
                     target_os = "vxworks",
+                    target_os = "aix",
                     target_os = "nto",
                     target_os = "vita",
                 )))]
@@ -203,6 +204,7 @@ pub struct DirEntry {
         target_os = "illumos",
         target_os = "haiku",
         target_os = "vxworks",
+        target_os = "aix",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -336,6 +338,7 @@ impl DirEntry {
             target_os = "illumos",
             target_os = "haiku",
             target_os = "vxworks",
+            target_os = "aix",
             target_os = "nto",
             target_os = "vita",
         )))]

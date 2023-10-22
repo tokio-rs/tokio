@@ -664,7 +664,7 @@ impl<T: ?Sized> Mutex<T> {
     /// ```
     pub fn try_lock(&self) -> Result<MutexGuard<'_, T>, TryLockError> {
         match self.s.try_acquire(1) {
-            Ok(_) => {
+            Ok(()) => {
                 let guard = MutexGuard {
                     lock: self,
                     #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -735,7 +735,7 @@ impl<T: ?Sized> Mutex<T> {
     /// # }
     pub fn try_lock_owned(self: Arc<Self>) -> Result<OwnedMutexGuard<T>, TryLockError> {
         match self.s.try_acquire(1) {
-            Ok(_) => {
+            Ok(()) => {
                 let guard = OwnedMutexGuard {
                     #[cfg(all(tokio_unstable, feature = "tracing"))]
                     resource_span: self.resource_span.clone(),
