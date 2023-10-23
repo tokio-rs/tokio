@@ -8,7 +8,7 @@ use super::linked_list::{Link, LinkedList};
 
 /// An intrusive  linked list supporting high concurrent updates.
 ///
-/// It relies on `LinkedList`, so it is the caller's
+/// It currently relies on `LinkedList`, so it is the caller's
 /// responsibility to ensure the list is empty before dropping it.
 ///
 /// Note: Due to its inner sharded design, the order of node cannot be guaranteed.
@@ -18,6 +18,14 @@ pub(crate) struct ShardedList<L, T> {
     shard_mask: usize,
 }
 
+/// Defines the id of a node in a linked list, different ids cause inner list nodes
+/// to be scattered in different mutexs.
+///
+/// # Safety
+///
+/// Implementations must guarantee that `Target` types are pinned in memory. In
+/// other words, when a node is inserted, the value will not be moved as long as
+/// it is stored in the list.
 pub(crate) unsafe trait ShardedListItem: Link {
     // The returned id is used to pick which list this item should go into.
     unsafe fn get_shared_id(target: NonNull<Self::Target>) -> usize;
