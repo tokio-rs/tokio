@@ -2,7 +2,8 @@
 
 use std::{ptr::NonNull, sync::atomic::Ordering};
 
-use crate::loom::sync::{atomic::AtomicUsize, Mutex, MutexGuard};
+use crate::loom::sync::{Mutex, MutexGuard};
+use std::sync::atomic::AtomicUsize;
 
 use super::linked_list::{Link, LinkedList};
 
