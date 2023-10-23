@@ -510,11 +510,8 @@ unsafe impl<S> linked_list::Link for Task<S> {
 /// Tasks are pinned.
 unsafe impl<S> shared_list::ShardedListItem for Task<S> {
     unsafe fn get_shared_id(target: NonNull<Self::Target>) -> usize {
-        let task_id = unsafe { Header::get_id(target) }.0;
-        if cfg!(target_pointer_width = "32") {
-            (task_id & 0xFFFFFFFF) as usize
-        } else {
-            task_id as usize
-        }
+        let task_id = unsafe { Header::get_id(target) };
+        // in 32-bits machine, the lower 32 bits will be reserved
+        return task_id.0 as usize;
     }
 }

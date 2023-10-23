@@ -16,6 +16,8 @@ use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 
+use super::core::Header;
+
 // The id from the module below is used to verify whether a given task is stored
 // in this OwnedTasks, or some other task. The counter starts at one so we can
 // use `None` for tasks not owned by any list.
@@ -110,6 +112,9 @@ impl<S: 'static> OwnedTasks<S> {
             // to the field.
             task.header().set_owner_id(self.id);
         }
+        // safety: We just set task_id for this task
+        let task_id = unsafe { Header::get_id(task.header_ptr()) };
+
         // check close flag
         if self.closed.load(Ordering::Acquire) {
             task.shutdown();
@@ -117,13 +122,10 @@ impl<S: 'static> OwnedTasks<S> {
         }
         self.list.push(task);
 
-        // double check close flag for ensuring all tasks will shutdown after OwnedTasks has been closed,
-        // it should be completed quickly.
+        // check close flag again, for ensuring all tasks will shutdown after OwnedTasks has been closed.
         if self.closed.load(Ordering::Acquire) {
-            for i in 0..self.get_shard_size() {
-                if let Some(task) = self.list.pop_back(i) {
-                    task.shutdown();
-                }
+            if let Some(task) = self.list.pop_back(task_id.0 as usize) {
+                task.shutdown();
             }
         }
         Some(notified)
