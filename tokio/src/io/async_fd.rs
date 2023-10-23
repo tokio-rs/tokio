@@ -247,8 +247,13 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// These flags replace any epoll flags would normally set when registering the fd.
     ///
-    ///  **Note**: This is an [unstable API][unstable]. The public API of this may break in 1.x
-    /// releases.
+    /// # Note
+    /// This API does not support the use of `EPOLLONESHOT`.
+    /// Users are strongly advised to use `EPOLLET` to prevent the tokio IO driver from receiving
+    /// spurious wakes.
+    ///
+    /// # Stability
+    /// This is an [unstable API][unstable]. The public API of this may break in 1.x releases.
     /// See [the documentation on unstable features][unstable] for details.
     ///
     ///  [unstable]: crate#unstable-features

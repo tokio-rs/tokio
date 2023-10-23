@@ -95,6 +95,11 @@ impl Registration {
         flags: u32,
         handle: scheduler::Handle,
     ) -> io::Result<Registration> {
+        debug_assert!(
+            (flags & libc::EPOLLONESHOT as u32) == 0,
+            "Tokio does not support using EPOLLONESHOT in user-specified epoll flags"
+        );
+
         let shared = handle.driver().io().add_source_raw(io, flags)?;
 
         Ok(Registration { handle, shared })
