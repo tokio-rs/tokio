@@ -208,6 +208,7 @@ cfg_taskdump! {
 
 use crate::future::Future;
 use crate::util::linked_list;
+use crate::util::shared_list;
 
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -501,5 +502,19 @@ unsafe impl<S> linked_list::Link for Task<S> {
 
     unsafe fn pointers(target: NonNull<Header>) -> NonNull<linked_list::Pointers<Header>> {
         self::core::Trailer::addr_of_owned(Header::get_trailer(target))
+    }
+}
+
+/// # Safety
+///
+/// Tasks are pinned.
+unsafe impl<S> shared_list::ShardedListItem for Task<S> {
+    unsafe fn get_shared_id(target: NonNull<Self::Target>) -> usize {
+        let task_id = unsafe { Header::get_id(target) }.0;
+        if cfg!(target_pointer_width = "32") {
+            (task_id & 0xFFFFFFFF) as usize
+        } else {
+            task_id as usize
+        }
     }
 }

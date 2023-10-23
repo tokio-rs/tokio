@@ -957,7 +957,7 @@ impl Core {
         // Start from a random inner list
         let start = self
             .rand
-            .fastrand_n(worker.handle.shared.owned.get_segment_size() as u32);
+            .fastrand_n(worker.handle.shared.owned.get_shard_size() as u32);
         // Signal to all tasks to shut down.
         worker
             .handle

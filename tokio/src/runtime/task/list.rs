@@ -8,16 +8,13 @@
 
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::{Mutex, MutexGuard};
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
-use std::sync::atomic::AtomicUsize;
+use crate::util::shared_list;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
-
-use super::core::Header;
 
 // The id from the module below is used to verify whether a given task is stored
 // in this OwnedTasks, or some other task. The counter starts at one so we can
@@ -59,14 +56,12 @@ cfg_not_has_atomic_u64! {
 }
 
 pub(crate) struct OwnedTasks<S: 'static> {
-    lists: Box<[Mutex<ListSement<S>>]>,
+    list: List<S>,
     pub(crate) id: NonZeroU64,
     closed: AtomicBool,
-    segment_mask: u32,
-    count: AtomicUsize,
 }
 
-type ListSement<S> = LinkedList<Task<S>, <Task<S> as Link>::Target>;
+type List<S> = shared_list::ShardedList<Task<S>, <Task<S> as Link>::Target>;
 
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
@@ -80,23 +75,10 @@ struct OwnedTasksInner<S: 'static> {
 
 impl<S: 'static> OwnedTasks<S> {
     pub(crate) fn new(concurrency_level: u32) -> Self {
-        // Find power-of-two sizes best matching arguments
-        let mut segment_size = 1;
-        while segment_size < concurrency_level {
-            segment_size <<= 1;
-        }
-        let segment_mask = segment_size - 1;
-
-        let mut lists = Vec::with_capacity(segment_size as usize);
-        for _ in 0..segment_size {
-            lists.push(Mutex::new(LinkedList::new()))
-        }
         Self {
-            lists: lists.into_boxed_slice(),
+            list: List::new(concurrency_level as usize),
             closed: AtomicBool::new(false),
             id: get_next_id(),
-            segment_mask,
-            count: AtomicUsize::new(0),
         }
     }
 
@@ -128,27 +110,18 @@ impl<S: 'static> OwnedTasks<S> {
             // to the field.
             task.header().set_owner_id(self.id);
         }
-        self.push_inner(task, notified)
-    }
-
-    #[inline]
-    pub(crate) fn push_inner(&self, task: Task<S>, notified: Notified<S>) -> Option<Notified<S>>
-    where
-        S: Schedule,
-    {
-        // Safety: it is safe, because every task has one task_id
-        let task_id = unsafe { Header::get_id(task.header_ptr()) };
-        let mut lock = self.segment_inner(task_id.0 as usize);
-
-        // check close flag,
-        // it must be checked in the lock, for ensuring all tasks will shutdown after OwnedTasks has been closed
+        // check close flag
         if self.closed.load(Ordering::Acquire) {
-            drop(lock);
             task.shutdown();
             return None;
         }
-        lock.push_front(task);
-        self.count.fetch_add(1, Ordering::Relaxed);
+        self.list.push(task);
+
+        // double check close flag for ensuring all tasks will shutdown after OwnedTasks has been closed,
+        // it should be completed quickly.
+        if self.closed.load(Ordering::Acquire) {
+            self.close_and_shutdown_all(0);
+        }
         Some(notified)
     }
 
@@ -167,23 +140,21 @@ impl<S: 'static> OwnedTasks<S> {
 
     /// Shuts down all tasks in the collection. This call also closes the
     /// collection, preventing new items from being added.
+    ///
     /// The parameter start should be random among different worker threads
     /// to reduce lock conflicts during shutdown.
-    /// Initiate shutting down the segment indexed by the start, and reset to 0
-    /// once the segment_size is reached, continuing until start - 1, it works like a ring.
+    /// Initiate shutting down the shard indexed by the start, and reset to 0
+    /// once the shar_size is reached, continuing until start - 1, it works like a ring.
     pub(crate) fn close_and_shutdown_all(&self, start: usize)
     where
         S: Schedule,
     {
         self.closed.store(true, Ordering::Release);
-        for i in start..self.get_segment_size() + start {
+        for i in start..self.get_shard_size() + start {
             loop {
-                let mut lock = self.segment_inner(i);
-                let task = lock.pop_back();
+                let task = self.list.pop_back(i);
                 match task {
                     Some(task) => {
-                        self.count.fetch_sub(1, Ordering::Relaxed);
-                        drop(lock);
                         task.shutdown();
                     }
                     None => break,
@@ -193,12 +164,12 @@ impl<S: 'static> OwnedTasks<S> {
     }
 
     #[inline]
-    pub(crate) fn get_segment_size(&self) -> usize {
-        self.lists.len()
+    pub(crate) fn get_shard_size(&self) -> usize {
+        self.list.shard_size()
     }
 
     pub(crate) fn active_tasks_count(&self) -> usize {
-        self.count.load(Ordering::Relaxed)
+        self.list.len()
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
@@ -210,54 +181,25 @@ impl<S: 'static> OwnedTasks<S> {
 
         // safety: We just checked that the provided task is not in some other
         // linked list.
-        unsafe { self.remove_inner(task) }
-    }
-
-    #[inline]
-    unsafe fn remove_inner(&self, task: &Task<S>) -> Option<Task<S>> {
-        // Safety: it is safe, because every task has one task_id
-        let task_id = unsafe { Header::get_id(task.header_ptr()) };
-        let mut lock = self.segment_inner(task_id.0 as usize);
-        let task = lock.remove(task.header_ptr());
-        if task.is_some() {
-            self.count.fetch_sub(1, Ordering::Relaxed);
-        }
-        task
-    }
-
-    #[inline]
-    fn segment_inner(&self, id: usize) -> MutexGuard<'_, ListSement<S>> {
-        // Safety: this modulo operation ensures it is safe here.
-        unsafe {
-            self.lists
-                .get_unchecked(id & (self.segment_mask) as usize)
-                .lock()
-        }
+        unsafe { self.list.remove(task.header_ptr()) }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.count.load(Ordering::Relaxed) == 0
+        self.list.is_empty()
     }
 }
 
 cfg_taskdump! {
     impl<S: 'static> OwnedTasks<S> {
-        /// Locks the tasks, and calls `f` on an iterator over them.
         pub(crate) fn for_each<F>(&self, mut f: F)
         where
             F: FnMut(&Task<S>),
         {
-            // while tracing, new tasks are not allowed to add, so we get all locks first
-            let mut guards = Vec::with_capacity(self.get_segment_size() as usize);
-            for list in self.lists.as_ref()  {
-                guards.push(list.lock());
-            }
-            for guard in &mut guards{
-                guard.for_each(&mut f);
-            }
+                self.list.for_each(&mut f);
         }
     }
 }
+
 impl<S: 'static> LocalOwnedTasks<S> {
     pub(crate) fn new() -> Self {
         Self {
