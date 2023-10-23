@@ -479,7 +479,7 @@ impl<T> Sender<T> {
     /// See the documentation of [`broadcast::channel`] for more information on this method.
     ///
     /// [`broadcast`]: crate::sync::broadcast
-    /// [`broadcast::channel`]: crate::sync::broadcast
+    /// [`broadcast::channel`]: crate::sync::broadcast::channel
     #[track_caller]
     pub fn new(capacity: usize) -> Self {
         // SAFETY: We don't create extra receivers, so there are 0.
