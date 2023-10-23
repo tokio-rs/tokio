@@ -68,7 +68,11 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
     /// empty.
     pub(crate) fn pop_back(&self, shard_id: usize) -> Option<L::Handle> {
         let mut lock = self.shard_inner(shard_id);
-        lock.pop_back()
+        let node = lock.pop_back();
+        if node.is_some() {
+            self.count.fetch_sub(1, Ordering::Relaxed);
+        }
+        node
     }
 
     /// Returns whether the linked list does not contain any node
