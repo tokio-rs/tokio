@@ -54,6 +54,7 @@ impl<L, T> ShardedList<L, T> {
     }
 }
 
+/// Used to get the lock of shard
 pub(crate) struct ShardGuard<'a, L, T> {
     lock: MutexGuard<'a, LinkedList<L, T>>,
     count: &'a AtomicUsize,
@@ -98,7 +99,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
         node
     }
 
-    /// Gets the lock of ShardedList, lets us have the write permission.
+    /// Gets the lock of ShardedList, makes us have the write permission.
     pub(crate) fn lock_shard(&self, val: &L::Handle) -> ShardGuard<'_, L, L::Target> {
         let id = unsafe { L::get_shared_id(L::as_raw(val)) };
         ShardGuard {
