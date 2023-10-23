@@ -112,7 +112,8 @@ impl<S: 'static> OwnedTasks<S> {
         }
 
         let shard = self.list.lock_shard(&task);
-        // check close flag
+        // check the closed flag in the lock for ensuring all tasks
+        // will shutdown after ownedTasks has been closed.
         if self.closed.load(Ordering::Acquire) {
             task.shutdown();
             return None;
