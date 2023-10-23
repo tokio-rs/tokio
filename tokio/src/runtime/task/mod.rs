@@ -208,7 +208,7 @@ cfg_taskdump! {
 
 use crate::future::Future;
 use crate::util::linked_list;
-use crate::util::shared_list;
+use crate::util::sharded_list;
 
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -508,7 +508,7 @@ unsafe impl<S> linked_list::Link for Task<S> {
 /// # Safety
 ///
 /// Tasks are pinned.
-unsafe impl<S> shared_list::ShardedListItem for Task<S> {
+unsafe impl<S> sharded_list::ShardedListItem for Task<S> {
     unsafe fn get_shared_id(target: NonNull<Self::Target>) -> usize {
         let task_id = unsafe { Header::get_id(target) };
         // in 32-bits machine, the lower 32 bits will be reserved

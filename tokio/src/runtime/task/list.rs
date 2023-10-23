@@ -10,13 +10,11 @@ use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
 use crate::util::linked_list::{Link, LinkedList};
-use crate::util::shared_list;
+use crate::util::sharded_list;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
-
-use super::core::Header;
 
 // The id from the module below is used to verify whether a given task is stored
 // in this OwnedTasks, or some other task. The counter starts at one so we can
@@ -63,7 +61,7 @@ pub(crate) struct OwnedTasks<S: 'static> {
     closed: AtomicBool,
 }
 
-type List<S> = shared_list::ShardedList<Task<S>, <Task<S> as Link>::Target>;
+type List<S> = sharded_list::ShardedList<Task<S>, <Task<S> as Link>::Target>;
 
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
@@ -112,22 +110,14 @@ impl<S: 'static> OwnedTasks<S> {
             // to the field.
             task.header().set_owner_id(self.id);
         }
-        // safety: We just set task_id for this task
-        let task_id = unsafe { Header::get_id(task.header_ptr()) };
 
+        let shard = self.list.lock_shard(&task);
         // check close flag
         if self.closed.load(Ordering::Acquire) {
             task.shutdown();
             return None;
         }
-        self.list.push(task);
-
-        // check close flag again, for ensuring all tasks will shutdown after OwnedTasks has been closed.
-        if self.closed.load(Ordering::Acquire) {
-            if let Some(task) = self.list.pop_back(task_id.0 as usize) {
-                task.shutdown();
-            }
-        }
+        shard.push(task);
         Some(notified)
     }
 

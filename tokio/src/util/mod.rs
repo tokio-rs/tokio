@@ -51,7 +51,7 @@ pub(crate) mod linked_list;
     feature = "signal",
     feature = "time",
 ))]
-pub(crate) mod shared_list;
+pub(crate) mod sharded_list;
 
 #[cfg(any(feature = "rt", feature = "macros"))]
 pub(crate) mod rand;

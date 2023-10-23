@@ -54,13 +54,18 @@ impl<L, T> ShardedList<L, T> {
     }
 }
 
+pub(crate) struct ShardGuard<'a, L, T> {
+    lock: MutexGuard<'a, LinkedList<L, T>>,
+    count: &'a AtomicUsize,
+    id: usize,
+}
+
 impl<L: ShardedListItem> ShardedList<L, L::Target> {
-    /// Adds an element into the list.
+    #[allow(dead_code)]
+    /// Push a value to this shard.
     pub(crate) fn push(&self, val: L::Handle) {
-        // Safety: it is safe, because every ShardedListItem has an id for shard.
-        let id = unsafe { L::get_shared_id(L::as_raw(&val)) };
-        let mut lock = self.shard_inner(id);
-        lock.push_front(val);
+        let shard = self.lock_shard(&val);
+        shard.push(val);
         self.count.fetch_add(1, Ordering::Relaxed);
     }
 
@@ -73,11 +78,6 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
             self.count.fetch_sub(1, Ordering::Relaxed);
         }
         node
-    }
-
-    /// Returns whether the linked list does not contain any node
-    pub(crate) fn is_empty(&self) -> bool {
-        self.count.load(Ordering::Relaxed) == 0
     }
 
     /// Removes the specified node from the list
@@ -98,9 +98,24 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
         node
     }
 
+    /// Gets the lock of ShardedList, lets us have the write permission.
+    pub(crate) fn lock_shard(&self, val: &L::Handle) -> ShardGuard<'_, L, L::Target> {
+        let id = unsafe { L::get_shared_id(L::as_raw(&val)) };
+        ShardGuard {
+            lock: self.shard_inner(id),
+            count: &self.count,
+            id,
+        }
+    }
+
     /// Gets the count of elements in this list.
     pub(crate) fn len(&self) -> usize {
         self.count.load(Ordering::Relaxed)
+    }
+
+    /// Returns whether the linked list does not contain any node
+    pub(crate) fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Gets the shard size of this SharedList.
@@ -113,6 +128,16 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
     fn shard_inner(&self, id: usize) -> MutexGuard<'_, LinkedList<L, <L as Link>::Target>> {
         // Safety: this modulo operation ensures it is safe here.
         unsafe { self.lists.get_unchecked(id & self.shard_mask).lock() }
+    }
+}
+
+impl<'a, L: ShardedListItem> ShardGuard<'a, L, L::Target> {
+    /// Push a value to this shard.
+    pub(crate) fn push(mut self, val: L::Handle) {
+        let id = unsafe { L::get_shared_id(L::as_raw(&val)) };
+        assert_eq!(id, self.id);
+        self.lock.push_front(val);
+        self.count.fetch_add(1, Ordering::Relaxed);
     }
 }
 
