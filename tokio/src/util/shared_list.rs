@@ -113,7 +113,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
 
 cfg_taskdump! {
     impl<L: ShardedListItem> ShardedList<L, L::Target> {
-        pub(crate) fn for_each<F>(&mut self, f: &mut F)
+        pub(crate) fn for_each<F>(&self, f: &mut F)
         where
         F: FnMut(&L::Handle),
         {
