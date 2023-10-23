@@ -120,7 +120,11 @@ impl<S: 'static> OwnedTasks<S> {
         // double check close flag for ensuring all tasks will shutdown after OwnedTasks has been closed,
         // it should be completed quickly.
         if self.closed.load(Ordering::Acquire) {
-            self.close_and_shutdown_all(0);
+            for i in 0..self.get_shard_size() {
+                if let Some(task) = self.list.pop_back(i) {
+                    task.shutdown();
+                }
+            }
         }
         Some(notified)
     }
