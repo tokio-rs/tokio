@@ -24,7 +24,7 @@ const CHUNK_SIZE: usize = 32;
 
 /// Returns a stream over the entries within a directory.
 ///
-/// This is an async version of [`std::fs::read_dir`](std::fs::read_dir)
+/// This is an async version of [`std::fs::read_dir`].
 ///
 /// This operation is implemented by running the equivalent blocking
 /// operation on a separate thread pool using [`spawn_blocking`].

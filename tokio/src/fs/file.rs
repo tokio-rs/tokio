@@ -32,7 +32,7 @@ use std::fs::File as StdFile;
 
 /// A reference to an open file on the filesystem.
 ///
-/// This is a specialized version of [`std::fs::File`][std] for usage from the
+/// This is a specialized version of [`std::fs::File`] for usage from the
 /// Tokio runtime.
 ///
 /// An instance of a `File` can be read and/or written depending on what options
@@ -50,7 +50,6 @@ use std::fs::File as StdFile;
 /// Reading and writing to a `File` is usually done using the convenience
 /// methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
 ///
-/// [std]: struct@std::fs::File
 /// [`AsyncSeek`]: trait@crate::io::AsyncSeek
 /// [`flush`]: fn@crate::io::AsyncWriteExt::flush
 /// [`sync_all`]: fn@crate::fs::File::sync_all
@@ -224,10 +223,7 @@ impl File {
         OpenOptions::new()
     }
 
-    /// Converts a [`std::fs::File`][std] to a [`tokio::fs::File`][file].
-    ///
-    /// [std]: std::fs::File
-    /// [file]: File
+    /// Converts a [`std::fs::File`] to a [`tokio::fs::File`](File).
     ///
     /// # Examples
     ///
@@ -430,12 +426,10 @@ impl File {
         Ok(File::from_std(std_file))
     }
 
-    /// Destructures `File` into a [`std::fs::File`][std]. This function is
+    /// Destructures `File` into a [`std::fs::File`]. This function is
     /// async to allow any in-flight operations to complete.
     ///
     /// Use `File::try_into_std` to attempt conversion immediately.
-    ///
-    /// [std]: std::fs::File
     ///
     /// # Examples
     ///
@@ -453,9 +447,7 @@ impl File {
         Arc::try_unwrap(self.std).expect("Arc::try_unwrap failed")
     }
 
-    /// Tries to immediately destructure `File` into a [`std::fs::File`][std].
-    ///
-    /// [std]: std::fs::File
+    /// Tries to immediately destructure `File` into a [`std::fs::File`].
     ///
     /// # Errors
     ///

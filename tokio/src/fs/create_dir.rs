@@ -5,9 +5,7 @@ use std::path::Path;
 
 /// Creates a new, empty directory at the provided path.
 ///
-/// This is an async version of [`std::fs::create_dir`][std]
-///
-/// [std]: std::fs::create_dir
+/// This is an async version of [`std::fs::create_dir`].
 ///
 /// # Platform-specific behavior
 ///

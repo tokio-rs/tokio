@@ -848,8 +848,7 @@ pub trait StreamExt: Stream {
     ///
     /// `collect` streams all values, awaiting as needed. Values are pushed into
     /// a collection. A number of different target collection types are
-    /// supported, including [`Vec`](std::vec::Vec),
-    /// [`String`](std::string::String), and [`Bytes`].
+    /// supported, including [`Vec`], [`String`], and [`Bytes`].
     ///
     /// [`Bytes`]: https://docs.rs/bytes/0.6.0/bytes/struct.Bytes.html
     ///
@@ -1005,9 +1004,8 @@ pub trait StreamExt: Stream {
 
     /// Applies a per-item timeout to the passed stream.
     ///
-    /// `timeout_repeating()` takes an [`Interval`](tokio::time::Interval) that
-    /// controls the time each element of the stream has to complete before
-    /// timing out.
+    /// `timeout_repeating()` takes an [`Interval`] that controls the time each
+    /// element of the stream has to complete before timing out.
     ///
     /// If the wrapped stream yields a value before the deadline is reached, the
     /// value is returned. Otherwise, an error is returned. The caller may decide

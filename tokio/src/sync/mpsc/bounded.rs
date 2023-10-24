@@ -13,7 +13,7 @@ use std::task::{Context, Poll};
 
 /// Sends values to the associated `Receiver`.
 ///
-/// Instances are created by the [`channel`](channel) function.
+/// Instances are created by the [`channel`] function.
 ///
 /// To convert the `Sender` into a `Sink` or use it in a poll function, you can
 /// use the [`PollSender`] utility.
@@ -86,7 +86,7 @@ pub struct OwnedPermit<T> {
 
 /// Receives values from the associated `Sender`.
 ///
-/// Instances are created by the [`channel`](channel) function.
+/// Instances are created by the [`channel`] function.
 ///
 /// This receiver can be turned into a `Stream` using [`ReceiverStream`].
 ///
