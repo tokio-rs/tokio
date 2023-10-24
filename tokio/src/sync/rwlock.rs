@@ -209,6 +209,7 @@ impl<T: ?Sized> RwLock<T> {
         let resource_span = {
             let location = std::panic::Location::caller();
             let resource_span = tracing::trace_span!(
+                parent: None,
                 "runtime.resource",
                 concrete_type = "RwLock",
                 kind = "Sync",
@@ -282,6 +283,7 @@ impl<T: ?Sized> RwLock<T> {
             let location = std::panic::Location::caller();
 
             let resource_span = tracing::trace_span!(
+                parent: None,
                 "runtime.resource",
                 concrete_type = "RwLock",
                 kind = "Sync",

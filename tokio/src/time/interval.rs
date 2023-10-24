@@ -122,6 +122,7 @@ fn internal_interval_at(
         let location = location.expect("should have location if tracing");
 
         tracing::trace_span!(
+            parent: None,
             "runtime.resource",
             concrete_type = "Interval",
             kind = "timer",
