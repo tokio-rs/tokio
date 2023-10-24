@@ -425,6 +425,31 @@ jobs:
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
+  cross-check-tier3:
+    name: cross-check-tier3
+    needs: basics
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - name: armv7-sony-vita-newlibeabihf
+            exclude_features: "process,signal,rt-process-signal,full"
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_nightly }}
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.rust_nightly }}
+          components: rust-src
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo hack check -Zbuild-std --workspace --each-feature --target ${{ matrix.target.name }} --exclude-features "${{ matrix.target.exclude_features }}"
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+
   cross-test-with-parking_lot:
     needs: basics
     runs-on: ubuntu-latest
