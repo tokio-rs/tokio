@@ -49,6 +49,7 @@ jobs:
       - miri
       - asan
       - cross-check
+      - cross-check-tier3
       - cross-test-with-parking_lot
       - cross-test-without-parking_lot
       - no-atomic-u64-test
