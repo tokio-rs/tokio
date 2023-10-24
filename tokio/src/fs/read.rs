@@ -4,9 +4,7 @@ use std::{io, path::Path};
 
 /// Reads the entire contents of a file into a bytes vector.
 ///
-/// This is an async version of [`std::fs::read`][std]
-///
-/// [std]: std::fs::read
+/// This is an async version of [`std::fs::read`].
 ///
 /// This is a convenience function for using [`File::open`] and [`read_to_end`]
 /// with fewer imports and without an intermediate variable. It pre-allocates a

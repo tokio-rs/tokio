@@ -5,9 +5,7 @@ use std::path::Path;
 
 /// Creates a new hard link on the filesystem.
 ///
-/// This is an async version of [`std::fs::hard_link`][std]
-///
-/// [std]: std::fs::hard_link
+/// This is an async version of [`std::fs::hard_link`].
 ///
 /// The `dst` path will be a link pointing to the `src` path. Note that systems
 /// often require these two paths to both be located on the same filesystem.

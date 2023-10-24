@@ -7,7 +7,7 @@ use std::path::Path;
 /// Given a path, queries the file system to get information about a file,
 /// directory, etc.
 ///
-/// This is an async version of [`std::fs::metadata`][std]
+/// This is an async version of [`std::fs::metadata`].
 ///
 /// This function will traverse symbolic links to query information about the
 /// destination file.
@@ -18,7 +18,6 @@ use std::path::Path;
 /// `GetFileAttributesEx` function on Windows.  Note that, this [may change in
 /// the future][changes].
 ///
-/// [std]: std::fs::metadata
 /// [changes]: https://doc.rust-lang.org/std/io/index.html#platform-specific-behavior
 ///
 /// # Errors

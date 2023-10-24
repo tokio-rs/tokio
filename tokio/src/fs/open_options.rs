@@ -25,7 +25,7 @@ use std::os::windows::fs::OpenOptionsExt;
 /// Generally speaking, when using `OpenOptions`, you'll first call [`new`],
 /// then chain calls to methods to set each option, then call [`open`], passing
 /// the path of the file you're trying to open. This will give you a
-/// [`io::Result`][result] with a [`File`] inside that you can further operate
+/// [`io::Result`] with a [`File`] inside that you can further operate
 /// on.
 ///
 /// This is a specialized version of [`std::fs::OpenOptions`] for usage from
@@ -36,11 +36,9 @@ use std::os::windows::fs::OpenOptionsExt;
 ///
 /// [`new`]: OpenOptions::new
 /// [`open`]: OpenOptions::open
-/// [result]: std::io::Result
 /// [`File`]: File
 /// [`File::open`]: File::open
 /// [`File::create`]: File::create
-/// [`std::fs::OpenOptions`]: std::fs::OpenOptions
 ///
 /// # Examples
 ///
