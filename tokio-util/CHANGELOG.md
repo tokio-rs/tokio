@@ -1,3 +1,20 @@
+# 0.7.10 (October 24th, 2023)
+
+### Added
+
+- task: add `TaskTracker` ([#6033])
+- task: add `JoinMap::keys` ([#6046])
+- io: implement `Seek` for `SyncIoBridge` ([#6058])
+
+### Changed
+
+- deps: update hashbrown to 0.14 ([#6102])
+
+[#6033]: https://github.com/tokio-rs/tokio/pull/6033
+[#6046]: https://github.com/tokio-rs/tokio/pull/6046
+[#6058]: https://github.com/tokio-rs/tokio/pull/6058
+[#6102]: https://github.com/tokio-rs/tokio/pull/6102
+
 # 0.7.9 (September 20th, 2023)
 
 ### Added
