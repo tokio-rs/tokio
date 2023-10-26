@@ -1,0 +1,17 @@
+[package]
+name = "tracing-instrumentation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[dev-dependencies]
+futures = { version = "0.3.0", features = ["async-await"] }
+tokio = { version = "1.33.0", path = "../..", features = ["full", "tracing"] }
+tracing = { version = "0.1.40", git = "https://github.com/tokio-rs/tracing.git", tag = "tracing-0.1.40" }
+tracing-mock = { version = "0.1.0", git = "https://github.com/tokio-rs/tracing.git", tag = "tracing-0.1.40" }
+
+[patch.crates-io]
+tracing = { git = "https://github.com/tokio-rs/tracing.git", tag = "tracing-0.1.40" }
+
+[workspace]
