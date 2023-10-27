@@ -191,6 +191,10 @@ cfg_rt! {
                 match_flavor!(self, Handle(handle) => handle.active_tasks_count())
             }
 
+            pub(crate) fn spawned_tasks_count(&self) -> u64 {
+                match_flavor!(self, Handle(handle) => handle.spawned_tasks_count())
+            }
+
             pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
                 match_flavor!(self, Handle(handle) => handle.scheduler_metrics())
             }
