@@ -99,6 +99,37 @@ fn active_tasks_count() {
 }
 
 #[test]
+fn active_tasks_count_pairs() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+    assert_eq!(0, metrics.stop_tasks_count());
+    assert_eq!(0, metrics.active_tasks_count());
+
+    rt.block_on(rt.spawn(async move {
+        assert_eq!(1, metrics.start_tasks_count());
+        assert_eq!(0, metrics.stop_tasks_count());
+    }))
+    .unwrap();
+
+    assert_eq!(1, rt.metrics().start_tasks_count());
+    assert_eq!(1, rt.metrics().stop_tasks_count());
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+    assert_eq!(0, metrics.stop_tasks_count());
+    assert_eq!(0, metrics.active_tasks_count());
+
+    rt.block_on(rt.spawn(async move {
+        assert_eq!(1, metrics.start_tasks_count());
+        assert_eq!(0, metrics.stop_tasks_count());
+    }))
+    .unwrap();
+
+    assert_eq!(1, rt.metrics().start_tasks_count());
+    assert_eq!(1, rt.metrics().stop_tasks_count());
+}
+
+#[test]
 fn remote_schedule_count() {
     use std::thread;
 

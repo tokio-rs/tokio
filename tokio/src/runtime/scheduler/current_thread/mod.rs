@@ -536,6 +536,10 @@ cfg_metrics! {
         pub(crate) fn active_tasks_count(&self) -> usize {
             self.shared.owned.active_tasks_count()
         }
+
+        pub(crate) fn start_tasks_count(&self) -> u64 {
+            self.shared.owned.start_tasks_count()
+        }
     }
 }
 
