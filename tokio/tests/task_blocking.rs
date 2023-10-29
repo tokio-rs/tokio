@@ -289,6 +289,7 @@ async fn unawaited_blocking_task_wakes_paused_runtime() {
     );
 }
 
+#[cfg(panic = "unwind")]
 #[cfg(feature = "test-util")]
 #[tokio::test(start_paused = true)]
 async fn panicking_blocking_task_wakes_paused_runtime() {
