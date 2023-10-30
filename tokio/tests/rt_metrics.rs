@@ -86,24 +86,26 @@ fn active_tasks_count() {
     let rt = current_thread();
     let metrics = rt.metrics();
     assert_eq!(0, metrics.active_tasks_count());
-    rt.spawn(async move {
+    rt.block_on(rt.spawn(async move {
         assert_eq!(1, metrics.active_tasks_count());
-    });
+    }))
+    .unwrap();
 
     let rt = threaded();
     let metrics = rt.metrics();
     assert_eq!(0, metrics.active_tasks_count());
-    rt.spawn(async move {
+    rt.block_on(rt.spawn(async move {
         assert_eq!(1, metrics.active_tasks_count());
-    });
+    }))
+    .unwrap();
 }
 
 #[test]
 fn active_tasks_count_pairs() {
     let rt = current_thread();
     let metrics = rt.metrics();
+    assert_eq!(0, metrics.start_tasks_count());
     assert_eq!(0, metrics.stop_tasks_count());
-    assert_eq!(0, metrics.active_tasks_count());
 
     rt.block_on(rt.spawn(async move {
         assert_eq!(1, metrics.start_tasks_count());
@@ -116,14 +118,19 @@ fn active_tasks_count_pairs() {
 
     let rt = threaded();
     let metrics = rt.metrics();
+    assert_eq!(0, metrics.start_tasks_count());
     assert_eq!(0, metrics.stop_tasks_count());
-    assert_eq!(0, metrics.active_tasks_count());
 
     rt.block_on(rt.spawn(async move {
         assert_eq!(1, metrics.start_tasks_count());
         assert_eq!(0, metrics.stop_tasks_count());
     }))
     .unwrap();
+
+    // for some reason, sometimes the stop count doesn't get a chance to incremenet before we get here.
+    // Only observed on single-cpu systems. Most likely the worker thread doesn't a chance to clean up
+    // the spawned task yet. We yield to give it an opportunity.
+    std::thread::yield_now();
 
     assert_eq!(1, rt.metrics().start_tasks_count());
     assert_eq!(1, rt.metrics().stop_tasks_count());
