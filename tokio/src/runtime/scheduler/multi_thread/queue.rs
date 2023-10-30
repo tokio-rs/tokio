@@ -179,7 +179,7 @@ impl<T> Local<T> {
     /// Pushes a task to the back of the local queue, if there is not enough
     /// capacity in the queue, this triggers the overflow operation.
     ///
-    /// When the queue overflows, half of the curent contents of the queue is
+    /// When the queue overflows, half of the current contents of the queue is
     /// moved to the given Injection queue. This frees up capacity for more
     /// tasks to be pushed into the local queue.
     pub(crate) fn push_back_or_overflow<O: Overflow<T>>(

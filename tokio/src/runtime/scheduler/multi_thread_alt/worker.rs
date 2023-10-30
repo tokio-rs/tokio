@@ -563,7 +563,7 @@ impl Worker {
                     let maybe_task = cx.shared().next_remote_task_synced(&mut synced);
                     (maybe_task, core)
                 } else {
-                    // block the thread to wait for a core to be assinged to us
+                    // block the thread to wait for a core to be assigned to us
                     self.wait_for_core(cx, synced)?
                 }
             }
@@ -801,7 +801,7 @@ impl Worker {
         // safety: passing in the correct `inject::Synced`.
         let mut tasks = unsafe { cx.shared().inject.pop_n(&mut synced.inject, n) };
 
-        // Pop the first task to return immedietly
+        // Pop the first task to return immediately
         let ret = tasks.next();
 
         // Push the rest of the on the run queue

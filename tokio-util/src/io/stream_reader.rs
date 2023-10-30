@@ -302,7 +302,7 @@ where
 }
 
 // The code below is a manual expansion of the code that pin-project-lite would
-// generate. This is done because pin-project-lite fails by hitting the recusion
+// generate. This is done because pin-project-lite fails by hitting the recursion
 // limit on this struct. (Every line of documentation is handled recursively by
 // the macro.)
 
