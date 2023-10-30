@@ -205,7 +205,7 @@ async fn reset() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn reset_immediatelly() {
+async fn reset_immediately() {
     let start = Instant::now();
 
     // This is necessary because the timer is only so granular, and in order for
