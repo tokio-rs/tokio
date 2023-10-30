@@ -12,6 +12,7 @@ mod support {
 }
 use support::panic::test_panic;
 
+#[cfg(panic = "unwind")]
 #[test]
 fn block_in_place_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -27,6 +28,7 @@ fn block_in_place_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn local_set_spawn_local_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -41,6 +43,7 @@ fn local_set_spawn_local_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn local_set_block_on_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -58,6 +61,7 @@ fn local_set_block_on_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn spawn_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -70,6 +74,7 @@ fn spawn_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn local_key_sync_scope_panic_caller() -> Result<(), Box<dyn Error>> {
     tokio::task_local! {
@@ -90,6 +95,7 @@ fn local_key_sync_scope_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn local_key_with_panic_caller() -> Result<(), Box<dyn Error>> {
     tokio::task_local! {
@@ -106,6 +112,7 @@ fn local_key_with_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn local_key_get_panic_caller() -> Result<(), Box<dyn Error>> {
     tokio::task_local! {

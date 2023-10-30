@@ -36,6 +36,7 @@ async fn pause_time_in_main_threads() {
     tokio::time::pause();
 }
 
+#[cfg(panic = "unwind")]
 #[cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support threads
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn pause_time_in_spawn_threads() {

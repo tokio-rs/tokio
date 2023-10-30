@@ -3,6 +3,7 @@
 
 use tokio::runtime::Runtime;
 
+#[cfg(panic = "unwind")]
 #[test]
 fn basic_enter() {
     let rt1 = rt();
@@ -15,6 +16,7 @@ fn basic_enter() {
     drop(enter1);
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 #[should_panic]
 fn interleave_enter_different_rt() {
@@ -28,6 +30,7 @@ fn interleave_enter_different_rt() {
     drop(enter2);
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 #[should_panic]
 fn interleave_enter_same_rt() {
@@ -41,6 +44,7 @@ fn interleave_enter_same_rt() {
     drop(enter3);
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 #[cfg(not(target_os = "wasi"))]
 fn interleave_then_enter() {
