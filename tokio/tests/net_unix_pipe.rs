@@ -8,6 +8,7 @@ use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
 
 use std::fs::File;
 use std::io;
+use std::os::fd::{FromRawFd, OwnedFd};
 use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
@@ -424,6 +425,84 @@ async fn try_read_buf() -> std::io::Result<()> {
     }
 
     assert_eq!(read_data, write_data);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn anon_pipe_simple_send() -> io::Result<()> {
+    const DATA: &[u8] = b"this is some data to write to the pipe";
+
+    let (mut writer, mut reader) = pipe::new()?;
+
+    // Create a reading task which should wait for data from the pipe.
+    let mut read_fut = task::spawn(async move {
+        let mut buf = vec![0; DATA.len()];
+        reader.read_exact(&mut buf).await?;
+        Ok::<_, io::Error>(buf)
+    });
+    assert_pending!(read_fut.poll());
+
+    writer.write_all(DATA).await?;
+
+    // Let the IO driver poll events for the reader.
+    while !read_fut.is_woken() {
+        tokio::task::yield_now().await;
+    }
+
+    // Reading task should be ready now.
+    let read_data = assert_ready_ok!(read_fut.poll());
+    assert_eq!(&read_data, DATA);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
+    use tokio::process::Command;
+
+    const DATA: &str = "this is some data to write to the pipe";
+
+    let (tx, mut rx) = pipe::new()?;
+
+    let status = Command::new("echo")
+        .arg("-n")
+        .arg(DATA)
+        .stdout(tx.into_owned_fd()?)
+        .status();
+
+    let mut buf = vec![0; DATA.len()];
+    rx.read_exact(&mut buf).await?;
+    assert_eq!(String::from_utf8(buf).unwrap(), DATA);
+
+    let exit_code = status.await?;
+    assert!(exit_code.success());
+
+    // Check if the pipe is closed.
+    buf = Vec::new();
+    let total = assert_ok!(rx.try_read(&mut buf));
+    assert_eq!(total, 0);
+
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg(target_os = "linux")]
+async fn anon_pipe_from_owned_fd() -> std::io::Result<()> {
+    use nix::fcntl::OFlag;
+
+    const DATA: &[u8] = b"this is some data to write to the pipe";
+
+    let fds = nix::unistd::pipe2(OFlag::O_CLOEXEC | OFlag::O_NONBLOCK)?;
+    let (rx_fd, tx_fd) = unsafe { (OwnedFd::from_raw_fd(fds.0), OwnedFd::from_raw_fd(fds.1)) };
+
+    let mut rx = pipe::Receiver::from_owned_fd(rx_fd)?;
+    let mut tx = pipe::Sender::from_owned_fd(tx_fd)?;
+
+    let mut buf = vec![0; DATA.len()];
+    tx.write_all(DATA).await?;
+    rx.read_exact(&mut buf).await?;
+    assert_eq!(buf, DATA);
 
     Ok(())
 }
