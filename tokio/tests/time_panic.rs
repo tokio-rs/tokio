@@ -12,6 +12,7 @@ mod support {
 }
 use support::panic::test_panic;
 
+#[cfg(panic = "unwind")]
 #[test]
 fn pause_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -29,6 +30,7 @@ fn pause_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn resume_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -45,6 +47,7 @@ fn resume_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn interval_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -57,6 +60,7 @@ fn interval_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn interval_at_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -69,6 +73,7 @@ fn interval_at_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn timeout_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {

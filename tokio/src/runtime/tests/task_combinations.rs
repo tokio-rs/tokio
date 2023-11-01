@@ -64,6 +64,7 @@ enum CombiAbortSource {
     AbortHandle,
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn test_combinations() {
     let mut rt = &[
