@@ -4,6 +4,7 @@ use std::task::{Context, Poll};
 use futures_core::Stream;
 use pin_project_lite::pin_project;
 
+use crate::stream_ext::Fuse;
 use crate::StreamExt;
 
 pin_project! {
@@ -11,12 +12,13 @@ pin_project! {
     pub struct Peekable<T: Stream> {
         peek: Option<T::Item>,
         #[pin]
-        stream: T,
+        stream: Fuse<T>,
     }
 }
 
 impl<T: Stream> Peekable<T> {
     pub(crate) fn new(stream: T) -> Self {
+        let stream = stream.fuse();
         Self { peek: None, stream }
     }
 
