@@ -20,4 +20,26 @@
 #[derive(Debug)]
 pub enum NotDefinedHere {}
 
+impl mio::event::Source for NotDefinedHere {
+    fn register(
+        &mut self,
+        registry: &mio::Registry,
+        token: mio::Token,
+        interests: mio::Interest,
+    ) -> std::io::Result<()> {
+        Ok(())
+    }
+    fn reregister(
+        &mut self,
+        registry: &mio::Registry,
+        token: mio::Token,
+        interests: mio::Interest,
+    ) -> std::io::Result<()> {
+        Ok(())
+    }
+    fn deregister(&mut self, registry: &mio::Registry) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 pub mod os;
