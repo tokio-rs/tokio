@@ -1326,7 +1326,9 @@ fn is_pipe(fd: BorrowedFd<'_>) -> io::Result<bool> {
     if r == -1 {
         Err(io::Error::last_os_error())
     } else {
-        Ok((stat.st_mode & libc::S_IFMT) == libc::S_IFIFO)
+        // on some platforms `st_mode` is larger than `S_IFMT` and `S_IFIFO`.
+        #[allow(clippy::useless_conversion)]
+        Ok((stat.st_mode & libc::S_IFMT) == libc::S_IFIFO.into())
     }
 }
 

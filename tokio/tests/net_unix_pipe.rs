@@ -9,7 +9,7 @@ use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
 use std::fs::File;
 use std::io;
 use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd};
+use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 
 /// Helper struct which will clean up temporary files once dropped.
@@ -489,6 +489,7 @@ async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
 #[cfg(target_os = "linux")]
 async fn anon_pipe_from_owned_fd() -> std::io::Result<()> {
     use nix::fcntl::OFlag;
+    use std::os::unix::io::{FromRawFd, OwnedFd};
 
     const DATA: &[u8] = b"this is some data to write to the pipe";
 
