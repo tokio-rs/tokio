@@ -1180,7 +1180,7 @@ pub trait StreamExt: Stream {
         ChunksTimeout::new(self, max_size, duration)
     }
 
-    /// Turns the stream into a peekable stream, whose first element can be peeked at without being
+    /// Turns the stream into a peekable stream, whose next element can be peeked at without being
     /// consumed.
     /// ```rust
     /// use tokio_stream::{self as stream, StreamExt};
