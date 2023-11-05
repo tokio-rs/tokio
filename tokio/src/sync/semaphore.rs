@@ -347,7 +347,8 @@ use std::sync::Arc;
 ///
 /// ```
 /// use tokio::sync::Semaphore;
-/// use std::{future::Future, sync::Arc};
+/// use std::future::Future;
+/// use std::sync::Arc;
 ///
 /// /// A token that holds a countdown latch open until it is dropped.
 /// #[derive(Clone)]
