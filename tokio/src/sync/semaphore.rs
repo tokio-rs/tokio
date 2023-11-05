@@ -345,7 +345,7 @@ use std::sync::Arc;
 /// [`Semaphore::add_permits`] with a single permit to increment the countdown
 /// latch as they complete. For example:
 ///
-/// ```rust
+/// ```
 /// use tokio::sync::Semaphore;
 /// use std::{future::Future, sync::Arc};
 ///
