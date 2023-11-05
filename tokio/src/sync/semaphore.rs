@@ -342,7 +342,7 @@ use std::sync::Arc;
 /// The task awaiting the countdown should call [`Semaphore::acquire_many`] to
 /// acquire the a number of permits equal to the number of tasks which hold the
 /// latch open. The tasks whose completion is awaited by the latch should call
-/// [`Semaphore::add_permit`] with a single permit to increment the countdown
+/// [`Semaphore::add_permits`] with a single permit to increment the countdown
 /// latch as they complete. For example:
 ///
 /// ```rust
