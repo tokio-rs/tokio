@@ -9,6 +9,7 @@ impl Drop for PanicsOnDrop {
     }
 }
 
+#[cfg(panic = "unwind")]
 #[tokio::test]
 async fn test_panics_do_not_propagate_when_dropping_join_handle() {
     let join_handle = tokio::spawn(async move { PanicsOnDrop });

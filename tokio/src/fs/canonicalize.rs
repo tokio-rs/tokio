@@ -6,9 +6,7 @@ use std::path::{Path, PathBuf};
 /// Returns the canonical, absolute form of a path with all intermediate
 /// components normalized and symbolic links resolved.
 ///
-/// This is an async version of [`std::fs::canonicalize`][std]
-///
-/// [std]: std::fs::canonicalize
+/// This is an async version of [`std::fs::canonicalize`].
 ///
 /// # Platform-specific behavior
 ///

@@ -7,8 +7,6 @@ use std::path::Path;
 ///
 /// This is a specialized version of [`std::fs::DirBuilder`] for usage on
 /// the Tokio runtime.
-///
-/// [std::fs::DirBuilder]: std::fs::DirBuilder
 #[derive(Debug, Default)]
 pub struct DirBuilder {
     /// Indicates whether to create parent directories if they are missing.
@@ -23,9 +21,7 @@ impl DirBuilder {
     /// Creates a new set of options with default mode/security settings for all
     /// platforms and also non-recursive.
     ///
-    /// This is an async version of [`std::fs::DirBuilder::new`][std]
-    ///
-    /// [std]: std::fs::DirBuilder::new
+    /// This is an async version of [`std::fs::DirBuilder::new`].
     ///
     /// # Examples
     ///
@@ -43,9 +39,7 @@ impl DirBuilder {
     ///
     /// This option defaults to `false`.
     ///
-    /// This is an async version of [`std::fs::DirBuilder::recursive`][std]
-    ///
-    /// [std]: std::fs::DirBuilder::recursive
+    /// This is an async version of [`std::fs::DirBuilder::recursive`].
     ///
     /// # Examples
     ///
@@ -65,9 +59,7 @@ impl DirBuilder {
     /// It is considered an error if the directory already exists unless
     /// recursive mode is enabled.
     ///
-    /// This is an async version of [`std::fs::DirBuilder::create`][std]
-    ///
-    /// [std]: std::fs::DirBuilder::create
+    /// This is an async version of [`std::fs::DirBuilder::create`].
     ///
     /// # Errors
     ///

@@ -176,6 +176,7 @@ fn test_abort_wakes_task_3964() {
 /// Checks that aborting a task whose destructor panics does not allow the
 /// panic to escape the task.
 #[test]
+#[cfg(panic = "unwind")]
 fn test_abort_task_that_panics_on_drop_contained() {
     let rt = Builder::new_current_thread().enable_time().build().unwrap();
 
@@ -199,6 +200,7 @@ fn test_abort_task_that_panics_on_drop_contained() {
 
 /// Checks that aborting a task whose destructor panics has the expected result.
 #[test]
+#[cfg(panic = "unwind")]
 fn test_abort_task_that_panics_on_drop_returned() {
     let rt = Builder::new_current_thread().enable_time().build().unwrap();
 

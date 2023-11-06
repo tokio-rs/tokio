@@ -6,9 +6,7 @@ use std::path::Path;
 /// Recursively creates a directory and all of its parent components if they
 /// are missing.
 ///
-/// This is an async version of [`std::fs::create_dir_all`][std]
-///
-/// [std]: std::fs::create_dir_all
+/// This is an async version of [`std::fs::create_dir_all`].
 ///
 /// # Platform-specific behavior
 ///

@@ -11,6 +11,7 @@ mod support {
 }
 use support::panic::test_panic;
 
+#[cfg(panic = "unwind")]
 #[test]
 fn current_handle_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -23,6 +24,7 @@ fn current_handle_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn into_panic_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(move || {
@@ -45,6 +47,7 @@ fn into_panic_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn builder_worker_threads_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -57,6 +60,7 @@ fn builder_worker_threads_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 fn builder_max_blocking_threads_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {

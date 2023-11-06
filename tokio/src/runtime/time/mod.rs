@@ -108,9 +108,6 @@ struct Inner {
 
 /// Time state shared which must be protected by a `Mutex`
 struct InnerState {
-    /// The last published timer `elapsed` value.
-    elapsed: u64,
-
     /// The earliest time at which we promise to wake up without unparking.
     next_wake: Option<NonZeroU64>,
 
@@ -132,7 +129,6 @@ impl Driver {
             time_source,
             inner: Inner {
                 state: Mutex::new(InnerState {
-                    elapsed: 0,
                     next_wake: None,
                     wheel: wheel::Wheel::new(),
                 }),
@@ -262,14 +258,14 @@ impl Handle {
 
         let mut lock = self.inner.lock();
 
-        if now < lock.elapsed {
+        if now < lock.wheel.elapsed() {
             // Time went backwards! This normally shouldn't happen as the Rust language
             // guarantees that an Instant is monotonic, but can happen when running
             // Linux in a VM on a Windows host due to std incorrectly trusting the
             // hardware clock to be monotonic.
             //
             // See <https://github.com/tokio-rs/tokio/issues/3619> for more information.
-            now = lock.elapsed;
+            now = lock.wheel.elapsed();
         }
 
         while let Some(entry) = lock.wheel.poll(now) {
@@ -296,8 +292,6 @@ impl Handle {
             }
         }
 
-        // Update the elapsed cache
-        lock.elapsed = lock.wheel.elapsed();
         lock.next_wake = lock
             .wheel
             .poll_at()

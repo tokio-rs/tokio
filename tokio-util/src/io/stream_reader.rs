@@ -166,7 +166,7 @@ where
     B: Buf,
     E: Into<std::io::Error>,
 {
-    /// Convert a stream of byte chunks into an [`AsyncRead`](tokio::io::AsyncRead).
+    /// Convert a stream of byte chunks into an [`AsyncRead`].
     ///
     /// The item should be a [`Result`] with the ok variant being something that
     /// implements the [`Buf`] trait (e.g. `Vec<u8>` or `Bytes`). The error
@@ -302,7 +302,7 @@ where
 }
 
 // The code below is a manual expansion of the code that pin-project-lite would
-// generate. This is done because pin-project-lite fails by hitting the recusion
+// generate. This is done because pin-project-lite fails by hitting the recursion
 // limit on this struct. (Every line of documentation is handled recursively by
 // the macro.)
 

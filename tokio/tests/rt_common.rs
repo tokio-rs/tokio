@@ -845,6 +845,7 @@ rt_test! {
     }
 
     #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support threads or panic recovery")]
+    #[cfg(panic = "unwind")]
     #[test]
     fn panic_in_task() {
         let rt = rt();
