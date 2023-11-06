@@ -153,7 +153,7 @@ cfg_taskdump! {
             for list in self.lists.iter() {
                 guards.push(list.lock());
             }
-            for g in &mut guards{
+            for g in &mut guards {
                 g.for_each(f);
             }
         }
