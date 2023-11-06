@@ -150,7 +150,7 @@ cfg_taskdump! {
         F: FnMut(&L::Handle),
         {
             let mut guards = Vec::with_capacity(self.lists.len());
-            for list in self.lists.iter(){
+            for list in self.lists.iter() {
                 guards.push(list.lock());
             }
             for g in &mut guards{
