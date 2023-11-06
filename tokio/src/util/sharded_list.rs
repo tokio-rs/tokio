@@ -128,7 +128,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
 
     #[inline]
     fn shard_inner(&self, id: usize) -> MutexGuard<'_, LinkedList<L, <L as Link>::Target>> {
-        // Safety: this modulo operation ensures it is safe here.
+        // Safety: This modulo operation ensures that the index is not out of bounds.
         unsafe { self.lists.get_unchecked(id & self.shard_mask).lock() }
     }
 }
