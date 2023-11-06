@@ -147,7 +147,7 @@ cfg_taskdump! {
     impl<L: ShardedListItem> ShardedList<L, L::Target> {
         pub(crate) fn for_each<F>(&self, f: &mut F)
         where
-        F: FnMut(&L::Handle),
+            F: FnMut(&L::Handle),
         {
             let mut guards = Vec::with_capacity(self.lists.len());
             for list in self.lists.iter() {
