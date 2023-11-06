@@ -543,6 +543,7 @@ impl Context {
                 } else {
                     self.park(core)
                 };
+                core.stats.start_processing_scheduled_tasks();
             }
         }
 
