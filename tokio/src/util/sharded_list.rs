@@ -145,7 +145,7 @@ impl<'a, L: ShardedListItem> ShardGuard<'a, L, L::Target> {
 
 cfg_taskdump! {
     impl<L: ShardedListItem> ShardedList<L, L::Target> {
-        pub(crate) fn for_each<F>(&self, f: &mut F)
+        pub(crate) fn for_each<F>(&self, mut f: F)
         where
             F: FnMut(&L::Handle),
         {
@@ -154,7 +154,7 @@ cfg_taskdump! {
                 guards.push(list.lock());
             }
             for g in &mut guards {
-                g.for_each(f);
+                g.for_each(&mut f);
             }
         }
     }

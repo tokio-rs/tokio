@@ -189,11 +189,11 @@ impl<S: 'static> OwnedTasks<S> {
 
 cfg_taskdump! {
     impl<S: 'static> OwnedTasks<S> {
-        pub(crate) fn for_each<F>(&self, mut f: F)
+        pub(crate) fn for_each<F>(&self, f: F)
         where
             F: FnMut(&Task<S>),
         {
-            self.list.for_each(&mut f);
+            self.list.for_each(f);
         }
     }
 }
