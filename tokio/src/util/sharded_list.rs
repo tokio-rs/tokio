@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "full"), allow(dead_code))]
 
-use std::{ptr::NonNull, sync::atomic::Ordering};
+use std::ptr::NonNull;
+use std::sync::atomic::Ordering;
 
 use crate::loom::sync::{Mutex, MutexGuard};
 use std::sync::atomic::AtomicUsize;
