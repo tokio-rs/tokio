@@ -511,7 +511,7 @@ unsafe impl<S> linked_list::Link for Task<S> {
 unsafe impl<S> sharded_list::ShardedListItem for Task<S> {
     unsafe fn get_shard_id(target: NonNull<Self::Target>) -> usize {
         let task_id = unsafe { Header::get_id(target) };
-        // safety: in 32-bits machine, the lower 32 bits will be reserved
+        // Safety: The task_id is 64-bits in all platforms, but lower 32 bits will be reserved in 32-bits machine.
         task_id.0 as usize
     }
 }
