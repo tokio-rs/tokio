@@ -13,21 +13,19 @@ use super::linked_list::{Link, LinkedList};
 /// It currently relies on `LinkedList`, so it is the caller's
 /// responsibility to ensure the list is empty before dropping it.
 ///
-/// Note: Due to its inner sharded design, the order of node cannot be guaranteed.
+/// Note: Due to its inner sharded design, the order of nodes cannot be guaranteed.
 pub(crate) struct ShardedList<L, T> {
     lists: Box<[Mutex<LinkedList<L, T>>]>,
     count: AtomicUsize,
     shard_mask: usize,
 }
 
-/// Defines the id of a node in a linked list, different ids cause inner list nodes
-/// to be scattered in different mutexs.
+/// Determines which linked list an item should be stored in.
 ///
 /// # Safety
 ///
-/// Implementations must guarantee that `Target` types are pinned in memory. In
-/// other words, when a node is inserted, the value will not be moved as long as
-/// it is stored in the list.
+/// Implementations must guarantee that the id of an item does not change from
+/// call to call.
 pub(crate) unsafe trait ShardedListItem: Link {
     // The returned id is used to pick which list this item should go into.
     unsafe fn get_shared_id(target: NonNull<Self::Target>) -> usize;
