@@ -464,7 +464,7 @@ impl Builder {
         self
     }
 
-    fn spawn_concurrency_level(&self) -> usize {
+    fn get_spawn_concurrency_level(&self) -> usize {
         const MAX_SPAWN_CONCURRENCY_LEVEL: usize = 1 << 16;
 
         match self.spawn_concurrency_level {
@@ -1317,7 +1317,7 @@ cfg_rt_multi_thread! {
             #[cfg(loom)]
             let spawn_concurrency_level = 4;
             #[cfg(not(loom))]
-            let spawn_concurrency_level = self.spawn_concurrency_level();
+            let spawn_concurrency_level = self.get_spawn_concurrency_level();
 
             let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
@@ -1373,7 +1373,7 @@ cfg_rt_multi_thread! {
                 #[cfg(loom)]
                 let spawn_concurrency_level = 4;
                 #[cfg(not(loom))]
-                let spawn_concurrency_level = self.spawn_concurrency_level();
+                let spawn_concurrency_level = self.get_spawn_concurrency_level();
 
                 let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
