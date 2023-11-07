@@ -34,7 +34,7 @@ impl<L, T> ShardedList<L, T> {
     /// Creates a new and empty sharded linked list with the specified size.
     pub(crate) fn new(sharded_size: usize) -> Self {
         assert!(sharded_size.is_power_of_two());
-        
+
         let shard_mask = sharded_size - 1;
         let mut lists = Vec::with_capacity(sharded_size);
         for _ in 0..sharded_size {
