@@ -27,7 +27,8 @@ pub(crate) struct ShardedList<L, T> {
 /// Implementations must guarantee that the id of an item does not change from
 /// call to call.
 pub(crate) unsafe trait ShardedListItem: Link {
-    // The returned id is used to pick which list this item should go into.
+    /// # Safety
+    /// The provided pointer must point at a valid list item.
     unsafe fn get_shared_id(target: NonNull<Self::Target>) -> usize;
 }
 
