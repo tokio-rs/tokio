@@ -454,7 +454,7 @@ impl Builder {
 
         assert!(val > 0, "spawn concurrency level cannot be set to 0");
         assert!(
-            sharded_size.is_power_of_two(),
+            val.is_power_of_two(),
             "spawn concurrency level must be power of two"
         );
         if val > MAX_SPAWN_CONCURRENCY_LEVEL {
