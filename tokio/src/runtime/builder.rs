@@ -464,24 +464,6 @@ impl Builder {
         self
     }
 
-    fn get_spawn_concurrency_level(&self) -> usize {
-        const MAX_SPAWN_CONCURRENCY_LEVEL: usize = 1 << 16;
-
-        match self.spawn_concurrency_level {
-            Some(i) => i,
-            None => {
-                use crate::loom::sys::num_cpus;
-                let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
-
-                let mut size = 1;
-                while size / 4 < core_threads && size < MAX_SPAWN_CONCURRENCY_LEVEL {
-                    size <<= 1;
-                }
-                size.min(MAX_SPAWN_CONCURRENCY_LEVEL)
-            }
-        }
-    }
-
     /// Specifies the limit for additional threads spawned by the Runtime.
     ///
     /// These threads are used for blocking operations like tasks spawned
@@ -1408,6 +1390,24 @@ cfg_rt_multi_thread! {
                 );
 
                 Ok(Runtime::from_parts(Scheduler::MultiThreadAlt(scheduler), handle, blocking_pool))
+            }
+        }
+
+        fn get_spawn_concurrency_level(&self) -> usize {
+            const MAX_SPAWN_CONCURRENCY_LEVEL: usize = 1 << 16;
+
+            match self.spawn_concurrency_level {
+                Some(i) => i,
+                None => {
+                    use crate::loom::sys::num_cpus;
+                    let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
+
+                    let mut size = 1;
+                    while size / 4 < core_threads && size < MAX_SPAWN_CONCURRENCY_LEVEL {
+                        size <<= 1;
+                    }
+                    size.min(MAX_SPAWN_CONCURRENCY_LEVEL)
+                }
             }
         }
     }
