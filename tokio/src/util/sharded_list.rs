@@ -82,7 +82,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
     /// - `node` is not contained by any list,
     /// - `node` is currently contained by some other `GuardedLinkedList`.
     pub(crate) unsafe fn remove(&self, node: NonNull<L::Target>) -> Option<L::Handle> {
-        let id = L::get_shared_id(node);
+        let id = L::get_shard_id(node);
         let mut lock = self.shard_inner(id);
         let node = lock.remove(node);
         if node.is_some() {
@@ -128,7 +128,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
 impl<'a, L: ShardedListItem> ShardGuard<'a, L, L::Target> {
     /// Push a value to this shard.
     pub(crate) fn push(mut self, val: L::Handle) {
-        let id = unsafe { L::get_shared_id(L::as_raw(&val)) };
+        let id = unsafe { L::get_shard_id(L::as_raw(&val)) };
         assert_eq!(id, self.id);
         self.lock.push_front(val);
         self.count.fetch_add(1, Ordering::Relaxed);
