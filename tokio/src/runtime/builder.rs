@@ -1373,7 +1373,7 @@ cfg_rt_multi_thread! {
                 #[cfg(loom)]
                 let spawn_concurrency_level = 4;
                 #[cfg(not(loom))]
-                let spawn_concurrency_level = spawn_concurrency_level;
+                let spawn_concurrency_level = self.spawn_concurrency_level();
 
                 let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
