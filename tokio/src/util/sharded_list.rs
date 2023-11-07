@@ -29,11 +29,11 @@ pub(crate) struct ShardedList<L, T> {
 pub(crate) unsafe trait ShardedListItem: Link {
     /// # Safety
     /// The provided pointer must point at a valid list item.
-    unsafe fn get_shared_id(target: NonNull<Self::Target>) -> usize;
+    unsafe fn get_shard_id(target: NonNull<Self::Target>) -> usize;
 }
 
 impl<L, T> ShardedList<L, T> {
-    /// Creates a new and empty sharded linked list under specified size
+    /// Creates a new and empty sharded linked list with the specified size.
     pub(crate) fn new(sharded_size: usize) -> Self {
         // Find power-of-two sizes best matching arguments
         let mut size = 1;
