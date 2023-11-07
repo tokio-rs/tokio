@@ -106,12 +106,13 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
         self.count.load(Ordering::Relaxed)
     }
 
-    /// Returns whether the linked list does not contain any node
+    /// Returns whether the linked list does not contain any node.
     pub(crate) fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Gets the shard size of this SharedList.
+    ///
     /// Used to help us to decide the parameter `shard_id`` of the `pop_back` method.
     pub(crate) fn shard_size(&self) -> usize {
         self.shard_mask + 1
