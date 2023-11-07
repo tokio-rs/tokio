@@ -62,14 +62,6 @@ pub(crate) struct ShardGuard<'a, L, T> {
 }
 
 impl<L: ShardedListItem> ShardedList<L, L::Target> {
-    #[allow(dead_code)]
-    /// Push a value to this shard.
-    pub(crate) fn push(&self, val: L::Handle) {
-        let shard = self.lock_shard(&val);
-        shard.push(val);
-        self.count.fetch_add(1, Ordering::Relaxed);
-    }
-
     /// Removes the last element from a list specified by shard_id and returns it, or None if it is
     /// empty.
     pub(crate) fn pop_back(&self, shard_id: usize) -> Option<L::Handle> {
