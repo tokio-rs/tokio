@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "full"), allow(dead_code))]
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering;
 
