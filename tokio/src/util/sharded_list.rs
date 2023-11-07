@@ -35,7 +35,7 @@ pub(crate) unsafe trait ShardedListItem: Link {
 impl<L, T> ShardedList<L, T> {
     /// Creates a new and empty sharded linked list with the specified size.
     pub(crate) fn new(sharded_size: usize) -> Self {
-        // Find power-of-two sizes best matching arguments
+        // Find power-of-two sizes best matching arguments.
         let mut size = 1;
         while size < sharded_size {
             size <<= 1;
@@ -54,7 +54,7 @@ impl<L, T> ShardedList<L, T> {
     }
 }
 
-/// Used to get the lock of shard
+/// Used to get the lock of shard.
 pub(crate) struct ShardGuard<'a, L, T> {
     lock: MutexGuard<'a, LinkedList<L, T>>,
     count: &'a AtomicUsize,
@@ -73,7 +73,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
         node
     }
 
-    /// Removes the specified node from the list
+    /// Removes the specified node from the list.
     ///
     /// # Safety
     ///
