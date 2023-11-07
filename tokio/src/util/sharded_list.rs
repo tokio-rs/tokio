@@ -8,7 +8,7 @@ use std::sync::atomic::AtomicUsize;
 
 use super::linked_list::{Link, LinkedList};
 
-/// An intrusive  linked list supporting high concurrent updates.
+/// An intrusive linked list supporting highly concurrent updates.
 ///
 /// It currently relies on `LinkedList`, so it is the caller's
 /// responsibility to ensure the list is empty before dropping it.
