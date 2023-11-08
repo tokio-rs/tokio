@@ -219,17 +219,21 @@ impl ScheduledIo {
             let current_readiness = Ready::from_usize(current);
             let new = f(current_readiness);
 
-            let next = match tick {
-                Tick::Set(t) => TICK.pack(t as usize, new.as_usize()),
+            let new_tick = match tick {
+                Tick::Set => {
+                    let current = TICK.unpack(current);
+                    current.wrapping_add(1) % (TICK.max_value() + 1)
+                }
                 Tick::Clear(t) => {
                     if TICK.unpack(current) as u8 != t {
                         // Trying to clear readiness with an old event!
                         return;
                     }
 
-                    TICK.pack(t as usize, new.as_usize())
+                    t as usize
                 }
             };
+            let next = TICK.pack(new_tick, new.as_usize());
 
             match self
                 .readiness
