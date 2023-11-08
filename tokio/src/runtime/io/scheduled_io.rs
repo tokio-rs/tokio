@@ -222,7 +222,7 @@ impl ScheduledIo {
             let new_tick = match tick {
                 Tick::Set => {
                     let current = TICK.unpack(current);
-                    current.wrapping_add(1) % TICK.max_value()
+                    current.wrapping_add(1) % (TICK.max_value() + 1)
                 }
                 Tick::Clear(t) => {
                     if TICK.unpack(current) as u8 != t {
