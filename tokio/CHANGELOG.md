@@ -7,12 +7,17 @@
 - io: fix I/O resource hang ([#6134])
 - sync: fix `broadcast::channel` link ([#6100])
 
+### Changed
+
+- macros: use `::core` qualified imports instead of `::std` inside `tokio::test` macro ([#5973])
+
 ### Added
 
 - fs: update cfg attr in `fs::read_dir` to include `aix` ([#6075])
 - sync: add `mpsc::Receiver::recv_many` ([#6010])
 - tokio: added vita target support ([#6094])
 
+[#5973]: https://github.com/tokio-rs/tokio/pull/5973
 [#6067]: https://github.com/tokio-rs/tokio/pull/6067
 [#6080]: https://github.com/tokio-rs/tokio/pull/6080
 [#6134]: https://github.com/tokio-rs/tokio/pull/6134
