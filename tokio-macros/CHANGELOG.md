@@ -1,3 +1,11 @@
+# 2.2.0 (November 19th, 2023)
+
+### Changed
+
+- use `::core` qualified imports instead of `::std` inside `tokio::test` macro ([#5973])
+
+[#5973]: https://github.com/tokio-rs/tokio/pull/5973
+
 # 2.1.0 (April 25th, 2023)
 
 - macros: fix typo in `#[tokio::test]` docs ([#5636])
