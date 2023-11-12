@@ -1368,11 +1368,13 @@ rt_test! {
     }
 
     #[test]
+    #[cfg_attr(target_family = "wasm", ignore)]
     fn wake_by_ref_from_thread_local() {
         wake_from_thread_local(true);
     }
 
     #[test]
+    #[cfg_attr(target_family = "wasm", ignore)]
     fn wake_by_val_from_thread_local() {
         wake_from_thread_local(false);
     }
