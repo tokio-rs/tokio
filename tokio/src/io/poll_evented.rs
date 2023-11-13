@@ -136,6 +136,19 @@ impl<E: Source> PollEvented<E> {
         self.registration.deregister(&mut inner)?;
         Ok(inner)
     }
+
+    #[cfg(feature = "process")]
+    pub(crate) fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.registration
+            .poll_read_ready(cx)
+            .map_err(io::Error::from)
+            .map_ok(|_| ())
+    }
+
+    #[cfg(feature = "process")]
+    pub(crate) fn scheduler_handle(&self) -> &scheduler::Handle {
+        self.registration.scheduler_handle()
+    }
 }
 
 feature! {

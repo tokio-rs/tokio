@@ -236,6 +236,11 @@ impl Registration {
     fn handle(&self) -> &Handle {
         self.handle.driver().io()
     }
+
+    #[cfg(feature = "process")]
+    pub(crate) fn scheduler_handle(&self) -> &scheduler::Handle {
+        &self.handle
+    }
 }
 
 impl Drop for Registration {

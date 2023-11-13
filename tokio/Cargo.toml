@@ -59,6 +59,7 @@ net = [
   "windows-sys/Win32_System_SystemServices",
 ]
 process = [
+  "rt",
   "bytes",
   "libc",
   "mio/os-poll",
