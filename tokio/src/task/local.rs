@@ -602,6 +602,10 @@ impl LocalSet {
     /// will remain on the local set, and will be driven on subsequent calls to
     /// `run_until` or when [awaiting the local set] itself.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe when `future` is cancel safe.
+    ///
     /// # Examples
     ///
     /// ```rust
