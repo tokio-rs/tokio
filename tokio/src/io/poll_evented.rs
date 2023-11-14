@@ -137,7 +137,7 @@ impl<E: Source> PollEvented<E> {
         Ok(inner)
     }
 
-    #[cfg(feature = "process")]
+    #[cfg(all(feature = "process", target_os = "linux"))]
     pub(crate) fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.registration
             .poll_read_ready(cx)
@@ -145,7 +145,7 @@ impl<E: Source> PollEvented<E> {
             .map_ok(|_| ())
     }
 
-    #[cfg(feature = "process")]
+    #[cfg(all(feature = "process", target_os = "linux"))]
     pub(crate) fn scheduler_handle(&self) -> &scheduler::Handle {
         self.registration.scheduler_handle()
     }
