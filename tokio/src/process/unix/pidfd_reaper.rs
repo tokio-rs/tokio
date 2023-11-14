@@ -112,14 +112,14 @@ impl<W> PidfdReaper<W>
 where
     W: Wait + Send + Sync + Unpin + 'static,
 {
-    pub(crate) fn new(inner: W) -> io::Result<Option<Self>> {
+    pub(crate) fn new(inner: W) -> Result<Self, (Option<io::Error>, W)> {
         if let Some(pidfd) = Pidfd::open(inner.id()) {
-            Ok(Some(Self(Some(PidfdReaperInner {
-                pidfd: PollEvented::new_with_interest(pidfd, Interest::READABLE)?,
-                inner,
-            }))))
+            match PollEvented::new_with_interest(pidfd, Interest::READABLE) {
+                Ok(pidfd) => Ok(Self(Some(PidfdReaperInner { pidfd, inner }))),
+                Err(io_error) => Err((Some(io_error), inner)),
+            }
         } else {
-            Ok(None)
+            Err((None, inner))
         }
     }
 
