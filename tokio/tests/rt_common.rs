@@ -1366,4 +1366,66 @@ rt_test! {
             th.join().unwrap();
         }
     }
+
+    #[test]
+    #[cfg_attr(target_family = "wasm", ignore)]
+    fn wake_by_ref_from_thread_local() {
+        wake_from_thread_local(true);
+    }
+
+    #[test]
+    #[cfg_attr(target_family = "wasm", ignore)]
+    fn wake_by_val_from_thread_local() {
+        wake_from_thread_local(false);
+    }
+
+    fn wake_from_thread_local(by_ref: bool) {
+        use std::cell::RefCell;
+        use std::sync::mpsc::{channel, Sender};
+        use std::task::Waker;
+
+        struct TLData {
+            by_ref: bool,
+            waker: Option<Waker>,
+            done: Sender<bool>,
+        }
+
+        impl Drop for TLData {
+            fn drop(&mut self) {
+                if self.by_ref {
+                    self.waker.take().unwrap().wake_by_ref();
+                } else {
+                    self.waker.take().unwrap().wake();
+                }
+                let _ = self.done.send(true);
+            }
+        }
+
+        std::thread_local! {
+            static TL_DATA: RefCell<Option<TLData>> = RefCell::new(None);
+        };
+
+        let (send, recv) = channel();
+
+        std::thread::spawn(move || {
+            let rt = rt();
+            rt.block_on(rt.spawn(poll_fn(move |cx| {
+                let waker = cx.waker().clone();
+                let send = send.clone();
+                TL_DATA.with(|tl| {
+                    tl.replace(Some(TLData {
+                        by_ref,
+                        waker: Some(waker),
+                        done: send,
+                    }));
+                });
+                Poll::Ready(())
+            })))
+            .unwrap();
+        })
+        .join()
+        .unwrap();
+
+        assert!(recv.recv().unwrap());
+    }
 }
