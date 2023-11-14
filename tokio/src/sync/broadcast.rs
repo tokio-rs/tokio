@@ -510,10 +510,10 @@ impl<T> Sender<T> {
 
         let mut buffer = Vec::with_capacity(capacity);
 
-        for i in 0..capacity {
+        for _ in 0..capacity {
             buffer.push(RwLock::new(Slot {
                 rem: AtomicUsize::new(0),
-                pos: (i as u64).wrapping_sub(capacity as u64),
+                pos: 0,
                 val: UnsafeCell::new(None),
             }));
         }
