@@ -172,3 +172,35 @@ where
         });
     }
 }
+
+#[cfg(all(test, not(loom)))]
+mod test {
+    use super::*;
+    use std::process::Command;
+
+    #[crate::test]
+    async fn test_pidfd_reaper_poll() {
+        let child = Command::new("true").spawn().unwrap();
+        let mut pidfd_reaper = PidfdReaper::new(child).unwrap();
+
+        let exit_status = pidfd_reaper.await.unwrap();
+        assert!(exit_status.success());
+    }
+
+    #[crate::test]
+    async fn test_pidfd_reaper_kill() {
+        let child = Command::new("sleep").arg("1800").spawn().unwrap();
+        let mut pidfd_reaper = PidfdReaper::new(child).unwrap();
+
+        pidfd_reaper.kill().unwrap();
+
+        let exit_status = pidfd_reaper.await.unwrap();
+        assert!(!exit_status.success());
+    }
+
+    #[crate::test]
+    async fn test_pidfd_reaper_drop() {
+        let child = Command::new("true").spawn().unwrap();
+        let mut pidfd_reaper = PidfdReaper::new(child).unwrap();
+    }
+}
