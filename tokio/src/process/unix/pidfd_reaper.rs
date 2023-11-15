@@ -173,7 +173,7 @@ where
     }
 }
 
-#[cfg(all(test, not(loom)))]
+#[cfg(all(test, not(loom), not(miri)))]
 mod test {
     use super::*;
     use crate::runtime::{Builder as RuntimeBuilder, Runtime};
