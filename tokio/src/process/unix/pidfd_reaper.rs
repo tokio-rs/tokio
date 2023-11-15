@@ -177,7 +177,7 @@ where
 mod test {
     use super::*;
     use crate::runtime::{Builder as RuntimeBuilder, Runtime};
-    use std::process::Command;
+    use std::process::{Command, Output};
 
     fn create_runtime() -> Runtime {
         RuntimeBuilder::new_current_thread()
@@ -190,8 +190,25 @@ mod test {
         create_runtime().block_on(fut)
     }
 
+    fn is_pidfd_available() -> bool {
+        let Output { stdout, status, .. } = Command::new("uname").arg("-r").output().unwrap();
+        assert!(status.success());
+        let stdout = String::from_utf8_lossy(&stdout);
+
+        let mut kernel_version_iter = stdout.split_once('-').unwrap().0.split('.');
+        let major = kernel_version_iter.next().unwrap();
+        let minor = kernel_version_iter.next().unwrap();
+
+        major >= 6 || (major == 5 && minor >= 10)
+    }
+
     #[test]
     fn test_pidfd_reaper_poll() {
+        if !is_pidfd_available() {
+            eprintln!("pidfd is not available on this linux kernel, skip this test");
+            return;
+        }
+
         run_test(async {
             let child = Command::new("true").spawn().unwrap();
             let pidfd_reaper = PidfdReaper::new(child).unwrap();
@@ -203,6 +220,11 @@ mod test {
 
     #[test]
     fn test_pidfd_reaper_kill() {
+        if !is_pidfd_available() {
+            eprintln!("pidfd is not available on this linux kernel, skip this test");
+            return;
+        }
+
         run_test(async {
             let child = Command::new("sleep").arg("1800").spawn().unwrap();
             let mut pidfd_reaper = PidfdReaper::new(child).unwrap();
@@ -216,6 +238,11 @@ mod test {
 
     #[test]
     fn test_pidfd_reaper_drop() {
+        if !is_pidfd_available() {
+            eprintln!("pidfd is not available on this linux kernel, skip this test");
+            return;
+        }
+
         run_test(async {
             let child = Command::new("true").spawn().unwrap();
             let _pidfd_reaper = PidfdReaper::new(child).unwrap();
