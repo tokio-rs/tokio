@@ -176,31 +176,49 @@ where
 #[cfg(all(test, not(loom)))]
 mod test {
     use super::*;
+    use crate::runtime::{Builder as RuntimeBuilder, Runtime};
     use std::process::Command;
 
-    #[crate::test]
-    async fn test_pidfd_reaper_poll() {
-        let child = Command::new("true").spawn().unwrap();
-        let mut pidfd_reaper = PidfdReaper::new(child).unwrap();
-
-        let exit_status = pidfd_reaper.await.unwrap();
-        assert!(exit_status.success());
+    fn create_runtime() -> Runtime {
+        RuntimeBuilder::new_current_thread()
+            .enable_io()
+            .build()
+            .unwrap()
     }
 
-    #[crate::test]
-    async fn test_pidfd_reaper_kill() {
-        let child = Command::new("sleep").arg("1800").spawn().unwrap();
-        let mut pidfd_reaper = PidfdReaper::new(child).unwrap();
-
-        pidfd_reaper.kill().unwrap();
-
-        let exit_status = pidfd_reaper.await.unwrap();
-        assert!(!exit_status.success());
+    fn run_test(fut: impl Future<Output = ()>) {
+        create_runtime().block_on(fut)
     }
 
-    #[crate::test]
-    async fn test_pidfd_reaper_drop() {
-        let child = Command::new("true").spawn().unwrap();
-        let mut pidfd_reaper = PidfdReaper::new(child).unwrap();
+    #[test]
+    fn test_pidfd_reaper_poll() {
+        run_test(async {
+            let child = Command::new("true").spawn().unwrap();
+            let pidfd_reaper = PidfdReaper::new(child).unwrap();
+
+            let exit_status = pidfd_reaper.await.unwrap();
+            assert!(exit_status.success());
+        });
+    }
+
+    #[test]
+    fn test_pidfd_reaper_kill() {
+        run_test(async {
+            let child = Command::new("sleep").arg("1800").spawn().unwrap();
+            let mut pidfd_reaper = PidfdReaper::new(child).unwrap();
+
+            pidfd_reaper.kill().unwrap();
+
+            let exit_status = pidfd_reaper.await.unwrap();
+            assert!(!exit_status.success());
+        });
+    }
+
+    #[test]
+    fn test_pidfd_reaper_drop() {
+        run_test(async {
+            let child = Command::new("true").spawn().unwrap();
+            let _pidfd_reaper = PidfdReaper::new(child).unwrap();
+        });
     }
 }
