@@ -4,7 +4,7 @@ use crate::{
     runtime::Handle,
 };
 
-use libc::{syscall, SYS_pidfd_open, PIDFD_NONBLOCK};
+use libc::{syscall, SYS_pidfd_open, __errno_location, ENOSYS, PIDFD_NONBLOCK};
 use mio::{event::Source, unix::SourceFd};
 use std::{
     fs::File,
@@ -15,6 +15,7 @@ use std::{
     os::unix::io::{AsRawFd, FromRawFd, RawFd},
     pin::Pin,
     process::ExitStatus,
+    sync::atomic::{AtomicBool, Ordering::Relaxed},
     task::{Context, Poll},
 };
 
@@ -25,9 +26,22 @@ struct Pidfd {
 
 impl Pidfd {
     fn open(pid: u32) -> Option<Pidfd> {
+        // Store false (0) to reduce executable size
+        static NO_PIDFD_SUPPORT: AtomicBool = AtomicBool::new(false);
+
+        if NO_PIDFD_SUPPORT.load(Relaxed) {
+            return None;
+        }
+
         unsafe {
             let fd = syscall(SYS_pidfd_open, pid, PIDFD_NONBLOCK);
             if fd == -1 {
+                let errno = *__errno_location();
+
+                if errno == ENOSYS {
+                    NO_PIDFD_SUPPORT.store(true, Relaxed)
+                }
+
                 None
             } else {
                 Some(Pidfd {
@@ -196,8 +210,8 @@ mod test {
         let stdout = String::from_utf8_lossy(&stdout);
 
         let mut kernel_version_iter = stdout.split_once('-').unwrap().0.split('.');
-        let major = kernel_version_iter.next().unwrap();
-        let minor = kernel_version_iter.next().unwrap();
+        let major: u32 = kernel_version_iter.next().unwrap().parse().unwrap();
+        let minor: u32 = kernel_version_iter.next().unwrap().parse().unwrap();
 
         major >= 6 || (major == 5 && minor >= 10)
     }
