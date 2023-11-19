@@ -1169,7 +1169,7 @@ mod tests {
     // Does a `LocalSet` running on a current-thread runtime...basically work?
     //
     // This duplicates a test in `tests/task_local_set.rs`, but because this is
-    // a lib test, it wil run under Miri, so this is necessary to catch stacked
+    // a lib test, it will run under Miri, so this is necessary to catch stacked
     // borrows violations in the `LocalSet` implementation.
     #[test]
     fn local_current_thread_scheduler() {

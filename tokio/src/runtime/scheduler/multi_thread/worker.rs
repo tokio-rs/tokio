@@ -789,7 +789,7 @@ impl Core {
             );
 
             // Take at least one task since the first task is returned directly
-            // and nto pushed onto the local queue.
+            // and not pushed onto the local queue.
             let n = usize::max(1, n);
 
             let mut synced = worker.handle.shared.synced.lock();
