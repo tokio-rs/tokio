@@ -16,6 +16,7 @@ cfg_trace! {
                 let location = std::panic::Location::caller();
                 tracing::trace_span!(
                     target: "tokio::task",
+                    parent: None,
                     "runtime.spawn",
                     %kind,
                     task.name = %name.unwrap_or_default(),
