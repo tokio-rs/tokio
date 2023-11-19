@@ -776,7 +776,6 @@ impl<T> Sender<T> {
     /// }
     /// ```
     #[track_caller]
-    #[cfg(feature = "sync")]
     #[cfg(all(feature = "sync"), not(target_arch = "wasm32"))]
     #[cfg_attr(docsrs, doc(alias = "send_blocking"))]
     pub fn blocking_send(&self, value: T) -> Result<(), SendError<T>> {
