@@ -20,6 +20,7 @@
 #[derive(Debug)]
 pub enum NotDefinedHere {}
 
+#[cfg(feature = "net")]
 impl mio::event::Source for NotDefinedHere {
     fn register(
         &mut self,
@@ -42,4 +43,5 @@ impl mio::event::Source for NotDefinedHere {
     }
 }
 
+#[cfg(feature = "net")]
 pub mod os;
