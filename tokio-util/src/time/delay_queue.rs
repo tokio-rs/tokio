@@ -671,6 +671,39 @@ impl<T> DelayQueue<T> {
         }
     }
 
+    /// Returns the deadline of the item associated with `key`.
+    ///
+    /// Since the queue operates at millisecond granularity, the returned
+    /// deadline may not exactly match the value that was given when initially
+    /// inserting the item into the queue.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `key` is not contained by the queue.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage
+    ///
+    /// ```rust
+    /// use tokio_util::time::DelayQueue;
+    /// use std::time::Duration;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let mut delay_queue = DelayQueue::new();
+    ///
+    /// let key1 = delay_queue.insert("foo", Duration::from_secs(5));
+    /// let key2 = delay_queue.insert("bar", Duration::from_secs(10));
+    ///
+    /// assert!(delay_queue.deadline(&key1) < delay_queue.deadline(&key2));
+    /// # }
+    /// ```
+    #[track_caller]
+    pub fn deadline(&self, key: &Key) -> Instant {
+        self.start + Duration::from_millis(self.slab[*key].when)
+    }
+
     /// Removes the key from the expired queue or the timer wheel
     /// depending on its expiration status.
     ///
@@ -909,8 +942,10 @@ impl<T> DelayQueue<T> {
         self.expired.peek().or_else(|| self.wheel.peek())
     }
 
-    /// Returns the next time to poll as determined by the wheel
-    fn next_deadline(&mut self) -> Option<Instant> {
+    /// Returns the next time to poll as determined by the wheel.
+    ///
+    /// Note that this does not include deadlines in the `expired` queue.
+    fn next_deadline(&self) -> Option<Instant> {
         self.wheel
             .poll_at()
             .map(|poll_at| self.start + Duration::from_millis(poll_at))
