@@ -1267,8 +1267,8 @@ impl TcpStream {
     /// Unlike [`split`], the owned halves can be moved to separate tasks, however
     /// this comes at the cost of a heap allocation.
     ///
-    /// **Note:** Dropping the write half will shut down the write half of the TCP
-    /// stream. This is equivalent to calling [`shutdown()`] on the `TcpStream`.
+    /// **Note:** Dropping the write half will shut down the TCP stream.
+    /// This is equivalent to calling [`shutdown()`] on the `TcpStream`.
     ///
     /// [`split`]: TcpStream::split()
     /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
