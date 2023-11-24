@@ -509,7 +509,7 @@ unsafe impl<S> linked_list::Link for Task<S> {
 ///
 /// The id of a task is never changed after creation of the task, so the return value of
 /// `get_shard_id` will not change. (The cast may throw away the upper 32 bits of the task id, but
-/// the shard still won't change from call to call.)
+/// the shard id still won't change from call to call.)
 unsafe impl<S> sharded_list::ShardedListItem for Task<S> {
     unsafe fn get_shard_id(target: NonNull<Self::Target>) -> usize {
         // SAFETY: The caller guarantees that `target` points at a valid task.

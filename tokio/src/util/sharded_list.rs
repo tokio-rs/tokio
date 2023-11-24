@@ -78,7 +78,9 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
     pub(crate) unsafe fn remove(&self, node: NonNull<L::Target>) -> Option<L::Handle> {
         let id = L::get_shard_id(node);
         let mut lock = self.shard_inner(id);
-        let node = lock.remove(node);
+        // SAFETY: Since the shard id cannot change, it's not possible for this node
+        // to be in any other list of the same sharded list.
+        let node = unsafe { lock.remove(node) };
         if node.is_some() {
             self.count.fetch_sub(1, Ordering::Relaxed);
         }

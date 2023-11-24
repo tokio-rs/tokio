@@ -112,8 +112,8 @@ impl<S: 'static> OwnedTasks<S> {
         }
 
         let shard = self.list.lock_shard(&task);
-        // check the closed flag in the lock for ensuring all tasks
-        // will shutdown after ownedTasks has been closed.
+        // Check the closed flag in the lock for ensuring all that tasks
+        // will shut down after the OwnedTasks has been closed.
         if self.closed.load(Ordering::Acquire) {
             drop(shard);
             task.shutdown();
@@ -139,10 +139,8 @@ impl<S: 'static> OwnedTasks<S> {
     /// Shuts down all tasks in the collection. This call also closes the
     /// collection, preventing new items from being added.
     ///
-    /// The parameter start should be random among different worker threads
-    /// to reduce lock conflicts during shutdown.
-    /// Initiate shutting down the shard indexed by the start, and reset to 0
-    /// once the `shard_size` is reached, continuing until `start - 1`, it works like a ring.
+    /// The parameter start determines which shard this method will start at.
+    /// Using different values for each worker thread reduces contention.
     pub(crate) fn close_and_shutdown_all(&self, start: usize)
     where
         S: Schedule,
