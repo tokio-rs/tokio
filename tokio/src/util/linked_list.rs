@@ -296,7 +296,7 @@ cfg_io_driver_impl! {
 
 cfg_taskdump! {
     impl<T: Link> LinkedList<T, T::Target> {
-        pub(crate) fn for_each<F>(&mut self, f: &mut F)
+        pub(crate) fn for_each<F>(&mut self, mut f: F)
         where
             F: FnMut(&T::Handle),
         {
