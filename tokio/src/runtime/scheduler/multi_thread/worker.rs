@@ -245,7 +245,6 @@ pub(super) fn create(
     driver_handle: driver::Handle,
     blocking_spawner: blocking::Spawner,
     seed_generator: RngSeedGenerator,
-    spawn_concurrency_level: usize,
     config: Config,
 ) -> (Arc<Handle>, Launch) {
     let mut cores = Vec::with_capacity(size);
@@ -288,7 +287,7 @@ pub(super) fn create(
             remotes: remotes.into_boxed_slice(),
             inject,
             idle,
-            owned: OwnedTasks::new(spawn_concurrency_level as u32),
+            owned: OwnedTasks::new(size),
             synced: Mutex::new(Synced {
                 idle: idle_synced,
                 inject: inject_synced,

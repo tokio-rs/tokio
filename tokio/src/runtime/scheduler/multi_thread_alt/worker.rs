@@ -259,7 +259,6 @@ pub(super) fn create(
     driver_handle: driver::Handle,
     blocking_spawner: blocking::Spawner,
     seed_generator: RngSeedGenerator,
-    spawn_concurrency_level: usize,
     config: Config,
 ) -> runtime::Handle {
     let mut num_workers = num_cores;
@@ -308,7 +307,7 @@ pub(super) fn create(
             remotes: remotes.into_boxed_slice(),
             inject,
             idle,
-            owned: OwnedTasks::new(spawn_concurrency_level as u32),
+            owned: OwnedTasks::new(num_cores),
             synced: Mutex::new(Synced {
                 assigned_cores: (0..num_workers).map(|_| None).collect(),
                 shutdown_cores: Vec::with_capacity(num_cores),

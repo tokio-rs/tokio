@@ -68,15 +68,17 @@ pub(crate) struct LocalOwnedTasks<S: 'static> {
     pub(crate) id: NonZeroU64,
     _not_send_or_sync: PhantomData<*const ()>,
 }
+
 struct OwnedTasksInner<S: 'static> {
     list: LinkedList<Task<S>, <Task<S> as Link>::Target>,
     closed: bool,
 }
 
 impl<S: 'static> OwnedTasks<S> {
-    pub(crate) fn new(concurrency_level: u32) -> Self {
+    pub(crate) fn new(num_cores: usize) -> Self {
+        let shard_size = Self::gen_shared_list_size(num_cores);
         Self {
-            list: List::new(concurrency_level as usize),
+            list: List::new(shard_size),
             closed: AtomicBool::new(false),
             id: get_next_id(),
         }
@@ -182,6 +184,22 @@ impl<S: 'static> OwnedTasks<S> {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.list.is_empty()
+    }
+
+    fn gen_shared_list_size(num_cores: usize) -> usize {
+        // Shrink the size of shared_list_size when using loom. This shouldn't impact
+        // logic, but allows loom to test more edge cases in a reasoable a mount of time.
+        #[cfg(loom)]
+        return 4;
+        #[cfg(not(loom))]
+        {
+            const MAX_SHARED_LIST_SIZE: usize = 1 << 16;
+            let mut size = 1;
+            while size / 4 < num_cores && size < MAX_SHARED_LIST_SIZE {
+                size <<= 1;
+            }
+            size.min(MAX_SHARED_LIST_SIZE)
+        }
     }
 }
 
