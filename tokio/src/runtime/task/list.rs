@@ -185,21 +185,23 @@ impl<S: 'static> OwnedTasks<S> {
     pub(crate) fn is_empty(&self) -> bool {
         self.list.is_empty()
     }
-
+    /// Generates the size of the shared list based on the number of worker threads.
+    ///
+    /// The sharded lock design can effectively alleviate
+    /// lock contention performance problems caused by high concurrency.
+    ///
+    /// However, as the number of shards increases, the memory continuity between nodes in
+    /// the intrusive linked list will decrease. Moreover, as the number of shards increases,
+    /// the construction time of the sharded list will increase.
+    ///
+    /// For the above reasons, we set a maximum value for the shared list size `MAX_SHARED_LIST_SIZE`.
     fn gen_shared_list_size(num_cores: usize) -> usize {
-        // Shrink the size of shared_list_size when using loom. This shouldn't impact
-        // logic, but allows loom to test more edge cases in a reasoable a mount of time.
-        #[cfg(loom)]
-        return 4;
-        #[cfg(not(loom))]
-        {
-            const MAX_SHARED_LIST_SIZE: usize = 1 << 16;
-            let mut size = 1;
-            while size / 4 < num_cores && size < MAX_SHARED_LIST_SIZE {
-                size <<= 1;
-            }
-            size.min(MAX_SHARED_LIST_SIZE)
+        const MAX_SHARED_LIST_SIZE: usize = 1 << 16;
+        let mut size = 1;
+        while size / 4 < num_cores && size < MAX_SHARED_LIST_SIZE {
+            size <<= 1;
         }
+        size.min(MAX_SHARED_LIST_SIZE)
     }
 }
 
