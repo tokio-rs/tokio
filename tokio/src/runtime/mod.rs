@@ -189,20 +189,25 @@
 //! starves other tasks by not scheduling them. To solve this, Tokio provides
 //! the following fairness guarantee:
 //!
+//! > If the total number of tasks does not grow without bound, and no task is
+//! > [blocking the thread], then it is guaranteed that tasks are scheduled
+//! > fairly.
+//!
+//! Or, more formally:
+//!
 //! > Under the following two assumptions:
 //! >
 //! > * There is some number `MAX_TASKS` such that the total number of tasks on
-//! >   the runtime never exceeds `MAX_TASKS`.
+//! >   the runtime at any specific point in time never exceeds `MAX_TASKS`.
 //! > * There is some number `MAX_SCHEDULE` such that calling [`poll`] on any
 //! >   task spawned on the runtime returns within `MAX_SCHEDULE` time units.
 //! >
-//! > Then, it is guaranteed that tasks are scheduled fairly, that is, there is
-//! > some number `MAX_DELAY` such that when a task becomes ready, it will be
-//! > scheduled by the runtime within `MAX_DELAY` time units.
-//! >
-//! > (Here, `MAX_TASKS` and `MAX_SCHEDULE` are controlled by the user of the
-//! > runtime, but `MAX_DELAY` is controlled by the runtime, and depends on the
-//! > value of `MAX_TASKS` and `MAX_SCHEDULE`.)
+//! > Then, there is some number `MAX_DELAY` such that when a task is woken, it
+//! > will be scheduled by the runtime within `MAX_DELAY` time units.
+//!
+//! (Here, `MAX_TASKS` and `MAX_SCHEDULE` can be any number and the user of
+//! the runtime may choose them. The `MAX_DELAY` number is controlled by the
+//! runtime, and depends on the value of `MAX_TASKS` and `MAX_SCHEDULE`.)
 //!
 //! Other than the above fairness guarantee, there is no guarantee about the
 //! order in which tasks are scheduled. There is also no guarantee that the
@@ -298,6 +303,7 @@
 //! [`poll`]: std::future::Future::poll
 //! [`wake`]: std::task::Waker::wake
 //! [`yield_now`]: crate::task::yield_now
+//! [blocking the thread]: https://ryhl.io/blog/async-what-is-blocking/
 //! [current thread runtime]: crate::runtime::Builder::new_current_thread
 //! [multi thread runtime]: crate::runtime::Builder::new_multi_thread
 //! [`global_queue_interval`]: crate::runtime::Builder::global_queue_interval
