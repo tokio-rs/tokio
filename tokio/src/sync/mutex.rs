@@ -340,6 +340,7 @@ impl<T: ?Sized> Mutex<T> {
             let location = std::panic::Location::caller();
 
             tracing::trace_span!(
+                parent: None,
                 "runtime.resource",
                 concrete_type = "Mutex",
                 kind = "Sync",

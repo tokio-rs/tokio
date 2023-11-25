@@ -400,6 +400,7 @@ impl Semaphore {
             let location = std::panic::Location::caller();
 
             tracing::trace_span!(
+                parent: None,
                 "runtime.resource",
                 concrete_type = "Semaphore",
                 kind = "Sync",

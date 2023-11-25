@@ -471,13 +471,16 @@ fn worker_overflow_count() {
 
             // First, we need to block the other worker until all tasks have
             // been spawned.
-            tokio::spawn(async move {
-                tx1.send(()).unwrap();
-                rx2.recv().unwrap();
+            //
+            // We spawn from outside the runtime to ensure that the other worker
+            // will pick it up:
+            // <https://github.com/tokio-rs/tokio/issues/4730>
+            tokio::task::spawn_blocking(|| {
+                tokio::spawn(async move {
+                    tx1.send(()).unwrap();
+                    rx2.recv().unwrap();
+                });
             });
-
-            // Bump the next-run spawn
-            tokio::spawn(async {});
 
             rx1.recv().unwrap();
 

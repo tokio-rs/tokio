@@ -487,7 +487,7 @@ cfg_taskdump! {
         /// `.cargo/config.toml`:
         /// ```text
         /// [build]
-        /// rustflags = ["--cfg tokio_unstable", "--cfg tokio_taskdump"]
+        /// rustflags = ["--cfg", "tokio_unstable", "--cfg", "tokio_taskdump"]
         /// ```
         ///
         /// [cargo-config]:

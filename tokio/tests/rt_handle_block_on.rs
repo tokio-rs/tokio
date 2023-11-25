@@ -3,7 +3,7 @@
 
 // All io tests that deal with shutdown is currently ignored because there are known bugs in with
 // shutting down the io driver while concurrently registering new resources. See
-// https://github.com/tokio-rs/tokio/pull/3569#pullrequestreview-612703467 fo more details.
+// https://github.com/tokio-rs/tokio/pull/3569#pullrequestreview-612703467 for more details.
 //
 // When this has been fixed we want to re-enable these tests.
 
