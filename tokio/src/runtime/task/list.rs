@@ -185,6 +185,7 @@ impl<S: 'static> OwnedTasks<S> {
     pub(crate) fn is_empty(&self) -> bool {
         self.list.is_empty()
     }
+
     /// Generates the size of the shared list based on the number of worker threads.
     ///
     /// The sharded lock design can effectively alleviate
@@ -198,11 +199,7 @@ impl<S: 'static> OwnedTasks<S> {
     /// denoted as `MAX_SHARED_LIST_SIZE`.
     fn gen_shared_list_size(num_cores: usize) -> usize {
         const MAX_SHARED_LIST_SIZE: usize = 1 << 16;
-        let mut size = 1;
-        while size / 4 < num_cores && size < MAX_SHARED_LIST_SIZE {
-            size <<= 1;
-        }
-        size.min(MAX_SHARED_LIST_SIZE)
+        usize::min(MAX_SHARED_LIST_SIZE, num_cores.next_power_of_two()*4)
     }
 }
 
