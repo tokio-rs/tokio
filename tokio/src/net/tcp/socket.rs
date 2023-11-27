@@ -528,6 +528,50 @@ impl TcpSocket {
         self.inner.bind_device(interface)
     }
 
+    /// Get the value for the `IPV6_V6ONLY` option on this socket.
+    ///
+    /// For more information about this option, see [`set_only_v6`].
+    ///
+    /// [`set_only_v6`]: Self::set_only_v6
+    pub fn only_v6(&self) -> io::Result<bool> {
+        self.inner.only_v6()
+    }
+
+    /// Set the value for the `IPV6_V6ONLY` option on this socket.
+    ///
+    /// If this is set to `true` then the socket is restricted to sending and
+    /// receiving IPv6 packets only. In this case two IPv4 and IPv6 applications
+    /// can bind the same port at the same time.
+    ///
+    /// If this is set to `false` then the socket can be used to send and
+    /// receive packets from an IPv4-mapped IPv6 address.
+    ///
+    /// This option is specific to IPv6 sockets and it must be set before binding
+    /// to any address. Its support and default value are platform specific. Refer
+    /// to the target platform's documentation for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpSocket;
+    ///
+    /// use std::{io, net::Ipv6Addr};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let socket = TcpSocket::new_v6()?;
+    ///     socket.set_only_v6(true)?;
+    ///     assert!(socket.only_v6().unwrap());
+    ///     socket.bind((Ipv6Addr::UNSPECIFIED, 8080).into())?;
+    ///
+    ///     let listener = socket.listen(1024)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn set_only_v6(&self, only_v6: bool) -> io::Result<()> {
+        self.inner.set_only_v6(only_v6)
+    }
+
     /// Gets the local address of this socket.
     ///
     /// Will fail on windows if called before `bind`.
