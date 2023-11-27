@@ -236,11 +236,6 @@ impl Registration {
     fn handle(&self) -> &Handle {
         self.handle.driver().io()
     }
-
-    #[cfg(all(feature = "process", target_os = "linux"))]
-    pub(crate) fn scheduler_handle(&self) -> &scheduler::Handle {
-        &self.handle
-    }
 }
 
 impl Drop for Registration {

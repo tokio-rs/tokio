@@ -106,7 +106,7 @@ impl OrphanQueue<StdChild> for GlobalOrphanQueue {
 pub(crate) enum Child {
     SignalReaper(Reaper<StdChild, GlobalOrphanQueue, Signal>),
     #[cfg(target_os = "linux")]
-    PidfdReaper(pidfd_reaper::PidfdReaper<StdChild>),
+    PidfdReaper(pidfd_reaper::PidfdReaper<StdChild, GlobalOrphanQueue>),
 }
 
 impl fmt::Debug for Child {
@@ -122,7 +122,7 @@ pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<Spawned
     let stderr = child.stderr.take().map(stdio).transpose()?;
 
     #[cfg(target_os = "linux")]
-    match pidfd_reaper::PidfdReaper::new(child) {
+    match pidfd_reaper::PidfdReaper::new(child, GlobalOrphanQueue) {
         Ok(pidfd_reaper) => {
             return Ok(SpawnedChild {
                 child: Child::PidfdReaper(pidfd_reaper),

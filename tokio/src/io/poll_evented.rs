@@ -144,11 +144,6 @@ impl<E: Source> PollEvented<E> {
             .map_err(io::Error::from)
             .map_ok(|_| ())
     }
-
-    #[cfg(all(feature = "process", target_os = "linux"))]
-    pub(crate) fn scheduler_handle(&self) -> &scheduler::Handle {
-        self.registration.scheduler_handle()
-    }
 }
 
 feature! {

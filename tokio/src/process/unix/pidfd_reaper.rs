@@ -1,7 +1,9 @@
 use crate::{
     io::{interest::Interest, PollEvented},
-    process::{imp::orphan::Wait, kill::Kill},
-    runtime::Handle,
+    process::{
+        imp::{orphan::Wait, OrphanQueue},
+        kill::Kill,
+    },
 };
 
 use libc::{syscall, SYS_pidfd_open, __errno_location, ENOSYS, PIDFD_NONBLOCK};
@@ -109,27 +111,39 @@ where
 }
 
 #[derive(Debug)]
-pub(crate) struct PidfdReaper<W: Wait + Send + Sync + Unpin + 'static>(Option<PidfdReaperInner<W>>);
-
-impl<W> Deref for PidfdReaper<W>
+pub(crate) struct PidfdReaper<W, Q>
 where
-    W: Wait + Send + Sync + Unpin + 'static,
+    W: Wait + Unpin,
+    Q: OrphanQueue<W> + Unpin,
+{
+    inner: Option<PidfdReaperInner<W>>,
+    orphan_queue: Q,
+}
+
+impl<W, Q> Deref for PidfdReaper<W, Q>
+where
+    W: Wait + Unpin,
+    Q: OrphanQueue<W> + Unpin,
 {
     type Target = W;
 
     fn deref(&self) -> &Self::Target {
-        &self.0.as_ref().expect("inner has gone away").inner
+        &self.inner.as_ref().expect("inner has gone away").inner
     }
 }
 
-impl<W> PidfdReaper<W>
+impl<W, Q> PidfdReaper<W, Q>
 where
-    W: Wait + Send + Sync + Unpin + 'static,
+    W: Wait + Unpin,
+    Q: OrphanQueue<W> + Unpin,
 {
-    pub(crate) fn new(inner: W) -> Result<Self, (Option<io::Error>, W)> {
+    pub(crate) fn new(inner: W, orphan_queue: Q) -> Result<Self, (Option<io::Error>, W)> {
         if let Some(pidfd) = Pidfd::open(inner.id()) {
             match PollEvented::new_with_interest(pidfd, Interest::READABLE) {
-                Ok(pidfd) => Ok(Self(Some(PidfdReaperInner { pidfd, inner }))),
+                Ok(pidfd) => Ok(Self {
+                    inner: Some(PidfdReaperInner { pidfd, inner }),
+                    orphan_queue,
+                }),
                 Err(io_error) => Err((Some(io_error), inner)),
             }
         } else {
@@ -138,20 +152,21 @@ where
     }
 
     pub(crate) fn inner_mut(&mut self) -> &mut W {
-        &mut self.0.as_mut().expect("inner has gone away").inner
+        &mut self.inner.as_mut().expect("inner has gone away").inner
     }
 }
 
-impl<W> Future for PidfdReaper<W>
+impl<W, Q> Future for PidfdReaper<W, Q>
 where
-    W: Wait + Send + Sync + Unpin + 'static,
+    W: Wait + Unpin,
+    Q: OrphanQueue<W> + Unpin,
 {
     type Output = io::Result<ExitStatus>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Pin::new(
             Pin::into_inner(self)
-                .0
+                .inner
                 .as_mut()
                 .expect("inner has gone away"),
         )
@@ -159,38 +174,38 @@ where
     }
 }
 
-impl<W> Kill for PidfdReaper<W>
+impl<W, Q> Kill for PidfdReaper<W, Q>
 where
-    W: Wait + Send + Sync + Unpin + Kill + 'static,
+    W: Wait + Unpin + Kill,
+    Q: OrphanQueue<W> + Unpin,
 {
     fn kill(&mut self) -> io::Result<()> {
         self.inner_mut().kill()
     }
 }
 
-impl<W> Drop for PidfdReaper<W>
+impl<W, Q> Drop for PidfdReaper<W, Q>
 where
-    W: Wait + Send + Sync + Unpin + 'static,
+    W: Wait + Unpin,
+    Q: OrphanQueue<W> + Unpin,
 {
     fn drop(&mut self) {
-        let mut reaper_inner = self.0.take().expect("inner has gone away");
-        if let Ok(Some(_)) = reaper_inner.inner.try_wait() {
+        let mut orphan = self.inner.take().expect("inner has gone away").inner;
+        if let Ok(Some(_)) = orphan.try_wait() {
             return;
         }
 
-        Handle {
-            inner: reaper_inner.pidfd.scheduler_handle().clone(),
-        }
-        .spawn(async move {
-            let _ = reaper_inner.await;
-        });
+        self.orphan_queue.push_orphan(orphan);
     }
 }
 
 #[cfg(all(test, not(loom), not(miri)))]
 mod test {
     use super::*;
-    use crate::runtime::{Builder as RuntimeBuilder, Runtime};
+    use crate::{
+        process::unix::orphan::test::MockQueue,
+        runtime::{Builder as RuntimeBuilder, Runtime},
+    };
     use std::process::{Command, Output};
 
     fn create_runtime() -> Runtime {
@@ -223,13 +238,17 @@ mod test {
             return;
         }
 
+        let queue = MockQueue::new();
+
         run_test(async {
             let child = Command::new("true").spawn().unwrap();
-            let pidfd_reaper = PidfdReaper::new(child).unwrap();
+            let pidfd_reaper = PidfdReaper::new(child, &queue).unwrap();
 
             let exit_status = pidfd_reaper.await.unwrap();
             assert!(exit_status.success());
         });
+
+        assert!(queue.all_enqueued.borrow().is_empty());
     }
 
     #[test]
@@ -239,15 +258,19 @@ mod test {
             return;
         }
 
+        let queue = MockQueue::new();
+
         run_test(async {
             let child = Command::new("sleep").arg("1800").spawn().unwrap();
-            let mut pidfd_reaper = PidfdReaper::new(child).unwrap();
+            let mut pidfd_reaper = PidfdReaper::new(child, &queue).unwrap();
 
             pidfd_reaper.kill().unwrap();
 
             let exit_status = pidfd_reaper.await.unwrap();
             assert!(!exit_status.success());
         });
+
+        assert!(queue.all_enqueued.borrow().is_empty());
     }
 
     #[test]
@@ -257,9 +280,13 @@ mod test {
             return;
         }
 
+        let queue = MockQueue::new();
+
         run_test(async {
-            let child = Command::new("true").spawn().unwrap();
-            let _pidfd_reaper = PidfdReaper::new(child).unwrap();
+            let child = Command::new("sleep").arg("1800").spawn().unwrap();
+            let _pidfd_reaper = PidfdReaper::new(child, &queue).unwrap();
         });
+
+        assert_eq!(queue.all_enqueued.borrow().len(), 1);
     }
 }
