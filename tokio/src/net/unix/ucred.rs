@@ -42,7 +42,7 @@ pub(crate) use self::impl_linux::get_peer_cred;
 #[cfg(target_os = "netbsd")]
 pub(crate) use self::impl_netbsd::get_peer_cred;
 
-#[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "nto"))]
 pub(crate) use self::impl_bsd::get_peer_cred;
 
 #[cfg(any(
@@ -162,7 +162,7 @@ pub(crate) mod impl_netbsd {
     }
 }
 
-#[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
+#[cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "nto"))]
 pub(crate) mod impl_bsd {
     use crate::net::unix::{self, UnixStream};
 
