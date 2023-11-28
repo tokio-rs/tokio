@@ -1,4 +1,4 @@
-use crate::runtime::Handle;
+use crate::runtime::{CounterPair, Handle};
 
 use std::ops::Range;
 use std::sync::atomic::Ordering::Relaxed;
@@ -13,6 +13,18 @@ use std::time::Duration;
 #[derive(Clone, Debug)]
 pub struct RuntimeMetrics {
     handle: Handle,
+}
+
+impl CounterPair {
+    /// Determines the current length of the pair
+    pub fn len(&self) -> usize {
+        (self.inc - self.dec) as usize
+    }
+
+    /// Determines if the counter pair represents an empty collection
+    pub fn is_empty(&self) -> bool {
+        self.inc == self.dec
+    }
 }
 
 impl RuntimeMetrics {
@@ -88,7 +100,7 @@ impl RuntimeMetrics {
         self.handle.inner.active_tasks_count()
     }
 
-    /// Returns the number of started tasks in the runtime.
+    /// Returns a counter pair representing the number of started and completed tasks in the runtime.
     ///
     /// # Examples
     ///
@@ -99,32 +111,19 @@ impl RuntimeMetrics {
     /// async fn main() {
     ///    let metrics = Handle::current().metrics();
     ///
-    ///     let n = metrics.start_tasks_count();
-    ///     println!("Runtime has {} active tasks", n);
+    ///     let n = metrics.task_counts();
+    ///     println!("Runtime has {} started tasks", n.inc);
+    ///     println!("Runtime has {} completed tasks", n.dec);
+    ///     println!("Runtime has {} active tasks", n.len());
     /// }
     /// ```
-    pub fn start_tasks_count(&self) -> u64 {
-        self.handle.inner.start_tasks_count()
-    }
-
-    /// Returns the number of finished tasks in the runtime.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::runtime::Handle;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///    let metrics = Handle::current().metrics();
-    ///
-    ///     let n = metrics.stop_tasks_count();
-    ///     println!("Runtime has {} active tasks", n);
-    /// }
-    /// ```
-    pub fn stop_tasks_count(&self) -> u64 {
-        self.start_tasks_count()
-            .saturating_sub(self.active_tasks_count() as u64)
+    pub fn task_counts(&self) -> CounterPair {
+        let added = self.handle.inner.start_tasks_count();
+        let active = self.active_tasks_count();
+        CounterPair {
+            inc: added,
+            dec: added.saturating_sub(active as u64),
+        }
     }
 
     /// Returns the number of idle threads, which have spawned by the runtime

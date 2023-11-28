@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::task::Poll;
 use tokio::macros::support::poll_fn;
 
+use tokio::runtime::CounterPair;
 use tokio::runtime::Runtime;
 use tokio::task::consume_budget;
 use tokio::time::{self, Duration};
@@ -104,36 +105,32 @@ fn active_tasks_count() {
 fn active_tasks_count_pairs() {
     let rt = current_thread();
     let metrics = rt.metrics();
-    assert_eq!(0, metrics.start_tasks_count());
-    assert_eq!(0, metrics.stop_tasks_count());
+    assert_eq!(CounterPair { inc: 0, dec: 0 }, metrics.task_counts());
 
     rt.block_on(rt.spawn(async move {
-        assert_eq!(1, metrics.start_tasks_count());
-        assert_eq!(0, metrics.stop_tasks_count());
+        assert_eq!(CounterPair { inc: 1, dec: 0 }, metrics.task_counts());
     }))
     .unwrap();
 
-    assert_eq!(1, rt.metrics().start_tasks_count());
-    assert_eq!(1, rt.metrics().stop_tasks_count());
+    assert_eq!(CounterPair { inc: 1, dec: 1 }, rt.metrics().task_counts());
 
     let rt = threaded();
     let metrics = rt.metrics();
-    assert_eq!(0, metrics.start_tasks_count());
-    assert_eq!(0, metrics.stop_tasks_count());
+    assert_eq!(CounterPair { inc: 0, dec: 0 }, metrics.task_counts());
 
     rt.block_on(rt.spawn(async move {
-        assert_eq!(1, metrics.start_tasks_count());
-        assert_eq!(0, metrics.stop_tasks_count());
+        assert_eq!(CounterPair { inc: 1, dec: 0 }, metrics.task_counts());
     }))
     .unwrap();
 
-    // for some reason, sometimes the stop count doesn't get a chance to incremenet before we get here.
-    // Only observed on single-cpu systems. Most likely the worker thread doesn't a chance to clean up
-    // the spawned task yet. We yield to give it an opportunity.
-    std::thread::yield_now();
-
-    assert_eq!(1, rt.metrics().start_tasks_count());
-    assert_eq!(1, rt.metrics().stop_tasks_count());
+    for _ in 0..100 {
+        if rt.metrics().task_counts() == (CounterPair { inc: 1, dec: 1 }) {
+            return;
+        }
+        // on single threaded machines (like in CI), we need to force the OS to run the runtime threads
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    panic!("runtime didn't decrement active task gauge")
 }
 
 #[test]
