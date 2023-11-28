@@ -157,7 +157,7 @@ required for various parts of Tokio are missing. To build the documentation
 correctly, use this command:
 
 ```
-RUSTDOCFLAGS="--cfg docsrs" RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+RUSTDOCFLAGS="--cfg tokio_docsrs" RUSTFLAGS="--cfg tokio_docsrs" cargo +nightly doc --all-features
 ```
 
 To build documentation including Tokio's unstable features, it is necessary to
@@ -165,7 +165,7 @@ pass `--cfg tokio_unstable` to both RustDoc *and* rustc. To build the
 documentation for unstable features, use this command:
 
 ```
-RUSTDOCFLAGS="--cfg docsrs --cfg tokio_unstable" RUSTFLAGS="--cfg docsrs --cfg tokio_unstable" cargo +nightly doc --all-features
+RUSTDOCFLAGS="--cfg tokio_docsrs --cfg tokio_unstable" RUSTFLAGS="--cfg tokio_docsrs --cfg tokio_unstable" cargo +nightly doc --all-features
 ```
 
 The `cargo fmt` command does not work on the Tokio codebase. You can use the

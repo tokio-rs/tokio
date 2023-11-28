@@ -32,7 +32,7 @@ use std::{fmt, mem, thread};
 ///
 /// [`tokio::task::LocalKey`]: struct@crate::task::LocalKey
 #[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+#[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
 macro_rules! task_local {
      // empty (base case for the recursion)
     () => {};
@@ -95,7 +95,7 @@ macro_rules! __task_local_inner {
 ///
 /// [`std::thread::LocalKey`]: struct@std::thread::LocalKey
 /// [`task_local!`]: ../macro.task_local.html
-#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+#[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
 pub struct LocalKey<T: 'static> {
     #[doc(hidden)]
     pub inner: thread::LocalKey<RefCell<Option<T>>>,

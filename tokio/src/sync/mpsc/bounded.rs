@@ -402,7 +402,7 @@ impl<T> Receiver<T> {
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
-    #[cfg_attr(docsrs, doc(alias = "recv_blocking"))]
+    #[cfg_attr(tokio_docsrs, doc(alias = "recv_blocking"))]
     pub fn blocking_recv(&mut self) -> Option<T> {
         crate::future::block_on(self.recv())
     }
@@ -722,7 +722,7 @@ impl<T> Sender<T> {
     /// }
     /// ```
     #[cfg(feature = "time")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "time")))]
     pub async fn send_timeout(
         &self,
         value: T,
@@ -777,7 +777,7 @@ impl<T> Sender<T> {
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
-    #[cfg_attr(docsrs, doc(alias = "send_blocking"))]
+    #[cfg_attr(tokio_docsrs, doc(alias = "send_blocking"))]
     pub fn blocking_send(&self, value: T) -> Result<(), SendError<T>> {
         crate::future::block_on(self.send(value))
     }

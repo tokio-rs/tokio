@@ -57,7 +57,7 @@ use std::task::{self, Poll};
 /// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
 /// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 // Alias for old name in 0.x
-#[cfg_attr(docsrs, doc(alias = "delay_until"))]
+#[cfg_attr(tokio_docsrs, doc(alias = "delay_until"))]
 #[track_caller]
 pub fn sleep_until(deadline: Instant) -> Sleep {
     Sleep::new_timeout(deadline, trace::caller_location())
@@ -119,8 +119,8 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 /// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
 /// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 // Alias for old name in 0.x
-#[cfg_attr(docsrs, doc(alias = "delay_for"))]
-#[cfg_attr(docsrs, doc(alias = "wait"))]
+#[cfg_attr(tokio_docsrs, doc(alias = "delay_for"))]
+#[cfg_attr(tokio_docsrs, doc(alias = "wait"))]
 #[track_caller]
 pub fn sleep(duration: Duration) -> Sleep {
     let location = trace::caller_location();
@@ -221,7 +221,7 @@ pin_project! {
     /// [`tokio::pin!`]: ../macro.pin.html
     #[project(!Unpin)]
     // Alias for old name in 0.2
-    #[cfg_attr(docsrs, doc(alias = "Delay"))]
+    #[cfg_attr(tokio_docsrs, doc(alias = "Delay"))]
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct Sleep {

@@ -12,7 +12,7 @@ use std::panic::{RefUnwindSafe, UnwindSafe};
 /// --- it does *not* abort the task.
 ///
 /// [`JoinHandle`]: crate::task::JoinHandle
-#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+#[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
 pub struct AbortHandle {
     raw: RawTask,
 }
@@ -58,7 +58,7 @@ impl AbortHandle {
     /// [task ID]: crate::task::Id
     /// [unstable]: crate#unstable-features
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(tokio_unstable)))]
     pub fn id(&self) -> super::Id {
         // Safety: The header pointer is valid.
         unsafe { Header::get_id(self.raw.header_ptr()) }

@@ -556,7 +556,7 @@ impl Notify {
     /// }
     /// ```
     // Alias for old name in 0.x
-    #[cfg_attr(docsrs, doc(alias = "notify"))]
+    #[cfg_attr(tokio_docsrs, doc(alias = "notify"))]
     pub fn notify_one(&self) {
         // Load the current state
         let mut curr = self.state.load(SeqCst);

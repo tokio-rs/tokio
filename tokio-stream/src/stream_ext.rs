@@ -997,7 +997,7 @@ pub trait StreamExt: Stream {
     /// # }
     /// ```
     #[cfg(feature = "time")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "time")))]
     fn timeout(self, duration: Duration) -> Timeout<Self>
     where
         Self: Sized,
@@ -1085,7 +1085,7 @@ pub trait StreamExt: Stream {
     /// # }
     /// ```
     #[cfg(feature = "time")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "time")))]
     fn timeout_repeating(self, interval: Interval) -> TimeoutRepeating<Self>
     where
         Self: Sized,
@@ -1115,7 +1115,7 @@ pub trait StreamExt: Stream {
     /// # }
     /// ```
     #[cfg(feature = "time")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "time")))]
     fn throttle(self, duration: Duration) -> Throttle<Self>
     where
         Self: Sized,
@@ -1170,7 +1170,7 @@ pub trait StreamExt: Stream {
     /// }
     /// ```
     #[cfg(feature = "time")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "time")))]
     #[track_caller]
     fn chunks_timeout(self, max_size: usize, duration: Duration) -> ChunksTimeout<Self>
     where

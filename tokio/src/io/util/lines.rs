@@ -19,7 +19,7 @@ pin_project! {
     /// [`lines`]: crate::io::AsyncBufReadExt::lines
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
-    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "io-util")))]
     pub struct Lines<R> {
         #[pin]
         reader: R,

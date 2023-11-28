@@ -16,8 +16,8 @@
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
 ))]
-#![cfg_attr(docsrs, feature(doc_cfg))]
-#![cfg_attr(docsrs, allow(unused_attributes))]
+#![cfg_attr(tokio_docsrs, feature(doc_cfg))]
+#![cfg_attr(tokio_docsrs, allow(unused_attributes))]
 #![cfg_attr(loom, allow(dead_code, unreachable_pub))]
 
 //! A runtime for writing reliable network applications without compromising speed.
@@ -628,14 +628,14 @@ pub mod stream {}
 // local re-exports of platform specific things, allowing for decent
 // documentation to be shimmed in on docs.rs
 
-#[cfg(docsrs)]
+#[cfg(tokio_docsrs)]
 pub mod doc;
 
-#[cfg(docsrs)]
+#[cfg(tokio_docsrs)]
 #[allow(unused)]
 pub(crate) use self::doc::os;
 
-#[cfg(not(docsrs))]
+#[cfg(not(tokio_docsrs))]
 #[allow(unused)]
 pub(crate) use std::os;
 
@@ -655,12 +655,12 @@ cfg_macros! {
     cfg_rt! {
         #[cfg(feature = "rt-multi-thread")]
         #[cfg(not(test))] // Work around for rust-lang/rust#62127
-        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[cfg_attr(tokio_docsrs, doc(cfg(feature = "macros")))]
         #[doc(inline)]
         pub use tokio_macros::main;
 
         #[cfg(feature = "rt-multi-thread")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        #[cfg_attr(tokio_docsrs, doc(cfg(feature = "macros")))]
         #[doc(inline)]
         pub use tokio_macros::test;
 

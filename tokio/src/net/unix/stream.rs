@@ -32,7 +32,7 @@ cfg_net_unix! {
     ///
     /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
     /// [`UnixListener::accept`]: crate::net::UnixListener::accept
-    #[cfg_attr(docsrs, doc(alias = "uds"))]
+    #[cfg_attr(tokio_docsrs, doc(alias = "uds"))]
     pub struct UnixStream {
         io: PollEvented<mio::net::UnixStream>,
     }

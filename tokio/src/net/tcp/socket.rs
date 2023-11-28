@@ -84,7 +84,7 @@ cfg_net! {
     /// [`AsRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
     /// [`AsRawSocket`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html
     /// [`socket2`]: https://docs.rs/socket2/
-    #[cfg_attr(docsrs, doc(alias = "connect_std"))]
+    #[cfg_attr(tokio_docsrs, doc(alias = "connect_std"))]
     pub struct TcpSocket {
         inner: socket2::Socket,
     }
@@ -268,7 +268,7 @@ impl TcpSocket {
     /// ```
     #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]
     #[cfg_attr(
-        docsrs,
+        tokio_docsrs,
         doc(cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos"))))
     )]
     pub fn set_reuseport(&self, reuseport: bool) -> io::Result<()> {
@@ -303,7 +303,7 @@ impl TcpSocket {
     /// ```
     #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]
     #[cfg_attr(
-        docsrs,
+        tokio_docsrs,
         doc(cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos"))))
     )]
     pub fn reuseport(&self) -> io::Result<bool> {
@@ -461,7 +461,7 @@ impl TcpSocket {
         target_os = "illumos",
     )))]
     #[cfg_attr(
-        docsrs,
+        tokio_docsrs,
         doc(cfg(not(any(
             target_os = "fuchsia",
             target_os = "redox",
@@ -488,7 +488,7 @@ impl TcpSocket {
         target_os = "illumos",
     )))]
     #[cfg_attr(
-        docsrs,
+        tokio_docsrs,
         doc(cfg(not(any(
             target_os = "fuchsia",
             target_os = "redox",
@@ -505,7 +505,7 @@ impl TcpSocket {
     /// This value gets the socket binded device's interface name.
     #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux",))]
     #[cfg_attr(
-        docsrs,
+        tokio_docsrs,
         doc(cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux",)))
     )]
     pub fn device(&self) -> io::Result<Option<Vec<u8>>> {
@@ -521,7 +521,7 @@ impl TcpSocket {
     /// If `interface` is `None` or an empty string it removes the binding.
     #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
     #[cfg_attr(
-        docsrs,
+        tokio_docsrs,
         doc(cfg(all(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))))
     )]
     pub fn bind_device(&self, interface: Option<&[u8]>) -> io::Result<()> {

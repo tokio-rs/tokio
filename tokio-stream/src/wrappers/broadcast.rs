@@ -12,7 +12,7 @@ use std::task::{Context, Poll};
 ///
 /// [`tokio::sync::broadcast::Receiver`]: struct@tokio::sync::broadcast::Receiver
 /// [`Stream`]: trait@crate::Stream
-#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+#[cfg_attr(tokio_docsrs, doc(cfg(feature = "sync")))]
 pub struct BroadcastStream<T> {
     inner: ReusableBoxFuture<'static, (Result<T, RecvError>, Receiver<T>)>,
 }

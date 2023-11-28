@@ -397,7 +397,7 @@
 /// }
 /// ```
 #[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+#[cfg_attr(tokio_docsrs, doc(cfg(feature = "macros")))]
 macro_rules! select {
     // Uses a declarative macro to do **most** of the work. While it is possible
     // to implement fully with a declarative macro, a procedural macro is used

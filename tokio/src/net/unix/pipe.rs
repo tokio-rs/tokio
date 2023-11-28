@@ -116,7 +116,7 @@ impl OpenOptions {
     ///     .open_receiver("path/to/a/fifo");
     /// ```
     #[cfg(target_os = "linux")]
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(target_os = "linux")))]
     pub fn read_write(&mut self, value: bool) -> &mut Self {
         self.read_write = value;
         self

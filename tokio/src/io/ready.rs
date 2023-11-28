@@ -16,7 +16,7 @@ const ERROR: usize = 0b10_0000;
 /// Describes the readiness state of an I/O resources.
 ///
 /// `Ready` tracks which operation an I/O resource is ready to perform.
-#[cfg_attr(docsrs, doc(cfg(feature = "net")))]
+#[cfg_attr(tokio_docsrs, doc(cfg(feature = "net")))]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Ready(usize);
 
@@ -38,7 +38,7 @@ impl Ready {
 
     /// Returns a `Ready` representing priority readiness.
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
     pub const PRIORITY: Ready = Ready(PRIORITY);
 
     /// Returns a `Ready` representing error readiness.
@@ -186,7 +186,7 @@ impl Ready {
     /// assert!(Ready::PRIORITY.is_priority());
     /// ```
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
     pub fn is_priority(self) -> bool {
         self.contains(Ready::PRIORITY)
     }

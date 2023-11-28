@@ -1465,7 +1465,7 @@ The following changes only apply when building with `--cfg tokio_unstable`
 
 ### Fixed
 
- - doc: fix non-doc builds with `--cfg docsrs` ([#4020])
+ - doc: fix non-doc builds with `--cfg tokio_docsrs` ([#4020])
  - io: flush eagerly in `io::copy` ([#4001])
  - runtime: a debug assert was sometimes triggered during shutdown ([#4005])
  - sync: use `spin_loop_hint` instead of `yield_now` in mpsc ([#4037])

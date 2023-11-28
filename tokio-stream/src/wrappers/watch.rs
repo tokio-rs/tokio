@@ -70,7 +70,7 @@ use tokio::sync::watch::error::RecvError;
 ///
 /// [`tokio::sync::watch::Receiver`]: struct@tokio::sync::watch::Receiver
 /// [`Stream`]: trait@crate::Stream
-#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+#[cfg_attr(tokio_docsrs, doc(cfg(feature = "sync")))]
 pub struct WatchStream<T> {
     inner: ReusableBoxFuture<'static, (Result<(), RecvError>, Receiver<T>)>,
 }

@@ -7,7 +7,7 @@ macro_rules! feature {
     ) => {
         $(
             #[cfg($meta)]
-            #[cfg_attr(docsrs, doc(cfg($meta)))]
+            #[cfg_attr(tokio_docsrs, doc(cfg($meta)))]
             $item
         )*
     }
@@ -18,8 +18,8 @@ macro_rules! feature {
 macro_rules! cfg_windows {
     ($($item:item)*) => {
         $(
-            #[cfg(any(all(doc, docsrs), windows))]
-            #[cfg_attr(docsrs, doc(cfg(windows)))]
+            #[cfg(any(all(doc, tokio_docsrs), windows))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(windows)))]
             $item
         )*
     }
@@ -30,8 +30,8 @@ macro_rules! cfg_windows {
 macro_rules! cfg_unstable_windows {
     ($($item:item)*) => {
         $(
-            #[cfg(all(any(all(doc, docsrs), windows), tokio_unstable))]
-            #[cfg_attr(docsrs, doc(cfg(all(windows, tokio_unstable))))]
+            #[cfg(all(any(all(doc, tokio_docsrs), windows), tokio_unstable))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(all(windows, tokio_unstable))))]
             $item
         )*
     }
@@ -72,8 +72,8 @@ macro_rules! cfg_atomic_waker_impl {
 macro_rules! cfg_aio {
     ($($item:item)*) => {
         $(
-            #[cfg(all(any(docsrs, target_os = "freebsd"), feature = "net"))]
-            #[cfg_attr(docsrs,
+            #[cfg(all(any(tokio_docsrs, target_os = "freebsd"), feature = "net"))]
+            #[cfg_attr(tokio_docsrs,
                 doc(cfg(all(target_os = "freebsd", feature = "net")))
             )]
             $item
@@ -86,7 +86,7 @@ macro_rules! cfg_fs {
         $(
             #[cfg(feature = "fs")]
             #[cfg(not(target_os = "wasi"))]
-            #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "fs")))]
             $item
         )*
     }
@@ -110,7 +110,7 @@ macro_rules! cfg_io_driver {
                 all(unix, feature = "process"),
                 all(unix, feature = "signal"),
             ))]
-            #[cfg_attr(docsrs, doc(cfg(any(
+            #[cfg_attr(tokio_docsrs, doc(cfg(any(
                 feature = "net",
                 all(unix, feature = "process"),
                 all(unix, feature = "signal"),
@@ -159,7 +159,7 @@ macro_rules! cfg_io_std {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "io-std")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "io-std")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "io-std")))]
             $item
         )*
     }
@@ -169,7 +169,7 @@ macro_rules! cfg_io_util {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "io-util")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "io-util")))]
             $item
         )*
     }
@@ -197,7 +197,7 @@ macro_rules! cfg_macros {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "macros")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "macros")))]
             $item
         )*
     }
@@ -209,7 +209,7 @@ macro_rules! cfg_metrics {
             // For now, metrics is only disabled in loom tests.
             // When stabilized, it might have a dedicated feature flag.
             #[cfg(all(tokio_unstable, not(loom)))]
-            #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(tokio_unstable)))]
             $item
         )*
     }
@@ -234,7 +234,7 @@ macro_rules! cfg_net_or_process {
     ($($item:item)*) => {
         $(
             #[cfg(any(feature = "net", feature = "process"))]
-            #[cfg_attr(docsrs, doc(cfg(any(feature = "net", feature = "process"))))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(any(feature = "net", feature = "process"))))]
             $item
         )*
     }
@@ -244,7 +244,7 @@ macro_rules! cfg_net {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "net")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "net")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "net")))]
             $item
         )*
     }
@@ -254,7 +254,7 @@ macro_rules! cfg_net_unix {
     ($($item:item)*) => {
         $(
             #[cfg(all(unix, feature = "net"))]
-            #[cfg_attr(docsrs, doc(cfg(all(unix, feature = "net"))))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(all(unix, feature = "net"))))]
             $item
         )*
     }
@@ -263,8 +263,8 @@ macro_rules! cfg_net_unix {
 macro_rules! cfg_net_windows {
     ($($item:item)*) => {
         $(
-            #[cfg(all(any(all(doc, docsrs), windows), feature = "net"))]
-            #[cfg_attr(docsrs, doc(cfg(all(windows, feature = "net"))))]
+            #[cfg(all(any(all(doc, tokio_docsrs), windows), feature = "net"))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(all(windows, feature = "net"))))]
             $item
         )*
     }
@@ -274,7 +274,7 @@ macro_rules! cfg_process {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "process")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "process")))]
             #[cfg(not(loom))]
             #[cfg(not(target_os = "wasi"))]
             $item
@@ -303,7 +303,7 @@ macro_rules! cfg_signal {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "signal")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "signal")))]
             #[cfg(not(loom))]
             #[cfg(not(target_os = "wasi"))]
             $item
@@ -341,7 +341,7 @@ macro_rules! cfg_sync {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "sync")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "sync")))]
             $item
         )*
     }
@@ -357,7 +357,7 @@ macro_rules! cfg_rt {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "rt")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
             $item
         )*
     }
@@ -373,7 +373,7 @@ macro_rules! cfg_rt_multi_thread {
     ($($item:item)*) => {
         $(
             #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
-            #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt-multi-thread")))]
             $item
         )*
     }
@@ -427,7 +427,7 @@ macro_rules! cfg_test_util {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "test-util")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "test-util")))]
             $item
         )*
     }
@@ -443,7 +443,7 @@ macro_rules! cfg_time {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "time")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "time")))]
             $item
         )*
     }
@@ -459,7 +459,7 @@ macro_rules! cfg_trace {
     ($($item:item)*) => {
         $(
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
             $item
         )*
     };
@@ -469,7 +469,7 @@ macro_rules! cfg_unstable {
     ($($item:item)*) => {
         $(
             #[cfg(tokio_unstable)]
-            #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(tokio_unstable)))]
             $item
         )*
     };

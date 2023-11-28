@@ -1003,7 +1003,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     // Alias for old name in 0.x
-    #[cfg_attr(docsrs, doc(alias = "with_io"))]
+    #[cfg_attr(tokio_docsrs, doc(alias = "with_io"))]
     pub fn try_io<R>(
         &mut self,
         f: impl FnOnce(&'a AsyncFd<Inner>) -> io::Result<R>,

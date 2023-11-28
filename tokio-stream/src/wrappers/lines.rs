@@ -11,7 +11,7 @@ pin_project! {
     /// [`tokio::io::Lines`]: struct@tokio::io::Lines
     /// [`Stream`]: trait@crate::Stream
     #[derive(Debug)]
-    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "io-util")))]
     pub struct LinesStream<R> {
         #[pin]
         inner: Lines<R>,

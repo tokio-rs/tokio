@@ -584,7 +584,7 @@ impl LocalSet {
     /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
     #[track_caller]
     #[cfg(feature = "rt")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
     pub fn block_on<F>(&self, rt: &crate::runtime::Runtime, future: F) -> F::Output
     where
         F: Future,

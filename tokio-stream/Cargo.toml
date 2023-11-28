@@ -50,9 +50,9 @@ futures = { version = "0.3", default-features = false }
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "tokio_docsrs"]
 # Issue #3770
 #
-# This should allow `docsrs` to be read across projects, so that `tokio-stream`
-# can pick up stubbed types exported by `tokio`.
-rustc-args = ["--cfg", "docsrs"]
+# This should allow `tokio_docsrs` to be read across projects, so that
+# `tokio-stream` can pick up stubbed types exported by `tokio`.
+rustc-args = ["--cfg", "tokio_docsrs"]

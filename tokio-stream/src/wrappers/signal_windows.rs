@@ -8,7 +8,7 @@ use tokio::signal::windows::{CtrlBreak, CtrlC};
 /// [`CtrlC`]: struct@tokio::signal::windows::CtrlC
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]
-#[cfg_attr(docsrs, doc(cfg(all(windows, feature = "signal"))))]
+#[cfg_attr(tokio_docsrs, doc(cfg(all(windows, feature = "signal"))))]
 pub struct CtrlCStream {
     inner: CtrlC,
 }
@@ -50,7 +50,7 @@ impl AsMut<CtrlC> for CtrlCStream {
 /// [`CtrlBreak`]: struct@tokio::signal::windows::CtrlBreak
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]
-#[cfg_attr(docsrs, doc(cfg(all(windows, feature = "signal"))))]
+#[cfg_attr(tokio_docsrs, doc(cfg(all(windows, feature = "signal"))))]
 pub struct CtrlBreakStream {
     inner: CtrlBreak,
 }

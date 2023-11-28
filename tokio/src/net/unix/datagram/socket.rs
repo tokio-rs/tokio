@@ -89,7 +89,7 @@ cfg_net_unix! {
     /// # Ok(())
     /// # }
     /// ```
-    #[cfg_attr(docsrs, doc(alias = "uds"))]
+    #[cfg_attr(tokio_docsrs, doc(alias = "uds"))]
     pub struct UnixDatagram {
         io: PollEvented<mio::net::UnixDatagram>,
     }

@@ -43,7 +43,7 @@ cfg_net_unix! {
     ///     }
     /// }
     /// ```
-    #[cfg_attr(docsrs, doc(alias = "uds"))]
+    #[cfg_attr(tokio_docsrs, doc(alias = "uds"))]
     pub struct UnixListener {
         io: PollEvented<mio::net::UnixListener>,
     }

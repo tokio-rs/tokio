@@ -6,11 +6,11 @@
 
 [build.environment]
   RUSTDOCFLAGS="""
-    --cfg docsrs \
+    --cfg tokio_docsrs \
     --cfg tokio_unstable \
     --cfg tokio_taskdump \
     """
-  RUSTFLAGS="--cfg tokio_unstable --cfg tokio_taskdump --cfg docsrs"
+  RUSTFLAGS="--cfg tokio_unstable --cfg tokio_taskdump --cfg tokio_docsrs"
 
 [[redirects]]
   from = "/"

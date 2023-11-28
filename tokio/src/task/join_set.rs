@@ -51,7 +51,7 @@ use crate::util::IdleNotifiedSet;
 ///     }
 /// }
 /// ```
-#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+#[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
 pub struct JoinSet<T> {
     inner: IdleNotifiedSet<JoinHandle<T>>,
 }
@@ -61,7 +61,7 @@ pub struct JoinSet<T> {
 ///
 /// [`task::Builder`]: crate::task::Builder
 #[cfg(all(tokio_unstable, feature = "tracing"))]
-#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+#[cfg_attr(tokio_docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 #[must_use = "builders do nothing unless used to spawn a task"]
 pub struct Builder<'a, T> {
     joinset: &'a mut JoinSet<T>,
@@ -109,7 +109,7 @@ impl<T: 'static> JoinSet<T> {
     /// }
     /// ```
     #[cfg(all(tokio_unstable, feature = "tracing"))]
-    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
     pub fn build_task(&mut self) -> Builder<'_, T> {
         Builder {
             builder: super::Builder::new(),
@@ -301,7 +301,7 @@ impl<T: 'static> JoinSet<T> {
     /// [task ID]: crate::task::Id
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(tokio_unstable)))]
     pub async fn join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         crate::future::poll_fn(|cx| self.poll_join_next_with_id(cx)).await
     }
@@ -419,7 +419,7 @@ impl<T: 'static> JoinSet<T> {
     /// [coop budget]: crate::task#cooperative-scheduling
     /// [task ID]: crate::task::Id
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(tokio_unstable)))]
     pub fn poll_join_next_with_id(
         &mut self,
         cx: &mut Context<'_>,
@@ -476,7 +476,7 @@ impl<T> Default for JoinSet<T> {
 // === impl Builder ===
 
 #[cfg(all(tokio_unstable, feature = "tracing"))]
-#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+#[cfg_attr(tokio_docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 impl<'a, T: 'static> Builder<'a, T> {
     /// Assigns a name to the task which will be spawned.
     pub fn name(self, name: &'a str) -> Self {
@@ -573,7 +573,7 @@ impl<'a, T: 'static> Builder<'a, T> {
 // Manual `Debug` impl so that `Builder` is `Debug` regardless of whether `T` is
 // `Debug`.
 #[cfg(all(tokio_unstable, feature = "tracing"))]
-#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+#[cfg_attr(tokio_docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 impl<'a, T> fmt::Debug for Builder<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("join_set::Builder")

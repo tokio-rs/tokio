@@ -9,7 +9,7 @@ use tokio::net::{TcpListener, TcpStream};
 /// [`TcpListener`]: struct@tokio::net::TcpListener
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]
-#[cfg_attr(docsrs, doc(cfg(feature = "net")))]
+#[cfg_attr(tokio_docsrs, doc(cfg(feature = "net")))]
 pub struct TcpListenerStream {
     inner: TcpListener,
 }

@@ -5,20 +5,20 @@
 //! notifications. These events are listened for via the `SetConsoleCtrlHandler`
 //! function which receives the corresponding windows_sys event type.
 
-#![cfg(any(windows, docsrs))]
-#![cfg_attr(docsrs, doc(cfg(all(windows, feature = "signal"))))]
+#![cfg(any(windows, tokio_docsrs))]
+#![cfg_attr(tokio_docsrs, doc(cfg(all(windows, feature = "signal"))))]
 
 use crate::signal::RxFuture;
 use std::io;
 use std::task::{Context, Poll};
 
-#[cfg(not(docsrs))]
+#[cfg(not(tokio_docsrs))]
 #[path = "windows/sys.rs"]
 mod imp;
-#[cfg(not(docsrs))]
+#[cfg(not(tokio_docsrs))]
 pub(crate) use self::imp::{OsExtraData, OsStorage};
 
-#[cfg(docsrs)]
+#[cfg(tokio_docsrs)]
 #[path = "windows/stub.rs"]
 mod imp;
 

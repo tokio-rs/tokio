@@ -9,7 +9,7 @@ use tokio::fs::{DirEntry, ReadDir};
 /// [`tokio::fs::ReadDir`]: struct@tokio::fs::ReadDir
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]
-#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
+#[cfg_attr(tokio_docsrs, doc(cfg(feature = "fs")))]
 pub struct ReadDirStream {
     inner: ReadDir,
 }

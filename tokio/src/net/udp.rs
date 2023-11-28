@@ -1863,7 +1863,7 @@ impl UdpSocket {
         target_os = "illumos",
     )))]
     #[cfg_attr(
-        docsrs,
+        tokio_docsrs,
         doc(cfg(not(any(
             target_os = "fuchsia",
             target_os = "redox",
@@ -1890,7 +1890,7 @@ impl UdpSocket {
         target_os = "illumos",
     )))]
     #[cfg_attr(
-        docsrs,
+        tokio_docsrs,
         doc(cfg(not(any(
             target_os = "fuchsia",
             target_os = "redox",
@@ -1907,7 +1907,7 @@ impl UdpSocket {
     /// This value gets the socket-bound device's interface name.
     #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux",))]
     #[cfg_attr(
-        docsrs,
+        tokio_docsrs,
         doc(cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux",)))
     )]
     pub fn device(&self) -> io::Result<Option<Vec<u8>>> {
@@ -1923,7 +1923,7 @@ impl UdpSocket {
     /// If `interface` is `None` or an empty string it removes the binding.
     #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
     #[cfg_attr(
-        docsrs,
+        tokio_docsrs,
         doc(cfg(all(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))))
     )]
     pub fn bind_device(&self, interface: Option<&[u8]>) -> io::Result<()> {

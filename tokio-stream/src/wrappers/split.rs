@@ -11,7 +11,7 @@ pin_project! {
     /// [`tokio::io::Split`]: struct@tokio::io::Split
     /// [`Stream`]: trait@crate::Stream
     #[derive(Debug)]
-    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "io-util")))]
     pub struct SplitStream<R> {
         #[pin]
         inner: Split<R>,

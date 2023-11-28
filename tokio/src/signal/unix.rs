@@ -4,7 +4,7 @@
 //! `Signal` type for receiving notifications of signals.
 
 #![cfg(unix)]
-#![cfg_attr(docsrs, doc(cfg(all(unix, feature = "signal"))))]
+#![cfg_attr(tokio_docsrs, doc(cfg(all(unix, feature = "signal"))))]
 
 use crate::runtime::scheduler;
 use crate::runtime::signal::Handle;

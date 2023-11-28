@@ -28,7 +28,7 @@ pin_project! {
     /// [`AsyncWrite`]: AsyncWrite
     /// [`flush`]: super::AsyncWriteExt::flush
     ///
-    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "io-util")))]
     pub struct BufWriter<W> {
         #[pin]
         pub(super) inner: W,

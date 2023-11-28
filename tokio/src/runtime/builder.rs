@@ -229,7 +229,7 @@ impl Builder {
         ///
         /// Configuration methods can be chained on the return value.
         #[cfg(feature = "rt-multi-thread")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+        #[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt-multi-thread")))]
         pub fn new_multi_thread() -> Builder {
             // The number `61` is fairly arbitrary. I believe this value was copied from golang.
             Builder::new(Kind::MultiThread, 61)
@@ -248,7 +248,7 @@ impl Builder {
             ///
             /// Configuration methods can be chained on the return value.
             #[cfg(feature = "rt-multi-thread")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+            #[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt-multi-thread")))]
             pub fn new_multi_thread_alt() -> Builder {
                 // The number `61` is fairly arbitrary. I believe this value was copied from golang.
                 Builder::new(Kind::MultiThreadAlt, 61)
@@ -436,7 +436,7 @@ impl Builder {
     /// [`worker_threads`]: Self::worker_threads
     /// [`thread_keep_alive`]: Self::thread_keep_alive
     #[track_caller]
-    #[cfg_attr(docsrs, doc(alias = "max_threads"))]
+    #[cfg_attr(tokio_docsrs, doc(alias = "max_threads"))]
     pub fn max_blocking_threads(&mut self, val: usize) -> &mut Self {
         assert!(val > 0, "Max blocking threads cannot be set to 0");
         self.max_blocking_threads = val;

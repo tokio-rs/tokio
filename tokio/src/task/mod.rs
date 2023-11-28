@@ -311,7 +311,7 @@ cfg_rt! {
     pub use join_set::JoinSet;
     pub use crate::runtime::task::AbortHandle;
 
-    // Uses #[cfg(...)] instead of macro since the macro adds docsrs annotations.
+    // Uses #[cfg(...)] instead of macro since the macro adds tokio_docsrs annotations.
     #[cfg(not(tokio_unstable))]
     mod join_set;
     #[cfg(tokio_unstable)]

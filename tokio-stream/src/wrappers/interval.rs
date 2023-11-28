@@ -8,7 +8,7 @@ use tokio::time::{Instant, Interval};
 /// [`Interval`]: struct@tokio::time::Interval
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]
-#[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+#[cfg_attr(tokio_docsrs, doc(cfg(feature = "time")))]
 pub struct IntervalStream {
     inner: Interval,
 }

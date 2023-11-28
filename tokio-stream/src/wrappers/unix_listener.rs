@@ -9,7 +9,7 @@ use tokio::net::{UnixListener, UnixStream};
 /// [`UnixListener`]: struct@tokio::net::UnixListener
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]
-#[cfg_attr(docsrs, doc(cfg(all(unix, feature = "net"))))]
+#[cfg_attr(tokio_docsrs, doc(cfg(all(unix, feature = "net"))))]
 pub struct UnixListenerStream {
     inner: UnixListener,
 }

@@ -670,7 +670,7 @@ impl Command {
     /// `setuid` call in the child process. Failure in the `setuid`
     /// call will cause the spawn to fail.
     #[cfg(unix)]
-    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(unix)))]
     pub fn uid(&mut self, id: u32) -> &mut Command {
         self.std.uid(id);
         self
@@ -679,7 +679,7 @@ impl Command {
     /// Similar to `uid` but sets the group ID of the child process. This has
     /// the same semantics as the `uid` field.
     #[cfg(unix)]
-    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(unix)))]
     pub fn gid(&mut self, id: u32) -> &mut Command {
         self.std.gid(id);
         self
@@ -690,7 +690,7 @@ impl Command {
     /// Set the first process argument, `argv[0]`, to something other than the
     /// default executable path.
     #[cfg(unix)]
-    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(unix)))]
     pub fn arg0<S>(&mut self, arg: S) -> &mut Command
     where
         S: AsRef<OsStr>,
@@ -729,7 +729,7 @@ impl Command {
     /// working directory have successfully been changed, so output to these
     /// locations may not appear where intended.
     #[cfg(unix)]
-    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(unix)))]
     pub unsafe fn pre_exec<F>(&mut self, f: F) -> &mut Command
     where
         F: FnMut() -> io::Result<()> + Send + Sync + 'static,
@@ -765,7 +765,7 @@ impl Command {
     /// ```
     #[cfg(unix)]
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(all(unix, tokio_unstable))))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(all(unix, tokio_unstable))))]
     pub fn process_group(&mut self, pgroup: i32) -> &mut Command {
         self.std.process_group(pgroup);
         self
@@ -1445,7 +1445,7 @@ impl TryInto<Stdio> for ChildStderr {
 }
 
 #[cfg(unix)]
-#[cfg_attr(docsrs, doc(cfg(unix)))]
+#[cfg_attr(tokio_docsrs, doc(cfg(unix)))]
 mod sys {
     use std::{
         io,
@@ -1482,13 +1482,13 @@ mod sys {
     impl_traits!(ChildStderr);
 }
 
-#[cfg(any(windows, docsrs))]
-#[cfg_attr(docsrs, doc(cfg(windows)))]
+#[cfg(any(windows, tokio_docsrs))]
+#[cfg_attr(tokio_docsrs, doc(cfg(windows)))]
 mod windows {
     use super::*;
     use crate::os::windows::io::{AsHandle, AsRawHandle, BorrowedHandle, OwnedHandle, RawHandle};
 
-    #[cfg(not(docsrs))]
+    #[cfg(not(tokio_docsrs))]
     macro_rules! impl_traits {
         ($type:ty) => {
             impl $type {
@@ -1512,7 +1512,7 @@ mod windows {
         };
     }
 
-    #[cfg(docsrs)]
+    #[cfg(tokio_docsrs)]
     macro_rules! impl_traits {
         ($type:ty) => {
             impl $type {

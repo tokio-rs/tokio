@@ -372,7 +372,7 @@ impl TaskTracker {
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
     pub fn spawn<F>(&self, task: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
@@ -387,7 +387,7 @@ impl TaskTracker {
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
     pub fn spawn_on<F>(&self, task: F, handle: &Handle) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
@@ -404,7 +404,7 @@ impl TaskTracker {
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
     pub fn spawn_local<F>(&self, task: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -421,7 +421,7 @@ impl TaskTracker {
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
     pub fn spawn_local_on<F>(&self, task: F, local_set: &LocalSet) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -437,7 +437,7 @@ impl TaskTracker {
     #[track_caller]
     #[cfg(feature = "rt")]
     #[cfg(not(target_family = "wasm"))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
     pub fn spawn_blocking<F, T>(&self, task: F) -> JoinHandle<T>
     where
         F: FnOnce() -> T,
@@ -459,7 +459,7 @@ impl TaskTracker {
     #[track_caller]
     #[cfg(feature = "rt")]
     #[cfg(not(target_family = "wasm"))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "rt")))]
     pub fn spawn_blocking_on<F, T>(&self, task: F, handle: &Handle) -> JoinHandle<T>
     where
         F: FnOnce() -> T,

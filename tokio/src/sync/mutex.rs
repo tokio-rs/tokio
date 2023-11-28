@@ -506,7 +506,7 @@ impl<T: ?Sized> Mutex<T> {
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
-    #[cfg_attr(docsrs, doc(alias = "lock_blocking"))]
+    #[cfg_attr(tokio_docsrs, doc(alias = "lock_blocking"))]
     pub fn blocking_lock(&self) -> MutexGuard<'_, T> {
         crate::future::block_on(self.lock())
     }

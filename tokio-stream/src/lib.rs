@@ -9,7 +9,7 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(tokio_docsrs, feature(doc_cfg))]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))

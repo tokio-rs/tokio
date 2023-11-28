@@ -15,7 +15,7 @@ pin_project! {
     /// [`SplitStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.SplitStream.html
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
-    #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+    #[cfg_attr(tokio_docsrs, doc(cfg(feature = "io-util")))]
     pub struct Split<R> {
         #[pin]
         reader: R,
