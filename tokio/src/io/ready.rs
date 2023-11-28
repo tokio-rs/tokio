@@ -38,7 +38,10 @@ impl Ready {
 
     /// Returns a `Ready` representing priority readiness.
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    #[cfg_attr(tokio_docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
+    #[cfg_attr(
+        tokio_docsrs,
+        doc(cfg(any(target_os = "linux", target_os = "android")))
+    )]
     pub const PRIORITY: Ready = Ready(PRIORITY);
 
     /// Returns a `Ready` representing error readiness.
@@ -186,7 +189,10 @@ impl Ready {
     /// assert!(Ready::PRIORITY.is_priority());
     /// ```
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    #[cfg_attr(tokio_docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
+    #[cfg_attr(
+        tokio_docsrs,
+        doc(cfg(any(target_os = "linux", target_os = "android")))
+    )]
     pub fn is_priority(self) -> bool {
         self.contains(Ready::PRIORITY)
     }

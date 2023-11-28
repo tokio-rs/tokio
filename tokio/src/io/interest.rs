@@ -67,7 +67,10 @@ impl Interest {
 
     /// Returns a `Interest` set representing priority completion interests.
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    #[cfg_attr(tokio_docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
+    #[cfg_attr(
+        tokio_docsrs,
+        doc(cfg(any(target_os = "linux", target_os = "android")))
+    )]
     pub const PRIORITY: Interest = Interest(PRIORITY);
 
     /// Returns true if the value includes readable interest.
@@ -145,7 +148,10 @@ impl Interest {
     /// assert!(both.is_priority());
     /// ```
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    #[cfg_attr(tokio_docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
+    #[cfg_attr(
+        tokio_docsrs,
+        doc(cfg(any(target_os = "linux", target_os = "android")))
+    )]
     pub const fn is_priority(self) -> bool {
         self.0 & PRIORITY != 0
     }
