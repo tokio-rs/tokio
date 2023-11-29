@@ -404,6 +404,10 @@ impl<T: ?Sized> Mutex<T> {
     /// been acquired.  When the lock has been acquired, function returns a
     /// [`MutexGuard`].
     ///
+    /// If the mutex is available to be acquired immediately, then this call
+    /// will typically not yield to the runtime. However, this is not guaranteed
+    /// under all circumstances.
+    ///
     /// # Cancel safety
     ///
     /// This method uses a queue to fairly distribute locks in the order they
@@ -570,6 +574,10 @@ impl<T: ?Sized> Mutex<T> {
     /// Locks this mutex, causing the current task to yield until the lock has
     /// been acquired. When the lock has been acquired, this returns an
     /// [`OwnedMutexGuard`].
+    ///
+    /// If the mutex is available to be acquired immediately, then this call
+    /// will typically not yield to the runtime. However, this is not guaranteed
+    /// under all circumstances.
     ///
     /// This method is identical to [`Mutex::lock`], except that the returned
     /// guard references the `Mutex` with an [`Arc`] rather than by borrowing

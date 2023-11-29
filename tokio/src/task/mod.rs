@@ -112,6 +112,46 @@
 //! [thread_join]: std::thread::JoinHandle
 //! [`JoinError`]: crate::task::JoinError
 //!
+//! #### Cancellation
+//!
+//! Spawned tasks may be cancelled using the [`JoinHandle::abort`] or
+//! [`AbortHandle::abort`] methods. When one of these methods are called, the
+//! task is signalled to shut down next time it yields at an `.await` point. If
+//! the task is already idle, then it will be shut down as soon as possible
+//! without running again before being shut down. Additionally, shutting down a
+//! Tokio runtime (e.g. by returning from `#[tokio::main]`) immediately cancels
+//! all tasks on it.
+//!
+//! When tasks are shut down, it will stop running at whichever `.await` it has
+//! yielded at. All local variables are destroyed by running their detructor.
+//! Once shutdown has completed, awaiting the [`JoinHandle`] will fail with a
+//! [cancelled error](crate::task::JoinError::is_cancelled).
+//!
+//! Note that aborting a task does not guarantee that it fails with a cancelled
+//! error, since it may complete normally first. For example, if the task does
+//! not yield to the runtime at any point between the call to `abort` and the
+//! end of the task, then the [`JoinHandle`] will instead report that the task
+//! exited normally.
+//!
+//! Be aware that calls to [`JoinHandle::abort`] just schedule the task for
+//! cancellation, and will return before the cancellation has completed. To wait
+//! for cancellation to complete, wait for the task to finish by awaiting the
+//! [`JoinHandle`]. Similarly, the [`JoinHandle::is_finished`] method does not
+//! return `true` until the cancellation has finished.
+//!
+//! Calling [`JoinHandle::abort`] multiple times has the same effect as calling
+//! it once.
+//!
+//! Tokio also provides an [`AbortHandle`], which is like the [`JoinHandle`],
+//! except that it does not provide a mechanism to wait for the task to finish.
+//! Each task can only have one [`JoinHandle`], but it can have more than one
+//! [`AbortHandle`].
+//!
+//! [`JoinHandle::abort`]: crate::task::JoinHandle::abort
+//! [`AbortHandle::abort`]: crate::task::AbortHandle::abort
+//! [`AbortHandle`]: crate::task::AbortHandle
+//! [`JoinHandle::is_finished`]: crate::task::JoinHandle::is_finished
+//!
 //! ### Blocking and Yielding
 //!
 //! As we discussed above, code running in asynchronous tasks should not perform

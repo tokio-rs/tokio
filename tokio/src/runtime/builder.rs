@@ -746,10 +746,8 @@ impl Builder {
     ///
     /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task.
     ///
-    /// By default the global queue interval is:
-    ///
-    /// * `31` for the current-thread scheduler.
-    /// * `61` for the multithreaded scheduler.
+    /// By default the global queue interval is 31 for the current-thread scheduler. Please see
+    /// [the module documentation] for the default behavior of the multi-thread scheduler.
     ///
     /// Schedulers have a local queue of already-claimed tasks, and a global queue of incoming
     /// tasks. Setting the interval to a smaller value increases the fairness of the scheduler,
@@ -757,6 +755,8 @@ impl Builder {
     /// getting started on new work, especially if tasks frequently yield rather than complete
     /// or await on further I/O. Conversely, a higher value prioritizes existing work, and
     /// is a good choice when most tasks quickly complete polling.
+    ///
+    /// [the module documentation]: crate::runtime#multi-threaded-runtime-behavior-at-the-time-of-writing
     ///
     /// # Examples
     ///
