@@ -215,7 +215,7 @@ pub mod error {
 
     use std::fmt;
 
-    /// Error returned by from the [`send`] function on a [`Sender`].
+    /// Error returned by the [`send`] function on a [`Sender`].
     ///
     /// A **send** operation can only fail if there are no active receivers,
     /// implying that the message could never be received. The error contains the
