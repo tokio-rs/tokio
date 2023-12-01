@@ -17,12 +17,12 @@ use std::task::{Context, Poll};
 
 cfg_io_util! {
     /// The readable half of a value returned from [`split`](split()).
-    pub struct ReadHalf<T> {
+    pub struct ReadHalf<T:?Sized> {
         inner: Arc<Inner<T>>,
     }
 
     /// The writable half of a value returned from [`split`](split()).
-    pub struct WriteHalf<T> {
+    pub struct WriteHalf<T:?Sized> {
         inner: Arc<Inner<T>>,
     }
 
@@ -53,23 +53,25 @@ cfg_io_util! {
     }
 }
 
-struct Inner<T> {
+struct Inner<T: ?Sized> {
     locked: AtomicBool,
-    stream: UnsafeCell<T>,
     is_write_vectored: bool,
+    stream: UnsafeCell<T>,
 }
 
-struct Guard<'a, T> {
+struct Guard<'a, T: ?Sized> {
     inner: &'a Inner<T>,
 }
 
-impl<T> ReadHalf<T> {
+impl<T: ?Sized> ReadHalf<T> {
     /// Checks if this `ReadHalf` and some `WriteHalf` were split from the same
     /// stream.
     pub fn is_pair_of(&self, other: &WriteHalf<T>) -> bool {
         other.is_pair_of(self)
     }
+}
 
+impl<T> ReadHalf<T> {
     /// Reunites with a previously split `WriteHalf`.
     ///
     /// # Panics
@@ -97,7 +99,7 @@ impl<T> ReadHalf<T> {
     }
 }
 
-impl<T> WriteHalf<T> {
+impl<T: ?Sized> WriteHalf<T> {
     /// Checks if this `WriteHalf` and some `ReadHalf` were split from the same
     /// stream.
     pub fn is_pair_of(&self, other: &ReadHalf<T>) -> bool {
@@ -105,7 +107,7 @@ impl<T> WriteHalf<T> {
     }
 }
 
-impl<T: AsyncRead> AsyncRead for ReadHalf<T> {
+impl<T: AsyncRead + ?Sized> AsyncRead for ReadHalf<T> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -116,7 +118,7 @@ impl<T: AsyncRead> AsyncRead for ReadHalf<T> {
     }
 }
 
-impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
+impl<T: AsyncWrite + ?Sized> AsyncWrite for WriteHalf<T> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -150,7 +152,7 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
     }
 }
 
-impl<T> Inner<T> {
+impl<T: ?Sized> Inner<T> {
     fn poll_lock(&self, cx: &mut Context<'_>) -> Poll<Guard<'_, T>> {
         if self
             .locked
@@ -169,7 +171,7 @@ impl<T> Inner<T> {
     }
 }
 
-impl<T> Guard<'_, T> {
+impl<T: ?Sized> Guard<'_, T> {
     fn stream_pin(&mut self) -> Pin<&mut T> {
         // safety: the stream is pinned in `Arc` and the `Guard` ensures mutual
         // exclusion.
@@ -177,24 +179,24 @@ impl<T> Guard<'_, T> {
     }
 }
 
-impl<T> Drop for Guard<'_, T> {
+impl<T: ?Sized> Drop for Guard<'_, T> {
     fn drop(&mut self) {
         self.inner.locked.store(false, Release);
     }
 }
 
-unsafe impl<T: Send> Send for ReadHalf<T> {}
-unsafe impl<T: Send> Send for WriteHalf<T> {}
-unsafe impl<T: Sync> Sync for ReadHalf<T> {}
-unsafe impl<T: Sync> Sync for WriteHalf<T> {}
+unsafe impl<T: Send + ?Sized> Send for ReadHalf<T> {}
+unsafe impl<T: Send + ?Sized> Send for WriteHalf<T> {}
+unsafe impl<T: Sync + ?Sized> Sync for ReadHalf<T> {}
+unsafe impl<T: Sync + ?Sized> Sync for WriteHalf<T> {}
 
-impl<T: fmt::Debug> fmt::Debug for ReadHalf<T> {
+impl<T: fmt::Debug + ?Sized> fmt::Debug for ReadHalf<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("split::ReadHalf").finish()
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for WriteHalf<T> {
+impl<T: fmt::Debug + ?Sized> fmt::Debug for WriteHalf<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("split::WriteHalf").finish()
     }
