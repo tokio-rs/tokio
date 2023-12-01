@@ -1,28 +1,29 @@
 //! Definition of the [`MaybeDone`] combinator.
 
+use pin_project_lite::pin_project;
 use std::future::Future;
-use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A future that may have completed.
-#[derive(Debug)]
-pub enum MaybeDone<Fut: Future> {
-    /// A not-yet-completed future.
-    Future(Fut),
-    /// The output of the completed future.
-    Done(Fut::Output),
-    /// The empty variant after the result of a [`MaybeDone`] has been
-    /// taken using the [`take_output`](MaybeDone::take_output) method.
-    Gone,
+pin_project! {
+    /// A future that may have completed.
+    #[derive(Debug)]
+    #[project = MaybeDoneProj]
+    #[project_replace = MaybeDoneProjReplace]
+    pub enum MaybeDone<Fut: Future> {
+        /// A not-yet-completed future.
+        Future { #[pin] future: Fut },
+        /// The output of the completed future.
+        Done { output: Fut::Output },
+        /// The empty variant after the result of a [`MaybeDone`] has been
+        /// taken using the [`take_output`](MaybeDone::take_output) method.
+        Gone,
+    }
 }
-
-// Safe because we never generate `Pin<&mut Fut::Output>`
-impl<Fut: Future + Unpin> Unpin for MaybeDone<Fut> {}
 
 /// Wraps a future into a `MaybeDone`.
 pub fn maybe_done<Fut: Future>(future: Fut) -> MaybeDone<Fut> {
-    MaybeDone::Future(future)
+    MaybeDone::Future { future }
 }
 
 impl<Fut: Future> MaybeDone<Fut> {
@@ -31,12 +32,9 @@ impl<Fut: Future> MaybeDone<Fut> {
     /// future has been completed and [`take_output`](MaybeDone::take_output)
     /// has not yet been called.
     pub fn output_mut(self: Pin<&mut Self>) -> Option<&mut Fut::Output> {
-        unsafe {
-            let this = self.get_unchecked_mut();
-            match this {
-                MaybeDone::Done(res) => Some(res),
-                _ => None,
-            }
+        match self.project() {
+            MaybeDoneProj::Done { output } => Some(output),
+            _ => None,
         }
     }
 
@@ -44,17 +42,14 @@ impl<Fut: Future> MaybeDone<Fut> {
     /// towards completion.
     #[inline]
     pub fn take_output(self: Pin<&mut Self>) -> Option<Fut::Output> {
-        unsafe {
-            let this = self.get_unchecked_mut();
-            match this {
-                MaybeDone::Done(_) => {}
-                MaybeDone::Future(_) | MaybeDone::Gone => return None,
-            };
-            if let MaybeDone::Done(output) = mem::replace(this, MaybeDone::Gone) {
-                Some(output)
-            } else {
-                unreachable!()
-            }
+        match *self {
+            MaybeDone::Done { .. } => {}
+            MaybeDone::Future { .. } | MaybeDone::Gone => return None,
+        };
+        if let MaybeDoneProjReplace::Done { output } = self.project_replace(MaybeDone::Gone) {
+            Some(output)
+        } else {
+            unreachable!()
         }
     }
 }
@@ -63,14 +58,12 @@ impl<Fut: Future> Future for MaybeDone<Fut> {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let res = unsafe {
-            match self.as_mut().get_unchecked_mut() {
-                MaybeDone::Future(a) => ready!(Pin::new_unchecked(a).poll(cx)),
-                MaybeDone::Done(_) => return Poll::Ready(()),
-                MaybeDone::Gone => panic!("MaybeDone polled after value taken"),
-            }
+        let output = match self.as_mut().project() {
+            MaybeDoneProj::Future { future } => ready!(future.poll(cx)),
+            MaybeDoneProj::Done { .. } => return Poll::Ready(()),
+            MaybeDoneProj::Gone => panic!("MaybeDone polled after value taken"),
         };
-        self.set(MaybeDone::Done(res));
+        self.set(MaybeDone::Done { output });
         Poll::Ready(())
     }
 }
