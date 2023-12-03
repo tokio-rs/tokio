@@ -35,12 +35,33 @@ cfg_io_util! {
     where
         T: AsyncRead + AsyncWrite,
     {
-        let is_write_vectored = stream.is_write_vectored();
+        StreamSpliterHelper{
+            t:stream
+        }.split()
+    }
+
+    /// Allows splitting a single dst value implementing `AsyncRead + AsyncWrite` into separate
+    /// `AsyncRead` and `AsyncWrite` handles.
+    ///
+    /// To restore this read/write object from its `ReadHalf` and
+    /// `WriteHalf` use [`unsplit`](ReadHalf::unsplit()).
+    pub struct StreamSpliterHelper<T:?Sized>{
+        pub t: T
+    }
+}
+impl<T:?Sized> StreamSpliterHelper<T> {
+    /// Splits a single dst value implementing `AsyncRead + AsyncWrite` into separate
+    /// `AsyncRead` and `AsyncWrite` handles.
+    ///
+    /// To restore this read/write object from its `ReadHalf` and
+    /// `WriteHalf` use [`unsplit`](ReadHalf::unsplit()).
+    pub fn split(self) -> (ReadHalf<T>, WriteHalf<T>) {
+        let is_write_vectored = self.t.is_write_vectored();
 
         let inner = Arc::new(Inner {
             locked: AtomicBool::new(false),
-            stream: UnsafeCell::new(stream),
             is_write_vectored,
+            stream: UnsafeCell::new(self.t),
         });
 
         let rd = ReadHalf {
@@ -52,7 +73,6 @@ cfg_io_util! {
         (rd, wr)
     }
 }
-
 struct Inner<T: ?Sized> {
     locked: AtomicBool,
     is_write_vectored: bool,
