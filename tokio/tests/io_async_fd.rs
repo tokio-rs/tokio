@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(unix, feature = "full"))]
 
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, IntoRawFd, RawFd};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -132,7 +132,14 @@ fn socketpair() -> (FileDescriptor, FileDescriptor) {
         SockFlag::empty(),
     )
     .expect("socketpair");
-    let fds = (FileDescriptor { fd: fd_a }, FileDescriptor { fd: fd_b });
+    let fds = (
+        FileDescriptor {
+            fd: fd_a.into_raw_fd(),
+        },
+        FileDescriptor {
+            fd: fd_b.into_raw_fd(),
+        },
+    );
 
     set_nonblocking(fds.0.fd);
     set_nonblocking(fds.1.fd);
