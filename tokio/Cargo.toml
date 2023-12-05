@@ -121,11 +121,11 @@ libc = { version = "0.2.149" }
 nix = { version = "0.27.1", default-features = false, features = ["fs", "socket"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.48"
+version = "0.52"
 optional = true
 
 [target.'cfg(windows)'.dev-dependencies.windows-sys]
-version = "0.48"
+version = "0.52"
 features = [
     "Win32_Foundation",
     "Win32_Security_Authorization",
