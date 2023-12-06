@@ -147,10 +147,51 @@ mod future_completes_during_trace {
         async fn dump() {
             let handle = Handle::current();
             let _dump = handle.dump().await;
+            tokio::task::yield_now().await;
         }
 
         rt.block_on(async {
             let _ = tokio::join!(tokio::spawn(complete_during_trace()), dump());
         });
     }
+}
+
+/// Regression test for #6051.
+///
+/// This test ensures that tasks notified outside of a worker will not be
+/// traced, since doing so will un-set their notified bit prior to them being
+/// run and panic.
+#[test]
+fn notified_during_tracing() {
+    let rt = runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(3)
+        .build()
+        .unwrap();
+
+    let timeout = async {
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    };
+
+    let timer = rt.spawn(async {
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_nanos(1)).await;
+        }
+    });
+
+    let dump = async {
+        loop {
+            let handle = Handle::current();
+            let _dump = handle.dump().await;
+        }
+    };
+
+    rt.block_on(async {
+        tokio::select!(
+            biased;
+            _ = timeout => {},
+            _ = timer => {},
+            _ = dump => {},
+        );
+    });
 }
