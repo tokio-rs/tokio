@@ -228,53 +228,6 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
     }
 }
 
-// ===== impl CountedLinkedList ====
-
-// Delegates operations to the base LinkedList implementation, and adds a counter to the elements
-// in the list.
-pub(crate) struct CountedLinkedList<L: Link, T> {
-    list: LinkedList<L, T>,
-    count: usize,
-}
-
-impl<L: Link> CountedLinkedList<L, L::Target> {
-    pub(crate) fn new() -> CountedLinkedList<L, L::Target> {
-        CountedLinkedList {
-            list: LinkedList::new(),
-            count: 0,
-        }
-    }
-
-    pub(crate) fn push_front(&mut self, val: L::Handle) {
-        self.list.push_front(val);
-        self.count += 1;
-    }
-
-    pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
-        let val = self.list.pop_back();
-        if val.is_some() {
-            self.count -= 1;
-        }
-        val
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.list.is_empty()
-    }
-
-    pub(crate) unsafe fn remove(&mut self, node: NonNull<L::Target>) -> Option<L::Handle> {
-        let val = self.list.remove(node);
-        if val.is_some() {
-            self.count -= 1;
-        }
-        val
-    }
-
-    pub(crate) fn count(&self) -> usize {
-        self.count
-    }
-}
-
 #[cfg(any(
     feature = "fs",
     feature = "rt",
@@ -342,22 +295,11 @@ cfg_io_driver_impl! {
 }
 
 cfg_taskdump! {
-    impl<T: Link> CountedLinkedList<T, T::Target> {
-        pub(crate) fn for_each<F>(&mut self, f: F)
-        where
-            F: FnMut(&T::Handle),
-        {
-            self.list.for_each(f)
-        }
-    }
-
     impl<T: Link> LinkedList<T, T::Target> {
         pub(crate) fn for_each<F>(&mut self, mut f: F)
         where
             F: FnMut(&T::Handle),
         {
-            use std::mem::ManuallyDrop;
-
             let mut next = self.head;
 
             while let Some(curr) = next {
@@ -794,26 +736,6 @@ pub(crate) mod tests {
 
             assert!(list.remove(ptr(&c)).is_none());
         }
-    }
-
-    #[test]
-    fn count() {
-        let mut list = CountedLinkedList::<&Entry, <&Entry as Link>::Target>::new();
-        assert_eq!(0, list.count());
-
-        let a = entry(5);
-        let b = entry(7);
-        list.push_front(a.as_ref());
-        list.push_front(b.as_ref());
-        assert_eq!(2, list.count());
-
-        list.pop_back();
-        assert_eq!(1, list.count());
-
-        unsafe {
-            list.remove(ptr(&b));
-        }
-        assert_eq!(0, list.count());
     }
 
     /// This is a fuzz test. You run it by entering `cargo fuzz run fuzz_linked_list` in CLI in `/tokio/` module.

@@ -208,6 +208,7 @@ cfg_taskdump! {
 
 use crate::future::Future;
 use crate::util::linked_list;
+use crate::util::sharded_list;
 
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -501,5 +502,18 @@ unsafe impl<S> linked_list::Link for Task<S> {
 
     unsafe fn pointers(target: NonNull<Header>) -> NonNull<linked_list::Pointers<Header>> {
         self::core::Trailer::addr_of_owned(Header::get_trailer(target))
+    }
+}
+
+/// # Safety
+///
+/// The id of a task is never changed after creation of the task, so the return value of
+/// `get_shard_id` will not change. (The cast may throw away the upper 32 bits of the task id, but
+/// the shard id still won't change from call to call.)
+unsafe impl<S> sharded_list::ShardedListItem for Task<S> {
+    unsafe fn get_shard_id(target: NonNull<Self::Target>) -> usize {
+        // SAFETY: The caller guarantees that `target` points at a valid task.
+        let task_id = unsafe { Header::get_id(target) };
+        task_id.0 as usize
     }
 }

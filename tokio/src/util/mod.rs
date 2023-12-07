@@ -42,6 +42,10 @@ pub(crate) use wake_list::WakeList;
 ))]
 pub(crate) mod linked_list;
 
+cfg_rt! {
+    pub(crate) mod sharded_list;
+}
+
 #[cfg(any(feature = "rt", feature = "macros"))]
 pub(crate) mod rand;
 

@@ -1,5 +1,5 @@
 use std::fmt;
-use std::num::NonZeroU64;
+use std::num::{NonZeroU32, NonZeroU64};
 
 /// An opaque ID that uniquely identifies a runtime relative to all other currently
 /// running runtimes.
@@ -36,6 +36,12 @@ pub struct Id(NonZeroU64);
 impl From<NonZeroU64> for Id {
     fn from(value: NonZeroU64) -> Self {
         Id(value)
+    }
+}
+
+impl From<NonZeroU32> for Id {
+    fn from(value: NonZeroU32) -> Self {
+        Id(value.into())
     }
 }
 
