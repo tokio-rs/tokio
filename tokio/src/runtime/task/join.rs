@@ -179,6 +179,8 @@ impl<T> JoinHandle<T> {
     /// already completed at the time it was cancelled, but most likely it
     /// will fail with a [cancelled] `JoinError`.
     ///
+    /// See also [the module level docs] for more information on cancellation.
+    ///
     /// ```rust
     /// use tokio::time;
     ///
@@ -205,7 +207,9 @@ impl<T> JoinHandle<T> {
     /// }
     /// # }
     /// ```
+    ///
     /// [cancelled]: method@super::error::JoinError::is_cancelled
+    /// [the module level docs]: crate::task#cancellation
     pub fn abort(&self) {
         self.raw.remote_abort();
     }

@@ -172,6 +172,146 @@
 //! [`Builder::enable_io`]: crate::runtime::Builder::enable_io
 //! [`Builder::enable_time`]: crate::runtime::Builder::enable_time
 //! [`Builder::enable_all`]: crate::runtime::Builder::enable_all
+//!
+//! # Detailed runtime behavior
+//!
+//! This section gives more details into how the Tokio runtime will schedule
+//! tasks for execution.
+//!
+//! At its most basic level, a runtime has a collection of tasks that need to be
+//! scheduled. It will repeatedly remove a task from that collection and
+//! schedule it (by calling [`poll`]). When the collection is empty, the thread
+//! will go to sleep until a task is added to the collection.
+//!
+//! However, the above is not sufficient to guarantee a well-behaved runtime.
+//! For example, the runtime might have a single task that is always ready to be
+//! scheduled, and schedule that task every time. This is a problem because it
+//! starves other tasks by not scheduling them. To solve this, Tokio provides
+//! the following fairness guarantee:
+//!
+//! > If the total number of tasks does not grow without bound, and no task is
+//! > [blocking the thread], then it is guaranteed that tasks are scheduled
+//! > fairly.
+//!
+//! Or, more formally:
+//!
+//! > Under the following two assumptions:
+//! >
+//! > * There is some number `MAX_TASKS` such that the total number of tasks on
+//! >   the runtime at any specific point in time never exceeds `MAX_TASKS`.
+//! > * There is some number `MAX_SCHEDULE` such that calling [`poll`] on any
+//! >   task spawned on the runtime returns within `MAX_SCHEDULE` time units.
+//! >
+//! > Then, there is some number `MAX_DELAY` such that when a task is woken, it
+//! > will be scheduled by the runtime within `MAX_DELAY` time units.
+//!
+//! (Here, `MAX_TASKS` and `MAX_SCHEDULE` can be any number and the user of
+//! the runtime may choose them. The `MAX_DELAY` number is controlled by the
+//! runtime, and depends on the value of `MAX_TASKS` and `MAX_SCHEDULE`.)
+//!
+//! Other than the above fairness guarantee, there is no guarantee about the
+//! order in which tasks are scheduled. There is also no guarantee that the
+//! runtime is equally fair to all tasks. For example, if the runtime has two
+//! tasks A and B that are both ready, then the runtime may schedule A five
+//! times before it schedules B. This is the case even if A yields using
+//! [`yield_now`]. All that is guaranteed is that it will schedule B eventually.
+//!
+//! Normally, tasks are scheduled only if they have been woken by calling
+//! [`wake`] on their waker. However, this is not guaranteed, and Tokio may
+//! schedule tasks that have not been woken under some circumstances. This is
+//! called a spurious wakeup.
+//!
+//! ## IO and timers
+//!
+//! Beyond just scheduling tasks, the runtime must also manage IO resources and
+//! timers. It does this by periodically checking whether there are any IO
+//! resources or timers that are ready, and waking the relevant task so that
+//! it will be scheduled.
+//!
+//! These checks are performed periodically between scheduling tasks. Under the
+//! same assumptions as the previous fairness guarantee, Tokio guarantees that
+//! it will wake tasks with an IO or timer event within some maximum number of
+//! time units.
+//!
+//! ## Current thread runtime (behavior at the time of writing)
+//!
+//! This section describes how the [current thread runtime] behaves today. This
+//! behavior may change in future versions of Tokio.
+//!
+//! The current thread runtime maintains two FIFO queues of tasks that are ready
+//! to be scheduled: the global queue and the local queue. The runtime will prefer
+//! to choose the next task to schedule from the local queue, and will only pick a
+//! task from the global queue if the local queue is empty, or if it has picked
+//! a task from the local queue 31 times in a row. The number 31 can be
+//! changed using the [`global_queue_interval`] setting.
+//!
+//! The runtime will check for new IO or timer events whenever there are no
+//! tasks ready to be scheduled, or when it has scheduled 61 tasks in a row. The
+//! number 61 may be changed using the [`event_interval`] setting.
+//!
+//! When a task is woken from within a task running on the runtime, then the
+//! woken task is added directly to the local queue. Otherwise, the task is
+//! added to the global queue. The current thread runtime does not use [the lifo
+//! slot optimization].
+//!
+//! ## Multi threaded runtime (behavior at the time of writing)
+//!
+//! This section describes how the [multi thread runtime] behaves today. This
+//! behavior may change in future versions of Tokio.
+//!
+//! A multi thread runtime has a fixed number of worker threads, which are all
+//! created on startup. The multi thread runtime maintains one global queue, and
+//! a local queue for each worker thread. The local queue of a worker thread can
+//! fit at most 256 tasks. If more than 256 tasks are added to the local queue,
+//! then half of them are moved to the global queue to make space.
+//!
+//! The runtime will prefer to choose the next task to schedule from the local
+//! queue, and will only pick a task from the global queue if the local queue is
+//! empty, or if it has picked a task from the local queue
+//! [`global_queue_interval`] times in a row. If the value of
+//! [`global_queue_interval`] is not explicitly set using the runtime builder,
+//! then the runtime will dynamically compute it using a heuristic that targets
+//! 10ms intervals between each check of the global queue (based on the
+//! [`worker_mean_poll_time`] metric).
+//!
+//! If both the local queue and global queue is empty, then the worker thread
+//! will attempt to steal tasks from the local queue of another worker thread.
+//! Stealing is done by moving half of the tasks in one local queue to another
+//! local queue.
+//!
+//! The runtime will check for new IO or timer events whenever there are no
+//! tasks ready to be scheduled, or when it has scheduled 61 tasks in a row. The
+//! number 61 may be changed using the [`event_interval`] setting.
+//!
+//! The multi thread runtime uses [the lifo slot optimization]: Whenever a task
+//! wakes up another task, the other task is added to the worker thread's lifo
+//! slot instead of being added to a queue. If there was already a task in the
+//! lifo slot when this happened, then the lifo slot is replaced, and the task
+//! that used to be in the lifo slot is placed in the thread's local queue.
+//! When the runtime finishes scheduling a task, it will schedule the task in
+//! the lifo slot immediately, if any. When the lifo slot is used, the [coop
+//! budget] is not reset. Furthermore, if a worker thread uses the lifo slot
+//! three times in a row, it is temporarily disabled until the worker thread has
+//! scheduled a task that didn't come from the lifo slot. The lifo slot can be
+//! disabled using the [`disable_lifo_slot`] setting. The lifo slot is separate
+//! from the local queue, so other worker threads cannot steal the task in the
+//! lifo slot.
+//!
+//! When a task is woken from a thread that is not a worker thread, then the
+//! task is placed in the global queue.
+//!
+//! [`poll`]: std::future::Future::poll
+//! [`wake`]: std::task::Waker::wake
+//! [`yield_now`]: crate::task::yield_now
+//! [blocking the thread]: https://ryhl.io/blog/async-what-is-blocking/
+//! [current thread runtime]: crate::runtime::Builder::new_current_thread
+//! [multi thread runtime]: crate::runtime::Builder::new_multi_thread
+//! [`global_queue_interval`]: crate::runtime::Builder::global_queue_interval
+//! [`event_interval`]: crate::runtime::Builder::event_interval
+//! [`disable_lifo_slot`]: crate::runtime::Builder::disable_lifo_slot
+//! [the lifo slot optimization]: crate::runtime::Builder::disable_lifo_slot
+//! [coop budget]: crate::task#cooperative-scheduling
+//! [`worker_mean_poll_time`]: crate::runtime::RuntimeMetrics::worker_mean_poll_time
 
 // At the top due to macros
 #[cfg(test)]

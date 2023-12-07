@@ -165,11 +165,11 @@ enum State {
 //
 // | shutdown | driver tick | readiness |
 // |----------+-------------+-----------|
-// |   1 bit  |   8 bits    +   16 bits |
+// |   1 bit  |  15 bits    +   16 bits |
 
 const READINESS: bit::Pack = bit::Pack::least_significant(16);
 
-const TICK: bit::Pack = READINESS.then(8);
+const TICK: bit::Pack = READINESS.then(15);
 
 const SHUTDOWN: bit::Pack = TICK.then(1);
 
@@ -219,17 +219,21 @@ impl ScheduledIo {
             let current_readiness = Ready::from_usize(current);
             let new = f(current_readiness);
 
-            let next = match tick {
-                Tick::Set(t) => TICK.pack(t as usize, new.as_usize()),
+            let new_tick = match tick {
+                Tick::Set => {
+                    let current = TICK.unpack(current);
+                    current.wrapping_add(1) % (TICK.max_value() + 1)
+                }
                 Tick::Clear(t) => {
                     if TICK.unpack(current) as u8 != t {
                         // Trying to clear readiness with an old event!
                         return;
                     }
 
-                    TICK.pack(t as usize, new.as_usize())
+                    t as usize
                 }
             };
+            let next = TICK.pack(new_tick, new.as_usize());
 
             match self
                 .readiness
