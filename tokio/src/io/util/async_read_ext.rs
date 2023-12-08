@@ -245,8 +245,8 @@ cfg_io_util! {
         /// ```
         fn read_buf<'a, B>(&'a mut self, buf: &'a mut B) -> ReadBuf<'a, Self, B>
         where
-            Self: Sized + Unpin,
-            B: BufMut,
+            Self: Unpin,
+            B: BufMut + ?Sized,
         {
             read_buf(self, buf)
         }
