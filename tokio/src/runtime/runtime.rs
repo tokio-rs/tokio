@@ -480,6 +480,10 @@ impl Drop for Runtime {
     }
 }
 
+impl std::panic::UnwindSafe for Runtime {}
+
+impl std::panic::RefUnwindSafe for Runtime {}
+
 cfg_metrics! {
     impl Runtime {
         /// TODO

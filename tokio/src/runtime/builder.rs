@@ -1279,7 +1279,6 @@ cfg_rt_multi_thread! {
                 use crate::runtime::scheduler::MultiThreadAlt;
 
                 let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
-
                 let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
                 // Create the blocking pool

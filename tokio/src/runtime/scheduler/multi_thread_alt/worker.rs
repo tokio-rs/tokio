@@ -307,7 +307,7 @@ pub(super) fn create(
             remotes: remotes.into_boxed_slice(),
             inject,
             idle,
-            owned: OwnedTasks::new(),
+            owned: OwnedTasks::new(num_cores),
             synced: Mutex::new(Synced {
                 assigned_cores: (0..num_workers).map(|_| None).collect(),
                 shutdown_cores: Vec::with_capacity(num_cores),
@@ -1460,7 +1460,9 @@ impl Shared {
     }
 
     pub(super) fn shutdown_core(&self, handle: &Handle, mut core: Box<Core>) {
-        self.owned.close_and_shutdown_all();
+        // Start from a random inner list
+        let start = core.rand.fastrand_n(self.owned.get_shard_size() as u32);
+        self.owned.close_and_shutdown_all(start as usize);
 
         core.stats.submit(&self.worker_metrics[core.index]);
 

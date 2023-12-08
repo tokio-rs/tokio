@@ -132,7 +132,7 @@ impl CurrentThread {
         let handle = Arc::new(Handle {
             shared: Shared {
                 inject: Inject::new(),
-                owned: OwnedTasks::new(),
+                owned: OwnedTasks::new(1),
                 woken: AtomicBool::new(false),
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),
@@ -248,7 +248,7 @@ fn shutdown2(mut core: Box<Core>, handle: &Handle) -> Box<Core> {
     // Drain the OwnedTasks collection. This call also closes the
     // collection, ensuring that no tasks are ever pushed after this
     // call returns.
-    handle.shared.owned.close_and_shutdown_all();
+    handle.shared.owned.close_and_shutdown_all(0);
 
     // Drain local queue
     // We already shut down every task, so we just need to drop the task.
@@ -614,7 +614,7 @@ impl Schedule for Arc<Handle> {
                             // If `None`, the runtime is shutting down, so there is no need to signal shutdown
                             if let Some(core) = core.as_mut() {
                                 core.unhandled_panic = true;
-                                self.shared.owned.close_and_shutdown_all();
+                                self.shared.owned.close_and_shutdown_all(0);
                             }
                         }
                         _ => unreachable!("runtime core not set in CURRENT thread-local"),
