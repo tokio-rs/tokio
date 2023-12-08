@@ -24,10 +24,7 @@ impl AtomicU32 {
     /// Additionally, there must be no concurrent mutations.
     pub(crate) unsafe fn unsync_load(&self) -> u32 {
         // See <https://github.com/tokio-rs/tokio/issues/6155>
-        #[cfg(miri)]
-        return self.load(std::sync::atomic::Ordering::Relaxed);
-        #[cfg(not(miri))]
-        return core::ptr::read(self.inner.get() as *const u32);
+        self.load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 

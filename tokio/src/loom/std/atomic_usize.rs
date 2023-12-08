@@ -24,10 +24,7 @@ impl AtomicUsize {
     /// Additionally, there must be no concurrent mutations.
     pub(crate) unsafe fn unsync_load(&self) -> usize {
         // See <https://github.com/tokio-rs/tokio/issues/6155>
-        #[cfg(miri)]
-        return self.load(std::sync::atomic::Ordering::Relaxed);
-        #[cfg(not(miri))]
-        return core::ptr::read(self.inner.get() as *const usize);
+        self.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     pub(crate) fn with_mut<R>(&mut self, f: impl FnOnce(&mut usize) -> R) -> R {
