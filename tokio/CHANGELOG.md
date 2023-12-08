@@ -1,3 +1,49 @@
+# 1.35.0 (December 8th, 2023)
+
+### Added
+
+- net: add Apple watchOS support ([#6176])
+
+### Changed
+
+- io: drop the `Sized` requirements from `AsyncReadExt.read_buf` ([#6169])
+- runtime: make `Runtime` unwind safe ([#6189])
+- runtime: reduce the lock contention in task spawn ([#6001])
+- tokio: update nix dependency to 0.27.1 ([#6190])
+
+### Fixed
+
+- chore: make `--cfg docsrs` work without net feature ([#6166])
+- chore: use relaxed load for `unsync_load` on miri ([#6179])
+- runtime: handle missing context on wake ([#6148])
+- taskdump: fix taskdump cargo config example ([#6150])
+- taskdump: skip notified tasks during taskdumps ([#6194])
+- tracing: avoid creating resource spans with current parent, use a None parent instead ([#6107])
+- tracing: make task span explicit root ([#6158])
+
+### Documented
+
+- io: flush in `AsyncWriteExt` examples ([#6149])
+- runtime: document fairness guarantees and current behavior ([#6145])
+- task: document cancel safety of `LocalSet::run_until` ([#6147])
+
+[#6001]: https://github.com/tokio-rs/tokio/pull/6001
+[#6107]: https://github.com/tokio-rs/tokio/pull/6107
+[#6144]: https://github.com/tokio-rs/tokio/pull/6144
+[#6145]: https://github.com/tokio-rs/tokio/pull/6145
+[#6147]: https://github.com/tokio-rs/tokio/pull/6147
+[#6148]: https://github.com/tokio-rs/tokio/pull/6148
+[#6149]: https://github.com/tokio-rs/tokio/pull/6149
+[#6150]: https://github.com/tokio-rs/tokio/pull/6150
+[#6158]: https://github.com/tokio-rs/tokio/pull/6158
+[#6166]: https://github.com/tokio-rs/tokio/pull/6166
+[#6169]: https://github.com/tokio-rs/tokio/pull/6169
+[#6176]: https://github.com/tokio-rs/tokio/pull/6176
+[#6179]: https://github.com/tokio-rs/tokio/pull/6179
+[#6189]: https://github.com/tokio-rs/tokio/pull/6189
+[#6190]: https://github.com/tokio-rs/tokio/pull/6190
+[#6194]: https://github.com/tokio-rs/tokio/pull/6194
+
 # 1.34.0 (November 19th, 2023)
 
 ### Fixed
