@@ -272,14 +272,19 @@ pub(in crate::runtime) fn trace_current_thread(
     injection: &Inject<Arc<current_thread::Handle>>,
 ) -> Vec<Trace> {
     // clear the local and injection queues
-    local.clear();
+
+    let mut dequeued = Vec::new();
+
+    while let Some(task) = local.pop_back() {
+        dequeued.push(task);
+    }
 
     while let Some(task) = injection.pop() {
-        drop(task);
+        dequeued.push(task);
     }
 
     // precondition: We have drained the tasks from the injection queue.
-    trace_owned(owned)
+    trace_owned(owned, dequeued)
 }
 
 cfg_rt_multi_thread! {
@@ -299,22 +304,24 @@ cfg_rt_multi_thread! {
         synced: &Mutex<Synced>,
         injection: &Shared<Arc<multi_thread::Handle>>,
     ) -> Vec<Trace> {
+        let mut dequeued = Vec::new();
+
         // clear the local queue
         while let Some(notified) = local.pop() {
-            drop(notified);
+            dequeued.push(notified);
         }
 
         // clear the injection queue
         let mut synced = synced.lock();
         while let Some(notified) = injection.pop(&mut synced.inject) {
-            drop(notified);
+            dequeued.push(notified);
         }
 
         drop(synced);
 
         // precondition: we have drained the tasks from the local and injection
         // queues.
-        trace_owned(owned)
+        trace_owned(owned, dequeued)
     }
 }
 
@@ -324,14 +331,20 @@ cfg_rt_multi_thread! {
 ///
 /// This helper presumes exclusive access to each task. The tasks must not exist
 /// in any other queue.
-fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>) -> Vec<Trace> {
-    // notify each task
-    let mut tasks = vec![];
+fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -> Vec<Trace> {
+    let mut tasks = dequeued;
+    // Notify and trace all un-notified tasks. The dequeued tasks are already
+    // notified and so do not need to be re-notified.
     owned.for_each(|task| {
-        // notify the task (and thus make it poll-able) and stash it
-        tasks.push(task.notify_for_tracing());
-        // we do not poll it here since we hold a lock on `owned` and the task
-        // may complete and need to remove itself from `owned`.
+        // Notify the task (and thus make it poll-able) and stash it. This fails
+        // if the task is already notified. In these cases, we skip tracing the
+        // task.
+        if let Some(notified) = task.notify_for_tracing() {
+            tasks.push(notified);
+        }
+        // We do not poll tasks here, since we hold a lock on `owned` and the
+        // task may complete and need to remove itself from `owned`. Polling
+        // such a task here would result in a deadlock.
     });
 
     tasks

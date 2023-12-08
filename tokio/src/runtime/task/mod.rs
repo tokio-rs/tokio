@@ -364,10 +364,17 @@ impl<S: 'static> Task<S> {
     }
 
     cfg_taskdump! {
-        pub(super) fn notify_for_tracing(&self) -> Notified<S> {
-            self.as_raw().state().transition_to_notified_for_tracing();
-            // SAFETY: `transition_to_notified_for_tracing` increments the refcount.
-            unsafe { Notified(Task::new(self.raw)) }
+        /// Notify the task for task dumping.
+        ///
+        /// Returns `None` if the task has already been notified.
+        pub(super) fn notify_for_tracing(&self) -> Option<Notified<S>> {
+            if self.as_raw().state().transition_to_notified_for_tracing() {
+                // SAFETY: `transition_to_notified_for_tracing` increments the
+                // refcount.
+                Some(unsafe { Notified(Task::new(self.raw)) })
+            } else {
+                None
+            }
         }
     }
 }
