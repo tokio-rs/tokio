@@ -3,7 +3,6 @@
 ### Added
 
 - net: add Apple watchOS support ([#6176])
-- net: add `SocketAddr::as_abstract_namespace` ([#6144])
 
 ### Changed
 
