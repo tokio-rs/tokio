@@ -1367,8 +1367,14 @@ impl AsFd for Receiver {
 
 /// Checks if the file descriptor is a pipe or a FIFO.
 fn is_pipe(fd: BorrowedFd<'_>) -> io::Result<bool> {
+    // Safety: `libc::stat` is C-like struct used for syscalls and all-zero
+    // byte pattern forms a valid value.
     let mut stat: libc::stat = unsafe { std::mem::zeroed() };
+
+    // Safety: it's safe to call `fstat` with a valid, open file descriptor
+    // and a valid pointer to a `stat` struct.
     let r = unsafe { libc::fstat(fd.as_raw_fd(), &mut stat) };
+
     if r == -1 {
         Err(io::Error::last_os_error())
     } else {
@@ -1378,6 +1384,7 @@ fn is_pipe(fd: BorrowedFd<'_>) -> io::Result<bool> {
 
 /// Gets file descriptor's flags by fcntl.
 fn get_file_flags(fd: BorrowedFd<'_>) -> io::Result<libc::c_int> {
+    // Safety: it's safe to use `fcntl` to read flags of a valid, open file descriptor.
     let flags = unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_GETFL) };
     if flags < 0 {
         Err(io::Error::last_os_error())
@@ -1403,6 +1410,8 @@ fn set_nonblocking(fd: BorrowedFd<'_>, current_flags: libc::c_int) -> io::Result
     let flags = current_flags | libc::O_NONBLOCK;
 
     if flags != current_flags {
+        // Safety: it's safe to use `fcntl` to set the `O_NONBLOCK` flag of a valid,
+        // open file descriptor.
         let ret = unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_SETFL, flags) };
         if ret < 0 {
             return Err(io::Error::last_os_error());
@@ -1414,6 +1423,7 @@ fn set_nonblocking(fd: BorrowedFd<'_>, current_flags: libc::c_int) -> io::Result
 
 /// Removes `O_NONBLOCK` from fd's flags.
 fn set_blocking<T: AsRawFd>(fd: &T) -> io::Result<()> {
+    // Safety: it's safe to use `fcntl` to read flags of a valid, open file descriptor.
     let previous = unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_GETFL) };
     if previous == -1 {
         return Err(io::Error::last_os_error());
@@ -1421,6 +1431,8 @@ fn set_blocking<T: AsRawFd>(fd: &T) -> io::Result<()> {
 
     let new = previous & !libc::O_NONBLOCK;
 
+    // Safety: it's safe to use `fcntl` to unset the `O_NONBLOCK` flag of a valid,
+    // open file descriptor.
     let r = unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_SETFL, new) };
     if r == -1 {
         Err(io::Error::last_os_error())
