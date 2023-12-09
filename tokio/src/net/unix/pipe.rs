@@ -46,7 +46,7 @@ cfg_io_util! {
 ///
 /// let status = Command::new("echo")
 ///     .arg("Hello, world!")
-///     .stdout(tx.into_owned_fd()?)
+///     .stdout(tx.into_blocking_fd()?)
 ///     .status();
 /// rx.read_to_string(&mut buffer).await?;
 ///
@@ -722,13 +722,23 @@ impl Sender {
             .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(buf))
     }
 
-    /// Converts the pipe into an [`OwnedFd`].
+    /// Converts the pipe into an [`OwnedFd`] in blocking mode.
     ///
     /// This function will deregister this pipe end from the event loop, set
     /// it in blocking mode and perform the conversion.
-    pub fn into_owned_fd(self) -> io::Result<OwnedFd> {
+    pub fn into_blocking_fd(self) -> io::Result<OwnedFd> {
+        let fd = self.into_nonblocking_fd()?;
+        set_blocking(&fd)?;
+        Ok(fd)
+    }
+
+    /// Converts the pipe into an [`OwnedFd`] in nonblocking mode.
+    ///
+    /// This function will deregister this pipe end from the event loop and
+    /// perform the conversion. Returned file descriptor will be in nonblocking
+    /// mode.
+    pub fn into_nonblocking_fd(self) -> io::Result<OwnedFd> {
         let mio_pipe = self.io.into_inner()?;
-        set_blocking(&mio_pipe)?;
 
         // Safety: the pipe is now deregistered from the event loop
         // and we are the only owner of this pipe end.
@@ -1305,13 +1315,23 @@ impl Receiver {
         }
     }
 
-    /// Converts the pipe into an [`OwnedFd`].
+    /// Converts the pipe into an [`OwnedFd`] in blocking mode.
     ///
     /// This function will deregister this pipe end from the event loop, set
     /// it in blocking mode and perform the conversion.
-    pub fn into_owned_fd(self) -> io::Result<OwnedFd> {
+    pub fn into_blocking_fd(self) -> io::Result<OwnedFd> {
+        let fd = self.into_nonblocking_fd()?;
+        set_blocking(&fd)?;
+        Ok(fd)
+    }
+
+    /// Converts the pipe into an [`OwnedFd`] in nonblocking mode.
+    ///
+    /// This function will deregister this pipe end from the event loop and
+    /// perform the conversion. Returned file descriptor will be in nonblocking
+    /// mode.
+    pub fn into_nonblocking_fd(self) -> io::Result<OwnedFd> {
         let mio_pipe = self.io.into_inner()?;
-        set_blocking(&mio_pipe)?;
 
         // Safety: the pipe is now deregistered from the event loop
         // and we are the only owner of this pipe end.

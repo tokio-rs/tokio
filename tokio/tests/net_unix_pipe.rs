@@ -467,7 +467,7 @@ async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
     let status = Command::new("echo")
         .arg("-n")
         .arg(DATA)
-        .stdout(tx.into_owned_fd()?)
+        .stdout(tx.into_blocking_fd()?)
         .status();
 
     let mut buf = vec![0; DATA.len()];
@@ -503,6 +503,32 @@ async fn anon_pipe_from_owned_fd() -> std::io::Result<()> {
     tx.write_all(DATA).await?;
     rx.read_exact(&mut buf).await?;
     assert_eq!(buf, DATA);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn anon_pipe_into_nonblocking_fd() -> std::io::Result<()> {
+    let (tx, rx) = pipe::pipe()?;
+
+    let tx_fd = tx.into_nonblocking_fd()?;
+    let rx_fd = rx.into_nonblocking_fd()?;
+
+    assert!(is_nonblocking(&tx_fd)?);
+    assert!(is_nonblocking(&rx_fd)?);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn anon_pipe_into_blocking_fd() -> std::io::Result<()> {
+    let (tx, rx) = pipe::pipe()?;
+
+    let tx_fd = tx.into_blocking_fd()?;
+    let rx_fd = rx.into_blocking_fd()?;
+
+    assert!(!is_nonblocking(&tx_fd)?);
+    assert!(!is_nonblocking(&rx_fd)?);
 
     Ok(())
 }
