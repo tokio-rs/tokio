@@ -76,8 +76,8 @@ pub struct Permit<'a, T> {
 /// [`Sender::reserve_many()`]: Sender::reserve_many
 /// [`Sender::try_reserve_many()`]: Sender::try_reserve_many
 pub struct ManyPermit<'a, T> {
-	chan: &'a chan::Tx<T, Semaphore>,
-	n: u32,
+    chan: &'a chan::Tx<T, Semaphore>,
+    n: u32,
 }
 
 /// Owned permit to send one value into the channel.
@@ -865,7 +865,7 @@ impl<T> Sender<T> {
         Ok(Permit { chan: &self.chan })
     }
 
-	/// Waits for channel capacity. Once capacity to send `n` message is
+    /// Waits for channel capacity. Once capacity to send `n` message is
     /// available, it is reserved for the caller.
     ///
     /// If the channel is full, the function waits for the number of unreceived
@@ -906,17 +906,20 @@ impl<T> Sender<T> {
     ///     permit.send(456).unwrap();
     ///     permit.send(457).unwrap();
     ///
-	/// 	// The third should fail due to no available capacity
+    ///     // The third should fail due to no available capacity
     ///     permit.send(458).unwrap_err();
     ///     
-	/// 	// The value sent on the permit is received
+    ///     // The value sent on the permit is received
     ///     assert_eq!(rx.recv().await.unwrap(), 456);
     ///     assert_eq!(rx.recv().await.unwrap(), 457);
     /// }
     /// ```
     pub async fn reserve_many(&self, n: u32) -> Result<ManyPermit<'_, T>, SendError<()>> {
         self.reserve_inner(n).await?;
-        Ok(ManyPermit { chan: &self.chan, n })
+        Ok(ManyPermit {
+            chan: &self.chan,
+            n,
+        })
     }
 
     /// Waits for channel capacity, moving the `Sender` and returning an owned
@@ -1068,7 +1071,7 @@ impl<T> Sender<T> {
         Ok(Permit { chan: &self.chan })
     }
 
-	/// Tries to acquire n slot in the channel without waiting for the slot to become
+    /// Tries to acquire n slot in the channel without waiting for the slot to become
     /// available.
     ///
     /// If the channel is full this function will return [`TrySendError`], otherwise
@@ -1106,10 +1109,10 @@ impl<T> Sender<T> {
     ///     // Sending on the permit succeeds
     ///     permit.send(456).unwrap();
     ///     permit.send(457).unwrap();
-    ///		
-	/// 	// The third should fail due to no available capacity
+    ///
+    ///     // The third should fail due to no available capacity
     ///     permit.send(458).unwrap_err();
-	///
+    ///
     ///     // The value sent on the permit is received
     ///     assert_eq!(rx.recv().await.unwrap(), 456);
     ///     assert_eq!(rx.recv().await.unwrap(), 457);
@@ -1123,7 +1126,10 @@ impl<T> Sender<T> {
             Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(())),
         }
 
-        Ok(ManyPermit { chan: &self.chan, n })
+        Ok(ManyPermit {
+            chan: &self.chan,
+            n,
+        })
     }
 
     /// Tries to acquire a slot in the channel without waiting for the slot to become
@@ -1402,17 +1408,16 @@ impl<T> fmt::Debug for Permit<'_, T> {
     }
 }
 
-
 // ===== impl ManyPermit =====
 
 impl<T> ManyPermit<'_, T> {
     /// Sends a value using the reserved capacity.
     ///
     /// Capacity for the messages has already been reserved. The message is sent
-    /// to the receiver and the permit capacity is reduced by one. If there is no 
-	/// remaining capacity a [`SendError`] will be returned with the provided value.
-	/// The operation will succeed even if the receiver half has been closed. 
-	/// See [`Receiver::close`] for more details on performing a clean shutdown.
+    /// to the receiver and the permit capacity is reduced by one. If there is no
+    /// remaining capacity a [`SendError`] will be returned with the provided value.
+    /// The operation will succeed even if the receiver half has been closed.
+    /// See [`Receiver::close`] for more details on performing a clean shutdown.
     ///
     /// [`Receiver::close`]: Receiver::close
     ///
@@ -1435,30 +1440,30 @@ impl<T> ManyPermit<'_, T> {
     ///     // Send 2 messages on the permit
     ///     permit.send(456).unwrap();
     ///     permit.send(457).unwrap();
-	/// 
-	/// 	// The third should fail due to no available capacity
+    ///
+    ///     // The third should fail due to no available capacity
     ///     permit.send(458).unwrap_err();
-	///
-	///     // The value sent on the permit is received
+    ///
+    ///     // The value sent on the permit is received
     ///     assert_eq!(rx.recv().await.unwrap(), 456);
     ///     assert_eq!(rx.recv().await.unwrap(), 457);
     /// }
     /// ```
     pub fn send(&mut self, value: T) -> Result<(), SendError<T>> {
-		// There is no remaining capacity on this permit
-		if self.n <= 0 {
-			return Err(SendError(value));
-		}
+        // There is no remaining capacity on this permit
+        if self.n == 0 {
+            return Err(SendError(value));
+        }
 
-		self.chan.send(value);
-		self.n -= 1;
-		Ok(())
+        self.chan.send(value);
+        self.n -= 1;
+        Ok(())
     }
 }
 
 impl<T> Drop for ManyPermit<'_, T> {
     fn drop(&mut self) {
-		use chan::Semaphore;
+        use chan::Semaphore;
 
         let semaphore = self.chan.semaphore();
 
@@ -1477,11 +1482,10 @@ impl<T> fmt::Debug for ManyPermit<'_, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Permit")
             .field("chan", &self.chan)
-			.field("capacity", &self.n)
+            .field("capacity", &self.n)
             .finish()
     }
 }
-
 
 // ===== impl Permit =====
 
