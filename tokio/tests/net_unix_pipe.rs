@@ -432,7 +432,7 @@ async fn try_read_buf() -> std::io::Result<()> {
 async fn anon_pipe_simple_send() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the pipe";
 
-    let (mut writer, mut reader) = pipe::new()?;
+    let (mut writer, mut reader) = pipe::pipe()?;
 
     // Create a reading task which should wait for data from the pipe.
     let mut read_fut = task::spawn(async move {
@@ -462,7 +462,7 @@ async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
 
     const DATA: &str = "this is some data to write to the pipe";
 
-    let (tx, mut rx) = pipe::new()?;
+    let (tx, mut rx) = pipe::pipe()?;
 
     let status = Command::new("echo")
         .arg("-n")

@@ -38,7 +38,7 @@ cfg_io_util! {
 /// The runtime is usually set implicitly when this function is called
 /// from a future driven by a tokio runtime, otherwise runtime can be set
 /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
-pub fn new() -> io::Result<(Sender, Receiver)> {
+pub fn pipe() -> io::Result<(Sender, Receiver)> {
     let (tx, rx) = mio_pipe::new()?;
     Ok((Sender::from_mio(tx)?, Receiver::from_mio(rx)?))
 }
