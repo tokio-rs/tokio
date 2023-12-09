@@ -68,6 +68,18 @@ pub struct Permit<'a, T> {
     chan: &'a chan::Tx<T, Semaphore>,
 }
 
+/// Permits to send `n` values into the channel.
+///
+/// `ManyPermit` values are returned by [`Sender::reserve_many()`] and [`Sender::try_reserve_many()`]
+/// and are used to guarantee channel capacity before generating `n` message to send.
+///
+/// [`Sender::reserve_many()`]: Sender::reserve_many
+/// [`Sender::try_reserve_many()`]: Sender::try_reserve_many
+pub struct ManyPermit<'a, T> {
+	chan: &'a chan::Tx<T, Semaphore>,
+	n: u32,
+}
+
 /// Owned permit to send one value into the channel.
 ///
 /// This is identical to the [`Permit`] type, except that it moves the sender
@@ -849,8 +861,62 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub async fn reserve(&self) -> Result<Permit<'_, T>, SendError<()>> {
-        self.reserve_inner().await?;
+        self.reserve_inner(1).await?;
         Ok(Permit { chan: &self.chan })
+    }
+
+	/// Waits for channel capacity. Once capacity to send `n` message is
+    /// available, it is reserved for the caller.
+    ///
+    /// If the channel is full, the function waits for the number of unreceived
+    /// messages to become less than the channel capacity. Capacity to send `n`
+    /// message is reserved for the caller. A [`ManyPermit`] is returned to track
+    /// the reserved capacity. The [`send`] function on [`ManyPermit`] consumes the
+    /// reserved capacity.
+    ///
+    /// Dropping [`ManyPermit`] without sending a message releases the capacity back
+    /// to the channel.
+    ///
+    /// [`ManyPermit`]: ManyPermit
+    /// [`send`]: ManyPermit::send
+    ///
+    /// # Cancel safety
+    ///
+    /// This channel uses a queue to ensure that calls to `send` and `reserve`
+    /// complete in the order they were requested. Cancelling a call to
+    /// `reserve` makes you lose your place in the queue.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(2);
+    ///
+    ///     // Reserve capacity
+    ///     let mut permit = tx.reserve_many(2).await.unwrap();
+    ///
+    ///     // Trying to send directly on the `tx` will fail due to no
+    ///     // available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Sending on the permit succeeds
+    ///     permit.send(456).unwrap();
+    ///     permit.send(457).unwrap();
+    ///
+	/// 	// The third should fail due to no available capacity
+    ///     permit.send(458).unwrap_err();
+    ///     
+	/// 	// The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    ///     assert_eq!(rx.recv().await.unwrap(), 457);
+    /// }
+    /// ```
+    pub async fn reserve_many(&self, n: u32) -> Result<ManyPermit<'_, T>, SendError<()>> {
+        self.reserve_inner(n).await?;
+        Ok(ManyPermit { chan: &self.chan, n })
     }
 
     /// Waits for channel capacity, moving the `Sender` and returning an owned
@@ -934,16 +1000,16 @@ impl<T> Sender<T> {
     /// [`send`]: OwnedPermit::send
     /// [`Arc::clone`]: std::sync::Arc::clone
     pub async fn reserve_owned(self) -> Result<OwnedPermit<T>, SendError<()>> {
-        self.reserve_inner().await?;
+        self.reserve_inner(1).await?;
         Ok(OwnedPermit {
             chan: Some(self.chan),
         })
     }
 
-    async fn reserve_inner(&self) -> Result<(), SendError<()>> {
+    async fn reserve_inner(&self, n: u32) -> Result<(), SendError<()>> {
         crate::trace::async_trace_leaf().await;
 
-        match self.chan.semaphore().semaphore.acquire(1).await {
+        match self.chan.semaphore().semaphore.acquire(n).await {
             Ok(()) => Ok(()),
             Err(_) => Err(SendError(())),
         }
@@ -1000,6 +1066,64 @@ impl<T> Sender<T> {
         }
 
         Ok(Permit { chan: &self.chan })
+    }
+
+	/// Tries to acquire n slot in the channel without waiting for the slot to become
+    /// available.
+    ///
+    /// If the channel is full this function will return [`TrySendError`], otherwise
+    /// if there is a slot available it will return a [`ManyPermit`] that will then allow you
+    /// to [`send`] on the channel with a guaranteed slot. This function is similar to
+    /// [`reserve_many`] except it does not await for the slot to become available.
+    ///
+    /// Dropping [`ManyPermit`] without sending a message releases the capacity back
+    /// to the channel.
+    ///
+    /// [`ManyPermit`]: ManyPermit
+    /// [`send`]: ManyPermit::send
+    /// [`reserve_many`]: Sender::reserve_many
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(2);
+    ///
+    ///     // Reserve capacity
+    ///     let mut permit = tx.try_reserve_many(2).unwrap();
+    ///
+    ///     // Trying to send directly on the `tx` will fail due to no
+    ///     // available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Trying to reserve an additional slot on the `tx` will
+    ///     // fail because there is no capacity.
+    ///     assert!(tx.try_reserve().is_err());
+    ///
+    ///     // Sending on the permit succeeds
+    ///     permit.send(456).unwrap();
+    ///     permit.send(457).unwrap();
+    ///		
+	/// 	// The third should fail due to no available capacity
+    ///     permit.send(458).unwrap_err();
+	///
+    ///     // The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    ///     assert_eq!(rx.recv().await.unwrap(), 457);
+    ///
+    /// }
+    /// ```
+    pub fn try_reserve_many(&self, n: u32) -> Result<ManyPermit<'_, T>, TrySendError<()>> {
+        match self.chan.semaphore().semaphore.try_acquire(n) {
+            Ok(()) => {}
+            Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(())),
+            Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(())),
+        }
+
+        Ok(ManyPermit { chan: &self.chan, n })
     }
 
     /// Tries to acquire a slot in the channel without waiting for the slot to become
@@ -1277,6 +1401,87 @@ impl<T> fmt::Debug for Permit<'_, T> {
             .finish()
     }
 }
+
+
+// ===== impl ManyPermit =====
+
+impl<T> ManyPermit<'_, T> {
+    /// Sends a value using the reserved capacity.
+    ///
+    /// Capacity for the messages has already been reserved. The message is sent
+    /// to the receiver and the permit capacity is reduced by one. If there is no 
+	/// remaining capacity a [`SendError`] will be returned with the provided value.
+	/// The operation will succeed even if the receiver half has been closed. 
+	/// See [`Receiver::close`] for more details on performing a clean shutdown.
+    ///
+    /// [`Receiver::close`]: Receiver::close
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(2);
+    ///
+    ///     // Reserve capacity
+    ///     let mut permit = tx.reserve_many(2).await.unwrap();
+    ///
+    ///     // Trying to send directly on the `tx` will fail due to no
+    ///     // available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Send 2 messages on the permit
+    ///     permit.send(456).unwrap();
+    ///     permit.send(457).unwrap();
+	/// 
+	/// 	// The third should fail due to no available capacity
+    ///     permit.send(458).unwrap_err();
+	///
+	///     // The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    ///     assert_eq!(rx.recv().await.unwrap(), 457);
+    /// }
+    /// ```
+    pub fn send(&mut self, value: T) -> Result<(), SendError<T>> {
+		// There is no remaining capacity on this permit
+		if self.n <= 0 {
+			return Err(SendError(value));
+		}
+
+		self.chan.send(value);
+		self.n -= 1;
+		Ok(())
+    }
+}
+
+impl<T> Drop for ManyPermit<'_, T> {
+    fn drop(&mut self) {
+		use chan::Semaphore;
+
+        let semaphore = self.chan.semaphore();
+
+        // Add the remaining permits back to the semaphore
+        semaphore.add_permits(self.n as usize);
+
+        // If this is the last sender for this channel, wake the receiver so
+        // that it can be notified that the channel is closed.
+        if semaphore.is_closed() && semaphore.is_idle() {
+            self.chan.wake_rx();
+        }
+    }
+}
+
+impl<T> fmt::Debug for ManyPermit<'_, T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("Permit")
+            .field("chan", &self.chan)
+			.field("capacity", &self.n)
+            .finish()
+    }
+}
+
 
 // ===== impl Permit =====
 
