@@ -21,14 +21,40 @@ cfg_io_util! {
 /// This function will open a new pipe and associate both pipe ends with the default
 /// event loop.
 ///
-/// If you need to create a pipe for communicating with a spawned process, you can
-/// also see how to use `Stdio::piped()` with [`tokio::process`].
+/// If you need to create a pipe for communication with a spawned process, you can
+/// use [`Stdio::piped()`] instead.
 ///
-/// [`tokio::process`]: crate::process
+/// [`Stdio::piped()`]: std::process::Stdio::piped
 ///
 /// # Errors
 ///
 /// If creating a pipe fails, this function will return with the related OS error.
+///
+/// # Examples
+///
+/// Create a pipe and pass the writing end to a spawned process.
+///
+/// ```no_run
+/// use tokio::net::unix::pipe;
+/// use tokio::process::Command;
+/// # use tokio::io::AsyncReadExt;
+/// # use std::error::Error;
+///
+/// # async fn dox() -> Result<(), Box<dyn Error>> {
+/// let (tx, mut rx) = pipe::pipe()?;
+/// let mut buffer = String::new();
+///
+/// let status = Command::new("echo")
+///     .arg("Hello, world!")
+///     .stdout(tx.into_owned_fd()?)
+///     .status();
+/// rx.read_to_string(&mut buffer).await?;
+///
+/// assert!(status.await?.success());
+/// assert_eq!(buffer, "Hello, world!\n");
+/// # Ok(())
+/// # }
+/// ```
 ///
 /// # Panics
 ///
