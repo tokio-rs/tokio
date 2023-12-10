@@ -1423,7 +1423,13 @@ impl<'a, T> Iterator for PermitIterator<'a, T> {
         self.n -= 1;
         Some(Permit { chan: self.chan })
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let n = self.n as usize;
+        (n, Some(n))
+    }
 }
+impl<T> ExactSizeIterator for PermitIterator<'_, T> {}
 
 impl<T> Drop for PermitIterator<'_, T> {
     fn drop(&mut self) {
