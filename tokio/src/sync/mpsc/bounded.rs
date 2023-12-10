@@ -1072,7 +1072,7 @@ impl<T> Sender<T> {
         Ok(Permit { chan: &self.chan })
     }
 
-    /// Tries to acquire n slot in the channel without waiting for the slot to become
+    /// Tries to acquire `n` slot in the channel without waiting for the slot to become
     /// available.
     ///
     /// If the channel is full this function will return a [`TrySendError`], otherwise
