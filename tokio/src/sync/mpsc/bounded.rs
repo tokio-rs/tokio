@@ -68,14 +68,14 @@ pub struct Permit<'a, T> {
     chan: &'a chan::Tx<T, Semaphore>,
 }
 
-/// Permits to send `n` values into the channel.
+/// An [`Iterator`] of [`Permit`] that can be used to reserve `n` slots in the channel
 ///
-/// `ManyPermit` values are returned by [`Sender::reserve_many()`] and [`Sender::try_reserve_many()`]
+/// `PermitIterator` values are returned by [`Sender::reserve_many()`] and [`Sender::try_reserve_many()`]
 /// and are used to guarantee channel capacity before generating `n` message to send.
 ///
 /// [`Sender::reserve_many()`]: Sender::reserve_many
 /// [`Sender::try_reserve_many()`]: Sender::try_reserve_many
-pub struct ManyPermit<'a, T> {
+pub struct PermitIterator<'a, T> {
     chan: &'a chan::Tx<T, Semaphore>,
     n: u32,
 }
@@ -870,15 +870,16 @@ impl<T> Sender<T> {
     ///
     /// If the channel is full, the function waits for the number of unreceived
     /// messages to become less than the channel capacity. Capacity to send `n`
-    /// message is reserved for the caller. A [`ManyPermit`] is returned to track
-    /// the reserved capacity. The [`send`] function on [`ManyPermit`] consumes the
-    /// reserved capacity.
+    /// message is reserved for the caller. A [`PermitIterator`] is returned to track
+    /// the reserved capacity. You can call this [`Iterator`] until it is exhausted to
+    /// get a [`Permit`] and then call [`Permit::send`].
     ///
-    /// Dropping [`ManyPermit`] without sending a message releases the capacity back
+    /// Dropping [`PermitIterator`] without sending a message releases the capacity back
     /// to the channel.
     ///
-    /// [`ManyPermit`]: ManyPermit
-    /// [`send`]: ManyPermit::send
+    /// [`PermitIterator`]: PermitIterator
+    /// [`Permit`]: Permit
+    /// [`send`]: Permit::send
     ///
     /// # Cancel safety
     ///
@@ -902,21 +903,21 @@ impl<T> Sender<T> {
     ///     // available capacity.
     ///     assert!(tx.try_send(123).is_err());
     ///
-    ///     // Sending on the permit succeeds
-    ///     permit.send(456).unwrap();
-    ///     permit.send(457).unwrap();
+    ///     // Sending with the permit iterator succeeds
+    ///     permit.next().unwrap().send(456);
+    ///     permit.next().unwrap().send(457);
     ///
-    ///     // The third should fail due to no available capacity
-    ///     permit.send(458).unwrap_err();
+    ///     // The iterator should now be exhausted
+    ///     assert!(permit.next().is_none());
     ///     
     ///     // The value sent on the permit is received
     ///     assert_eq!(rx.recv().await.unwrap(), 456);
     ///     assert_eq!(rx.recv().await.unwrap(), 457);
     /// }
     /// ```
-    pub async fn reserve_many(&self, n: u32) -> Result<ManyPermit<'_, T>, SendError<()>> {
+    pub async fn reserve_many(&self, n: u32) -> Result<PermitIterator<'_, T>, SendError<()>> {
         self.reserve_inner(n).await?;
-        Ok(ManyPermit {
+        Ok(PermitIterator {
             chan: &self.chan,
             n,
         })
@@ -1076,14 +1077,16 @@ impl<T> Sender<T> {
     ///
     /// If the channel is full this function will return [`TrySendError`], otherwise
     /// if there is a slot available it will return a [`ManyPermit`] that will then allow you
-    /// to [`send`] on the channel with a guaranteed slot. This function is similar to
+    /// to [`send`] on the channel with a guaranteed slot. A [`PermitIterator`] is returned to track
+    /// the reserved capacity. You can call this [`Iterator`] until it is exhausted to
+    /// get a [`Permit`] and then call [`Permit::send`]. This function is similar to
     /// [`reserve_many`] except it does not await for the slot to become available.
     ///
     /// Dropping [`ManyPermit`] without sending a message releases the capacity back
     /// to the channel.
     ///
-    /// [`ManyPermit`]: ManyPermit
-    /// [`send`]: ManyPermit::send
+    /// [`PermitIterator`]: PermitIterator
+    /// [`send`]: Permit::send
     /// [`reserve_many`]: Sender::reserve_many
     ///
     /// # Examples
@@ -1106,12 +1109,12 @@ impl<T> Sender<T> {
     ///     // fail because there is no capacity.
     ///     assert!(tx.try_reserve().is_err());
     ///
-    ///     // Sending on the permit succeeds
-    ///     permit.send(456).unwrap();
-    ///     permit.send(457).unwrap();
+    ///     // Sending with the permit iterator succeeds
+    ///     permit.next().unwrap().send(456);
+    ///     permit.next().unwrap().send(457);
     ///
-    ///     // The third should fail due to no available capacity
-    ///     permit.send(458).unwrap_err();
+    ///     // The iterator should now be exhausted
+    ///     assert!(permit.next().is_none());
     ///
     ///     // The value sent on the permit is received
     ///     assert_eq!(rx.recv().await.unwrap(), 456);
@@ -1119,14 +1122,14 @@ impl<T> Sender<T> {
     ///
     /// }
     /// ```
-    pub fn try_reserve_many(&self, n: u32) -> Result<ManyPermit<'_, T>, TrySendError<()>> {
+    pub fn try_reserve_many(&self, n: u32) -> Result<PermitIterator<'_, T>, TrySendError<()>> {
         match self.chan.semaphore().semaphore.try_acquire(n) {
             Ok(()) => {}
             Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(())),
             Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(())),
         }
 
-        Ok(ManyPermit {
+        Ok(PermitIterator {
             chan: &self.chan,
             n,
         })
@@ -1408,60 +1411,22 @@ impl<T> fmt::Debug for Permit<'_, T> {
     }
 }
 
-// ===== impl ManyPermit =====
+// ===== impl PermitIterator =====
 
-impl<T> ManyPermit<'_, T> {
-    /// Sends a value using the reserved capacity.
-    ///
-    /// Capacity for the messages has already been reserved. The message is sent
-    /// to the receiver and the permit capacity is reduced by one. If there is no
-    /// remaining capacity a [`SendError`] will be returned with the provided value.
-    /// The operation will succeed even if the receiver half has been closed.
-    /// See [`Receiver::close`] for more details on performing a clean shutdown.
-    ///
-    /// [`Receiver::close`]: Receiver::close
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::sync::mpsc;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(2);
-    ///
-    ///     // Reserve capacity
-    ///     let mut permit = tx.reserve_many(2).await.unwrap();
-    ///
-    ///     // Trying to send directly on the `tx` will fail due to no
-    ///     // available capacity.
-    ///     assert!(tx.try_send(123).is_err());
-    ///
-    ///     // Send 2 messages on the permit
-    ///     permit.send(456).unwrap();
-    ///     permit.send(457).unwrap();
-    ///
-    ///     // The third should fail due to no available capacity
-    ///     permit.send(458).unwrap_err();
-    ///
-    ///     // The value sent on the permit is received
-    ///     assert_eq!(rx.recv().await.unwrap(), 456);
-    ///     assert_eq!(rx.recv().await.unwrap(), 457);
-    /// }
-    /// ```
-    pub fn send(&mut self, value: T) -> Result<(), SendError<T>> {
-        // There is no remaining capacity on this permit
+impl<'a, T> Iterator for PermitIterator<'a, T> {
+    type Item = Permit<'a, T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         if self.n == 0 {
-            return Err(SendError(value));
+            return None;
         }
 
-        self.chan.send(value);
         self.n -= 1;
-        Ok(())
+        Some(Permit { chan: self.chan })
     }
 }
 
-impl<T> Drop for ManyPermit<'_, T> {
+impl<T> Drop for PermitIterator<'_, T> {
     fn drop(&mut self) {
         use chan::Semaphore;
 
@@ -1478,7 +1443,7 @@ impl<T> Drop for ManyPermit<'_, T> {
     }
 }
 
-impl<T> fmt::Debug for ManyPermit<'_, T> {
+impl<T> fmt::Debug for PermitIterator<'_, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Permit")
             .field("chan", &self.chan)
