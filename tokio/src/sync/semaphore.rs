@@ -565,7 +565,7 @@ impl Semaphore {
     pub async fn acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, AcquireError> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         trace::async_op(
-            || self.ll_sem.acquire(n),
+            || self.ll_sem.acquire(n as usize),
             self.resource_span.clone(),
             "Semaphore::acquire_many",
             "poll",
@@ -764,7 +764,7 @@ impl Semaphore {
     ) -> Result<OwnedSemaphorePermit, AcquireError> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = trace::async_op(
-            || self.ll_sem.acquire(n),
+            || self.ll_sem.acquire(n as usize),
             self.resource_span.clone(),
             "Semaphore::acquire_many_owned",
             "poll",
