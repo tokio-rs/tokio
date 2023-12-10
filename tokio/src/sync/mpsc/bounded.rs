@@ -1450,7 +1450,7 @@ impl<T> Drop for PermitIterator<'_, T> {
 
 impl<T> fmt::Debug for PermitIterator<'_, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Permit")
+        fmt.debug_struct("PermitIterator")
             .field("chan", &self.chan)
             .field("capacity", &self.n)
             .finish()
