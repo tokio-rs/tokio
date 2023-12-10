@@ -1075,14 +1075,13 @@ impl<T> Sender<T> {
     /// Tries to acquire n slot in the channel without waiting for the slot to become
     /// available.
     ///
-    /// If the channel is full this function will return [`TrySendError`], otherwise
-    /// if there is a slot available it will return a [`ManyPermit`] that will then allow you
-    /// to [`send`] on the channel with a guaranteed slot. A [`PermitIterator`] is returned to track
-    /// the reserved capacity. You can call this [`Iterator`] until it is exhausted to
+    /// If the channel is full this function will return a [`TrySendError`], otherwise
+    /// A [`PermitIterator`] is returned to track the reserved capacity. 
+	/// You can call this [`Iterator`] until it is exhausted to
     /// get a [`Permit`] and then call [`Permit::send`]. This function is similar to
     /// [`reserve_many`] except it does not await for the slot to become available.
     ///
-    /// Dropping [`ManyPermit`] without sending a message releases the capacity back
+    /// Dropping [`PermitIterator`] without sending a message releases the capacity back
     /// to the channel.
     ///
     /// [`PermitIterator`]: PermitIterator
