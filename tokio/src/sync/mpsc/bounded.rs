@@ -68,7 +68,7 @@ pub struct Permit<'a, T> {
     chan: &'a chan::Tx<T, Semaphore>,
 }
 
-/// An [`Iterator`] of [`Permit`] that can be used to reserve `n` slots in the channel
+/// An [`Iterator`] of [`Permit`] that can be used to reserve `n` slots in the channel.
 ///
 /// `PermitIterator` values are returned by [`Sender::reserve_many()`] and [`Sender::try_reserve_many()`]
 /// and are used to guarantee channel capacity before generating `n` message to send.
@@ -865,16 +865,16 @@ impl<T> Sender<T> {
         Ok(Permit { chan: &self.chan })
     }
 
-    /// Waits for channel capacity. Once capacity to send `n` message is
+    /// Waits for channel capacity. Once capacity to send `n` messages is
     /// available, it is reserved for the caller.
     ///
     /// If the channel is full, the function waits for the number of unreceived
-    /// messages to become less than the channel capacity. Capacity to send `n`
+    /// messages to become `n` less than the channel capacity. Capacity to send `n`
     /// message is reserved for the caller. A [`PermitIterator`] is returned to track
     /// the reserved capacity. You can call this [`Iterator`] until it is exhausted to
     /// get a [`Permit`] and then call [`Permit::send`].
     ///
-    /// Dropping [`PermitIterator`] without sending a message releases the capacity back
+    /// Dropping [`PermitIterator`] without sending all messages releases the capacity back
     /// to the channel.
     ///
     /// [`PermitIterator`]: PermitIterator
