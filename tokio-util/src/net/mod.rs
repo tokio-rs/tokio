@@ -62,36 +62,46 @@ where
     }
 }
 
+impl<L, R> Listener for Either<L, R>
+where
+    L: Listener,
+    R: Listener,
+{
+    type Io = Either<L::Io, R::Io>;
+
+    type Addr = Either<L::Addr, R::Addr>;
+
+    fn poll_accept(&mut self, cx: &mut Context<'_>) -> Poll<Result<(Self::Io, Self::Addr)>> {
+        match self {
+            Self::Left(l) => l
+                .poll_accept(cx)
+                .map(|res| res.map(|(io, addr)| (Either::Left(io), Either::Left(addr)))),
+            Self::Right(r) => r
+                .poll_accept(cx)
+                .map(|res| res.map(|(io, addr)| (Either::Right(io), Either::Right(addr)))),
+        }
+    }
+
+    fn local_addr(&self) -> Result<Self::Addr> {
+        match self {
+            Either::Left(l) => l.local_addr().map(Either::Left),
+            Either::Right(r) => r.local_addr().map(Either::Right),
+        }
+    }
+}
+
 impl<L, R> Either<L, R>
 where
     L: Listener,
     R: Listener,
 {
     /// Accepts a new incoming connection from this listener.
-    pub async fn accept(&mut self) -> Result<Either<(L::Io, L::Addr), (R::Io, R::Addr)>> {
-        match self {
-            Either::Left(listener) => {
-                let (stream, addr) = listener.accept().await?;
-                Ok(Either::Left((stream, addr)))
-            }
-            Either::Right(listener) => {
-                let (stream, addr) = listener.accept().await?;
-                Ok(Either::Right((stream, addr)))
-            }
-        }
+    pub fn accept(&mut self) -> ListenerAcceptFut<'_, Self> {
+        ListenerAcceptFut { listener: self }
     }
 
     /// Returns the local address that this listener is bound to.
     pub fn local_addr(&self) -> Result<Either<L::Addr, R::Addr>> {
-        match self {
-            Either::Left(listener) => {
-                let addr = listener.local_addr()?;
-                Ok(Either::Left(addr))
-            }
-            Either::Right(listener) => {
-                let addr = listener.local_addr()?;
-                Ok(Either::Right(addr))
-            }
-        }
+        Listener::local_addr(self)
     }
 }
