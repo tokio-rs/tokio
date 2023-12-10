@@ -915,11 +915,11 @@ impl<T> Sender<T> {
     ///     assert_eq!(rx.recv().await.unwrap(), 457);
     /// }
     /// ```
-    pub async fn reserve_many(&self, n: u32) -> Result<PermitIterator<'_, T>, SendError<()>> {
+    pub async fn reserve_many(&self, n: usize) -> Result<PermitIterator<'_, T>, SendError<()>> {
         self.reserve_inner(n).await?;
         Ok(PermitIterator {
             chan: &self.chan,
-            n,
+            n: n as u32,
         })
     }
 
@@ -1010,10 +1010,10 @@ impl<T> Sender<T> {
         })
     }
 
-    async fn reserve_inner(&self, n: u32) -> Result<(), SendError<()>> {
+    async fn reserve_inner(&self, n: usize) -> Result<(), SendError<()>> {
         crate::trace::async_trace_leaf().await;
 
-        match self.chan.semaphore().semaphore.acquire(n).await {
+        match self.chan.semaphore().semaphore.acquire(n as u32).await {
             Ok(()) => Ok(()),
             Err(_) => Err(SendError(())),
         }
@@ -1121,8 +1121,8 @@ impl<T> Sender<T> {
     ///
     /// }
     /// ```
-    pub fn try_reserve_many(&self, n: u32) -> Result<PermitIterator<'_, T>, TrySendError<()>> {
-        match self.chan.semaphore().semaphore.try_acquire(n) {
+    pub fn try_reserve_many(&self, n: usize) -> Result<PermitIterator<'_, T>, TrySendError<()>> {
+        match self.chan.semaphore().semaphore.try_acquire(n as u32) {
             Ok(()) => {}
             Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(())),
             Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(())),
@@ -1130,7 +1130,7 @@ impl<T> Sender<T> {
 
         Ok(PermitIterator {
             chan: &self.chan,
-            n,
+            n: n as u32,
         })
     }
 
