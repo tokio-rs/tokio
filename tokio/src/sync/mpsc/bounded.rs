@@ -77,7 +77,7 @@ pub struct Permit<'a, T> {
 /// [`Sender::try_reserve_many()`]: Sender::try_reserve_many
 pub struct PermitIterator<'a, T> {
     chan: &'a chan::Tx<T, Semaphore>,
-    n: u32,
+    n: usize,
 }
 
 /// Owned permit to send one value into the channel.
@@ -919,7 +919,7 @@ impl<T> Sender<T> {
         self.reserve_inner(n).await?;
         Ok(PermitIterator {
             chan: &self.chan,
-            n: n as u32,
+            n,
         })
     }
 
@@ -1013,7 +1013,7 @@ impl<T> Sender<T> {
     async fn reserve_inner(&self, n: usize) -> Result<(), SendError<()>> {
         crate::trace::async_trace_leaf().await;
 
-        match self.chan.semaphore().semaphore.acquire(n as u32).await {
+        match self.chan.semaphore().semaphore.acquire(n).await {
             Ok(()) => Ok(()),
             Err(_) => Err(SendError(())),
         }
@@ -1130,7 +1130,7 @@ impl<T> Sender<T> {
 
         Ok(PermitIterator {
             chan: &self.chan,
-            n: n as u32,
+            n,
         })
     }
 
@@ -1425,7 +1425,7 @@ impl<'a, T> Iterator for PermitIterator<'a, T> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let n = self.n as usize;
+        let n = self.n;
         (n, Some(n))
     }
 }
@@ -1438,7 +1438,7 @@ impl<T> Drop for PermitIterator<'_, T> {
         let semaphore = self.chan.semaphore();
 
         // Add the remaining permits back to the semaphore
-        semaphore.add_permits(self.n as usize);
+        semaphore.add_permits(self.n);
 
         // If this is the last sender for this channel, wake the receiver so
         // that it can be notified that the channel is closed.

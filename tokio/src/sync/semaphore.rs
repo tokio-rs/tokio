@@ -574,7 +574,7 @@ impl Semaphore {
         .await?;
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        self.ll_sem.acquire(n).await?;
+        self.ll_sem.acquire(n as usize).await?;
 
         Ok(SemaphorePermit {
             sem: self,
@@ -771,7 +771,7 @@ impl Semaphore {
             true,
         );
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let inner = self.ll_sem.acquire(n);
+        let inner = self.ll_sem.acquire(n as usize);
 
         inner.await?;
         Ok(OwnedSemaphorePermit {
