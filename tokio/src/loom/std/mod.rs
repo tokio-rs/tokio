@@ -97,7 +97,13 @@ pub(crate) mod sys {
                 assert!(n > 0, "\"{}\" cannot be set to 0", ENV_WORKER_THREADS);
                 n
             }
-            Err(std::env::VarError::NotPresent) => usize::max(1, num_cpus::get()),
+            Err(std::env::VarError::NotPresent) => usize::max(
+                1,
+                std::thread::available_parallelism()
+                    .ok()
+                    .and_then(|el| el.try_into().ok())
+                    .unwrap_or_default(),
+            ),
             Err(std::env::VarError::NotUnicode(e)) => {
                 panic!(
                     "\"{}\" must be valid unicode, error: {:?}",
