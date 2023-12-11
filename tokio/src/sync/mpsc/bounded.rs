@@ -1013,6 +1013,9 @@ impl<T> Sender<T> {
     async fn reserve_inner(&self, n: usize) -> Result<(), SendError<()>> {
         crate::trace::async_trace_leaf().await;
 
+        if n > semaphore::Semaphore::MAX_PERMITS {
+            return Err(SendError(()));
+        }
         match self.chan.semaphore().semaphore.acquire(n).await {
             Ok(()) => Ok(()),
             Err(_) => Err(SendError(())),
@@ -1122,6 +1125,10 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub fn try_reserve_many(&self, n: usize) -> Result<PermitIterator<'_, T>, TrySendError<()>> {
+        if n > semaphore::Semaphore::MAX_PERMITS {
+            return Err(TrySendError::Full(()));
+        }
+
         match self.chan.semaphore().semaphore.try_acquire(n) {
             Ok(()) => {}
             Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(())),
