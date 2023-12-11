@@ -262,13 +262,13 @@ impl Semaphore {
         self.permits.load(Acquire) & Self::CLOSED == Self::CLOSED
     }
 
-    pub(crate) fn try_acquire(&self, num_permits: u32) -> Result<(), TryAcquireError> {
+    pub(crate) fn try_acquire(&self, num_permits: usize) -> Result<(), TryAcquireError> {
         assert!(
-            num_permits as usize <= Self::MAX_PERMITS,
+            num_permits <= Self::MAX_PERMITS,
             "a semaphore may not have more than MAX_PERMITS permits ({})",
             Self::MAX_PERMITS
         );
-        let num_permits = (num_permits as usize) << Self::PERMIT_SHIFT;
+        let num_permits = num_permits << Self::PERMIT_SHIFT;
         let mut curr = self.permits.load(Acquire);
         loop {
             // Has the semaphore closed?
@@ -642,7 +642,7 @@ impl<'a> Acquire<'a> {
 
             is_unpin::<&Semaphore>();
             is_unpin::<&mut bool>();
-            is_unpin::<u32>();
+            is_unpin::<usize>();
 
             let this = self.get_unchecked_mut();
             (

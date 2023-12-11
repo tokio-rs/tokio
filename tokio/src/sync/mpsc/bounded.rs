@@ -1122,7 +1122,7 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub fn try_reserve_many(&self, n: usize) -> Result<PermitIterator<'_, T>, TrySendError<()>> {
-        match self.chan.semaphore().semaphore.try_acquire(n as u32) {
+        match self.chan.semaphore().semaphore.try_acquire(n) {
             Ok(()) => {}
             Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(())),
             Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(())),

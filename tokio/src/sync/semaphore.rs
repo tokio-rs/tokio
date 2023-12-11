@@ -646,7 +646,7 @@ impl Semaphore {
     /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
     /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
     pub fn try_acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, TryAcquireError> {
-        match self.ll_sem.try_acquire(n) {
+        match self.ll_sem.try_acquire(n as usize) {
             Ok(()) => Ok(SemaphorePermit {
                 sem: self,
                 permits: n,
@@ -855,7 +855,7 @@ impl Semaphore {
         self: Arc<Self>,
         n: u32,
     ) -> Result<OwnedSemaphorePermit, TryAcquireError> {
-        match self.ll_sem.try_acquire(n) {
+        match self.ll_sem.try_acquire(n as usize) {
             Ok(()) => Ok(OwnedSemaphorePermit {
                 sem: self,
                 permits: n,
