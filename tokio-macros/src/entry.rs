@@ -507,7 +507,7 @@ impl ItemFn {
 
         // Inner attributes require extra care, since they're not supported on
         // blocks (which is what we're expanded into) we instead lift them
-        // outside of the function. This matches the behaviour of `syn`.
+        // outside of the function. This matches the behavior of `syn`.
         for mut attr in self.inner_attrs {
             attr.style = syn::AttrStyle::Outer;
             attr.to_tokens(&mut tokens);
