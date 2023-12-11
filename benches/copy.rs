@@ -29,7 +29,7 @@ const WRITE_SERVICE_PERIOD: Duration = Duration::from_millis(20);
 // because another writer claimed the buffer space
 const PROBABILITY_FLUSH_WAIT: f64 = 0.1;
 
-/// A slow writer that aims to simulate HDD behaviour under heavy load.
+/// A slow writer that aims to simulate HDD behavior under heavy load.
 ///
 /// There is a limited buffer, which is fully drained on the next write after
 /// a time limit is reached. Flush waits for the time limit to be reached
