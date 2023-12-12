@@ -747,7 +747,7 @@ impl Command {
     /// tokio's MSRV is sufficiently new. See [the documentation on
     /// unstable features][unstable] for details about using unstable features.
     ///
-    /// If you want similar behaviour without using this unstable feature you can
+    /// If you want similar behavior without using this unstable feature you can
     /// create a [`std::process::Command`] and convert that into a
     /// [`tokio::process::Command`] using the `From` trait.
     ///
