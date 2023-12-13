@@ -545,6 +545,36 @@ async fn try_reserve_fails() {
     let _permit = tx.try_reserve().unwrap();
 }
 
+#[maybe_tokio_test]
+async fn try_reserve_many_fails() {
+	for i in 4..20 {
+		let (tx, mut rx) = mpsc::channel(i);
+
+		let mut permit = tx.try_reserve_many(i - 2).unwrap();
+
+		// This should fail, there is only two remaining permits
+		match assert_err!(tx.try_reserve_many(3)) {
+			TrySendError::Full(()) => {}
+			_ => panic!(),
+		}
+
+		permit.next().unwrap().send("foo");
+		permit.next().unwrap().send("foo");
+		
+		assert_eq!(rx.recv().await, Some("foo"));
+		assert_eq!(rx.recv().await, Some("foo"));
+		
+		// There are now 4 remaining permits because of the 2 sends/recv
+		let _permit = tx.try_reserve_many(4).unwrap();
+
+		// Dropping permit iterator releases the remaining slots.
+		drop(permit);
+		drop(_permit);
+
+		let _permit = tx.try_reserve_many(i).unwrap();
+	}
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn drop_permit_releases_permit() {
