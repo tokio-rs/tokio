@@ -687,7 +687,9 @@ impl CoreGuard<'_> {
                         None => {
                             core.metrics.end_processing_scheduled_tasks();
 
-                            core = if !context.defer.is_empty() {
+                            core = if handle.shared.config.poll_mode { 
+                                context.park_yield(core, handle)
+                            } else if !context.defer.is_empty() {
                                 context.park_yield(core, handle)
                             } else {
                                 context.park(core, handle)

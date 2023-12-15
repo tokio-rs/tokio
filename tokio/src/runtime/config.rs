@@ -40,4 +40,7 @@ pub(crate) struct Config {
     #[cfg(tokio_unstable)]
     /// How to respond to unhandled task panics.
     pub(crate) unhandled_panic: crate::runtime::UnhandledPanic,
+
+    /// Polling mode for the driver(io, time, parkthread), maybe 100% cpu usage.
+    pub(crate) poll_mode: bool,
 }

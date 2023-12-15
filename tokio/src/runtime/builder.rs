@@ -111,6 +111,10 @@ pub struct Builder {
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
+
+    /// Whether or not to enable the poll mode.
+    /// Poll continuously maybe  100% cpu use
+    pub(super) poll_mode: bool,
 }
 
 cfg_unstable! {
@@ -315,6 +319,9 @@ impl Builder {
             metrics_poll_count_histogram: Default::default(),
 
             disable_lifo_slot: false,
+
+            // poll_mode  defaults to "off"
+            poll_mode: false,
         }
     }
 
@@ -1109,6 +1116,7 @@ impl Builder {
                 disable_lifo_slot: self.disable_lifo_slot,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                poll_mode: self.poll_mode,
             },
         );
 
@@ -1129,6 +1137,29 @@ impl Builder {
         } else {
             None
         }
+    }
+
+    /// The poll mode for any tokio current thread runtime with/without resources
+    /// driver.
+    ///
+    /// Doing this enables busy poll, not sleep wait for event.
+    ///
+    /// Default disable, call this enable poll mode.
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .poll_mode()
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    pub fn poll_mode(&mut self) -> &mut Self {
+        if matches!(self.kind, Kind::CurrentThread) {
+            self.poll_mode = true;
+        }
+        self
     }
 }
 
@@ -1260,6 +1291,7 @@ cfg_rt_multi_thread! {
                     disable_lifo_slot: self.disable_lifo_slot,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                    poll_mode: self.poll_mode,
                 },
             );
 
