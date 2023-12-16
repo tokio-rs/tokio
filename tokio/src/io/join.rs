@@ -72,7 +72,7 @@ where
 
 impl<R, W> AsyncRead for Join<R, W>
 where
-    R: AsyncRead + Unpin,
+    R: AsyncRead,
 {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -85,7 +85,7 @@ where
 
 impl<R, W> AsyncWrite for Join<R, W>
 where
-    W: AsyncWrite + Unpin,
+    W: AsyncWrite,
 {
     fn poll_write(
         self: Pin<&mut Self>,
