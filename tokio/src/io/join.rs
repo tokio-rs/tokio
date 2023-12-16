@@ -2,7 +2,6 @@
 
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-use std::fmt;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -20,6 +19,7 @@ where
 pin_project_lite::pin_project! {
     /// Joins two values implementing `AsyncRead` and `AsyncWrite` into a
     /// single handle.
+    #[derive(Debug)]
     pub struct Join<R, W> {
         #[pin]
         reader: R,
@@ -113,18 +113,5 @@ where
 
     fn is_write_vectored(&self) -> bool {
         self.writer.is_write_vectored()
-    }
-}
-
-impl<R, W> fmt::Debug for Join<R, W>
-where
-    R: fmt::Debug,
-    W: fmt::Debug,
-{
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Join")
-            .field("writer", &self.writer)
-            .field("reader", &self.reader)
-            .finish()
     }
 }
