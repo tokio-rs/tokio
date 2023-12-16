@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support panic recovery
+#![cfg(feature = "full")]
 
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, Join, ReadBuf};
+use tokio::io::{join, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, Join, ReadBuf};
 
 use std::io;
 use std::pin::Pin;
@@ -61,7 +61,7 @@ fn is_send_and_sync() {
 
 #[test]
 fn method_delegation() {
-    let mut rw = Join::new(R, W);
+    let mut rw = join(R, W);
     let mut buf = [0; 1];
 
     tokio_test::block_on(async move {
