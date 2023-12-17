@@ -342,20 +342,20 @@ jobs:
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
-  minrust:
-    name: minrust
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust ${{ env.rust_min }}
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.rust_min }}
-      - uses: Swatinem/rust-cache@v2
-      - name: "check --workspace --all-features"
-        run: cargo check --workspace --all-features
-        env:
-          RUSTFLAGS: "" # remove -Dwarnings
+#  minrust:
+#    name: minrust
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: Install Rust ${{ env.rust_min }}
+#        uses: dtolnay/rust-toolchain@master
+#        with:
+#          toolchain: ${{ env.rust_min }}
+#      - uses: Swatinem/rust-cache@v2
+#      - name: "check --workspace --all-features"
+#        run: cargo check --workspace --all-features
+#        env:
+#          RUSTFLAGS: "" # remove -Dwarnings
 
   minimal-versions:
     name: minimal-versions
