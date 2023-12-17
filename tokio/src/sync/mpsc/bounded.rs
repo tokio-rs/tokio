@@ -1121,12 +1121,26 @@ impl<T> Sender<T> {
     ///     // The value sent on the permit is received
     ///     assert_eq!(rx.recv().await.unwrap(), 456);
     ///     assert_eq!(rx.recv().await.unwrap(), 457);
+    ///     
+    ///     // Trying to call try_reserve_many with 0 will return an empty iterator
+    ///     let mut permit = tx.try_reserve_many(0).unwrap();
+    ///     assert!(permit.next().is_none());
     ///
+    ///     // Trying to call try_reserve_many with a number greater than the channel
+    ///     // capacity will return an error
+    ///     let permit = tx.try_reserve_many(3);
+    ///     assert!(permit.is_err());
     /// }
     /// ```
     pub fn try_reserve_many(&self, n: usize) -> Result<PermitIterator<'_, T>, TrySendError<()>> {
         if n > self.max_capacity() {
             return Err(TrySendError::Full(()));
+        }
+        if n == 0 {
+            return Ok(PermitIterator {
+                chan: &self.chan,
+                n,
+            });
         }
 
         match self.chan.semaphore().semaphore.try_acquire(n) {
