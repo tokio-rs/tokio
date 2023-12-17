@@ -550,7 +550,7 @@ async fn try_reserve_many_fails() {
     for i in 4..20 {
         let (tx, mut rx) = mpsc::channel(i);
 
-        let mut permit = tx.try_reserve_many(i - 2).unwrap();
+        let mut permit = assert_ok!(tx.try_reserve_many(i - 2));
 
         // This should fail, there is only two remaining permits
         match assert_err!(tx.try_reserve_many(3)) {
@@ -565,13 +565,13 @@ async fn try_reserve_many_fails() {
         assert_eq!(rx.recv().await, Some("foo"));
 
         // There are now 4 remaining permits because of the 2 sends/recv
-        let _permit = tx.try_reserve_many(4).unwrap();
+        let _permit = assert_ok!(tx.try_reserve_many(4));
 
         // Dropping permit iterator releases the remaining slots.
         drop(permit);
         drop(_permit);
 
-        let _permit = tx.try_reserve_many(i).unwrap();
+        let _permit = assert_ok!(tx.try_reserve_many(i));
     }
 }
 
