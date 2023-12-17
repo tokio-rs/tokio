@@ -53,18 +53,18 @@ tokio_thread_local! {
             #[cfg(feature = "rt")]
             thread_id: Cell::new(None),
 
-            /// Tracks the current runtime handle to use when spawning,
-            /// accessing drivers, etc...
+            // Tracks the current runtime handle to use when spawning,
+            // accessing drivers, etc...
             #[cfg(feature = "rt")]
             handle: RefCell::new(None),
             #[cfg(feature = "rt")]
             current_task_id: Cell::new(None),
 
-            /// Tracks if the current thread is currently driving a runtime.
-            /// Note, that if this is set to "entered", the current scheduler
-            /// handle may not reference the runtime currently executing. This
-            /// is because other runtime handles may be set to current from
-            /// within a runtime.
+            // Tracks if the current thread is currently driving a runtime.
+            // Note, that if this is set to "entered", the current scheduler
+            // handle may not reference the runtime currently executing. This
+            // is because other runtime handles may be set to current from
+            // within a runtime.
             #[cfg(feature = "rt")]
             runtime: Cell::new(EnterRuntime::NotEntered),
 
