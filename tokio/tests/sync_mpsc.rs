@@ -571,11 +571,11 @@ async fn try_reserve_many_fails() {
         drop(permit1);
         drop(permit2);
 
-		// It is possible to reserve all the permits
+        // It is possible to reserve all the permits
         assert_ok!(tx.try_reserve_many(i));
-		
+
         // This should fail because the channel is closed
-		drop(rx);
+        drop(rx);
         match assert_err!(tx.try_reserve_many(3)) {
             TrySendError::Closed(()) => {}
             _ => panic!(),
@@ -585,14 +585,14 @@ async fn try_reserve_many_fails() {
 
 #[maybe_tokio_test]
 async fn reserve_many_and_send() {
-	let (tx, mut rx) = mpsc::channel(100);
-	for i in 1..100 {
-		for permit in assert_ok!(tx.reserve_many(i).await) {
-			permit.send("foo");
-			assert_eq!(rx.recv().await, Some("foo"));
-		}
-		assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
-	}
+    let (tx, mut rx) = mpsc::channel(100);
+    for i in 1..100 {
+        for permit in assert_ok!(tx.reserve_many(i).await) {
+            permit.send("foo");
+            assert_eq!(rx.recv().await, Some("foo"));
+        }
+        assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
+    }
 }
 
 #[tokio::test]
@@ -642,7 +642,7 @@ async fn dropping_rx_closes_channel() {
 
     drop(rx);
     assert_err!(tx.reserve().await);
-	assert_err!(tx.reserve_many(10).await);
+    assert_err!(tx.reserve_many(10).await);
     assert_eq!(1, Arc::strong_count(&msg));
 }
 
