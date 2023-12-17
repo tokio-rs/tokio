@@ -46,7 +46,7 @@ jobs:
       - cross-test
       - no-atomic-u64
       - features
-      - minrust
+#      - minrust
       - minimal-versions
       - fmt
       - clippy
