@@ -1990,6 +1990,16 @@ impl UdpSocket {
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.io.take_error()
     }
+
+    /// Creates a new independently owned handle to the underlying socket.
+    ///
+    /// Cloned sockets don't share wakers, allowing multiple tasks to perform I/O in the same
+    /// direction concurrently.
+    ///
+    /// See [`std::net::UdpSocket::try_clone`] for further details.
+    pub fn try_clone(&self) -> io::Result<Self> {
+        Self::from_std(self.as_socket().try_clone()?.into())
+    }
 }
 
 impl TryFrom<std::net::UdpSocket> for UdpSocket {
