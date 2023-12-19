@@ -153,6 +153,16 @@
 [#6056]: https://github.com/tokio-rs/tokio/pull/6056
 [#6058]: https://github.com/tokio-rs/tokio/pull/6058
 
+# 1.32.1 (December 19, 2023)
+
+This is a forward part of a change that was backported to 1.25.3.
+
+### Fixed
+
+- io: add budgeting to `tokio::runtime::io::registration::async_io` ([#6221])
+
+[#6221]: https://github.com/tokio-rs/tokio/pull/6221
+
 # 1.32.0 (August 16, 2023)
 
 ### Fixed
@@ -514,6 +524,13 @@ This release bumps the MSRV of Tokio to 1.56. ([#5559])
 [#5511]: https://github.com/tokio-rs/tokio/pull/5511
 [#5513]: https://github.com/tokio-rs/tokio/pull/5513
 [#5517]: https://github.com/tokio-rs/tokio/pull/5517
+
+# 1.25.3 (December 17th, 2023)
+
+### Fixed
+- io: add budgeting to `tokio::runtime::io::registration::async_io` ([#6221])
+
+[#6221]: https://github.com/tokio-rs/tokio/pull/6221
 
 # 1.25.2 (September 22, 2023)
 
