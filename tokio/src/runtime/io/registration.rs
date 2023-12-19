@@ -219,11 +219,16 @@ impl Registration {
         loop {
             let event = self.readiness(interest).await?;
 
+            let coop = crate::future::poll_fn(crate::runtime::coop::poll_proceed).await;
+
             match f() {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.clear_readiness(event);
                 }
-                x => return x,
+                x => {
+                    coop.made_progress();
+                    return x;
+                }
             }
         }
     }
