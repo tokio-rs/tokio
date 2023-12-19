@@ -1,3 +1,13 @@
+# 1.32.1 (December 19, 2023)
+
+This is a forward part of a change that was backported to 1.25.3.
+
+### Fixed
+
+- io: add budgeting to `tokio::runtime::io::registration::async_io` ([#6221])
+
+[#6221]: https://github.com/tokio-rs/tokio/pull/6221
+
 # 1.32.0 (August 16, 2023)
 
 ### Fixed
