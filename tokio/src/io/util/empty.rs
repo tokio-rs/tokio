@@ -92,19 +92,25 @@ impl AsyncWrite for Empty {
     #[inline]
     fn poll_write(
         self: Pin<&mut Self>,
-        _: &mut Context<'_>,
+        cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(buf.len()))
     }
 
     #[inline]
-    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }
 
     #[inline]
-    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }
 
@@ -116,9 +122,11 @@ impl AsyncWrite for Empty {
     #[inline]
     fn poll_write_vectored(
         self: Pin<&mut Self>,
-        _: &mut Context<'_>,
+        cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<Result<usize, io::Error>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
         let num_bytes = bufs.iter().map(|b| b.len()).sum();
         Poll::Ready(Ok(num_bytes))
     }
