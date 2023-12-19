@@ -265,6 +265,8 @@ cfg_io_std! {
 cfg_io_util! {
     mod split;
     pub use split::{split, ReadHalf, WriteHalf};
+    mod join;
+    pub use join::{join, Join};
 
     pub(crate) mod seek;
     pub(crate) mod util;
