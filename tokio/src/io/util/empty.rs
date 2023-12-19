@@ -107,6 +107,21 @@ impl AsyncWrite for Empty {
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         Poll::Ready(Ok(()))
     }
+
+    #[inline]
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<Result<usize, io::Error>> {
+        let num_bytes = bufs.iter().map(|b| b.len()).sum();
+        Poll::Ready(Ok(num_bytes))
+    }
 }
 
 impl fmt::Debug for Empty {
