@@ -360,6 +360,13 @@ This release bumps the MSRV of Tokio to 1.56. ([#5559])
 [#5513]: https://github.com/tokio-rs/tokio/pull/5513
 [#5517]: https://github.com/tokio-rs/tokio/pull/5517
 
+# 1.25.3 (December 17th, 2023)
+
+### Fixed
+- io: add budgeting to `tokio::runtime::io::registration::async_io` ([#6221])
+
+[#6221]: https://github.com/tokio-rs/tokio/pull/6221
+
 # 1.25.2 (September 22, 2023)
 
 Forward ports 1.20.6 changes.
