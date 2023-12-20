@@ -187,7 +187,7 @@ fn wake_in_drop_after_panic() {
 
     impl Drop for WakeOnDrop {
         fn drop(&mut self) {
-            self.0.take().unwrap().send(()).unwrap();
+            let _ = self.0.take().unwrap().send(());
         }
     }
 
