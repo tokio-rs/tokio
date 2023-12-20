@@ -354,6 +354,67 @@ impl<T> UnboundedReceiver<T> {
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
     }
+
+    /// Polls to receive multiple messages on this channel, filling the provided buffer up to a specified limit.
+    ///
+    /// This method attempts to receive messages from the channel and store them in the provided buffer.
+    /// The number of messages received is limited by the `limit` parameter.
+    /// # Examples
+    ///
+    /// ```
+    /// use std::task::{Context, Poll};
+    /// use std::pin::Pin;
+    /// use tokio::sync::mpsc;
+    /// use futures::Future;
+    ///
+    /// struct MyReceiverFuture<'a> {
+    ///     receiver: mpsc::UnboundedReceiver<i32>,
+    ///     buffer: &'a mut Vec<i32>,
+    ///     limit: usize,
+    /// }
+    ///
+    /// impl<'a> Future for MyReceiverFuture<'a> {
+    ///     type Output = usize; // Number of messages received
+    ///
+    ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    ///         let MyReceiverFuture { receiver, buffer, limit } = &mut *self;
+    ///
+    ///         // Now `receiver` and `buffer` are mutable references, and `limit` is copied
+    ///         match receiver.poll_recv_many(cx, *buffer, *limit) {
+    ///             Poll::Pending => Poll::Pending,
+    ///             Poll::Ready(count) => Poll::Ready(count),
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::unbounded_channel::<i32>();
+    ///     let mut buffer = Vec::new();
+    ///
+    ///     let my_receiver_future = MyReceiverFuture {
+    ///         receiver: rx,
+    ///         buffer: &mut buffer,
+    ///         limit: 3,
+    ///     };
+    ///
+    ///     for i in 0..10 {
+    ///         tx.send(i).expect("Unable to send integer");
+    ///     }
+    ///
+    ///     let count = my_receiver_future.await;
+    ///     assert_eq!(count, 3);
+    ///     assert_eq!(buffer, vec![0,1,2])
+    /// }
+    /// ```
+    pub fn poll_recv_many(
+        &mut self,
+        cx: &mut Context<'_>,
+        buffer: &mut Vec<T>,
+        limit: usize,
+    ) -> Poll<usize> {
+        self.chan.recv_many(cx, buffer, limit)
+    }
 }
 
 impl<T> UnboundedSender<T> {
