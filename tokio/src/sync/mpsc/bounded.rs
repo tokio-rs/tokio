@@ -476,10 +476,24 @@ impl<T> Receiver<T> {
         self.chan.recv(cx)
     }
 
-    /// Polls to receive multiple messages on this channel, filling the provided buffer up to a specified limit.
+    /// Polls to receive multiple messages on this channel, extending the provided buffer.
     ///
-    /// This method attempts to receive messages from the channel and store them in the provided buffer.
-    /// The number of messages received is limited by the `limit` parameter.
+    /// This method attempts to receive messages from the channel and store them in the provided buffer,
+    /// up to the specified `limit`. It behaves similarly to `poll_recv` but for multiple messages.
+    ///
+    /// This method returns:
+    /// * `Poll::Pending` if no messages are available but the channel is not closed, or if a
+    ///   spurious failure happens. In such cases, the `Waker` from the `Context` is scheduled
+    ///   to be woken up when new messages are sent on the channel or when the channel is closed.
+    /// * `Poll::Ready(count)` where `count` is the number of messages successfully received and
+    ///   stored in `buffer`. This can be less than, or equal to, `limit`. If the channel is closed
+    ///   and there are no more messages to receive, `count` will be the number of messages received
+    ///   before the channel was closed, which could be zero.
+    ///
+    /// Note that this method does not guarantee that the buffer will be filled up to `limit` on each call,
+    /// especially if fewer messages are available. Also, the actual number of messages received can be
+    /// zero if the channel is empty or closed.
+    ///
     /// # Examples
     ///
     /// ```
