@@ -164,26 +164,26 @@ where
     }
 }
 
-impl<L, R, T> futures_sink::Sink<T> for Either<L, R>
+impl<L, R, Item> futures_sink::Sink<Item> for Either<L, R>
 where
-    L: futures_sink::Sink<T>,
-    R: futures_sink::Sink<T>,
+    L: futures_sink::Sink<Item>,
+    R: futures_sink::Sink<Item>,
 {
     type Error = L::Error;
 
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         delegate_call!(self.poll_ready(cx))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: Item) -> Result<()> {
         delegate_call!(self.start_send(item))
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         delegate_call!(self.poll_flush(cx))
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         delegate_call!(self.poll_close(cx))
     }
 }
