@@ -485,7 +485,7 @@ impl<T> Receiver<T> {
     /// This method also shares similarities with `recv_many`, including its behavior in response to channel closure
     /// and message availability. For `limit > 0`, if there are no messages in the channel's queue,
     /// but the channel has not yet been closed, this method will sleep until a message is sent or
-    /// the channel is closed. The channel is  closed when all senders have been dropped, or when [`close`] is called.
+    /// the channel is closed. The channel is  closed when all senders have been dropped, or when `close` is called.
     ///
     /// This method returns:
     /// * `Poll::Pending` if no messages are available but the channel is not closed, or if a
