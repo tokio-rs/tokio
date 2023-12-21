@@ -164,6 +164,31 @@ where
     }
 }
 
+impl<L, R, T> futures_sink::Sink<T> for Either<L, R>
+where
+    L: futures_sink::Sink<T>,
+    R: futures_sink::Sink<T>,
+{
+    type Error = L::Error;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        delegate_call!(self.poll_ready(cx))
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        delegate_call!(self.start_send(item))
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        delegate_call!(self.poll_flush(cx))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        delegate_call!(self.poll_close(cx))
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
