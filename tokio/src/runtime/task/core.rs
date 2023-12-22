@@ -124,6 +124,8 @@ pub(super) enum Stage<T: Future> {
 impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
+    // Ignore. Return type is reasonable.
+    #[allow(clippy::new_ret_no_self)]
     pub(super) fn new(future: T, scheduler: S, state: State, task_id: Id) -> TaskBox<T, S> {
         // Separated into a non-generic function to reduce LLVM codegen
         fn new_header(
