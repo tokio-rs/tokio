@@ -171,7 +171,10 @@ where
 {
     type Error = Error;
 
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), Self::Error>> {
         delegate_call!(self.poll_ready(cx))
     }
 
@@ -179,15 +182,20 @@ where
         delegate_call!(self.start_send(item))
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), Self::Error>> {
         delegate_call!(self.poll_flush(cx))
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
+    fn poll_close(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), Self::Error>> {
         delegate_call!(self.poll_close(cx))
     }
 }
-
 
 #[cfg(test)]
 mod tests {
