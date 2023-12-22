@@ -1451,6 +1451,7 @@ impl<'a, T> Iterator for PermitIterator<'a, T> {
     }
 }
 impl<T> ExactSizeIterator for PermitIterator<'_, T> {}
+impl<T> FusedIterator for PermitIterator<'_, T> {}
 
 impl<T> Drop for PermitIterator<'_, T> {
     fn drop(&mut self) {
