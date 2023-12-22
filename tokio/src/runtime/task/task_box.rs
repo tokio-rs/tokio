@@ -1,10 +1,10 @@
 //! Helper module for allocating and deallocating tasks.
 
+use crate::future::Future;
 use crate::runtime::task::core::{Cell, Core, Header, Trailer};
 use crate::runtime::task::Schedule;
 
 use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
-use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::{align_of, size_of, ManuallyDrop};
 use std::ptr::{drop_in_place, NonNull};
