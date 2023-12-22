@@ -279,7 +279,7 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     ///
     /// This is used by the multi-threaded runtime to avoid false sharing.
     ///
-    /// The same scheduler must always return the same value.
+    /// The same scheduler must always return the same value. It should be a power of two.
     fn min_align(&self) -> usize {
         1
     }
