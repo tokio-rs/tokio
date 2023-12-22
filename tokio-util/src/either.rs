@@ -164,12 +164,12 @@ where
     }
 }
 
-impl<L, R, Item> futures_sink::Sink<Item> for Either<L, R>
+impl<L, R, Item, Error> futures_sink::Sink<Item> for Either<L, R>
 where
-    L: futures_sink::Sink<Item>,
-    R: futures_sink::Sink<Item>,
+    L: futures_sink::Sink<Item, Error = Error>,
+    R: futures_sink::Sink<Item, Error = Error>,
 {
-    type Error = L::Error;
+    type Error = Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         delegate_call!(self.poll_ready(cx))
