@@ -200,6 +200,9 @@ pub(crate) use self::raw::RawTask;
 mod state;
 use self::state::State;
 
+mod task_box;
+use self::task_box::TaskBox;
+
 mod waker;
 
 cfg_taskdump! {
@@ -270,6 +273,15 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     /// other tasks.
     fn yield_now(&self, task: Notified<Self>) {
         self.schedule(task);
+    }
+
+    /// The minimum alignment for tasks spawned on this runtime.
+    ///
+    /// This is used by the multi-threaded runtime to avoid false sharing.
+    ///
+    /// The same scheduler must always return the same value.
+    fn min_align(&self) -> usize {
+        1
     }
 
     /// Polling the task resulted in a panic. Should the runtime shutdown?

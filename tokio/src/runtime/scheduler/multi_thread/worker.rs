@@ -1014,6 +1014,17 @@ impl task::Schedule for Arc<Handle> {
     fn yield_now(&self, task: Notified) {
         self.schedule_task(task, true);
     }
+
+    fn min_align(&self) -> usize {
+        use crate::util::cacheline::CachePadded;
+
+        // One for single-threaded runtime, otherwise use a high value to avoid
+        // false sharing.
+        match self.shared.remotes.len() {
+            1 => 1,
+            _ => std::mem::align_of::<CachePadded<()>>(),
+        }
+    }
 }
 
 impl Handle {
