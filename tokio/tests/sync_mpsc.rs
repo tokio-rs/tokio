@@ -586,7 +586,7 @@ async fn try_reserve_many_fails() {
 #[maybe_tokio_test]
 async fn reserve_many_and_send() {
     let (tx, mut rx) = mpsc::channel(100);
-    for i in 1..100 {
+    for i in 0..100 {
         for permit in assert_ok!(tx.reserve_many(i).await) {
             permit.send("foo");
             assert_eq!(rx.recv().await, Some("foo"));
