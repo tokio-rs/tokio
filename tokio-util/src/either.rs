@@ -169,21 +169,21 @@ where
     L: futures_sink::Sink<Item, Error = Error>,
     R: futures_sink::Sink<Item, Error = Error>,
 {
-    type Error = Error;
+    type Error = L::Error;
 
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
         delegate_call!(self.poll_ready(cx))
     }
 
-    fn start_send(self: Pin<&mut Self>, item: Item) -> Result<()> {
+    fn start_send(self: Pin<&mut Self>, item: Item) -> Result<(), Error> {
         delegate_call!(self.start_send(item))
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
         delegate_call!(self.poll_flush(cx))
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
         delegate_call!(self.poll_close(cx))
     }
 }
