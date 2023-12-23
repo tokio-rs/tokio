@@ -883,9 +883,9 @@ impl<T> Sender<T> {
     ///
     /// # Cancel safety
     ///
-    /// This channel uses a queue to ensure that calls to `send` and `reserve`
+    /// This channel uses a queue to ensure that calls to `send` and `reserve_many`
     /// complete in the order they were requested. Cancelling a call to
-    /// `reserve` makes you lose your place in the queue.
+    /// `reserve_many` makes you lose your place in the queue.
     ///
     /// # Examples
     ///
