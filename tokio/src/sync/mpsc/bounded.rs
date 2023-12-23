@@ -1019,9 +1019,6 @@ impl<T> Sender<T> {
     async fn reserve_inner(&self, n: usize) -> Result<(), SendError<()>> {
         crate::trace::async_trace_leaf().await;
 
-        if n == 0 {
-            return Ok(());
-        }
         if n > self.max_capacity() {
             return Err(SendError(()));
         }
