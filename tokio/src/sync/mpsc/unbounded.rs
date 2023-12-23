@@ -357,27 +357,20 @@ impl<T> UnboundedReceiver<T> {
 
     /// Polls to receive multiple messages on this channel, extending the provided buffer.
     ///
-    /// This method attempts to receive messages from the channel and store them in the provided buffer,
-    /// up to the specified `limit`. It behaves similarly to `poll_recv` but for multiple messages. If `limit`
-    /// is zero, the function returns immediately with `0`.
-    ///
-    /// This method also shares similarities with `recv_many`, including its behavior in response to channel closure
-    /// and message availability. For `limit > 0`, if there are no messages in the channel's queue,
-    /// but the channel has not yet been closed, this method will sleep until a message is sent or
-    /// the channel is closed. The channel is  closed when all senders have been dropped, or when `close` is called.
-    ///
     /// This method returns:
     /// * `Poll::Pending` if no messages are available but the channel is not closed, or if a
-    ///   spurious failure happens. In such cases, the `Waker` from the `Context` is scheduled
-    ///   to be woken up when new messages are sent on the channel or when the channel is closed.
+    ///   spurious failure happens.
     /// * `Poll::Ready(count)` where `count` is the number of messages successfully received and
-    ///   stored in `buffer`. This can be less than, or equal to, `limit`. If the channel is closed
-    ///   and there are no more messages to receive, `count` will be the number of messages received
-    ///   before the channel was closed, which could be zero.
+    ///   stored in `buffer`. This can be less than, or equal to, `limit`.
+    /// * `Poll::Ready(0)` if `limit` is set to zero or when the channel is closed.
     ///
-    /// Note that this method does not guarantee that the buffer will be filled up to `limit` on each call,
-    /// especially if fewer messages are available. Also, the actual number of messages received can be
-    /// zero if the channel is empty or closed.
+    /// When the method returns `Poll::Pending`, the `Waker` from the `Context` is scheduled
+    /// to be woken up when new messages are sent on the channel or when the channel is closed.
+    ///
+    /// Note that this method does not guarantee that exactly `limit` messages
+    /// are received. Rather, if at least one message is available, it returns
+    /// as many messages as it can up to the given limit. This method returns
+    /// zero only if the channel is closed (or if `limit` is zero).
     ///
     /// # Examples
     ///
