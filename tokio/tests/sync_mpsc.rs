@@ -595,6 +595,25 @@ async fn reserve_many_and_send() {
     }
 }
 
+#[maybe_tokio_test]
+async fn reserve_many_on_closed_channel() {
+	let (tx, rx) = mpsc::channel::<()>(100);
+	drop(rx);
+	assert_err!(tx.reserve_many(10).await);
+	match assert_err!(tx.try_reserve_many(10)) {
+		TrySendError::Closed(()) => {}
+		_ => panic!(),
+	};
+
+	let (tx, rx) = mpsc::channel::<()>(100);
+	drop(rx);
+	assert_err!(tx.reserve_many(0).await);
+	match assert_err!(tx.try_reserve_many(0)) {
+		TrySendError::Closed(()) => {}
+		_ => panic!(),
+	};
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn drop_permit_releases_permit() {
