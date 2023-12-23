@@ -633,7 +633,7 @@ async fn drop_permit_releases_permit() {
     assert_ready_ok!(reserve2.poll());
 }
 
-#[tokio::test]
+#[maybe_tokio_test]
 #[cfg(feature = "full")]
 async fn drop_permit_iterator_releases_permits() {
     // poll_ready reserves capacity, ensure that the capacity is released if tx
