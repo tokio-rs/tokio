@@ -263,7 +263,7 @@ fn stall() {
 }
 
 criterion_group!(
-    scheduler,
+    rt_multi_scheduler,
     spawn_many_local,
     spawn_many_remote_idle,
     spawn_many_remote_busy1,
@@ -273,4 +273,4 @@ criterion_group!(
     chained_spawn,
 );
 
-criterion_main!(scheduler);
+criterion_main!(rt_multi_scheduler);
