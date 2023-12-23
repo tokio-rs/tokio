@@ -873,6 +873,8 @@ impl<T> Sender<T> {
     /// message is reserved for the caller. A [`PermitIterator`] is returned to track
     /// the reserved capacity. You can call this [`Iterator`] until it is exhausted to
     /// get a [`Permit`] and then call [`Permit::send`].
+	/// 
+	/// If the channel is closed, the function returns a [`SendError`].
     ///
     /// Dropping [`PermitIterator`] without sending all messages releases the capacity back
     /// to the channel.
@@ -1130,6 +1132,14 @@ impl<T> Sender<T> {
     ///     // capacity will return an error
     ///     let permit = tx.try_reserve_many(3);
     ///     assert!(permit.is_err());
+	/// 
+	/// 	// Trying to call try_reserve_many on a closed channel will return an error
+	/// 	drop(rx);
+	/// 	let permit = tx.try_reserve_many(1);
+	/// 	assert!(permit.is_err());
+	/// 
+	/// 	let permit = tx.try_reserve_many(0);
+	/// 	assert!(permit.is_err());
     /// }
     /// ```
     pub fn try_reserve_many(&self, n: usize) -> Result<PermitIterator<'_, T>, TrySendError<()>> {
@@ -1451,7 +1461,7 @@ impl<'a, T> Iterator for PermitIterator<'a, T> {
     }
 }
 impl<T> ExactSizeIterator for PermitIterator<'_, T> {}
-impl<T> FusedIterator for PermitIterator<'_, T> {}
+impl<T> std::iter::FusedIterator for PermitIterator<'_, T> {}
 
 impl<T> Drop for PermitIterator<'_, T> {
     fn drop(&mut self) {
