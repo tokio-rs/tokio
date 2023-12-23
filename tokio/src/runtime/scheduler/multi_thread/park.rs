@@ -63,16 +63,21 @@ impl Parker {
         }
     }
 
-    pub(crate) fn park(&mut self, handle: &driver::Handle) {
-        self.inner.park(handle);
+    /// Returns whether this worker has obtained driver
+    pub(crate) fn park(&mut self, handle: &driver::Handle) -> bool {
+        self.inner.park(handle)
     }
 
-    pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
+    /// Returns whether this worker has obtained driver
+    pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) -> bool {
         // Only parking with zero is supported...
         assert_eq!(duration, Duration::from_millis(0));
 
         if let Some(mut driver) = self.inner.shared.driver.try_lock() {
             driver.park_timeout(handle, duration);
+            true
+        } else {
+            false
         }
     }
 
@@ -101,8 +106,8 @@ impl Unparker {
 }
 
 impl Inner {
-    /// Parks the current thread for at most `dur`.
-    fn park(&self, handle: &driver::Handle) {
+    /// Returns whether this worker has obtained driver.
+    fn park(&self, handle: &driver::Handle) -> bool {
         // If we were previously notified then we consume this notification and
         // return quickly.
         if self
@@ -110,13 +115,15 @@ impl Inner {
             .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
             .is_ok()
         {
-            return;
+            return false;
         }
 
         if let Some(mut driver) = self.shared.driver.try_lock() {
             self.park_driver(&mut driver, handle);
+            true
         } else {
             self.park_condvar();
+            false
         }
     }
 

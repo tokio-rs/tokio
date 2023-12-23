@@ -716,11 +716,14 @@ impl Context {
         // Store `core` in context
         *self.core.borrow_mut() = Some(core);
 
+        // Whether this park has obtained driver lock
+        let park_has_driver;
+
         // Park thread
         if let Some(timeout) = duration {
-            park.park_timeout(&self.worker.handle.driver, timeout);
+            park_has_driver = park.park_timeout(&self.worker.handle.driver, timeout);
         } else {
-            park.park(&self.worker.handle.driver);
+            park_has_driver = park.park(&self.worker.handle.driver);
         }
 
         self.defer.wake();
@@ -731,7 +734,7 @@ impl Context {
         // Place `park` back in `core`
         core.park = Some(park);
 
-        if core.should_notify_others() {
+        if park_has_driver || core.should_notify_others() {
             self.worker.handle.notify_parked_local();
         }
 
