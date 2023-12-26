@@ -27,7 +27,7 @@ cfg_io_util! {
         ) => {
             $(
                 $(#[$outer])*
-                fn $name<'a>(&'a mut self) -> $($fut)*<&'a mut Self> where Self: Unpin {
+                fn $name(&mut self) -> $($fut)*<&mut Self> where Self: Unpin {
                     $($fut)*::new(self)
                 }
             )*
@@ -230,10 +230,13 @@ cfg_io_util! {
         ///     let mut buffer = BytesMut::with_capacity(10);
         ///
         ///     assert!(buffer.is_empty());
+        ///     assert!(buffer.capacity() >= 10);
         ///
-        ///     // read up to 10 bytes, note that the return value is not needed
-        ///     // to access the data that was read as `buffer`'s internal
-        ///     // cursor is updated.
+        ///     // note that the return value is not needed to access the data
+        ///     // that was read as `buffer`'s internal cursor is updated.
+        ///     //
+        ///     // this might read more than 10 bytes if the capacity of `buffer`
+        ///     // is larger than 10.
         ///     f.read_buf(&mut buffer).await?;
         ///
         ///     println!("The bytes: {:?}", &buffer[..]);
@@ -242,8 +245,8 @@ cfg_io_util! {
         /// ```
         fn read_buf<'a, B>(&'a mut self, buf: &'a mut B) -> ReadBuf<'a, Self, B>
         where
-            Self: Sized + Unpin,
-            B: BufMut,
+            Self: Unpin,
+            B: BufMut + ?Sized,
         {
             read_buf(self, buf)
         }

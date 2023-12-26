@@ -8,15 +8,17 @@
 
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::Mutex;
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, Task};
-use crate::util::linked_list::{CountedLinkedList, Link, LinkedList};
+use crate::util::linked_list::{Link, LinkedList};
+use crate::util::sharded_list;
 
+use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use std::marker::PhantomData;
+use std::num::NonZeroU64;
 
 // The id from the module below is used to verify whether a given task is stored
 // in this OwnedTasks, or some other task. The counter starts at one so we can
-// use zero for tasks not owned by any list.
+// use `None` for tasks not owned by any list.
 //
 // The safety checks in this file can technically be violated if the counter is
 // overflown, but the checks are not supposed to ever fail unless there is a
@@ -24,14 +26,14 @@ use std::marker::PhantomData;
 // mixed up runtimes happen to have the same id.
 
 cfg_has_atomic_u64! {
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::atomic::AtomicU64;
 
     static NEXT_OWNED_TASKS_ID: AtomicU64 = AtomicU64::new(1);
 
-    fn get_next_id() -> u64 {
+    fn get_next_id() -> NonZeroU64 {
         loop {
             let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
-            if id != 0 {
+            if let Some(id) = NonZeroU64::new(id) {
                 return id;
             }
         }
@@ -39,45 +41,45 @@ cfg_has_atomic_u64! {
 }
 
 cfg_not_has_atomic_u64! {
-    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::atomic::AtomicU32;
 
     static NEXT_OWNED_TASKS_ID: AtomicU32 = AtomicU32::new(1);
 
-    fn get_next_id() -> u64 {
+    fn get_next_id() -> NonZeroU64 {
         loop {
             let id = NEXT_OWNED_TASKS_ID.fetch_add(1, Ordering::Relaxed);
-            if id != 0 {
-                return u64::from(id);
+            if let Some(id) = NonZeroU64::new(u64::from(id)) {
+                return id;
             }
         }
     }
 }
 
 pub(crate) struct OwnedTasks<S: 'static> {
-    inner: Mutex<CountedOwnedTasksInner<S>>,
-    id: u64,
+    list: List<S>,
+    pub(crate) id: NonZeroU64,
+    closed: AtomicBool,
 }
-struct CountedOwnedTasksInner<S: 'static> {
-    list: CountedLinkedList<Task<S>, <Task<S> as Link>::Target>,
-    closed: bool,
-}
+
+type List<S> = sharded_list::ShardedList<Task<S>, <Task<S> as Link>::Target>;
+
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
-    id: u64,
+    pub(crate) id: NonZeroU64,
     _not_send_or_sync: PhantomData<*const ()>,
 }
+
 struct OwnedTasksInner<S: 'static> {
     list: LinkedList<Task<S>, <Task<S> as Link>::Target>,
     closed: bool,
 }
 
 impl<S: 'static> OwnedTasks<S> {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(num_cores: usize) -> Self {
+        let shard_size = Self::gen_shared_list_size(num_cores);
         Self {
-            inner: Mutex::new(CountedOwnedTasksInner {
-                list: CountedLinkedList::new(),
-                closed: false,
-            }),
+            list: List::new(shard_size),
+            closed: AtomicBool::new(false),
             id: get_next_id(),
         }
     }
@@ -111,24 +113,23 @@ impl<S: 'static> OwnedTasks<S> {
             task.header().set_owner_id(self.id);
         }
 
-        let mut lock = self.inner.lock();
-        if lock.closed {
-            drop(lock);
-            drop(notified);
+        let shard = self.list.lock_shard(&task);
+        // Check the closed flag in the lock for ensuring all that tasks
+        // will shut down after the OwnedTasks has been closed.
+        if self.closed.load(Ordering::Acquire) {
+            drop(shard);
             task.shutdown();
-            None
-        } else {
-            lock.list.push_front(task);
-            Some(notified)
+            return None;
         }
+        shard.push(task);
+        Some(notified)
     }
 
     /// Asserts that the given task is owned by this OwnedTasks and convert it to
     /// a LocalNotified, giving the thread permission to poll this task.
     #[inline]
     pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
-        assert_eq!(task.header().get_owner_id(), self.id);
-
+        debug_assert_eq!(task.header().get_owner_id(), Some(self.id));
         // safety: All tasks bound to this OwnedTasks are Send, so it is safe
         // to poll it on this thread no matter what thread we are on.
         LocalNotified {
@@ -139,52 +140,66 @@ impl<S: 'static> OwnedTasks<S> {
 
     /// Shuts down all tasks in the collection. This call also closes the
     /// collection, preventing new items from being added.
-    pub(crate) fn close_and_shutdown_all(&self)
+    ///
+    /// The parameter start determines which shard this method will start at.
+    /// Using different values for each worker thread reduces contention.
+    pub(crate) fn close_and_shutdown_all(&self, start: usize)
     where
         S: Schedule,
     {
-        // The first iteration of the loop was unrolled so it can set the
-        // closed bool.
-        let first_task = {
-            let mut lock = self.inner.lock();
-            lock.closed = true;
-            lock.list.pop_back()
-        };
-        match first_task {
-            Some(task) => task.shutdown(),
-            None => return,
+        self.closed.store(true, Ordering::Release);
+        for i in start..self.get_shard_size() + start {
+            loop {
+                let task = self.list.pop_back(i);
+                match task {
+                    Some(task) => {
+                        task.shutdown();
+                    }
+                    None => break,
+                }
+            }
         }
+    }
 
-        loop {
-            let task = match self.inner.lock().list.pop_back() {
-                Some(task) => task,
-                None => return,
-            };
-
-            task.shutdown();
-        }
+    #[inline]
+    pub(crate) fn get_shard_size(&self) -> usize {
+        self.list.shard_size()
     }
 
     pub(crate) fn active_tasks_count(&self) -> usize {
-        self.inner.lock().list.count()
+        self.list.len()
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
-        let task_id = task.header().get_owner_id();
-        if task_id == 0 {
-            // The task is unowned.
-            return None;
-        }
+        // If the task's owner ID is `None` then it is not part of any list and
+        // doesn't need removing.
+        let task_id = task.header().get_owner_id()?;
 
         assert_eq!(task_id, self.id);
 
         // safety: We just checked that the provided task is not in some other
         // linked list.
-        unsafe { self.inner.lock().list.remove(task.header_ptr()) }
+        unsafe { self.list.remove(task.header_ptr()) }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.inner.lock().list.is_empty()
+        self.list.is_empty()
+    }
+
+    /// Generates the size of the sharded list based on the number of worker threads.
+    ///
+    /// The sharded lock design can effectively alleviate
+    /// lock contention performance problems caused by high concurrency.
+    ///
+    /// However, as the number of shards increases, the memory continuity between
+    /// nodes in the intrusive linked list will diminish. Furthermore,
+    /// the construction time of the sharded list will also increase with a higher number of shards.
+    ///
+    /// Due to the above reasons, we set a maximum value for the shared list size,
+    /// denoted as `MAX_SHARED_LIST_SIZE`.
+    fn gen_shared_list_size(num_cores: usize) -> usize {
+        const MAX_SHARED_LIST_SIZE: usize = 1 << 16;
+        usize::min(MAX_SHARED_LIST_SIZE, num_cores.next_power_of_two() * 4)
     }
 }
 
@@ -193,9 +208,9 @@ cfg_taskdump! {
         /// Locks the tasks, and calls `f` on an iterator over them.
         pub(crate) fn for_each<F>(&self, f: F)
         where
-            F: FnMut(&Task<S>)
+            F: FnMut(&Task<S>),
         {
-            self.inner.lock().list.for_each(f)
+            self.list.for_each(f);
         }
     }
 }
@@ -257,11 +272,9 @@ impl<S: 'static> LocalOwnedTasks<S> {
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
-        let task_id = task.header().get_owner_id();
-        if task_id == 0 {
-            // The task is unowned.
-            return None;
-        }
+        // If the task's owner ID is `None` then it is not part of any list and
+        // doesn't need removing.
+        let task_id = task.header().get_owner_id()?;
 
         assert_eq!(task_id, self.id);
 
@@ -275,7 +288,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
     /// it to a LocalNotified, giving the thread permission to poll this task.
     #[inline]
     pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
-        assert_eq!(task.header().get_owner_id(), self.id);
+        assert_eq!(task.header().get_owner_id(), Some(self.id));
 
         // safety: The task was bound to this LocalOwnedTasks, and the
         // LocalOwnedTasks is not Send or Sync, so we are on the right thread
@@ -306,7 +319,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -315,11 +328,9 @@ mod tests {
     #[test]
     fn test_id_not_broken() {
         let mut last_id = get_next_id();
-        assert_ne!(last_id, 0);
 
         for _ in 0..1000 {
             let next_id = get_next_id();
-            assert_ne!(next_id, 0);
             assert!(last_id < next_id);
             last_id = next_id;
         }

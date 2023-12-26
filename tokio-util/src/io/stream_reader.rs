@@ -1,5 +1,6 @@
 use bytes::Buf;
 use futures_core::stream::Stream;
+use futures_sink::Sink;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -165,7 +166,7 @@ where
     B: Buf,
     E: Into<std::io::Error>,
 {
-    /// Convert a stream of byte chunks into an [`AsyncRead`](tokio::io::AsyncRead).
+    /// Convert a stream of byte chunks into an [`AsyncRead`].
     ///
     /// The item should be a [`Result`] with the ok variant being something that
     /// implements the [`Buf`] trait (e.g. `Vec<u8>` or `Bytes`). The error
@@ -301,7 +302,7 @@ where
 }
 
 // The code below is a manual expansion of the code that pin-project-lite would
-// generate. This is done because pin-project-lite fails by hitting the recusion
+// generate. This is done because pin-project-lite fails by hitting the recursion
 // limit on this struct. (Every line of documentation is handled recursively by
 // the macro.)
 
@@ -322,5 +323,24 @@ impl<S, B> StreamReader<S, B> {
             inner: unsafe { Pin::new_unchecked(&mut me.inner) },
             chunk: &mut me.chunk,
         }
+    }
+}
+
+impl<S: Sink<T, Error = E>, E, T> Sink<T> for StreamReader<S, E> {
+    type Error = E;
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_ready(cx)
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        self.project().inner.start_send(item)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_close(cx)
     }
 }

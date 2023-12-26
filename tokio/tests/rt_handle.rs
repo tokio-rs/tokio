@@ -3,6 +3,7 @@
 
 use tokio::runtime::Runtime;
 
+#[cfg(panic = "unwind")]
 #[test]
 fn basic_enter() {
     let rt1 = rt();
@@ -15,6 +16,7 @@ fn basic_enter() {
     drop(enter1);
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 #[should_panic]
 fn interleave_enter_different_rt() {
@@ -28,6 +30,7 @@ fn interleave_enter_different_rt() {
     drop(enter2);
 }
 
+#[cfg(panic = "unwind")]
 #[test]
 #[should_panic]
 fn interleave_enter_same_rt() {
@@ -41,8 +44,9 @@ fn interleave_enter_same_rt() {
     drop(enter3);
 }
 
+#[cfg(panic = "unwind")]
 #[test]
-#[cfg(not(tokio_wasi))]
+#[cfg(not(target_os = "wasi"))]
 fn interleave_then_enter() {
     let _ = std::panic::catch_unwind(|| {
         let rt1 = rt();
@@ -58,6 +62,29 @@ fn interleave_then_enter() {
     // Can still enter
     let rt3 = rt();
     let _enter = rt3.enter();
+}
+
+#[cfg(tokio_unstable)]
+mod unstable {
+    use super::*;
+
+    #[test]
+    fn runtime_id_is_same() {
+        let rt = rt();
+
+        let handle1 = rt.handle();
+        let handle2 = rt.handle();
+
+        assert_eq!(handle1.id(), handle2.id());
+    }
+
+    #[test]
+    fn runtime_ids_different() {
+        let rt1 = rt();
+        let rt2 = rt();
+
+        assert_ne!(rt1.handle().id(), rt2.handle().id());
+    }
 }
 
 fn rt() -> Runtime {

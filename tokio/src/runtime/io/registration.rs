@@ -118,7 +118,7 @@ impl Registration {
 
     // Uses the poll path, requiring the caller to ensure mutual exclusion for
     // correctness. Only the last task to call this function is notified.
-    #[cfg(not(tokio_wasi))]
+    #[cfg(not(target_os = "wasi"))]
     pub(crate) fn poll_read_io<R>(
         &self,
         cx: &mut Context<'_>,
@@ -219,11 +219,16 @@ impl Registration {
         loop {
             let event = self.readiness(interest).await?;
 
+            let coop = crate::future::poll_fn(crate::runtime::coop::poll_proceed).await;
+
             match f() {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.clear_readiness(event);
                 }
-                x => return x,
+                x => {
+                    coop.made_progress();
+                    return x;
+                }
             }
         }
     }

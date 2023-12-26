@@ -1,4 +1,4 @@
-use crate::io::{AsyncBufRead, AsyncRead, ReadBuf};
+use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
 use std::fmt;
 use std::io;
@@ -6,7 +6,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 cfg_io_util! {
-    /// An async reader which is always at EOF.
+    /// `Empty` ignores any data written via [`AsyncWrite`], and will always be empty
+    /// (returning zero bytes) when read via [`AsyncRead`].
     ///
     /// This struct is generally created by calling [`empty`]. Please see
     /// the documentation of [`empty()`][`empty`] for more details.
@@ -19,9 +20,12 @@ cfg_io_util! {
         _p: (),
     }
 
-    /// Creates a new empty async reader.
+    /// Creates a value that is always at EOF for reads, and ignores all data written.
     ///
-    /// All reads from the returned reader will return `Poll::Ready(Ok(0))`.
+    /// All writes on the returned instance will return `Poll::Ready(Ok(buf.len()))`
+    /// and the contents of the buffer will not be inspected.
+    ///
+    /// All reads from the returned instance will return `Poll::Ready(Ok(0))`.
     ///
     /// This is an asynchronous version of [`std::io::empty`][std].
     ///
@@ -39,6 +43,19 @@ cfg_io_util! {
     ///     let mut buffer = String::new();
     ///     io::empty().read_to_string(&mut buffer).await.unwrap();
     ///     assert!(buffer.is_empty());
+    /// }
+    /// ```
+    ///
+    /// A convoluted way of getting the length of a buffer:
+    ///
+    /// ```
+    /// use tokio::io::{self, AsyncWriteExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let buffer = vec![1, 2, 3, 5, 8];
+    ///     let num_bytes = io::empty().write(&buffer).await.unwrap();
+    ///     assert_eq!(num_bytes, 5);
     /// }
     /// ```
     pub fn empty() -> Empty {
@@ -69,6 +86,50 @@ impl AsyncBufRead for Empty {
 
     #[inline]
     fn consume(self: Pin<&mut Self>, _: usize) {}
+}
+
+impl AsyncWrite for Empty {
+    #[inline]
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
+        Poll::Ready(Ok(buf.len()))
+    }
+
+    #[inline]
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline]
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline]
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<Result<usize, io::Error>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
+        let num_bytes = bufs.iter().map(|b| b.len()).sum();
+        Poll::Ready(Ok(num_bytes))
+    }
 }
 
 impl fmt::Debug for Empty {

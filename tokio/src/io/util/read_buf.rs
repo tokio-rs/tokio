@@ -10,8 +10,8 @@ use std::task::{Context, Poll};
 
 pub(crate) fn read_buf<'a, R, B>(reader: &'a mut R, buf: &'a mut B) -> ReadBuf<'a, R, B>
 where
-    R: AsyncRead + Unpin,
-    B: BufMut,
+    R: AsyncRead + Unpin + ?Sized,
+    B: BufMut + ?Sized,
 {
     ReadBuf {
         reader,
@@ -24,7 +24,7 @@ pin_project! {
     /// Future returned by [`read_buf`](crate::io::AsyncReadExt::read_buf).
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct ReadBuf<'a, R, B> {
+    pub struct ReadBuf<'a, R: ?Sized, B: ?Sized> {
         reader: &'a mut R,
         buf: &'a mut B,
         #[pin]
@@ -34,8 +34,8 @@ pin_project! {
 
 impl<R, B> Future for ReadBuf<'_, R, B>
 where
-    R: AsyncRead + Unpin,
-    B: BufMut,
+    R: AsyncRead + Unpin + ?Sized,
+    B: BufMut + ?Sized,
 {
     type Output = io::Result<usize>;
 

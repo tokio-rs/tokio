@@ -114,12 +114,10 @@ impl<T> Drop for OnceCell<T> {
 
 impl<T> From<T> for OnceCell<T> {
     fn from(value: T) -> Self {
-        let semaphore = Semaphore::new(0);
-        semaphore.close();
         OnceCell {
             value_set: AtomicBool::new(true),
             value: UnsafeCell::new(MaybeUninit::new(value)),
-            semaphore,
+            semaphore: Semaphore::new_closed(),
         }
     }
 }
@@ -139,6 +137,10 @@ impl<T> OnceCell<T> {
     /// If the `Option` is `None`, this is equivalent to `OnceCell::new`.
     ///
     /// [`OnceCell::new`]: crate::sync::OnceCell::new
+    // Once https://github.com/rust-lang/rust/issues/73255 lands
+    // and tokio MSRV is bumped to the rustc version with it stablised,
+    // we can made this function available in const context,
+    // by creating `Semaphore::const_new_closed`.
     pub fn new_with(value: Option<T>) -> Self {
         if let Some(v) = value {
             OnceCell::from(v)
@@ -147,10 +149,53 @@ impl<T> OnceCell<T> {
         }
     }
 
+    /// Creates a new `OnceCell` that contains the provided value.
+    ///
+    /// # Example
+    ///
+    /// When using the `tracing` [unstable feature], a `OnceCell` created with
+    /// `const_new_with` will not be instrumented. As such, it will not be
+    /// visible in [`tokio-console`]. Instead, [`OnceCell::new_with`] should be
+    /// used to create an instrumented object if that is needed.
+    ///
+    /// ```
+    /// use tokio::sync::OnceCell;
+    ///
+    /// static ONCE: OnceCell<u32> = OnceCell::const_new_with(1);
+    ///
+    /// async fn get_global_integer() -> &'static u32 {
+    ///     ONCE.get_or_init(|| async {
+    ///         1 + 1
+    ///     }).await
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let result = get_global_integer().await;
+    ///     assert_eq!(*result, 1);
+    /// }
+    /// ```
+    ///
+    /// [`tokio-console`]: https://github.com/tokio-rs/console
+    /// [unstable feature]: crate#unstable-features
+    #[cfg(not(all(loom, test)))]
+    pub const fn const_new_with(value: T) -> Self {
+        OnceCell {
+            value_set: AtomicBool::new(true),
+            value: UnsafeCell::new(MaybeUninit::new(value)),
+            semaphore: Semaphore::const_new_closed(),
+        }
+    }
+
     /// Creates a new empty `OnceCell` instance.
     ///
     /// Equivalent to `OnceCell::new`, except that it can be used in static
     /// variables.
+    ///
+    /// When using the `tracing` [unstable feature], a `OnceCell` created with
+    /// `const_new` will not be instrumented. As such, it will not be visible
+    /// in [`tokio-console`]. Instead, [`OnceCell::new`] should be used to
+    /// create an instrumented object if that is needed.
     ///
     /// # Example
     ///
@@ -171,8 +216,10 @@ impl<T> OnceCell<T> {
     ///     assert_eq!(*result, 2);
     /// }
     /// ```
-    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    ///
+    /// [`tokio-console`]: https://github.com/tokio-rs/console
+    /// [unstable feature]: crate#unstable-features
+    #[cfg(not(all(loom, test)))]
     pub const fn const_new() -> Self {
         OnceCell {
             value_set: AtomicBool::new(false),

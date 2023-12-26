@@ -3,8 +3,8 @@ use crate::io::AsyncWrite;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 /// # Windows
-/// AsyncWrite adapter that finds last char boundary in given buffer and does not write the rest,
-/// if buffer contents seems to be utf8. Otherwise it only trims buffer down to MAX_BUF.
+/// [`AsyncWrite`] adapter that finds last char boundary in given buffer and does not write the rest,
+/// if buffer contents seems to be utf8. Otherwise it only trims buffer down to `MAX_BUF`.
 /// That's why, wrapped writer will always receive well-formed utf-8 bytes.
 /// # Other platforms
 /// Passes data to `inner` as is.

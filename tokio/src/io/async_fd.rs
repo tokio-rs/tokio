@@ -13,15 +13,15 @@ use std::{task::Context, task::Poll};
 /// `kqueue`, etc), such as a network socket or pipe, and the file descriptor
 /// must have the nonblocking mode set to true.
 ///
-/// Creating an AsyncFd registers the file descriptor with the current tokio
+/// Creating an [`AsyncFd`] registers the file descriptor with the current tokio
 /// Reactor, allowing you to directly await the file descriptor being readable
 /// or writable. Once registered, the file descriptor remains registered until
-/// the AsyncFd is dropped.
+/// the [`AsyncFd`] is dropped.
 ///
-/// The AsyncFd takes ownership of an arbitrary object to represent the IO
+/// The [`AsyncFd`] takes ownership of an arbitrary object to represent the IO
 /// object. It is intended that this object will handle closing the file
 /// descriptor when it is dropped, avoiding resource leaks and ensuring that the
-/// AsyncFd can clean up the registration before closing the file descriptor.
+/// [`AsyncFd`] can clean up the registration before closing the file descriptor.
 /// The [`AsyncFd::into_inner`] function can be used to extract the inner object
 /// to retake control from the tokio IO reactor.
 ///
@@ -176,6 +176,8 @@ use std::{task::Context, task::Poll};
 /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 pub struct AsyncFd<T: AsRawFd> {
     registration: Registration,
+    // The inner value is always present. the Option is required for `drop` and `into_inner`.
+    // In all other methods `unwrap` is valid, and will never panic.
     inner: Option<T>,
 }
 
@@ -202,7 +204,7 @@ pub struct AsyncFdReadyMutGuard<'a, T: AsRawFd> {
 }
 
 impl<T: AsRawFd> AsyncFd<T> {
-    /// Creates an AsyncFd backed by (and taking ownership of) an object
+    /// Creates an [`AsyncFd`] backed by (and taking ownership of) an object
     /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
     /// time of creation.
     ///
@@ -224,7 +226,7 @@ impl<T: AsRawFd> AsyncFd<T> {
         Self::with_interest(inner, Interest::READABLE | Interest::WRITABLE)
     }
 
-    /// Creates an AsyncFd backed by (and taking ownership of) an object
+    /// Creates an [`AsyncFd`] backed by (and taking ownership of) an object
     /// implementing [`AsRawFd`], with a specific [`Interest`]. The backing
     /// file descriptor is cached at the time of creation.
     ///
@@ -271,13 +273,12 @@ impl<T: AsRawFd> AsyncFd<T> {
     }
 
     fn take_inner(&mut self) -> Option<T> {
-        let fd = self.inner.as_ref().map(AsRawFd::as_raw_fd);
+        let inner = self.inner.take()?;
+        let fd = inner.as_raw_fd();
 
-        if let Some(fd) = fd {
-            let _ = self.registration.deregister(&mut SourceFd(&fd));
-        }
+        let _ = self.registration.deregister(&mut SourceFd(&fd));
 
-        self.inner.take()
+        Some(inner)
     }
 
     /// Deregisters this file descriptor and returns ownership of the backing
@@ -319,11 +320,10 @@ impl<T: AsRawFd> AsyncFd<T> {
     ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
         let event = ready!(self.registration.poll_read_ready(cx))?;
 
-        Ok(AsyncFdReadyGuard {
+        Poll::Ready(Ok(AsyncFdReadyGuard {
             async_fd: self,
             event: Some(event),
-        })
-        .into()
+        }))
     }
 
     /// Polls for read readiness.
@@ -357,11 +357,10 @@ impl<T: AsRawFd> AsyncFd<T> {
     ) -> Poll<io::Result<AsyncFdReadyMutGuard<'a, T>>> {
         let event = ready!(self.registration.poll_read_ready(cx))?;
 
-        Ok(AsyncFdReadyMutGuard {
+        Poll::Ready(Ok(AsyncFdReadyMutGuard {
             async_fd: self,
             event: Some(event),
-        })
-        .into()
+        }))
     }
 
     /// Polls for write readiness.
@@ -397,11 +396,10 @@ impl<T: AsRawFd> AsyncFd<T> {
     ) -> Poll<io::Result<AsyncFdReadyGuard<'a, T>>> {
         let event = ready!(self.registration.poll_write_ready(cx))?;
 
-        Ok(AsyncFdReadyGuard {
+        Poll::Ready(Ok(AsyncFdReadyGuard {
             async_fd: self,
             event: Some(event),
-        })
-        .into()
+        }))
     }
 
     /// Polls for write readiness.
@@ -435,11 +433,10 @@ impl<T: AsRawFd> AsyncFd<T> {
     ) -> Poll<io::Result<AsyncFdReadyMutGuard<'a, T>>> {
         let event = ready!(self.registration.poll_write_ready(cx))?;
 
-        Ok(AsyncFdReadyMutGuard {
+        Poll::Ready(Ok(AsyncFdReadyMutGuard {
             async_fd: self,
             event: Some(event),
-        })
-        .into()
+        }))
     }
 
     /// Waits for any of the requested ready states, returning a
@@ -797,7 +794,6 @@ impl<T: AsRawFd> AsRawFd for AsyncFd<T> {
     }
 }
 
-#[cfg(not(tokio_no_as_fd))]
 impl<T: AsRawFd> std::os::unix::io::AsFd for AsyncFd<T> {
     fn as_fd(&self) -> std::os::unix::io::BorrowedFd<'_> {
         unsafe { std::os::unix::io::BorrowedFd::borrow_raw(self.as_raw_fd()) }
@@ -1014,14 +1010,11 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     ) -> Result<io::Result<R>, TryIoError> {
         let result = f(self.async_fd);
 
-        if let Err(e) = result.as_ref() {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                self.clear_ready();
-            }
-        }
-
         match result {
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
+                self.clear_ready();
+                Err(TryIoError(()))
+            }
             result => Ok(result),
         }
     }
@@ -1194,14 +1187,11 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     ) -> Result<io::Result<R>, TryIoError> {
         let result = f(self.async_fd);
 
-        if let Err(e) = result.as_ref() {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                self.clear_ready();
-            }
-        }
-
         match result {
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock => Err(TryIoError(())),
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
+                self.clear_ready();
+                Err(TryIoError(()))
+            }
             result => Ok(result),
         }
     }

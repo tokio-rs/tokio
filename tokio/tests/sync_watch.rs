@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(tokio_wasm_not_wasi)]
+#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use tokio::sync::watch;
@@ -41,6 +41,64 @@ fn single_rx_recv() {
         assert!(t.is_woken());
         assert_ready_err!(t.poll());
     }
+    assert_eq!(*rx.borrow(), "two");
+}
+
+#[test]
+fn rx_version_underflow() {
+    let (_tx, mut rx) = watch::channel("one");
+
+    // Version starts at 2, validate we do not underflow
+    rx.mark_changed();
+    rx.mark_changed();
+}
+
+#[test]
+fn rx_mark_changed() {
+    let (tx, mut rx) = watch::channel("one");
+
+    let mut rx2 = rx.clone();
+    let mut rx3 = rx.clone();
+    let mut rx4 = rx.clone();
+    {
+        rx.mark_changed();
+        assert!(rx.has_changed().unwrap());
+
+        let mut t = spawn(rx.changed());
+        assert_ready_ok!(t.poll());
+    }
+
+    {
+        assert!(!rx2.has_changed().unwrap());
+
+        let mut t = spawn(rx2.changed());
+        assert_pending!(t.poll());
+    }
+
+    {
+        rx3.mark_changed();
+        assert_eq!(*rx3.borrow(), "one");
+
+        assert!(rx3.has_changed().unwrap());
+
+        assert_eq!(*rx3.borrow_and_update(), "one");
+
+        assert!(!rx3.has_changed().unwrap());
+
+        let mut t = spawn(rx3.changed());
+        assert_pending!(t.poll());
+    }
+
+    {
+        tx.send("two").unwrap();
+        assert!(rx4.has_changed().unwrap());
+        assert_eq!(*rx4.borrow_and_update(), "two");
+
+        rx4.mark_changed();
+        assert!(rx4.has_changed().unwrap());
+        assert_eq!(*rx4.borrow_and_update(), "two")
+    }
+
     assert_eq!(*rx.borrow(), "two");
 }
 
@@ -214,7 +272,7 @@ fn reopened_after_subscribe() {
 
 #[test]
 #[cfg(panic = "unwind")]
-#[cfg(not(tokio_wasm))] // wasm currently doesn't support unwinding
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn send_modify_panic() {
     let (tx, mut rx) = watch::channel("one");
 

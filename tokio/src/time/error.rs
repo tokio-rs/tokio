@@ -1,6 +1,5 @@
 //! Time error types.
 
-use self::Kind::*;
 use std::error;
 use std::fmt;
 
@@ -57,7 +56,7 @@ pub(crate) enum InsertError {
 impl Error {
     /// Creates an error representing a shutdown timer.
     pub fn shutdown() -> Error {
-        Error(Shutdown)
+        Error(Kind::Shutdown)
     }
 
     /// Returns `true` if the error was caused by the timer being shutdown.
@@ -67,7 +66,7 @@ impl Error {
 
     /// Creates an error representing a timer at capacity.
     pub fn at_capacity() -> Error {
-        Error(AtCapacity)
+        Error(Kind::AtCapacity)
     }
 
     /// Returns `true` if the error was caused by the timer being at capacity.
@@ -77,7 +76,7 @@ impl Error {
 
     /// Creates an error representing a misconfigured timer.
     pub fn invalid() -> Error {
-        Error(Invalid)
+        Error(Kind::Invalid)
     }
 
     /// Returns `true` if the error was caused by the timer being misconfigured.
@@ -90,11 +89,12 @@ impl error::Error for Error {}
 
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use self::Kind::*;
         let descr = match self.0 {
-            Shutdown => "the timer is shutdown, must be called from the context of Tokio runtime",
-            AtCapacity => "timer is at capacity and cannot create a new entry",
-            Invalid => "timer duration exceeds maximum duration",
+            Kind::Shutdown => {
+                "the timer is shutdown, must be called from the context of Tokio runtime"
+            }
+            Kind::AtCapacity => "timer is at capacity and cannot create a new entry",
+            Kind::Invalid => "timer duration exceeds maximum duration",
         };
         write!(fmt, "{}", descr)
     }

@@ -9,9 +9,7 @@ use std::path::Path;
 /// depending on platform, other open file descriptors may prevent immediate
 /// removal).
 ///
-/// This is an async version of [`std::fs::remove_file`][std]
-///
-/// [std]: std::fs::remove_file
+/// This is an async version of [`std::fs::remove_file`].
 pub async fn remove_file(path: impl AsRef<Path>) -> io::Result<()> {
     let path = path.as_ref().to_owned();
     asyncify(move || std::fs::remove_file(path)).await

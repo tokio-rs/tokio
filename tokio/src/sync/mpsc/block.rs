@@ -272,10 +272,9 @@ impl<T> Block<T> {
         let ret = NonNull::new(self.header.next.load(ordering));
 
         debug_assert!(unsafe {
-            ret.map(|block| {
+            ret.map_or(true, |block| {
                 block.as_ref().header.start_index == self.header.start_index.wrapping_add(BLOCK_CAP)
             })
-            .unwrap_or(true)
         });
 
         ret
@@ -290,7 +289,7 @@ impl<T> Block<T> {
     ///
     /// # Ordering
     ///
-    /// This performs a compare-and-swap on `next` using AcqRel ordering.
+    /// This performs a compare-and-swap on `next` using `AcqRel` ordering.
     ///
     /// # Safety
     ///
@@ -326,7 +325,7 @@ impl<T> Block<T> {
     ///
     /// It is assumed that `self.next` is null. A new block is allocated with
     /// `start_index` set to be the next block. A compare-and-swap is performed
-    /// with AcqRel memory ordering. If the compare-and-swap is successful, the
+    /// with `AcqRel` memory ordering. If the compare-and-swap is successful, the
     /// newly allocated block is released to other threads walking the block
     /// linked list. If the compare-and-swap fails, the current thread acquires
     /// the next block in the linked list, allowing the current thread to access
@@ -382,7 +381,7 @@ impl<T> Block<T> {
             let actual = unsafe { curr.as_ref().try_push(&mut new_block, AcqRel, Acquire) };
 
             curr = match actual {
-                Ok(_) => {
+                Ok(()) => {
                     return next;
                 }
                 Err(curr) => curr,

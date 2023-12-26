@@ -55,6 +55,9 @@ use then::Then;
 mod try_next;
 use try_next::TryNext;
 
+mod peekable;
+use peekable::Peekable;
+
 cfg_time! {
     pub(crate) mod timeout;
     pub(crate) mod timeout_repeating;
@@ -848,8 +851,7 @@ pub trait StreamExt: Stream {
     ///
     /// `collect` streams all values, awaiting as needed. Values are pushed into
     /// a collection. A number of different target collection types are
-    /// supported, including [`Vec`](std::vec::Vec),
-    /// [`String`](std::string::String), and [`Bytes`].
+    /// supported, including [`Vec`], [`String`], and [`Bytes`].
     ///
     /// [`Bytes`]: https://docs.rs/bytes/0.6.0/bytes/struct.Bytes.html
     ///
@@ -994,7 +996,7 @@ pub trait StreamExt: Stream {
     /// assert!(timeout_stream.try_next().await.is_ok(), "expected no more timeouts");
     /// # }
     /// ```
-    #[cfg(all(feature = "time"))]
+    #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     fn timeout(self, duration: Duration) -> Timeout<Self>
     where
@@ -1005,9 +1007,8 @@ pub trait StreamExt: Stream {
 
     /// Applies a per-item timeout to the passed stream.
     ///
-    /// `timeout_repeating()` takes an [`Interval`](tokio::time::Interval) that
-    /// controls the time each element of the stream has to complete before
-    /// timing out.
+    /// `timeout_repeating()` takes an [`Interval`] that controls the time each
+    /// element of the stream has to complete before timing out.
     ///
     /// If the wrapped stream yields a value before the deadline is reached, the
     /// value is returned. Otherwise, an error is returned. The caller may decide
@@ -1083,7 +1084,7 @@ pub trait StreamExt: Stream {
     /// assert!(timeout_stream.try_next().await.is_ok(), "expected non-timeout");
     /// # }
     /// ```
-    #[cfg(all(feature = "time"))]
+    #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     fn timeout_repeating(self, interval: Interval) -> TimeoutRepeating<Self>
     where
@@ -1113,7 +1114,7 @@ pub trait StreamExt: Stream {
     /// }
     /// # }
     /// ```
-    #[cfg(all(feature = "time"))]
+    #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
     fn throttle(self, duration: Duration) -> Throttle<Self>
     where
@@ -1177,6 +1178,31 @@ pub trait StreamExt: Stream {
     {
         assert!(max_size > 0, "`max_size` must be non-zero.");
         ChunksTimeout::new(self, max_size, duration)
+    }
+
+    /// Turns the stream into a peekable stream, whose next element can be peeked at without being
+    /// consumed.
+    /// ```rust
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// #[tokio::main]
+    /// # async fn _unused() {}
+    /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+    /// async fn main() {
+    ///     let iter = vec![1, 2, 3, 4].into_iter();
+    ///     let mut stream = stream::iter(iter).peekable();
+    ///
+    ///     assert_eq!(*stream.peek().await.unwrap(), 1);
+    ///     assert_eq!(*stream.peek().await.unwrap(), 1);
+    ///     assert_eq!(stream.next().await.unwrap(), 1);
+    ///     assert_eq!(*stream.peek().await.unwrap(), 2);
+    /// }
+    /// ```
+    fn peekable(self) -> Peekable<Self>
+    where
+        Self: Sized,
+    {
+        Peekable::new(self)
     }
 }
 

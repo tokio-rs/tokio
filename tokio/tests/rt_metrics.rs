@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", tokio_unstable, not(tokio_wasi)))]
+#![cfg(all(feature = "full", tokio_unstable, not(target_os = "wasi")))]
 
 use std::future::Future;
 use std::sync::{Arc, Mutex};
@@ -215,18 +215,25 @@ fn worker_steal_count() {
 }
 
 #[test]
-fn worker_poll_count() {
+fn worker_poll_count_and_time() {
     const N: u64 = 5;
+
+    async fn task() {
+        // Sync sleep
+        std::thread::sleep(std::time::Duration::from_micros(10));
+    }
 
     let rt = current_thread();
     let metrics = rt.metrics();
     rt.block_on(async {
         for _ in 0..N {
-            tokio::spawn(async {}).await.unwrap();
+            tokio::spawn(task()).await.unwrap();
         }
     });
     drop(rt);
     assert_eq!(N, metrics.worker_poll_count(0));
+    // Not currently supported for current-thread runtime
+    assert_eq!(Duration::default(), metrics.worker_mean_poll_time(0));
 
     // Does not populate the histogram
     assert!(!metrics.poll_count_histogram_enabled());
@@ -238,7 +245,7 @@ fn worker_poll_count() {
     let metrics = rt.metrics();
     rt.block_on(async {
         for _ in 0..N {
-            tokio::spawn(async {}).await.unwrap();
+            tokio::spawn(task()).await.unwrap();
         }
     });
     drop(rt);
@@ -248,6 +255,12 @@ fn worker_poll_count() {
         .sum();
 
     assert_eq!(N, n);
+
+    let n: Duration = (0..metrics.num_workers())
+        .map(|i| metrics.worker_mean_poll_time(i))
+        .sum();
+
+    assert!(n > Duration::default());
 
     // Does not populate the histogram
     assert!(!metrics.poll_count_histogram_enabled());
@@ -458,13 +471,16 @@ fn worker_overflow_count() {
 
             // First, we need to block the other worker until all tasks have
             // been spawned.
-            tokio::spawn(async move {
-                tx1.send(()).unwrap();
-                rx2.recv().unwrap();
+            //
+            // We spawn from outside the runtime to ensure that the other worker
+            // will pick it up:
+            // <https://github.com/tokio-rs/tokio/issues/4730>
+            tokio::task::spawn_blocking(|| {
+                tokio::spawn(async move {
+                    tx1.send(()).unwrap();
+                    rx2.recv().unwrap();
+                });
             });
-
-            // Bump the next-run spawn
-            tokio::spawn(async {});
 
             rx1.recv().unwrap();
 

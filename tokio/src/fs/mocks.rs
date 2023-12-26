@@ -124,12 +124,12 @@ impl<T> Future for JoinHandle<T> {
     type Output = Result<T, io::Error>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        use std::task::Poll::*;
+        use std::task::Poll;
 
         match Pin::new(&mut self.rx).poll(cx) {
-            Ready(Ok(v)) => Ready(Ok(v)),
-            Ready(Err(e)) => panic!("error = {:?}", e),
-            Pending => Pending,
+            Poll::Ready(Ok(v)) => Poll::Ready(Ok(v)),
+            Poll::Ready(Err(e)) => panic!("error = {:?}", e),
+            Poll::Pending => Poll::Pending,
         }
     }
 }

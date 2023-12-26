@@ -24,7 +24,7 @@ const CHUNK_SIZE: usize = 32;
 
 /// Returns a stream over the entries within a directory.
 ///
-/// This is an async version of [`std::fs::read_dir`](std::fs::read_dir)
+/// This is an async version of [`std::fs::read_dir`].
 ///
 /// This operation is implemented by running the equivalent blocking
 /// operation on a separate thread pool using [`spawn_blocking`].
@@ -140,6 +140,7 @@ impl ReadDir {
                     target_os = "illumos",
                     target_os = "haiku",
                     target_os = "vxworks",
+                    target_os = "aix",
                     target_os = "nto",
                     target_os = "vita",
                 )))]
@@ -203,6 +204,7 @@ pub struct DirEntry {
         target_os = "illumos",
         target_os = "haiku",
         target_os = "vxworks",
+        target_os = "aix",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -336,6 +338,7 @@ impl DirEntry {
             target_os = "illumos",
             target_os = "haiku",
             target_os = "vxworks",
+            target_os = "aix",
             target_os = "nto",
             target_os = "vita",
         )))]

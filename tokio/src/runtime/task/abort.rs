@@ -31,8 +31,11 @@ impl AbortHandle {
     /// If the task was already cancelled, such as by [`JoinHandle::abort`],
     /// this method will do nothing.
     ///
+    /// See also [the module level docs] for more information on cancellation.
+    ///
     /// [cancelled]: method@super::error::JoinError::is_cancelled
     /// [`JoinHandle::abort`]: method@super::JoinHandle::abort
+    /// [the module level docs]: crate::task#cancellation
     pub fn abort(&self) {
         self.raw.remote_abort();
     }

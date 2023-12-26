@@ -30,7 +30,7 @@ cfg_io_util! {
         ) => {
             $(
                 $(#[$outer])*
-                fn $name<'a>(&'a mut self, n: $ty) -> $($fut)*<&'a mut Self> where Self: Unpin {
+                fn $name(&mut self, n: $ty) -> $($fut)*<&mut Self> where Self: Unpin {
                     $($fut)*::new(self, n)
                 }
             )*
@@ -117,6 +117,7 @@ cfg_io_util! {
         ///
         ///     // Writes some prefix of the byte string, not necessarily all of it.
         ///     file.write(b"some bytes").await?;
+        ///     file.flush().await?;
         ///     Ok(())
         /// }
         /// ```
@@ -162,6 +163,7 @@ cfg_io_util! {
         ///     ];
         ///
         ///     file.write_vectored(&bufs).await?;
+        ///     file.flush().await?;
         ///
         ///     Ok(())
         /// }
@@ -244,6 +246,7 @@ cfg_io_util! {
         ///         // all of it.
         ///         file.write_buf(&mut buffer).await?;
         ///     }
+        ///     file.flush().await?;
         ///
         ///     Ok(())
         /// }
@@ -307,6 +310,7 @@ cfg_io_util! {
         ///     let mut buffer = Cursor::new(b"data to write");
         ///
         ///     file.write_all_buf(&mut buffer).await?;
+        ///     file.flush().await?;
         ///     Ok(())
         /// }
         /// ```
@@ -356,6 +360,7 @@ cfg_io_util! {
         ///     let mut file = File::create("foo.txt").await?;
         ///
         ///     file.write_all(b"some bytes").await?;
+        ///     file.flush().await?;
         ///     Ok(())
         /// }
         /// ```

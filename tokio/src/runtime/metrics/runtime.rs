@@ -474,7 +474,7 @@ impl RuntimeMetrics {
     ///
     /// This metric only applies to the **multi-threaded** scheduler.
     ///
-    /// The worker steal count starts at zero when the runtime is created and
+    /// The worker overflow count starts at zero when the runtime is created and
     /// increases by one each time the worker attempts to schedule a task
     /// locally, but its local queue is full. When this happens, half of the
     /// local queue is moved to the injection queue.
@@ -767,6 +767,47 @@ impl RuntimeMetrics {
             .as_ref()
             .map(|histogram| histogram.get(bucket))
             .unwrap_or_default()
+    }
+
+    /// Returns the mean duration of task polls, in nanoseconds.
+    ///
+    /// This is an exponentially weighted moving average. Currently, this metric
+    /// is only provided by the multi-threaded runtime.
+    ///
+    /// # Arguments
+    ///
+    /// `worker` is the index of the worker being queried. The given value must
+    /// be between 0 and `num_workers()`. The index uniquely identifies a single
+    /// worker and will continue to identify the worker throughout the lifetime
+    /// of the runtime instance.
+    ///
+    /// # Panics
+    ///
+    /// The method panics when `worker` represents an invalid worker, i.e. is
+    /// greater than or equal to `num_workers()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let metrics = Handle::current().metrics();
+    ///
+    ///     let n = metrics.worker_mean_poll_time(0);
+    ///     println!("worker 0 has a mean poll time of {:?}", n);
+    /// }
+    /// ```
+    #[track_caller]
+    pub fn worker_mean_poll_time(&self, worker: usize) -> Duration {
+        let nanos = self
+            .handle
+            .inner
+            .worker_metrics(worker)
+            .mean_poll_time
+            .load(Relaxed);
+        Duration::from_nanos(nanos)
     }
 
     /// Returns the number of tasks currently scheduled in the blocking

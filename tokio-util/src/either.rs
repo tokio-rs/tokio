@@ -116,7 +116,7 @@ where
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        delegate_call!(self.consume(amt))
+        delegate_call!(self.consume(amt));
     }
 }
 
@@ -161,6 +161,39 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         delegate_call!(self.poll_next(cx))
+    }
+}
+
+impl<L, R, Item, Error> futures_sink::Sink<Item> for Either<L, R>
+where
+    L: futures_sink::Sink<Item, Error = Error>,
+    R: futures_sink::Sink<Item, Error = Error>,
+{
+    type Error = Error;
+
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), Self::Error>> {
+        delegate_call!(self.poll_ready(cx))
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: Item) -> std::result::Result<(), Self::Error> {
+        delegate_call!(self.start_send(item))
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), Self::Error>> {
+        delegate_call!(self.poll_flush(cx))
+    }
+
+    fn poll_close(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::result::Result<(), Self::Error>> {
+        delegate_call!(self.poll_close(cx))
     }
 }
 

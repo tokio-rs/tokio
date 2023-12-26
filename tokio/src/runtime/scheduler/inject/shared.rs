@@ -38,7 +38,10 @@ impl<T: 'static> Shared<T> {
     }
 
     // Kind of annoying to have to include the cfg here
-    #[cfg(any(tokio_taskdump, all(feature = "rt-multi-thread", not(tokio_wasi))))]
+    #[cfg(any(
+        tokio_taskdump,
+        all(feature = "rt-multi-thread", not(target_os = "wasi"))
+    ))]
     pub(crate) fn is_closed(&self, synced: &Synced) -> bool {
         synced.is_closed
     }
@@ -105,6 +108,8 @@ impl<T: 'static> Shared<T> {
     /// Must be called with the same `Synced` instance returned by `Inject::new`
     pub(crate) unsafe fn pop_n<'a>(&'a self, synced: &'a mut Synced, n: usize) -> Pop<'a, T> {
         use std::cmp;
+
+        debug_assert!(n > 0);
 
         // safety: All updates to the len atomic are guarded by the mutex. As
         // such, a non-atomic load followed by a store is safe.

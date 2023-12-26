@@ -34,7 +34,7 @@ impl<T> ReceiverStream<T> {
     ///
     /// [`Permit`]: struct@tokio::sync::mpsc::Permit
     pub fn close(&mut self) {
-        self.inner.close()
+        self.inner.close();
     }
 }
 

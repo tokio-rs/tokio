@@ -161,14 +161,14 @@ cfg_rt! {
     /// error[E0391]: cycle detected when processing `main`
     /// ```
     #[track_caller]
-    pub fn spawn<T>(future: T) -> JoinHandle<T::Output>
+    pub fn spawn<F>(future: F) -> JoinHandle<F::Output>
     where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
     {
         // preventing stack overflows on debug mode, by quickly sending the
         // task to the heap.
-        if cfg!(debug_assertions) && std::mem::size_of::<T>() > 2048 {
+        if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
             spawn_inner(Box::pin(future), None)
         } else {
             spawn_inner(future, None)

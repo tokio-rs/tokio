@@ -85,7 +85,7 @@ macro_rules! cfg_fs {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "fs")]
-            #[cfg(not(tokio_wasi))]
+            #[cfg(not(target_os = "wasi"))]
             #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
             $item
         )*
@@ -276,7 +276,7 @@ macro_rules! cfg_process {
             #[cfg(feature = "process")]
             #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
             #[cfg(not(loom))]
-            #[cfg(not(tokio_wasi))]
+            #[cfg(not(target_os = "wasi"))]
             $item
         )*
     }
@@ -305,7 +305,7 @@ macro_rules! cfg_signal {
             #[cfg(feature = "signal")]
             #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
             #[cfg(not(loom))]
-            #[cfg(not(tokio_wasi))]
+            #[cfg(not(target_os = "wasi"))]
             $item
         )*
     }
@@ -372,7 +372,7 @@ macro_rules! cfg_not_rt {
 macro_rules! cfg_rt_multi_thread {
     ($($item:item)*) => {
         $(
-            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
             #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
             $item
         )*
@@ -523,14 +523,7 @@ macro_rules! cfg_not_coop {
 macro_rules! cfg_has_atomic_u64 {
     ($($item:item)*) => {
         $(
-            #[cfg_attr(
-                not(tokio_no_target_has_atomic),
-                cfg(all(target_has_atomic = "64", not(tokio_no_atomic_u64))
-            ))]
-            #[cfg_attr(
-                tokio_no_target_has_atomic,
-                cfg(not(tokio_no_atomic_u64))
-            )]
+            #[cfg(target_has_atomic = "64")]
             $item
         )*
     }
@@ -539,14 +532,7 @@ macro_rules! cfg_has_atomic_u64 {
 macro_rules! cfg_not_has_atomic_u64 {
     ($($item:item)*) => {
         $(
-            #[cfg_attr(
-                not(tokio_no_target_has_atomic),
-                cfg(any(not(target_has_atomic = "64"), tokio_no_atomic_u64)
-            ))]
-            #[cfg_attr(
-                tokio_no_target_has_atomic,
-                cfg(tokio_no_atomic_u64)
-            )]
+            #[cfg(not(target_has_atomic = "64"))]
             $item
         )*
     }
@@ -555,13 +541,7 @@ macro_rules! cfg_not_has_atomic_u64 {
 macro_rules! cfg_has_const_mutex_new {
     ($($item:item)*) => {
         $(
-            #[cfg(all(
-                not(all(loom, test)),
-                any(
-                    feature = "parking_lot",
-                    not(tokio_no_const_mutex_new)
-                )
-            ))]
+            #[cfg(not(all(loom, test)))]
             $item
         )*
     }
@@ -570,13 +550,7 @@ macro_rules! cfg_has_const_mutex_new {
 macro_rules! cfg_not_has_const_mutex_new {
     ($($item:item)*) => {
         $(
-            #[cfg(not(all(
-                not(all(loom, test)),
-                any(
-                    feature = "parking_lot",
-                    not(tokio_no_const_mutex_new)
-                )
-            )))]
+            #[cfg(all(loom, test))]
             $item
         )*
     }
@@ -585,7 +559,7 @@ macro_rules! cfg_not_has_const_mutex_new {
 macro_rules! cfg_not_wasi {
     ($($item:item)*) => {
         $(
-            #[cfg(not(tokio_wasi))]
+            #[cfg(not(target_os = "wasi"))]
             $item
         )*
     }
@@ -594,7 +568,7 @@ macro_rules! cfg_not_wasi {
 macro_rules! cfg_is_wasm_not_wasi {
     ($($item:item)*) => {
         $(
-            #[cfg(tokio_wasm_not_wasi)]
+            #[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
             $item
         )*
     }

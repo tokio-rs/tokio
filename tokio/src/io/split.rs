@@ -35,9 +35,12 @@ cfg_io_util! {
     where
         T: AsyncRead + AsyncWrite,
     {
+        let is_write_vectored = stream.is_write_vectored();
+
         let inner = Arc::new(Inner {
             locked: AtomicBool::new(false),
             stream: UnsafeCell::new(stream),
+            is_write_vectored,
         });
 
         let rd = ReadHalf {
@@ -53,6 +56,7 @@ cfg_io_util! {
 struct Inner<T> {
     locked: AtomicBool,
     stream: UnsafeCell<T>,
+    is_write_vectored: bool,
 }
 
 struct Guard<'a, T> {
@@ -130,6 +134,19 @@ impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         let mut inner = ready!(self.inner.poll_lock(cx));
         inner.stream_pin().poll_shutdown(cx)
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<Result<usize, io::Error>> {
+        let mut inner = ready!(self.inner.poll_lock(cx));
+        inner.stream_pin().poll_write_vectored(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        self.inner.is_write_vectored
     }
 }
 

@@ -209,6 +209,7 @@ impl<T: ?Sized> RwLock<T> {
         let resource_span = {
             let location = std::panic::Location::caller();
             let resource_span = tracing::trace_span!(
+                parent: None,
                 "runtime.resource",
                 concrete_type = "RwLock",
                 kind = "Sync",
@@ -282,6 +283,7 @@ impl<T: ?Sized> RwLock<T> {
             let location = std::panic::Location::caller();
 
             let resource_span = tracing::trace_span!(
+                parent: None,
                 "runtime.resource",
                 concrete_type = "RwLock",
                 kind = "Sync",
@@ -327,6 +329,11 @@ impl<T: ?Sized> RwLock<T> {
 
     /// Creates a new instance of an `RwLock<T>` which is unlocked.
     ///
+    /// When using the `tracing` [unstable feature], a `RwLock` created with
+    /// `const_new` will not be instrumented. As such, it will not be visible
+    /// in [`tokio-console`]. Instead, [`RwLock::new`] should be used to create
+    /// an instrumented object if that is needed.
+    ///
     /// # Examples
     ///
     /// ```
@@ -334,8 +341,10 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// static LOCK: RwLock<i32> = RwLock::const_new(5);
     /// ```
-    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
+    ///
+    /// [`tokio-console`]: https://github.com/tokio-rs/console
+    /// [unstable feature]: crate#unstable-features
+    #[cfg(not(all(loom, test)))]
     pub const fn const_new(value: T) -> RwLock<T>
     where
         T: Sized,
@@ -359,13 +368,13 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// static LOCK: RwLock<i32> = RwLock::const_with_max_readers(5, 1024);
     /// ```
-    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "parking_lot")))]
-    pub const fn const_with_max_readers(value: T, mut max_reads: u32) -> RwLock<T>
+    #[cfg(not(all(loom, test)))]
+    pub const fn const_with_max_readers(value: T, max_reads: u32) -> RwLock<T>
     where
         T: Sized,
     {
-        max_reads &= MAX_READS;
+        assert!(max_reads <= MAX_READS);
+
         RwLock {
             mr: max_reads,
             c: UnsafeCell::new(value),

@@ -270,7 +270,11 @@ impl State {
         })
     }
 
-    /// Transitions the state to `NOTIFIED`, unconditionally increasing the ref count.
+    /// Transitions the state to `NOTIFIED`, unconditionally increasing the ref
+    /// count.
+    ///
+    /// Returns `true` if the notified bit was transitioned from `0` to `1`;
+    /// otherwise `false.`
     #[cfg(all(
         tokio_unstable,
         tokio_taskdump,
@@ -278,12 +282,16 @@ impl State {
         target_os = "linux",
         any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
     ))]
-    pub(super) fn transition_to_notified_for_tracing(&self) {
+    pub(super) fn transition_to_notified_for_tracing(&self) -> bool {
         self.fetch_update_action(|mut snapshot| {
-            snapshot.set_notified();
-            snapshot.ref_inc();
-            ((), Some(snapshot))
-        });
+            if snapshot.is_notified() {
+                (false, None)
+            } else {
+                snapshot.set_notified();
+                snapshot.ref_inc();
+                (true, Some(snapshot))
+            }
+        })
     }
 
     /// Sets the cancelled bit and transitions the state to `NOTIFIED` if idle.
@@ -368,7 +376,7 @@ impl State {
             .map_err(|_| ())
     }
 
-    /// Tries to unset the JOIN_INTEREST flag.
+    /// Tries to unset the `JOIN_INTEREST` flag.
     ///
     /// Returns `Ok` if the operation happens before the task transitions to a
     /// completed state, `Err` otherwise.
@@ -522,11 +530,11 @@ impl Snapshot {
     }
 
     fn unset_notified(&mut self) {
-        self.0 &= !NOTIFIED
+        self.0 &= !NOTIFIED;
     }
 
     fn set_notified(&mut self) {
-        self.0 |= NOTIFIED
+        self.0 |= NOTIFIED;
     }
 
     pub(super) fn is_running(self) -> bool {
@@ -559,7 +567,7 @@ impl Snapshot {
     }
 
     fn unset_join_interested(&mut self) {
-        self.0 &= !JOIN_INTEREST
+        self.0 &= !JOIN_INTEREST;
     }
 
     pub(super) fn is_join_waker_set(self) -> bool {
@@ -571,7 +579,7 @@ impl Snapshot {
     }
 
     fn unset_join_waker(&mut self) {
-        self.0 &= !JOIN_WAKER
+        self.0 &= !JOIN_WAKER;
     }
 
     pub(super) fn ref_count(self) -> usize {
@@ -585,7 +593,7 @@ impl Snapshot {
 
     pub(super) fn ref_dec(&mut self) {
         assert!(self.ref_count() > 0);
-        self.0 -= REF_ONE
+        self.0 -= REF_ONE;
     }
 }
 

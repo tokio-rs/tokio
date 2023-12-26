@@ -192,7 +192,7 @@ impl<RW: AsyncRead + AsyncWrite> AsyncBufRead for BufStream<RW> {
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        self.project().inner.consume(amt)
+        self.project().inner.consume(amt);
     }
 }
 

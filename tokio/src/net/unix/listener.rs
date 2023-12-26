@@ -3,9 +3,7 @@ use crate::net::unix::{SocketAddr, UnixStream};
 
 use std::fmt;
 use std::io;
-#[cfg(not(tokio_no_as_fd))]
-use std::os::unix::io::{AsFd, BorrowedFd};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
@@ -72,7 +70,7 @@ impl UnixListener {
         Ok(UnixListener { io })
     }
 
-    /// Creates new `UnixListener` from a `std::os::unix::net::UnixListener `.
+    /// Creates new [`UnixListener`] from a [`std::os::unix::net::UnixListener`].
     ///
     /// This function is intended to be used to wrap a UnixListener from the
     /// standard library in the Tokio equivalent.
@@ -139,7 +137,7 @@ impl UnixListener {
     pub fn into_std(self) -> io::Result<std::os::unix::net::UnixListener> {
         self.io
             .into_inner()
-            .map(|io| io.into_raw_fd())
+            .map(IntoRawFd::into_raw_fd)
             .map(|raw_fd| unsafe { net::UnixListener::from_raw_fd(raw_fd) })
     }
 
@@ -211,7 +209,6 @@ impl AsRawFd for UnixListener {
     }
 }
 
-#[cfg(not(tokio_no_as_fd))]
 impl AsFd for UnixListener {
     fn as_fd(&self) -> BorrowedFd<'_> {
         unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }

@@ -54,7 +54,7 @@ pub(super) fn read_to_end_internal<V: VecU8, R: AsyncRead + ?Sized>(
     }
 }
 
-/// Tries to read from the provided AsyncRead.
+/// Tries to read from the provided [`AsyncRead`].
 ///
 /// The length of the buffer is increased by the number of bytes read.
 fn poll_read_to_end<V: VecU8, R: AsyncRead + ?Sized>(

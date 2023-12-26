@@ -1,6 +1,7 @@
-use std::io::{BufRead, Read, Write};
+use std::io::{BufRead, Read, Seek, Write};
 use tokio::io::{
-    AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
+    AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite,
+    AsyncWriteExt,
 };
 
 /// Use a [`tokio::io::AsyncRead`] synchronously as a [`std::io::Read`] or
@@ -79,6 +80,13 @@ impl<T: AsyncWrite + Unpin> Write for SyncIoBridge<T> {
     }
 }
 
+impl<T: AsyncSeek + Unpin> Seek for SyncIoBridge<T> {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        let src = &mut self.src;
+        self.rt.block_on(AsyncSeekExt::seek(src, pos))
+    }
+}
+
 // Because https://doc.rust-lang.org/std/io/trait.Write.html#method.is_write_vectored is at the time
 // of this writing still unstable, we expose this as part of a standalone method.
 impl<T: AsyncWrite> SyncIoBridge<T> {
@@ -139,5 +147,10 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// be initially invoked outside of an asynchronous context.
     pub fn new_with_handle(src: T, rt: tokio::runtime::Handle) -> Self {
         Self { src, rt }
+    }
+
+    /// Consume this bridge, returning the underlying stream.
+    pub fn into_inner(self) -> T {
+        self.src
     }
 }

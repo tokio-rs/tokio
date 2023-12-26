@@ -28,7 +28,6 @@ use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::*;
-use std::task::Poll::*;
 use std::task::{Context, Poll, Waker};
 use std::{cmp, fmt};
 
@@ -178,20 +177,42 @@ impl Semaphore {
     /// Creates a new semaphore with the initial number of permits.
     ///
     /// Maximum number of permits on 32-bit platforms is `1<<29`.
-    ///
-    /// If the specified number of permits exceeds the maximum permit amount
-    /// Then the value will get clamped to the maximum number of permits.
-    #[cfg(all(feature = "parking_lot", not(all(loom, test))))]
-    pub(crate) const fn const_new(mut permits: usize) -> Self {
-        // NOTE: assertions and by extension panics are still being worked on: https://github.com/rust-lang/rust/issues/74925
-        // currently we just clamp the permit count when it exceeds the max
-        permits &= Self::MAX_PERMITS;
+    #[cfg(not(all(loom, test)))]
+    pub(crate) const fn const_new(permits: usize) -> Self {
+        assert!(permits <= Self::MAX_PERMITS);
 
         Self {
             permits: AtomicUsize::new(permits << Self::PERMIT_SHIFT),
             waiters: Mutex::const_new(Waitlist {
                 queue: LinkedList::new(),
                 closed: false,
+            }),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: tracing::Span::none(),
+        }
+    }
+
+    /// Creates a new closed semaphore with 0 permits.
+    pub(crate) fn new_closed() -> Self {
+        Self {
+            permits: AtomicUsize::new(Self::CLOSED),
+            waiters: Mutex::new(Waitlist {
+                queue: LinkedList::new(),
+                closed: true,
+            }),
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: tracing::Span::none(),
+        }
+    }
+
+    /// Creates a new closed semaphore with 0 permits.
+    #[cfg(not(all(loom, test)))]
+    pub(crate) const fn const_new_closed() -> Self {
+        Self {
+            permits: AtomicUsize::new(Self::CLOSED),
+            waiters: Mutex::const_new(Waitlist {
+                queue: LinkedList::new(),
+                closed: true,
             }),
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             resource_span: tracing::Span::none(),
@@ -369,7 +390,7 @@ impl Semaphore {
         let mut waiters = loop {
             // Has the semaphore closed?
             if curr & Self::CLOSED > 0 {
-                return Ready(Err(AcquireError::closed()));
+                return Poll::Ready(Err(AcquireError::closed()));
             }
 
             let mut remaining = 0;
@@ -414,7 +435,7 @@ impl Semaphore {
                                 )
                             });
 
-                            return Ready(Ok(()));
+                            return Poll::Ready(Ok(()));
                         } else if lock.is_none() {
                             break self.waiters.lock();
                         }
@@ -426,7 +447,7 @@ impl Semaphore {
         };
 
         if waiters.closed {
-            return Ready(Err(AcquireError::closed()));
+            return Poll::Ready(Err(AcquireError::closed()));
         }
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -440,7 +461,7 @@ impl Semaphore {
 
         if node.assign_permits(&mut acquired) {
             self.add_permits_locked(acquired, waiters);
-            return Ready(Ok(()));
+            return Poll::Ready(Ok(()));
         }
 
         assert_eq!(acquired, 0);
@@ -453,8 +474,7 @@ impl Semaphore {
             // Do we need to register the new waker?
             if waker
                 .as_ref()
-                .map(|waker| !waker.will_wake(cx.waker()))
-                .unwrap_or(true)
+                .map_or(true, |waker| !waker.will_wake(cx.waker()))
             {
                 old_waker = std::mem::replace(waker, Some(cx.waker().clone()));
             }
@@ -472,7 +492,7 @@ impl Semaphore {
         drop(waiters);
         drop(old_waker);
 
-        Pending
+        Poll::Pending
     }
 }
 
@@ -550,15 +570,15 @@ impl Future for Acquire<'_> {
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
         let result = match semaphore.poll_acquire(cx, needed, node, *queued) {
-            Pending => {
+            Poll::Pending => {
                 *queued = true;
-                Pending
+                Poll::Pending
             }
-            Ready(r) => {
+            Poll::Ready(r) => {
                 coop.made_progress();
                 r?;
                 *queued = false;
-                Ready(Ok(()))
+                Poll::Ready(Ok(()))
             }
         };
 

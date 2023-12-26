@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 #[test]
 fn smoke() {
-    use crate::sync::mpsc::block::Read::*;
+    use crate::sync::mpsc::block::Read;
 
     const NUM_TX: usize = 2;
     const NUM_MSG: usize = 2;
@@ -28,7 +28,7 @@ fn smoke() {
 
         loop {
             match rx.pop(&tx) {
-                Some(Value((th, v))) => {
+                Some(Read::Value((th, v))) => {
                     assert_eq!(v, next[th]);
                     next[th] += 1;
 
@@ -36,7 +36,7 @@ fn smoke() {
                         break;
                     }
                 }
-                Some(Closed) => {
+                Some(Read::Closed) => {
                     panic!();
                 }
                 None => {

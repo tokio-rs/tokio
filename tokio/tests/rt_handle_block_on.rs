@@ -3,17 +3,17 @@
 
 // All io tests that deal with shutdown is currently ignored because there are known bugs in with
 // shutting down the io driver while concurrently registering new resources. See
-// https://github.com/tokio-rs/tokio/pull/3569#pullrequestreview-612703467 fo more details.
+// https://github.com/tokio-rs/tokio/pull/3569#pullrequestreview-612703467 for more details.
 //
 // When this has been fixed we want to re-enable these tests.
 
 use std::time::Duration;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::mpsc;
-#[cfg(not(tokio_wasi))]
+#[cfg(not(target_os = "wasi"))]
 use tokio::{net, time};
 
-#[cfg(not(tokio_wasi))] // Wasi doesn't support threads
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 macro_rules! multi_threaded_rt_test {
     ($($t:tt)*) => {
         mod threaded_scheduler_4_threads_only {
@@ -46,7 +46,7 @@ macro_rules! multi_threaded_rt_test {
     }
 }
 
-#[cfg(not(tokio_wasi))]
+#[cfg(not(target_os = "wasi"))]
 macro_rules! rt_test {
     ($($t:tt)*) => {
         mod current_thread_scheduler {
@@ -126,7 +126,7 @@ fn unbounded_mpsc_channel() {
     })
 }
 
-#[cfg(not(tokio_wasi))] // Wasi doesn't support file operations or bind
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support file operations or bind
 rt_test! {
     use tokio::fs;
     // ==== spawn blocking futures ======
@@ -419,7 +419,7 @@ rt_test! {
     }
 }
 
-#[cfg(not(tokio_wasi))]
+#[cfg(not(target_os = "wasi"))]
 multi_threaded_rt_test! {
     #[cfg(unix)]
     #[test]
@@ -482,7 +482,7 @@ multi_threaded_rt_test! {
 // ==== utils ======
 
 /// Create a new multi threaded runtime
-#[cfg(not(tokio_wasi))]
+#[cfg(not(target_os = "wasi"))]
 fn new_multi_thread(n: usize) -> Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(n)
@@ -513,7 +513,7 @@ where
         f();
     }
 
-    #[cfg(not(tokio_wasi))]
+    #[cfg(not(target_os = "wasi"))]
     {
         let rt = new_multi_thread(1);
         let _enter = rt.enter();
@@ -523,7 +523,7 @@ where
         f();
     }
 
-    #[cfg(not(tokio_wasi))]
+    #[cfg(not(target_os = "wasi"))]
     {
         let rt = new_multi_thread(4);
         let _enter = rt.enter();

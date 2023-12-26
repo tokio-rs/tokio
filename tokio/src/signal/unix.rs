@@ -43,7 +43,7 @@ impl Storage for OsStorage {
     where
         F: FnMut(&'a EventInfo),
     {
-        self.iter().map(|si| &si.event_info).for_each(f)
+        self.iter().map(|si| &si.event_info).for_each(f);
     }
 }
 
@@ -224,7 +224,7 @@ pub(crate) struct SignalInfo {
 impl Default for SignalInfo {
     fn default() -> SignalInfo {
         SignalInfo {
-            event_info: Default::default(),
+            event_info: EventInfo::default(),
             init: Once::new(),
             initialized: AtomicBool::new(false),
         }

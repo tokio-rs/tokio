@@ -26,7 +26,7 @@ pin_project! {
     }
 }
 
-/// Convert from a [`Stream`](crate::Stream).
+/// Convert from a [`Stream`].
 ///
 /// This trait is not intended to be used directly. Instead, call
 /// [`StreamExt::collect()`](super::StreamExt::collect).

@@ -133,7 +133,7 @@ cfg_test_util! {
                 Some(clock) => clock.pause(),
                 None => Err("time cannot be frozen from outside the Tokio runtime"),
             }
-        })
+        });
     }
 
     /// Resumes time.
@@ -161,7 +161,7 @@ cfg_test_util! {
 
             inner.unfrozen = Some(std::time::Instant::now());
             Ok(())
-        })
+        });
     }
 
     /// Advances time.

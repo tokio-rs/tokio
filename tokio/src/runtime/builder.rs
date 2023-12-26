@@ -93,6 +93,8 @@ pub struct Builder {
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(super) event_interval: u32,
 
+    pub(super) local_queue_capacity: usize,
+
     /// When true, the multi-threade scheduler LIFO slot should not be used.
     ///
     /// This option should only be exposed as unstable.
@@ -197,8 +199,10 @@ pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync +
 #[derive(Clone, Copy)]
 pub(crate) enum Kind {
     CurrentThread,
-    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
     MultiThread,
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+    MultiThreadAlt,
 }
 
 impl Builder {
@@ -229,6 +233,26 @@ impl Builder {
         pub fn new_multi_thread() -> Builder {
             // The number `61` is fairly arbitrary. I believe this value was copied from golang.
             Builder::new(Kind::MultiThread, 61)
+        }
+
+        cfg_unstable! {
+            /// Returns a new builder with the alternate multi thread scheduler
+            /// selected.
+            ///
+            /// The alternate multi threaded scheduler is an in-progress
+            /// candidate to replace the existing multi threaded scheduler. It
+            /// currently does not scale as well to 16+ processors.
+            ///
+            /// This runtime flavor is currently **not considered production
+            /// ready**.
+            ///
+            /// Configuration methods can be chained on the return value.
+            #[cfg(feature = "rt-multi-thread")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+            pub fn new_multi_thread_alt() -> Builder {
+                // The number `61` is fairly arbitrary. I believe this value was copied from golang.
+                Builder::new(Kind::MultiThreadAlt, 61)
+            }
         }
     }
 
@@ -275,6 +299,12 @@ impl Builder {
             global_queue_interval: None,
             event_interval,
 
+            #[cfg(not(loom))]
+            local_queue_capacity: 256,
+
+            #[cfg(loom)]
+            local_queue_capacity: 4,
+
             seed_generator: RngSeedGenerator::new(RngSeed::new()),
 
             #[cfg(tokio_unstable)]
@@ -282,7 +312,7 @@ impl Builder {
 
             metrics_poll_count_histogram_enable: false,
 
-            metrics_poll_count_histogram: Default::default(),
+            metrics_poll_count_histogram: HistogramBuilder::default(),
 
             disable_lifo_slot: false,
         }
@@ -374,9 +404,17 @@ impl Builder {
     /// Specifies the limit for additional threads spawned by the Runtime.
     ///
     /// These threads are used for blocking operations like tasks spawned
-    /// through [`spawn_blocking`]. Unlike the [`worker_threads`], they are not
-    /// always active and will exit if left idle for too long. You can change
-    /// this timeout duration with [`thread_keep_alive`].
+    /// through [`spawn_blocking`], this includes but is not limited to:
+    /// - [`fs`] operations
+    /// - dns resolution through [`ToSocketAddrs`]
+    /// - writing to [`Stdout`] or [`Stderr`]
+    /// - reading from [`Stdin`]
+    ///
+    /// Unlike the [`worker_threads`], they are not always active and will exit
+    /// if left idle for too long. You can change this timeout duration with [`thread_keep_alive`].
+    ///
+    /// It's recommended to not set this limit too low in order to avoid hanging on operations
+    /// requiring [`spawn_blocking`].
     ///
     /// The default value is 512.
     ///
@@ -390,6 +428,11 @@ impl Builder {
     /// current `max_blocking_threads` does not include async worker threads in the count.
     ///
     /// [`spawn_blocking`]: fn@crate::task::spawn_blocking
+    /// [`fs`]: mod@crate::fs
+    /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
+    /// [`Stdout`]: struct@crate::io::Stdout
+    /// [`Stdin`]: struct@crate::io::Stdin
+    /// [`Stderr`]: struct@crate::io::Stderr
     /// [`worker_threads`]: Self::worker_threads
     /// [`thread_keep_alive`]: Self::thread_keep_alive
     #[track_caller]
@@ -654,8 +697,10 @@ impl Builder {
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_runtime(),
-            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
             Kind::MultiThread => self.build_threaded_runtime(),
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+            Kind::MultiThreadAlt => self.build_alt_threaded_runtime(),
         }
     }
 
@@ -663,8 +708,10 @@ impl Builder {
         driver::Cfg {
             enable_pause_time: match self.kind {
                 Kind::CurrentThread => true,
-                #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
                 Kind::MultiThread => false,
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+                Kind::MultiThreadAlt => false,
             },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
@@ -699,10 +746,8 @@ impl Builder {
     ///
     /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task.
     ///
-    /// By default the global queue interval is:
-    ///
-    /// * `31` for the current-thread scheduler.
-    /// * `61` for the multithreaded scheduler.
+    /// By default the global queue interval is 31 for the current-thread scheduler. Please see
+    /// [the module documentation] for the default behavior of the multi-thread scheduler.
     ///
     /// Schedulers have a local queue of already-claimed tasks, and a global queue of incoming
     /// tasks. Setting the interval to a smaller value increases the fairness of the scheduler,
@@ -710,6 +755,8 @@ impl Builder {
     /// getting started on new work, especially if tasks frequently yield rather than complete
     /// or await on further I/O. Conversely, a higher value prioritizes existing work, and
     /// is a good choice when most tasks quickly complete polling.
+    ///
+    /// [the module documentation]: crate::runtime#multi-threaded-runtime-behavior-at-the-time-of-writing
     ///
     /// # Examples
     ///
@@ -1020,6 +1067,14 @@ impl Builder {
         }
     }
 
+    cfg_loom! {
+        pub(crate) fn local_queue_capacity(&mut self, value: usize) -> &mut Self {
+            assert!(value.is_power_of_two());
+            self.local_queue_capacity = value;
+            self
+        }
+    }
+
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::scheduler::{self, CurrentThread};
         use crate::runtime::{runtime::Scheduler, Config};
@@ -1048,6 +1103,7 @@ impl Builder {
                 after_unpark: self.after_unpark.clone(),
                 global_queue_interval: self.global_queue_interval,
                 event_interval: self.event_interval,
+                local_queue_capacity: self.local_queue_capacity,
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
@@ -1198,6 +1254,7 @@ cfg_rt_multi_thread! {
                     after_unpark: self.after_unpark.clone(),
                     global_queue_interval: self.global_queue_interval,
                     event_interval: self.event_interval,
+                    local_queue_capacity: self.local_queue_capacity,
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
@@ -1213,6 +1270,48 @@ cfg_rt_multi_thread! {
             launch.launch();
 
             Ok(Runtime::from_parts(Scheduler::MultiThread(scheduler), handle, blocking_pool))
+        }
+
+        cfg_unstable! {
+            fn build_alt_threaded_runtime(&mut self) -> io::Result<Runtime> {
+                use crate::loom::sys::num_cpus;
+                use crate::runtime::{Config, runtime::Scheduler};
+                use crate::runtime::scheduler::MultiThreadAlt;
+
+                let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
+                let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+
+                // Create the blocking pool
+                let blocking_pool =
+                    blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
+                let blocking_spawner = blocking_pool.spawner().clone();
+
+                // Generate a rng seed for this runtime.
+                let seed_generator_1 = self.seed_generator.next_generator();
+                let seed_generator_2 = self.seed_generator.next_generator();
+
+                let (scheduler, handle) = MultiThreadAlt::new(
+                    core_threads,
+                    driver,
+                    driver_handle,
+                    blocking_spawner,
+                    seed_generator_2,
+                    Config {
+                        before_park: self.before_park.clone(),
+                        after_unpark: self.after_unpark.clone(),
+                        global_queue_interval: self.global_queue_interval,
+                        event_interval: self.event_interval,
+                        local_queue_capacity: self.local_queue_capacity,
+                        #[cfg(tokio_unstable)]
+                        unhandled_panic: self.unhandled_panic.clone(),
+                        disable_lifo_slot: self.disable_lifo_slot,
+                        seed_generator: seed_generator_1,
+                        metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                    },
+                );
+
+                Ok(Runtime::from_parts(Scheduler::MultiThreadAlt(scheduler), handle, blocking_pool))
+            }
         }
     }
 }

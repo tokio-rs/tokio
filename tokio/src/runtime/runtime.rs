@@ -9,6 +9,10 @@ use std::time::Duration;
 cfg_rt_multi_thread! {
     use crate::runtime::Builder;
     use crate::runtime::scheduler::MultiThread;
+
+    cfg_unstable! {
+        use crate::runtime::scheduler::MultiThreadAlt;
+    }
 }
 
 /// The Tokio runtime.
@@ -109,6 +113,9 @@ pub enum RuntimeFlavor {
     CurrentThread,
     /// The flavor that executes tasks across multiple threads.
     MultiThread,
+    /// The flavor that executes tasks across multiple threads.
+    #[cfg(tokio_unstable)]
+    MultiThreadAlt,
 }
 
 /// The runtime scheduler is either a multi-thread or a current-thread executor.
@@ -118,8 +125,12 @@ pub(super) enum Scheduler {
     CurrentThread(CurrentThread),
 
     /// Execute tasks across multiple threads.
-    #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
     MultiThread(MultiThread),
+
+    /// Execute tasks across multiple threads.
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+    MultiThreadAlt(MultiThreadAlt),
 }
 
 impl Runtime {
@@ -249,6 +260,7 @@ impl Runtime {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
+    /// ```
     #[track_caller]
     pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
@@ -334,8 +346,10 @@ impl Runtime {
 
         match &self.scheduler {
             Scheduler::CurrentThread(exec) => exec.block_on(&self.handle.inner, future),
-            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
             Scheduler::MultiThread(exec) => exec.block_on(&self.handle.inner, future),
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+            Scheduler::MultiThreadAlt(exec) => exec.block_on(&self.handle.inner, future),
         }
     }
 
@@ -436,7 +450,7 @@ impl Runtime {
     /// }
     /// ```
     pub fn shutdown_background(self) {
-        self.shutdown_timeout(Duration::from_nanos(0))
+        self.shutdown_timeout(Duration::from_nanos(0));
     }
 }
 
@@ -450,8 +464,14 @@ impl Drop for Runtime {
                 let _guard = context::try_set_current(&self.handle.inner);
                 current_thread.shutdown(&self.handle.inner);
             }
-            #[cfg(all(feature = "rt-multi-thread", not(tokio_wasi)))]
+            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
             Scheduler::MultiThread(multi_thread) => {
+                // The threaded scheduler drops its tasks on its worker threads, which is
+                // already in the runtime's context.
+                multi_thread.shutdown(&self.handle.inner);
+            }
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+            Scheduler::MultiThreadAlt(multi_thread) => {
                 // The threaded scheduler drops its tasks on its worker threads, which is
                 // already in the runtime's context.
                 multi_thread.shutdown(&self.handle.inner);
@@ -459,6 +479,10 @@ impl Drop for Runtime {
         }
     }
 }
+
+impl std::panic::UnwindSafe for Runtime {}
+
+impl std::panic::RefUnwindSafe for Runtime {}
 
 cfg_metrics! {
     impl Runtime {

@@ -168,7 +168,7 @@ async fn reset_sleep_to_past() {
     assert_ready!(sleep.poll());
 }
 
-#[cfg(not(tokio_wasi))] // Wasi doesn't support panic recovery
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #[test]
 #[should_panic]
 fn creating_sleep_outside_of_context() {
@@ -189,7 +189,7 @@ async fn greater_than_max() {
 
 #[tokio::test]
 async fn short_sleeps() {
-    for _ in 0..10000 {
+    for _ in 0..1000 {
         tokio::time::sleep(std::time::Duration::from_millis(0)).await;
     }
 }

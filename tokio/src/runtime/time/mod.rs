@@ -108,9 +108,6 @@ struct Inner {
 
 /// Time state shared which must be protected by a `Mutex`
 struct InnerState {
-    /// The last published timer `elapsed` value.
-    elapsed: u64,
-
     /// The earliest time at which we promise to wake up without unparking.
     next_wake: Option<NonZeroU64>,
 
@@ -132,7 +129,6 @@ impl Driver {
             time_source,
             inner: Inner {
                 state: Mutex::new(InnerState {
-                    elapsed: 0,
                     next_wake: None,
                     wheel: wheel::Wheel::new(),
                 }),
@@ -149,11 +145,11 @@ impl Driver {
     }
 
     pub(crate) fn park(&mut self, handle: &driver::Handle) {
-        self.park_internal(handle, None)
+        self.park_internal(handle, None);
     }
 
     pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
-        self.park_internal(handle, Some(duration))
+        self.park_internal(handle, Some(duration));
     }
 
     pub(crate) fn shutdown(&mut self, rt_handle: &driver::Handle) {
@@ -253,7 +249,7 @@ impl Handle {
     pub(self) fn process(&self, clock: &Clock) {
         let now = self.time_source().now(clock);
 
-        self.process_at_time(now)
+        self.process_at_time(now);
     }
 
     pub(self) fn process_at_time(&self, mut now: u64) {
@@ -262,14 +258,14 @@ impl Handle {
 
         let mut lock = self.inner.lock();
 
-        if now < lock.elapsed {
+        if now < lock.wheel.elapsed() {
             // Time went backwards! This normally shouldn't happen as the Rust language
             // guarantees that an Instant is monotonic, but can happen when running
             // Linux in a VM on a Windows host due to std incorrectly trusting the
             // hardware clock to be monotonic.
             //
             // See <https://github.com/tokio-rs/tokio/issues/3619> for more information.
-            now = lock.elapsed;
+            now = lock.wheel.elapsed();
         }
 
         while let Some(entry) = lock.wheel.poll(now) {
@@ -296,8 +292,6 @@ impl Handle {
             }
         }
 
-        // Update the elapsed cache
-        lock.elapsed = lock.wheel.elapsed();
         lock.next_wake = lock
             .wheel
             .poll_at()
@@ -305,7 +299,7 @@ impl Handle {
 
         drop(lock);
 
-        for waker in waker_list[0..waker_idx].iter_mut() {
+        for waker in &mut waker_list[0..waker_idx] {
             waker.take().unwrap().wake();
         }
     }

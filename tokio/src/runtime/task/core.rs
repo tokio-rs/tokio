@@ -17,6 +17,7 @@ use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule};
 use crate::util::linked_list;
 
+use std::num::NonZeroU64;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
@@ -56,25 +57,20 @@ use std::task::{Context, Poll, Waker};
     ),
     repr(align(128))
 )]
-// arm, mips, mips64, riscv64, sparc, and hexagon have 32-byte cache line size.
+// arm, mips, mips64, sparc, and hexagon have 32-byte cache line size.
 //
 // Sources:
 // - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_arm.go#L7
 // - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mips.go#L7
 // - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mipsle.go#L7
 // - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_mips64x.go#L9
-// - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_riscv64.go#L7
 // - https://github.com/torvalds/linux/blob/3516bd729358a2a9b090c1905bd2a3fa926e24c6/arch/sparc/include/asm/cache.h#L17
 // - https://github.com/torvalds/linux/blob/3516bd729358a2a9b090c1905bd2a3fa926e24c6/arch/hexagon/include/asm/cache.h#L12
-//
-// riscv32 is assumed not to exceed the cache line size of riscv64.
 #[cfg_attr(
     any(
         target_arch = "arm",
         target_arch = "mips",
         target_arch = "mips64",
-        target_arch = "riscv32",
-        target_arch = "riscv64",
         target_arch = "sparc",
         target_arch = "hexagon",
     ),
@@ -91,12 +87,13 @@ use std::task::{Context, Poll, Waker};
 // - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_s390x.go#L7
 // - https://github.com/torvalds/linux/blob/3516bd729358a2a9b090c1905bd2a3fa926e24c6/arch/s390/include/asm/cache.h#L13
 #[cfg_attr(target_arch = "s390x", repr(align(256)))]
-// x86, wasm, and sparc64 have 64-byte cache line size.
+// x86, riscv, wasm, and sparc64 have 64-byte cache line size.
 //
 // Sources:
 // - https://github.com/golang/go/blob/dda2991c2ea0c5914714469c4defc2562a907230/src/internal/cpu/cpu_x86.go#L9
 // - https://github.com/golang/go/blob/3dd58676054223962cd915bb0934d1f9f489d4d2/src/internal/cpu/cpu_wasm.go#L7
 // - https://github.com/torvalds/linux/blob/3516bd729358a2a9b090c1905bd2a3fa926e24c6/arch/sparc/include/asm/cache.h#L19
+// - https://github.com/torvalds/linux/blob/3516bd729358a2a9b090c1905bd2a3fa926e24c6/arch/riscv/include/asm/cache.h#L10
 //
 // All others are assumed to have 64-byte cache line size.
 #[cfg_attr(
@@ -107,8 +104,6 @@ use std::task::{Context, Poll, Waker};
         target_arch = "arm",
         target_arch = "mips",
         target_arch = "mips64",
-        target_arch = "riscv32",
-        target_arch = "riscv64",
         target_arch = "sparc",
         target_arch = "hexagon",
         target_arch = "m68k",
@@ -164,7 +159,7 @@ pub(crate) struct Header {
 
     /// This integer contains the id of the OwnedTasks or LocalOwnedTasks that
     /// this task is stored in. If the task is not in any list, should be the
-    /// id of the list that it was previously in, or zero if it has never been
+    /// id of the list that it was previously in, or `None` if it has never been
     /// in any list.
     ///
     /// Once a task has been bound to a list, it can never be bound to another
@@ -173,7 +168,7 @@ pub(crate) struct Header {
     /// The id is not unset when removed from a list because we want to be able
     /// to read the id without synchronization, even if it is concurrently being
     /// removed from the list.
-    pub(super) owner_id: UnsafeCell<u64>,
+    pub(super) owner_id: UnsafeCell<Option<NonZeroU64>>,
 
     /// The tracing ID for this instrumented task.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -221,7 +216,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 state,
                 queue_next: UnsafeCell::new(None),
                 vtable,
-                owner_id: UnsafeCell::new(0),
+                owner_id: UnsafeCell::new(None),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
             }
@@ -384,7 +379,7 @@ impl<T: Future, S: Schedule> Core<T, S> {
 
     unsafe fn set_stage(&self, stage: Stage<T>) {
         let _guard = TaskIdGuard::enter(self.task_id);
-        self.stage.stage.with_mut(|ptr| *ptr = stage)
+        self.stage.stage.with_mut(|ptr| *ptr = stage);
     }
 }
 
@@ -394,13 +389,13 @@ impl Header {
     }
 
     // safety: The caller must guarantee exclusive access to this field, and
-    // must ensure that the id is either 0 or the id of the OwnedTasks
+    // must ensure that the id is either `None` or the id of the OwnedTasks
     // containing this task.
-    pub(super) unsafe fn set_owner_id(&self, owner: u64) {
-        self.owner_id.with_mut(|ptr| *ptr = owner);
+    pub(super) unsafe fn set_owner_id(&self, owner: NonZeroU64) {
+        self.owner_id.with_mut(|ptr| *ptr = Some(owner));
     }
 
-    pub(super) fn get_owner_id(&self) -> u64 {
+    pub(super) fn get_owner_id(&self) -> Option<NonZeroU64> {
         // safety: If there are concurrent writes, then that write has violated
         // the safety requirements on `set_owner_id`.
         unsafe { self.owner_id.with(|ptr| *ptr) }

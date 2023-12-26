@@ -8,9 +8,7 @@ use crate::net::unix::SocketAddr;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
-#[cfg(not(tokio_no_as_fd))]
-use std::os::unix::io::{AsFd, BorrowedFd};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::pin::Pin;
@@ -744,7 +742,7 @@ impl UnixStream {
             .await
     }
 
-    /// Creates new `UnixStream` from a `std::os::unix::net::UnixStream`.
+    /// Creates new [`UnixStream`] from a [`std::os::unix::net::UnixStream`].
     ///
     /// This function is intended to be used to wrap a UnixStream from the
     /// standard library in the Tokio equivalent.
@@ -830,7 +828,7 @@ impl UnixStream {
     pub fn into_std(self) -> io::Result<std::os::unix::net::UnixStream> {
         self.io
             .into_inner()
-            .map(|io| io.into_raw_fd())
+            .map(IntoRawFd::into_raw_fd)
             .map(|raw_fd| unsafe { std::os::unix::net::UnixStream::from_raw_fd(raw_fd) })
     }
 
@@ -1039,7 +1037,6 @@ impl AsRawFd for UnixStream {
     }
 }
 
-#[cfg(not(tokio_no_as_fd))]
 impl AsFd for UnixStream {
     fn as_fd(&self) -> BorrowedFd<'_> {
         unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }

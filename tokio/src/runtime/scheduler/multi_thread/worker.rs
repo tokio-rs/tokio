@@ -158,7 +158,7 @@ pub(crate) struct Shared {
     idle: Idle,
 
     /// Collection of all active tasks spawned onto this executor.
-    pub(super) owned: OwnedTasks<Arc<Handle>>,
+    pub(crate) owned: OwnedTasks<Arc<Handle>>,
 
     /// Data synchronized by the scheduler mutex
     pub(super) synced: Mutex<Synced>,
@@ -287,7 +287,7 @@ pub(super) fn create(
             remotes: remotes.into_boxed_slice(),
             inject,
             idle,
-            owned: OwnedTasks::new(),
+            owned: OwnedTasks::new(size),
             synced: Mutex::new(Synced {
                 idle: idle_synced,
                 inject: inject_synced,
@@ -543,11 +543,11 @@ impl Context {
                 } else {
                     self.park(core)
                 };
+                core.stats.start_processing_scheduled_tasks();
             }
         }
 
         core.pre_shutdown(&self.worker);
-
         // Signal shutdown
         self.worker.handle.shutdown_core(core);
         Err(())
@@ -787,11 +787,15 @@ impl Core {
                 cap,
             );
 
+            // Take at least one task since the first task is returned directly
+            // and not pushed onto the local queue.
+            let n = usize::max(1, n);
+
             let mut synced = worker.handle.shared.synced.lock();
             // safety: passing in the correct `inject::Synced`.
             let mut tasks = unsafe { worker.inject().pop_n(&mut synced.inject, n) };
 
-            // Pop the first task to return immedietly
+            // Pop the first task to return immediately
             let ret = tasks.next();
 
             // Push the rest of the on the run queue
@@ -950,8 +954,16 @@ impl Core {
     /// Signals all tasks to shut down, and waits for them to complete. Must run
     /// before we enter the single-threaded phase of shutdown processing.
     fn pre_shutdown(&mut self, worker: &Worker) {
+        // Start from a random inner list
+        let start = self
+            .rand
+            .fastrand_n(worker.handle.shared.owned.get_shard_size() as u32);
         // Signal to all tasks to shut down.
-        worker.handle.shared.owned.close_and_shutdown_all();
+        worker
+            .handle
+            .shared
+            .owned
+            .close_and_shutdown_all(start as usize);
 
         self.stats
             .submit(&worker.handle.shared.worker_metrics[worker.index]);
@@ -1021,7 +1033,7 @@ impl Handle {
             // Otherwise, use the inject queue.
             self.push_remote_task(task);
             self.notify_parked_remote();
-        })
+        });
     }
 
     pub(super) fn schedule_option_task_without_yield(&self, task: Option<Notified>) {

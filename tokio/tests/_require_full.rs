@@ -1,4 +1,4 @@
-#[cfg(not(any(feature = "full", tokio_wasm)))]
+#[cfg(not(any(feature = "full", target_family = "wasm")))]
 compile_error!("run main Tokio tests with `--features full`");
 
 // CI sets `--cfg tokio_no_parking_lot` when trying to run tests with

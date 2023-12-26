@@ -4,9 +4,7 @@ use crate::net::unix::SocketAddr;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
-#[cfg(not(tokio_no_as_fd))]
-use std::os::unix::io::{AsFd, BorrowedFd};
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::task::{Context, Poll};
@@ -425,7 +423,7 @@ impl UnixDatagram {
         Ok((a, b))
     }
 
-    /// Creates new `UnixDatagram` from a `std::os::unix::net::UnixDatagram`.
+    /// Creates new [`UnixDatagram`] from a [`std::os::unix::net::UnixDatagram`].
     ///
     /// This function is intended to be used to wrap a UnixDatagram from the
     /// standard library in the Tokio equivalent.
@@ -500,7 +498,7 @@ impl UnixDatagram {
     pub fn into_std(self) -> io::Result<std::os::unix::net::UnixDatagram> {
         self.io
             .into_inner()
-            .map(|io| io.into_raw_fd())
+            .map(IntoRawFd::into_raw_fd)
             .map(|raw_fd| unsafe { std::os::unix::net::UnixDatagram::from_raw_fd(raw_fd) })
     }
 
@@ -1578,7 +1576,6 @@ impl AsRawFd for UnixDatagram {
     }
 }
 
-#[cfg(not(tokio_no_as_fd))]
 impl AsFd for UnixDatagram {
     fn as_fd(&self) -> BorrowedFd<'_> {
         unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }

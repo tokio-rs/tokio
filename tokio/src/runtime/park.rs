@@ -67,9 +67,9 @@ impl ParkThread {
         CURRENT_THREAD_PARK_COUNT.with(|count| count.fetch_add(1, SeqCst));
 
         // Wasm doesn't have threads, so just sleep.
-        #[cfg(not(tokio_wasm))]
+        #[cfg(not(target_family = "wasm"))]
         self.inner.park_timeout(duration);
-        #[cfg(tokio_wasm)]
+        #[cfg(target_family = "wasm")]
         std::thread::sleep(duration);
     }
 
@@ -81,7 +81,6 @@ impl ParkThread {
 // ==== impl Inner ====
 
 impl Inner {
-    /// Parks the current thread for at most `dur`.
     fn park(&self) {
         // If we were previously notified then we consume this notification and
         // return quickly.
@@ -129,6 +128,7 @@ impl Inner {
         }
     }
 
+    /// Parks the current thread for at most `dur`.
     fn park_timeout(&self, dur: Duration) {
         // Like `park` above we have a fast path for an already-notified thread,
         // and afterwards we start coordinating for a sleep. Return quickly.
@@ -197,7 +197,7 @@ impl Inner {
         // to release `lock`.
         drop(self.mutex.lock());
 
-        self.condvar.notify_one()
+        self.condvar.notify_one();
     }
 
     fn shutdown(&self) {
@@ -243,11 +243,11 @@ impl CachedParkThread {
     }
 
     pub(crate) fn waker(&self) -> Result<Waker, AccessError> {
-        self.unpark().map(|unpark| unpark.into_waker())
+        self.unpark().map(UnparkThread::into_waker)
     }
 
     fn unpark(&self) -> Result<UnparkThread, AccessError> {
-        self.with_current(|park_thread| park_thread.unpark())
+        self.with_current(ParkThread::unpark)
     }
 
     pub(crate) fn park(&mut self) {

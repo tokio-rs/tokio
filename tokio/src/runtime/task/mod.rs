@@ -179,7 +179,7 @@ mod harness;
 use self::harness::Harness;
 
 mod id;
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub, unused_imports))]
 pub use id::{id, try_id, Id};
 
 #[cfg(feature = "rt")]
@@ -208,6 +208,7 @@ cfg_taskdump! {
 
 use crate::future::Future;
 use crate::util::linked_list;
+use crate::util::sharded_list;
 
 use std::marker::PhantomData;
 use std::ptr::NonNull;
@@ -361,6 +362,21 @@ impl<S: 'static> Task<S> {
     fn header_ptr(&self) -> NonNull<Header> {
         self.raw.header_ptr()
     }
+
+    cfg_taskdump! {
+        /// Notify the task for task dumping.
+        ///
+        /// Returns `None` if the task has already been notified.
+        pub(super) fn notify_for_tracing(&self) -> Option<Notified<S>> {
+            if self.as_raw().state().transition_to_notified_for_tracing() {
+                // SAFETY: `transition_to_notified_for_tracing` increments the
+                // refcount.
+                Some(unsafe { Notified(Task::new(self.raw)) })
+            } else {
+                None
+            }
+        }
+    }
 }
 
 impl<S: 'static> Notified<S> {
@@ -404,7 +420,7 @@ impl<S: Schedule> LocalNotified<S> {
 impl<S: Schedule> UnownedTask<S> {
     // Used in test of the inject queue.
     #[cfg(test)]
-    #[cfg_attr(tokio_wasm, allow(dead_code))]
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
     pub(super) fn into_notified(self) -> Notified<S> {
         Notified(self.into_task())
     }
@@ -440,7 +456,7 @@ impl<S: Schedule> UnownedTask<S> {
     }
 
     pub(crate) fn shutdown(self) {
-        self.into_task().shutdown()
+        self.into_task().shutdown();
     }
 }
 
@@ -493,5 +509,18 @@ unsafe impl<S> linked_list::Link for Task<S> {
 
     unsafe fn pointers(target: NonNull<Header>) -> NonNull<linked_list::Pointers<Header>> {
         self::core::Trailer::addr_of_owned(Header::get_trailer(target))
+    }
+}
+
+/// # Safety
+///
+/// The id of a task is never changed after creation of the task, so the return value of
+/// `get_shard_id` will not change. (The cast may throw away the upper 32 bits of the task id, but
+/// the shard id still won't change from call to call.)
+unsafe impl<S> sharded_list::ShardedListItem for Task<S> {
+    unsafe fn get_shard_id(target: NonNull<Self::Target>) -> usize {
+        // SAFETY: The caller guarantees that `target` points at a valid task.
+        let task_id = unsafe { Header::get_id(target) };
+        task_id.0 as usize
     }
 }

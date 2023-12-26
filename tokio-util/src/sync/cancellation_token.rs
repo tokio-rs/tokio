@@ -133,7 +133,7 @@ impl Default for CancellationToken {
 }
 
 impl CancellationToken {
-    /// Creates a new CancellationToken in the non-cancelled state.
+    /// Creates a new `CancellationToken` in the non-cancelled state.
     pub fn new() -> CancellationToken {
         CancellationToken {
             inner: Arc::new(tree_node::TreeNode::new()),

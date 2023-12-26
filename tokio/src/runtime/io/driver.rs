@@ -18,10 +18,6 @@ use std::time::Duration;
 
 /// I/O driver, backed by Mio.
 pub(crate) struct Driver {
-    /// Tracks the number of times `turn` is called. It is safe for this to wrap
-    /// as it is mostly used to determine when to call `compact()`.
-    tick: u8,
-
     /// True when an event with the signal token is received
     signal_ready: bool,
 
@@ -45,7 +41,7 @@ pub(crate) struct Handle {
 
     /// Used to wake up the reactor from a call to `turn`.
     /// Not supported on Wasi due to lack of threading support.
-    #[cfg(not(tokio_wasi))]
+    #[cfg(not(target_os = "wasi"))]
     waker: mio::Waker,
 
     pub(crate) metrics: IoDriverMetrics,
@@ -77,7 +73,7 @@ pub(super) enum Direction {
 }
 
 pub(super) enum Tick {
-    Set(u8),
+    Set,
     Clear(u8),
 }
 
@@ -97,12 +93,11 @@ impl Driver {
     /// creation.
     pub(crate) fn new(nevents: usize) -> io::Result<(Driver, Handle)> {
         let poll = mio::Poll::new()?;
-        #[cfg(not(tokio_wasi))]
+        #[cfg(not(target_os = "wasi"))]
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
         let registry = poll.registry().try_clone()?;
 
         let driver = Driver {
-            tick: 0,
             signal_ready: false,
             events: mio::Events::with_capacity(nevents),
             poll,
@@ -114,7 +109,7 @@ impl Driver {
             registry,
             registrations,
             synced: Mutex::new(synced),
-            #[cfg(not(tokio_wasi))]
+            #[cfg(not(target_os = "wasi"))]
             waker,
             metrics: IoDriverMetrics::default(),
         };
@@ -145,8 +140,6 @@ impl Driver {
     fn turn(&mut self, handle: &Handle, max_wait: Option<Duration>) {
         debug_assert!(!handle.registrations.is_shutdown(&handle.synced.lock()));
 
-        self.tick = self.tick.wrapping_add(1);
-
         handle.release_pending_registrations();
 
         let events = &mut self.events;
@@ -154,9 +147,9 @@ impl Driver {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.poll.poll(events, max_wait) {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
-            #[cfg(tokio_wasi)]
+            #[cfg(target_os = "wasi")]
             Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
                 // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
                 // just return from the park, as there would be nothing, which wakes us up.
@@ -184,7 +177,7 @@ impl Driver {
                 // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
                 let io: &ScheduledIo = unsafe { &*ptr };
 
-                io.set_readiness(Tick::Set(self.tick), |curr| curr | ready);
+                io.set_readiness(Tick::Set, |curr| curr | ready);
                 io.wake(ready);
 
                 ready_count += 1;
@@ -212,7 +205,7 @@ impl Handle {
     /// blocked in `turn`, then the next call to `turn` will not block and
     /// return immediately.
     pub(crate) fn unpark(&self) {
-        #[cfg(not(tokio_wasi))]
+        #[cfg(not(target_os = "wasi"))]
         self.waker.wake().expect("failed to wake I/O driver");
     }
 

@@ -473,6 +473,7 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
         let location = std::panic::Location::caller();
 
         let resource_span = tracing::trace_span!(
+            parent: None,
             "runtime.resource",
             concrete_type = "Sender|Receiver",
             kind = "Sync",
@@ -712,7 +713,7 @@ impl<T> Sender<T> {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let closed = poll_fn(|cx| self.poll_closed(cx));
 
-        closed.await
+        closed.await;
     }
 
     /// Returns `true` if the associated [`Receiver`] handle has been dropped.
