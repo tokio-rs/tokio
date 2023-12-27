@@ -669,6 +669,22 @@ impl<T> Receiver<T> {
         self.version.decrement();
     }
 
+    /// Marks the state as unchanged.
+    ///
+    /// The current value can will be considered seen by the receiver.
+    ///
+    /// After invoking this method [`has_changed()`](Self::has_changed)
+    /// *MAY* return `false` and [`changed()`](Self::changed) *MAY* not return
+    /// immediately. This is because a new value could be sent before
+    /// this method returns.
+    ///
+    /// This is useful if you are not interested in the current value
+    /// visible in the receiver.
+    pub fn mark_unchanged(&mut self) {
+        let current_version = self.shared.state.load().version();
+        self.version = current_version;
+    }
+
     /// Waits for a change notification, then marks the newest value as seen.
     ///
     /// If the newest value in the channel has not yet been marked seen when

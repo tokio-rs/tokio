@@ -103,6 +103,39 @@ fn rx_mark_changed() {
 }
 
 #[test]
+fn rx_mark_unchanged() {
+    let (tx, mut rx) = watch::channel("one");
+
+    let mut rx2 = rx.clone();
+
+    {
+        assert!(!rx.has_changed().unwrap());
+
+        rx.mark_changed();
+        assert!(rx.has_changed().unwrap());
+
+        rx.mark_unchanged();
+        assert!(!rx.has_changed().unwrap());
+
+        let mut t = spawn(rx.changed());
+        assert_pending!(t.poll());
+    }
+
+    {
+        assert!(!rx2.has_changed().unwrap());
+
+        tx.send("two").unwrap();
+        assert!(rx2.has_changed().unwrap());
+
+        rx2.mark_unchanged();
+        assert!(!rx2.has_changed().unwrap());
+        assert_eq!(*rx2.borrow_and_update(), "two");
+    }
+
+    assert_eq!(*rx.borrow(), "two");
+}
+
+#[test]
 fn multi_rx() {
     let (tx, mut rx1) = watch::channel("one");
     let mut rx2 = rx1.clone();
