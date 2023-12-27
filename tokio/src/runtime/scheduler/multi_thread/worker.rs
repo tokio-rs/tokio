@@ -917,6 +917,13 @@ impl Core {
                 .shared
                 .idle
                 .unpark_worker_by_id(&worker.handle.shared, worker.index);
+
+            // Since this worker is awakened with tasks, it cannot be responsible for
+            // polling the driver for a certain period of time.
+            // Therefore, we ensure that at least one worker is designated to poll the driver here.
+            // This is for avoid significant delays in driver event processing,
+            // as discussed in https://github.com/tokio-rs/tokio/issues/4730.
+            worker.handle.notify_parked_local();
             return true;
         }
 
