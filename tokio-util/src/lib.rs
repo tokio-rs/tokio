@@ -51,6 +51,8 @@ cfg_time! {
     pub mod time;
 }
 
+pub mod lrtd;
+
 pub mod sync;
 
 pub mod either;
