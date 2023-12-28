@@ -318,6 +318,17 @@ impl Builder {
         }
     }
 
+    /// Returns true if kind is "CurrentThread" of this [`Builder`]. False otherwise.
+    pub fn is_current_threaded(&self) -> bool {
+        match &self.kind {
+            Kind::CurrentThread => true,
+            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+            Kind::MultiThread => false,
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+            Kind::MultiThreadAlt => false,
+        }
+    }
+
     /// Enables both I/O and time drivers.
     ///
     /// Doing this is a shorthand for calling `enable_io` and `enable_time`
