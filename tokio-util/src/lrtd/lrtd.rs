@@ -78,11 +78,6 @@ pub fn install_thread_stack_stace_handler(signal: Signal) {
     }
 }
 
-pub fn install_thread_stack_stace_handler_default() {
-    let default_signal = Signal::SIGUSR1;
-    install_thread_stack_stace_handler(default_signal);
-}
-
 fn signal_all_threads(signal: Signal, targets: Vec<libc::pthread_t>) {
     for thread_id in &targets {
         let result = unsafe {
