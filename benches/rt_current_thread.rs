@@ -81,9 +81,9 @@ fn rt() -> Runtime {
 
 criterion_group!(
     rt_curr_scheduler,
-    rt_curr_pawn_many_local,
-    rt_curr_pawn_many_remote_idle,
-    rt_curr_pawn_many_remote_busy
+    rt_curr_spawn_many_local,
+    rt_curr_spawn_many_remote_idle,
+    rt_curr_spawn_many_remote_busy
 );
 
 criterion_main!(rt_curr_scheduler);
