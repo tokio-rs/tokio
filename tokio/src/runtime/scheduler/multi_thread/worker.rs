@@ -121,6 +121,11 @@ struct Core {
     /// involves attempting to steal from other workers.
     is_searching: bool,
 
+    /// True if the worker has just acquired driver lock. If so, the core
+    /// attempts to notify another worker to park on the io driver before running
+    /// tasks if there is no other searching worker.
+    did_acquire_driver_lock: bool,
+
     /// True if the scheduler is being shutdown
     is_shutdown: bool,
 
@@ -266,6 +271,7 @@ pub(super) fn create(
             lifo_enabled: !config.disable_lifo_slot,
             run_queue,
             is_searching: false,
+            did_acquire_driver_lock: false,
             is_shutdown: false,
             is_traced: false,
             park: Some(park),
@@ -560,6 +566,10 @@ impl Context {
         // another idle worker to try to steal work.
         core.transition_from_searching(&self.worker);
 
+        // Attempt to notify a worker to park on IO driver if the current worker has
+        // previously obtained driver lock.
+        core.notify_for_driver_before_running(&self.worker);
+
         self.assert_lifo_enabled_is_correct(&core);
 
         // Measure the poll start time. Note that we may end up polling other
@@ -734,9 +744,11 @@ impl Context {
         // Place `park` back in `core`
         core.park = Some(park);
 
-        if park_has_driver || core.should_notify_others() {
+        if core.should_notify_others() {
             self.worker.handle.notify_parked_local();
         }
+
+        core.did_acquire_driver_lock = park_has_driver;
 
         core
     }
@@ -862,6 +874,13 @@ impl Core {
 
         self.is_searching = false;
         worker.handle.transition_worker_from_searching();
+    }
+
+    fn notify_for_driver_before_running(&mut self, worker: &Worker) {
+        if self.did_acquire_driver_lock {
+            worker.handle.notify_parked_local();
+            self.did_acquire_driver_lock = false;
+        }
     }
 
     fn has_tasks(&self) -> bool {
