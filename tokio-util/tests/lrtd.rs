@@ -2,7 +2,7 @@ use nix::sys::signal::Signal;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tokio_util::lrtd::{install_thread_stack_stace_handler, LongRunningTaskDetector};
+use tokio_util::lrtd::LongRunningTaskDetector;
 
 async fn run_blocking_stuff() {
     println!("slow start");
@@ -10,13 +10,8 @@ async fn run_blocking_stuff() {
     println!("slow done");
 }
 
-fn install_thread_stack_stace_handler_default() {
-    install_thread_stack_stace_handler(Signal::SIGUSR1);
-}
-
 #[test]
 fn test_blocking_detection_multi() {
-    install_thread_stack_stace_handler_default();
     let mut builder = tokio::runtime::Builder::new_multi_thread();
     let mutable_builder = builder.worker_threads(2);
     let lrtd = LongRunningTaskDetector::new(
@@ -40,7 +35,6 @@ fn test_blocking_detection_multi() {
 
 #[test]
 fn test_blocking_detection_current() {
-    install_thread_stack_stace_handler_default();
     let mut builder = tokio::runtime::Builder::new_current_thread();
     let mutable_builder = builder.enable_all();
     let lrtd = LongRunningTaskDetector::new(
