@@ -671,12 +671,16 @@ impl<T> Receiver<T> {
 
     /// Marks the state as unchanged.
     ///
-    /// The current value can will be considered seen by the receiver.
+    /// The current value will be considered seen by the receiver.
     ///
-    /// After invoking this method [`has_changed()`](Self::has_changed)
-    /// *MAY* return `false` and [`changed()`](Self::changed) *MAY* not return
-    /// immediately. This is because a new value could be sent before
-    /// this method returns.
+    /// After calling this method in a single-threaded context, a subsequent call to
+    /// [`has_changed()`](Self::has_changed) will return `false`, and a subsequent call
+    /// to [`changed()`](Self::changed) will yield.
+    ///
+    /// After calling this method in a multi-threaded context, subsequent
+    /// behaviour will vary depending on if a value is sent concurrently.
+    /// For example, a new value could be sent before this method returns
+    /// which would cause a call to [`changed`](Self::changed) to return immediately
     ///
     /// This is useful if you are not interested in the current value
     /// visible in the receiver.
