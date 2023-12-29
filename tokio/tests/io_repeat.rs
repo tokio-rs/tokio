@@ -4,7 +4,7 @@
 use tokio::io::AsyncReadExt;
 
 #[tokio::test]
-async fn repeat_is_cooperative() {
+async fn repeat_poll_read_is_cooperative() {
     tokio::select! {
         biased;
         _ = async {
