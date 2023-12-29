@@ -1,3 +1,4 @@
+use crate::io::util::poll_proceed_and_make_progress;
 use crate::io::AsyncWrite;
 
 use std::fmt;
@@ -75,20 +76,6 @@ impl AsyncWrite for Sink {
 impl fmt::Debug for Sink {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.pad("Sink { .. }")
-    }
-}
-
-cfg_coop! {
-    fn poll_proceed_and_make_progress(cx: &mut Context<'_>) -> Poll<()> {
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
-        coop.made_progress();
-        Poll::Ready(())
-    }
-}
-
-cfg_not_coop! {
-    fn poll_proceed_and_make_progress(_: &mut Context<'_>) -> Poll<()> {
-        Poll::Ready(())
     }
 }
 

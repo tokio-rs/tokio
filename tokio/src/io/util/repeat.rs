@@ -1,3 +1,4 @@
+use crate::io::util::poll_proceed_and_make_progress;
 use crate::io::{AsyncRead, ReadBuf};
 
 use std::io;
@@ -60,20 +61,6 @@ impl AsyncRead for Repeat {
             buf.put_slice(&[self.byte]);
         }
         Poll::Ready(Ok(()))
-    }
-}
-
-cfg_coop! {
-    fn poll_proceed_and_make_progress(cx: &mut Context<'_>) -> Poll<()> {
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
-        coop.made_progress();
-        Poll::Ready(())
-    }
-}
-
-cfg_not_coop! {
-    fn poll_proceed_and_make_progress(_: &mut Context<'_>) -> Poll<()> {
-        Poll::Ready(())
     }
 }
 
