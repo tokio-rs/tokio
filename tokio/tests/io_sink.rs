@@ -9,7 +9,7 @@ async fn sink_is_cooperative() {
         biased;
         _ = async {
             loop {
-                let buf= vec![1, 2, 3];
+                let buf = vec![1, 2, 3];
                 let _ = tokio::io::sink().write(&buf).await.unwrap();
             }
         } => {},
