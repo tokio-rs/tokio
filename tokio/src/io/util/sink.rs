@@ -53,9 +53,11 @@ impl AsyncWrite for Sink {
     #[inline]
     fn poll_write(
         self: Pin<&mut Self>,
-        _: &mut Context<'_>,
+        cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(buf.len()))
     }
 
@@ -73,6 +75,20 @@ impl AsyncWrite for Sink {
 impl fmt::Debug for Sink {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.pad("Sink { .. }")
+    }
+}
+
+cfg_coop! {
+    fn poll_proceed_and_make_progress(cx: &mut Context<'_>) -> Poll<()> {
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        coop.made_progress();
+        Poll::Ready(())
+    }
+}
+
+cfg_not_coop! {
+    fn poll_proceed_and_make_progress(_: &mut Context<'_>) -> Poll<()> {
+        Poll::Ready(())
     }
 }
 

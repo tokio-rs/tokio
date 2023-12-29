@@ -50,14 +50,30 @@ impl AsyncRead for Repeat {
     #[inline]
     fn poll_read(
         self: Pin<&mut Self>,
-        _: &mut Context<'_>,
+        cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
         // TODO: could be faster, but should we unsafe it?
         while buf.remaining() != 0 {
             buf.put_slice(&[self.byte]);
         }
         Poll::Ready(Ok(()))
+    }
+}
+
+cfg_coop! {
+    fn poll_proceed_and_make_progress(cx: &mut Context<'_>) -> Poll<()> {
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        coop.made_progress();
+        Poll::Ready(())
+    }
+}
+
+cfg_not_coop! {
+    fn poll_proceed_and_make_progress(_: &mut Context<'_>) -> Poll<()> {
+        Poll::Ready(())
     }
 }
 
