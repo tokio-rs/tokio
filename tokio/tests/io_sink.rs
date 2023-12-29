@@ -10,7 +10,7 @@ async fn sink_is_cooperative() {
         _ = async {
             loop {
                 let buf = vec![1, 2, 3];
-                let _ = tokio::io::sink().write(&buf).await.unwrap();
+                tokio::io::sink().write_all(&buf).await.unwrap();
             }
         } => {},
         _ = tokio::task::yield_now() => {}
