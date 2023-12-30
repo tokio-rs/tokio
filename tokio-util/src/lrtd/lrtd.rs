@@ -307,27 +307,32 @@ fn probe(
 
 /// Utility to help with "really nice to add a warning for tasks that might be blocking"
 /// Example use:
-///
+///  ```
+///    use std::sync::Arc;
+///    use tokio_util::lrtd::LongRunningTaskDetector;
+/// 
 ///    let mut builder = tokio::runtime::Builder::new_multi_thread();
 ///    let mutable_builder = builder.worker_threads(2);
 ///    let lrtd = LongRunningTaskDetector::new(
-///      Duration::from_millis(10),
-///      Duration::from_millis(100),
-///      Signal::SIGUSR1,
+///      std::time::Duration::from_millis(10),
+///      std::time::Duration::from_millis(100),
+///      nix::sys::signal::Signal::SIGUSR1,
 ///      mutable_builder,
 ///    );
 ///    let runtime = builder.enable_all().build().unwrap();
 ///    let arc_runtime = Arc::new(runtime);
 ///    let arc_runtime2 = arc_runtime.clone();
-///    lrtd.start(arc_runtime.clone());
+///    lrtd.start(arc_runtime);
 ///    arc_runtime2.block_on(async {
-///       ...
+///     print!("my async code")
 ///    });
-///    lrtd.stop()
+/// 
+/// ```
 ///
 ///    The above will allow you to get details on what is blocking your tokio worker threads for longer that 100ms.
 ///    The detail will look like:
 ///    
+///  ```text
 ///     Detected worker blocking, signaling SIGUSR1 worker threads: [123145318232064, 123145320341504]
 ///     Stack trace for thread "tokio-runtime-worker":123145318232064
 ///        0: std::backtrace_rs::backtrace::libunwind::trace
@@ -354,6 +359,7 @@ fn probe(
 ///        12: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
 ///                at /Users/zoly/NetBeansProjects/tokio/tokio/src/loom/std/unsafe_cell.rs:16:9
 ///        13: tokio::runtime::task::core::Core<T,S>::poll
+///  ```
 ///
 impl LongRunningTaskDetector {
     /// Creates a new `LongRunningTaskDetector` instance.
