@@ -69,3 +69,13 @@ macro_rules! cfg_time {
         )*
     }
 }
+
+macro_rules! cfg_lrtd {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "lrtd")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "lrtd")))]
+            $item
+        )*
+    }
+}

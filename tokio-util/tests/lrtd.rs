@@ -1,3 +1,4 @@
+#![cfg(all(feature = "lrtd"))]
 use nix::sys::signal::Signal;
 use std::backtrace::Backtrace;
 use std::collections::HashSet;
@@ -12,8 +13,11 @@ async fn run_blocking_stuff() {
     println!("slow done");
 }
 
+static GLOBAL_MUTEX: Mutex<()> = Mutex::new(());
+
 #[test]
 fn test_blocking_detection_multi() {
+    let _guard = GLOBAL_MUTEX.lock().unwrap();
     let mut builder = tokio::runtime::Builder::new_multi_thread();
     let mutable_builder = builder.worker_threads(2);
     let lrtd = LongRunningTaskDetector::new(
@@ -37,6 +41,7 @@ fn test_blocking_detection_multi() {
 
 #[test]
 fn test_blocking_detection_current() {
+    let _guard = GLOBAL_MUTEX.lock().unwrap();   
     let mut builder = tokio::runtime::Builder::new_current_thread();
     let mutable_builder = builder.enable_all();
     let lrtd = LongRunningTaskDetector::new(
@@ -131,6 +136,7 @@ impl ThreadStateHandler for CaptureThreadStateHandler {
 
 #[test]
 fn test_blocking_detection_multi_capture() {
+    let _guard = GLOBAL_MUTEX.lock().unwrap();  
     let mut builder = tokio::runtime::Builder::new_multi_thread();
     let mutable_builder = builder.worker_threads(2);
     let lrtd = LongRunningTaskDetector::new(

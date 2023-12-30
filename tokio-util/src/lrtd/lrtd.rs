@@ -40,7 +40,7 @@ struct OwnedThreadStateHandler {
 impl OwnedThreadStateHandler {
     fn add(&mut self, action: Arc<dyn ThreadStateHandler>, owner: usize) {
         if !Arc::ptr_eq(&action, &(self.action)) {
-            panic!("Cannot overwrite action with something different!")
+            panic!("Cannot overwrite action with something different!");
         }
         for x_owner in &(self.owners) {
             if *x_owner == owner {
@@ -62,47 +62,43 @@ impl OwnedThreadStateHandler {
     }
 }
 
-static mut GLOBAL_TH_STATE_HANDLER: Mutex<Option<OwnedThreadStateHandler>> = Mutex::new(None);
+static GLOBAL_TH_STATE_HANDLER: Mutex<Option<OwnedThreadStateHandler>> = Mutex::new(None);
 
 fn set_thread_state_handler(action: Arc<dyn ThreadStateHandler>, owner: usize) {
-    unsafe {
-        if let Ok(mut value) = GLOBAL_TH_STATE_HANDLER.lock() {
-            match value.as_mut() {
-                Some(handler) => {
-                    (*handler).add(action, owner);
-                }
-                None => {
-                    let mut owners = Vec::new();
-                    owners.push(owner);
-                    *value = Some(OwnedThreadStateHandler { owners, action });
-                }
-            }
+    let mut value = GLOBAL_TH_STATE_HANDLER.lock().unwrap();
+    match value.as_mut() {
+        Some(handler) => {
+            (*handler).add(action, owner);
+        }
+        None => {
+            let mut owners = Vec::new();
+            owners.push(owner);
+            *value = Some(OwnedThreadStateHandler { owners, action });
         }
     }
 }
 
 fn reset_thread_state_handler(owner: usize) {
-    unsafe {
-        if let Ok(mut value) = GLOBAL_TH_STATE_HANDLER.lock() {
-            match value.as_mut() {
-                Some(handler) => {
-                    (*handler).remove(owner);
-                }
-                None => {
-                    panic!("No action handler found for: {}, likely LongRunningTaskDetector not started", owner);
-                }
-            }
+    let mut value = GLOBAL_TH_STATE_HANDLER.lock().unwrap();
+    let h = match value.as_mut() {
+        Some(handler) => {
+            (*handler).remove(owner);
+            handler
         }
+        None => {
+            panic!("No action handler found for: {}, likely LongRunningTaskDetector not started", owner)
+        }
+    };
+    if h.owners.is_empty() {
+        *value = None
     }
 }
 
 fn get_thread_state_handler() -> Arc<dyn ThreadStateHandler> {
-    unsafe {
-        let option = GLOBAL_TH_STATE_HANDLER.lock().unwrap();
-        match option.as_ref() {
-            Some(value) => value.action.clone(),
-            None => Arc::new(StdErrThreadStateHandler),
-        }
+    let option = GLOBAL_TH_STATE_HANDLER.lock().unwrap();
+    match option.as_ref() {
+        Some(value) => value.action.clone(),
+        None => Arc::new(StdErrThreadStateHandler),
     }
 }
 
@@ -454,5 +450,12 @@ impl LongRunningTaskDetector {
             *sf = true;
             reset_thread_state_handler(self.identity);
         }
+    }
+
+}
+
+impl Drop for LongRunningTaskDetector {
+    fn drop(&mut self) {
+        self.stop();
     }
 }
