@@ -735,7 +735,7 @@ impl Sender {
     /// Converts the pipe into an [`OwnedFd`] in nonblocking mode.
     ///
     /// This function will deregister this pipe end from the event loop and
-    /// perform the conversion. Returned file descriptor will be in nonblocking
+    /// perform the conversion. The returned file descriptor will be in nonblocking
     /// mode.
     pub fn into_nonblocking_fd(self) -> io::Result<OwnedFd> {
         let mio_pipe = self.io.into_inner()?;
