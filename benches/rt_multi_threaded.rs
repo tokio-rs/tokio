@@ -16,7 +16,7 @@ const NUM_WORKERS: usize = 4;
 const NUM_SPAWN: usize = 10_000;
 const STALL_DUR: Duration = Duration::from_micros(10);
 
-fn spawn_many_local(c: &mut Criterion) {
+fn rt_multi_spawn_many_local(c: &mut Criterion) {
     let rt = rt();
 
     let (tx, rx) = mpsc::sync_channel(1000);
@@ -44,7 +44,7 @@ fn spawn_many_local(c: &mut Criterion) {
     });
 }
 
-fn spawn_many_remote_idle(c: &mut Criterion) {
+fn rt_multi_spawn_many_remote_idle(c: &mut Criterion) {
     let rt = rt();
 
     let mut handles = Vec::with_capacity(NUM_SPAWN);
@@ -66,7 +66,7 @@ fn spawn_many_remote_idle(c: &mut Criterion) {
 
 // The runtime is busy with tasks that consume CPU time and yield. Yielding is a
 // lower notification priority than spawning / regular notification.
-fn spawn_many_remote_busy1(c: &mut Criterion) {
+fn rt_multi_spawn_many_remote_busy1(c: &mut Criterion) {
     let rt = rt();
     let rt_handle = rt.handle();
     let mut handles = Vec::with_capacity(NUM_SPAWN);
@@ -102,7 +102,7 @@ fn spawn_many_remote_busy1(c: &mut Criterion) {
 
 // The runtime is busy with tasks that consume CPU time and spawn new high-CPU
 // tasks. Spawning goes via a higher notification priority than yielding.
-fn spawn_many_remote_busy2(c: &mut Criterion) {
+fn rt_multi_spawn_many_remote_busy2(c: &mut Criterion) {
     const NUM_SPAWN: usize = 1_000;
 
     let rt = rt();
@@ -143,7 +143,7 @@ fn spawn_many_remote_busy2(c: &mut Criterion) {
     flag.store(false, Relaxed);
 }
 
-fn yield_many(c: &mut Criterion) {
+fn rt_multi_yield_many(c: &mut Criterion) {
     const NUM_YIELD: usize = 1_000;
     const TASKS: usize = 200;
 
@@ -171,7 +171,7 @@ fn yield_many(c: &mut Criterion) {
     });
 }
 
-fn ping_pong(c: &mut Criterion) {
+fn rt_multi_ping_pong(c: &mut Criterion) {
     const NUM_PINGS: usize = 1_000;
 
     let rt = rt();
@@ -216,7 +216,7 @@ fn ping_pong(c: &mut Criterion) {
     });
 }
 
-fn chained_spawn(c: &mut Criterion) {
+fn rt_multi_chained_spawn(c: &mut Criterion) {
     const ITER: usize = 1_000;
 
     fn iter(done_tx: mpsc::SyncSender<()>, n: usize) {
@@ -264,13 +264,13 @@ fn stall() {
 
 criterion_group!(
     rt_multi_scheduler,
-    spawn_many_local,
-    spawn_many_remote_idle,
-    spawn_many_remote_busy1,
-    spawn_many_remote_busy2,
-    ping_pong,
-    yield_many,
-    chained_spawn,
+    rt_multi_spawn_many_local,
+    rt_multi_spawn_many_remote_idle,
+    rt_multi_spawn_many_remote_busy1,
+    rt_multi_spawn_many_remote_busy2,
+    rt_multi_ping_pong,
+    rt_multi_yield_many,
+    rt_multi_chained_spawn,
 );
 
 criterion_main!(rt_multi_scheduler);

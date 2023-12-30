@@ -8,7 +8,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 const NUM_SPAWN: usize = 1_000;
 
-fn spawn_many_local(c: &mut Criterion) {
+fn rt_curr_spawn_many_local(c: &mut Criterion) {
     let rt = rt();
     let mut handles = Vec::with_capacity(NUM_SPAWN);
 
@@ -27,7 +27,7 @@ fn spawn_many_local(c: &mut Criterion) {
     });
 }
 
-fn spawn_many_remote_idle(c: &mut Criterion) {
+fn rt_curr_spawn_many_remote_idle(c: &mut Criterion) {
     let rt = rt();
     let rt_handle = rt.handle();
     let mut handles = Vec::with_capacity(NUM_SPAWN);
@@ -47,7 +47,7 @@ fn spawn_many_remote_idle(c: &mut Criterion) {
     });
 }
 
-fn spawn_many_remote_busy(c: &mut Criterion) {
+fn rt_curr_spawn_many_remote_busy(c: &mut Criterion) {
     let rt = rt();
     let rt_handle = rt.handle();
     let mut handles = Vec::with_capacity(NUM_SPAWN);
@@ -81,9 +81,9 @@ fn rt() -> Runtime {
 
 criterion_group!(
     rt_curr_scheduler,
-    spawn_many_local,
-    spawn_many_remote_idle,
-    spawn_many_remote_busy
+    rt_curr_spawn_many_local,
+    rt_curr_spawn_many_remote_idle,
+    rt_curr_spawn_many_remote_busy
 );
 
 criterion_main!(rt_curr_scheduler);
