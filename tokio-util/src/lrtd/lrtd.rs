@@ -310,7 +310,7 @@ fn probe(
 ///  ```
 ///    use std::sync::Arc;
 ///    use tokio_util::lrtd::LongRunningTaskDetector;
-/// 
+///
 ///    let mut builder = tokio::runtime::Builder::new_multi_thread();
 ///    let mutable_builder = builder.worker_threads(2);
 ///    let lrtd = LongRunningTaskDetector::new(
@@ -326,7 +326,7 @@ fn probe(
 ///    arc_runtime2.block_on(async {
 ///     print!("my async code")
 ///    });
-/// 
+///
 /// ```
 ///
 ///    The above will allow you to get details on what is blocking your tokio worker threads for longer that 100ms.
