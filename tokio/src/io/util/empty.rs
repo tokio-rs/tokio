@@ -1,3 +1,4 @@
+use crate::io::util::poll_proceed_and_make_progress;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
 use std::fmt;
@@ -135,20 +136,6 @@ impl AsyncWrite for Empty {
 impl fmt::Debug for Empty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.pad("Empty { .. }")
-    }
-}
-
-cfg_coop! {
-    fn poll_proceed_and_make_progress(cx: &mut Context<'_>) -> Poll<()> {
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
-        coop.made_progress();
-        Poll::Ready(())
-    }
-}
-
-cfg_not_coop! {
-    fn poll_proceed_and_make_progress(_: &mut Context<'_>) -> Poll<()> {
-        Poll::Ready(())
     }
 }
 
