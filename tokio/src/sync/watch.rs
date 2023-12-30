@@ -673,15 +673,6 @@ impl<T> Receiver<T> {
     ///
     /// The current value will be considered seen by the receiver.
     ///
-    /// After calling this method in a single-threaded context, a subsequent call to
-    /// [`has_changed()`](Self::has_changed) will return `false`, and a subsequent call
-    /// to [`changed()`](Self::changed) will yield.
-    ///
-    /// After calling this method in a multi-threaded context, subsequent
-    /// behaviour will vary depending on if a value is sent concurrently.
-    /// For example, a new value could be sent before this method returns
-    /// which would cause a call to [`changed`](Self::changed) to return immediately
-    ///
     /// This is useful if you are not interested in the current value
     /// visible in the receiver.
     pub fn mark_unchanged(&mut self) {
