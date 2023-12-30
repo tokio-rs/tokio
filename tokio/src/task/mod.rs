@@ -283,7 +283,7 @@
 //!
 //! #### unconstrained
 //!
-//! If necessary, [`task::unconstrained`] lets you opt a future out of of Tokio's cooperative
+//! If necessary, [`task::unconstrained`] lets you opt a future out of Tokio's cooperative
 //! scheduling. When a future is wrapped with `unconstrained`, it will never be forced to yield to
 //! Tokio. For example:
 //!
