@@ -5,11 +5,11 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use tokio_util::lrtd::{LongRunningTaskDetector, BlockingActionHandler, ThreadStateHandler};
+use tokio_util::lrtd::{BlockingActionHandler, LongRunningTaskDetector, ThreadStateHandler};
 
 async fn run_blocking_stuff() {
     println!("slow start");
-    thread::sleep(Duration::from_secs(2));
+    thread::sleep(Duration::from_secs(1));
     println!("slow done");
 }
 
@@ -34,14 +34,14 @@ fn test_blocking_detection_multi() {
     arc_runtime2.spawn(run_blocking_stuff());
     arc_runtime2.block_on(async {
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-        println!("Hello world");
+        println!("Done");
     });
     lrtd.stop()
 }
 
 #[test]
 fn test_blocking_detection_current() {
-    let _guard = GLOBAL_MUTEX.lock().unwrap();   
+    let _guard = GLOBAL_MUTEX.lock().unwrap();
     let mut builder = tokio::runtime::Builder::new_current_thread();
     let mutable_builder = builder.enable_all();
     let lrtd = LongRunningTaskDetector::new(
@@ -56,17 +56,14 @@ fn test_blocking_detection_current() {
     lrtd.start(arc_runtime);
     arc_runtime2.block_on(async {
         run_blocking_stuff().await;
-        println!("Sleeping");
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        println!("Hello world");
+        println!("Done");
     });
     lrtd.stop()
 }
 
-
-
 struct CaptureBlockingActionHandler {
-    inner: Mutex<HashSet<libc::pthread_t>>
+    inner: Mutex<HashSet<libc::pthread_t>>,
 }
 
 impl CaptureBlockingActionHandler {
@@ -79,7 +76,7 @@ impl CaptureBlockingActionHandler {
     fn get_all(&self) -> Vec<libc::pthread_t> {
         let set = self.inner.lock().unwrap();
         set.iter().cloned().collect()
-    }    
+    }
 }
 
 impl BlockingActionHandler for CaptureBlockingActionHandler {
@@ -91,7 +88,7 @@ impl BlockingActionHandler for CaptureBlockingActionHandler {
 }
 
 struct CaptureThreadStateHandler {
-    inner: Mutex<Vec<String>>
+    inner: Mutex<Vec<String>>,
 }
 
 impl CaptureThreadStateHandler {
@@ -110,14 +107,12 @@ impl CaptureThreadStateHandler {
         // Iterate over the frames in the backtrace
         let traces = self.get_all();
         if traces.is_empty() {
-            return false
+            return false;
         }
         let bt_str = traces.get(0).unwrap();
         bt_str.contains(symbol_name)
-    }    
-
+    }
 }
-
 
 impl ThreadStateHandler for CaptureThreadStateHandler {
     fn blocking_thread_details(
@@ -127,16 +122,13 @@ impl ThreadStateHandler for CaptureThreadStateHandler {
         backtrace: Backtrace,
     ) {
         let mut vec = self.inner.lock().unwrap();
-        vec.push( format!("{}", backtrace));
+        vec.push(format!("{}", backtrace));
     }
 }
 
-
-
-
 #[test]
 fn test_blocking_detection_multi_capture() {
-    let _guard = GLOBAL_MUTEX.lock().unwrap();  
+    let _guard = GLOBAL_MUTEX.lock().unwrap();
     let mut builder = tokio::runtime::Builder::new_multi_thread();
     let mutable_builder = builder.worker_threads(2);
     let lrtd = LongRunningTaskDetector::new(

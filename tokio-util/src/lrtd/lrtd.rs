@@ -44,10 +44,13 @@ impl OwnedThreadStateHandler {
         }
         for x_owner in &(self.owners) {
             if *x_owner == owner {
-                panic!("Cannot set thread state handler twice by the same owner: {}", owner);
+                panic!(
+                    "Cannot set thread state handler twice by the same owner: {}",
+                    owner
+                );
             }
         }
-        self.owners.push(owner); 
+        self.owners.push(owner);
     }
 
     fn remove(&mut self, owner: usize) {
@@ -86,7 +89,10 @@ fn reset_thread_state_handler(owner: usize) {
             handler
         }
         None => {
-            panic!("No action handler found for: {}, likely LongRunningTaskDetector not started", owner)
+            panic!(
+                "No action handler found for: {}, likely LongRunningTaskDetector not started",
+                owner
+            )
         }
     };
     if h.owners.is_empty() {
@@ -147,9 +153,9 @@ pub trait BlockingActionHandler: Send + Sync {
     /// * `targets` - The list of thread IDs of the tokio runtime worker threads.   /// # Returns
     ///
     /// # Returns
-    /// 
+    ///
     /// Returns `true` if the signaling of the threads is to be executed, false otherwise.
-    /// 
+    ///
     fn blocking_detected(&self, signal: Signal, targets: &Vec<libc::pthread_t>) -> bool;
 }
 
@@ -160,8 +166,7 @@ impl BlockingActionHandler for StdErrBlockingActionHandler {
     fn blocking_detected(&self, signal: Signal, targets: &Vec<libc::pthread_t>) -> bool {
         eprintln!(
             "Detected worker blocking, signaling {} worker threads: {:?}",
-            signal,
-            targets
+            signal, targets
         );
         true
     }
@@ -302,7 +307,7 @@ fn probe(
 
 /// Utility to help with "really nice to add a warning for tasks that might be blocking"
 /// Example use:
-/// 
+///
 ///    let mut builder = tokio::runtime::Builder::new_multi_thread();
 ///    let mutable_builder = builder.worker_threads(2);
 ///    let lrtd = LongRunningTaskDetector::new(
@@ -319,7 +324,7 @@ fn probe(
 ///       ...
 ///    });
 ///    lrtd.stop()
-/// 
+///
 ///    The above will allow you to get details on what is blocking your tokio worker threads for longer that 100ms.
 ///    The detail will look like:
 ///    
@@ -349,14 +354,14 @@ fn probe(
 ///        12: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
 ///                at /Users/zoly/NetBeansProjects/tokio/tokio/src/loom/std/unsafe_cell.rs:16:9
 ///        13: tokio::runtime::task::core::Core<T,S>::poll
-/// 
+///
 impl LongRunningTaskDetector {
     /// Creates a new `LongRunningTaskDetector` instance.
     ///
     /// # Arguments
     ///
     /// * `interval` - The interval between probes. This interval is randomized.
-    /// * `detection_time` - The maximum time allowed for a probe to succeed. 
+    /// * `detection_time` - The maximum time allowed for a probe to succeed.
     ///                      A probe running for longer indicates something is blocking the worker threads.
     /// * `signal` - The signal to use for signaling worker threads when blocking is detected.
     /// * `runtime_builder` - A mutable reference to a `tokio::runtime::Builder`.
@@ -446,12 +451,11 @@ impl LongRunningTaskDetector {
     /// Stops the monitoring thread. Does nothing if LRTD is already stopped.
     pub fn stop(&self) {
         let mut sf = self.stop_flag.lock().unwrap();
-        if *sf != true  {
+        if *sf != true {
             *sf = true;
             reset_thread_state_handler(self.identity);
         }
     }
-
 }
 
 impl Drop for LongRunningTaskDetector {
