@@ -262,6 +262,7 @@ fn signal_all_threads(signal: Signal, targets: Vec<libc::pthread_t>) {
     }
 }
 
+/// Utility to help with "really nice to add a warning for tasks that might be blocking"
 #[derive(Debug)]
 pub struct LongRunningTaskDetector {
     interval: Duration,
