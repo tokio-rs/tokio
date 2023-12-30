@@ -10,18 +10,15 @@ use std::time::Duration;
 use std::{env, thread};
 use tokio::runtime::{Builder, Runtime};
 
-// A static AtomicUsize variable
 static mut GLOBAL_COUNTER: Option<AtomicUsize> = None;
 static INIT: Once = Once::new();
 
-// Function to initialize the global counter if not already initialized
 fn initialize_global_counter() {
     INIT.call_once(|| unsafe {
         GLOBAL_COUNTER = Some(AtomicUsize::new(0));
     });
 }
 
-// Function to get the next value in the global counter
 fn get_next_global_value() -> usize {
     initialize_global_counter();
 
@@ -303,7 +300,70 @@ fn probe(
     }
 }
 
+/// Utility to help with "really nice to add a warning for tasks that might be blocking"
+/// Example use:
+/// 
+///    let mut builder = tokio::runtime::Builder::new_multi_thread();
+///    let mutable_builder = builder.worker_threads(2);
+///    let lrtd = LongRunningTaskDetector::new(
+///      Duration::from_millis(10),
+///      Duration::from_millis(100),
+///      Signal::SIGUSR1,
+///      mutable_builder,
+///    );
+///    let runtime = builder.enable_all().build().unwrap();
+///    let arc_runtime = Arc::new(runtime);
+///    let arc_runtime2 = arc_runtime.clone();
+///    lrtd.start(arc_runtime.clone());
+///    arc_runtime2.block_on(async {
+///       ...
+///    });
+///    lrtd.stop()
+/// 
+///    The above will allow you to get details on what is blocking your tokio worker threads for longer that 100ms.
+///    The detail will look like:
+///    
+///     Detected worker blocking, signaling SIGUSR1 worker threads: [123145318232064, 123145320341504]
+///     Stack trace for thread "tokio-runtime-worker":123145318232064
+///        0: std::backtrace_rs::backtrace::libunwind::trace
+///                at /rustc/a28077b28a02b92985b3a3faecf92813155f1ea1/library/std/src/../../backtrace/src/backtrace/libunwind.rs:93:5
+///        1: std::backtrace_rs::backtrace::trace_unsynchronized
+///                at /rustc/a28077b28a02b92985b3a3faecf92813155f1ea1/library/std/src/../../backtrace/src/backtrace/mod.rs:66:5
+///        2: std::backtrace::Backtrace::create
+///                at /rustc/a28077b28a02b92985b3a3faecf92813155f1ea1/library/std/src/backtrace.rs:331:13
+///        3: std::backtrace::Backtrace::force_capture
+///                at /rustc/a28077b28a02b92985b3a3faecf92813155f1ea1/library/std/src/backtrace.rs:313:9
+///        4: tokio_util::lrtd::lrtd::signal_handler
+///                at ./src/lrtd/lrtd.rs:217:21
+///        5: __sigtramp
+///        6: ___semwait_signal
+///        7: <unknown>
+///        8: std::sys::unix::thread::Thread::sleep
+///                at /rustc/a28077b28a02b92985b3a3faecf92813155f1ea1/library/std/src/sys/unix/thread.rs:241:20
+///        9: std::thread::sleep
+///                at /rustc/a28077b28a02b92985b3a3faecf92813155f1ea1/library/std/src/thread/mod.rs:872:5
+///        10: lrtd::run_blocking_stuff::{{closure}}
+///                at ./tests/lrtd.rs:11:5
+///        11: tokio::runtime::task::core::Core<T,S>::poll::{{closure}}
+///                at /Users/zoly/NetBeansProjects/tokio/tokio/src/runtime/task/core.rs:328:17
+///        12: tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut
+///                at /Users/zoly/NetBeansProjects/tokio/tokio/src/loom/std/unsafe_cell.rs:16:9
+///        13: tokio::runtime::task::core::Core<T,S>::poll
+/// 
 impl LongRunningTaskDetector {
+    /// Creates a new `LongRunningTaskDetector` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `interval` - The interval between probes. This interval is randomized.
+    /// * `detection_time` - The maximum time allowed for a probe to succeed. 
+    ///                      A probe running for longer indicates something is blocking the worker threads.
+    /// * `signal` - The signal to use for signaling worker threads when blocking is detected.
+    /// * `runtime_builder` - A mutable reference to a `tokio::runtime::Builder`.
+    ///
+    /// # Returns
+    ///
+    /// Returns a new `LongRunningTaskDetector` instance.    
     pub fn new(
         interval: Duration,
         detection_time: Duration,
@@ -338,6 +398,11 @@ impl LongRunningTaskDetector {
         }
     }
 
+     /// Starts the monitoring thread with default action handlers (that write details to std err).
+    ///
+    /// # Arguments
+    ///
+    /// * `runtime` - An `Arc` reference to a `tokio::runtime::Runtime`.    
     pub fn start(&self, runtime: Arc<Runtime>) {
         self.start_with_custom_action(
             runtime,
@@ -346,6 +411,14 @@ impl LongRunningTaskDetector {
         )
     }
 
+    /// Starts the monitoring process with custom action handlers that
+    ///  allow you to customize what happens when blocking is detected.
+    ///
+    /// # Arguments
+    ///
+    /// * `runtime` - An `Arc` reference to a `tokio::runtime::Runtime`.
+    /// * `action` - An `Arc` reference to a custom `BlockingActionHandler`.
+    /// * `thread_action` - An `Arc` reference to a custom `ThreadStateHandler`.
     pub fn start_with_custom_action(
         &self,
         runtime: Arc<Runtime>,
@@ -369,6 +442,7 @@ impl LongRunningTaskDetector {
         });
     }
 
+    /// Stops the monitoring thread.
     pub fn stop(&self) {
         *self.stop_flag.lock().unwrap() = true;
         reset_thread_state_handler(self.identity);
