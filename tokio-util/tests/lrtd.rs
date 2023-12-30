@@ -157,3 +157,16 @@ fn test_blocking_detection_multi_capture() {
     assert!(to_assert_thread.contains_symbol("std::thread::sleep"));
     lrtd.stop()
 }
+
+#[test]
+fn test_blocking_detection_stop_unstarted() {
+    let mut builder = tokio::runtime::Builder::new_multi_thread();
+    let mutable_builder = builder.worker_threads(2);
+    let lrtd = LongRunningTaskDetector::new(
+        Duration::from_millis(10),
+        Duration::from_millis(100),
+        Signal::SIGUSR1,
+        mutable_builder,
+    );
+    lrtd.stop()
+}

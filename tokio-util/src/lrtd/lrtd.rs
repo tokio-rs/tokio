@@ -1,3 +1,4 @@
+/// Utility to help with "really nice to add a warning for tasks that might be blocking"
 use libc;
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use rand::Rng;
@@ -19,6 +20,7 @@ fn initialize_global_counter() {
     });
 }
 
+/// The purpose of this method is to generate unique IDs for LRTD instances.
 fn get_next_global_value() -> usize {
     initialize_global_counter();
 
@@ -40,23 +42,22 @@ impl OwnedThreadStateHandler {
         if !Arc::ptr_eq(&action, &(self.action)) {
             panic!("Cannot overwrite action with something different!")
         }
-        let mut found = false;
         for x_owner in &(self.owners) {
             if *x_owner == owner {
-                panic!("Cannot set thread state handler twice by the same owner")
+                panic!("Cannot set thread state handler twice by the same owner: {}", owner);
             }
         }
-        if !found {
-            self.owners.push(owner);
-        }
+        self.owners.push(owner); 
     }
 
     fn remove(&mut self, owner: usize) {
         if let Some(index) = self.owners.iter().position(|&x| x == owner) {
-            // Use remove() to remove the value at the found index
             let removed_value = self.owners.remove(index);
+            if removed_value != owner {
+                panic!("Wrong value, whould have been {}", owner);
+            }
         } else {
-            panic!("Cannot find owner")
+            panic!("Cannot find owner: {}", owner)
         }
     }
 }
@@ -88,7 +89,7 @@ fn reset_thread_state_handler(owner: usize) {
                     (*handler).remove(owner);
                 }
                 None => {
-                    panic!("Cannot find handler");
+                    panic!("No action handler found for: {}, likely LongRunningTaskDetector not started", owner);
                 }
             }
         }
@@ -158,6 +159,7 @@ pub trait BlockingActionHandler: Send + Sync {
 
 struct StdErrBlockingActionHandler;
 
+/// BlockingActionHandler implementation that writes blocker details to standard error.
 impl BlockingActionHandler for StdErrBlockingActionHandler {
     fn blocking_detected(&self, signal: Signal, targets: &Vec<libc::pthread_t>) -> bool {
         eprintln!(
@@ -171,6 +173,7 @@ impl BlockingActionHandler for StdErrBlockingActionHandler {
 
 struct StdErrThreadStateHandler;
 
+/// ThreadStateHandler implementation that writes details to standard error.
 impl ThreadStateHandler for StdErrThreadStateHandler {
     fn blocking_thread_details(
         &self,
@@ -392,14 +395,14 @@ impl LongRunningTaskDetector {
         LongRunningTaskDetector {
             interval,
             detection_time,
-            stop_flag: Arc::new(Mutex::new(false)),
+            stop_flag: Arc::new(Mutex::new(true)),
             workers,
             signal,
             identity,
         }
     }
 
-     /// Starts the monitoring thread with default action handlers (that write details to std err).
+    /// Starts the monitoring thread with default action handlers (that write details to std err).
     ///
     /// # Arguments
     ///
@@ -427,6 +430,7 @@ impl LongRunningTaskDetector {
         thread_action: Arc<dyn ThreadStateHandler>,
     ) {
         set_thread_state_handler(thread_action, self.identity);
+        *self.stop_flag.lock().unwrap() = false;
         let stop_flag = Arc::clone(&self.stop_flag);
         let detection_time = self.detection_time.clone();
         let interval = self.interval.clone();
@@ -443,9 +447,12 @@ impl LongRunningTaskDetector {
         });
     }
 
-    /// Stops the monitoring thread.
+    /// Stops the monitoring thread. Does nothing if LRTD is already stopped.
     pub fn stop(&self) {
-        *self.stop_flag.lock().unwrap() = true;
-        reset_thread_state_handler(self.identity);
+        let mut sf = self.stop_flag.lock().unwrap();
+        if *sf != true  {
+            *sf = true;
+            reset_thread_state_handler(self.identity);
+        }
     }
 }

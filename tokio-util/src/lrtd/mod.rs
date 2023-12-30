@@ -1,3 +1,4 @@
+//! Utility to help with "really nice to add a warning for tasks that might be blocking"
 mod lrtd;
 
 pub use self::lrtd::LongRunningTaskDetector;
