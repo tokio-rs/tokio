@@ -122,7 +122,17 @@ fn get_thread_id() -> libc::pthread_t {
     unsafe { libc::pthread_self() }
 }
 
+/// A trait for handling thread state details.
+///
+/// This trait provides a method for capturing details of a blocking thread.
 pub trait ThreadStateHandler: Send + Sync {
+    /// Invoked with details of a blocking thread.
+    ///
+    /// # Arguments
+    ///
+    /// * `thread_id` - The ID of the blocking thread.
+    /// * `thread_name` - An optional name of the blocking thread.
+    /// * `backtrace` - The backtrace of the blocking thread.    
     fn blocking_thread_details(
         &self,
         thread_id: libc::pthread_t,
@@ -131,18 +141,34 @@ pub trait ThreadStateHandler: Send + Sync {
     );
 }
 
+/// A trait for handling actions when blocking is detected.
+///
+/// This trait provides a method for handling the detection of a blocking action.
 pub trait BlockingActionHandler: Send + Sync {
-    fn blocking_detected(&self, signal: Signal, targets: &Vec<libc::pthread_t>);
+    /// Called when a blocking action is detected and prior to thread signaling.
+    ///
+    /// # Arguments
+    ///
+    /// * `signal` - The signal used to signal tokio worker threads for state details.
+    /// * `targets` - The list of thread IDs of the tokio runtime worker threads.   /// # Returns
+    ///
+    /// # Returns
+    /// 
+    /// Returns `true` if the signaling of the threads is to be executed, false otherwise.
+    /// 
+    fn blocking_detected(&self, signal: Signal, targets: &Vec<libc::pthread_t>) -> bool;
 }
 
 struct StdErrBlockingActionHandler;
 
 impl BlockingActionHandler for StdErrBlockingActionHandler {
-    fn blocking_detected(&self, signal: Signal, targets: &Vec<libc::pthread_t>) {
+    fn blocking_detected(&self, signal: Signal, targets: &Vec<libc::pthread_t>) -> bool {
         eprintln!(
-            "Detected worker blocking, signaling worker threads: {:?}",
+            "Detected worker blocking, signaling {} worker threads: {:?}",
+            signal,
             targets
         );
+        true
     }
 }
 
@@ -269,10 +295,10 @@ fn probe(
     };
     if !is_probe_success {
         let targets = workers.get_all();
-        action.blocking_detected(signal, &targets);
-
-        signal_all_threads(signal, targets);
-        // Wait for our probe to eventually finish, we do not want to have multiple probes running at the same time.
+        if action.blocking_detected(signal, &targets) {
+            signal_all_threads(signal, targets);
+            // Wait for our probe to eventually finish, we do not want to have multiple probes running at the same time.
+        }
         let _ = rx.recv_timeout(get_panic_worker_block_duration()).unwrap();
     }
 }
