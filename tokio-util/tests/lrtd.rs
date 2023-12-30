@@ -36,7 +36,6 @@ fn test_blocking_detection_multi() {
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         println!("Done");
     });
-    lrtd.stop()
 }
 
 #[test]
@@ -59,7 +58,6 @@ fn test_blocking_detection_current() {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         println!("Done");
     });
-    lrtd.stop()
 }
 
 struct CaptureBlockingActionHandler {
@@ -160,11 +158,10 @@ fn test_blocking_detection_multi_capture() {
 fn test_blocking_detection_stop_unstarted() {
     let mut builder = tokio::runtime::Builder::new_multi_thread();
     let mutable_builder = builder.worker_threads(2);
-    let lrtd = LongRunningTaskDetector::new(
+    let _lrtd = LongRunningTaskDetector::new(
         Duration::from_millis(10),
         Duration::from_millis(100),
         Signal::SIGUSR1,
         mutable_builder,
     );
-    lrtd.stop()
 }
