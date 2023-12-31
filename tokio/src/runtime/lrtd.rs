@@ -34,14 +34,14 @@ pub trait BlockingActionHandler: Send + Sync {
     ///
     /// * `workers` - The list of thread IDs of the tokio runtime worker threads.   /// # Returns
     ///
-    fn blocking_detected(&self, workers: &Vec<libc::pthread_t>);
+    fn blocking_detected(&self, workers: &[libc::pthread_t]);
 }
 
 struct StdErrBlockingActionHandler;
 
 /// BlockingActionHandler implementation that writes blocker details to standard error.
 impl BlockingActionHandler for StdErrBlockingActionHandler {
-    fn blocking_detected(&self, workers: &Vec<libc::pthread_t>) {
+    fn blocking_detected(&self, workers: &[libc::pthread_t]) {
         eprintln!("Detected blocking in worker threads: {:?}", workers);
     }
 }
@@ -85,7 +85,7 @@ pub struct LongRunningTaskDetector {
 
 async fn do_nothing(tx: mpsc::Sender<()>) {
     // signal I am done
-    let _ = tx.send(()).unwrap();
+    tx.send(()).unwrap();
 }
 
 fn probe(
@@ -103,7 +103,7 @@ fn probe(
     if !is_probe_success {
         let targets = workers.get_all();
         action.blocking_detected(&targets);
-        let _ = rx.recv_timeout(get_panic_worker_block_duration()).unwrap();
+        rx.recv_timeout(get_panic_worker_block_duration()).unwrap();
     }
 }
 
@@ -205,8 +205,8 @@ impl LongRunningTaskDetector {
     ) {
         *self.stop_flag.lock().unwrap() = false;
         let stop_flag = Arc::clone(&self.stop_flag);
-        let detection_time = self.detection_time.clone();
-        let interval = self.interval.clone();
+        let detection_time = self.detection_time;
+        let interval = self.interval;
         let workers = Arc::clone(&self.workers);
         thread::spawn(move || {
             let mut rnd = FastRand::new();
@@ -221,7 +221,7 @@ impl LongRunningTaskDetector {
     /// Stops the monitoring thread. Does nothing if LRTD is already stopped.
     pub fn stop(&self) {
         let mut sf = self.stop_flag.lock().unwrap();
-        if *sf != true {
+        if !(*sf) {
             *sf = true;
         }
     }

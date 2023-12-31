@@ -98,7 +98,7 @@ static GTI_MUTEX: Mutex<()> = Mutex::new(());
 /// A naive stack trace capture implementation for threads for DEMO/TEST only purposes.
 fn get_thread_info(
     signal: libc::c_int,
-    targets: &Vec<libc::pthread_t>,
+    targets: &[libc::pthread_t],
 ) -> HashMap<libc::pthread_t, String> {
     let _lock = GTI_MUTEX.lock();
     {
@@ -160,7 +160,7 @@ impl DetailedCaptureBlockingActionHandler {
 }
 
 impl BlockingActionHandler for DetailedCaptureBlockingActionHandler {
-    fn blocking_detected(&self, workers: &Vec<libc::pthread_t>) {
+    fn blocking_detected(&self, workers: &[libc::pthread_t]) {
         let mut map = self.inner.lock().unwrap();
         let tinfo = get_thread_info(libc::SIGUSR1, workers);
         eprint!("Blocking detected with details: {:?}\n", tinfo);
