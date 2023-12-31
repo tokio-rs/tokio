@@ -1,5 +1,4 @@
 #![cfg(all(feature = "lrtd"))]
-use nix::sys::signal::Signal;
 use std::backtrace::Backtrace;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
@@ -23,7 +22,7 @@ fn test_blocking_detection_multi() {
     let lrtd = LongRunningTaskDetector::new(
         Duration::from_millis(10),
         Duration::from_millis(100),
-        Signal::SIGUSR1,
+        libc::SIGUSR1,
         mutable_builder,
     );
     let runtime = builder.enable_all().build().unwrap();
@@ -46,7 +45,7 @@ fn test_blocking_detection_current() {
     let lrtd = LongRunningTaskDetector::new(
         Duration::from_millis(10),
         Duration::from_millis(100),
-        Signal::SIGUSR1,
+        libc::SIGUSR1,
         mutable_builder,
     );
     let runtime = mutable_builder.build().unwrap();
@@ -78,7 +77,7 @@ impl CaptureBlockingActionHandler {
 }
 
 impl BlockingActionHandler for CaptureBlockingActionHandler {
-    fn blocking_detected(&self, _signal: Signal, targets: &Vec<libc::pthread_t>) -> bool {
+    fn blocking_detected(&self, _signal: libc::c_int, targets: &Vec<libc::pthread_t>) -> bool {
         let mut set = self.inner.lock().unwrap();
         set.extend(targets);
         true
@@ -132,7 +131,7 @@ fn test_blocking_detection_multi_capture() {
     let lrtd = LongRunningTaskDetector::new(
         Duration::from_millis(10),
         Duration::from_millis(100),
-        Signal::SIGUSR1,
+        libc::SIGUSR1,
         mutable_builder,
     );
     let runtime = builder.enable_all().build().unwrap();
@@ -161,7 +160,7 @@ fn test_blocking_detection_stop_unstarted() {
     let _lrtd = LongRunningTaskDetector::new(
         Duration::from_millis(10),
         Duration::from_millis(100),
-        Signal::SIGUSR1,
+        libc::SIGUSR1,
         mutable_builder,
     );
 }

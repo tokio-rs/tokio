@@ -1,6 +1,5 @@
 /// Utility to help with "really nice to add a warning for tasks that might be blocking"
 use libc;
-use nix::sys::signal::{self, SaFlags, SigAction, SigHandler, SigSet, Signal};
 use rand::Rng;
 use std::backtrace::Backtrace;
 use std::collections::HashSet;
@@ -156,14 +155,14 @@ pub trait BlockingActionHandler: Send + Sync {
     ///
     /// Returns `true` if the signaling of the threads is to be executed, false otherwise.
     ///
-    fn blocking_detected(&self, signal: Signal, targets: &Vec<libc::pthread_t>) -> bool;
+    fn blocking_detected(&self, signal: libc::c_int, targets: &Vec<libc::pthread_t>) -> bool;
 }
 
 struct StdErrBlockingActionHandler;
 
 /// BlockingActionHandler implementation that writes blocker details to standard error.
 impl BlockingActionHandler for StdErrBlockingActionHandler {
-    fn blocking_detected(&self, signal: Signal, targets: &Vec<libc::pthread_t>) -> bool {
+    fn blocking_detected(&self, signal: libc::c_int, targets: &Vec<libc::pthread_t>) -> bool {
         eprintln!(
             "Detected worker blocking, signaling {} worker threads: {:?}",
             signal, targets
@@ -228,38 +227,19 @@ extern "C" fn signal_handler(_: i32) {
 
 static INIT_SIGNAL_HANDLER: Once = Once::new();
 
-fn install_thread_stack_stace_handler(signal: Signal) {
+fn install_thread_stack_stace_handler(signal: libc::c_int) {
     INIT_SIGNAL_HANDLER.call_once(|| _install_thread_stack_stace_handler(signal))
 }
 
-fn _install_thread_stack_stace_handler(signal: Signal) {
-    let mut sigset = SigSet::empty();
-    sigset.add(signal);
-
-    // Set up a signal action
-    let sa = SigAction::new(
-        SigHandler::Handler(signal_handler),
-        SaFlags::empty(),
-        sigset,
-    );
-
-    // Register the signal action for process
+fn _install_thread_stack_stace_handler(signal: libc::c_int) {
     unsafe {
-        signal::sigaction(signal, &sa).expect("Failed to register signal handler");
+        libc::signal(signal, signal_handler as libc::sighandler_t);
     }
 }
 
-fn signal_all_threads(signal: Signal, targets: Vec<libc::pthread_t>) {
+fn signal_all_threads(signal: libc::c_int, targets: Vec<libc::pthread_t>) {
     for thread_id in &targets {
-        let result = unsafe {
-            libc::pthread_kill(
-                *thread_id,
-                match signal.into() {
-                    Some(s) => s as libc::c_int,
-                    None => 0,
-                },
-            )
-        };
+        let result = unsafe { libc::pthread_kill(*thread_id, signal) };
         if result != 0 {
             eprintln!("Error sending signal: {:?}", result);
         }
@@ -273,7 +253,7 @@ pub struct LongRunningTaskDetector {
     detection_time: Duration,
     stop_flag: Arc<Mutex<bool>>,
     workers: Arc<WorkerSet>,
-    signal: Signal,
+    signal: libc::c_int,
     identity: usize,
 }
 
@@ -285,7 +265,7 @@ async fn do_nothing(tx: mpsc::Sender<()>) {
 fn probe(
     tokio_runtime: &Arc<Runtime>,
     detection_time: Duration,
-    signal: Signal,
+    signal: libc::c_int,
     workers: &Arc<WorkerSet>,
     action: &Arc<dyn BlockingActionHandler>,
 ) {
@@ -316,7 +296,7 @@ fn probe(
 ///    let lrtd = LongRunningTaskDetector::new(
 ///      std::time::Duration::from_millis(10),
 ///      std::time::Duration::from_millis(100),
-///      nix::sys::signal::Signal::SIGUSR1,
+///      libc::SIGUSR1,
 ///      mutable_builder,
 ///    );
 ///    let runtime = builder.enable_all().build().unwrap();
@@ -378,7 +358,7 @@ impl LongRunningTaskDetector {
     pub fn new(
         interval: Duration,
         detection_time: Duration,
-        signal: Signal,
+        signal: libc::c_int,
         runtime_builder: &mut Builder,
     ) -> Self {
         install_thread_stack_stace_handler(signal);
@@ -441,7 +421,7 @@ impl LongRunningTaskDetector {
         let stop_flag = Arc::clone(&self.stop_flag);
         let detection_time = self.detection_time.clone();
         let interval = self.interval.clone();
-        let signal = self.signal.clone();
+        let signal = self.signal;
         let workers = Arc::clone(&self.workers);
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
