@@ -21,7 +21,7 @@ categories = ["asynchronous"]
 default = []
 
 # Shorthand for enabling everything
-full = ["codec", "compat", "io-util", "time", "net", "rt", "lrtd"]
+full = ["codec", "compat", "io-util", "time", "net", "rt"]
 
 net = ["tokio/net"]
 compat = ["futures-io",]
@@ -30,7 +30,6 @@ time = ["tokio/time","slab"]
 io = []
 io-util = ["io", "tokio/rt", "tokio/io-util"]
 rt = ["tokio/rt", "tokio/sync", "futures-util", "hashbrown"]
-lrtd = []
 
 __docs_rs = ["futures-util"]
 
@@ -44,7 +43,6 @@ futures-util = { version = "0.3.0", optional = true }
 pin-project-lite = "0.2.11"
 slab = { version = "0.4.4", optional = true } # Backs `DelayQueue`
 tracing = { version = "0.1.25", default-features = false, features = ["std"], optional = true }
-rand = "0.8"
 libc = "0.2"
 
 [target.'cfg(tokio_unstable)'.dependencies]
