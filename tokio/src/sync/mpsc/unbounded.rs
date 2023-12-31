@@ -343,8 +343,8 @@ impl<T> UnboundedReceiver<T> {
     /// When the method returns `Poll::Pending`, the `Waker` in the provided
     /// `Context` is scheduled to receive a wakeup when a message is sent on any
     /// receiver, or when the channel is closed.  Note that on multiple calls to
-    /// `poll_recv`, only the `Waker` from the `Context` passed to the most
-    /// recent call is scheduled to receive a wakeup.
+    /// `poll_recv` or `poll_recv_many`, only the `Waker` from the `Context`
+    /// passed to the most recent call is scheduled to receive a wakeup.
     ///
     /// If this method returns `Poll::Pending` due to a spurious failure, then
     /// the `Waker` will be notified when the situation causing the spurious
@@ -364,8 +364,11 @@ impl<T> UnboundedReceiver<T> {
     ///   stored in `buffer`. This can be less than, or equal to, `limit`.
     /// * `Poll::Ready(0)` if `limit` is set to zero or when the channel is closed.
     ///
-    /// When the method returns `Poll::Pending`, the `Waker` from the `Context` is scheduled
-    /// to be woken up when new messages are sent on the channel or when the channel is closed.
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when a message is sent on any
+    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// `poll_recv` or `poll_recv_many`, only the `Waker` from the `Context`
+    /// passed to the most recent call is scheduled to receive a wakeup.
     ///
     /// Note that this method does not guarantee that exactly `limit` messages
     /// are received. Rather, if at least one message is available, it returns
