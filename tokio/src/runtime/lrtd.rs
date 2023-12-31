@@ -1,12 +1,14 @@
-/// Utility to help with "really nice to add a warning for tasks that might be blocking"
+//! Utility to help with "really nice to add a warning for tasks that might be blocking"
+#![cfg(unix)]
 use libc;
-use rand::Rng;
 use std::collections::HashSet;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::{env, thread};
-use tokio::runtime::{Builder, Runtime};
+
+use crate::runtime::{Builder, Runtime};
+use crate::util::rand::FastRand;
 
 const PANIC_WORKER_BLOCK_DURATION_DEFAULT: Duration = Duration::from_secs(60);
 
@@ -109,7 +111,7 @@ fn probe(
 /// Example use:
 ///  ```
 ///    use std::sync::Arc;
-///    use tokio_util::lrtd::LongRunningTaskDetector;
+///    use tokio::runtime::lrtd::LongRunningTaskDetector;
 ///
 ///    let mut builder = tokio::runtime::Builder::new_multi_thread();
 ///    let mutable_builder = builder.worker_threads(2);
@@ -207,12 +209,11 @@ impl LongRunningTaskDetector {
         let interval = self.interval.clone();
         let workers = Arc::clone(&self.workers);
         thread::spawn(move || {
-            let mut rng = rand::thread_rng();
+            let mut rnd = FastRand::new();
+            let max: u32 = <u128 as TryInto<u32>>::try_into(interval.as_micros()).unwrap() - 10;
             while !*stop_flag.lock().unwrap() {
                 probe(&runtime, detection_time, &workers, &action);
-                thread::sleep(Duration::from_micros(
-                    rng.gen_range(1..=interval.as_micros()).try_into().unwrap(),
-                ));
+                thread::sleep(Duration::from_micros(rnd.fastrand_n(max).into()));
             }
         });
     }

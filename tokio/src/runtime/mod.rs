@@ -379,6 +379,9 @@ cfg_rt! {
         pub use dump::Dump;
     }
 
+    #[cfg(unix)]
+    pub mod lrtd;
+
     mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};
 

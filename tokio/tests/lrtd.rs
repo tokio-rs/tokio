@@ -1,11 +1,10 @@
-#![cfg(all(feature = "lrtd"))]
 use std::backtrace::Backtrace;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use tokio_util::lrtd::{BlockingActionHandler, LongRunningTaskDetector};
+use tokio::runtime::lrtd::{BlockingActionHandler, LongRunningTaskDetector};
 
 async fn run_blocking_stuff() {
     println!("slow start");
