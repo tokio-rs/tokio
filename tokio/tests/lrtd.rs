@@ -80,7 +80,7 @@ mod lrtd_tests {
         let name = thread::current()
             .name()
             .map(|n| format!(" for thread \"{}\"", n))
-            .unwrap_or("".to_owned());
+            .unwrap_or_else(|| "".to_owned());
         let tid = get_thread_id();
         let detail = format!("Stack trace{}:{}\n{}", name, tid, backtrace);
         let mut omap = THREAD_DUMPS.lock().unwrap();
@@ -128,7 +128,7 @@ mod lrtd_tests {
         }
         {
             let omap = THREAD_DUMPS.lock().unwrap();
-            omap.clone().unwrap().clone()
+            omap.clone().unwrap()
         }
     }
 
