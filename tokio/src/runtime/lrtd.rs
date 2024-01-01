@@ -1,5 +1,4 @@
 //! Utility to help with "really nice to add a warning for tasks that might be blocking"
-#![cfg(unix)]
 use libc;
 use std::collections::HashSet;
 use std::sync::mpsc;
