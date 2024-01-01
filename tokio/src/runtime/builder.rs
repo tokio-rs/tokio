@@ -319,7 +319,7 @@ impl Builder {
     }
 
     /// Returns true if kind is "CurrentThread" of this [`Builder`]. False otherwise.
-    pub(crate) fn is_current_threaded(&self) -> bool {
+    pub fn is_current_threaded(&self) -> bool {
         match &self.kind {
             Kind::CurrentThread => true,
             #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
