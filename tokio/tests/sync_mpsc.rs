@@ -522,10 +522,9 @@ async fn try_send_fail_with_try_recv() {
     assert_eq!(rx.try_recv(), Err(TryRecvError::Disconnected));
 }
 
-
 #[maybe_tokio_test]
 async fn reserve_many_above_cap() {
-	const MAX_PERMITS: usize = tokio::sync::Semaphore::MAX_PERMITS;
+    const MAX_PERMITS: usize = tokio::sync::Semaphore::MAX_PERMITS;
     let (tx, _rx) = mpsc::channel::<()>(1);
 
     assert_err!(tx.reserve_many(2).await);
@@ -547,7 +546,10 @@ fn try_reserve_many_zero() {
     drop(rx);
 
     // Closed error when closed.
-    assert_eq!(assert_err!(tx.try_reserve_many(0)), TrySendError::Closed(()));
+    assert_eq!(
+        assert_err!(tx.try_reserve_many(0)),
+        TrySendError::Closed(())
+    );
 }
 
 #[maybe_tokio_test]
@@ -569,7 +571,7 @@ async fn reserve_many_zero() {
 
 #[maybe_tokio_test]
 async fn try_reserve_many_edge_cases() {
-	const MAX_PERMITS: usize = tokio::sync::Semaphore::MAX_PERMITS;
+    const MAX_PERMITS: usize = tokio::sync::Semaphore::MAX_PERMITS;
 
     let (tx, rx) = mpsc::channel::<()>(1);
 
