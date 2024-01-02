@@ -71,7 +71,7 @@ pub struct Permit<'a, T> {
 /// An [`Iterator`] of [`Permit`] that can be used to hold `n` slots in the channel.
 ///
 /// `PermitIterator` values are returned by [`Sender::reserve_many()`] and [`Sender::try_reserve_many()`]
-/// and are used to guarantee channel capacity before generating `n` message to send.
+/// and are used to guarantee channel capacity before generating `n` messages to send.
 ///
 /// [`Sender::reserve_many()`]: Sender::reserve_many
 /// [`Sender::try_reserve_many()`]: Sender::try_reserve_many
@@ -1089,7 +1089,7 @@ impl<T> Sender<T> {
     /// get a [`Permit`] and then call [`Permit::send`]. This function is similar to
     /// [`reserve_many`] except it does not await for the slots to become available.
     ///
-    /// If the channel is full or if there are fewer than `n` permits available
+    /// If there are fewer than `n` permits available on the channel, then
     /// this function will return a [`TrySendError::Full`]. If the channel is closed
     /// this function will return a [`TrySendError::Closed`].
     ///

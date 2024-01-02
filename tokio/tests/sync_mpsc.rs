@@ -522,24 +522,49 @@ async fn try_send_fail_with_try_recv() {
     assert_eq!(rx.try_recv(), Err(TryRecvError::Disconnected));
 }
 
+use tokio::sync::Semaphore::MAX_PERMITS;
+
 #[maybe_tokio_test]
-async fn reserve_many_edge_cases() {
-    // MAX_PERMITS as defined in `sync/batch_semaphore.rs`
-    const MAX_PERMITS: usize = std::usize::MAX >> 3;
-
+async fn reserve_many_above_cap() {
     let (tx, rx) = mpsc::channel::<()>(1);
-    let mut permit = assert_ok!(tx.reserve_many(0).await);
-    assert!(permit.next().is_none());
 
+    assert_err!(tx.reserve_many(2).await);
     assert_err!(tx.reserve_many(MAX_PERMITS + 1).await);
     assert_err!(tx.reserve_many(usize::MAX).await);
+}
 
-    // Dropping the receiver should close the channel
+#[test]
+fn try_reserve_many_zero() {
+    let (tx, rx) = mpsc::channel::<()>(1);
+
+    // Succeeds when not closed.
+    assert!(assert_ok!(tx.try_reserve_many(0)).next().is_none());
+
+    // Even when channel is full.
+    tx.send(()).unwrap();
+    assert!(assert_ok!(tx.try_reserve_many(0)).next().is_none());
+
     drop(rx);
-    match assert_err!(tx.try_reserve_many(0)) {
-        TrySendError::Closed(()) => {}
-        _ => panic!(),
-    };
+
+    // Closed error when closed.
+    assert!(tx.try_reserve_many(0) == TrySendError::Closed(()));
+}
+
+#[maybe_tokio_test]
+async fn reserve_many_zero() {
+    let (tx, rx) = mpsc::channel::<()>(1);
+
+    // Succeeds when not closed.
+    assert!(assert_ok!(tx.reserve_many(0).await).next().is_none());
+
+    // Even when channel is full.
+    tx.send(()).unwrap();
+    assert!(assert_ok!(tx.reserve_many(0).await).next().is_none());
+
+    drop(rx);
+
+    // Closed error when closed.
+    assert!(tx.reserve_many(0).await == TrySendError::Closed(()));
 }
 
 #[maybe_tokio_test]
