@@ -565,7 +565,7 @@ impl Semaphore {
     pub async fn acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, AcquireError> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         trace::async_op(
-            || self.ll_sem.acquire(n),
+            || self.ll_sem.acquire(n as usize),
             self.resource_span.clone(),
             "Semaphore::acquire_many",
             "poll",
@@ -574,7 +574,7 @@ impl Semaphore {
         .await?;
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        self.ll_sem.acquire(n).await?;
+        self.ll_sem.acquire(n as usize).await?;
 
         Ok(SemaphorePermit {
             sem: self,
@@ -646,7 +646,7 @@ impl Semaphore {
     /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
     /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
     pub fn try_acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, TryAcquireError> {
-        match self.ll_sem.try_acquire(n) {
+        match self.ll_sem.try_acquire(n as usize) {
             Ok(()) => Ok(SemaphorePermit {
                 sem: self,
                 permits: n,
@@ -764,14 +764,14 @@ impl Semaphore {
     ) -> Result<OwnedSemaphorePermit, AcquireError> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = trace::async_op(
-            || self.ll_sem.acquire(n),
+            || self.ll_sem.acquire(n as usize),
             self.resource_span.clone(),
             "Semaphore::acquire_many_owned",
             "poll",
             true,
         );
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let inner = self.ll_sem.acquire(n);
+        let inner = self.ll_sem.acquire(n as usize);
 
         inner.await?;
         Ok(OwnedSemaphorePermit {
@@ -855,7 +855,7 @@ impl Semaphore {
         self: Arc<Self>,
         n: u32,
     ) -> Result<OwnedSemaphorePermit, TryAcquireError> {
-        match self.ll_sem.try_acquire(n) {
+        match self.ll_sem.try_acquire(n as usize) {
             Ok(()) => Ok(OwnedSemaphorePermit {
                 sem: self,
                 permits: n,
