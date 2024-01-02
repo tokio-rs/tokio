@@ -1153,12 +1153,6 @@ impl<T> Sender<T> {
         if n > self.max_capacity() {
             return Err(TrySendError::Full(()));
         }
-        if n == 0 && !self.is_closed() {
-            return Ok(PermitIterator {
-                chan: &self.chan,
-                n,
-            });
-        }
 
         match self.chan.semaphore().semaphore.try_acquire(n) {
             Ok(()) => {}
