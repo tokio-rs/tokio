@@ -157,10 +157,10 @@ pub(crate) struct Header {
     /// Table of function pointers for executing actions on the task.
     pub(super) vtable: &'static Vtable,
 
-    /// This integer contains the id of the OwnedTasks or LocalOwnedTasks that
-    /// this task is stored in. If the task is not in any list, should be the
-    /// id of the list that it was previously in, or `None` if it has never been
-    /// in any list.
+    /// This integer contains the id of the `OwnedTasks` or `LocalOwnedTasks`
+    /// that this task is stored in. If the task is not in any list, should be
+    /// the id of the list that it was previously in, or `None` if it has never
+    /// been in any list.
     ///
     /// Once a task has been bound to a list, it can never be bound to another
     /// list, even if removed from the first list.
