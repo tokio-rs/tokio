@@ -1545,6 +1545,10 @@ impl<T> Drop for PermitIterator<'_, T> {
     fn drop(&mut self) {
         use chan::Semaphore;
 
+        if self.n == 0 {
+            return;
+        }
+
         let semaphore = self.chan.semaphore();
 
         // Add the remaining permits back to the semaphore
