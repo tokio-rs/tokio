@@ -68,7 +68,7 @@ pub struct Permit<'a, T> {
     chan: &'a chan::Tx<T, Semaphore>,
 }
 
-/// An [`Iterator`] of [`Permit`] that can be used to reserve `n` slots in the channel.
+/// An [`Iterator`] of [`Permit`] that can be used to hold `n` slots in the channel.
 ///
 /// `PermitIterator` values are returned by [`Sender::reserve_many()`] and [`Sender::try_reserve_many()`]
 /// and are used to guarantee channel capacity before generating `n` message to send.
