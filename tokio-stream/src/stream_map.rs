@@ -209,7 +209,7 @@ pub struct StreamMap<K, V> {
 impl<K, V> StreamMap<K, V> {
     /// An iterator visiting all key-value pairs in arbitrary order.
     ///
-    /// The iterator element type is &'a (K, V).
+    /// The iterator element type is `&'a (K, V)`.
     ///
     /// # Examples
     ///
@@ -232,7 +232,7 @@ impl<K, V> StreamMap<K, V> {
 
     /// An iterator visiting all key-value pairs mutably in arbitrary order.
     ///
-    /// The iterator element type is &'a mut (K, V).
+    /// The iterator element type is `&'a mut (K, V)`.
     ///
     /// # Examples
     ///
@@ -289,7 +289,7 @@ impl<K, V> StreamMap<K, V> {
 
     /// Returns an iterator visiting all keys in arbitrary order.
     ///
-    /// The iterator element type is &'a K.
+    /// The iterator element type is `&'a K`.
     ///
     /// # Examples
     ///
@@ -312,7 +312,7 @@ impl<K, V> StreamMap<K, V> {
 
     /// An iterator visiting all values in arbitrary order.
     ///
-    /// The iterator element type is &'a V.
+    /// The iterator element type is `&'a V`.
     ///
     /// # Examples
     ///
@@ -335,7 +335,7 @@ impl<K, V> StreamMap<K, V> {
 
     /// An iterator visiting all values mutably in arbitrary order.
     ///
-    /// The iterator element type is &'a mut V.
+    /// The iterator element type is `&'a mut V`.
     ///
     /// # Examples
     ///

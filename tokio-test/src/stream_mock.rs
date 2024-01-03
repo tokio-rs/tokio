@@ -8,7 +8,7 @@
 //! intervals between items.
 //!
 //! # Usage
-//! To use the `StreamMock`, you need to create a builder using[`StreamMockBuilder`]. The builder
+//! To use the `StreamMock`, you need to create a builder using [`StreamMockBuilder`]. The builder
 //! allows you to enqueue actions such as returning items or waiting for a certain duration.
 //!
 //! # Example
