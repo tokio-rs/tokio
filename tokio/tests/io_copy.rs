@@ -85,3 +85,18 @@ async fn proxy() {
 
     assert_eq!(n, 1024);
 }
+
+#[tokio::test]
+async fn copy_is_cooperative() {
+    tokio::select! {
+        biased;
+        _ = async {
+            loop {
+                let mut reader: &[u8] = b"hello";
+                let mut writer: Vec<u8> = vec![];
+                let _ = io::copy(&mut reader, &mut writer).await;
+            }
+        } => {},
+        _ = tokio::task::yield_now() => {}
+    }
+}
