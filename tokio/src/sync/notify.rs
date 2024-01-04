@@ -16,7 +16,7 @@ use std::marker::PhantomPinned;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::sync::atomic::Ordering::{self, Acquire, Relaxed, Release, SeqCst};
+use std::sync::atomic::Ordering::{self, *};
 use std::task::{Context, Poll, Waker};
 
 type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
@@ -567,7 +567,7 @@ impl Notify {
             // happens-before synchronization must happen between this atomic
             // operation and a task calling `notified().await`.
             let new = set_state(curr, NOTIFIED);
-            let res = self.state.compare_exchange(curr, new, SeqCst, SeqCst);
+            let res = self.state.compare_exchange(curr, new, AcqRel, Acquire);
 
             match res {
                 // No waiters, no further work to do
@@ -583,7 +583,7 @@ impl Notify {
 
         // The state must be reloaded while the lock is held. The state may only
         // transition out of WAITING while the lock is held.
-        curr = self.state.load(SeqCst);
+        curr = self.state.load(Acquire);
 
         if let Some(waker) = notify_locked(&mut waiters, &self.state, curr) {
             drop(waiters);
@@ -640,7 +640,7 @@ impl Notify {
         // Increment the number of times this method was called
         // and transition to empty.
         let new_state = set_state(inc_num_notify_waiters_calls(curr), EMPTY);
-        self.state.store(new_state, SeqCst);
+        self.state.store(new_state, Release);
 
         // It is critical for `GuardedLinkedList` safety that the guard node is
         // pinned in memory and is not dropped until the guarded list is dropped.
@@ -932,8 +932,8 @@ impl Notified<'_> {
                                 let res = notify.state.compare_exchange(
                                     set_state(curr, EMPTY),
                                     set_state(curr, WAITING),
-                                    SeqCst,
-                                    SeqCst,
+                                    AcqRel,
+                                    Acquire,
                                 );
 
                                 if let Err(actual) = res {
@@ -949,8 +949,8 @@ impl Notified<'_> {
                                 let res = notify.state.compare_exchange(
                                     set_state(curr, NOTIFIED),
                                     set_state(curr, EMPTY),
-                                    SeqCst,
-                                    SeqCst,
+                                    AcqRel,
+                                    Acquire,
                                 );
 
                                 match res {
