@@ -178,7 +178,9 @@ where
                 locked_node = node.inner.lock().unwrap();
                 locked_parent
             }
-            Err(TryLockError::Poisoned(err)) => panic!("{:?}", err),
+            // https://github.com/tokio-rs/tokio/pull/6273#discussion_r1443752911
+            #[allow(clippy::unnecessary_literal_unwrap)]
+            Err(TryLockError::Poisoned(err)) => Err(err).unwrap(),
         };
 
         // If we unlocked the child, then the parent may have changed. Check
