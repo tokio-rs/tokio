@@ -1,4 +1,4 @@
-#![cfg(all(feature = "full"))]
+#![cfg(feature = "full")]
 
 use tokio::time::{Duration, Instant};
 

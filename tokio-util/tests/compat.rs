@@ -1,4 +1,4 @@
-#![cfg(all(feature = "compat"))]
+#![cfg(feature = "compat")]
 #![cfg(not(target_os = "wasi"))] // WASI does not support all fs operations
 #![warn(rust_2018_idioms)]
 

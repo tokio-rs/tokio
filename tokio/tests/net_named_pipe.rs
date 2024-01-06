@@ -1,5 +1,5 @@
 #![cfg(feature = "full")]
-#![cfg(all(windows))]
+#![cfg(windows)]
 
 use std::io;
 use std::time::Duration;

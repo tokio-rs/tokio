@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full"))]
+#![cfg(feature = "full")]
 
 use tokio::io::AsyncWriteExt;
 
