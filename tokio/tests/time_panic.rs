@@ -80,7 +80,7 @@ fn timeout_panic_caller() -> Result<(), Box<dyn Error>> {
         // Runtime without `enable_time` so it has no current timer set.
         let rt = Builder::new_current_thread().build().unwrap();
         rt.block_on(async {
-            let _ = timeout(Duration::from_millis(5), future::pending::<()>());
+            let _timeout = timeout(Duration::from_millis(5), future::pending::<()>());
         });
     });
 

@@ -16,7 +16,7 @@ env:
   # Change to specific Rust release to pin
   rust_stable: stable
   rust_nightly: nightly-2023-10-21
-  rust_clippy: 1.65.0
+  rust_clippy: '1.75'
   # When updating this, also update:
   # - README.md
   # - tokio/README.md
@@ -25,7 +25,7 @@ env:
   # - tokio-util/Cargo.toml
   # - tokio-test/Cargo.toml
   # - tokio-stream/Cargo.toml
-  rust_min: 1.63.0
+  rust_min: '1.63'
 
 defaults:
   run:

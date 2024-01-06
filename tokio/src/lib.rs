@@ -2,8 +2,7 @@
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
     clippy::module_inception,
-    clippy::needless_doctest_main,
-    clippy::declare_interior_mutable_const
+    clippy::needless_doctest_main
 )]
 #![warn(
     missing_debug_implementations,

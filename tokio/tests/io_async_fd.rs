@@ -825,7 +825,7 @@ async fn await_error_readiness_invalid_address() {
         msg.msg_iovlen = 1;
 
         if unsafe { libc::sendmsg(socket_fd, &msg, 0) } == -1 {
-            Err(std::io::Error::last_os_error()).unwrap()
+            panic!("{:?}", std::io::Error::last_os_error())
         }
     });
 

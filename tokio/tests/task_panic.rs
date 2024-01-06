@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![allow(clippy::declare_interior_mutable_const)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))]
 
 use futures::future;
@@ -34,7 +33,7 @@ fn local_set_spawn_local_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _local = task::LocalSet::new();
 
-        let _ = task::spawn_local(async {});
+        task::spawn_local(async {});
     });
 
     // The panic location should be in this file

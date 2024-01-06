@@ -29,15 +29,12 @@ const LIFECYCLE_MASK: usize = 0b11;
 const NOTIFIED: usize = 0b100;
 
 /// The join handle is still around.
-#[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
 const JOIN_INTEREST: usize = 0b1_000;
 
 /// A join handle waker has been set.
-#[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
 const JOIN_WAKER: usize = 0b10_000;
 
 /// The task has been forcibly cancelled.
-#[allow(clippy::unusual_byte_groupings)] // https://github.com/rust-lang/rust-clippy/issues/6556
 const CANCELLED: usize = 0b100_000;
 
 /// All bits.
