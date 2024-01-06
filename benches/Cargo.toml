@@ -27,6 +27,11 @@ path = "spawn.rs"
 harness = false
 
 [[bench]]
+name = "sync_broadcast"
+path = "sync_broadcast.rs"
+harness = false
+
+[[bench]]
 name = "sync_mpsc"
 path = "sync_mpsc.rs"
 harness = false
