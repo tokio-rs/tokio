@@ -31,7 +31,7 @@ fn can_drop_future_and_still_get_output() {
     let pool = task::LocalPoolHandle::new(1);
     let (sender, receiver) = std::sync::mpsc::channel();
 
-    let _ = pool.spawn_pinned(move || {
+    pool.spawn_pinned(move || {
         // Rc is !Send + !Sync
         let local_data = Rc::new("test");
 
@@ -209,7 +209,7 @@ async fn spawn_by_idx() {
         },
         0,
     );
-    let _ = pool.spawn_pinned_by_idx(
+    pool.spawn_pinned_by_idx(
         || async move {
             barrier2.wait().await;
             std::thread::current().id()
