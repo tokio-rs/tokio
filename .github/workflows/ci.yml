@@ -942,7 +942,7 @@ jobs:
       - name: Install cargo-check-external-types
         uses: taiki-e/cache-cargo-install-action@v1
         with:
-          tool: cargo-check-external-types@0.1.9
+          tool: cargo-check-external-types@0.1.10
       - name: check-external-types
         run: cargo check-external-types --all-features
         working-directory: tokio
