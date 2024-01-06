@@ -1,5 +1,3 @@
-#![allow(clippy::unit_arg)]
-
 use crate::signal::os::{OsExtraData, OsStorage};
 use crate::sync::watch;
 use crate::util::once_cell::OnceCell;
