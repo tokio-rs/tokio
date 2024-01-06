@@ -149,7 +149,7 @@ rand = "0.8.0"
 wasm-bindgen-test = "0.3.0"
 
 [target.'cfg(target_os = "freebsd")'.dev-dependencies]
-mio-aio = { version = "0.7.0", features = ["tokio"] }
+mio-aio = { version = "0.8.0", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.7", features = ["futures", "checkpoint"] }
