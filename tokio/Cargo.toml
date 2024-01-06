@@ -164,3 +164,13 @@ rustc-args = ["--cfg", "tokio_unstable", "--cfg", "tokio_taskdump"]
 
 [package.metadata.playground]
 features = ["full", "test-util"]
+
+[package.metadata.cargo_check_external_types]
+# The following are types that are allowed to be exposed in Tokio's public API.
+# The standard library is allowed by default.
+allowed_external_types = [
+   "bytes::buf::buf_impl::Buf",
+   "bytes::buf::buf_mut::BufMut",
+
+   "tokio_macros::*",
+]
