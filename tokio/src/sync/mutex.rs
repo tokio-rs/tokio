@@ -16,7 +16,12 @@ use std::{fmt, mem, ptr};
 /// This type acts similarly to [`std::sync::Mutex`], with two major
 /// differences: [`lock`] is an async method so does not block, and the lock
 /// guard is designed to be held across `.await` points.
-///
+/// 
+/// Please note that Tokio's Mutex operates on a guaranteed FIFO basis. 
+/// This means that the order in which tasks call the [`lock`] method is 
+/// the exact order in which they will acquire the lock. 
+/// We commit to maintaining this behavior in future versions.
+/// 
 /// # Which kind of mutex should you use?
 ///
 /// Contrary to popular belief, it is ok and often preferred to use the ordinary
