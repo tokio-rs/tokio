@@ -27,7 +27,7 @@ use orphan::{OrphanQueue, OrphanQueueImpl, Wait};
 mod reap;
 use reap::Reaper;
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "rt"))]
 mod pidfd_reaper;
 
 use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
@@ -105,7 +105,7 @@ impl OrphanQueue<StdChild> for GlobalOrphanQueue {
 #[must_use = "futures do nothing unless polled"]
 pub(crate) enum Child {
     SignalReaper(Reaper<StdChild, GlobalOrphanQueue, Signal>),
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "rt"))]
     PidfdReaper(pidfd_reaper::PidfdReaper<StdChild, GlobalOrphanQueue>),
 }
 
@@ -121,7 +121,7 @@ pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<Spawned
     let stdout = child.stdout.take().map(stdio).transpose()?;
     let stderr = child.stderr.take().map(stdio).transpose()?;
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "rt"))]
     match pidfd_reaper::PidfdReaper::new(child, GlobalOrphanQueue) {
         Ok(pidfd_reaper) => {
             return Ok(SpawnedChild {
@@ -149,7 +149,7 @@ impl Child {
     pub(crate) fn id(&self) -> u32 {
         match self {
             Self::SignalReaper(signal_reaper) => signal_reaper.id(),
-            #[cfg(target_os = "linux")]
+            #[cfg(all(target_os = "linux", feature = "rt"))]
             Self::PidfdReaper(pidfd_reaper) => pidfd_reaper.id(),
         }
     }
@@ -157,7 +157,7 @@ impl Child {
     fn std_child(&mut self) -> &mut StdChild {
         match self {
             Self::SignalReaper(signal_reaper) => signal_reaper.inner_mut(),
-            #[cfg(target_os = "linux")]
+            #[cfg(all(target_os = "linux", feature = "rt"))]
             Self::PidfdReaper(pidfd_reaper) => pidfd_reaper.inner_mut(),
         }
     }
@@ -179,7 +179,7 @@ impl Future for Child {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match Pin::into_inner(self) {
             Self::SignalReaper(signal_reaper) => Pin::new(signal_reaper).poll(cx),
-            #[cfg(target_os = "linux")]
+            #[cfg(all(target_os = "linux", feature = "rt"))]
             Self::PidfdReaper(pidfd_reaper) => Pin::new(pidfd_reaper).poll(cx),
         }
     }
