@@ -7,7 +7,7 @@ use crate::{
     util::error::RUNTIME_SHUTTING_DOWN_ERROR,
 };
 
-use libc::{syscall, SYS_pidfd_open, __errno_location, ENOSYS, PIDFD_NONBLOCK};
+use libc::{syscall, SYS_pidfd_open, ENOSYS, PIDFD_NONBLOCK};
 use mio::{event::Source, unix::SourceFd};
 use std::{
     fs::File,
@@ -36,21 +36,22 @@ impl Pidfd {
             return None;
         }
 
-        unsafe {
-            let fd = syscall(SYS_pidfd_open, pid, PIDFD_NONBLOCK);
-            if fd == -1 {
-                let errno = *__errno_location();
+        // Safety: The following function calls invovkes syscall pidfd_open,
+        // which takes two parameter: pidfd_open(fd: c_int, flag: c_int)
+        let fd = unsafe { syscall(SYS_pidfd_open, pid, PIDFD_NONBLOCK) };
+        if fd == -1 {
+            let errno = io::Error::last_os_error().raw_os_error().unwrap();
 
-                if errno == ENOSYS {
-                    NO_PIDFD_SUPPORT.store(true, Relaxed)
-                }
-
-                None
-            } else {
-                Some(Pidfd {
-                    fd: File::from_raw_fd(fd as i32),
-                })
+            if errno == ENOSYS {
+                NO_PIDFD_SUPPORT.store(true, Relaxed)
             }
+
+            None
+        } else {
+            // Safety: pidfd_open returns -1 on error or a valid fd with ownership.
+            Some(Pidfd {
+                fd: unsafe { File::from_raw_fd(fd as i32) },
+            })
         }
     }
 }
