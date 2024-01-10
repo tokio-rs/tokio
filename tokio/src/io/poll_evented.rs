@@ -144,6 +144,17 @@ impl<E: Source> PollEvented<E> {
             .map_err(io::Error::from)
             .map_ok(|_| ())
     }
+
+    /// Re-register under new runtime with `interest`.
+    #[cfg(all(feature = "process", target_os = "linux"))]
+    pub(crate) fn reregister(&mut self, interest: Interest) -> io::Result<()> {
+        let io = self.io.as_mut().unwrap(); // As io shouldn't ever be None, just unwrap here.
+        let _ = self.registration.deregister(io);
+        self.registration =
+            Registration::new_with_interest_and_handle(io, interest, scheduler::Handle::current())?;
+
+        Ok(())
+    }
 }
 
 feature! {

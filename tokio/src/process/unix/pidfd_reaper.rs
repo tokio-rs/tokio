@@ -4,6 +4,7 @@ use crate::{
         imp::{orphan::Wait, OrphanQueue},
         kill::Kill,
     },
+    util::error::RUNTIME_SHUTTING_DOWN_ERROR,
 };
 
 use libc::{syscall, SYS_pidfd_open, __errno_location, ENOSYS, PIDFD_NONBLOCK};
@@ -93,6 +94,17 @@ where
     pidfd: PollEvented<Pidfd>,
 }
 
+#[allow(deprecated)]
+fn is_rt_shutdown_err(err: &io::Error) -> bool {
+    if let Some(inner) = err.get_ref() {
+        // Using `Error::description()` is more efficient than `format!("{inner}")`,
+        // so we use it here even if it is deprecated.
+        inner.source().is_none() && inner.description() == RUNTIME_SHUTTING_DOWN_ERROR
+    } else {
+        false
+    }
+}
+
 impl<W> Future for PidfdReaperInner<W>
 where
     W: Wait + Unpin,
@@ -102,7 +114,13 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = Pin::into_inner(self);
 
-        ready!(this.pidfd.poll_read_ready(cx))?;
+        match ready!(this.pidfd.poll_read_ready(cx)) {
+            Err(err) if err.kind() == io::ErrorKind::Other && is_rt_shutdown_err(&err) => {
+                this.pidfd.reregister(Interest::READABLE)?;
+                ready!(this.pidfd.poll_read_ready(cx))?
+            }
+            res => res?,
+        }
         Poll::Ready(Ok(this
             .inner
             .try_wait()?
