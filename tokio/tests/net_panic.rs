@@ -101,7 +101,7 @@ fn unix_listener_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
 
     let dir = tempfile::tempdir().unwrap();
     let sock_path = dir.path().join("socket");
-    let std_listener = std::os::unix::net::UnixListener::bind(&sock_path).unwrap();
+    let std_listener = std::os::unix::net::UnixListener::bind(sock_path).unwrap();
 
     let panic_location_file = test_panic(|| {
         let rt = runtime_without_io();
@@ -150,7 +150,7 @@ fn unix_datagram_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
 
     // Bind the socket to a filesystem path
     // /let socket_path = tmp.path().join("socket");
-    let std_socket = StdUDS::bind(&sock_path).unwrap();
+    let std_socket = StdUDS::bind(sock_path).unwrap();
     std_socket.set_nonblocking(true).unwrap();
 
     let panic_location_file = test_panic(move || {

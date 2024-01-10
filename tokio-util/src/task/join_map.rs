@@ -462,7 +462,7 @@ where
     ///  * `Some((key, Ok(value)))` if one of the tasks in this `JoinMap` has
     ///    completed. The `value` is the return value of that ask, and `key` is
     ///    the key associated with the task.
-    ///  * `Some((key, Err(err))` if one of the tasks in this JoinMap` has
+    ///  * `Some((key, Err(err))` if one of the tasks in this `JoinMap` has
     ///    panicked or been aborted. `key` is the key associated  with the task
     ///    that panicked or was aborted.
     ///  * `None` if the `JoinMap` is empty.

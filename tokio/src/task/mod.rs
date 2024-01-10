@@ -123,7 +123,7 @@
 //! all tasks on it.
 //!
 //! When tasks are shut down, it will stop running at whichever `.await` it has
-//! yielded at. All local variables are destroyed by running their detructor.
+//! yielded at. All local variables are destroyed by running their destructor.
 //! Once shutdown has completed, awaiting the [`JoinHandle`] will fail with a
 //! [cancelled error](crate::task::JoinError::is_cancelled).
 //!

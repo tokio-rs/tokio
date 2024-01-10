@@ -45,8 +45,7 @@ async fn two_await() {
     let (tx1, rx1) = oneshot::channel::<&str>();
     let (tx2, rx2) = oneshot::channel::<u32>();
 
-    let mut join =
-        task::spawn(async { tokio::try_join!(async { rx1.await }, async { rx2.await }) });
+    let mut join = task::spawn(async { tokio::try_join!(rx1, rx2) });
 
     assert_pending!(join.poll());
 
@@ -67,11 +66,7 @@ async fn err_abort_early() {
     let (tx2, rx2) = oneshot::channel::<u32>();
     let (_tx3, rx3) = oneshot::channel::<u32>();
 
-    let mut join = task::spawn(async {
-        tokio::try_join!(async { rx1.await }, async { rx2.await }, async {
-            rx3.await
-        })
-    });
+    let mut join = task::spawn(async { tokio::try_join!(rx1, rx2, rx3) });
 
     assert_pending!(join.poll());
 
