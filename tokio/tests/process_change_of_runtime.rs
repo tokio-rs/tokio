@@ -1,12 +1,8 @@
 #![cfg(feature = "process")]
 #![warn(rust_2018_idioms)]
-// This test reveals a difference in behavior of kqueue on FreeBSD. When the
-// reader disconnects, there does not seem to be an `EVFILT_WRITE` filter that
-// is returned.
-//
-// It is expected that `EVFILT_WRITE` would be returned with either the
-// `EV_EOF` or `EV_ERROR` flag set. If either flag is set a write would be
-// attempted, but that does not seem to occur.
+// This tests test the behavior of `process::Command::spawn` when it is used
+// outside runtime, and when `process::Child::wait ` is used in a different
+// runtime from which `process::Command::spawn` is used.
 #![cfg(all(unix, not(target_os = "freebsd")))]
 
 use std::process::Stdio;
@@ -24,4 +20,15 @@ fn process_spawned_and_wait_in_different_runtime() {
     Runtime::new().unwrap().block_on(async {
         let _ = child.wait().await.unwrap();
     });
+}
+
+#[test]
+#[should_panic(
+    expected = "there is no reactor running, must be called from the context of a Tokio 1.x runtime"
+)]
+fn process_spawned_outside_runtime() {
+    let _ = Command::new("true")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .spawn();
 }
