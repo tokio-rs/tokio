@@ -100,7 +100,9 @@ fn is_rt_shutdown_err(err: &io::Error) -> bool {
     if let Some(inner) = err.get_ref() {
         // Using `Error::description()` is more efficient than `format!("{inner}")`,
         // so we use it here even if it is deprecated.
-        inner.source().is_none() && inner.description() == RUNTIME_SHUTTING_DOWN_ERROR
+        err.kind() == io::ErrorKind::Other
+            && inner.source().is_none()
+            && inner.description() == RUNTIME_SHUTTING_DOWN_ERROR
     } else {
         false
     }
@@ -116,7 +118,7 @@ where
         let this = Pin::into_inner(self);
 
         match ready!(this.pidfd.poll_read_ready(cx)) {
-            Err(err) if err.kind() == io::ErrorKind::Other && is_rt_shutdown_err(&err) => {
+            Err(err) if is_rt_shutdown_err(&err) => {
                 this.pidfd.reregister(Interest::READABLE)?;
                 ready!(this.pidfd.poll_read_ready(cx))?
             }
