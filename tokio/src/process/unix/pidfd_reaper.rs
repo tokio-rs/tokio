@@ -303,11 +303,15 @@ mod test {
 
         let queue = MockQueue::new();
 
+        let mut child = Command::new("sleep").arg("1800").spawn().unwrap();
+
         run_test(async {
-            let child = Command::new("sleep").arg("1800").spawn().unwrap();
-            let _pidfd_reaper = PidfdReaper::new(child, &queue).unwrap();
+            let _pidfd_reaper = PidfdReaper::new(&mut child, &queue).unwrap();
         });
 
         assert_eq!(queue.all_enqueued.borrow().len(), 1);
+
+        child.kill().unwrap();
+        child.wait().unwrap();
     }
 }
