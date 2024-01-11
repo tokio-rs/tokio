@@ -227,3 +227,42 @@ async fn join_set_coop() {
     assert!(coop_count >= 1);
     assert_eq!(count, TASK_NUM);
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn try_join_next() {
+    // Large enough to trigger coop.
+    const TASK_NUM: u32 = 1000;
+
+    static SEM: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(0);
+
+    let mut set = JoinSet::new();
+
+    for _ in 0..TASK_NUM {
+        set.spawn(async {
+            SEM.add_permits(1);
+        });
+    }
+
+    // Wait for all tasks to complete.
+    //
+    // Since this is a `current_thread` runtime, there's no race condition
+    // between the last permit being added and the task completing.
+    let _ = SEM.acquire_many(TASK_NUM).await.unwrap();
+
+    let mut count = 0;
+    let mut coop_count = 0;
+    while count != TASK_NUM {
+        match set.try_join_next() {
+            Some(Ok(())) => {
+                count += 1;
+            }
+            Some(Err(err)) => panic!("failed: {}", err),
+            None => {
+                coop_count += 1;
+                tokio::task::yield_now().await;
+            }
+        }
+    }
+    assert!(coop_count >= 1);
+    assert_eq!(count, TASK_NUM);
+}

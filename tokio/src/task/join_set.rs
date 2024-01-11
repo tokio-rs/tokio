@@ -306,6 +306,23 @@ impl<T: 'static> JoinSet<T> {
         crate::future::poll_fn(|cx| self.poll_join_next_with_id(cx)).await
     }
 
+    /// Tries to join one of the tasks in the set that has completed and return its output.
+    ///
+    /// Returns `None` if the set is empty.    
+    pub fn try_join_next(&mut self) -> Option<Result<T, JoinError>> {
+        let mut entry = self.inner.try_pop_notified()?;
+
+        let res = entry.with_value_and_context(|jh, ctx| Pin::new(jh).poll(ctx));
+
+        if let Poll::Ready(res) = res {
+            let _entry = entry.remove();
+            Some(res)
+        } else {
+            None
+        }
+    }
+
+
     /// Aborts all tasks and waits for them to finish shutting down.
     ///
     /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_next`] in
