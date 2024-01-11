@@ -322,7 +322,6 @@ impl<T: 'static> JoinSet<T> {
         }
     }
 
-
     /// Aborts all tasks and waits for them to finish shutting down.
     ///
     /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_next`] in
