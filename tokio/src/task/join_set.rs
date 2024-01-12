@@ -12,7 +12,7 @@ use std::task::{Context, Poll};
 use crate::runtime::Handle;
 #[cfg(tokio_unstable)]
 use crate::task::Id;
-use crate::task::{AbortHandle, JoinError, JoinHandle, LocalSet};
+use crate::task::{unconstrained, AbortHandle, JoinError, JoinHandle, LocalSet};
 use crate::util::IdleNotifiedSet;
 
 /// A collection of tasks spawned on a Tokio runtime.
@@ -310,15 +310,24 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// Returns `None` if the set is empty.    
     pub fn try_join_next(&mut self) -> Option<Result<T, JoinError>> {
-        let mut entry = self.inner.try_pop_notified()?;
+        // Loop over all notified `JoinHandle`s to find one that's ready, or until none are left.
+        loop {
+            let mut entry = self.inner.try_pop_notified()?;
 
-        let res = entry.with_value_and_context(|jh, ctx| Pin::new(jh).poll(ctx));
+            let res = entry.with_value_and_context(|jh, ctx| {
+                // Since this function is not async and cannot be forced to yield, we should
+                // disable budgeting when we want to check for the `JoinHandle` readiness.
+                let fut = unconstrained(jh);
+                pin!(fut);
 
-        if let Poll::Ready(res) = res {
-            let _entry = entry.remove();
-            Some(res)
-        } else {
-            None
+                fut.poll(ctx)
+            });
+
+            if let Poll::Ready(res) = res {
+                let _entry = entry.remove();
+
+                return Some(res);
+            }
         }
     }
 
