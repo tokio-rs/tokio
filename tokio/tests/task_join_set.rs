@@ -263,3 +263,46 @@ async fn try_join_next() {
 
     assert_eq!(count, TASK_NUM);
 }
+
+#[cfg(tokio_unstable)]
+#[tokio::test(flavor = "current_thread")]
+async fn try_join_next_with_id() {
+    const TASK_NUM: u32 = 1000;
+
+    static SEM: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(0);
+
+    let mut set = JoinSet::new();
+    let mut spawned = std::collections::HashSet::with_capacity(TASK_NUM as usize);
+
+    for _ in 0..TASK_NUM {
+        let handle = set.spawn(async {
+            SEM.add_permits(1);
+        });
+
+        spawned.insert(handle.id());
+    }
+
+    // Wait for all tasks to complete.
+    //
+    // Since this is a `current_thread` runtime, there's no race condition
+    // between the last permit being added and the task completing.
+    let _ = SEM.acquire_many(TASK_NUM).await.unwrap();
+
+    let mut count = 0;
+    let mut joined = std::collections::HashSet::with_capacity(TASK_NUM as usize);
+    loop {
+        match set.try_join_next_with_id() {
+            Some(Ok((id, ()))) => {
+                count += 1;
+                joined.insert(id);
+            }
+            Some(Err(err)) => panic!("failed: {}", err),
+            None => {
+                break;
+            }
+        }
+    }
+
+    assert_eq!(count, TASK_NUM);
+    assert_eq!(joined, spawned);
+}
