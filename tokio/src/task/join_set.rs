@@ -317,10 +317,7 @@ impl<T: 'static> JoinSet<T> {
             let res = entry.with_value_and_context(|jh, ctx| {
                 // Since this function is not async and cannot be forced to yield, we should
                 // disable budgeting when we want to check for the `JoinHandle` readiness.
-                let fut = unconstrained(jh);
-                pin!(fut);
-
-                fut.poll(ctx)
+                Pin::new(&mut unconstrained(jh)).poll(ctx)
             });
 
             if let Poll::Ready(res) = res {
