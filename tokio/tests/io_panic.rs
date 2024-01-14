@@ -55,7 +55,6 @@ mod unix {
     }
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn read_buf_initialize_unfilled_to_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
