@@ -159,6 +159,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_nightly }}
         uses: dtolnay/rust-toolchain@stable
         with:
