@@ -11,10 +11,6 @@ use core::fmt;
 use core::marker::{PhantomData, PhantomPinned};
 use core::mem::ManuallyDrop;
 use core::ptr::{self, NonNull};
-use core::sync::atomic::{
-    AtomicPtr,
-    Ordering::{AcqRel, Relaxed},
-};
 
 /// An intrusive linked list.
 ///
@@ -355,6 +351,11 @@ cfg_taskdump! {
 
 feature! {
     #![feature = "sync"]
+
+    use core::sync::atomic::{
+        AtomicPtr,
+        Ordering::{AcqRel, Relaxed},
+    };
 
     /// An atomic intrusive linked list. It allows pushing new nodes concurrently.
     /// Removing nodes still requires an exclusive reference.
@@ -971,7 +972,7 @@ pub(crate) mod tests {
         }
     }
 
-    #[cfg(feature = "sync")]
+    #[cfg(all(feature = "sync", not(target_os = "wasi")))] // Wasi doesn't support threads
     #[test]
     fn atomic_push_front() {
         use std::sync::Arc;
