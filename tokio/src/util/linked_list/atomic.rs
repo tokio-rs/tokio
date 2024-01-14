@@ -140,7 +140,7 @@ impl<L: Link> AtomicLinkedList<L, L::Target> {
     }
 }
 
-#[cfg(any(test, fuzzing))]
+#[cfg(test)]
 #[cfg(not(loom))]
 #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 pub(crate) mod tests {
