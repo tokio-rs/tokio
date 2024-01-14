@@ -142,15 +142,15 @@ impl<L: Link> AtomicLinkedList<L, L::Target> {
 
 #[cfg(any(test, fuzzing))]
 #[cfg(not(loom))]
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 pub(crate) mod tests {
     use super::super::tests::*;
     use super::*;
 
-    #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+    use std::sync::Arc;
+
     #[test]
     fn atomic_push_front() {
-        use std::sync::Arc;
-
         let atomic_list = Arc::new(AtomicLinkedList::<&Entry, <&Entry as Link>::Target>::new());
 
         let _entries = [5, 7]
