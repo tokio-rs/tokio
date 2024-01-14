@@ -174,7 +174,7 @@ jobs:
       - name: test all --all-features panic=abort
         run: |
           set -euxo pipefail
-          RUSTFLAGS="-C panic=abort -Zpanic-abort-tests" cargo nextest run --workspace --exclude tokio-macros --exclude tests-build --all-features --tests
+          RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run --workspace --exclude tokio-macros --exclude tests-build --all-features --tests
   
   test-integration-tests-per-feature:
     needs: basics
