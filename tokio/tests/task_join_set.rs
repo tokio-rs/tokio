@@ -228,7 +228,7 @@ async fn join_set_coop() {
     assert_eq!(count, TASK_NUM);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn try_join_next() {
     const TASK_NUM: u32 = 1000;
 
@@ -264,7 +264,7 @@ async fn try_join_next() {
 }
 
 #[cfg(tokio_unstable)]
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn try_join_next_with_id() {
     const TASK_NUM: u32 = 1000;
 
