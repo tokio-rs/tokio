@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(unix)]
+#![cfg(panic = "unwind")]
 
 use std::error::Error;
 use tokio::runtime::Builder;
@@ -12,7 +13,6 @@ mod support {
 use support::panic::test_panic;
 
 #[test]
-#[cfg(panic = "unwind")]
 fn signal_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = Builder::new_current_thread().build().unwrap();

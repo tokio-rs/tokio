@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support panic recovery
+#![cfg(panic = "unwind")]
 
 use parking_lot::{const_mutex, Mutex};
 use std::error::Error;
@@ -49,7 +50,6 @@ fn test_panic<Func: FnOnce() + panic::UnwindSafe>(func: Func) -> Option<String> 
 }
 
 #[test]
-#[cfg(panic = "unwind")]
 fn sync_bridge_new_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = SyncIoBridge::new(tokio::io::empty());
@@ -62,7 +62,6 @@ fn sync_bridge_new_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(panic = "unwind")]
 fn poll_sender_send_item_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let (send, _) = channel::<u32>(3);
@@ -78,7 +77,6 @@ fn poll_sender_send_item_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(panic = "unwind")]
 fn local_pool_handle_new_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = LocalPoolHandle::new(0);
@@ -91,7 +89,6 @@ fn local_pool_handle_new_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(panic = "unwind")]
 fn local_pool_handle_spawn_pinned_by_idx_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -108,7 +105,6 @@ fn local_pool_handle_spawn_pinned_by_idx_panic_caller() -> Result<(), Box<dyn Er
     Ok(())
 }
 #[test]
-#[cfg(panic = "unwind")]
 fn delay_queue_insert_at_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -130,7 +126,6 @@ fn delay_queue_insert_at_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(panic = "unwind")]
 fn delay_queue_insert_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -148,7 +143,6 @@ fn delay_queue_insert_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(panic = "unwind")]
 fn delay_queue_remove_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -168,7 +162,6 @@ fn delay_queue_remove_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(panic = "unwind")]
 fn delay_queue_reset_at_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -190,7 +183,6 @@ fn delay_queue_reset_at_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(panic = "unwind")]
 fn delay_queue_reset_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -209,7 +201,6 @@ fn delay_queue_reset_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(panic = "unwind")]
 fn delay_queue_reserve_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();

@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "time", not(target_os = "wasi")))] // Wasi does not support panic recovery
+#![cfg(panic = "unwind")]
 
 use parking_lot::{const_mutex, Mutex};
 use std::error::Error;
@@ -40,7 +41,6 @@ fn test_panic<Func: FnOnce() + panic::UnwindSafe>(func: Func) -> Option<String> 
 }
 
 #[test]
-#[cfg(panic = "unwind")]
 fn stream_chunks_timeout_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let iter = vec![1, 2, 3].into_iter();
