@@ -178,6 +178,8 @@ where
                 locked_node = node.inner.lock().unwrap();
                 locked_parent
             }
+            // https://github.com/tokio-rs/tokio/pull/6273#discussion_r1443752911
+            #[allow(clippy::unnecessary_literal_unwrap)]
             Err(TryLockError::Poisoned(err)) => Err(err).unwrap(),
         };
 

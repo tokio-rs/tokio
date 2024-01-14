@@ -29,7 +29,7 @@ async fn simple() {
 
 #[tokio::test]
 async fn simple_ref() {
-    let v = vec![1, 2, 3i32];
+    let v = [1, 2, 3i32];
 
     let (send, mut recv) = channel(3);
     let mut send = PollSender::new(send);

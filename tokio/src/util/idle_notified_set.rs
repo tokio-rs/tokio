@@ -203,6 +203,34 @@ impl<T> IdleNotifiedSet<T> {
         Some(EntryInOneOfTheLists { entry, set: self })
     }
 
+    /// Tries to pop an entry from the notified list to poll it. The entry is moved to
+    /// the idle list atomically.
+    pub(crate) fn try_pop_notified(&mut self) -> Option<EntryInOneOfTheLists<'_, T>> {
+        // We don't decrement the length because this call moves the entry to
+        // the idle list rather than removing it.
+        if self.length == 0 {
+            // Fast path.
+            return None;
+        }
+
+        let mut lock = self.lists.lock();
+
+        // Pop the entry, returning None if empty.
+        let entry = lock.notified.pop_back()?;
+
+        lock.idle.push_front(entry.clone());
+
+        // Safety: We are holding the lock.
+        entry.my_list.with_mut(|ptr| unsafe {
+            *ptr = List::Idle;
+        });
+
+        drop(lock);
+
+        // Safety: We just put the entry in the idle list, so it is in one of the lists.
+        Some(EntryInOneOfTheLists { entry, set: self })
+    }
+
     /// Call a function on every element in this list.
     pub(crate) fn for_each<F: FnMut(&mut T)>(&mut self, mut func: F) {
         fn get_ptrs<T>(list: &mut LinkedList<T>, ptrs: &mut Vec<*mut T>) {

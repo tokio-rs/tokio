@@ -138,3 +138,28 @@ async fn immediate_exit_on_read_error() {
 
     assert!(copy_bidirectional(&mut a, &mut b).await.is_err());
 }
+
+#[tokio::test]
+async fn copy_bidirectional_is_cooperative() {
+    tokio::select! {
+        biased;
+        _ = async {
+            loop {
+                let payload = b"here, take this";
+
+                let mut a = tokio_test::io::Builder::new()
+                    .read(payload)
+                    .write(payload)
+                    .build();
+
+                let mut b = tokio_test::io::Builder::new()
+                    .read(payload)
+                    .write(payload)
+                    .build();
+
+                let _ = copy_bidirectional(&mut a, &mut b).await;
+            }
+        } => {},
+        _ = tokio::task::yield_now() => {}
+    }
+}

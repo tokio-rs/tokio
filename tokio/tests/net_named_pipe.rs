@@ -1,5 +1,5 @@
 #![cfg(feature = "full")]
-#![cfg(all(windows))]
+#![cfg(windows)]
 
 use std::io;
 use std::time::Duration;
@@ -92,7 +92,7 @@ async fn test_named_pipe_multi_client() -> io::Result<()> {
             // `io::ErrorKind::NotFound`.
             server = ServerOptions::new().create(PIPE_NAME)?;
 
-            let _ = tokio::spawn(async move {
+            tokio::spawn(async move {
                 let mut buf = String::new();
                 inner.read_line(&mut buf).await?;
                 inner.write_all(b"pong\n").await?;
@@ -170,7 +170,7 @@ async fn test_named_pipe_multi_client_ready() -> io::Result<()> {
             // `io::ErrorKind::NotFound`.
             server = ServerOptions::new().create(PIPE_NAME)?;
 
-            let _ = tokio::spawn(async move {
+            tokio::spawn(async move {
                 let server = inner_server;
 
                 {

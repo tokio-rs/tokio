@@ -25,8 +25,6 @@
 //! assert!(task.poll().is_ready(), "Task was not ready!");
 //! ```
 
-#![allow(clippy::mutex_atomic)]
-
 use std::future::Future;
 use std::mem;
 use std::ops;
