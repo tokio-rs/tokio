@@ -449,16 +449,16 @@ feature! {
                 // inserted it into the list, so we can still assume ownership.
                 L::pointers(new_head).as_mut().set_next(NonNull::new(old_head));
 
-                let Err(actual_head) = self.head.compare_exchange_weak(
+                if let Err(actual_head) = self.head.compare_exchange_weak(
                     old_head,
                     new_head.as_ptr(),
                     AcqRel,
                     Relaxed,
-                ) else {
+                ) {
+                    old_head = actual_head;
+                } else {
                     break;
                 };
-
-                old_head = actual_head;
             }
 
             if old_head.is_null() {
