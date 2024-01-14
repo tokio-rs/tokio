@@ -40,6 +40,7 @@ fn test_panic<Func: FnOnce() + panic::UnwindSafe>(func: Func) -> Option<String> 
 }
 
 #[test]
+#[cfg(panic = "unwind")]
 fn stream_chunks_timeout_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let iter = vec![1, 2, 3].into_iter();

@@ -71,6 +71,7 @@ async fn can_spawn_multiple_futures() {
 /// A panic in the spawned task causes the join handle to return an error.
 /// But, you can continue to spawn tasks.
 #[tokio::test]
+#[cfg(panic = "unwind")]
 async fn task_panic_propagates() {
     let pool = task::LocalPoolHandle::new(1);
 
@@ -95,6 +96,7 @@ async fn task_panic_propagates() {
 /// A panic during task creation causes the join handle to return an error.
 /// But, you can continue to spawn tasks.
 #[tokio::test]
+#[cfg(panic = "unwind")]
 async fn callback_panic_does_not_kill_worker() {
     let pool = task::LocalPoolHandle::new(1);
 

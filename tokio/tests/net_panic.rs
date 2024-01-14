@@ -75,6 +75,7 @@ fn tcp_stream_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
 
 #[test]
 #[cfg(unix)]
+#[cfg(panic = "unwind")]
 fn unix_listener_bind_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::net::UnixListener;
 
@@ -96,6 +97,7 @@ fn unix_listener_bind_panic_caller() -> Result<(), Box<dyn Error>> {
 
 #[test]
 #[cfg(unix)]
+#[cfg(panic = "unwind")]
 fn unix_listener_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::net::UnixListener;
 
@@ -118,6 +120,7 @@ fn unix_listener_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
 
 #[test]
 #[cfg(unix)]
+#[cfg(panic = "unwind")]
 fn unix_stream_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::net::UnixStream;
 
@@ -141,6 +144,7 @@ fn unix_stream_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
 
 #[test]
 #[cfg(unix)]
+#[cfg(panic = "unwind")]
 fn unix_datagram_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     use std::os::unix::net::UnixDatagram as StdUDS;
     use tokio::net::UnixDatagram;

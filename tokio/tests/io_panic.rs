@@ -137,6 +137,7 @@ fn unsplit_panic_caller() -> Result<(), Box<dyn Error>> {
 
 #[test]
 #[cfg(unix)]
+#[cfg(panic = "unwind")]
 fn async_fd_new_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::io::unix::AsyncFd;
     use tokio::runtime::Builder;
@@ -159,6 +160,7 @@ fn async_fd_new_panic_caller() -> Result<(), Box<dyn Error>> {
 
 #[test]
 #[cfg(unix)]
+#[cfg(panic = "unwind")]
 fn async_fd_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::io::unix::AsyncFd;
     use tokio::io::Interest;
