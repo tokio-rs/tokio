@@ -898,7 +898,7 @@ impl<T> Shared<T> {
         // and we only need to guard against concurrent waiter removals.
         // Except us, waiter removals are done by `Recv::drop` and it takes
         // a write lock to do it.
-        let mut tail = if cfg!(feature = "parking_lot") {
+        let mut tail = if cfg!(all(feature = "parking_lot", not(loom))) {
             RwLockWriteGuard::downgrade(tail)
         } else {
             // Std does not support the downgrade API.
@@ -914,7 +914,7 @@ impl<T> Shared<T> {
                         // Safety: except us, `waiter.waker` is accessed only
                         // by `Shared::recv_ref`. As this waiter is already
                         // queued, `Shared::recf_ref` would take a write lock.
-                        let waker = unsafe { (*waiter.as_mut()).waker.take() };
+                        let waker = unsafe { waiter.as_mut().waker.take() };
                         if let Some(waker) = waker {
                             wakers.push(waker);
                         }
