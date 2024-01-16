@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))]
+#![cfg(panic = "unwind")]
 
 use std::error::Error;
 use tokio::net::{TcpListener, TcpStream};
@@ -10,7 +11,6 @@ mod support {
 }
 use support::panic::test_panic;
 
-#[cfg(panic = "unwind")]
 #[test]
 fn udp_socket_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     use std::net::SocketAddr;
@@ -33,7 +33,6 @@ fn udp_socket_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn tcp_listener_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     let std_listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -52,7 +51,6 @@ fn tcp_listener_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn tcp_stream_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     let std_listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -166,7 +164,6 @@ fn unix_datagram_from_std_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 #[cfg(windows)]
 fn server_options_max_instances_panic_caller() -> Result<(), Box<dyn Error>> {
