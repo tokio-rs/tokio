@@ -898,6 +898,7 @@ impl<T> Shared<T> {
         // and we only need to guard against concurrent waiter removals.
         // Except us, waiter removals are done by `Recv::drop` and it takes
         // a write lock to do it.
+        /*
         let mut tail = if cfg!(all(
             not(all(test, loom)),
             feature = "parking_lot",
@@ -909,6 +910,11 @@ impl<T> Shared<T> {
             drop(tail);
             self.tail.read().unwrap()
         };
+        */
+
+        // Std does not support the downgrade API.
+        drop(tail);
+        let mut tail = self.tail.read().unwrap();
 
         let mut wakers = WakeList::new();
         'outer: loop {
