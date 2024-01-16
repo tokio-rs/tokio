@@ -1,9 +1,12 @@
 pub(crate) use loom::*;
 
 pub(crate) mod sync {
-    use std::ops::{Deref, DerefMut};
+    use std::{
+        ops::{Deref, DerefMut},
+        sync::{LockResult, PoisonError},
+    };
 
-    pub(crate) use loom::sync::{LockResult, MutexGuard, PoisonError};
+    pub(crate) use loom::sync::MutexGuard;
 
     #[derive(Debug)]
     pub(crate) struct Mutex<T>(loom::sync::Mutex<T>);
