@@ -128,7 +128,7 @@ use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::{Relaxed, SeqCst};
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
 use std::task::{Context, Poll, Waker};
 use std::usize;
 
@@ -865,7 +865,7 @@ impl<'a, T> WaitersList<'a, T> {
     }
 
     /// Removes the last element from the guarded list. Modifying this list
-    /// requires an exclusive access to the main list in `Notify`.
+    /// requires a read lock on the main list.
     fn pop_back_locked(&mut self, _tail: &Tail) -> Option<NonNull<Waiter>> {
         let result = self.list.pop_back();
         if result.is_none() {
@@ -888,7 +888,7 @@ impl<T> Shared<T> {
         // underneath to allow every waiter to safely remove itself from it.
         //
         // * This list will be still guarded by the `waiters` lock.
-        //   `NotifyWaitersList` wrapper makes sure we hold the lock to modify it.
+        //   `NotifyWaitersList` wrapper makes sure we hold a read lock to modify it.
         // * This wrapper will empty the list on drop. It is critical for safety
         //   that we will not leave any list entry with a pointer to the local
         //   guard node after this function returns / panics.
@@ -923,7 +923,7 @@ impl<T> Shared<T> {
                     Some(mut waiter) => {
                         // Safety: except us, `waiter.waker` is accessed only
                         // by `Shared::recv_ref`. As this waiter is already
-                        // queued, `Shared::recf_ref` would take a write lock.
+                        // queued, `Shared::recv_ref` would take a write lock.
                         let waker = unsafe { waiter.as_mut().waker.take() };
                         if let Some(waker) = waker {
                             wakers.push(waker);
@@ -932,13 +932,16 @@ impl<T> Shared<T> {
                         // Mark the waiter as not queued.
                         // It is critical to do it **after** the waker was extracted,
                         // otherwise we might data race with `Shared::recv_ref`.
+                        // Release memory order is required to extablish a happens-before
+                        // relationship between us writing to `waiter.waker` and
+                        // `Receiver::recv_ref` accessing it.
                         //
                         // Safety:
                         // - Read lock on tail is held, so `waiter` cannot
                         //   be concurrently removed,
                         // - `waiter.queued` is atomic, so read lock suffices.
                         let queued = unsafe { &(*waiter.as_ptr()).queued };
-                        let prev_queued = queued.swap(false, Relaxed);
+                        let prev_queued = queued.swap(false, Release);
                         assert!(prev_queued);
                     }
                     None => {
@@ -1125,7 +1128,8 @@ impl<T> Receiver<T> {
                     if let Some((waiter, waker)) = waiter {
                         let queued = waiter.with(|ptr| {
                             // Safety: waiter.queued is atomic.
-                            unsafe { (*ptr).queued.load(Relaxed) }
+                            // Acquire is needed to synchronize with `Shared::notify_rx`.
+                            unsafe { (*ptr).queued.load(Acquire) }
                         });
 
                         // Release the slot lock before reacquiring tail locks
@@ -1168,13 +1172,11 @@ impl<T> Receiver<T> {
                                     }
                                 }
 
-                                // Technically, `queued` was fetched before we took
-                                // a write. This is OK: if it was `false`, it cannot
-                                // become `true`. If it was `true` and became `false`
-                                // before we acquired the lock, we will just wake
-                                // the waiter unnecessarily at some point in the future.
-                                if !queued {
-                                    (*ptr).queued.store(true, Relaxed);
+                                // If the waiter is already queued, don't do anything.
+                                // If not, enqueue it.
+                                // Relaxed memory order suffices because, if `waiter`
+                                // is shared, then we hold a write lock on tail.
+                                if !(*ptr).queued.swap(true, Relaxed) {
                                     // Safety:
                                     // - `waiter` is not already queued,
                                     // - calling `recv_ref` with a waiter implies ownership
@@ -1479,6 +1481,11 @@ where
 impl<'a, T> Drop for Recv<'a, T> {
     fn drop(&mut self) {
         // Safety: `waiter.queued` is atomic.
+        // Relaxed ordering is enough because, if `queued` is true,
+        // we will take a write lock on tail that provides the
+        // necessary synchronization. If `queued` is false,
+        // there is no way it can become true again and we
+        // simply don't do anything.
         let queued = self
             .waiter
             .with(|ptr| unsafe { (*ptr).queued.load(Relaxed) });
@@ -1493,6 +1500,7 @@ impl<'a, T> Drop for Recv<'a, T> {
             let mut tail = self.receiver.shared.tail.write().unwrap();
 
             // Safety: `waiter.queued` is atomic.
+            // Relaxed order suffices because we hold a write lock on tail.
             let queued = self
                 .waiter
                 .with(|ptr| unsafe { (*ptr).queued.load(Relaxed) });
