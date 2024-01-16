@@ -924,7 +924,7 @@ impl<T> Shared<T> {
                         let queued = unsafe { &(*waiter.as_ptr()).queued };
                         // Release memory order is required to establish a happens-before
                         // relationship between us writing to `waiter.waker` and
-                        // `Receiver::recv_ref` accessing it.
+                        // `Receiver::recv_ref`/`Recv::drop` accessing it.
                         let prev_queued = queued.swap(false, Release);
                         assert!(prev_queued);
                     }
@@ -1465,14 +1465,11 @@ where
 impl<'a, T> Drop for Recv<'a, T> {
     fn drop(&mut self) {
         // Safety: `waiter.queued` is atomic.
-        // Relaxed ordering is enough because, if `queued` is true,
-        // we will take a write lock on tail that provides the
-        // necessary synchronization. If `queued` is false,
-        // there is no way it can become true again and we
-        // simply don't do anything.
+        // Acquire ordering is required to synchronize with
+        // `Shared::notify_rx` before we drop the object.
         let queued = self
             .waiter
-            .with(|ptr| unsafe { (*ptr).queued.load(Relaxed) });
+            .with(|ptr| unsafe { (*ptr).queued.load(Acquire) });
 
         // If `queued` is false, it cannot become true again
         // (concurrent calls to `Shared::recv_ref` with this
