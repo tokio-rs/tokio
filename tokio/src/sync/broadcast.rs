@@ -898,23 +898,7 @@ impl<T> Shared<T> {
         // and we only need to guard against concurrent waiter removals.
         // Except us, waiter removals are done by `Recv::drop` and it takes
         // a write lock to do it.
-        /*
-        let mut tail = if cfg!(all(
-            not(all(test, loom)),
-            feature = "parking_lot",
-            not(miri)
-        )) {
-            RwLockWriteGuard::downgrade(tail)
-        } else {
-            // Std does not support the downgrade API.
-            drop(tail);
-            self.tail.read().unwrap()
-        };
-        */
-
-        // Std does not support the downgrade API.
-        drop(tail);
-        let mut tail = self.tail.read().unwrap();
+        let mut tail = RwLockWriteGuard::downgrade(tail, &self.tail).unwrap();
 
         let mut wakers = WakeList::new();
         'outer: loop {
@@ -932,15 +916,15 @@ impl<T> Shared<T> {
                         // Mark the waiter as not queued.
                         // It is critical to do it **after** the waker was extracted,
                         // otherwise we might data race with `Receiver::recv_ref`.
-                        // Release memory order is required to extablish a happens-before
-                        // relationship between us writing to `waiter.waker` and
-                        // `Receiver::recv_ref` accessing it.
                         //
                         // Safety:
                         // - Read lock on tail is held, so `waiter` cannot
                         //   be concurrently removed,
                         // - `waiter.queued` is atomic, so read lock suffices.
                         let queued = unsafe { &(*waiter.as_ptr()).queued };
+                        // Release memory order is required to establish a happens-before
+                        // relationship between us writing to `waiter.waker` and
+                        // `Receiver::recv_ref` accessing it.
                         let prev_queued = queued.swap(false, Release);
                         assert!(prev_queued);
                     }

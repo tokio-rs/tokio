@@ -105,16 +105,20 @@ impl<T> RwLock<T> {
     }
 }
 
-impl<'a, T> RwLockWriteGuard<'a, T> {
-    pub(crate) fn downgrade(s: Self) -> RwLockReadGuard<'a, T> {
-        RwLockReadGuard(PhantomData, parking_lot::RwLockWriteGuard::downgrade(s.1))
-    }
-}
-
 impl<'a, T: ?Sized> Deref for RwLockReadGuard<'a, T> {
     type Target = T;
     fn deref(&self) -> &T {
         self.1.deref()
+    }
+}
+
+impl<'a, T> RwLockWriteGuard<'a, T> {
+    // The corresponding std method requires the rwlock.
+    pub(crate) fn downgrade(s: Self, _rwlock: &'a RwLock<T>) -> LockResult<RwLockReadGuard<'a, T>> {
+        Ok(RwLockReadGuard(
+            PhantomData,
+            parking_lot::RwLockWriteGuard::downgrade(s.1),
+        ))
     }
 }
 
