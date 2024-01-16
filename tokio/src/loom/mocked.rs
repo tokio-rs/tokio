@@ -1,11 +1,21 @@
 pub(crate) use loom::*;
 
 pub(crate) mod sync {
+    use std::ops::{Deref, DerefMut};
 
-    pub(crate) use loom::sync::MutexGuard;
+    pub(crate) use loom::sync::{LockResult, MutexGuard, PoisonError};
 
     #[derive(Debug)]
     pub(crate) struct Mutex<T>(loom::sync::Mutex<T>);
+
+    #[derive(Debug)]
+    pub(crate) struct RwLock<T>(loom::sync::RwLock<T>);
+
+    #[derive(Debug)]
+    pub(crate) struct RwLockReadGuard<'a, T>(loom::sync::RwLockReadGuard<'a, T>);
+
+    #[derive(Debug)]
+    pub(crate) struct RwLockWriteGuard<'a, T>(loom::sync::RwLockWriteGuard<'a, T>);
 
     #[allow(dead_code)]
     impl<T> Mutex<T> {
@@ -25,6 +35,63 @@ pub(crate) mod sync {
             self.0.try_lock().ok()
         }
     }
+
+    #[allow(dead_code)]
+    impl<T> RwLock<T> {
+        #[inline]
+        pub(crate) fn new(t: T) -> RwLock<T> {
+            RwLock(loom::sync::RwLock::new(t))
+        }
+
+        #[inline]
+        pub(crate) fn read(&self) -> LockResult<RwLockReadGuard<'_, T>> {
+            match self.0.read() {
+                Ok(inner) => Ok(RwLockReadGuard(inner)),
+                Err(err) => Err(PoisonError::new(RwLockReadGuard(err.into_inner()))),
+            }
+        }
+
+        #[inline]
+        pub(crate) fn write(&self) -> LockResult<RwLockWriteGuard<'_, T>> {
+            match self.0.write() {
+                Ok(inner) => Ok(RwLockWriteGuard(inner)),
+                Err(err) => Err(PoisonError::new(RwLockWriteGuard(err.into_inner()))),
+            }
+        }
+    }
+
+    impl<'a, T> Deref for RwLockReadGuard<'a, T> {
+        type Target = T;
+        fn deref(&self) -> &T {
+            self.0.deref()
+        }
+    }
+
+    #[allow(dead_code)]
+    impl<'a, T> RwLockWriteGuard<'a, T> {
+        pub(crate) fn downgrade(
+            s: Self,
+            rwlock: &'a RwLock<T>,
+        ) -> LockResult<RwLockReadGuard<'a, T>> {
+            // Std rwlock does not support downgrading.
+            drop(s);
+            rwlock.read()
+        }
+    }
+
+    impl<'a, T> Deref for RwLockWriteGuard<'a, T> {
+        type Target = T;
+        fn deref(&self) -> &T {
+            self.0.deref()
+        }
+    }
+
+    impl<'a, T> DerefMut for RwLockWriteGuard<'a, T> {
+        fn deref_mut(&mut self) -> &mut T {
+            self.0.deref_mut()
+        }
+    }
+
     pub(crate) use loom::sync::*;
 
     pub(crate) mod atomic {

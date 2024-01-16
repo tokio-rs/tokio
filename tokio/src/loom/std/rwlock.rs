@@ -44,6 +44,7 @@ impl<'a, T> Deref for RwLockReadGuard<'a, T> {
     }
 }
 
+#[allow(dead_code)]
 impl<'a, T> RwLockWriteGuard<'a, T> {
     pub(crate) fn downgrade(s: Self, rwlock: &'a RwLock<T>) -> LockResult<RwLockReadGuard<'a, T>> {
         // Std rwlock does not support downgrading.
