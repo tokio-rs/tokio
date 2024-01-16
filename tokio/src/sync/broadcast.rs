@@ -888,7 +888,7 @@ impl<T> Shared<T> {
         // underneath to allow every waiter to safely remove itself from it.
         //
         // * This list will be still guarded by the `waiters` lock.
-        //   `NotifyWaitersList` wrapper makes sure we hold a read lock to modify it.
+        //   `WaitersList` wrapper makes sure we hold a read lock to modify it.
         // * This wrapper will empty the list on drop. It is critical for safety
         //   that we will not leave any list entry with a pointer to the local
         //   guard node after this function returns / panics.
@@ -922,8 +922,8 @@ impl<T> Shared<T> {
                 match list.pop_back_locked(&tail) {
                     Some(mut waiter) => {
                         // Safety: except us, `waiter.waker` is accessed only
-                        // by `Shared::recv_ref`. As this waiter is already
-                        // queued, `Shared::recv_ref` would take a write lock.
+                        // by `Receiver::recv_ref`. As this waiter is already
+                        // queued, `Receiver::recv_ref` would take a write lock.
                         let waker = unsafe { waiter.as_mut().waker.take() };
                         if let Some(waker) = waker {
                             wakers.push(waker);
@@ -931,7 +931,7 @@ impl<T> Shared<T> {
 
                         // Mark the waiter as not queued.
                         // It is critical to do it **after** the waker was extracted,
-                        // otherwise we might data race with `Shared::recv_ref`.
+                        // otherwise we might data race with `Receiver::recv_ref`.
                         // Release memory order is required to extablish a happens-before
                         // relationship between us writing to `waiter.waker` and
                         // `Receiver::recv_ref` accessing it.
