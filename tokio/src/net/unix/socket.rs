@@ -86,8 +86,7 @@ cfg_net_unix! {
 }
 
 impl UnixSocket {
-    /// Returns the type of the socket.
-    pub fn ty(&self) -> socket2::Type {
+    fn ty(&self) -> socket2::Type {
         self.inner.r#type().unwrap()
     }
 

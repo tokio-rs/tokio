@@ -3,10 +3,7 @@
 #![cfg(unix)]
 
 use futures::future::try_join;
-use std::{
-    io,
-    os::fd::{FromRawFd, IntoRawFd},
-};
+use std::io;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixSocket,
@@ -89,20 +86,6 @@ async fn listen_and_stream() -> std::io::Result<()> {
     assert_eq!(&buf, b"hello");
     let len = server.read(&mut buf).await?;
     assert_eq!(len, 0);
-    Ok(())
-}
-
-#[test]
-fn into_and_from_raw_fd() -> std::io::Result<()> {
-    let datagram_socket = UnixSocket::new_datagram()?;
-    let stream_socket = UnixSocket::new_stream()?;
-
-    let stream_socket = unsafe { UnixSocket::from_raw_fd(stream_socket.into_raw_fd()) };
-    let datagram_socket = unsafe { UnixSocket::from_raw_fd(datagram_socket.into_raw_fd()) };
-
-    assert_eq!(stream_socket.ty(), socket2::Type::STREAM);
-    assert_eq!(datagram_socket.ty(), socket2::Type::DGRAM);
-
     Ok(())
 }
 
