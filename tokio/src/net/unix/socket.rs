@@ -81,7 +81,7 @@ cfg_net_unix! {
     /// [`RawFd`]: std::os::fd::RawFd
     /// [`RawSocket`]: https://doc.rust-lang.org/std/os/windows/io/type.RawSocket.html
     /// [`AsRawFd`]: std::os::fd::AsRawFd
-    /// [`AsRawSocket`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html    
+    /// [`AsRawSocket`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html
     /// [`socket2`]: https://docs.rs/socket2/
     #[derive(Debug)]
     pub struct UnixSocket {
