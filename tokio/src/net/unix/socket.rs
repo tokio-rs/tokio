@@ -28,6 +28,8 @@ cfg_net_unix! {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let dir = tempfile::tempdir().unwrap();
+    ///     let path = dir.path().join("bind_path");
     ///     let socket = UnixSocket::new_stream()?;
     ///
     ///     let stream = socket.connect(path).await?;
