@@ -6,8 +6,8 @@ use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use crate::net::{UnixDatagram, UnixListener, UnixStream};
 
 cfg_net_unix! {
-    /// A Unix socket that has not yet been converted to a `UnixStream`, `UnixDatagram`, or
-    /// `UnixListener`.
+    /// A Unix socket that has not yet been converted to a [`UnixStream`], [`UnixDatagram`], or
+    /// [`UnixListener`].
     ///
     /// `UnixSocket` wraps an operating system socket and enables the caller to
     /// configure the socket before establishing a connection or accepting
@@ -17,10 +17,10 @@ cfg_net_unix! {
     /// The underlying socket is closed when the `UnixSocket` value is dropped.
     ///
     /// `UnixSocket` should only be used directly if the default configuration used
-    /// by `UnixStream::connect`, `UnixDatagram::bind`, and `UnixListener::bind`
+    /// by [`UnixStream::connect`], [`UnixDatagram::bind`], and [`UnixListener::bind`]
     /// does not meet the required use case.
     ///
-    /// Calling `UnixStream::connect(path)` is equivalent to:
+    /// Calling `UnixStream::connect(path)` effectively performs the same function as:
     ///
     /// ```no_run
     /// use tokio::net::UnixSocket;
@@ -28,8 +28,6 @@ cfg_net_unix! {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    ///     let dir = tempfile::tempdir().unwrap();
-    ///     let path = dir.path().join("bind_path");
     ///     let socket = UnixSocket::new_stream()?;
     ///
     ///     let stream = socket.connect(path).await?;
@@ -38,7 +36,7 @@ cfg_net_unix! {
     /// }
     /// ```
     ///
-    /// Calling `UnixDatagram::bind(path)` is equivalent to:
+    /// Calling `UnixDatagram::bind(path)` effectively performs the same function as:
     ///
     /// ```no_run
     /// use tokio::net::UnixSocket;
@@ -57,7 +55,7 @@ cfg_net_unix! {
     /// }
     /// ```
     ///
-    /// Calling `UnixListener::bind(path)` is equivalent to:
+    /// Calling `UnixListener::bind(path)` effectively performs the same function as:
     ///
     /// ```no_run
     /// use tokio::net::UnixSocket;
@@ -77,13 +75,13 @@ cfg_net_unix! {
     /// ```
     ///
     /// Setting socket options not explicitly provided by `UnixSocket` may be done by
-    /// accessing the `RawFd`/`RawSocket` using [`AsRawFd`]/[`AsRawSocket`] and
+    /// accessing the [`RawFd`]/[`RawSocket`] using [`AsRawFd`]/[`AsRawSocket`] and
     /// setting the option with a crate like [`socket2`].
     ///
-    /// [`RawFd`]: https://doc.rust-lang.org/std/os/unix/io/type.RawFd.html
-    /// [`RawSocket`]: https://doc.rust-lang.org/std/os/windows/io/type.RawSocket.html
-    /// [`AsRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
-    /// [`AsRawSocket`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html
+    /// [`RawFd`]: std::os::fd::RawFd
+    /// [`RawSocket`]: std::os::windows::io::RawSocket
+    /// [`AsRawFd`]: std::os::fd::AsRawFd
+    /// [`AsRawSocket`]: std::os::windows::io::AsRawSocket
     /// [`socket2`]: https://docs.rs/socket2/
     #[derive(Debug)]
     pub struct UnixSocket {
@@ -102,7 +100,7 @@ impl UnixSocket {
     ///
     /// # Returns
     ///
-    /// On success, the newly created `UnixSocket` is returned. If an error is
+    /// On success, the newly created [`UnixSocket`] is returned. If an error is
     /// encountered, it is returned instead.
     pub fn new_datagram() -> io::Result<UnixSocket> {
         UnixSocket::new(socket2::Type::DGRAM)
@@ -114,7 +112,7 @@ impl UnixSocket {
     ///
     /// # Returns
     ///
-    /// On success, the newly created `UnixSocket` is returned. If an error is
+    /// On success, the newly created [`UnixSocket`] is returned. If an error is
     /// encountered, it is returned instead.
     pub fn new_stream() -> io::Result<UnixSocket> {
         UnixSocket::new(socket2::Type::STREAM)
@@ -162,12 +160,12 @@ impl UnixSocket {
     /// the queue with [`UnixListener::accept`]. When the queue is full, the
     /// operating-system will start rejecting connections.
     ///
-    /// Calling this function on a socket created by `new_datagram` will return an error.
-    ///
-    /// [`UnixListener::accept`]: UnixListener::accept
+    /// Calling this function on a socket created by [`new_datagram`] will return an error.
     ///
     /// This calls the `listen(2)` operating-system function, marking the socket
     /// as a passive socket.
+    ///
+    /// [`new_datagram`]: `UnixSocket::new_datagram`
     pub fn listen(self, backlog: u32) -> io::Result<UnixListener> {
         if self.ty() == socket2::Type::DGRAM {
             return Err(io::Error::new(
@@ -191,12 +189,13 @@ impl UnixSocket {
     ///
     /// The `UnixSocket` is consumed. Once the connection is established, a
     /// connected [`UnixStream`] is returned. If the connection fails, the
-    /// encountered error is returned. Also, calling this function on a socket
-    /// created by `new_datagram` will return an error.
+    /// encountered error is returned.
     ///
-    /// [`UnixStream`]: UnixStream
+    /// Calling this function on a socket created by [`new_datagram`] will return an error.
     ///
     /// This calls the `connect(2)` operating-system function.
+    ///
+    /// [`new_datagram`]: `UnixSocket::new_datagram`
     pub async fn connect(self, path: impl AsRef<Path>) -> io::Result<UnixStream> {
         if self.ty() == socket2::Type::DGRAM {
             return Err(io::Error::new(
@@ -221,7 +220,11 @@ impl UnixSocket {
         UnixStream::connect_mio(mio).await
     }
 
-    /// Converts the socket into a `UnixDatagram`.
+    /// Converts the socket into a [`UnixDatagram`].
+    ///
+    /// Calling this function on a socket created by [`new_stream`] will return an error.
+    ///
+    /// [`new_stream`]: `UnixSocket::new_stream`
     pub fn datagram(self) -> io::Result<UnixDatagram> {
         if self.ty() == socket2::Type::STREAM {
             return Err(io::Error::new(
@@ -240,35 +243,25 @@ impl UnixSocket {
     }
 }
 
-#[cfg(unix)]
 impl AsRawFd for UnixSocket {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
 
-#[cfg(unix)]
 impl AsFd for UnixSocket {
     fn as_fd(&self) -> BorrowedFd<'_> {
         unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
     }
 }
 
-#[cfg(unix)]
 impl FromRawFd for UnixSocket {
-    /// Converts a `RawFd` to a `UnixSocket`.
-    ///
-    /// # Notes
-    ///
-    /// The caller is responsible for ensuring that the socket is in
-    /// non-blocking mode.
     unsafe fn from_raw_fd(fd: RawFd) -> UnixSocket {
         let inner = socket2::Socket::from_raw_fd(fd);
         UnixSocket { inner }
     }
 }
 
-#[cfg(unix)]
 impl IntoRawFd for UnixSocket {
     fn into_raw_fd(self) -> RawFd {
         self.inner.into_raw_fd()
