@@ -165,7 +165,8 @@ impl UnixSocket {
     /// as a passive socket.
     pub fn listen(self, backlog: u32) -> io::Result<UnixListener> {
         if self.ty() == socket2::Type::DGRAM {
-            return Err(io::Error::other(
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
                 "listen cannot be called on a datagram socket",
             ));
         }
@@ -193,7 +194,8 @@ impl UnixSocket {
     /// This calls the `connect(2)` operating-system function.
     pub async fn connect(self, path: impl AsRef<Path>) -> io::Result<UnixStream> {
         if self.ty() == socket2::Type::DGRAM {
-            return Err(io::Error::other(
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
                 "connect cannot be called on a datagram socket",
             ));
         }
@@ -217,7 +219,8 @@ impl UnixSocket {
     /// Converts the socket into a `UnixDatagram`.
     pub fn datagram(self) -> io::Result<UnixDatagram> {
         if self.ty() == socket2::Type::STREAM {
-            return Err(io::Error::other(
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
                 "datagram cannot be called on a stream socket",
             ));
         }
