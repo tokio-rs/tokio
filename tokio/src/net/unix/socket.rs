@@ -33,7 +33,7 @@ cfg_net_unix! {
     ///     let socket = UnixSocket::new_stream()?;
     ///
     ///     let stream = socket.connect(path)?;
-    /// 
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -52,7 +52,7 @@ cfg_net_unix! {
     ///     socket.bind(path)?;
     ///
     ///     let datagram = socket.datagram()?;
-    /// 
+    ///
     ///     Ok(())
     /// }
     /// ```
@@ -71,7 +71,7 @@ cfg_net_unix! {
     ///     socket.bind(path)?;
     ///
     ///     let listener = socket.listen(1024)?;
-    /// 
+    ///
     ///     Ok(())
     /// }
     /// ```
