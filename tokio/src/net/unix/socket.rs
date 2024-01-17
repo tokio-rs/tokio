@@ -32,7 +32,7 @@ cfg_net_unix! {
     ///     let path = dir.path().join("bind_path");
     ///     let socket = UnixSocket::new_stream()?;
     ///
-    ///     let stream = socket.connect(path)?;
+    ///     let stream = socket.connect(path).await?;
     ///
     ///     Ok(())
     /// }
