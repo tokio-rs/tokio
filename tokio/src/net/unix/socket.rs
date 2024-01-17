@@ -32,7 +32,9 @@ cfg_net_unix! {
     ///     let path = dir.path().join("bind_path");
     ///     let socket = UnixSocket::new_stream()?;
     ///
-    ///     let stream = socket.connect(path)?
+    ///     let stream = socket.connect(path)?;
+    /// 
+    ///     Ok(())
     /// }
     /// ```
     ///
@@ -49,7 +51,9 @@ cfg_net_unix! {
     ///     let socket = UnixSocket::new_datagram()?;
     ///     socket.bind(path)?;
     ///
-    ///     let datagram = socket.datagram()?
+    ///     let datagram = socket.datagram()?;
+    /// 
+    ///     Ok(())
     /// }
     /// ```
     ///
@@ -66,7 +70,9 @@ cfg_net_unix! {
     ///     let socket = UnixSocket::new_stream()?;
     ///     socket.bind(path)?;
     ///
-    ///     let listener = socket.listen(1024)?
+    ///     let listener = socket.listen(1024)?;
+    /// 
+    ///     Ok(())
     /// }
     /// ```
     ///
