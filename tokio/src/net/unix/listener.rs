@@ -50,6 +50,11 @@ cfg_net_unix! {
 }
 
 impl UnixListener {
+    pub(crate) fn new(listener: mio::net::UnixListener) -> io::Result<UnixListener> {
+        let io = PollEvented::new(listener)?;
+        Ok(UnixListener { io })
+    }
+
     /// Creates a new `UnixListener` bound to the specified path.
     ///
     /// # Panics
