@@ -79,9 +79,9 @@ cfg_net_unix! {
     /// setting the option with a crate like [`socket2`].
     ///
     /// [`RawFd`]: std::os::fd::RawFd
-    /// [`RawSocket`]: std::os::windows::io::RawSocket
+    /// [`RawSocket`]: https://doc.rust-lang.org/std/os/windows/io/type.RawSocket.html
     /// [`AsRawFd`]: std::os::fd::AsRawFd
-    /// [`AsRawSocket`]: std::os::windows::io::AsRawSocket
+    /// [`AsRawSocket`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html    
     /// [`socket2`]: https://docs.rs/socket2/
     #[derive(Debug)]
     pub struct UnixSocket {
