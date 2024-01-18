@@ -777,38 +777,36 @@ impl fmt::Debug for TcpSocket {
     }
 }
 
-#[cfg(unix)]
-impl AsRawFd for TcpSocket {
-    fn as_raw_fd(&self) -> RawFd {
-        self.inner.as_raw_fd()
+cfg_unix! {
+    impl AsRawFd for TcpSocket {
+        fn as_raw_fd(&self) -> RawFd {
+            self.inner.as_raw_fd()
+        }
     }
-}
 
-#[cfg(unix)]
-impl AsFd for TcpSocket {
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+    impl AsFd for TcpSocket {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        }
     }
-}
 
-#[cfg(unix)]
-impl FromRawFd for TcpSocket {
-    /// Converts a `RawFd` to a `TcpSocket`.
-    ///
-    /// # Notes
-    ///
-    /// The caller is responsible for ensuring that the socket is in
-    /// non-blocking mode.
-    unsafe fn from_raw_fd(fd: RawFd) -> TcpSocket {
-        let inner = socket2::Socket::from_raw_fd(fd);
-        TcpSocket { inner }
+    impl FromRawFd for TcpSocket {
+        /// Converts a `RawFd` to a `TcpSocket`.
+        ///
+        /// # Notes
+        ///
+        /// The caller is responsible for ensuring that the socket is in
+        /// non-blocking mode.
+        unsafe fn from_raw_fd(fd: RawFd) -> TcpSocket {
+            let inner = socket2::Socket::from_raw_fd(fd);
+            TcpSocket { inner }
+        }
     }
-}
 
-#[cfg(unix)]
-impl IntoRawFd for TcpSocket {
-    fn into_raw_fd(self) -> RawFd {
-        self.inner.into_raw_fd()
+    impl IntoRawFd for TcpSocket {
+        fn into_raw_fd(self) -> RawFd {
+            self.inner.into_raw_fd()
+        }
     }
 }
 
