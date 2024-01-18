@@ -14,3 +14,6 @@ members = [
   "tests-build",
   "tests-integration",
 ]
+
+[workspace.metadata.spellcheck]
+config = "spellcheck.toml"
