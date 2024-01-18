@@ -9,9 +9,13 @@ use core::sync::atomic::{
     Ordering::{AcqRel, Relaxed},
 };
 
-/// An atomic intrusive linked list. It allows pushing new nodes concurrently.
-/// Removing nodes still requires an exclusive reference.
-pub(crate) struct AtomicLinkedList<L, T> {
+/// A linked list that supports adding new nodes concurrently.
+/// Note that all other operations, e.g. node removals,
+/// require external synchronization.
+/// The simplest way to achieve it is to use RwLock:
+/// pushing nodes only requires a read lock,
+/// while removing nodes requires a write lock.
+pub(crate) struct ConcurrentPushLinkedList<L, T> {
     /// Linked list head.
     head: AtomicPtr<T>,
 
@@ -22,26 +26,26 @@ pub(crate) struct AtomicLinkedList<L, T> {
     _marker: PhantomData<*const L>,
 }
 
-unsafe impl<L: Link> Send for AtomicLinkedList<L, L::Target> where L::Target: Send {}
-unsafe impl<L: Link> Sync for AtomicLinkedList<L, L::Target> where L::Target: Sync {}
+unsafe impl<L: Link> Send for ConcurrentPushLinkedList<L, L::Target> where L::Target: Send {}
+unsafe impl<L: Link> Sync for ConcurrentPushLinkedList<L, L::Target> where L::Target: Sync {}
 
-impl<L: Link> Default for AtomicLinkedList<L, L::Target> {
+impl<L: Link> Default for ConcurrentPushLinkedList<L, L::Target> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<L, T> AtomicLinkedList<L, T> {
-    /// Creates an empty atomic linked list.
-    pub(crate) const fn new() -> AtomicLinkedList<L, T> {
-        AtomicLinkedList {
+impl<L, T> ConcurrentPushLinkedList<L, T> {
+    /// Creates an empty concurrent push linked list.
+    pub(crate) const fn new() -> ConcurrentPushLinkedList<L, T> {
+        ConcurrentPushLinkedList {
             head: AtomicPtr::new(core::ptr::null_mut()),
             tail: UnsafeCell::new(None),
             _marker: PhantomData,
         }
     }
 
-    /// Convert an atomic linked list into a non-atomic version.
+    /// Convert a concurrent push LL into a regular LL.
     pub(crate) fn into_list(mut self) -> LinkedList<L, T> {
         LinkedList {
             head: NonNull::new(*self.head.get_mut()),
@@ -51,7 +55,7 @@ impl<L, T> AtomicLinkedList<L, T> {
     }
 }
 
-impl<L: Link> LinkedListBase<L> for AtomicLinkedList<L, L::Target> {
+impl<L: Link> LinkedListBase<L> for ConcurrentPushLinkedList<L, L::Target> {
     fn head(&mut self) -> Option<NonNull<L::Target>> {
         NonNull::new(*self.head.get_mut())
     }
@@ -72,9 +76,9 @@ impl<L: Link> LinkedListBase<L> for AtomicLinkedList<L, L::Target> {
     }
 }
 
-impl<L: Link> AtomicLinkedList<L, L::Target> {
+impl<L: Link> ConcurrentPushLinkedList<L, L::Target> {
     /// Atomically adds an element first in the list.
-    /// This method can be called concurrently from multiple threads.
+    /// This method can be called concurrently by multiple threads.
     ///
     /// # Safety
     ///
@@ -135,6 +139,12 @@ impl<L: Link> AtomicLinkedList<L, L::Target> {
     }
 
     /// See [LinkedList::remove].
+    ///
+    /// Note that `&mut self` implies that this call is somehow
+    /// synchronized with `push_front` (e.g. with RwLock).
+    /// In terms of memory model, there has to be an established
+    /// happens-before relationship between any given `push_front`
+    /// and any given `remove`. The relation can go either way.
     pub(crate) unsafe fn remove(&mut self, node: NonNull<L::Target>) -> Option<L::Handle> {
         LinkedListBase::remove(self, node)
     }
@@ -150,8 +160,9 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     #[test]
-    fn atomic_push_front() {
-        let atomic_list = Arc::new(AtomicLinkedList::<&Entry, <&Entry as Link>::Target>::new());
+    fn concurrent_push_front() {
+        let atomic_list =
+            Arc::new(ConcurrentPushLinkedList::<&Entry, <&Entry as Link>::Target>::new());
 
         let _entries = [5, 7]
             .into_iter()

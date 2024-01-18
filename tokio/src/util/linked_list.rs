@@ -7,9 +7,9 @@
 //! specified node is actually contained by the list.
 
 #[cfg(feature = "sync")]
-mod atomic;
+mod concurrent_push;
 #[cfg(feature = "sync")]
-pub(crate) use self::atomic::AtomicLinkedList;
+pub(crate) use self::concurrent_push::ConcurrentPushLinkedList;
 
 use core::cell::UnsafeCell;
 use core::fmt;
@@ -115,7 +115,7 @@ unsafe impl<T: Sync> Sync for Pointers<T> {}
 
 // ===== LinkedListBase =====
 
-// Common methods between LinkedList and AtomicLinkedList.
+// Common methods between LinkedList and ConcurrentPushLinkedList.
 trait LinkedListBase<L: Link> {
     // NB: exclusive reference is important for AtomicLinkedList safety guarantees.
     fn head(&mut self) -> Option<NonNull<L::Target>>;

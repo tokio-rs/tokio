@@ -119,7 +119,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use crate::util::linked_list::{self, AtomicLinkedList, GuardedLinkedList};
+use crate::util::linked_list::{self, ConcurrentPushLinkedList, GuardedLinkedList};
 use crate::util::WakeList;
 
 use std::fmt;
@@ -329,7 +329,7 @@ struct Tail {
     closed: bool,
 
     /// Receivers waiting for a value.
-    waiters: AtomicLinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+    waiters: ConcurrentPushLinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
 }
 
 /// Slot in the buffer.
@@ -526,7 +526,7 @@ impl<T> Sender<T> {
                 pos: 0,
                 rx_cnt: receiver_count,
                 closed: false,
-                waiters: AtomicLinkedList::new(),
+                waiters: ConcurrentPushLinkedList::new(),
             }),
             num_tx: AtomicUsize::new(1),
         });
@@ -851,7 +851,7 @@ impl<'a, T> Drop for WaitersList<'a, T> {
 
 impl<'a, T> WaitersList<'a, T> {
     fn new(
-        unguarded_list: AtomicLinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+        unguarded_list: ConcurrentPushLinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
         guard: Pin<&'a Waiter>,
         shared: &'a Shared<T>,
     ) -> Self {
@@ -1075,24 +1075,46 @@ impl<T> Receiver<T> {
 
         if slot.pos != self.next {
             // Release the `slot` lock before attempting to acquire the `tail`
-            // lock. This is required because `send2` acquires the tail lock
+            // lock. This is required because `send` acquires the tail lock
             // first followed by the slot lock. Acquiring the locks in reverse
             // order here would result in a potential deadlock: `recv_ref`
             // acquires the `slot` lock and attempts to acquire the `tail` lock
-            // while `send2` acquired the `tail` lock and attempts to acquire
+            // while `send` acquired the `tail` lock and attempts to acquire
             // the slot lock.
             drop(slot);
 
             let mut old_waker = None;
 
-            let tail = self.shared.tail.read().unwrap();
+            let queued = waiter
+                .map(|(waiter, _)| {
+                    waiter.with(|ptr| {
+                        // Safety: waiter.queued is atomic.
+                        // Acquire is needed to synchronize with `Shared::notify_rx`.
+                        unsafe { (*ptr).queued.load(Acquire) }
+                    })
+                })
+                .unwrap_or(false);
+
+            // If `queued` is false, then we are the sole owner if the waiter,
+            // so read lock on tail suffices.
+            // If `queued` is true, the waiter might be accessed concurrently,
+            // so we need a write lock.
+            let mut tail_read = None;
+            let mut tail_write = None;
+            let tail = if queued {
+                tail_write = Some(self.shared.tail.write().unwrap());
+                tail_write.as_deref().unwrap()
+            } else {
+                tail_read = Some(self.shared.tail.read().unwrap());
+                tail_read.as_deref().unwrap()
+            };
 
             // Acquire slot lock again
             slot = self.shared.buffer[idx].read().unwrap();
 
             // Make sure the position did not change. This could happen in the
             // unlikely event that the buffer is wrapped between dropping the
-            // read lock and acquiring the tail lock.
+            // slot lock and acquiring the tail lock.
             if slot.pos != self.next {
                 let next_pos = slot.pos.wrapping_add(self.shared.buffer.len() as u64);
 
@@ -1104,36 +1126,8 @@ impl<T> Receiver<T> {
                         return Err(TryRecvError::Closed);
                     }
 
-                    // We will might want to upgrade to a write lock.
-                    let mut tail_read = Some(tail);
-                    let mut tail_write = None;
-
                     // Store the waker
                     if let Some((waiter, waker)) = waiter {
-                        let queued = waiter.with(|ptr| {
-                            // Safety: waiter.queued is atomic.
-                            // Acquire is needed to synchronize with `Shared::notify_rx`.
-                            unsafe { (*ptr).queued.load(Acquire) }
-                        });
-
-                        // Release the slot lock before reacquiring tail locks
-                        // to avoid a deadlock.
-                        drop(slot);
-
-                        // If waiter is already queued, then a write lock on tail is required
-                        // since other threads may try to mutate the waiter concurrently.
-                        // If the waiter is not queued, we are the only owner now and
-                        // read lock suffices.
-                        let tail_ref: &Tail = if queued {
-                            // TODO: this is sketchy, need do make sure that
-                            // it is safe to drop all the locks here...
-                            tail_read = None;
-                            tail_write = Some(self.shared.tail.write().unwrap());
-                            tail_write.as_deref().unwrap()
-                        } else {
-                            tail_read.as_deref().unwrap()
-                        };
-
                         // Safety: called while holding a lock on tail.
                         // If waiter is not queued, then we hold a read lock
                         // on tail and can safely mutate `waiter` since we
@@ -1156,25 +1150,24 @@ impl<T> Receiver<T> {
                                     }
                                 }
 
-                                // If the waiter is already queued, don't do anything.
-                                // If not, enqueue it.
-                                // Relaxed memory order suffices because, if `waiter`
-                                // is shared, then we hold a write lock on tail.
+                                // If the waiter is not already queued, enqueue it.
+                                // Relaxed memory order suffices because, if `queued`
+                                // if `false`, then we are the sole owner of the waiter,
+                                // and all future accesses will happen with tail lock held.
                                 if !(*ptr).queued.swap(true, Relaxed) {
                                     // Safety:
                                     // - `waiter` is not already queued,
                                     // - calling `recv_ref` with a waiter implies ownership
                                     //   of it's `Recv`. As such, this waiter cannot be pushed
                                     //   concurrently by some other thread.
-                                    tail_ref
-                                        .waiters
-                                        .push_front(NonNull::new_unchecked(&mut *ptr));
+                                    tail.waiters.push_front(NonNull::new_unchecked(&mut *ptr));
                                 }
                             });
                         }
                     }
 
                     // Drop the old waker after releasing the locks.
+                    drop(slot);
                     drop(tail_read);
                     drop(tail_write);
                     drop(old_waker);
@@ -1191,7 +1184,8 @@ impl<T> Receiver<T> {
 
                 let missed = next.wrapping_sub(self.next);
 
-                drop(tail);
+                drop(tail_read);
+                drop(tail_write);
 
                 // The receiver is slow but no values have been missed
                 if missed == 0 {
