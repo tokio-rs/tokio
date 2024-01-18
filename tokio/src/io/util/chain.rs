@@ -114,7 +114,7 @@ where
 
         if !*me.done_first {
             match ready!(me.first.poll_fill_buf(cx)?) {
-                buf if buf.is_empty() => {
+                [] => {
                     *me.done_first = true;
                 }
                 buf => return Poll::Ready(Ok(buf)),
