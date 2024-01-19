@@ -128,7 +128,7 @@ use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
+use std::sync::atomic::Ordering::{Acquire, Release, SeqCst};
 use std::task::{Context, Poll, Waker};
 use std::usize;
 
@@ -1424,10 +1424,9 @@ impl<'a, T> Drop for Recv<'a, T> {
             let mut tail = self.receiver.shared.tail.lock();
 
             // Safety: tail lock is held.
-            // Relaxed order suffices because we hold the tail lock.
             let queued = self
                 .waiter
-                .with(|ptr| unsafe { (*ptr).queued.load(Relaxed) });
+                .with_mut(|ptr| unsafe { *(*ptr).queued.get_mut() });
 
             if queued {
                 // Remove the node
