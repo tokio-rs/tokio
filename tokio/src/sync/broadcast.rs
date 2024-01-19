@@ -898,18 +898,20 @@ impl<T> Shared<T> {
         'outer: loop {
             while wakers.can_push() {
                 match list.pop_back_locked(&mut tail) {
-                    Some(mut waiter) => {
-                        // Safety: `tail` lock is still held.
-                        let waiter = unsafe { waiter.as_mut() };
+                    Some(waiter) => {
+                        unsafe {
+                            // Safety: accessing `waker` is safe because
+                            // the tail lock is held.
+                            if let Some(waker) = (*waiter.as_ptr()).waker.take() {
+                                wakers.push(waker);
+                            }
 
-                        if let Some(waker) = waiter.waker.take() {
-                            wakers.push(waker);
+                            // Safety: `queued` is atomic.
+                            // `Release` is needed to synchronize with `Recv::drop`.
+                            // It is critical to set this variable **after** waker
+                            // is extracted, otherwise we may data race with `Recv::drop`.
+                            assert!((*waiter.as_ptr()).queued.swap(false, Release));
                         }
-
-                        // `Release` is needed to synchronize with `Recv::drop`.
-                        // It is critical to set this variable **after** waker
-                        // is extracted, otherwise we may data race with `Recv::drop`.
-                        assert!(waiter.queued.swap(false, Release));
                     }
                     None => {
                         break 'outer;
@@ -1108,11 +1110,8 @@ impl<T> Receiver<T> {
                                 }
 
                                 // If the waiter is not already queued, enqueue it.
-                                // Relaxed memory order suffices because we don't need
-                                // to synchronize with `Recv::drop` here (calling
-                                // `Receiver::recv_ref` with a waiter implies ownership
-                                // of the corresponding `Recv`).
-                                if !(*ptr).queued.swap(true, Relaxed) {
+                                if !*(*ptr).queued.get_mut() {
+                                    *(*ptr).queued.get_mut() = true;
                                     tail.waiters.push_front(NonNull::new_unchecked(&mut *ptr));
                                 }
                             });
