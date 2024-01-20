@@ -25,7 +25,7 @@ pub trait AioSource {
     fn deregister(&mut self);
 }
 
-/// Wraps the user's AioSource in order to implement mio::event::Source, which
+/// Wraps the user's `AioSource` in order to implement mio::event::Source, which
 /// is what the rest of the crate wants.
 struct MioSource<T>(T);
 
