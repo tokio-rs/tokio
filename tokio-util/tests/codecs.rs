@@ -20,7 +20,7 @@ fn bytes_decoder() {
 fn bytes_encoder() {
     let mut codec = BytesCodec::new();
 
-    // Default capacity of BytesMut
+    // Default capacity of `BytesMut`
     #[cfg(target_pointer_width = "64")]
     const INLINE_CAP: usize = 4 * 8 - 1;
     #[cfg(target_pointer_width = "32")]
