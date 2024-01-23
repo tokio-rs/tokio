@@ -1,46 +1,30 @@
-52
+112
 +
-waker po:noun
+>
+±
+~
 AcqRel
 SeqCst
 utf8
 UTF8
 fixup
-Tokio/A po:noun
-tokio/A po:noun
-Tokio's/A pos:possessive po:noun
-tokio's/A pos:possessive po:noun
 MSRV
 const
 eval
-combinator po:noun
-runtime/A po:noun
 noalias
-struct/A po:noun
 unhandled
 TODO
 WASM
 WASI
 usize
-mio po:noun
 FreeBSD
 libc
 macOS
 iOS
 EOF
 async
-wakeup/A po:noun
-vice versa
-symlink/A po:noun
-filesystem/A po:noun
-mock/A po:noun
-mock's/A pos:possessive po:noun
-config/A po:noun
-stealer/A po:noun
-deregister/A
+vice-versa
 endian
-fn/A po:noun
-APIs
 buf
 io
 CTRL
@@ -48,39 +32,94 @@ arg
 codec
 codecs
 DNS
-Datagram
-DirEntry
+Datagram/S
+datagram/S
 millis
 Env
 txt
-Invariants
-Lauck
-LengthDelimitedCodec
-ListEntry
-Marsaglia
-mio
-Ok
+Invariant/S
+invariant/S
 POSIX
 PowerShell
 RAII
 RMW
 cfg
 SmallCrush
+TestU01
 UDS
 cmd
 TCP
-TestU01
-Tokio
 UDP
-Unowned
+peekable
+Peekable
 Valgrind
+resize
+reallocation/S po:noun
+expiration/S
+
+DoS
+DOS
+impl
+lookup po:verb
+lookups
+destructor
+boolean
+poller
+scalability
+TLS
+gzip
+oef
+implementors
+FIFO/S po:noun
+FIFOs
+vice-versa
+untrusted
+Ok
+gzip
+runtime/M po:noun
+runtime/S po:noun
+reqwest
+versioning
+versioned
+enum
+resize
+datagram/S po:noun
+backpressure po:noun
+multi po:adjective
+iterative/Y po:verb
+mutex
+mock/M po:noun
+mock/S po:noun
+mock's
+waker po:noun
+Tokio/M po:noun
+tokio/M po:noun
+combinator po:noun
+struct/S po:noun
+mio po:noun
+wakeup/S po:noun
+symlink/S po:noun
+filesystem/S po:noun
+mock/S po:noun
+config/S po:noun
+stealer/S po:noun
+deregister/S po:noun
+fn/S po:noun
+APIs
+DirEntry
+ListEntry
+threadpool/S po:noun
+stateful po:adjective
+parser/S po:noun
+
+Lauck
+MPMC
+Marsaglia/M po:noun
+Mio
+plaintext
+vec
+Ok
 Varghese
 Xorshift
-x00
-x0b
-x0B
-xFF
-x0D
-x0F
-xCA
-xFE
+xorshift
+xorshift64

@@ -11,7 +11,7 @@ lang = "en_US"
 # or https://www.systutorials.com/docs/linux/man/4-hunspell/#lbAE
 # on how to define a custom dictionary file.
 search_dirs = ["."]
-extra_dictionaries = ["./spellcheck.dic"]
+extra_dictionaries = ["./spellcheck.dic", "./syscalls.dic"]
 skip_os_lookups = true
 use_builtin = true
 
