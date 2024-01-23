@@ -1,8 +1,57 @@
-112
+134
+# Personal Dictionary for Tokio and Rust Context
 +
 >
 ±
 ~
+-
+—
+
+## Networking
+IPv6
+IPv4
+IP
+udp
+TCP
+UDP
+multicast
+recv/M
+Datagram/S
+datagram/S
+socket2/M
+
+## Filesystem
+symlink/S po:noun
+filesystem/S po:noun
+MacOS
+macOS
+
+## Protocols
+TLS
+qos
+
+## Asynchronous Programming
+async
+Future/S
+Tokio/M po:noun
+Tokio/S po:noun
+tokio/M po:noun
+tokio/S po:noun
+Runtime/S po:noun
+threadpool/S po:noun
+peekable
+Peekable
+mutex
+MPMC
+
+## Security and Access
+FIFO/S po:noun
+FIFOs
+runtime/M po:noun
+runtime/S po:noun
+syscall
+
+## Miscellaneous Concepts
 AcqRel
 SeqCst
 utf8
@@ -19,10 +68,8 @@ WASI
 usize
 FreeBSD
 libc
-macOS
 iOS
 EOF
-async
 vice-versa
 endian
 buf
@@ -32,8 +79,6 @@ arg
 codec
 codecs
 DNS
-Datagram/S
-datagram/S
 millis
 Env
 txt
@@ -48,15 +93,10 @@ SmallCrush
 TestU01
 UDS
 cmd
-TCP
-UDP
-peekable
-Peekable
 Valgrind
 resize
 reallocation/S po:noun
 expiration/S
-
 DoS
 DOS
 impl
@@ -66,45 +106,29 @@ destructor
 boolean
 poller
 scalability
-TLS
 gzip
 oef
 implementors
-FIFO/S po:noun
-FIFOs
 vice-versa
 untrusted
 Ok
 gzip
-syscall
-runtime/M po:noun
-runtime/S po:noun
-Runtime/S po:noun
 reqwest
 versioning
 versioned
 enum
 resize
-datagram/S po:noun
 backpressure po:noun
 multi po:adjective
 iterative/Y po:verb
-mutex
 mock/M po:noun
 mock/S po:noun
 mock's
 waker po:noun
-Tokio/M po:noun
-Tokio/S po:noun
-tokio/M po:noun
-tokio/S po:noun
 combinator po:noun
 struct/S po:noun
 mio po:noun
 wakeup/S po:noun
-symlink/S po:noun
-filesystem/S po:noun
-mock/S po:noun
 config/S po:noun
 stealer/S po:noun
 deregister/S po:noun
@@ -112,21 +136,21 @@ fn/S po:noun
 APIs
 DirEntry
 ListEntry
-threadpool/S po:noun
 stateful po:adjective
 parser/S po:noun
 
+## Random Number Generation
 Lauck
-MPMC
-qos
 Marsaglia/M po:noun
+Xorshift
+xorshift
+xorshift64
+
+## Performance and Optimization
 Mio
 cpu/S po:noun
 Dev
 plaintext
 vec
-Ok
 Varghese
-Xorshift
-xorshift
-xorshift64
+
