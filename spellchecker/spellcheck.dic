@@ -11,6 +11,7 @@
 cancelled
 Cancelled
 Cancelling
+cancelling
 0xA
 0xD
 versa
@@ -19,6 +20,7 @@ Customizable
 interoperate
 
 ## Networking
+proxied
 dns
 IPv6
 IPv4
@@ -47,6 +49,7 @@ macOS
 PID
 GID
 UID
+AIO
 filename/S po:noun
 x86_64
 x86
@@ -58,6 +61,9 @@ PGID
 libuv
 kernel32
 dll
+metadata
+Destructure/M
+destructure/M
 
 
 ## Protocols
@@ -83,7 +89,7 @@ spmc
 spsc
 mpmc
 coroutine/S po:noun
-_parking_lot_
+parking_lot
 unpark/G
 semver
 mio/M po:noun
@@ -120,7 +126,6 @@ enqueu/D po:verb
 dequeu/D po:verb
 stealable
 Growable
-EWMA
 
 ## Miscellaneous Concepts
 startup
@@ -219,6 +224,8 @@ stealer/S po:noun
 deregister
 deregistered
 deregistering
+Deregister
+Deregisters
 fn/S po:noun
 APIs
 DirEntry
@@ -247,6 +254,8 @@ xorshift
 xorshift64
 combinator/S
 Bitfield
+EWMA
+superset
 
 ## Performance and Optimization
 Mio
