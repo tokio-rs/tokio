@@ -18,6 +18,7 @@ versa
 functionalities
 Customizable
 interoperate
+interoperability
 
 ## Networking
 proxied
@@ -37,6 +38,7 @@ datagram/S
 socket2/M
 
 ## Filesystem / Os / Libraries
+mio_aio
 fs/S
 fs/M
 fd/M
@@ -50,6 +52,7 @@ PID
 GID
 UID
 AIO
+Aio
 filename/S po:noun
 x86_64
 x86
@@ -64,7 +67,11 @@ dll
 metadata
 Destructure/M
 destructure/M
-
+lio_listio
+fsync
+kevent
+loopback
+toml
 
 ## Protocols
 TLS
@@ -72,6 +79,8 @@ qos
 
 ## Asynchronous Programming
 async
+multithreaded
+gRPC
 Future/S
 Tokio/M po:noun
 Tokio/S po:noun
@@ -129,6 +138,11 @@ Growable
 
 ## Miscellaneous Concepts
 startup
+Scalable
+modularity
+changelog
+Changelog
+composable
 frontend
 backend
 latencies
@@ -273,3 +287,4 @@ Erlang/M po:noun
 mut
 implementor/S po:noun
 implementor/M po:noun
+
