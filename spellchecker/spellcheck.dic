@@ -16,6 +16,7 @@ Cancelling
 versa
 functionalities
 Customizable
+interoperate
 
 ## Networking
 dns
@@ -33,7 +34,7 @@ Datagram/S
 datagram/S
 socket2/M
 
-## Filesystem / Os
+## Filesystem / Os / Libraries
 fs/S
 fs/M
 fd/M
@@ -50,6 +51,14 @@ filename/S po:noun
 x86_64
 x86
 aarch64
+stdin
+stdout
+stderr
+PGID
+libuv
+kernel32
+dll
+
 
 ## Protocols
 TLS
@@ -225,6 +234,7 @@ deregistration
 timestamp/S po:noun
 u64
 debuginfo
+ORed
 
 ## Authors/Papers or Math
 Lauck
