@@ -35,14 +35,14 @@ __docs_rs = ["futures-util"]
 
 [dependencies]
 tokio = { version = "1.28.0", path = "../tokio", features = ["sync"] }
-bytes = "1.0.0"
-futures-core = "0.3.0"
+bytes = { workspace = true }
+futures-core = { workspace = true }
 futures-sink = "0.3.0"
 futures-io = { version = "0.3.0", optional = true }
-futures-util = { version = "0.3.0", optional = true }
-pin-project-lite = "0.2.11"
+futures-util = { workspace = true, optional = true }
+pin-project-lite = { workspace = true }
 slab = { version = "0.4.4", optional = true } # Backs `DelayQueue`
-tracing = { version = "0.1.25", default-features = false, features = ["std"], optional = true }
+tracing = { workspace = true, default-features = false, features = ["std"], optional = true }
 
 [target.'cfg(tokio_unstable)'.dependencies]
 hashbrown = { version = "0.14.0", optional = true }
@@ -52,10 +52,10 @@ tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
-async-stream = "0.3.0"
-futures = "0.3.0"
+async-stream = { workspace = true }
+futures = { workspace = true }
 futures-test = "0.3.5"
-parking_lot = "0.12.0"
+parking_lot = { workspace = true }
 tempfile = "3.1.0"
 
 [package.metadata.docs.rs]

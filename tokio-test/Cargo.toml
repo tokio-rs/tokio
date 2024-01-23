@@ -19,14 +19,74 @@ categories = ["asynchronous", "development-tools::testing"]
 [dependencies]
 tokio = { version = "1.2.0", path = "../tokio", features = ["rt", "sync", "time", "test-util"] }
 tokio-stream = { version = "0.1.1", path = "../tokio-stream" }
-async-stream = "0.3.3"
+async-stream = { workspace = true }
 
-bytes = "1.0.0"
-futures-core = "0.3.0"
+bytes = [package]
+name = "tests-integration"
+version = "0.1.0"
+authors = ["Tokio Contributors <team@tokio.rs>"]
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "test-cat"
+
+[[bin]]
+name = "test-mem"
+required-features = ["rt-net"]
+
+[[bin]]
+name = "test-process-signal"
+required-features = ["rt-process-signal"]
+
+[[test]]
+name = "macros_main"
+
+[[test]]
+name = "macros_pin"
+
+[[test]]
+name = "macros_select"
+
+[[test]]
+name = "rt_yield"
+required-features = ["rt", "macros", "sync"]
+
+[features]
+# For mem check
+rt-net = ["tokio/rt", "tokio/rt-multi-thread", "tokio/net"]
+# For test-process-signal
+rt-process-signal = ["rt-net", "tokio/process", "tokio/signal"]
+# For testing wasi + rt/macros/sync features
+#
+# This is an explicit feature so we can use `cargo hack` testing single features
+# instead of all possible permutations.
+wasi-rt = ["rt", "macros", "sync"]
+
+full = [
+    "macros",
+    "rt",
+    "rt-multi-thread",
+
+    "tokio/full",
+    "tokio-test"
+]
+macros = ["tokio/macros"]
+sync = ["tokio/sync"]
+rt = ["tokio/rt"]
+rt-multi-thread = ["rt", "tokio/rt-multi-thread"]
+
+[dependencies]
+tokio = { path = "../tokio" }
+tokio-test = { path = "../tokio-test", optional = true }
+doc-comment = "0.3.1"
+futures = { version = "0.3.0", features = ["async-await"] }
+bytes = { workspace = true }
+futures-core = { workspace = true }
 
 [dev-dependencies]
 tokio = { version = "1.2.0", path = "../tokio", features = ["full"] }
-futures-util = "0.3.0"
+futures-util = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true
