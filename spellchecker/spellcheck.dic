@@ -1,16 +1,26 @@
 134
 # Personal Dictionary for Tokio and Rust Context
+
+## Truly misc
 +
 >
 ±
 ~
 -
 —
+cancelled
+Cancelled
+Cancelling
+0xA
+0xD
+versa
 
 ## Networking
 IPv6
 IPv4
 IP
+ip
+tcp
 udp
 TCP
 UDP
@@ -20,11 +30,19 @@ Datagram/S
 datagram/S
 socket2/M
 
-## Filesystem
+## Filesystem / Os
+fs/S
+fd/M
+fd/M
+fd/S
 symlink/S po:noun
 filesystem/S po:noun
 MacOS
+unix
 macOS
+PID
+GID
+UID
 
 ## Protocols
 TLS
@@ -42,18 +60,41 @@ threadpool/S po:noun
 peekable
 Peekable
 mutex
+MPSC
 MPMC
+mpsc
+mpmc
+coroutine/S po:noun
+_parking_lot_
+semver
+mio/M po:noun
+Mio/M
+nonblocking
+Blockingly
+blockingly
+unpark/S po:verb
+unpark/D po:verb
 
 ## Security and Access and OS
 FIFO/S po:noun
 FIFOs
 runtime/M po:noun
 runtime/S po:noun
-syscall
+syscall/S
 CLI
+scheduler's
+codebase
+epoll
+kqueue
+IOCP
+Wasi
+spawner
 
 ## Miscellaneous Concepts
-AcqRel
+frontend
+backend
+lifecycle
+tuple
 representable
 getter/S
 setter/S
@@ -87,8 +128,12 @@ DNS
 millis
 Env
 txt
-Invariant/S
-invariant/S
+Invariant
+Invariants
+invariant
+invariants
+fcntl
+descriptor's
 POSIX
 PowerShell
 RAII
@@ -113,7 +158,6 @@ poller
 scalability
 gzip
 oef
-implementors
 vice-versa
 untrusted
 Ok
@@ -136,21 +180,35 @@ mio po:noun
 wakeup/S po:noun
 config/S po:noun
 stealer/S po:noun
-deregister/S po:noun
+deregister/S po:verb
+deregister/D po:verb
 fn/S po:noun
 APIs
 DirEntry
 ListEntry
 stateful po:adjective
 parser/S po:noun
-sharded
+shard/D
+usecase/S
+misconfigure/D
+subfield
+incrementing
+deregistration
+timestamp/S po:noun
+u64
+Growable
+EWMA
 
-## Random Number Generation
+## Authors/Papers or Math
 Lauck
+Illumos
+Solaris
+Nagle
 Marsaglia/M po:noun
 Xorshift
 xorshift
 xorshift64
+combinator/S
 
 ## Performance and Optimization
 Mio
@@ -160,3 +218,11 @@ plaintext
 vec
 Varghese
 
+## Language based
+goroutine/S po:noun
+Kotlin/M po:noun
+Erlang/M po:noun
+&mut
+mut
+implementor/S po:noun
+implementor/M po:noun
