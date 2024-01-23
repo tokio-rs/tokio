@@ -15,8 +15,10 @@ Cancelling
 0xD
 versa
 functionalities
+Customizable
 
 ## Networking
+dns
 IPv6
 IPv4
 IP
@@ -45,6 +47,9 @@ PID
 GID
 UID
 filename/S po:noun
+x86_64
+x86
+aarch64
 
 ## Protocols
 TLS
@@ -70,6 +75,7 @@ spsc
 mpmc
 coroutine/S po:noun
 _parking_lot_
+unpark/G
 semver
 mio/M po:noun
 Mio/M
@@ -86,6 +92,8 @@ Oneshot
 rwlock
 FIFO/S po:noun
 FIFOs
+fifo/S
+lifo/S
 runtime/M po:noun
 runtime/S po:noun
 syscall/S
@@ -101,12 +109,18 @@ deallocate/D po:verb
 broadcasted
 enqueu/D po:verb
 dequeu/D po:verb
+stealable
+Growable
+EWMA
 
 ## Miscellaneous Concepts
+startup
 frontend
 backend
+latencies
 lifecycle
 tuple
+Decrement/G
 resize/D po:verb
 representable
 getter/S
@@ -210,8 +224,7 @@ incrementing
 deregistration
 timestamp/S po:noun
 u64
-Growable
-EWMA
+debuginfo
 
 ## Authors/Papers or Math
 Lauck

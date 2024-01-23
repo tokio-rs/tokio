@@ -17,4 +17,4 @@ use_builtin = true
 
 [Hunspell.quirks]
 allow_concatenation = true
-transform_regex = ["^'([^\\s])'$", "^[0-9]+x$", "(?s)```.+?```"]
+transform_regex = ["^'([^\\s])'$", "^[0-9]+x$", "[0-9]+ms", "(?s)```.+?```"]
