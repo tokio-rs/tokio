@@ -2067,7 +2067,7 @@ impl ServerOptions {
     ///     Win32::Security::Authorization::{SetSecurityInfo, SE_KERNEL_OBJECT},
     /// };
     ///
-    /// const PIPE_NAME: &str = r"\\.\pipe\write_dac_pipe";
+    /// const PIPE_NAME: `&str` = r"\\.\pipe\write_dac_pipe";
     ///
     /// # #[tokio::main] async fn main() -> io::Result<()> {
     /// let mut pipe_template = ServerOptions::new();
@@ -2102,7 +2102,7 @@ impl ServerOptions {
     ///     Win32::Security::Authorization::{SetSecurityInfo, SE_KERNEL_OBJECT},
     /// };
     ///
-    /// const PIPE_NAME: &str = r"\\.\pipe\write_dac_pipe_fail";
+    /// const PIPE_NAME: `&str` = r"\\.\pipe\write_dac_pipe_fail";
     ///
     /// # #[tokio::main] async fn main() -> io::Result<()> {
     /// let mut pipe_template = ServerOptions::new();

@@ -82,11 +82,11 @@ pub(super) const MAX_SAFE_MILLIS_DURATION: u64 = u64::MAX - 2;
 /// well as the registered waker.
 ///
 /// Generally, the StateCell is only permitted to be accessed from two contexts:
-/// Either a thread holding the corresponding &mut TimerEntry, or a thread
+/// Either a thread holding the corresponding `&mut TimerEntry`, or a thread
 /// holding the timer driver lock. The write actions on the StateCell amount to
 /// passing "ownership" of the StateCell between these contexts; moving a timer
-/// from the TimerEntry to the driver requires _both_ holding the &mut
-/// TimerEntry and the driver lock, while moving it back (firing the timer)
+/// from the TimerEntry to the driver requires _both_ holding the `&mut
+/// TimerEntry` and the driver lock, while moving it back (firing the timer)
 /// requires only the driver lock.
 pub(super) struct StateCell {
     /// Holds either the scheduled expiration time for this timer, or (if the
