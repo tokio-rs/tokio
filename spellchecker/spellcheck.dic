@@ -19,6 +19,9 @@ functionalities
 Customizable
 interoperate
 interoperability
+security@tokio
+moderation@tokio
+reviewable
 
 ## Networking
 proxied
@@ -53,6 +56,7 @@ GID
 UID
 AIO
 Aio
+Mio
 filename/S po:noun
 x86_64
 x86
@@ -72,6 +76,9 @@ fsync
 kevent
 loopback
 toml
+subprocess
+ci
+yml
 
 ## Protocols
 TLS
@@ -137,9 +144,15 @@ stealable
 Growable
 
 ## Miscellaneous Concepts
+userland
+PR
+PRs
+triaging
+Triaging
 startup
 Scalable
 modularity
+username
 changelog
 Changelog
 composable
@@ -149,6 +162,7 @@ latencies
 lifecycle
 tuple
 Decrement/G
+decrement/G
 resize/D po:verb
 representable
 getter/S
@@ -256,8 +270,9 @@ timestamp/S po:noun
 u64
 debuginfo
 ORed
+workflow
 
-## Authors/Papers or Math
+## Authors/Papers / Optimization / Maths
 Lauck
 Illumos
 Solaris
@@ -270,11 +285,9 @@ combinator/S
 Bitfield
 EWMA
 superset
-
-## Performance and Optimization
-Mio
 cpu/S po:noun
 Dev
+dev
 plaintext
 vec
 Varghese
@@ -287,4 +300,7 @@ Erlang/M po:noun
 mut
 implementor/S po:noun
 implementor/M po:noun
+RustSec
+clippy
+
 
