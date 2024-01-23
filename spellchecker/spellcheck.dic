@@ -44,15 +44,20 @@ Peekable
 mutex
 MPMC
 
-## Security and Access
+## Security and Access and OS
 FIFO/S po:noun
 FIFOs
 runtime/M po:noun
 runtime/S po:noun
 syscall
+CLI
 
 ## Miscellaneous Concepts
 AcqRel
+representable
+getter/S
+setter/S
+destructor/S
 SeqCst
 utf8
 UTF8
@@ -124,7 +129,7 @@ iterative/Y po:verb
 mock/M po:noun
 mock/S po:noun
 mock's
-waker po:noun
+waker/S po:noun
 combinator po:noun
 struct/S po:noun
 mio po:noun
@@ -138,6 +143,7 @@ DirEntry
 ListEntry
 stateful po:adjective
 parser/S po:noun
+sharded
 
 ## Random Number Generation
 Lauck
