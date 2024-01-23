@@ -107,6 +107,7 @@ frontend
 backend
 lifecycle
 tuple
+resize/D po:verb
 representable
 getter/S
 setter/S
