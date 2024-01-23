@@ -272,7 +272,6 @@ impl CachedParkThread {
         use std::task::Context;
         use std::task::Poll::Ready;
 
-        // `get_unpark()` should not return a Result
         let waker = self.waker()?;
         let mut cx = Context::from_waker(&waker);
 
