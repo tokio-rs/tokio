@@ -1,4 +1,4 @@
-134
+322
 # Personal Dictionary for Tokio and Rust Context
 
 ## Truly misc
@@ -22,6 +22,7 @@ interoperability
 security@tokio
 moderation@tokio
 reviewable
+amongst
 
 ## Networking
 proxied
@@ -79,6 +80,8 @@ toml
 subprocess
 ci
 yml
+IO
+IOs
 
 ## Protocols
 TLS
@@ -88,6 +91,7 @@ qos
 async
 multithreaded
 gRPC
+condvar
 Future/S
 Tokio/M po:noun
 Tokio/S po:noun
@@ -106,6 +110,7 @@ spsc
 mpmc
 coroutine/S po:noun
 parking_lot
+parker
 unpark/G
 semver
 mio/M po:noun
@@ -142,27 +147,45 @@ enqueu/D po:verb
 dequeu/D po:verb
 stealable
 Growable
+workstealing
 
 ## Miscellaneous Concepts
+i32
+i64
+f64
+u32
+u64
+MSB
+LSB
 userland
+refactor
+refactors
 PR
 PRs
 triaging
 Triaging
 startup
+hashmap/S
+hashset/S
 Scalable
 modularity
+backtrace
+backtraces
+backtracing
+Unsets
+Dealloc
+Deallocate
+Deallocates
+vtable
 username
+src
+errored
 changelog
+noop
 Changelog
 composable
 frontend
 backend
-latencies
-lifecycle
-tuple
-Decrement/G
-decrement/G
 resize/D po:verb
 representable
 getter/S
@@ -250,6 +273,7 @@ wakeup/S po:noun
 config/S po:noun
 stealer/S po:noun
 deregister
+deregisters
 deregistered
 deregistering
 Deregister
@@ -260,17 +284,26 @@ DirEntry
 ListEntry
 stateful po:adjective
 parser/S po:noun
-shard/D
+sharded
+unreceive/D
 usecase/S
 misconfigure/D
 subfield
 incrementing
+decrementing
+Incrementing
+Decrementing
 deregistration
 timestamp/S po:noun
 u64
 debuginfo
 ORed
 workflow
+Unowned
+lifecycle
+tuple
+refcount
+
 
 ## Authors/Papers / Optimization / Maths
 Lauck
@@ -282,7 +315,8 @@ Xorshift
 xorshift
 xorshift64
 combinator/S
-Bitfield
+Bitfield/S
+bitfield/S
 EWMA
 superset
 cpu/S po:noun
