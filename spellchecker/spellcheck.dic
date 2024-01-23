@@ -76,8 +76,10 @@ vice-versa
 untrusted
 Ok
 gzip
+syscall
 runtime/M po:noun
 runtime/S po:noun
+Runtime/S po:noun
 reqwest
 versioning
 versioned
@@ -93,7 +95,9 @@ mock/S po:noun
 mock's
 waker po:noun
 Tokio/M po:noun
+Tokio/S po:noun
 tokio/M po:noun
+tokio/S po:noun
 combinator po:noun
 struct/S po:noun
 mio po:noun
@@ -114,8 +118,11 @@ parser/S po:noun
 
 Lauck
 MPMC
+qos
 Marsaglia/M po:noun
 Mio
+cpu/S po:noun
+Dev
 plaintext
 vec
 Ok
