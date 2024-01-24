@@ -87,12 +87,36 @@ unlink
 sys
 eof
 
-## Protocols
+## Protocols / Syscalls
 TLS
 qos
+EACCES
+EAGAIN
+EWOULDBLOCK
+ENOMEM
+HUP
+SYSHUP
+SIGCHLD
+SIGINT
+SO_LINGER
+WSAEMSGSIZE
+SIGHUP
+SIGWINCH
+SIGUSR1
+SIGUSR2
+SIGTERM
+SIGIO
+SIGPIPE
+SIGQUIT
+SIGINFO
+SIGALRM
+SIGKILL
+SETPGID
+SOFTIRQ
 
 ## Asynchronous Programming
 async
+Async
 multithreaded
 gRPC
 condvar
@@ -320,7 +344,6 @@ lifecycle
 tuple
 refcount
 
-
 ## Authors/Papers / Optimization / Maths
 Lauck
 Illumos
@@ -355,5 +378,3 @@ implementor/S po:noun
 implementor/M po:noun
 RustSec
 clippy
-
-
