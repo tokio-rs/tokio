@@ -25,6 +25,18 @@ macro_rules! cfg_windows {
     }
 }
 
+/// Enables Unix-specific code.
+/// Use this macro instead of `cfg(unix)` to generate docs properly.
+macro_rules! cfg_unix {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(all(doc, docsrs), unix))]
+            #[cfg_attr(docsrs, doc(cfg(unix)))]
+            $item
+        )*
+    }
+}
+
 /// Enables unstable Windows-specific code.
 /// Use this macro instead of `cfg(windows)` to generate docs properly.
 macro_rules! cfg_unstable_windows {

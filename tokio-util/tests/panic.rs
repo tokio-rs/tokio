@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support panic recovery
+#![cfg(panic = "unwind")]
 
 use parking_lot::{const_mutex, Mutex};
 use std::error::Error;
@@ -76,7 +77,6 @@ fn poll_sender_send_item_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-
 fn local_pool_handle_new_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = LocalPoolHandle::new(0);
@@ -89,7 +89,6 @@ fn local_pool_handle_new_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-
 fn local_pool_handle_spawn_pinned_by_idx_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();

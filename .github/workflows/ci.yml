@@ -148,6 +148,34 @@ jobs:
           cargo nextest run --workspace --all-features
           cargo test --doc --workspace --all-features
 
+  test-workspace-all-features-panic-abort:
+    needs: basics
+    name: test all crates in the workspace with all features and panic=abort
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_nightly }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+            toolchain: ${{ env.rust_nightly }}
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: test all --all-features panic=abort
+        run: |
+          set -euxo pipefail
+          RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run --workspace --exclude tokio-macros --exclude tests-build --all-features --tests
+  
   test-integration-tests-per-feature:
     needs: basics
     name: Run integration tests for each feature

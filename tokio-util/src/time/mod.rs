@@ -8,7 +8,9 @@
 //!
 //! This type must be used from within the context of the `Runtime`.
 
+use futures_core::Future;
 use std::time::Duration;
+use tokio::time::Timeout;
 
 mod wheel;
 
@@ -16,6 +18,34 @@ pub mod delay_queue;
 
 #[doc(inline)]
 pub use delay_queue::DelayQueue;
+
+/// A trait which contains a variety of convenient adapters and utilities for `Future`s.
+pub trait FutureExt: Future {
+    /// A wrapper around [`tokio::time::timeout`], with the advantage that it is easier to write
+    /// fluent call chains.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use tokio::{sync::oneshot, time::Duration};
+    /// use tokio_util::time::FutureExt;
+    ///
+    /// # async fn dox() {
+    /// let (tx, rx) = oneshot::channel::<()>();
+    ///
+    /// let res = rx.timeout(Duration::from_millis(10)).await;
+    /// assert!(res.is_err());
+    /// # }
+    /// ```
+    fn timeout(self, timeout: Duration) -> Timeout<Self>
+    where
+        Self: Sized,
+    {
+        tokio::time::timeout(timeout, self)
+    }
+}
+
+impl<T: Future + ?Sized> FutureExt for T {}
 
 // ===== Internal utils =====
 
