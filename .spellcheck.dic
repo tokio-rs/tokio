@@ -1,4 +1,4 @@
-322
+360
 # Personal Dictionary for Tokio and Rust Context
 
 ## Truly misc
@@ -8,15 +8,15 @@
 ~
 -
 —
-cancelled
-Cancelled
+canceled
+Canceled
 Cancelling
 cancelling
 0xA
 0xD
 versa
 functionalities
-Customizable
+Customize/B
 interoperate
 interoperability
 security@tokio
@@ -25,7 +25,7 @@ reviewable
 amongst
 
 ## Networking
-proxied
+proxy/D
 dns
 IPv6
 IPv4
@@ -42,6 +42,7 @@ datagram/S
 socket2/M
 
 ## Filesystem / Os / Libraries
+unix
 mio_aio
 fs/S
 fs/M
@@ -50,12 +51,12 @@ fd/S
 symlink/S po:noun
 filesystem/S po:noun
 MacOS po:noun
-unix
 macOS
 PID
 GID
 UID
 AIO
+LIO
 Aio
 Mio
 filename/S po:noun
@@ -70,7 +71,7 @@ libuv
 kernel32
 dll
 metadata
-Destructure/M
+Destructures
 destructure/M
 lio_listio
 fsync
@@ -82,6 +83,11 @@ ci
 yml
 IO
 IOs
+repo
+linkable
+unlink
+sys
+eof
 
 ## Protocols
 TLS
@@ -93,11 +99,14 @@ multithreaded
 gRPC
 condvar
 Future/S
+Tokio
+tokio
 Tokio/M po:noun
 Tokio/S po:noun
 tokio/M po:noun
 tokio/S po:noun
-Runtime/S po:noun
+waker
+wakeup
 threadpool/S po:noun
 peekable
 Peekable
@@ -130,8 +139,10 @@ FIFO/S po:noun
 FIFOs
 fifo/S
 lifo/S
-runtime/M po:noun
-runtime/S po:noun
+Runtime/S po:noun
+runtime
+runtime's
+runtimes
 syscall/S
 CLI
 scheduler's
@@ -143,20 +154,26 @@ Wasi
 spawner
 deallocate/D po:verb
 broadcasted
-enqueu/D po:verb
-dequeu/D po:verb
+enqueue/D po:verb
+enqueuing
+dequeue/D po:verb
 stealable
 Growable
 workstealing
+unsynchronized
+unsafety
 
 ## Miscellaneous Concepts
 i32
 i64
 f64
+bool
 u32
 u64
 MSB
 LSB
+api
+CRLF
 userland
 refactor
 refactors
@@ -248,6 +265,7 @@ destructor
 boolean
 poller
 scalability
+scalable
 gzip
 oef
 vice-versa
@@ -332,6 +350,9 @@ Kotlin/M po:noun
 Erlang/M po:noun
 &mut
 mut
+refcount
+refcounting
+cloneable
 implementor/S po:noun
 implementor/M po:noun
 RustSec

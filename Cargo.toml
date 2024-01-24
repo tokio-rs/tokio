@@ -16,4 +16,4 @@ members = [
 ]
 
 [workspace.metadata.spellcheck]
-config = "./spellchecker/spellcheck.toml"
+config = ".spellcheck.toml"
