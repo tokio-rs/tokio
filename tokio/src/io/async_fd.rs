@@ -818,8 +818,6 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// Indicates to tokio that the file descriptor is no longer ready. All
     /// internal readiness flags will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
-    /// This implies that if a readiness notification occurs following the last operation
-    /// but prior to invoking `clear_ready`, it will not be cleared.
     ///
     /// This function is commonly used with guards returned by [`AsyncFd::readable`] and
     /// [`AsyncFd::writable`].
@@ -828,6 +826,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// _actually observes_ that the file descriptor is _not_ ready. Do not call
     /// it simply because, for example, a read succeeded; it should be called
     /// when a read is observed to block.
+    ///
+    /// Note that that if a readiness notification occurs following the last operation
+    /// but prior to invoking `clear_ready`, it will not be cleared.
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
             self.async_fd.registration.clear_readiness(event);
@@ -849,6 +850,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// when a read is observed to block. Only clear the specific readiness that is observed to
     /// block. For example when a read blocks when using a combined interest,
     /// only clear `Ready::READABLE`.
+    ///
+    /// Note that that if a readiness notification occurs following the last operation
+    /// but prior to invoking `clear_ready`, it will not be cleared.    
     ///
     /// # Examples
     ///
@@ -1038,8 +1042,6 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// Indicates to tokio that the file descriptor is no longer ready. All
     /// internal readiness flags will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
-    /// This implies that if a readiness notification occurs following the last operation
-    /// but prior to invoking `clear_ready`, it will not be cleared.
     ///
     /// This function is commonly used with guards returned by [`AsyncFd::readable_mut`] and
     /// [`AsyncFd::writable_mut`].
@@ -1048,6 +1050,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// _actually observes_ that the file descriptor is _not_ ready. Do not call
     /// it simply because, for example, a read succeeded; it should be called
     /// when a read is observed to block.
+    ///
+    /// Note that that if a readiness notification occurs following the last operation
+    /// but prior to invoking `clear_ready`, it will not be cleared.
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
             self.async_fd.registration.clear_readiness(event);
@@ -1057,8 +1062,6 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// Indicates to tokio that the file descriptor no longer has a specific readiness.
     /// The internal readiness flag will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
-    /// This implies that if a readiness notification occurs following the last operation
-    /// but prior to invoking `clear_ready`, it will not be cleared.
     ///
     /// This function is useful in combination with the [`AsyncFd::ready_mut`] method when a
     /// combined interest like `Interest::READABLE | Interest::WRITABLE` is used.
@@ -1069,6 +1072,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// when a read is observed to block. Only clear the specific readiness that is observed to
     /// block. For example when a read blocks when using a combined interest,
     /// only clear `Ready::READABLE`.
+    ///
+    /// Note that that if a readiness notification occurs following the last operation
+    /// but prior to invoking `clear_ready`, it will not be cleared.
     ///
     /// # Examples
     ///
