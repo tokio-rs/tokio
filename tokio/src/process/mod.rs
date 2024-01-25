@@ -1128,9 +1128,9 @@ impl Child {
     /// This is equivalent to sending a SIGKILL on unix platforms.
     ///
     /// If the child has to be killed remotely, it is possible to do it using
-    /// a combination of the select! macro and a oneshot channel. In the following
+    /// a combination of the select! macro and a `oneshot` channel. In the following
     /// example, the child will run until completion unless a message is sent on
-    /// the oneshot channel. If that happens, the child is killed immediately
+    /// the `oneshot` channel. If that happens, the child is killed immediately
     /// using the `.kill()` method.
     ///
     /// ```no_run

@@ -30,7 +30,7 @@
 ///
 /// # Examples
 ///
-/// Basic try_join with two branches.
+/// Basic `try_join` with two branches.
 ///
 /// ```
 /// async fn do_stuff_async() -> Result<(), &'static str> {

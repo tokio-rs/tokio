@@ -258,7 +258,7 @@ pub fn ctrl_close() -> io::Result<CtrlClose> {
 }
 
 /// Represents a listener which receives "ctrl-close" notitifications sent to the process
-/// via 'SetConsoleCtrlHandler'.
+/// via `SetConsoleCtrlHandler`.
 ///
 /// A notification to this process notifies *all* listeners listening for
 /// this event. Moreover, the notifications **are coalesced** if they aren't processed
@@ -355,7 +355,7 @@ pub fn ctrl_shutdown() -> io::Result<CtrlShutdown> {
 }
 
 /// Represents a listener which receives "ctrl-shutdown" notitifications sent to the process
-/// via 'SetConsoleCtrlHandler'.
+/// via `SetConsoleCtrlHandler`.
 ///
 /// A notification to this process notifies *all* listeners listening for
 /// this event. Moreover, the notifications **are coalesced** if they aren't processed
@@ -452,7 +452,7 @@ pub fn ctrl_logoff() -> io::Result<CtrlLogoff> {
 }
 
 /// Represents a listener which receives "ctrl-logoff" notitifications sent to the process
-/// via 'SetConsoleCtrlHandler'.
+/// via `SetConsoleCtrlHandler`.
 ///
 /// A notification to this process notifies *all* listeners listening for
 /// this event. Moreover, the notifications **are coalesced** if they aren't processed

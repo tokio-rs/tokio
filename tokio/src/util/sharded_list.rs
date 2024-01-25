@@ -87,7 +87,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
         node
     }
 
-    /// Gets the lock of ShardedList, makes us have the write permission.
+    /// Gets the lock of `ShardedList`, makes us have the write permission.
     pub(crate) fn lock_shard(&self, val: &L::Handle) -> ShardGuard<'_, L, L::Target> {
         let id = unsafe { L::get_shard_id(L::as_raw(val)) };
         ShardGuard {
@@ -107,7 +107,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
         self.len() == 0
     }
 
-    /// Gets the shard size of this SharedList.
+    /// Gets the shard size of this `SharedList`.
     ///
     /// Used to help us to decide the parameter `shard_id` of the `pop_back` method.
     pub(crate) fn shard_size(&self) -> usize {

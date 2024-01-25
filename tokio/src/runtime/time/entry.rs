@@ -11,10 +11,10 @@
 //! 2) a held driver lock.
 //!
 //! It follows from this that any changes made while holding BOTH 1 and 2 will
-//! be reliably visible, regardless of ordering. This is because of the acq/rel
+//! be reliably visible, regardless of ordering. This is because of the `acq/rel`
 //! fences on the driver lock ensuring ordering with 2, and rust mutable
 //! reference rules for 1 (a mutable reference to an object can't be passed
-//! between threads without an acq/rel barrier, and same-thread we have local
+//! between threads without an `acq/rel` barrier, and same-thread we have local
 //! happens-before ordering).
 //!
 //! # State field
@@ -81,11 +81,11 @@ pub(super) const MAX_SAFE_MILLIS_DURATION: u64 = u64::MAX - 2;
 /// time (if registered), or otherwise the result of the timer completing, as
 /// well as the registered waker.
 ///
-/// Generally, the StateCell is only permitted to be accessed from two contexts:
+/// Generally, the `StateCell` is only permitted to be accessed from two contexts:
 /// Either a thread holding the corresponding `&mut TimerEntry`, or a thread
-/// holding the timer driver lock. The write actions on the StateCell amount to
-/// passing "ownership" of the StateCell between these contexts; moving a timer
-/// from the TimerEntry to the driver requires _both_ holding the `&mut
+/// holding the timer driver lock. The write actions on the `StateCell` amount to
+/// passing "ownership" of the `StateCell` between these contexts; moving a timer
+/// from the `TimerEntry` to the driver requires _both_ holding the `&mut
 /// TimerEntry` and the driver lock, while moving it back (firing the timer)
 /// requires only the driver lock.
 pub(super) struct StateCell {
@@ -314,15 +314,15 @@ pub(crate) struct TimerEntry {
 unsafe impl Send for TimerEntry {}
 unsafe impl Sync for TimerEntry {}
 
-/// An TimerHandle is the (non-enforced) "unique" pointer from the driver to the
-/// timer entry. Generally, at most one TimerHandle exists for a timer at a time
+/// An `TimerHandle` is the (non-enforced) "unique" pointer from the driver to the
+/// timer entry. Generally, at most one `TimerHandle` exists for a timer at a time
 /// (enforced by the timer state machine).
 ///
-/// SAFETY: An TimerHandle is essentially a raw pointer, and the usual caveats
-/// of pointer safety apply. In particular, TimerHandle does not itself enforce
-/// that the timer does still exist; however, normally an TimerHandle is created
+/// SAFETY: An `TimerHandle` is essentially a raw pointer, and the usual caveats
+/// of pointer safety apply. In particular, `TimerHandle` does not itself enforce
+/// that the timer does still exist; however, normally an `TimerHandle` is created
 /// immediately before registering the timer, and is consumed when firing the
-/// timer, to help minimize mistakes. Still, because TimerHandle cannot enforce
+/// timer, to help minimize mistakes. Still, because `TimerHandle` cannot enforce
 /// memory safety, all operations are unsafe.
 #[derive(Debug)]
 pub(crate) struct TimerHandle {
@@ -437,7 +437,7 @@ impl TimerShared {
         self.state.extend_expiration(t)
     }
 
-    /// Returns a TimerHandle for this timer.
+    /// Returns a `TimerHandle` for this timer.
     pub(super) fn handle(&self) -> TimerHandle {
         TimerHandle {
             inner: NonNull::from(self),

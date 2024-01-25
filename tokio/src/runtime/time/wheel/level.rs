@@ -15,7 +15,7 @@ pub(crate) struct Level {
     /// The least-significant bit represents slot zero.
     occupied: u64,
 
-    /// Slots. We access these via the EntryInner `current_list` as well, so this needs to be an UnsafeCell.
+    /// Slots. We access these via the EntryInner `current_list` as well, so this needs to be an `UnsafeCell`.
     slot: [EntryList; LEVEL_MULT],
 }
 

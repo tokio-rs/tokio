@@ -54,7 +54,7 @@
 //!
 //! [async-stream]: https://docs.rs/async-stream
 //!
-//! # Conversion to and from AsyncRead/AsyncWrite
+//! # Conversion to and from `AsyncRead`/`AsyncWrite`
 //!
 //! It is often desirable to convert a `Stream` into an [`AsyncRead`],
 //! especially when dealing with plaintext formats streamed over the network.

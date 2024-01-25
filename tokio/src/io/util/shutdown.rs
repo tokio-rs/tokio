@@ -11,7 +11,7 @@ pin_project! {
     /// A future used to shutdown an I/O object.
     ///
     /// Created by the [`AsyncWriteExt::shutdown`][shutdown] function.
-    /// [shutdown]: crate::io::AsyncWriteExt::shutdown
+    /// [shutdown]: [`crate::io::AsyncWriteExt::shutdown`]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     #[derive(Debug)]
     pub struct Shutdown<'a, A: ?Sized> {

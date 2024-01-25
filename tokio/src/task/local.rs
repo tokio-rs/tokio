@@ -237,7 +237,7 @@ struct Context {
     unhandled_panic: Cell<bool>,
 }
 
-/// LocalSet state shared between threads.
+/// `LocalSet` state shared between threads.
 struct Shared {
     /// # Safety
     ///
@@ -290,7 +290,7 @@ struct LocalData {
 
 impl LocalData {
     /// Should be called except when we call `LocalSet::enter`.
-    /// Especially when we poll a LocalSet.
+    /// Especially when we poll a `LocalSet`.
     #[must_use = "dropping this guard will reset the entered state"]
     fn enter(&self, ctx: Rc<Context>) -> LocalDataEnterGuard<'_> {
         let ctx = self.ctx.replace(Some(ctx));
@@ -392,7 +392,7 @@ const MAX_TASKS_PER_TICK: usize = 61;
 /// How often it check the remote queue first.
 const REMOTE_FIRST_INTERVAL: u8 = 31;
 
-/// Context guard for LocalSet
+/// Context guard for `LocalSet`
 pub struct LocalEnterGuard {
     ctx: Option<Rc<Context>>,
 

@@ -10,7 +10,7 @@ use tokio::sync::watch::error::RecvError;
 
 /// A wrapper around [`tokio::sync::watch::Receiver`] that implements [`Stream`].
 ///
-/// This stream will start by yielding the current value when the WatchStream is polled,
+/// This stream will start by yielding the current value when the `WatchStream` is polled,
 /// regardless of whether it was the initial value or sent afterwards,
 /// unless you use [`WatchStream<T>::from_changes`].
 ///

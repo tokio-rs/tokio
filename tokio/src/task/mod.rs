@@ -167,7 +167,7 @@
 //! blocking operations there. This includes destructors of objects destroyed in
 //! async code.
 //!
-//! #### spawn_blocking
+//! #### `spawn_blocking`
 //!
 //! The `task::spawn_blocking` function is similar to the `task::spawn` function
 //! discussed in the previous section, but rather than spawning an
