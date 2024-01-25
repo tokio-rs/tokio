@@ -370,10 +370,15 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     };
 
     let body_ident = quote! { body };
+    let return_or_nothing = match &input.sig.output {
+        syn::ReturnType::Type(_, ty) if matches!(**ty, syn::Type::Never(_)) => quote! {},
+        _ => quote! { return },
+    };
+
     let last_block = quote_spanned! {last_stmt_end_span=>
         #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
         {
-            return #rt
+            #return_or_nothing #rt
                 .enable_all()
                 .build()
                 .expect("Failed building the Runtime")
