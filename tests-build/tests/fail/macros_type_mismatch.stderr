@@ -57,3 +57,31 @@ error[E0308]: mismatched types
 31 |     return 1;
 32 |     ;
    |     ^ expected `()`, found integer
+
+error[E0277]: the `?` operator can only be used in an async block that returns `Result` or `Option` (or another type that implements `FromResidual`)
+  --> tests/fail/macros_type_mismatch.rs:37:11
+   |
+35 | #[tokio::main]
+   | -------------- this function should return `Result` or `Option` to accept `?`
+36 | async fn extra_semicolon_with_try_operator() -> Result<(), ()> {
+37 |     Ok(())?;
+   |           ^ cannot use the `?` operator in an async block that returns `()`
+   |
+   = help: the trait `FromResidual<Result<Infallible, _>>` is not implemented for `()`
+
+error[E0308]: mismatched types
+  --> tests/fail/macros_type_mismatch.rs:38:5
+   |
+36 | async fn extra_semicolon_with_try_operator() -> Result<(), ()> {
+   |                                                 -------------- expected `Result<(), ()>` because of return type
+37 |     Ok(())?;
+38 |     Ok(());
+   |     ^^^^^^^ expected `Result<(), ()>`, found `()`
+   |
+   = note:   expected enum `Result<(), ()>`
+           found unit type `()`
+help: try adding an expression at the end of the block
+   |
+38 ~     Ok(());;
+39 +     Ok(())
+   |

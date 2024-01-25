@@ -32,4 +32,10 @@ async fn issue_4635() {
     ;
 }
 
+#[tokio::main]
+async fn extra_semicolon_with_try_operator() -> Result<(), ()> {
+    Ok(())?;
+    Ok(());
+}
+
 fn main() {}
