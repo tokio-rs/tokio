@@ -817,8 +817,8 @@ impl<T: AsRawFd> Drop for AsyncFd<T> {
 impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// Indicates to tokio that the file descriptor is no longer ready. All
     /// internal readiness flags will be cleared, and tokio will wait for the
-    /// next readiness notification after the last operation from the OS. This
-    /// implies that if a readiness notification occurs following the last operation
+    /// next edge-triggered readiness notification from the OS.
+    /// This implies that if a readiness notification occurs following the last operation
     /// but prior to invoking `clear_ready`, it will not be cleared.
     ///
     /// This function is commonly used with guards returned by [`AsyncFd::readable`] and
@@ -836,8 +836,8 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
 
     /// Indicates to tokio that the file descriptor no longer has a specific readiness.
     /// The internal readiness flag will be cleared, and tokio will wait for the
-    /// next readiness notification after the last operation from the OS. This
-    /// implies that if a readiness notification occurs following the last operation
+    /// next edge-triggered readiness notification from the OS.
+    /// This implies that if a readiness notification occurs following the last operation
     /// but prior to invoking `clear_ready`, it will not be cleared.
     ///
     /// This function is useful in combination with the [`AsyncFd::ready`] method when a
@@ -1037,8 +1037,8 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
 impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// Indicates to tokio that the file descriptor is no longer ready. All
     /// internal readiness flags will be cleared, and tokio will wait for the
-    /// next readiness notification after the last operation from the OS. This
-    /// implies that if a readiness notification occurs following the last operation
+    /// next edge-triggered readiness notification from the OS.
+    /// This implies that if a readiness notification occurs following the last operation
     /// but prior to invoking `clear_ready`, it will not be cleared.
     ///
     /// This function is commonly used with guards returned by [`AsyncFd::readable_mut`] and
@@ -1056,8 +1056,8 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
 
     /// Indicates to tokio that the file descriptor no longer has a specific readiness.
     /// The internal readiness flag will be cleared, and tokio will wait for the
-    /// next readiness notification after the last operation from the OS. This
-    /// implies that if a readiness notification occurs following the last operation
+    /// next edge-triggered readiness notification from the OS.
+    /// This implies that if a readiness notification occurs following the last operation
     /// but prior to invoking `clear_ready`, it will not be cleared.
     ///
     /// This function is useful in combination with the [`AsyncFd::ready_mut`] method when a
