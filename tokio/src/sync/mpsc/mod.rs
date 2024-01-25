@@ -23,7 +23,7 @@
 //!
 //! This channel is also suitable for the single-producer single-consumer
 //! use-case. (Unless you only need to send one message, in which case you
-//! should use the [`oneshot`] channel.)
+//! should use the [oneshot] channel.)
 //!
 //! # Disconnection
 //!
@@ -66,7 +66,7 @@
 //! in mind, but they can also be generalized to other kinds of channels. In
 //! general, any channel method that isn't marked async can be called anywhere,
 //! including outside of the runtime. For example, sending a message on a
-//! [`oneshot`] channel from outside the runtime is perfectly fine.
+//! [oneshot] channel from outside the runtime is perfectly fine.
 //!
 //! # Multiple runtimes
 //!
