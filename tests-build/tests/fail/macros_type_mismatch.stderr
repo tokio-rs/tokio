@@ -21,36 +21,32 @@ error[E0308]: mismatched types
    |
 14 |   async fn extra_semicolon() -> Result<(), ()> {
    |  ______________________________________________^
-15 | |     /* TODO(taiki-e): help message still wrong
-16 | |     help: try using a variant of the expected enum
-17 | |        |
-...  |
-23 | |     Ok(());
+15 | |     Ok(());
    | |           - help: remove this semicolon to return this value
-24 | | }
+16 | | }
    | |_^ expected `Result<(), ()>`, found `()`
    |
    = note:   expected enum `Result<(), ()>`
            found unit type `()`
 
 error[E0308]: mismatched types
-  --> tests/fail/macros_type_mismatch.rs:31:12
+  --> tests/fail/macros_type_mismatch.rs:23:12
    |
-29 | #[tokio::main]
+21 | #[tokio::main]
    |               - help: try adding a return type: `-> i32`
-30 | async fn issue_4635() {
-31 |     return 1;
+22 | async fn issue_4635() {
+23 |     return 1;
    |            ^ expected `()`, found integer
 
 error[E0308]: mismatched types
-  --> tests/fail/macros_type_mismatch.rs:36:64
+  --> tests/fail/macros_type_mismatch.rs:28:64
    |
-36 |   async fn extra_semicolon_with_try_operator() -> Result<(), ()> {
+28 |   async fn extra_semicolon_with_try_operator() -> Result<(), ()> {
    |  ________________________________________________________________^
-37 | |     Ok(())?;
-38 | |     Ok(());
+29 | |     Ok(())?;
+30 | |     Ok(());
    | |           - help: remove this semicolon to return this value
-39 | | }
+31 | | }
    | |_^ expected `Result<(), ()>`, found `()`
    |
    = note:   expected enum `Result<(), ()>`
