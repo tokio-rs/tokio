@@ -407,12 +407,14 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     // there will be no benefit.
     let body = if is_test {
         quote! {
+            #[allow(unused_must_use)]
             async fn #unique_fn_name #generics() #fn_output #body
             let body = #unique_fn_name();
             #crate_path::pin!(body);
         }
     } else {
         quote! {
+            #[allow(unused_must_use)]
             async fn #unique_fn_name #generics() #fn_output #body
             let body = #unique_fn_name();
         }
