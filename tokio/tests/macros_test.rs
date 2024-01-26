@@ -25,10 +25,16 @@ async fn unused_braces_test() { assert_eq!(1 + 1, 2) }
 fn trait_method() {
     trait A {
         fn f(self);
+
+        fn g(self);
     }
     impl A for () {
         #[tokio::main]
-        async fn f(self) {}
+        async fn f(self) {
+            self.g()
+        }
+
+        fn g(self) {}
     }
     ().f()
 }
