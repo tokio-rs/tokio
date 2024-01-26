@@ -36,8 +36,9 @@ error[E0308]: mismatched types
 error[E0308]: mismatched types
   --> tests/fail/macros_type_mismatch.rs:31:12
    |
-30 | async fn issue_4635() -> () {
-   |                          -- expected `()` because of return type
+29 | #[tokio::main]
+   |               - help: try adding a return type: `-> i32`
+30 | async fn issue_4635() {
 31 |     return 1;
    |            ^ expected `()`, found integer
 
