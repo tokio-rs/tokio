@@ -827,8 +827,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// it simply because, for example, a read succeeded; it should be called
     /// when a read is observed to block.
     ///
-    /// Note that that if a readiness notification occurs following the last operation
-    /// but prior to invoking `clear_ready`, it will not be cleared.
+    /// This method only clears readiness events that happened before the creation of this guard.
+    /// In other words, if the IO resource becomes ready between the creation of the guard and
+    /// this call to `clear_ready`, then the readiness is not actually cleared.
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
             self.async_fd.registration.clear_readiness(event);
@@ -851,8 +852,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// block. For example when a read blocks when using a combined interest,
     /// only clear `Ready::READABLE`.
     ///
-    /// Note that that if a readiness notification occurs following the last operation
-    /// but prior to invoking `clear_ready`, it will not be cleared.    
+    /// This method only clears readiness events that happened before the creation of this guard.
+    /// In other words, if the IO resource becomes ready between the creation of the guard and
+    /// this call to `clear_ready`, then the readiness is not actually cleared.
     ///
     /// # Examples
     ///
@@ -1051,8 +1053,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// it simply because, for example, a read succeeded; it should be called
     /// when a read is observed to block.
     ///
-    /// Note that that if a readiness notification occurs following the last operation
-    /// but prior to invoking `clear_ready`, it will not be cleared.
+    /// This method only clears readiness events that happened before the creation of this guard.
+    /// In other words, if the IO resource becomes ready between the creation of the guard and
+    /// this call to `clear_ready`, then the readiness is not actually cleared.
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
             self.async_fd.registration.clear_readiness(event);
@@ -1073,8 +1076,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// block. For example when a read blocks when using a combined interest,
     /// only clear `Ready::READABLE`.
     ///
-    /// Note that that if a readiness notification occurs following the last operation
-    /// but prior to invoking `clear_ready`, it will not be cleared.
+    /// This method only clears readiness events that happened before the creation of this guard.
+    /// In other words, if the IO resource becomes ready between the creation of the guard and
+    /// this call to `clear_ready`, then the readiness is not actually cleared.
     ///
     /// # Examples
     ///
