@@ -1114,7 +1114,7 @@ impl<T> Receiver<T> {
                                 // If the waiter is not already queued, enqueue it.
                                 // `Relaxed` order suffices: we have synchronized with
                                 // all writers through the tail lock that we hold.
-                                if (*ptr).queued.load(Relaxed) {
+                                if !(*ptr).queued.load(Relaxed) {
                                     // `Relaxed` order suffices: all the readers will
                                     // synchronize with this write through the tail lock.
                                     (*ptr).queued.store(true, Relaxed);
