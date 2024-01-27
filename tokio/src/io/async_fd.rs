@@ -839,8 +839,6 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// Indicates to tokio that the file descriptor no longer has a specific readiness.
     /// The internal readiness flag will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
-    /// This implies that if a readiness notification occurs following the last operation
-    /// but prior to invoking `clear_ready`, it will not be cleared.
     ///
     /// This function is useful in combination with the [`AsyncFd::ready`] method when a
     /// combined interest like `Interest::READABLE | Interest::WRITABLE` is used.
