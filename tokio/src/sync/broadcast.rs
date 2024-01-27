@@ -1430,9 +1430,10 @@ impl<'a, T> Drop for Recv<'a, T> {
             let mut tail = self.receiver.shared.tail.lock();
 
             // Safety: tail lock is held.
+            // `Relaxed` order suffices because we hold the tail lock.
             let queued = self
                 .waiter
-                .with_mut(|ptr| unsafe { *(*ptr).queued.get_mut() });
+                .with_mut(|ptr| unsafe { (*ptr).queued.load(Relaxed) });
 
             if queued {
                 // Remove the node
