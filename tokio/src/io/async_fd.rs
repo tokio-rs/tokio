@@ -826,6 +826,10 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// _actually observes_ that the file descriptor is _not_ ready. Do not call
     /// it simply because, for example, a read succeeded; it should be called
     /// when a read is observed to block.
+    ///
+    /// This method only clears readiness events that happened before the creation of this guard.
+    /// In other words, if the IO resource becomes ready between the creation of the guard and
+    /// this call to `clear_ready`, then the readiness is not actually cleared.
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
             self.async_fd.registration.clear_readiness(event);
@@ -845,6 +849,10 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// when a read is observed to block. Only clear the specific readiness that is observed to
     /// block. For example when a read blocks when using a combined interest,
     /// only clear `Ready::READABLE`.
+    ///
+    /// This method only clears readiness events that happened before the creation of this guard.
+    /// In other words, if the IO resource becomes ready between the creation of the guard and
+    /// this call to `clear_ready`, then the readiness is not actually cleared.
     ///
     /// # Examples
     ///
@@ -1042,6 +1050,10 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// _actually observes_ that the file descriptor is _not_ ready. Do not call
     /// it simply because, for example, a read succeeded; it should be called
     /// when a read is observed to block.
+    ///
+    /// This method only clears readiness events that happened before the creation of this guard.
+    /// In other words, if the IO resource becomes ready between the creation of the guard and
+    /// this call to `clear_ready`, then the readiness is not actually cleared.
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
             self.async_fd.registration.clear_readiness(event);
@@ -1061,6 +1073,10 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// when a read is observed to block. Only clear the specific readiness that is observed to
     /// block. For example when a read blocks when using a combined interest,
     /// only clear `Ready::READABLE`.
+    ///
+    /// This method only clears readiness events that happened before the creation of this guard.
+    /// In other words, if the IO resource becomes ready between the creation of the guard and
+    /// this call to `clear_ready`, then the readiness is not actually cleared.
     ///
     /// # Examples
     ///
