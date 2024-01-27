@@ -117,7 +117,7 @@
 //! ```
 
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard};
 use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
 use crate::util::WakeList;
@@ -127,8 +127,7 @@ use std::future::Future;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::{Acquire, Release, SeqCst};
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
 use std::task::{Context, Poll, Waker};
 use std::usize;
 
@@ -907,10 +906,13 @@ impl<T> Shared<T> {
                             }
 
                             // Safety: `queued` is atomic.
+                            let queued = &(*waiter.as_ptr()).queued;
+                            // `Relaxed` suffices because the tail lock is held.
+                            assert!(queued.load(Relaxed));
                             // `Release` is needed to synchronize with `Recv::drop`.
                             // It is critical to set this variable **after** waker
                             // is extracted, otherwise we may data race with `Recv::drop`.
-                            assert!((*waiter.as_ptr()).queued.swap(false, Release));
+                            queued.store(false, Release);
                         }
                     }
                     None => {
