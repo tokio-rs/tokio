@@ -10,3 +10,4 @@ use_builtin = true
 
 [Hunspell.quirks]
 allow_concatenation = true
+

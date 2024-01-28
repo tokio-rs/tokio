@@ -1013,3 +1013,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run cargo-spellcheck
         run: cargo spellcheck --code 1
+
