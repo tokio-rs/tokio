@@ -14,29 +14,12 @@ use std::task::{Context, Poll};
 pin_project! {
     /// A [`Stream`] of messages decoded from an [`AsyncRead`].
     ///
-    /// # Examples
-    /// ```
-    /// use tokio_stream::StreamExt;
-    /// use tokio_util::codec::LinesCodec;
-    /// use tokio_util::codec::FramedRead;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let message = "Hello\nWorld".as_bytes();
-    ///     let decoder = LinesCodec::new();
-    ///     let mut reader = FramedRead::new(message, decoder);
-    ///
-    ///     let frame1 = reader.next().await.unwrap().unwrap();
-    ///     let frame2 = reader.next().await.unwrap().unwrap();
-    ///
-    ///     assert!(reader.next().await.is_none());
-    ///     assert_eq!(frame1, "Hello");
-    ///     assert_eq!(frame2, "World");
-    /// }
-    /// ```
+    /// For examples of how to use `FramedRead` with a codec, see the
+    /// examples on the [`codec`] module.
     ///
     /// [`Stream`]: futures_core::Stream
     /// [`AsyncRead`]: tokio::io::AsyncRead
+    /// [`codec`]: crate::codec
     pub struct FramedRead<T, D> {
         #[pin]
         inner: FramedImpl<T, D, ReadFrame>,

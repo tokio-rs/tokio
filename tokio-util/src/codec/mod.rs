@@ -7,6 +7,61 @@
 //! [`AsyncWrite`], to framed streams implementing [`Sink`] and [`Stream`].
 //! Framed streams are also known as transports.
 //!
+//! ## Example using codecs
+//! ```
+//! use tokio_util::codec::LinesCodec;
+//!
+//! use futures::sink::SinkExt;
+//! use tokio_util::codec::FramedWrite;
+//!
+//! use tokio_stream::StreamExt;
+//! use tokio_util::codec::FramedRead;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let messages = vec!["Hello", "World"];
+//!     let buffer = Vec::new();
+//!
+//!     // Encoding
+//!     let encoder = LinesCodec::new();
+//!
+//!     // FramedWrite is a sink which means you can send values into it
+//!     // asynchronously. Other examples of a sink are channels and socekts.
+//!     // Values sent into a FramedWrite will be framed according to a codec.
+//!     let mut writer = FramedWrite::new(buffer, encoder);
+//!
+//!     for message in &messages {
+//!         // To be able to send values into a FramedWrite, you need to bring the
+//!         // `futures::sink::Sink` into scope. But working with `Sink` is difficult
+//!         // since it only provides the barebone functions. In order to work with a `Sink`
+//!         // in a higher level, you should use the functions in the `SinkExt` trait.
+//!         writer.send(message).await.unwrap();
+//!     }
+//!
+//!     let buffer = writer.into_inner();
+//!     assert_eq!(buffer.as_slice(), "Hello\nWorld\n".as_bytes());
+//!
+//!     // Decoding
+//!     let decoder = LinesCodec::new();
+//!
+//!     // FramedRead can be used to read a stream of values that are framed according to
+//!     // a codec. FramedRead will read from its input (here `buffer`) until a whole frame
+//!     // can be parsed.
+//!     let mut reader = FramedRead::new(buffer.as_slice(), decoder);
+//!
+//!     // To be able to read values from a FramedRead, you need to bring the
+//!     // `futures::stream::Stream` into scope. But working with `Stream` is difficult
+//!     // since it only provides the barebone functions. In order to work with a `Stream`
+//!     // in a higher level, you should use the functions in the `StreamExt` trait.
+//!     let frame1 = reader.next().await.unwrap().unwrap();
+//!     let frame2 = reader.next().await.unwrap().unwrap();
+//!
+//!     assert!(reader.next().await.is_none());
+//!     assert_eq!(frame1, "Hello");
+//!     assert_eq!(frame2, "World");
+//! }
+//! ```
+//!
 //! # The Decoder trait
 //!
 //! A [`Decoder`] is used together with [`FramedRead`] or [`Framed`] to turn an

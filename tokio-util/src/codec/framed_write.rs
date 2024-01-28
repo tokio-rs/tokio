@@ -15,31 +15,11 @@ use std::task::{Context, Poll};
 pin_project! {
     /// A [`Sink`] of frames encoded to an `AsyncWrite`.
     ///
-    /// # Examples
-    /// ```
-    /// use futures::sink::SinkExt;
-    /// use tokio_util::codec::LinesCodec;
-    /// use tokio_util::codec::FramedWrite;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let messages = vec!["Hello", "World"];
-    ///
-    ///     let buffer = Vec::new();
-    ///     let encoder = LinesCodec::new();
-    ///     let mut writer = FramedWrite::new(buffer, encoder);
-    ///
-    ///     for message in &messages {
-    ///         writer.send(message).await.unwrap();
-    ///     }
-    ///
-    ///     let buffer = writer.get_ref();
-    ///
-    ///     assert_eq!(buffer.as_slice(), "Hello\nWorld\n".as_bytes());
-    /// }
-    /// ```
+    /// For examples of how to use `FramedWrite` with a codec, see the
+    /// examples on the [`codec`] module.
     ///
     /// [`Sink`]: futures_sink::Sink
+    /// [`codec`]: crate::codec
     pub struct FramedWrite<T, E> {
         #[pin]
         inner: FramedImpl<T, E, WriteFrame>,
