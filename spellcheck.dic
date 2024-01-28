@@ -7,7 +7,6 @@
 ±1ms
 —
 &
-&str
 +
 0o777
 0s
@@ -161,7 +160,6 @@ Nagle
 nonblocking
 nondecreasing
 noop
-notitifications
 ntasks
 ok
 oneshot
