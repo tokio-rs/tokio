@@ -463,7 +463,7 @@ cfg_taskdump! {
         /// ## Debug Info Must Be Available
         ///
         /// To produce task traces, the application must **not** be compiled
-        /// with split debuginfo. On Linux, including debuginfo within the
+        /// with `split debuginfo`. On Linux, including `debuginfo` within the
         /// application binary is the (correct) default. You can further ensure
         /// this behavior with the following directive in your `Cargo.toml`:
         ///

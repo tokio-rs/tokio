@@ -157,7 +157,7 @@ pub(crate) struct Shared {
     driver: AtomicCell<Driver>,
 
     /// Condition variables used to unblock worker threads. Each worker thread
-    /// has its own condvar it waits on.
+    /// has its own `condvar` it waits on.
     pub(super) condvars: Vec<Condvar>,
 
     /// The number of cores that have observed the trace signal.

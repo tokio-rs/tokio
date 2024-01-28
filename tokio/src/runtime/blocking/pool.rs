@@ -114,7 +114,7 @@ struct Shared {
     /// This holds the `JoinHandles` for all running threads; on shutdown, the thread
     /// calling shutdown handles joining on these.
     worker_threads: HashMap<usize, thread::JoinHandle<()>>,
-    /// This is a counter used to iterate worker_threads in a consistent order (for loom's
+    /// This is a counter used to iterate `worker_threads` in a consistent order (for loom's
     /// benefit).
     worker_thread_index: usize,
 }

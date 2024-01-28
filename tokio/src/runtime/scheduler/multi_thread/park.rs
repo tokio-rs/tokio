@@ -22,10 +22,10 @@ struct Inner {
     /// Avoids entering the park if possible
     state: AtomicUsize,
 
-    /// Used to coordinate access to the driver / condvar
+    /// Used to coordinate access to the driver / `condvar`
     mutex: Mutex<()>,
 
-    /// Condvar to block on if the driver is unavailable.
+    /// `Condvar` to block on if the driver is unavailable.
     condvar: Condvar,
 
     /// Resource (I/O, time, ...) driver

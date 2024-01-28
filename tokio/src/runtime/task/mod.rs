@@ -31,7 +31,7 @@
 //!
 //! # State
 //!
-//! The task stores its state in an atomic usize with various bitfields for the
+//! The task stores its state in an atomic `usize` with various bitfields for the
 //! necessary information. The state has the following bitfields:
 //!
 //!  * `RUNNING` - Tracks whether the task is currently being polled or cancelled.

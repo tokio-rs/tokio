@@ -23,7 +23,7 @@
 //! }
 //! ```
 //!
-//! Wait for SIGHUP on Unix
+//! Wait for `SIGHUP` on Unix
 //!
 //! ```rust,no_run
 //! # #[cfg(unix)] {

@@ -40,7 +40,7 @@ pub(crate) struct Handle {
     synced: Mutex<registration_set::Synced>,
 
     /// Used to wake up the reactor from a call to `turn`.
-    /// Not supported on Wasi due to lack of threading support.
+    /// Not supported on `Wasi` due to lack of threading support.
     #[cfg(not(target_os = "wasi"))]
     waker: mio::Waker,
 

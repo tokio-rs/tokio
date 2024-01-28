@@ -212,11 +212,11 @@ impl<W: AsyncWrite> AsyncWrite for BufWriter<W> {
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum SeekState {
-    /// start_seek has not been called.
+    /// `start_seek` has not been called.
     Init,
-    /// start_seek has been called, but poll_complete has not yet been called.
+    /// `start_seek` has been called, but `poll_complete` has not yet been called.
     Start(SeekFrom),
-    /// Waiting for completion of poll_complete.
+    /// Waiting for completion of `poll_complete`.
     Pending,
 }
 

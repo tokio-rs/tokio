@@ -1507,7 +1507,7 @@ impl UdpSocket {
     ///
     /// On Windows, if the data is larger than the buffer specified, the buffer
     /// is filled with the first part of the data, and `peek_from` returns the error
-    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// `WSAEMSGSIZE(10040)`. The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
     ///
@@ -1561,7 +1561,7 @@ impl UdpSocket {
     ///
     /// On Windows, if the data is larger than the buffer specified, the buffer
     /// is filled with the first part of the data, and peek returns the error
-    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// `WSAEMSGSIZE(10040)`. The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
     ///
@@ -1623,7 +1623,7 @@ impl UdpSocket {
     ///
     /// On Windows, if the data is larger than the buffer specified, the buffer
     /// is filled with the first part of the data, and peek returns the error
-    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// `WSAEMSGSIZE(10040)`. The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
     ///

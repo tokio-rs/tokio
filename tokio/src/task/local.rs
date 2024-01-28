@@ -526,7 +526,7 @@ impl LocalSet {
     /// This runs the given future on the runtime, blocking until it is
     /// complete, and yielding its resolved result. Any tasks or timers which
     /// the future spawns internally will be executed on the runtime. The future
-    /// may also call [`spawn_local`] to spawn_local additional local futures on the
+    /// may also call [`spawn_local`] to `spawn_local` additional local futures on the
     /// current thread.
     ///
     /// This method should not be called from an asynchronous context.

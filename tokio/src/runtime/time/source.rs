@@ -1,7 +1,7 @@
 use super::MAX_SAFE_MILLIS_DURATION;
 use crate::time::{Clock, Duration, Instant};
 
-/// A structure which handles conversion from Instants to u64 timestamps.
+/// A structure which handles conversion from Instants to `u64` timestamps.
 #[derive(Debug)]
 pub(crate) struct TimeSource {
     start_time: Instant,

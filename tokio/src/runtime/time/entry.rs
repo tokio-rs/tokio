@@ -164,7 +164,7 @@ impl StateCell {
     /// Marks this timer as being moved to the pending list, if its scheduled
     /// time is not after `not_after`.
     ///
-    /// If the timer is scheduled for a time after not_after, returns an Err
+    /// If the timer is scheduled for a time after `not_after`, returns an Err
     /// containing the current scheduled time.
     ///
     /// SAFETY: Must hold the driver lock.

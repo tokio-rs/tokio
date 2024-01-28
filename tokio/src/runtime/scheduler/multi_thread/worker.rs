@@ -677,7 +677,7 @@ impl Context {
     /// Also important to notice that, before parking, the worker thread will try to take
     /// ownership of the Driver (IO/Time) and dispatch any events that might have fired.
     /// Whenever a worker thread executes the Driver loop, all waken tasks are scheduled
-    /// in its own local queue until the queue saturates (ntasks > LOCAL_QUEUE_CAPACITY).
+    /// in its own local queue until the queue saturates (ntasks > `LOCAL_QUEUE_CAPACITY`).
     /// When the local queue is saturated, the overflow tasks are added to the injection queue
     /// from where other workers can pick them up.
     /// Also, we rely on the workstealing algorithm to spread the tasks amongst workers

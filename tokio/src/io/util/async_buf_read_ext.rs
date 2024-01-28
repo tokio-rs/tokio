@@ -302,7 +302,7 @@ cfg_io_util! {
         ///
         /// The stream returned from this function will yield instances of
         /// [`io::Result`]`<`[`Option`]`<`[`String`]`>>`. Each string returned will *not* have a newline
-        /// byte (the 0xA byte) or CRLF (0xD, 0xA bytes) at the end.
+        /// byte (the 0xA byte) or `CRLF` (0xD, 0xA bytes) at the end.
         ///
         /// [`io::Result`]: std::io::Result
         /// [`Option`]: core::option::Option

@@ -145,13 +145,13 @@ impl<R: AsyncRead> AsyncBufRead for BufReader<R> {
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum SeekState {
-    /// start_seek has not been called.
+    /// `start_seek` has not been called.
     Init,
-    /// start_seek has been called, but poll_complete has not yet been called.
+    /// `start_seek` has been called, but `poll_complete` has not yet been called.
     Start(SeekFrom),
-    /// Waiting for completion of the first poll_complete in the `n.checked_sub(remainder).is_none()` branch.
+    /// Waiting for completion of the first `poll_complete` in the `n.checked_sub(remainder).is_none()` branch.
     PendingOverflowed(i64),
-    /// Waiting for completion of poll_complete.
+    /// Waiting for completion of `poll_complete`.
     Pending,
 }
 

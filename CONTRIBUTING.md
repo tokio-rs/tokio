@@ -194,15 +194,23 @@ MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tag-raw-pointers" \
     cargo +nightly miri test --features full --lib
 ```
 
-You can also perform spell-check on tokio codebase. For details of how to use the spellcheck tool, feel free to visit
+### Performing spellcheck on tokio codebase
+
+You can perform spell-check on tokio codebase. For details of how to use the spellcheck tool, feel free to visit
 https://github.com/drahnr/cargo-spellcheck
 ```
 # First install the spell-check plugin
 cargo install --locked cargo-spellcheck
 
 # Then run the cargo spell check command
-cargo spell check
+cargo spellcheck check
 ```
+
+if the command rejects a word, you should backtick the rejected word if it's code related. If not, the 
+rejected word should be put into `spellcheck.dic` file. 
+
+Note that when you add a word into the file, you should also update the first line which tells the spellcheck tool
+the total number of words included in the file
 
 ### Tests
 
