@@ -96,6 +96,16 @@ cfg_net_unix! {
 }
 
 impl UnixDatagram {
+    pub(crate) fn from_mio(sys: mio::net::UnixDatagram) -> io::Result<UnixDatagram> {
+        let datagram = UnixDatagram::new(sys)?;
+
+        if let Some(e) = datagram.io.take_error()? {
+            return Err(e);
+        }
+
+        Ok(datagram)
+    }
+
     /// Waits for any of the requested ready states.
     ///
     /// This function is usually paired with `try_recv()` or `try_send()`. It
