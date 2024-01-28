@@ -1,4 +1,4 @@
-286
+279
 \
 ~
 ~4
@@ -34,7 +34,6 @@ ambiant
 amongst
 api
 APIs
-assert_eq
 async
 awaitable
 backend
@@ -46,14 +45,11 @@ binded
 bitfield
 bitfields
 Blockingly
-bool
 boolean
 broadcasted
-buf
 cancelled
 cancelling
 Cancelling
-cfg
 CLI
 cloneable
 codebase
@@ -64,7 +60,6 @@ combinators
 Config
 config
 connectionless
-const
 cpu
 cpus
 Customizable
@@ -113,7 +108,6 @@ FreeBSD
 frontend
 fs
 functionalities
-fuzz_linked_list
 getters
 GID
 Growable
@@ -207,7 +201,6 @@ scalability
 scheduler's
 semver
 setpgid
-shard_id
 sharded
 signalled
 signalling

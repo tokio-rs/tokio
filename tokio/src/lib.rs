@@ -333,7 +333,7 @@
 //! - `parking_lot`: As a potential optimization, use the `_parking_lot_` crate's
 //!                  synchronization primitives internally. Also, this
 //!                  dependency is necessary to construct some of our primitives
-//!                  in a const context. `MSRV` may increase according to the
+//!                  in a `const` context. `MSRV` may increase according to the
 //!                  `_parking_lot_` release in use.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
@@ -689,6 +689,6 @@ cfg_macros! {
 #[cfg(test)]
 fn is_unpin<T: Unpin>() {}
 
-/// fuzz test (fuzz_linked_list)
+/// fuzz test (`fuzz_linked_list`)
 #[cfg(fuzzing)]
 pub mod fuzz;
