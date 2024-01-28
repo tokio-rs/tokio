@@ -42,7 +42,7 @@ struct Context {
     #[cfg(feature = "rt")]
     current: current::HandleCell,
 
-    /// Handle to the scheduler's internal "context"
+    /// Handle to the `scheduler's` internal "context"
     #[cfg(feature = "rt")]
     scheduler: Scoped<scheduler::Context>,
 

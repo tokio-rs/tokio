@@ -31,8 +31,8 @@
 //!
 //! # State
 //!
-//! The task stores its state in an atomic `usize` with various bitfields for the
-//! necessary information. The state has the following bitfields:
+//! The task stores its state in an atomic `usize` with various `bitfields` for the
+//! necessary information. The state has the following `bitfields`:
 //!
 //!  * `RUNNING` - Tracks whether the task is currently being polled or cancelled.
 //!    This bit functions as a lock around the task.
@@ -68,7 +68,7 @@
 //!    synchronization.
 //!
 //!  * If COMPLETE is one, then the `JoinHandle` has exclusive access to the
-//!    stage field. If COMPLETE is zero, then the RUNNING bitfield functions as
+//!    stage field. If COMPLETE is zero, then the RUNNING `bitfield` functions as
 //!    a lock for the stage field, and it can be accessed only by the thread
 //!    that set RUNNING to one.
 //!
@@ -159,7 +159,7 @@
 //!
 //! Calling poll from inside a shutdown call or vice-versa is not prevented by
 //! the API exposed by the task module, so this has to be safe. In either case,
-//! the lock in the RUNNING bitfield makes the inner call return immediately. If
+//! the lock in the RUNNING `bitfield` makes the inner call return immediately. If
 //! the inner call is a `shutdown` call, then the CANCELLED bit is set, and the
 //! poll call will notice it when the poll finishes, and the task is cancelled
 //! at that point.

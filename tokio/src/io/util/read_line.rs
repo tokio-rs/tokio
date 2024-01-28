@@ -51,7 +51,7 @@ fn put_back_original_data(output: &mut String, mut vector: Vec<u8>, num_bytes_re
 
 /// This handles the various failure cases and puts the string back into `output`.
 ///
-/// The `truncate_on_io_error` bool is necessary because `read_to_string` and `read_line`
+/// The `truncate_on_io_error` `bool` is necessary because `read_to_string` and `read_line`
 /// disagree on what should happen when an IO error occurs.
 pub(super) fn finish_string_read(
     io_res: io::Result<usize>,

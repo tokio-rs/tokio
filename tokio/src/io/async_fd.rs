@@ -55,7 +55,7 @@ use std::{task::Context, task::Poll};
 ///
 /// ## Use with to a poll-based API
 ///
-/// In some cases it may be desirable to use `AsyncFd` from APIs similar to
+/// In some cases it may be desirable to use `AsyncFd` from `APIs` similar to
 /// [`TcpStream::poll_read_ready`]. The [`AsyncFd::poll_read_ready`] and
 /// [`AsyncFd::poll_write_ready`] functions are provided for this purpose.
 /// Because these functions don't create a future to hold their state, they have

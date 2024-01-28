@@ -88,7 +88,7 @@ cfg_not_taskdump! {
 
 /// A scheduler worker
 pub(super) struct Worker {
-    /// Reference to scheduler's handle
+    /// Reference to `scheduler's` handle
     handle: Arc<Handle>,
 
     /// Index holding this worker's remote state
@@ -184,7 +184,7 @@ pub(crate) struct Shared {
     /// Only held to trigger some code on drop. This is used to get internal
     /// runtime metrics that can be useful when doing performance
     /// investigations. This does nothing (empty struct, no drop impl) unless
-    /// the `tokio_internal_mt_counters` cfg flag is set.
+    /// the `tokio_internal_mt_counters` `cfg` flag is set.
     _counters: Counters,
 }
 
@@ -995,7 +995,7 @@ impl Core {
 }
 
 impl Worker {
-    /// Returns a reference to the scheduler's injection queue.
+    /// Returns a reference to the `scheduler's` injection queue.
     fn inject(&self) -> &inject::Shared<Arc<Handle>> {
         &self.handle.shared.inject
     }

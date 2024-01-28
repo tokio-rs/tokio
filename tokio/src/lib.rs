@@ -28,7 +28,7 @@
 //! * Tools for [working with asynchronous tasks][tasks], including
 //!   [synchronization primitives and channels][sync] and [timeouts, sleeps, and
 //!   intervals][time].
-//! * APIs for [performing asynchronous I/O][io], including [TCP and UDP][net] sockets,
+//! * `APIs` for [performing asynchronous I/O][io], including [TCP and UDP][net] sockets,
 //!   [filesystem][fs] operations, and [process] and [signal] management.
 //! * A [runtime] for executing asynchronous code, including a task scheduler,
 //!   an I/O driver backed by the operating system's event queue (`epoll`, `kqueue`,
@@ -52,7 +52,7 @@
 //!
 //! Tokio consists of a number of modules that provide a range of functionality
 //! essential for implementing asynchronous applications in Rust. In this
-//! section, we will take a brief tour of Tokio, summarizing the major APIs and
+//! section, we will take a brief tour of Tokio, summarizing the major `APIs` and
 //! their uses.
 //!
 //! The easiest way to get started is to enable all features. Do this by
@@ -149,7 +149,7 @@
 //! Finally, Tokio provides a _runtime_ for executing asynchronous tasks. Most
 //! applications can use the [`#[tokio::main]`][main] macro to run their code on the
 //! Tokio runtime. However, this macro provides only basic configuration options. As
-//! an alternative, the [`tokio::runtime`] module provides more powerful APIs for configuring
+//! an alternative, the [`tokio::runtime`] module provides more powerful `APIs` for configuring
 //! and managing runtimes. You should use that module if the `#[tokio::main]` macro doesn't
 //! provide the functionality you need.
 //!
@@ -234,13 +234,13 @@
 //! functions for working with these traits, forming as an asynchronous
 //! counterpart to [`std::io`].
 //!
-//! Tokio also includes APIs for performing various kinds of I/O and interacting
+//! Tokio also includes `APIs` for performing various kinds of I/O and interacting
 //! with the operating system asynchronously. These include:
 //!
 //! * [`tokio::net`], which contains non-blocking versions of [TCP], [UDP], and
 //!   [Unix Domain Sockets][UDS] (enabled by the "net" feature flag),
 //! * [`tokio::fs`], similar to [`std::fs`] but for performing filesystem I/O
-//!   asynchronously (enabled by the "fs" feature flag),
+//!   asynchronously (enabled by the `"fs"` feature flag),
 //! * [`tokio::signal`], for asynchronously handling Unix and Windows OS signals
 //!   (enabled by the "signal" feature flag),
 //! * [`tokio::process`], for spawning and managing child processes (enabled by
@@ -309,7 +309,7 @@
 //! case. Below is a list of the available feature flags. You may also notice
 //! above each function, struct and trait there is listed one or more feature flags
 //! that are required for that item to be used. If you are new to Tokio it is
-//! recommended that you use the `full` feature flag which will enable all public APIs.
+//! recommended that you use the `full` feature flag which will enable all public `APIs`.
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
@@ -333,7 +333,7 @@
 //! - `parking_lot`: As a potential optimization, use the `_parking_lot_` crate's
 //!                  synchronization primitives internally. Also, this
 //!                  dependency is necessary to construct some of our primitives
-//!                  in a const context. `MSRV` may increase according to the
+//!                  in a `const` context. `MSRV` may increase according to the
 //!                  `_parking_lot_` release in use.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
@@ -356,7 +356,7 @@
 //! This flag enables **unstable** features. The public API of these features
 //! may break in 1.x releases. To enable these features, the `--cfg
 //! tokio_unstable` argument must be passed to `rustc` when compiling. This
-//! serves to explicitly opt-in to features which may break semver conventions,
+//! serves to explicitly opt-in to features which may break `semver` conventions,
 //! since Cargo [does not yet directly support such opt-ins][unstable features].
 //!
 //! You can specify it in your project's `.cargo/config.toml` file:
@@ -689,6 +689,6 @@ cfg_macros! {
 #[cfg(test)]
 fn is_unpin<T: Unpin>() {}
 
-/// fuzz test (fuzz_linked_list)
+/// fuzz test (`fuzz_linked_list`)
 #[cfg(fuzzing)]
 pub mod fuzz;

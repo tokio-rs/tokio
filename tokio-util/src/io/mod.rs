@@ -4,7 +4,7 @@
 //! allow converting between a hyper [`Body`] and [`AsyncRead`].
 //!
 //! The [`SyncIoBridge`] type converts from the world of async I/O
-//! to synchronous I/O; this may often come up when using synchronous APIs
+//! to synchronous I/O; this may often come up when using synchronous `APIs`
 //! inside [`tokio::task::spawn_blocking`].
 //!
 //! [`Body`]: https://docs.rs/hyper/0.13/hyper/struct.Body.html
