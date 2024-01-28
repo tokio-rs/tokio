@@ -3,7 +3,7 @@
 //! An intrusive double linked list of data.
 //!
 //! The data structure supports tracking pinned nodes. Most of the data
-//! structure's `APIs` are `unsafe` as they require the caller to ensure the
+//! structure's APIs are `unsafe` as they require the caller to ensure the
 //! specified node is actually contained by the list.
 
 use core::cell::UnsafeCell;

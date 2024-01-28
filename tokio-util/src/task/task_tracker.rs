@@ -23,7 +23,7 @@ use tokio::{
 /// `CancellationToken` is used to signal to tasks that they should shut down, and the
 /// `TaskTracker` is used to wait for them to finish shutting down.
 ///
-/// The `TaskTracker` will also keep track of a `closed` `boolean`. This is used to handle the case
+/// The `TaskTracker` will also keep track of a `closed` boolean. This is used to handle the case
 /// where the `TaskTracker` is empty, but we don't want to shut down yet. This means that the
 /// [`wait`] method will wait until *both* of the following happen at the same time:
 ///

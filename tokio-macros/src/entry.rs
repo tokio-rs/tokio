@@ -32,7 +32,7 @@ struct FinalConfig {
     crate_name: Option<Path>,
 }
 
-/// `Config` used in case of the attribute not being able to build a valid `config`
+/// Config used in case of the attribute not being able to build a valid config
 const DEFAULT_ERROR_CONFIG: FinalConfig = FinalConfig {
     flavor: RuntimeFlavor::CurrentThread,
     worker_threads: None,

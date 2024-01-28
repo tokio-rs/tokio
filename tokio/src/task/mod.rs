@@ -33,7 +33,7 @@
 //!   yield instead, allowing the Tokio runtime to schedule another task. Tasks
 //!   should generally not perform system calls or other operations that could
 //!   block a thread, as this would prevent other tasks running on the same
-//!   thread from executing as well. Instead, this module provides `APIs` for
+//!   thread from executing as well. Instead, this module provides APIs for
 //!   running blocking operations in an asynchronous context.
 //!
 //! [rt]: crate::runtime
@@ -44,7 +44,7 @@
 //!
 //! ## Working with Tasks
 //!
-//! This module provides the following `APIs` for working with tasks:
+//! This module provides the following APIs for working with tasks:
 //!
 //! ### Spawning
 //!
@@ -159,7 +159,7 @@
 //! on a thread that is also running other tasks would block the entire thread,
 //! preventing other tasks from running.
 //!
-//! Instead, Tokio provides two `APIs` for running blocking operations in an
+//! Instead, Tokio provides two APIs for running blocking operations in an
 //! asynchronous context: [`task::spawn_blocking`] and [`task::block_in_place`].
 //!
 //! Be aware that if you call a non-async method from async code, that non-async

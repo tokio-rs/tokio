@@ -1,4 +1,4 @@
-265
+286
 \
 ~
 ~4
@@ -32,6 +32,9 @@ Adaptors
 AIO
 ambiant
 amongst
+api
+APIs
+assert_eq
 async
 awaitable
 backend
@@ -40,11 +43,17 @@ backtrace
 backtraces
 backtracing
 binded
+bitfield
+bitfields
 Blockingly
+bool
+boolean
 broadcasted
+buf
 cancelled
 cancelling
 Cancelling
+cfg
 CLI
 cloneable
 codebase
@@ -52,6 +61,10 @@ codec
 codecs
 combinator
 combinators
+Config
+config
+connectionless
+const
 cpu
 cpus
 Customizable
@@ -97,7 +110,10 @@ filesystems
 fn
 fns
 FreeBSD
+frontend
+fs
 functionalities
+fuzz_linked_list
 getters
 GID
 Growable
@@ -151,6 +167,7 @@ Nagle
 nonblocking
 nondecreasing
 noop
+notitifications
 ntasks
 ok
 oneshot
@@ -187,6 +204,10 @@ runtime's
 rwlock
 rx
 scalability
+scheduler's
+semver
+setpgid
+shard_id
 sharded
 signalled
 signalling

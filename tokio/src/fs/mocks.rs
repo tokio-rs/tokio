@@ -1,4 +1,4 @@
-//! Mock version of `std::fs::File`;
+//! Mock version of std::fs::File;
 use mockall::mock;
 
 use crate::sync::oneshot;

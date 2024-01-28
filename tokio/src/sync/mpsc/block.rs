@@ -30,7 +30,7 @@ struct BlockHeader<T> {
     /// The next block in the linked list.
     next: AtomicPtr<Block<T>>,
 
-    /// `Bitfield` tracking slots that are ready to have their values consumed.
+    /// Bitfield tracking slots that are ready to have their values consumed.
     ready_slots: AtomicUsize,
 
     /// The observed `tail_position` value *after* the block has been passed by

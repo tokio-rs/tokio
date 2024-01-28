@@ -4,7 +4,7 @@
 //! [`std::process::Command`] type in the standard library, but provides asynchronous versions of
 //! functions that create processes. These functions (`spawn`, `status`, `output` and their
 //! variants) return "future aware" types that interoperate with Tokio. The asynchronous process
-//! support is provided through signal handling on Unix and system `APIs` on Windows.
+//! support is provided through signal handling on Unix and system APIs on Windows.
 //!
 //! [`std::process::Command`]: std::process::Command
 //!

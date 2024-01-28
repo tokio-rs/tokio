@@ -13,7 +13,7 @@ cfg_io_util! {
 cfg_net! {
     /// A UDP socket.
     ///
-    /// UDP is `"connectionless"`, unlike TCP. Meaning, regardless of what address you've bound to, a `UdpSocket`
+    /// UDP is "connectionless", unlike TCP. Meaning, regardless of what address you've bound to, a `UdpSocket`
     /// is free to communicate with many different remotes. In tokio there are basically two main ways to use `UdpSocket`:
     ///
     /// * one to many: [`bind`](`UdpSocket::bind`) and use [`send_to`](`UdpSocket::send_to`)
@@ -825,7 +825,7 @@ impl UdpSocket {
     /// address to which it is connected. On success, returns the number of
     /// bytes read.
     ///
-    /// This method must be called with valid byte array `buf` of sufficient size
+    /// This method must be called with valid byte array buf of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the
     /// supplied buffer, excess bytes may be discarded.
     ///
@@ -881,7 +881,7 @@ impl UdpSocket {
         /// Tries to receive data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
-        /// This method must be called with valid byte array `buf` of sufficient size
+        /// This method must be called with valid byte array buf of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
@@ -949,7 +949,7 @@ impl UdpSocket {
         /// to which it is connected, advancing the buffer's internal cursor,
         /// returning how many bytes were read.
         ///
-        /// This method must be called with valid byte array `buf` of sufficient size
+        /// This method must be called with valid byte array buf of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
@@ -996,7 +996,7 @@ impl UdpSocket {
         /// Tries to receive a single datagram message on the socket. On success,
         /// returns the number of bytes read and the origin.
         ///
-        /// This method must be called with valid byte array `buf` of sufficient size
+        /// This method must be called with valid byte array buf of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
@@ -1071,7 +1071,7 @@ impl UdpSocket {
         /// Receives a single datagram message on the socket, advancing the
         /// buffer's internal cursor, returning how many bytes were read and the origin.
         ///
-        /// This method must be called with valid byte array `buf` of sufficient size
+        /// This method must be called with valid byte array buf of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
@@ -1360,7 +1360,7 @@ impl UdpSocket {
     /// Tries to receive a single datagram message on the socket. On success,
     /// returns the number of bytes read and the origin.
     ///
-    /// This method must be called with valid byte array `buf` of sufficient size
+    /// This method must be called with valid byte array buf of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the
     /// supplied buffer, excess bytes may be discarded.
     ///
