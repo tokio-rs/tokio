@@ -7,22 +7,20 @@
 //! [`AsyncWrite`], to framed streams implementing [`Sink`] and [`Stream`].
 //! Framed streams are also known as transports.
 //!
-//! # Example using codecs
+//! # Example encoding using `LinesCodec`
+//! The following example demonstrates how to use a codec such as [`LinesCodec`] to
+//! write a sink of framed data. [`FramedWrite`] can be used to achieve this. Data sent
+//! to [`FramedWrite`] are first framed according to a specific codec, and then sent to
+//! an implementor of [`AsyncWrite`].
 //! ```
-//! use tokio_util::codec::LinesCodec;
-//!
 //! use futures::sink::SinkExt;
+//! use tokio_util::codec::LinesCodec;
 //! use tokio_util::codec::FramedWrite;
-//!
-//! use tokio_stream::StreamExt;
-//! use tokio_util::codec::FramedRead;
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let messages = vec!["Hello", "World"];
 //!     let buffer = Vec::new();
-//!
-//!     // Encoding
+//!     let messages = vec!["Hello", "World"];
 //!     let encoder = LinesCodec::new();
 //!
 //!     // FramedWrite is a sink which means you can send values into it
@@ -30,29 +28,39 @@
 //!     // Values sent into a FramedWrite will be framed according to a codec.
 //!     let mut writer = FramedWrite::new(buffer, encoder);
 //!
-//!     for message in &messages {
-//!         // To be able to send values into a FramedWrite, you need to bring the
-//!         // `futures::sink::Sink` into scope. But working with `Sink` is difficult
-//!         // since it only provides the barebone functions. In order to work with a `Sink`
-//!         // in a higher level, you should use the functions in the `SinkExt` trait.
-//!         writer.send(message).await.unwrap();
-//!     }
+//!     // To be able to send values into a FramedWrite, you need to bring the
+//!     // `SinkExt` trait into scope.
+//!     writer.send(messages[0]).await.unwrap();
+//!     writer.send(messages[1]).await.unwrap();
 //!
-//!     let buffer = writer.into_inner();
+//!     let buffer = writer.get_ref();
+//!
 //!     assert_eq!(buffer.as_slice(), "Hello\nWorld\n".as_bytes());
+//! }
+//!```
 //!
-//!     // Decoding
+//! # Example decoding using `LinesCodec`
+//! The following example demonstrates how to use a codec such as [`LinesCodec`] to
+//! read a stream of framed data. [`FramedRead`] can be used to achieve this. [`FramedRead`]
+//! will keep reading from an [`AsyncRead`] implementor until a whole frame, according to a codec,
+//! can be parsed.
+//!```
+//! use tokio_stream::StreamExt;
+//! use tokio_util::codec::LinesCodec;
+//! use tokio_util::codec::FramedRead;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let message = "Hello\nWorld".as_bytes();
 //!     let decoder = LinesCodec::new();
 //!
 //!     // FramedRead can be used to read a stream of values that are framed according to
 //!     // a codec. FramedRead will read from its input (here `buffer`) until a whole frame
 //!     // can be parsed.
-//!     let mut reader = FramedRead::new(buffer.as_slice(), decoder);
+//!     let mut reader = FramedRead::new(message, decoder);
 //!
 //!     // To be able to read values from a FramedRead, you need to bring the
-//!     // `futures::stream::Stream` into scope. But working with `Stream` is difficult
-//!     // since it only provides the barebone functions. In order to work with a `Stream`
-//!     // in a higher level, you should use the functions in the `StreamExt` trait.
+//!     // `StreamExt` trait into scope.
 //!     let frame1 = reader.next().await.unwrap().unwrap();
 //!     let frame2 = reader.next().await.unwrap().unwrap();
 //!
@@ -303,6 +311,7 @@
 //! [`AsyncWrite`]: tokio::io::AsyncWrite
 //! [`Stream`]: futures_core::Stream
 //! [`Sink`]: futures_sink::Sink
+//! [`SinkExt`]: futures::sink::SinkExt
 //! [`SinkExt::close`]: https://docs.rs/futures/0.3/futures/sink/trait.SinkExt.html#method.close
 //! [`FramedRead`]: struct@crate::codec::FramedRead
 //! [`FramedWrite`]: struct@crate::codec::FramedWrite
