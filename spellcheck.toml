@@ -1,0 +1,13 @@
+dev_comments = false
+skip_readme = false
+
+[Hunspell]
+lang = "en_US"
+search_dirs = ["."]
+extra_dictionaries = ["spellcheck.dic"]
+skip_os_lookups = true
+use_builtin = true
+
+[Hunspell.quirks]
+allow_concatenation = true
+

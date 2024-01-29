@@ -265,7 +265,7 @@ impl<T: Future> Future for Root<T> {
     }
 }
 
-/// Trace and poll all tasks of the current_thread runtime.
+/// Trace and poll all tasks of the `current_thread` runtime.
 pub(in crate::runtime) fn trace_current_thread(
     owned: &OwnedTasks<Arc<current_thread::Handle>>,
     local: &mut VecDeque<Notified<Arc<current_thread::Handle>>>,
@@ -293,7 +293,7 @@ cfg_rt_multi_thread! {
     use crate::runtime::scheduler::multi_thread::Synced;
     use crate::runtime::scheduler::inject::Shared;
 
-    /// Trace and poll all tasks of the current_thread runtime.
+    /// Trace and poll all tasks of the `current_thread` runtime.
     ///
     /// ## Safety
     ///

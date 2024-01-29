@@ -1,16 +1,16 @@
-//! This mod provides the logic for the inner tree structure of the CancellationToken.
+//! This mod provides the logic for the inner tree structure of the `CancellationToken`.
 //!
-//! CancellationTokens are only light handles with references to [`TreeNode`].
+//! `CancellationTokens` are only light handles with references to [`TreeNode`].
 //! All the logic is actually implemented in the [`TreeNode`].
 //!
 //! A [`TreeNode`] is part of the cancellation tree and may have one parent and an arbitrary number of
 //! children.
 //!
-//! A [`TreeNode`] can receive the request to perform a cancellation through a CancellationToken.
+//! A [`TreeNode`] can receive the request to perform a cancellation through a `CancellationToken`.
 //! This cancellation request will cancel the node and all of its descendants.
 //!
 //! As soon as a node cannot get cancelled any more (because it was already cancelled or it has no
-//! more CancellationTokens pointing to it any more), it gets removed from the tree, to keep the
+//! more `CancellationTokens` pointing to it any more), it gets removed from the tree, to keep the
 //! tree as small as possible.
 //!
 //! # Invariants
@@ -66,7 +66,7 @@ impl TreeNode {
     }
 }
 
-/// The data contained inside a TreeNode.
+/// The data contained inside a `TreeNode`.
 ///
 /// This struct exists so that the data of the node can be wrapped
 /// in a Mutex.
@@ -198,7 +198,7 @@ where
 /// `parent` MUST have been a parent of the node when they both got locked,
 /// otherwise there is a potential for a deadlock as invariant #2 would be violated.
 ///
-/// To acquire the locks for node and parent, use [with_locked_node_and_parent].
+/// To acquire the locks for node and parent, use [`with_locked_node_and_parent`].
 fn move_children_to_parent(node: &mut Inner, parent: &mut Inner) {
     // Pre-allocate in the parent, for performance
     parent.children.reserve(node.children.len());
@@ -216,7 +216,7 @@ fn move_children_to_parent(node: &mut Inner, parent: &mut Inner) {
 /// Removes a child from the parent.
 ///
 /// `parent` MUST be the parent of `node`.
-/// To acquire the locks for node and parent, use [with_locked_node_and_parent].
+/// To acquire the locks for node and parent, use [`with_locked_node_and_parent`].
 fn remove_child(parent: &mut Inner, mut node: MutexGuard<'_, Inner>) {
     // Query the position from where to remove a node
     let pos = node.parent_idx;

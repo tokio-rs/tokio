@@ -40,11 +40,11 @@ impl Interest {
         #[cfg(not(target_os = "freebsd"))]
         pub const AIO: Interest = Interest(READABLE);
 
-        /// Interest for POSIX AIO lio_listio events.
+        /// Interest for POSIX AIO `lio_listio` events.
         #[cfg(target_os = "freebsd")]
         pub const LIO: Interest = Interest(LIO);
 
-        /// Interest for POSIX AIO lio_listio events.
+        /// Interest for POSIX AIO `lio_listio` events.
         #[cfg(not(target_os = "freebsd"))]
         pub const LIO: Interest = Interest(READABLE);
     }

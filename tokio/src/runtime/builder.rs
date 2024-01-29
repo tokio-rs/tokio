@@ -78,7 +78,7 @@ pub struct Builder {
     /// To run after each thread is unparked.
     pub(super) after_unpark: Option<Callback>,
 
-    /// Customizable keep alive timeout for BlockingPool
+    /// Customizable keep alive timeout for `BlockingPool`
     pub(super) keep_alive: Option<Duration>,
 
     /// How many ticks before pulling a task from the global/remote queue?
@@ -723,7 +723,7 @@ impl Builder {
     /// Sets a custom timeout for a thread in the blocking pool.
     ///
     /// By default, the timeout for a thread is set to 10 seconds. This can
-    /// be overridden using .thread_keep_alive().
+    /// be overridden using `.thread_keep_alive()`.
     ///
     /// # Example
     ///

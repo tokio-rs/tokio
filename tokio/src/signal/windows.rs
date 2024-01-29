@@ -3,7 +3,7 @@
 //! This module is only defined on Windows and allows receiving "ctrl-c",
 //! "ctrl-break", "ctrl-logoff", "ctrl-shutdown", and "ctrl-close"
 //! notifications. These events are listened for via the `SetConsoleCtrlHandler`
-//! function which receives the corresponding windows_sys event type.
+//! function which receives the corresponding `windows_sys` event type.
 
 #![cfg(any(windows, docsrs))]
 #![cfg_attr(docsrs, doc(cfg(all(windows, feature = "signal"))))]
@@ -257,8 +257,8 @@ pub fn ctrl_close() -> io::Result<CtrlClose> {
     })
 }
 
-/// Represents a listener which receives "ctrl-close" notitifications sent to the process
-/// via 'SetConsoleCtrlHandler'.
+/// Represents a listener which receives "ctrl-close" notifications sent to the process
+/// via `SetConsoleCtrlHandler`.
 ///
 /// A notification to this process notifies *all* listeners listening for
 /// this event. Moreover, the notifications **are coalesced** if they aren't processed
@@ -354,8 +354,8 @@ pub fn ctrl_shutdown() -> io::Result<CtrlShutdown> {
     })
 }
 
-/// Represents a listener which receives "ctrl-shutdown" notitifications sent to the process
-/// via 'SetConsoleCtrlHandler'.
+/// Represents a listener which receives "ctrl-shutdown" notifications sent to the process
+/// via `SetConsoleCtrlHandler`.
 ///
 /// A notification to this process notifies *all* listeners listening for
 /// this event. Moreover, the notifications **are coalesced** if they aren't processed
@@ -451,8 +451,8 @@ pub fn ctrl_logoff() -> io::Result<CtrlLogoff> {
     })
 }
 
-/// Represents a listener which receives "ctrl-logoff" notitifications sent to the process
-/// via 'SetConsoleCtrlHandler'.
+/// Represents a listener which receives "ctrl-logoff" notifications sent to the process
+/// via `SetConsoleCtrlHandler`.
 ///
 /// A notification to this process notifies *all* listeners listening for
 /// this event. Moreover, the notifications **are coalesced** if they aren't processed

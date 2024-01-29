@@ -47,7 +47,7 @@ cfg_io_driver! {
     /// This clears the readiness state until a new readiness event is received.
     ///
     /// This allows the caller to implement additional functions. For example,
-    /// [`TcpListener`] implements poll_accept by using [`poll_read_ready`] and
+    /// [`TcpListener`] implements `poll_accept` by using [`poll_read_ready`] and
     /// [`clear_readiness`].
     ///
     /// ## Platform-specific events

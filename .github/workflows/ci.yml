@@ -71,6 +71,7 @@ jobs:
       - check-external-types
       - check-fuzzing
       - check-unstable-mt-counters
+      - check-spelling
     steps:
       - run: exit 0
 
@@ -994,3 +995,22 @@ jobs:
       - name: Check /tokio-stream/
         run: cargo fuzz check --all-features
         working-directory: tokio-stream
+
+  check-spelling:
+    name: check-spelling
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_stable }}
+      - name: Install cargo-spellcheck
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-spellcheck
+      - uses: actions/checkout@v4
+      - name: Run cargo-spellcheck
+        run: cargo spellcheck --code 1
+

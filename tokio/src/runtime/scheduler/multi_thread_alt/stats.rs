@@ -13,7 +13,7 @@ pub(crate) struct Stats {
     /// Exponentially-weighted moving average of time spent polling scheduled a
     /// task.
     ///
-    /// Tracked in nanoseconds, stored as a f64 since that is what we use with
+    /// Tracked in nanoseconds, stored as a `f64` since that is what we use with
     /// the EWMA calculations
     task_poll_time_ewma: f64,
 }

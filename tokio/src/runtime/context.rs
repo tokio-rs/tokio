@@ -61,7 +61,7 @@ struct Context {
     rng: Cell<Option<FastRand>>,
 
     /// Tracks the amount of "work" a task may still do before yielding back to
-    /// the sheduler
+    /// the scheduler
     budget: Cell<coop::Budget>,
 
     #[cfg(all(

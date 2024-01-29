@@ -183,7 +183,7 @@ where
     /// If the return value is Complete, the caller is given ownership of a
     /// single ref-count, which should be passed on to `complete`.
     ///
-    /// If the return value is Dealloc, then this call consumed the last
+    /// If the return value is `Dealloc`, then this call consumed the last
     /// ref-count and the caller should call `dealloc`.
     ///
     /// Otherwise the ref-count is consumed and the caller should not access

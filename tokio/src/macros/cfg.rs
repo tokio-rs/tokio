@@ -49,7 +49,7 @@ macro_rules! cfg_unstable_windows {
     }
 }
 
-/// Enables enter::block_on.
+/// Enables `enter::block_on`.
 macro_rules! cfg_block_on {
     ($($item:item)*) => {
         $(

@@ -28,7 +28,7 @@ use std::task::{Context, Poll, Waker};
 /// be referenced by both *mut Cell and *mut Header.
 ///
 /// Any changes to the layout of this struct _must_ also be reflected in the
-/// const fns in raw.rs.
+/// `const` fns in raw.rs.
 ///
 // # This struct should be cache padded to avoid false sharing. The cache padding rules are copied
 // from crossbeam-utils/src/cache_padded.rs
@@ -132,7 +132,7 @@ pub(super) struct CoreStage<T: Future> {
 /// Holds the future or output, depending on the stage of execution.
 ///
 /// Any changes to the layout of this struct _must_ also be reflected in the
-/// const fns in raw.rs.
+/// `const` fns in raw.rs.
 #[repr(C)]
 pub(super) struct Core<T: Future, S> {
     /// Scheduler used to drive this future.

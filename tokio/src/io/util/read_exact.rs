@@ -12,7 +12,7 @@ use std::task::{Context, Poll};
 /// a buffer.
 ///
 /// Created by the [`AsyncReadExt::read_exact`][read_exact].
-/// [read_exact]: [crate::io::AsyncReadExt::read_exact]
+/// [`read_exact`]: [`crate::io::AsyncReadExt::read_exact`]
 pub(crate) fn read_exact<'a, A>(reader: &'a mut A, buf: &'a mut [u8]) -> ReadExact<'a, A>
 where
     A: AsyncRead + Unpin + ?Sized,
