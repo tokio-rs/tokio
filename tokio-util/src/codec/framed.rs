@@ -130,7 +130,7 @@ impl<T, U> Framed<T, U> {
     /// things like gzip or TLS, which require both read and write access to the
     /// underlying object.
     ///
-    /// This objects takes a stream and a readbuffer and a writebuffer. These field
+    /// This objects takes a stream and a `readbuffer` and a `writebuffer`. These field
     /// can be obtained from an existing `Framed` with the [`into_parts`] method.
     ///
     /// If you want to work more directly with the streams and sink, consider

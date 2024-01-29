@@ -2059,7 +2059,7 @@ impl ServerOptions {
     ///
     /// ```
     /// use std::{io, os::windows::prelude::AsRawHandle, ptr};
-    //
+    ///
     /// use tokio::net::windows::named_pipe::ServerOptions;
     /// use windows_sys::{
     ///     Win32::Foundation::ERROR_SUCCESS,
@@ -2094,7 +2094,7 @@ impl ServerOptions {
     ///
     /// ```
     /// use std::{io, os::windows::prelude::AsRawHandle, ptr};
-    //
+    ///
     /// use tokio::net::windows::named_pipe::ServerOptions;
     /// use windows_sys::{
     ///     Win32::Foundation::ERROR_ACCESS_DENIED,

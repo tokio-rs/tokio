@@ -762,7 +762,7 @@ impl UnixStream {
 
     /// Creates new [`UnixStream`] from a [`std::os::unix::net::UnixStream`].
     ///
-    /// This function is intended to be used to wrap a UnixStream from the
+    /// This function is intended to be used to wrap a `UnixStream` from the
     /// standard library in the Tokio equivalent.
     ///
     /// # Notes

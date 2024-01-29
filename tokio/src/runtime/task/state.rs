@@ -53,9 +53,9 @@ const REF_ONE: usize = 1 << REF_COUNT_SHIFT;
 ///
 /// A task is initialized with three references:
 ///
-///  * A reference that will be stored in an OwnedTasks or LocalOwnedTasks.
+///  * A reference that will be stored in an `OwnedTasks` or `LocalOwnedTasks`.
 ///  * A reference that will be sent to the scheduler as an ordinary notification.
-///  * A reference for the JoinHandle.
+///  * A reference for the `JoinHandle`.
 ///
 /// As the task starts with a `JoinHandle`, `JOIN_INTEREST` is set.
 /// As the task starts with a `Notified`, `NOTIFIED` is set.

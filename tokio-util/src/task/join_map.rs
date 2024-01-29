@@ -878,7 +878,7 @@ impl<K: Eq> Eq for Key<K> {}
 #[derive(Debug, Clone)]
 pub struct JoinMapKeys<'a, K, V> {
     iter: hashbrown::hash_map::Keys<'a, Key<K>, AbortHandle>,
-    /// To make it easier to change JoinMap in the future, keep V as a generic
+    /// To make it easier to change `JoinMap` in the future, keep V as a generic
     /// parameter.
     _value: PhantomData<&'a V>,
 }

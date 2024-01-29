@@ -4,7 +4,7 @@
 //! defines two traits, [`AsyncRead`] and [`AsyncWrite`], which are asynchronous
 //! versions of the [`Read`] and [`Write`] traits in the standard library.
 //!
-//! # AsyncRead and AsyncWrite
+//! # `AsyncRead` and `AsyncWrite`
 //!
 //! Like the standard library's [`Read`] and [`Write`] traits, [`AsyncRead`] and
 //! [`AsyncWrite`] provide the most general interface for reading and writing
@@ -122,7 +122,7 @@
 //! [`BufReader`]: crate::io::BufReader
 //! [`BufWriter`]: crate::io::BufWriter
 //!
-//! ## Implementing AsyncRead and AsyncWrite
+//! ## Implementing `AsyncRead` and `AsyncWrite`
 //!
 //! Because they are traits, we can implement [`AsyncRead`] and [`AsyncWrite`] for
 //! our own types, as well. Note that these traits must only be implemented for

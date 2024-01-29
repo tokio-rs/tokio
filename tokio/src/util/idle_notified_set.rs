@@ -42,8 +42,8 @@ pub(crate) struct EntryInOneOfTheLists<'a, T> {
 
 type Lists<T> = Mutex<ListsInner<T>>;
 
-/// The linked lists hold strong references to the ListEntry items, and the
-/// ListEntry items also hold a strong reference back to the Lists object, but
+/// The linked lists hold strong references to the `ListEntry` items, and the
+/// `ListEntry` items also hold a strong reference back to the Lists object, but
 /// the destructor of the `IdleNotifiedSet` will clear the two lists, so once
 /// that object is destroyed, no ref-cycles will remain.
 struct ListsInner<T> {

@@ -1,4 +1,4 @@
-//! Implementation of an atomic u64 cell. On 64 bit platforms, this is a
+//! Implementation of an atomic `u64` cell. On 64 bit platforms, this is a
 //! re-export of `AtomicU64`. On 32 bit platforms, this is implemented using a
 //! `Mutex`.
 

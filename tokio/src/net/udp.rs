@@ -180,7 +180,7 @@ impl UdpSocket {
     /// This function is intended to be used to wrap a UDP socket from the
     /// standard library in the Tokio equivalent.
     ///
-    /// This can be used in conjunction with socket2's `Socket` interface to
+    /// This can be used in conjunction with `socket2`'s `Socket` interface to
     /// configure a socket before it's handed off, such as setting options like
     /// `reuse_address` or binding to multiple addresses.
     ///
@@ -313,7 +313,7 @@ impl UdpSocket {
     }
 
     /// Connects the UDP socket setting the default destination for send() and
-    /// limiting packets that are read via recv from the address specified in
+    /// limiting packets that are read via `recv` from the address specified in
     /// `addr`.
     ///
     /// # Example
@@ -358,7 +358,7 @@ impl UdpSocket {
     /// Waits for any of the requested ready states.
     ///
     /// This function is usually paired with `try_recv()` or `try_send()`. It
-    /// can be used to concurrently recv / send to the same socket on a single
+    /// can be used to concurrently `recv` / `send` to the same socket on a single
     /// task without splitting the socket.
     ///
     /// The function may complete without the socket being ready. This is a
@@ -786,7 +786,7 @@ impl UdpSocket {
     /// The [`connect`] method will connect this socket to a remote address. This method
     /// resolves to an error if the socket is not connected.
     ///
-    /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
+    /// Note that on multiple calls to a `poll_*` method in the `recv` direction, only the
     /// `Waker` from the `Context` passed to the most recent call will be scheduled to
     /// receive a wakeup.
     ///
@@ -825,7 +825,7 @@ impl UdpSocket {
     /// address to which it is connected. On success, returns the number of
     /// bytes read.
     ///
-    /// This method must be called with valid byte array buf of sufficient size
+    /// This method must be called with valid byte array `buf` of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the
     /// supplied buffer, excess bytes may be discarded.
     ///
@@ -881,7 +881,7 @@ impl UdpSocket {
         /// Tries to receive data from the stream into the provided buffer, advancing the
         /// buffer's internal cursor, returning how many bytes were read.
         ///
-        /// This method must be called with valid byte array buf of sufficient size
+        /// This method must be called with valid byte array `buf` of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
@@ -949,7 +949,7 @@ impl UdpSocket {
         /// to which it is connected, advancing the buffer's internal cursor,
         /// returning how many bytes were read.
         ///
-        /// This method must be called with valid byte array buf of sufficient size
+        /// This method must be called with valid byte array `buf` of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
@@ -996,7 +996,7 @@ impl UdpSocket {
         /// Tries to receive a single datagram message on the socket. On success,
         /// returns the number of bytes read and the origin.
         ///
-        /// This method must be called with valid byte array buf of sufficient size
+        /// This method must be called with valid byte array `buf` of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
@@ -1071,7 +1071,7 @@ impl UdpSocket {
         /// Receives a single datagram message on the socket, advancing the
         /// buffer's internal cursor, returning how many bytes were read and the origin.
         ///
-        /// This method must be called with valid byte array buf of sufficient size
+        /// This method must be called with valid byte array `buf` of sufficient size
         /// to hold the message bytes. If a message is too long to fit in the
         /// supplied buffer, excess bytes may be discarded.
         ///
@@ -1311,7 +1311,7 @@ impl UdpSocket {
 
     /// Attempts to receive a single datagram on the socket.
     ///
-    /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
+    /// Note that on multiple calls to a `poll_*` method in the `recv` direction, only the
     /// `Waker` from the `Context` passed to the most recent call will be scheduled to
     /// receive a wakeup.
     ///
@@ -1360,7 +1360,7 @@ impl UdpSocket {
     /// Tries to receive a single datagram message on the socket. On success,
     /// returns the number of bytes read and the origin.
     ///
-    /// This method must be called with valid byte array buf of sufficient size
+    /// This method must be called with valid byte array `buf` of sufficient size
     /// to hold the message bytes. If a message is too long to fit in the
     /// supplied buffer, excess bytes may be discarded.
     ///
@@ -1507,7 +1507,7 @@ impl UdpSocket {
     ///
     /// On Windows, if the data is larger than the buffer specified, the buffer
     /// is filled with the first part of the data, and `peek_from` returns the error
-    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// `WSAEMSGSIZE(10040)`. The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
     ///
@@ -1555,13 +1555,13 @@ impl UdpSocket {
     ///
     /// # Notes
     ///
-    /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
+    /// Note that on multiple calls to a `poll_*` method in the `recv` direction, only the
     /// `Waker` from the `Context` passed to the most recent call will be scheduled to
     /// receive a wakeup
     ///
     /// On Windows, if the data is larger than the buffer specified, the buffer
     /// is filled with the first part of the data, and peek returns the error
-    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// `WSAEMSGSIZE(10040)`. The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
     ///
@@ -1623,7 +1623,7 @@ impl UdpSocket {
     ///
     /// On Windows, if the data is larger than the buffer specified, the buffer
     /// is filled with the first part of the data, and peek returns the error
-    /// WSAEMSGSIZE(10040). The excess data is lost.
+    /// `WSAEMSGSIZE(10040)`. The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
     ///
@@ -1674,7 +1674,7 @@ impl UdpSocket {
     ///
     /// # Notes
     ///
-    /// Note that on multiple calls to a `poll_*` method in the recv direction, only the
+    /// Note that on multiple calls to a `poll_*` method in the `recv` direction, only the
     /// `Waker` from the `Context` passed to the most recent call will be scheduled to
     /// receive a wakeup.
     ///

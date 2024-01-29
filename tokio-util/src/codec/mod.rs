@@ -1,4 +1,4 @@
-//! Adaptors from AsyncRead/AsyncWrite to Stream/Sink
+//! Adaptors from `AsyncRead`/`AsyncWrite` to Stream/Sink
 //!
 //! Raw I/O objects work with byte sequences, but higher-level code usually
 //! wants to batch these into meaningful chunks, called "frames".

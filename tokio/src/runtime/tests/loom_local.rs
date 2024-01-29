@@ -9,7 +9,7 @@ use std::task::Poll;
 /// to the runtime itself. This means that if they are not properly removed at
 /// runtime shutdown, this will cause a memory leak.
 ///
-/// This test verifies that waking something during shutdown of a LocalSet does
+/// This test verifies that waking something during shutdown of a `LocalSet` does
 /// not result in tasks lingering in the queue once shutdown is complete. This
 /// is verified using loom's leak finder.
 #[test]

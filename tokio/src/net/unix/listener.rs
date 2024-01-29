@@ -77,7 +77,7 @@ impl UnixListener {
 
     /// Creates new [`UnixListener`] from a [`std::os::unix::net::UnixListener`].
     ///
-    /// This function is intended to be used to wrap a UnixListener from the
+    /// This function is intended to be used to wrap a `UnixListener` from the
     /// standard library in the Tokio equivalent.
     ///
     /// # Notes
