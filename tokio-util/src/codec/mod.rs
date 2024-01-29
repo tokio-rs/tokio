@@ -7,7 +7,7 @@
 //! [`AsyncWrite`], to framed streams implementing [`Sink`] and [`Stream`].
 //! Framed streams are also known as transports.
 //!
-//! ## Example using codecs
+//! # Example using codecs
 //! ```
 //! use tokio_util::codec::LinesCodec;
 //!
