@@ -19,13 +19,12 @@
 - io: make `repeat` and `sink` cooperative ([#6254])
 - io: simplify check for empty slice ([#6293])
 - rt: improve robustness of `wake_in_drop_after_panic` test ([#6238])
-- sync: use AtomicBool in broadcast channel future ([#6298])
 - process: use pidfd on Linux when available ([#6152])
+- sync: use AtomicBool in broadcast channel future ([#6298])
 
 ### Fixed
 
 - chore: typographic improvements ([#6262])
-- tests: fix name of `coop_budget.rs` ([#6234])
 - runtime: remove obsolete comment ([#6303])
 
 ### Documented
@@ -48,10 +47,9 @@
 [#6254]: https://github.com/tokio-rs/tokio/pull/6254
 [#6293]: https://github.com/tokio-rs/tokio/pull/6293
 [#6238]: https://github.com/tokio-rs/tokio/pull/6238
-[#6298]: https://github.com/tokio-rs/tokio/pull/6298
 [#6152]: https://github.com/tokio-rs/tokio/pull/6152
+[#6298]: https://github.com/tokio-rs/tokio/pull/6298
 [#6262]: https://github.com/tokio-rs/tokio/pull/6262
-[#6234]: https://github.com/tokio-rs/tokio/pull/6234
 [#6303]: https://github.com/tokio-rs/tokio/pull/6303
 [#6304]: https://github.com/tokio-rs/tokio/pull/6304
 [#6294]: https://github.com/tokio-rs/tokio/pull/6294
