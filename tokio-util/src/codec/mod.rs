@@ -45,7 +45,7 @@
 //! read a stream of framed data. [`FramedRead`] can be used to achieve this. [`FramedRead`]
 //! will keep reading from an [`AsyncRead`] implementor until a whole frame, according to a codec,
 //! can be parsed.
-//! 
+//!
 //!```
 //! use tokio_stream::StreamExt;
 //! use tokio_util::codec::LinesCodec;
