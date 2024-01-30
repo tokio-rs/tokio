@@ -185,7 +185,7 @@ impl TcpSocket {
         Ok(TcpSocket { inner })
     }
 
-    /// Enable sending of keep-alive messages on connection-oriented sockets.
+    /// Enable sending of keep-alive messages.
     pub fn set_keepalive(&self, keepalive: bool) -> io::Result<()> {
         self.inner.set_keepalive(keepalive)
     }
