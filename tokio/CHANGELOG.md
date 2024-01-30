@@ -2,8 +2,6 @@
 
 ### Added
 
-- ci: add spellchecking ([#6297])
-- ci: verify that tests work with panic=abort ([#6283])
 - io: add `tokio::io::Join` ([#6220])
 - io: implement `AsyncWrite` for `Empty` ([#6235])
 - net: add `UnixSocket` ([#6290])
@@ -16,10 +14,6 @@
 
 ### Changed
 
-- ci: update FreeBSD CI environment to 13.2 ([#6270])
-- ci: update actions/checkout action to v4 ([#6272])
-- ci: update cargo-check-external-types to 0.1.10 ([#6274])
-- ci: update clippy version to 1.75 ([#6273])
 - io: make `repeat` and `sink` cooperative ([#6254])
 - io: make `copy` cooperative ([#6265])
 - io: simplify check for empty slice ([#6293])
@@ -30,8 +24,6 @@
 
 ### Fixed
 
-- ci: fix configured clippy msrv ([#6244])
-- ci: fix new warnings on 1.75.0 ([#6255])
 - task: fix typo ([#6261])
 - chore: typographic improvements ([#6262])
 - tests: fix name of `coop_budget.rs` ([#6234])
@@ -49,9 +41,7 @@
 [#6234]: https://github.com/tokio-rs/tokio/pull/6234
 [#6235]: https://github.com/tokio-rs/tokio/pull/6235
 [#6243]: https://github.com/tokio-rs/tokio/pull/6243
-[#6244]: https://github.com/tokio-rs/tokio/pull/6244
 [#6246]: https://github.com/tokio-rs/tokio/pull/6246
-[#6255]: https://github.com/tokio-rs/tokio/pull/6255
 [#6254]: https://github.com/tokio-rs/tokio/pull/6254
 [#6127]: https://github.com/tokio-rs/tokio/pull/6127
 [#6252]: https://github.com/tokio-rs/tokio/pull/6252
@@ -60,24 +50,18 @@
 [#6238]: https://github.com/tokio-rs/tokio/pull/6238
 [#6205]: https://github.com/tokio-rs/tokio/pull/6205
 [#6262]: https://github.com/tokio-rs/tokio/pull/6262
-[#6270]: https://github.com/tokio-rs/tokio/pull/6270
 [#6269]: https://github.com/tokio-rs/tokio/pull/6269
-[#6272]: https://github.com/tokio-rs/tokio/pull/6272
-[#6274]: https://github.com/tokio-rs/tokio/pull/6274
 [#6265]: https://github.com/tokio-rs/tokio/pull/6265
-[#6273]: https://github.com/tokio-rs/tokio/pull/6273
 [#6279]: https://github.com/tokio-rs/tokio/pull/6279
 [#6152]: https://github.com/tokio-rs/tokio/pull/6152
 [#6280]: https://github.com/tokio-rs/tokio/pull/6280
 [#6276]: https://github.com/tokio-rs/tokio/pull/6276
-[#6283]: https://github.com/tokio-rs/tokio/pull/6283
 [#6294]: https://github.com/tokio-rs/tokio/pull/6294
 [#6293]: https://github.com/tokio-rs/tokio/pull/6293
 [#6290]: https://github.com/tokio-rs/tokio/pull/6290
 [#6303]: https://github.com/tokio-rs/tokio/pull/6303
 [#6298]: https://github.com/tokio-rs/tokio/pull/6298
 [#6304]: https://github.com/tokio-rs/tokio/pull/6304
-[#6297]: https://github.com/tokio-rs/tokio/pull/6297
 
 # 1.35.1 (December 19, 2023)
 

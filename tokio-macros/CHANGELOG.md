@@ -1,11 +1,3 @@
-# 2.3.0 (January 30th, 2024)
-
-### Fixed
-
-- macros: fix trait_method breaking change detection ([#6308])
-
-[#6308]: https://github.com/tokio-rs/tokio/pull/6308
-
 # 2.2.0 (November 19th, 2023)
 
 ### Changed
