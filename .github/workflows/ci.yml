@@ -1012,7 +1012,12 @@ jobs:
           tool: cargo-spellcheck
       - uses: actions/checkout@v4
       - name: Make sure dictionary is sorted and unique
-        run: sort -uC spellcheck.dic
+        run: |
+          # `sed` removes the first line (number of words) and
+          # the last line (new line). `sort` makes sure everything
+          # in between is sorted and contains no duplicates
+
+          sed '1d; $d' spellcheck.dic | sort -uc
       - name: Run cargo-spellcheck
         run: cargo spellcheck --code 1
 
