@@ -59,7 +59,7 @@
 //!     // can be parsed.
 //!     let mut reader = FramedRead::new(message, decoder);
 //!
-//!     // To be able to read values from a FramedRead, you need to bring the
+//!     // To read values from a FramedRead, you need to bring the
 //!     // `StreamExt` trait into scope.
 //!     let frame1 = reader.next().await.unwrap().unwrap();
 //!     let frame2 = reader.next().await.unwrap().unwrap();
