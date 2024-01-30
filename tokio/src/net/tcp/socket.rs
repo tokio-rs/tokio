@@ -185,6 +185,11 @@ impl TcpSocket {
         Ok(TcpSocket { inner })
     }
 
+    /// Enable sending of keep-alive messages on connection-oriented sockets.
+    pub fn set_keepalive(&self, keepalive: bool) -> io::Result<()> {
+        self.inner.set_keepalive(keepalive)
+    }
+
     /// Allows the socket to bind to an in-use address.
     ///
     /// Behavior is platform specific. Refer to the target platform's
