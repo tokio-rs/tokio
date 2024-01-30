@@ -8,10 +8,12 @@
 //! Framed streams are also known as transports.
 //!
 //! # Example encoding using `LinesCodec`
+//!
 //! The following example demonstrates how to use a codec such as [`LinesCodec`] to
 //! write a sink of framed data. [`FramedWrite`] can be used to achieve this. Data sent
 //! to [`FramedWrite`] are first framed according to a specific codec, and then sent to
 //! an implementor of [`AsyncWrite`].
+//!
 //! ```
 //! use futures::sink::SinkExt;
 //! use tokio_util::codec::LinesCodec;
