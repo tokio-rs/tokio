@@ -1011,7 +1011,7 @@ jobs:
         with:
           tool: cargo-spellcheck
       - uses: actions/checkout@v4
-      - name: Make sure dictionary is sorted and unique
+      - name: Make sure dictionary words are sorted and unique
         run: |
           # `sed` removes the first line (number of words) and
           # the last line (new line). 
@@ -1019,7 +1019,7 @@ jobs:
           # `sort` makes sure everything in between is sorted
           # and contains no duplicates.
           # 
-          # Since `sort` is sensitive to locale, we set the it
+          # Since `sort` is sensitive to locale, we set it
           # using LC_ALL to en_US.UTF8 to be consistent in different
           # environments.
 
