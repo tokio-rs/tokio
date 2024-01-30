@@ -185,6 +185,16 @@ impl TcpSocket {
         Ok(TcpSocket { inner })
     }
 
+    /// Sets value for the `SO_KEEPALIVE` option on this socket.
+    pub fn set_keepalive(&self, keepalive: bool) -> io::Result<()> {
+        self.inner.set_keepalive(keepalive)
+    }
+
+    /// Gets the value of the `SO_KEEPALIVE` option on this socket.
+    pub fn keepalive(&self) -> io::Result<bool> {
+        self.inner.keepalive()
+    }
+
     /// Allows the socket to bind to an in-use address.
     ///
     /// Behavior is platform specific. Refer to the target platform's
