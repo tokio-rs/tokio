@@ -1011,6 +1011,8 @@ jobs:
         with:
           tool: cargo-spellcheck
       - uses: actions/checkout@v4
+      - name: Make sure dictionary is sorted and unique
+        run: sort -uC spellcheck.dic
       - name: Run cargo-spellcheck
         run: cargo spellcheck --code 1
 
