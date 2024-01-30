@@ -2,6 +2,7 @@
 
 ### Added
 
+- net: expose keepalive option on `TcpSocket` ([#6311])
 - io: add `tokio::io::Join` ([#6220])
 - io: implement `AsyncWrite` for `Empty` ([#6235])
 - net: add `UnixSocket` ([#6290])
@@ -37,6 +38,7 @@
 - net: document that `*Fd` traits on `TcpSocket` are unix-only ([#6294])
 - sync: document FIFO behavior of `tokio::sync::Mutex` ([#6279])
 
+[#6311]: https://github.com/tokio-rs/tokio/pull/6311
 [#6220]: https://github.com/tokio-rs/tokio/pull/6220
 [#6234]: https://github.com/tokio-rs/tokio/pull/6234
 [#6235]: https://github.com/tokio-rs/tokio/pull/6235
