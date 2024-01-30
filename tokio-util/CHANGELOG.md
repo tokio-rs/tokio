@@ -1,3 +1,11 @@
+# 0.7.11 (January 30th, 2024)
+
+### Added
+
+- util: implement `Sink` for `Either` ([#6239])
+
+[#6239]: https://github.com/tokio-rs/tokio/pull/6239
+
 # 0.7.10 (October 24th, 2023)
 
 ### Added
