@@ -10,8 +10,8 @@
 //! # Example encoding using `LinesCodec`
 //!
 //! The following example demonstrates how to use a codec such as [`LinesCodec`] to
-//! write a sink of framed data. [`FramedWrite`] can be used to achieve this. Data sent
-//! to [`FramedWrite`] are first framed according to a specific codec, and then sent to
+//! write framed data. [`FramedWrite`] can be used to achieve this. Data sent to
+//! [`FramedWrite`] are first framed according to a specific codec, and then sent to
 //! an implementor of [`AsyncWrite`].
 //!
 //! ```
@@ -26,8 +26,7 @@
 //!     let encoder = LinesCodec::new();
 //!
 //!     // FramedWrite is a sink which means you can send values into it
-//!     // asynchronously. Other examples of a sink are channels and socekts.
-//!     // Values sent into a FramedWrite will be framed according to a codec.
+//!     // asynchronously.
 //!     let mut writer = FramedWrite::new(buffer, encoder);
 //!
 //!     // To be able to send values into a FramedWrite, you need to bring the
@@ -46,6 +45,7 @@
 //! read a stream of framed data. [`FramedRead`] can be used to achieve this. [`FramedRead`]
 //! will keep reading from an [`AsyncRead`] implementor until a whole frame, according to a codec,
 //! can be parsed.
+//! 
 //!```
 //! use tokio_stream::StreamExt;
 //! use tokio_util::codec::LinesCodec;
