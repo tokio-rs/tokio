@@ -26,6 +26,7 @@
 
 - chore: typographic improvements ([#6262])
 - runtime: remove obsolete comment ([#6303])
+- task: fix typo ([#6261])
 
 ### Documented
 
@@ -51,6 +52,7 @@
 [#6298]: https://github.com/tokio-rs/tokio/pull/6298
 [#6262]: https://github.com/tokio-rs/tokio/pull/6262
 [#6303]: https://github.com/tokio-rs/tokio/pull/6303
+[#6261]: https://github.com/tokio-rs/tokio/pull/6261
 [#6304]: https://github.com/tokio-rs/tokio/pull/6304
 [#6294]: https://github.com/tokio-rs/tokio/pull/6294
 [#6279]: https://github.com/tokio-rs/tokio/pull/6279
