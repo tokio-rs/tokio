@@ -2,35 +2,31 @@
 
 ### Added
 
-- net: expose keepalive option on `TcpSocket` ([#6311])
 - io: add `tokio::io::Join` ([#6220])
 - io: implement `AsyncWrite` for `Empty` ([#6235])
-- net: add `UnixSocket` ([#6290])
 - net: add support for anonymous unix pipes ([#6127])
-- sync: add `watch::Receiver::mark_unchanged` ([#6252])
+- net: add `UnixSocket` ([#6290])
+- net: expose keepalive option on `TcpSocket` ([#6311])
 - sync: add `{Receiver,UnboundedReceiver}::poll_recv_many` ([#6236])
 - sync: add `Sender::{try_,}reserve_many` ([#6205])
+- sync: add `watch::Receiver::mark_unchanged` ([#6252])
 - task: add `JoinSet::try_join_next` ([#6280])
 - time: add `FutureExt::timeout` ([#6276])
 
 ### Changed
 
-- io: make `repeat` and `sink` cooperative ([#6254])
 - io: make `copy` cooperative ([#6265])
+- io: make `repeat` and `sink` cooperative ([#6254])
 - io: simplify check for empty slice ([#6293])
 - rt: improve robustness of `wake_in_drop_after_panic` test ([#6238])
 - sync: use AtomicBool in broadcast channel future ([#6298])
-- tests: update mio-aio to 0.8 ([#6269])
 - process: use pidfd on Linux when available ([#6152])
 
 ### Fixed
 
-- task: fix typo ([#6261])
 - chore: typographic improvements ([#6262])
 - tests: fix name of `coop_budget.rs` ([#6234])
 - runtime: remove obsolete comment ([#6303])
-- benches: fix benchmarking conflicts ([#6243])
-- benches: fix benchmarking conflicts for real this time ([#6246])
 
 ### Documented
 
@@ -38,32 +34,28 @@
 - net: document that `*Fd` traits on `TcpSocket` are unix-only ([#6294])
 - sync: document FIFO behavior of `tokio::sync::Mutex` ([#6279])
 
-[#6311]: https://github.com/tokio-rs/tokio/pull/6311
 [#6220]: https://github.com/tokio-rs/tokio/pull/6220
-[#6234]: https://github.com/tokio-rs/tokio/pull/6234
 [#6235]: https://github.com/tokio-rs/tokio/pull/6235
-[#6243]: https://github.com/tokio-rs/tokio/pull/6243
-[#6246]: https://github.com/tokio-rs/tokio/pull/6246
-[#6254]: https://github.com/tokio-rs/tokio/pull/6254
 [#6127]: https://github.com/tokio-rs/tokio/pull/6127
-[#6252]: https://github.com/tokio-rs/tokio/pull/6252
+[#6290]: https://github.com/tokio-rs/tokio/pull/6290
+[#6311]: https://github.com/tokio-rs/tokio/pull/6311
 [#6236]: https://github.com/tokio-rs/tokio/pull/6236
-[#6261]: https://github.com/tokio-rs/tokio/pull/6261
-[#6238]: https://github.com/tokio-rs/tokio/pull/6238
 [#6205]: https://github.com/tokio-rs/tokio/pull/6205
-[#6262]: https://github.com/tokio-rs/tokio/pull/6262
-[#6269]: https://github.com/tokio-rs/tokio/pull/6269
-[#6265]: https://github.com/tokio-rs/tokio/pull/6265
-[#6279]: https://github.com/tokio-rs/tokio/pull/6279
-[#6152]: https://github.com/tokio-rs/tokio/pull/6152
+[#6252]: https://github.com/tokio-rs/tokio/pull/6252
 [#6280]: https://github.com/tokio-rs/tokio/pull/6280
 [#6276]: https://github.com/tokio-rs/tokio/pull/6276
-[#6294]: https://github.com/tokio-rs/tokio/pull/6294
+[#6265]: https://github.com/tokio-rs/tokio/pull/6265
+[#6254]: https://github.com/tokio-rs/tokio/pull/6254
 [#6293]: https://github.com/tokio-rs/tokio/pull/6293
-[#6290]: https://github.com/tokio-rs/tokio/pull/6290
-[#6303]: https://github.com/tokio-rs/tokio/pull/6303
+[#6238]: https://github.com/tokio-rs/tokio/pull/6238
 [#6298]: https://github.com/tokio-rs/tokio/pull/6298
+[#6152]: https://github.com/tokio-rs/tokio/pull/6152
+[#6262]: https://github.com/tokio-rs/tokio/pull/6262
+[#6234]: https://github.com/tokio-rs/tokio/pull/6234
+[#6303]: https://github.com/tokio-rs/tokio/pull/6303
 [#6304]: https://github.com/tokio-rs/tokio/pull/6304
+[#6294]: https://github.com/tokio-rs/tokio/pull/6294
+[#6279]: https://github.com/tokio-rs/tokio/pull/6279
 
 # 1.35.1 (December 19, 2023)
 
