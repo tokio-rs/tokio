@@ -268,6 +268,7 @@ fn release_permits_at_drop() {
 
     let sem = Arc::new(Semaphore::new(1));
 
+    #[allow(dead_code)]
     struct ReleaseOnDrop(Option<OwnedSemaphorePermit>);
 
     impl ArcWake for ReleaseOnDrop {

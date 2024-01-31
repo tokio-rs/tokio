@@ -52,6 +52,7 @@ fn notify_waiters_handles_panicking_waker() {
 
     let notify = Arc::new(Notify::new());
 
+    #[allow(dead_code)]
     struct PanickingWaker(Arc<Notify>);
 
     impl ArcWake for PanickingWaker {

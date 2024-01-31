@@ -41,7 +41,7 @@ use tokio::{
 /// unique features is required:
 ///
 ///  1. When tasks exit, a `TaskTracker` will allow the task to immediately free its memory.
-///  2. By not closing the `TaskTracker`, [`wait`] will be prevented from from returning even if
+///  2. By not closing the `TaskTracker`, [`wait`] will be prevented from returning even if
 ///     the `TaskTracker` is empty.
 ///  3. A `TaskTracker` does not require mutable access to insert tasks.
 ///  4. A `TaskTracker` can be cloned to share it with many tasks.
