@@ -1,4 +1,4 @@
-# 1.36.0 (January 30th, 2024)
+# 1.36.0 (February 2nd, 2024)
 
 ### Added
 
