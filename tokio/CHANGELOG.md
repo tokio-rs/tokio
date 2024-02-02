@@ -1,3 +1,62 @@
+# 1.36.0 (February 2nd, 2024)
+
+### Added
+
+- io: add `tokio::io::Join` ([#6220])
+- io: implement `AsyncWrite` for `Empty` ([#6235])
+- net: add support for anonymous unix pipes ([#6127])
+- net: add `UnixSocket` ([#6290])
+- net: expose keepalive option on `TcpSocket` ([#6311])
+- sync: add `{Receiver,UnboundedReceiver}::poll_recv_many` ([#6236])
+- sync: add `Sender::{try_,}reserve_many` ([#6205])
+- sync: add `watch::Receiver::mark_unchanged` ([#6252])
+- task: add `JoinSet::try_join_next` ([#6280])
+- time: add `FutureExt::timeout` ([#6276])
+
+### Changed
+
+- io: make `copy` cooperative ([#6265])
+- io: make `repeat` and `sink` cooperative ([#6254])
+- io: simplify check for empty slice ([#6293])
+- rt: improve robustness of `wake_in_drop_after_panic` test ([#6238])
+- process: use pidfd on Linux when available ([#6152])
+- sync: use AtomicBool in broadcast channel future ([#6298])
+
+### Fixed
+
+- chore: typographic improvements ([#6262])
+- runtime: remove obsolete comment ([#6303])
+- task: fix typo ([#6261])
+
+### Documented
+
+- io: clarify `clear_ready` docs ([#6304])
+- net: document that `*Fd` traits on `TcpSocket` are unix-only ([#6294])
+- sync: document FIFO behavior of `tokio::sync::Mutex` ([#6279])
+
+[#6220]: https://github.com/tokio-rs/tokio/pull/6220
+[#6235]: https://github.com/tokio-rs/tokio/pull/6235
+[#6127]: https://github.com/tokio-rs/tokio/pull/6127
+[#6290]: https://github.com/tokio-rs/tokio/pull/6290
+[#6311]: https://github.com/tokio-rs/tokio/pull/6311
+[#6236]: https://github.com/tokio-rs/tokio/pull/6236
+[#6205]: https://github.com/tokio-rs/tokio/pull/6205
+[#6252]: https://github.com/tokio-rs/tokio/pull/6252
+[#6280]: https://github.com/tokio-rs/tokio/pull/6280
+[#6276]: https://github.com/tokio-rs/tokio/pull/6276
+[#6265]: https://github.com/tokio-rs/tokio/pull/6265
+[#6254]: https://github.com/tokio-rs/tokio/pull/6254
+[#6293]: https://github.com/tokio-rs/tokio/pull/6293
+[#6238]: https://github.com/tokio-rs/tokio/pull/6238
+[#6152]: https://github.com/tokio-rs/tokio/pull/6152
+[#6298]: https://github.com/tokio-rs/tokio/pull/6298
+[#6262]: https://github.com/tokio-rs/tokio/pull/6262
+[#6303]: https://github.com/tokio-rs/tokio/pull/6303
+[#6261]: https://github.com/tokio-rs/tokio/pull/6261
+[#6304]: https://github.com/tokio-rs/tokio/pull/6304
+[#6294]: https://github.com/tokio-rs/tokio/pull/6294
+[#6279]: https://github.com/tokio-rs/tokio/pull/6279
+
 # 1.35.1 (December 19, 2023)
 
 This is a forward part of a change that was backported to 1.25.3.
