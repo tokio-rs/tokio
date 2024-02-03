@@ -526,6 +526,49 @@ impl<T> Default for JoinSet<T> {
     }
 }
 
+/// Collect an iterator of futures into a [`JoinSet`].
+///
+/// This is equivalent to calling [`JoinSet::spawn`] on each element of the iterator.
+///
+/// # Examples
+///
+/// The main example from [`JoinSet`]'s documentation can also be written using [`collect`]:
+///
+/// ```
+/// use tokio::task::JoinSet;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut set: JoinSet<_> = (0..10).map(|i| async move { i }).collect();
+///
+///     let mut seen = [false; 10];
+///     while let Some(res) = set.join_next().await {
+///         let idx = res.unwrap();
+///         seen[idx] = true;
+///     }
+///
+///     for i in 0..10 {
+///         assert!(seen[i]);
+///     }
+/// }
+/// ```
+///
+/// [`collect`]: std::iter::Iterator::collect
+impl<T, F> std::iter::FromIterator<F> for JoinSet<T>
+where
+    F: Future<Output = T>,
+    F: Send + 'static,
+    T: Send + 'static,
+{
+    fn from_iter<I: IntoIterator<Item = F>>(iter: I) -> Self {
+        let mut set = Self::new();
+        iter.into_iter().for_each(|task| {
+            set.spawn(task);
+        });
+        set
+    }
+}
+
 // === impl Builder ===
 
 #[cfg(all(tokio_unstable, feature = "tracing"))]
