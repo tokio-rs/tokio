@@ -11,28 +11,23 @@
 - sync: add `Sender::{try_,}reserve_many` ([#6205])
 - sync: add `watch::Receiver::mark_unchanged` ([#6252])
 - task: add `JoinSet::try_join_next` ([#6280])
-- time: add `FutureExt::timeout` ([#6276])
 
 ### Changed
 
 - io: make `copy` cooperative ([#6265])
 - io: make `repeat` and `sink` cooperative ([#6254])
 - io: simplify check for empty slice ([#6293])
-- rt: improve robustness of `wake_in_drop_after_panic` test ([#6238])
 - process: use pidfd on Linux when available ([#6152])
 - sync: use AtomicBool in broadcast channel future ([#6298])
-
-### Fixed
-
-- chore: typographic improvements ([#6262])
-- runtime: remove obsolete comment ([#6303])
-- task: fix typo ([#6261])
 
 ### Documented
 
 - io: clarify `clear_ready` docs ([#6304])
 - net: document that `*Fd` traits on `TcpSocket` are unix-only ([#6294])
 - sync: document FIFO behavior of `tokio::sync::Mutex` ([#6279])
+- chore: typographic improvements ([#6262])
+- runtime: remove obsolete comment ([#6303])
+- task: fix typo ([#6261])
 
 [#6220]: https://github.com/tokio-rs/tokio/pull/6220
 [#6235]: https://github.com/tokio-rs/tokio/pull/6235
@@ -43,7 +38,6 @@
 [#6205]: https://github.com/tokio-rs/tokio/pull/6205
 [#6252]: https://github.com/tokio-rs/tokio/pull/6252
 [#6280]: https://github.com/tokio-rs/tokio/pull/6280
-[#6276]: https://github.com/tokio-rs/tokio/pull/6276
 [#6265]: https://github.com/tokio-rs/tokio/pull/6265
 [#6254]: https://github.com/tokio-rs/tokio/pull/6254
 [#6293]: https://github.com/tokio-rs/tokio/pull/6293
