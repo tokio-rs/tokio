@@ -1367,6 +1367,7 @@ impl<T> Sender<T> {
     /// towards RAII semantics, i.e. if all `Sender` instances of the
     /// channel were dropped and only `WeakSender` instances remain,
     /// the channel is closed.
+    #[must_use = "Downgrade creates a WeakSender without destroying the original non-weak sender."]
     pub fn downgrade(&self) -> WeakSender<T> {
         WeakSender {
             chan: self.chan.downgrade(),
