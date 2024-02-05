@@ -42,7 +42,7 @@ impl Handle {
         // was created with.
         let traces = unsafe { trace_multi_thread(owned, &mut local, synced, injection) }
             .into_iter()
-            .map(dump::Task::new)
+            .map(|(id, trace)| dump::Task::new(id, trace))
             .collect();
 
         let result = dump::Dump::new(traces);
