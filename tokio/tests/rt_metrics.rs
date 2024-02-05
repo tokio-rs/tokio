@@ -181,7 +181,7 @@ fn worker_steal_count() {
     // We use a blocking channel to backup one worker thread.
     use std::sync::mpsc::channel;
 
-    let rt = threaded();
+    let rt = threaded_no_lifo();
     let metrics = rt.metrics();
 
     rt.block_on(async {
@@ -190,13 +190,11 @@ fn worker_steal_count() {
         // Move to the runtime.
         tokio::spawn(async move {
             // Spawn the task that sends to the channel
+            //
+            // Since the lifo slot is disabled, this task is stealable.
             tokio::spawn(async move {
                 tx.send(()).unwrap();
             });
-
-            // Spawn a task that bumps the previous task out of the "next
-            // scheduled" slot.
-            tokio::spawn(async {});
 
             // Blocking receive on the channel.
             rx.recv().unwrap();
@@ -724,6 +722,15 @@ fn current_thread() -> Runtime {
 fn threaded() -> Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap()
+}
+
+fn threaded_no_lifo() -> Runtime {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .disable_lifo_slot()
         .enable_all()
         .build()
         .unwrap()
