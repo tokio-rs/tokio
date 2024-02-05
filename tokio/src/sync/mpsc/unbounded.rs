@@ -572,6 +572,7 @@ impl<T> UnboundedSender<T> {
     /// towards RAII semantics, i.e. if all `UnboundedSender` instances of the
     /// channel were dropped and only `WeakUnboundedSender` instances remain,
     /// the channel is closed.
+    #[must_use = "Downgrade creates a WeakSender without destroying the original non-weak sender."]
     pub fn downgrade(&self) -> WeakUnboundedSender<T> {
         WeakUnboundedSender {
             chan: self.chan.downgrade(),
