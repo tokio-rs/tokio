@@ -2,6 +2,7 @@
 //!
 //! See [Handle::dump][crate::runtime::Handle::dump].
 
+use crate::task::Id;
 use std::fmt;
 
 /// A snapshot of a runtime's state.
@@ -25,6 +26,7 @@ pub struct Tasks {
 /// See [Handle::dump][crate::runtime::Handle::dump].
 #[derive(Debug)]
 pub struct Task {
+    id: Id,
     trace: Trace,
 }
 
@@ -57,10 +59,26 @@ impl Tasks {
 }
 
 impl Task {
-    pub(crate) fn new(trace: super::task::trace::Trace) -> Self {
+    pub(crate) fn new(id: Id, trace: super::task::trace::Trace) -> Self {
         Self {
+            id,
             trace: Trace { inner: trace },
         }
+    }
+
+    /// Returns a [task ID] that uniquely identifies this task relative to other
+    /// tasks spawned at the time of the dump.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
+    ///
+    /// [task ID]: crate::task::Id
+    /// [unstable]: crate#unstable-features
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn id(&self) -> Id {
+        self.id
     }
 
     /// A trace of this task's state.

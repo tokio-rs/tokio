@@ -376,6 +376,17 @@ impl<S: 'static> Task<S> {
                 None
             }
         }
+
+        /// Returns a [task ID] that uniquely identifies this task relative to other
+        /// currently spawned tasks.
+        ///
+        /// [task ID]: crate::task::Id
+        #[cfg(tokio_unstable)]
+        #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+        pub(crate) fn id(&self) -> crate::task::Id {
+            // Safety: The header pointer is valid.
+            unsafe { Header::get_id(self.raw.header_ptr()) }
+        }
     }
 }
 

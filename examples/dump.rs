@@ -47,9 +47,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // capture a dump, and print each trace
             println!("{:-<80}", "");
             if let Ok(dump) = timeout(Duration::from_secs(2), handle.dump()).await {
-                for (i, task) in dump.tasks().iter().enumerate() {
+                for task in dump.tasks().iter() {
+                    let id = task.id();
                     let trace = task.trace();
-                    println!("TASK {i}:");
+                    println!("TASK {id}:");
                     println!("{trace}\n");
                 }
             } else {
