@@ -263,6 +263,22 @@ impl Buf {
         self.buf.clear();
         res
     }
+
+    pub(crate) fn write_to_partial<T: Write>(&mut self, wr: &mut T) -> io::Result<()> {
+        if self.is_empty() {
+            return Ok(());
+        }
+
+        let res = uninterruptibly!(wr.write(self.bytes()));
+
+        match res {
+            Ok(n) => {
+                self.pos += n;
+                Ok(())
+            }
+            Err(err) => Err(err),
+        }
+    }
 }
 
 cfg_fs! {
