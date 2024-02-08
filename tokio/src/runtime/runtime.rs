@@ -430,7 +430,7 @@ impl Runtime {
     ///
     /// Note however, that because we do not wait for any blocking tasks to complete, this
     /// may result in a resource leak (in that any blocking tasks are still running until they
-    /// return.
+    /// return).
     ///
     /// See the [struct level documentation](Runtime#shutdown) for more details.
     ///

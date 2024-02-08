@@ -4,6 +4,7 @@ use criterion::measurement::WallTime;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkGroup, Criterion};
 
 #[derive(Debug, Copy, Clone)]
+#[allow(dead_code)]
 struct Medium([usize; 64]);
 impl Default for Medium {
     fn default() -> Self {
@@ -12,6 +13,7 @@ impl Default for Medium {
 }
 
 #[derive(Debug, Copy, Clone)]
+#[allow(dead_code)]
 struct Large([Medium; 64]);
 impl Default for Large {
     fn default() -> Self {

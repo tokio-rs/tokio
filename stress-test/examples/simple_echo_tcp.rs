@@ -42,7 +42,7 @@ fn main() {
                 .write_all(one_mega_random_bytes.as_slice())
                 .await
                 .unwrap();
-            stream.read(&mut buff).await.unwrap();
+            let _ = stream.read(&mut buff).await.unwrap();
         }
         tx.send(()).unwrap();
     });

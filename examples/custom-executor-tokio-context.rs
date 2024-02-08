@@ -23,7 +23,7 @@ fn main() {
 
     // Without the `HandleExt.wrap()` there would be a panic because there is
     // no timer running, since it would be referencing runtime r1.
-    let _ = rt1.block_on(rt2.wrap(async move {
+    rt1.block_on(rt2.wrap(async move {
         let listener = TcpListener::bind("0.0.0.0:0").await.unwrap();
         println!("addr: {:?}", listener.local_addr());
         tx.send(()).unwrap();

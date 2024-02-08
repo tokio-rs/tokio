@@ -38,7 +38,7 @@ fn rt_multi_spawn_many_local(c: &mut Criterion) {
                     });
                 }
 
-                let _ = rx.recv().unwrap();
+                rx.recv().unwrap();
             });
         })
     });
@@ -165,7 +165,7 @@ fn rt_multi_yield_many(c: &mut Criterion) {
             }
 
             for _ in 0..TASKS {
-                let _ = rx.recv().unwrap();
+                rx.recv().unwrap();
             }
         })
     });
