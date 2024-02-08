@@ -481,6 +481,14 @@ impl Semaphore {
         self.ll_sem.release(n);
     }
 
+    /// Decrease a semaphore's permits by a maximum of `n`.
+    ///
+    /// If there are insufficient permits and it's not possible to reduce by `n`,
+    /// return the number of permits that were actually reduced.
+    pub fn forget_permits(&self, n: usize) -> usize {
+        self.ll_sem.forget_permits(n)
+    }
+
     /// Acquires a permit from the semaphore.
     ///
     /// If the semaphore has been closed, this returns an [`AcquireError`].

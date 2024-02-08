@@ -213,3 +213,31 @@ fn release_during_acquire() {
         assert_eq!(10, semaphore.available_permits());
     })
 }
+
+#[test]
+fn concurrent_permit_updates() {
+    loom::model(move || {
+        let semaphore = Arc::new(Semaphore::new(5));
+        let t1 = {
+            let semaphore = semaphore.clone();
+            thread::spawn(move || semaphore.release(3))
+        };
+        let t2 = {
+            let semaphore = semaphore.clone();
+            thread::spawn(move || {
+                semaphore
+                    .try_acquire(1)
+                    .expect("try_acquire should succeed")
+            })
+        };
+        let t3 = {
+            let semaphore = semaphore.clone();
+            thread::spawn(move || semaphore.forget_permits(2))
+        };
+
+        t1.join().unwrap();
+        t2.join().unwrap();
+        t3.join().unwrap();
+        assert_eq!(semaphore.available_permits(), 5);
+    })
+}

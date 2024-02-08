@@ -368,6 +368,31 @@ impl Semaphore {
         assert_eq!(rem, 0);
     }
 
+    /// Decrease a semaphore's permits by a maximum of `n`.
+    ///
+    /// If there are insufficient permits and it's not possible to reduce by `n`,
+    /// return the number of permits that were actually reduced.
+    pub(crate) fn forget_permits(&self, n: usize) -> usize {
+        if n == 0 {
+            return 0;
+        }
+
+        let mut curr_bits = self.permits.load(Acquire);
+        loop {
+            let curr = curr_bits >> Self::PERMIT_SHIFT;
+            let new = curr.saturating_sub(n);
+            match self.permits.compare_exchange_weak(
+                curr_bits,
+                new << Self::PERMIT_SHIFT,
+                AcqRel,
+                Acquire,
+            ) {
+                Ok(_) => return std::cmp::min(curr, n),
+                Err(actual) => curr_bits = actual,
+            };
+        }
+    }
+
     fn poll_acquire(
         &self,
         cx: &mut Context<'_>,
