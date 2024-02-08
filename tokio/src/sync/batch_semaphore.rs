@@ -372,7 +372,7 @@ impl Semaphore {
     ///
     /// If there are insufficient permits and it's not possible to reduce by n,
     /// return the number of permits that were actually reduced.
-    pub(crate) fn decrease_permits(&self, n: usize) -> usize {
+    pub(crate) fn forget_permits(&self, n: usize) -> usize {
         if n == 0 {
             return 0;
         }

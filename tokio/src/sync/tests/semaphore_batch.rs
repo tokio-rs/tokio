@@ -289,11 +289,11 @@ fn release_permits_at_drop() {
 }
 
 #[test]
-fn decrease_permits_basic() {
+fn forget_permits_basic() {
     let s = Semaphore::new(10);
-    assert_eq!(s.decrease_permits(4), 4);
+    assert_eq!(s.forget_permits(4), 4);
     assert_eq!(s.available_permits(), 6);
-    assert_eq!(s.decrease_permits(10), 6);
+    assert_eq!(s.forget_permits(10), 6);
     assert_eq!(s.available_permits(), 0);
 }
 
@@ -305,6 +305,6 @@ fn update_permits_many_times() {
     s.release(5);
     assert_ready_ok!(acquire.poll());
     assert_eq!(s.available_permits(), 3);
-    assert_eq!(s.decrease_permits(3), 3);
+    assert_eq!(s.forget_permits(3), 3);
     assert_eq!(s.available_permits(), 0);
 }

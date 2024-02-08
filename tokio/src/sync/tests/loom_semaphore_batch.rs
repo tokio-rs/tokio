@@ -232,7 +232,7 @@ fn concurrent_permit_updates() {
         };
         let t3 = {
             let semaphore = semaphore.clone();
-            thread::spawn(move || semaphore.decrease_permits(2))
+            thread::spawn(move || semaphore.forget_permits(2))
         };
 
         t1.join().unwrap();

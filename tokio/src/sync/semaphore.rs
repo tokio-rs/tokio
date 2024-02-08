@@ -485,8 +485,8 @@ impl Semaphore {
     ///
     /// If there are insufficient permits and it's not possible to reduce by n,
     /// return the number of permits that were actually reduced.
-    pub fn decrease_permits(&self, n: usize) -> usize {
-        self.ll_sem.decrease_permits(n)
+    pub fn forget_permits(&self, n: usize) -> usize {
+        self.ll_sem.forget_permits(n)
     }
 
     /// Acquires a permit from the semaphore.
