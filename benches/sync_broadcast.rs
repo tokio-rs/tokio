@@ -37,7 +37,7 @@ fn contention_impl<const N_TASKS: usize>(g: &mut BenchmarkGroup<WallTime>) {
         let mut rx = tx.subscribe();
         let mut rng = rand::rngs::StdRng::seed_from_u64(n as u64);
         rt.spawn(async move {
-            while let Ok(_) = rx.recv().await {
+            while (rx.recv().await).is_ok() {
                 let r = do_work(&mut rng);
                 let _ = black_box(r);
                 if wg.0.fetch_sub(1, Ordering::Relaxed) == 1 {

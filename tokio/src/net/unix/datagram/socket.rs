@@ -1161,6 +1161,7 @@ impl UnixDatagram {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<SocketAddr>> {
+        #[allow(clippy::blocks_in_conditions)]
         let (n, addr) = ready!(self.io.registration().poll_read_io(cx, || {
             // Safety: will not read the maybe uninitialized bytes.
             let b = unsafe {
@@ -1262,6 +1263,7 @@ impl UnixDatagram {
     ///
     /// [`connect`]: method@Self::connect
     pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+        #[allow(clippy::blocks_in_conditions)]
         let n = ready!(self.io.registration().poll_read_io(cx, || {
             // Safety: will not read the maybe uninitialized bytes.
             let b = unsafe {
