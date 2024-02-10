@@ -149,7 +149,7 @@ When updating this, also update:
 -->
 
 ```
-cargo +1.75 clippy --all --tests --all-features
+cargo +1.76 clippy --all --tests --all-features
 ```
 
 When building documentation normally, the markers that list the features
