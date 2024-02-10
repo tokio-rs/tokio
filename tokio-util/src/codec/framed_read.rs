@@ -14,8 +14,12 @@ use std::task::{Context, Poll};
 pin_project! {
     /// A [`Stream`] of messages decoded from an [`AsyncRead`].
     ///
+    /// For examples of how to use `FramedRead` with a codec, see the
+    /// examples on the [`codec`] module.
+    ///
     /// [`Stream`]: futures_core::Stream
     /// [`AsyncRead`]: tokio::io::AsyncRead
+    /// [`codec`]: crate::codec
     pub struct FramedRead<T, D> {
         #[pin]
         inner: FramedImpl<T, D, ReadFrame>,

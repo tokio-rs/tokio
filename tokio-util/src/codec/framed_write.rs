@@ -15,7 +15,11 @@ use std::task::{Context, Poll};
 pin_project! {
     /// A [`Sink`] of frames encoded to an `AsyncWrite`.
     ///
+    /// For examples of how to use `FramedWrite` with a codec, see the
+    /// examples on the [`codec`] module.
+    ///
     /// [`Sink`]: futures_sink::Sink
+    /// [`codec`]: crate::codec
     pub struct FramedWrite<T, E> {
         #[pin]
         inner: FramedImpl<T, E, WriteFrame>,
