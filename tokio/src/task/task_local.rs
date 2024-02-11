@@ -332,6 +332,76 @@ pin_project! {
     }
 }
 
+impl<T, F> TaskLocalFuture<T, F>
+where
+    T: 'static,
+{
+    /// Takes the task local value `T` owned by the `TaskLocalFuture`. If the
+    /// task local value exists, then returns `Some(T)` and the task local value
+    /// inside the `TaskLocalFuture` becomes unset. If it does not exist,
+    /// it returns `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # async fn dox() {
+    ///  tokio::task_local! {
+    ///     static KEY: u32;
+    ///  }
+    ///
+    ///  let fut = KEY.scope(42, async {
+    ///     // Do some async work
+    ///  });
+    ///
+    ///  let mut pinned = Box::pin(fut);
+    ///
+    ///  // Complete the TaskLocalFuture
+    ///  let _ = (&mut pinned).as_mut().await;
+    ///
+    ///  // And here, we can take task local value
+    ///  let value = pinned.as_mut().take_value();
+    ///
+    ///  assert_eq!(value, Some(42));
+    /// # }
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// Note that this function attempts to take the task local value regardless of
+    /// whether the `TaskLocalFuture` is completed or not. This means that if you
+    /// call this function before the `TaskLocalFuture` is completed, you need to
+    /// make sure that the access to the task local value in the `TaskLocalFuture` is safe.
+    ///
+    /// For example, the following code returns `Err` for accessing the `KEY` variable
+    /// in the async block of the `scope` function.
+    ///
+    /// ```
+    /// # async fn dox() {
+    /// tokio::task_local! {
+    ///    static KEY: u32;
+    /// }
+    ///
+    /// let fut = KEY.scope(42, async {
+    ///    // Since `take_value()` has already been called at this point,
+    ///    // `try_with` here will fail.
+    ///    assert!(KEY.try_with(|_| {}).is_err())
+    /// });
+    ///
+    /// let mut pinned = Box::pin(fut);
+    ///
+    /// // With this call, the task local value of fut is unset.
+    /// assert_eq!(pinned.as_mut().take_value(), Some(42));
+    ///
+    /// // Poll **after** invoking `take_value()`
+    /// let _ = (&mut pinned).as_mut().await;
+    /// # }
+    /// ```
+    pub fn take_value(self: Pin<&mut Self>) -> Option<T> {
+        let this = self.project();
+        this.slot.take()
+    }
+}
+
 impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
     type Output = F::Output;
 
