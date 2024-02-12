@@ -88,3 +88,23 @@ fn wait_for_returns_correct_value() {
         jh.join().unwrap();
     });
 }
+
+#[test]
+fn multiple_sender_drop_concurrently() {
+    loom::model(move || {
+        let (tx1, rx) = watch::channel(0);
+        let tx2 = tx1.clone();
+
+        let jh = thread::spawn(move || {
+            drop(tx2);
+        });
+        assert!(rx.has_changed().is_ok());
+
+        drop(tx1);
+
+        jh.join().unwrap();
+
+        // Check if all sender are dropped and closed flag is set.
+        assert!(rx.has_changed().is_err());
+    });
+}

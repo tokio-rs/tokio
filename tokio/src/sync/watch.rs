@@ -114,7 +114,7 @@
 use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::atomic::Ordering::Relaxed;
+use crate::loom::sync::atomic::Ordering::{AcqRel, Relaxed};
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 use std::mem;
@@ -144,6 +144,16 @@ pub struct Receiver<T> {
 #[derive(Debug)]
 pub struct Sender<T> {
     shared: Arc<Shared<T>>,
+}
+
+impl<T> Clone for Sender<T> {
+    fn clone(&self) -> Self {
+        self.shared.ref_count_tx.fetch_add(1, AcqRel);
+
+        Self {
+            shared: self.shared.clone(),
+        }
+    }
 }
 
 /// Returns a reference to the inner value.
@@ -237,6 +247,9 @@ struct Shared<T> {
 
     /// Tracks the number of `Receiver` instances.
     ref_count_rx: AtomicUsize,
+
+    /// Tracks the number of `Sender` instances.
+    ref_count_tx: AtomicUsize,
 
     /// Notifies waiting receivers that the value changed.
     notify_rx: big_notify::BigNotify,
@@ -354,12 +367,12 @@ mod big_notify {
     }
 }
 
-use self::state::{AtomicState, Version};
+use self::state::{AtomicState, Version, CLOSED_BIT};
 mod state {
     use crate::loom::sync::atomic::AtomicUsize;
     use crate::loom::sync::atomic::Ordering;
 
-    const CLOSED_BIT: usize = 1;
+    pub(super) const CLOSED_BIT: usize = 1;
 
     // Using 2 as the step size preserves the `CLOSED_BIT`.
     const STEP_SIZE: usize = 2;
@@ -374,7 +387,7 @@ mod state {
     /// The CLOSED bit tracks whether the Sender has been dropped. Dropping all
     /// receivers does not set it.
     #[derive(Copy, Clone, Debug)]
-    pub(super) struct StateSnapshot(usize);
+    pub(super) struct StateSnapshot(pub(super) usize);
 
     /// The state stored in an atomic integer.
     ///
@@ -383,7 +396,7 @@ mod state {
     /// current state. This ensures that written values are seen by
     /// the `Receiver`s for a proper handover.
     #[derive(Debug)]
-    pub(super) struct AtomicState(AtomicUsize);
+    pub(super) struct AtomicState(pub(super) AtomicUsize);
 
     impl Version {
         /// Decrements the version.
@@ -436,11 +449,6 @@ mod state {
             // method.
             self.0.fetch_add(STEP_SIZE, Ordering::Release);
         }
-
-        /// Set the closed bit in the state.
-        pub(super) fn set_closed(&self) {
-            self.0.fetch_or(CLOSED_BIT, Ordering::Release);
-        }
     }
 }
 
@@ -485,6 +493,7 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
         value: RwLock::new(init),
         state: AtomicState::new(),
         ref_count_rx: AtomicUsize::new(1),
+        ref_count_tx: AtomicUsize::new(1),
         notify_rx: big_notify::BigNotify::new(),
         notify_tx: Notify::new(),
     });
@@ -1302,8 +1311,34 @@ impl<T> Sender<T> {
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        self.shared.state.set_closed();
-        self.shared.notify_rx.notify_waiters();
+        if self.shared.ref_count_tx.fetch_sub(1, AcqRel) == 1 {
+            // Now that the sender's ref count is zero, so we attempt to close the sender.
+
+            // Fetch the latest state.
+            let current_state = self.shared.state.load();
+            let currrent_ref_count = current_state.0;
+
+            // We try to update the state with compare_exchange.
+            //
+            // If another task closes the sender or clones the sender again while loading
+            // the latest state, the `compare_exchange` here will fail. In that case,
+            // we do nothing in this sender's drop.
+            if self
+                .shared
+                .state
+                .0
+                .compare_exchange(
+                    currrent_ref_count,
+                    currrent_ref_count | CLOSED_BIT,
+                    AcqRel,
+                    Relaxed,
+                )
+                .is_ok()
+            {
+                // Only when last sender is dropped, we notify the receivers.
+                self.shared.notify_rx.notify_waiters();
+            }
+        }
     }
 }
 
