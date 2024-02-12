@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex};
 use std::task::Poll;
 use tokio::macros::support::poll_fn;
 
-use tokio::runtime::CounterPair;
 use tokio::runtime::Runtime;
 use tokio::task::consume_budget;
 use tokio::time::{self, Duration};
@@ -102,29 +101,29 @@ fn active_tasks_count() {
 }
 
 #[test]
-fn active_tasks_count_pairs() {
+fn spawned_tasks_count() {
     let rt = current_thread();
     let metrics = rt.metrics();
-    assert_eq!(CounterPair { inc: 0, dec: 0 }, metrics.task_counts());
+    assert_eq!(0, metrics.spawned_tasks_count());
 
     rt.block_on(rt.spawn(async move {
-        assert_eq!(CounterPair { inc: 1, dec: 0 }, metrics.task_counts());
+        assert_eq!(1, metrics.spawned_tasks_count());
     }))
     .unwrap();
 
-    assert_eq!(CounterPair { inc: 1, dec: 1 }, rt.metrics().task_counts());
+    assert_eq!(1, rt.metrics().spawned_tasks_count());
 
     let rt = threaded();
     let metrics = rt.metrics();
-    assert_eq!(CounterPair { inc: 0, dec: 0 }, metrics.task_counts());
+    assert_eq!(0, metrics.spawned_tasks_count());
 
     rt.block_on(rt.spawn(async move {
-        assert_eq!(CounterPair { inc: 1, dec: 0 }, metrics.task_counts());
+        assert_eq!(1, metrics.spawned_tasks_count());
     }))
     .unwrap();
 
     for _ in 0..100 {
-        if rt.metrics().task_counts() == (CounterPair { inc: 1, dec: 1 }) {
+        if rt.metrics().spawned_tasks_count() == 1 {
             return;
         }
         // on single threaded machines (like in CI), we need to force the OS to run the runtime threads

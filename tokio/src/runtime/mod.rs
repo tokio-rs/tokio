@@ -391,7 +391,6 @@ cfg_rt! {
     cfg_metrics! {
         mod metrics;
         pub use metrics::{RuntimeMetrics, HistogramScale};
-        pub use crate::runtime::counter_pair::CounterPair;
 
         pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics, HistogramBuilder};
 
@@ -407,20 +406,4 @@ cfg_rt! {
 
     /// After thread starts / before thread stops
     type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
-}
-
-pub(crate) mod counter_pair {
-    /// A gauge represented as two counters.
-    ///
-    /// Instead of decrementing a gauge, we increment a decrements counter.
-    /// This is beneficial as it allows you to observe activity spikes that occur
-    /// inbetween a scrape interval
-    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-    #[allow(unreachable_pub)] // rust-lang/rust#57411
-    pub struct CounterPair {
-        /// Tracks how many times this gauge was incremented
-        pub inc: u64,
-        /// Tracks how many times this gauge was decremeneted
-        pub dec: u64,
-    }
 }
