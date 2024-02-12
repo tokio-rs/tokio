@@ -99,12 +99,12 @@ impl RuntimeMetrics {
     /// async fn main() {
     ///    let metrics = Handle::current().metrics();
     ///
-    ///     let n = metrics.start_tasks_count();
+    ///     let n = metrics.spawned_tasks_count();
     ///     println!("Runtime has had {} tasks spawned", n);
     /// }
     /// ```
     pub fn spawned_tasks_count(&self) -> u64 {
-        self.handle.inner.start_tasks_count()
+        self.handle.inner.spawned_tasks_count()
     }
 
     /// Returns the number of idle threads, which have spawned by the runtime

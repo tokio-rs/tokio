@@ -170,7 +170,7 @@ impl<S: 'static> OwnedTasks<S> {
         self.list.len()
     }
 
-    pub(crate) fn start_tasks_count(&self) -> u64 {
+    pub(crate) fn spawned_tasks_count(&self) -> u64 {
         self.list.added()
     }
 

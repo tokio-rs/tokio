@@ -537,8 +537,8 @@ cfg_metrics! {
             self.shared.owned.active_tasks_count()
         }
 
-        pub(crate) fn start_tasks_count(&self) -> u64 {
-            self.shared.owned.start_tasks_count()
+        pub(crate) fn spawned_tasks_count(&self) -> u64 {
+            self.shared.owned.spawned_tasks_count()
         }
     }
 }
