@@ -1,6 +1,7 @@
+use std::ptr::NonNull;
 use std::sync::atomic::Ordering;
-use std::{ptr::NonNull, sync::atomic::AtomicU64};
 
+use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::{Mutex, MutexGuard};
 use std::sync::atomic::AtomicUsize;
 
