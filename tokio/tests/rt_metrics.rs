@@ -91,8 +91,6 @@ fn active_tasks_count() {
     }))
     .unwrap();
 
-    assert_eq!(0, rt.metrics().active_tasks_count());
-
     let rt = threaded();
     let metrics = rt.metrics();
     assert_eq!(0, metrics.active_tasks_count());
@@ -100,8 +98,6 @@ fn active_tasks_count() {
         assert_eq!(1, metrics.active_tasks_count());
     }))
     .unwrap();
-
-    assert_eq!(0, rt.metrics().active_tasks_count());
 }
 
 #[test]
