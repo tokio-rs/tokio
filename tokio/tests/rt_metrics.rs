@@ -91,6 +91,8 @@ fn active_tasks_count() {
     }))
     .unwrap();
 
+    assert_eq!(0, rt.metrics().active_tasks_count());
+
     let rt = threaded();
     let metrics = rt.metrics();
     assert_eq!(0, metrics.active_tasks_count());
@@ -98,6 +100,8 @@ fn active_tasks_count() {
         assert_eq!(1, metrics.active_tasks_count());
     }))
     .unwrap();
+
+    assert_eq!(0, rt.metrics().active_tasks_count());
 }
 
 #[test]
@@ -122,14 +126,7 @@ fn spawned_tasks_count() {
     }))
     .unwrap();
 
-    for _ in 0..100 {
-        if rt.metrics().spawned_tasks_count() == 1 {
-            return;
-        }
-        // on single threaded machines (like in CI), we need to force the OS to run the runtime threads
-        std::thread::sleep(std::time::Duration::from_millis(1));
-    }
-    panic!("runtime didn't decrement active task gauge")
+    assert_eq!(1, rt.metrics().spawned_tasks_count());
 }
 
 #[test]
