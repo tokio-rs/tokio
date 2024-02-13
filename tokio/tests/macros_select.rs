@@ -23,6 +23,25 @@ async fn sync_one_lit_expr_comma() {
 }
 
 #[maybe_tokio_test]
+async fn no_branch_else_only() {
+    let foo = tokio::select! {
+        else => 1,
+    };
+
+    assert_eq!(foo, 1);
+}
+
+#[maybe_tokio_test]
+async fn no_branch_else_only_biased() {
+    let foo = tokio::select! {
+        biased;
+        else => 1,
+    };
+
+    assert_eq!(foo, 1);
+}
+
+#[maybe_tokio_test]
 async fn nested_one() {
     let foo = tokio::select! {
         foo = async { 1 } => tokio::select! {
