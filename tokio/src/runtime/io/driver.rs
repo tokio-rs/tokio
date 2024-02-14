@@ -223,7 +223,7 @@ impl Handle {
         // we should remove the `scheduled_io` from the `registrations` set if registering
         // the `source` with the OS fails. Otherwise it will leak the `scheduled_io`.
         if let Err(e) = self.registry.register(source, token, interest.to_mio()) {
-            // safety: `scheduled_io` is part of the `registartions` set.
+            // safety: `scheduled_io` is part of the `registrations` set.
             unsafe {
                 self.registrations
                     .remove(&mut self.synced.lock(), &scheduled_io)
