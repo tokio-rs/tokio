@@ -3,6 +3,8 @@ use crate::runtime::io::{ReadyEvent, Registration};
 use crate::runtime::scheduler;
 
 use mio::unix::SourceFd;
+use std::error::Error;
+use std::fmt;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{task::Context, task::Poll};
@@ -249,15 +251,69 @@ impl<T: AsRawFd> AsyncFd<T> {
         handle: scheduler::Handle,
         interest: Interest,
     ) -> io::Result<Self> {
+        Self::try_new_with_handle_and_interest(inner, handle, interest).map_err(Into::into)
+    }
+
+    /// Creates an [`AsyncFd`] backed by (and taking ownership of) an object
+    /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
+    /// time of creation.
+    ///
+    /// Only configures the [`Interest::READABLE`] and [`Interest::WRITABLE`] interests. For more
+    /// control, use [`AsyncFd::with_interest`].
+    ///
+    /// This method must be called in the context of a tokio runtime.
+    ///
+    /// In the case of failure, it returns [`AsyncFdError`] that contains the original object
+    /// passed to this function.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if there is no current reactor set, or if the `rt`
+    /// feature flag is not enabled.
+    #[inline]
+    #[track_caller]
+    pub fn try_new(inner: T) -> Result<Self, AsyncFdError<T>>
+    where
+        T: AsRawFd,
+    {
+        Self::try_with_interest(inner, Interest::READABLE | Interest::WRITABLE)
+    }
+
+    /// Creates an [`AsyncFd`] backed by (and taking ownership of) an object
+    /// implementing [`AsRawFd`], with a specific [`Interest`]. The backing
+    /// file descriptor is cached at the time of creation.
+    ///
+    /// In the case of failure, it returns [`AsyncFdError`] that contains the original object
+    /// passed to this function.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if there is no current reactor set, or if the `rt`
+    /// feature flag is not enabled.
+    #[inline]
+    #[track_caller]
+    pub fn try_with_interest(inner: T, interest: Interest) -> Result<Self, AsyncFdError<T>>
+    where
+        T: AsRawFd,
+    {
+        Self::try_new_with_handle_and_interest(inner, scheduler::Handle::current(), interest)
+    }
+
+    #[track_caller]
+    pub(crate) fn try_new_with_handle_and_interest(
+        inner: T,
+        handle: scheduler::Handle,
+        interest: Interest,
+    ) -> Result<Self, AsyncFdError<T>> {
         let fd = inner.as_raw_fd();
 
-        let registration =
-            Registration::new_with_interest_and_handle(&mut SourceFd(&fd), interest, handle)?;
-
-        Ok(AsyncFd {
-            registration,
-            inner: Some(inner),
-        })
+        match Registration::new_with_interest_and_handle(&mut SourceFd(&fd), interest, handle) {
+            Ok(registration) => Ok(AsyncFd {
+                registration,
+                inner: Some(inner),
+            }),
+            Err(cause) => Err(AsyncFdError { inner, cause }),
+        }
     }
 
     /// Returns a shared reference to the backing object of this [`AsyncFd`].
@@ -1257,3 +1313,43 @@ impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyMutGuard<
 /// [`try_io`]: method@AsyncFdReadyGuard::try_io
 #[derive(Debug)]
 pub struct TryIoError(());
+
+/// Error returned by [`try_new`] or [`try_with_interest`].
+///
+/// [`try_new`]: AsyncFd::try_new
+/// [`try_with_interest`]: AsyncFd::try_with_interest
+pub struct AsyncFdError<T> {
+    inner: T,
+    cause: io::Error,
+}
+
+impl<T> AsyncFdError<T> {
+    /// Returns the original object passed to [`try_new`] or [`try_with_interest`]
+    /// alongside the error that caused these functions to fail.
+    ///
+    /// [`try_new`]: AsyncFd::try_new
+    /// [`try_with_interest`]: AsyncFd::try_with_interest
+    pub fn into_parts(self) -> (T, io::Error) {
+        (self.inner, self.cause)
+    }
+}
+
+impl<T> fmt::Display for AsyncFdError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.cause, f)
+    }
+}
+
+impl<T> fmt::Debug for AsyncFdError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.cause, f)
+    }
+}
+
+impl<T> Error for AsyncFdError<T> {}
+
+impl<T> From<AsyncFdError<T>> for io::Error {
+    fn from(value: AsyncFdError<T>) -> Self {
+        value.cause
+    }
+}
