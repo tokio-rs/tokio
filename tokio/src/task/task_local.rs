@@ -336,34 +336,13 @@ impl<T, F> TaskLocalFuture<T, F>
 where
     T: 'static,
 {
-    /// Takes the task local value `T` owned by the `TaskLocalFuture`. If the
-    /// task local value exists, then returns `Some(T)` and the task local value
-    /// inside the `TaskLocalFuture` becomes unset. If it does not exist,
-    /// it returns `None`.
+    /// Returns the value stored in the task local by this `TaskLocalFuture`.
     ///
-    /// # Examples
+    /// The function returns:
     ///
-    /// ```
-    /// # async fn dox() {
-    ///  tokio::task_local! {
-    ///     static KEY: u32;
-    ///  }
-    ///
-    ///  let fut = KEY.scope(42, async {
-    ///     // Do some async work
-    ///  });
-    ///
-    ///  let mut pinned = Box::pin(fut);
-    ///
-    ///  // Complete the TaskLocalFuture
-    ///  let _ = (&mut pinned).as_mut().await;
-    ///
-    ///  // And here, we can take task local value
-    ///  let value = pinned.as_mut().take_value();
-    ///
-    ///  assert_eq!(value, Some(42));
-    /// # }
-    /// ```
+    /// * `Some(T)` if the task local value exists, and unset the task local value
+    ///   in the Future.
+    /// * `None` if the task local value does not exist.
     ///
     /// # Note
     ///
@@ -378,13 +357,13 @@ where
     /// ```
     /// # async fn dox() {
     /// tokio::task_local! {
-    ///    static KEY: u32;
+    ///     static KEY: u32;
     /// }
     ///
     /// let fut = KEY.scope(42, async {
-    ///    // Since `take_value()` has already been called at this point,
-    ///    // `try_with` here will fail.
-    ///    assert!(KEY.try_with(|_| {}).is_err())
+    ///     // Since `take_value()` has already been called at this point,
+    ///     // `try_with` here will fail.
+    ///     assert!(KEY.try_with(|_| {}).is_err())
     /// });
     ///
     /// let mut pinned = Box::pin(fut);
@@ -393,7 +372,31 @@ where
     /// assert_eq!(pinned.as_mut().take_value(), Some(42));
     ///
     /// // Poll **after** invoking `take_value()`
-    /// let _ = (&mut pinned).as_mut().await;
+    /// let _ = pinned.as_mut().await;
+    /// # }
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # async fn dox() {
+    /// tokio::task_local! {
+    ///     static KEY: u32;
+    /// }
+    ///
+    /// let fut = KEY.scope(42, async {
+    ///     // Do some async work
+    /// });
+    ///
+    /// let mut pinned = Box::pin(fut);
+    ///
+    /// // Complete the TaskLocalFuture
+    /// let _ = pinned.as_mut().await;
+    ///
+    /// // And here, we can take task local value
+    /// let value = pinned.as_mut().take_value();
+    ///
+    /// assert_eq!(value, Some(42));
     /// # }
     /// ```
     pub fn take_value(self: Pin<&mut Self>) -> Option<T> {
