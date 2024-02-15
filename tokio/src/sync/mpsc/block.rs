@@ -168,6 +168,20 @@ impl<T> Block<T> {
         Some(Read::Value(value.assume_init()))
     }
 
+    /// Returns true if the sender half of the list is closed and there is no
+    /// value in the slot to be consumed
+    ///
+    /// # Safety
+    ///
+    /// To maintain safety, the caller must ensure:
+    ///
+    /// * No concurrent access to the slot.
+    pub(crate) fn is_closed_and_empty(&self, slot_index: usize) -> bool {
+        let offset = offset(slot_index);
+        let ready_bits = self.header.ready_slots.load(Acquire);
+        !is_ready(ready_bits, offset) && is_tx_closed(ready_bits)
+    }
+
     /// Writes a value to the block at the given offset.
     ///
     /// # Safety

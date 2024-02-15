@@ -1017,4 +1017,79 @@ async fn test_tx_capacity() {
     assert_eq!(tx.max_capacity(), 10);
 }
 
+#[tokio::test]
+async fn text_rx_is_closed() {
+    let (tx, mut rx) = mpsc::channel(10);
+
+    assert!(!rx.is_closed());
+
+    tx.send(100).await.unwrap();
+    tx.send(200).await.unwrap();
+
+    rx.close();
+    assert!(!rx.is_closed());
+
+    assert_eq!(rx.recv().await, Some(100));
+    assert!(!rx.is_closed());
+
+    assert_eq!(rx.recv().await, Some(200));
+    assert!(rx.recv().await.is_none());
+    assert!(rx.is_closed());
+
+    let (tx, mut rx) = mpsc::channel(10);
+
+    assert!(!rx.is_closed());
+
+    tx.send(100).await.unwrap();
+    tx.send(200).await.unwrap();
+
+    drop(tx);
+    assert!(!rx.is_closed());
+
+    assert_eq!(rx.recv().await, Some(100));
+    assert!(!rx.is_closed());
+
+    assert_eq!(rx.recv().await, Some(200));
+    assert!(rx.recv().await.is_none());
+    assert!(rx.is_closed());
+}
+
+#[tokio::test]
+async fn text_rx_is_closed_unbounded() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    assert!(!rx.is_closed());
+
+    tx.send(100).unwrap();
+    tx.send(200).unwrap();
+
+    rx.close();
+    assert!(!rx.is_closed());
+
+    assert_eq!(rx.recv().await, Some(100));
+    assert!(!rx.is_closed());
+
+    assert_eq!(rx.recv().await, Some(200));
+    assert!(rx.recv().await.is_none());
+    assert!(rx.is_closed());
+
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    assert!(!rx.is_closed());
+
+    tx.send(100).unwrap();
+    tx.send(200).unwrap();
+
+    drop(tx);
+    assert!(!rx.is_closed());
+
+    assert_eq!(rx.recv().await, Some(100));
+    assert!(!rx.is_closed());
+
+    assert_eq!(rx.recv().await, Some(200));
+    assert!(rx.recv().await.is_none());
+    assert!(rx.is_closed());
+
+    rx.close();
+    assert!(rx.is_closed());
+}
+
 fn is_debug<T: fmt::Debug>(_: &T) {}

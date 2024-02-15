@@ -230,6 +230,23 @@ impl<T> fmt::Debug for Tx<T> {
 }
 
 impl<T> Rx<T> {
+    pub(crate) fn is_closed_and_empty(&mut self, tx: &Tx<T>) -> bool {
+        // Advance `head`, if needed
+        if self.try_advancing_head() {
+            self.reclaim_blocks(tx);
+        }
+
+        unsafe {
+            let block = self.head.as_ref();
+            block.is_closed_and_empty(self.index)
+        }
+    }
+
+    pub(crate) fn is_at_tail_position(&mut self, tx: &Tx<T>) -> bool {
+        let tail_position = tx.tail_position.load(Acquire);
+        tail_position == self.index
+    }
+
     /// Pops the next value off the queue.
     pub(crate) fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
         // Advance `head`, if needed
