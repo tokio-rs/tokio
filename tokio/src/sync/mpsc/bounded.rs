@@ -467,7 +467,10 @@ impl<T> Receiver<T> {
     ///
     /// This method returns `true` if the channel has been closed and there are
     /// no remaining messages in the channel's buffer. The channel is closed
-    /// when all senders have been dropped, or when [`close`] is called.
+    /// when all [`Sender`] have been dropped, or when [`Receiver::close`] is called.
+    ///
+    /// [`Sender`]: crate::sync::mpsc::Sender
+    /// [`Receiver::close`]: crate::sync::mpsc::Receiver::close
     ///
     /// # Examples
     /// ```

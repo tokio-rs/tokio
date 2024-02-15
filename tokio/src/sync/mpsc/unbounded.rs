@@ -334,7 +334,10 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// This method returns `true` if the channel has been closed and there are
     /// no remaining messages in the channel's buffer. The channel is closed
-    /// when all senders have been dropped, or when [`close`] is called.
+    /// when all [`UnboundedSender`] have been dropped, or when [`UnboundedReceiver::close`] is called.
+    ///
+    /// [`UnboundedSender`]: crate::sync::mpsc::UnboundedSender
+    /// [`UnboundedReceiver::close`]: crate::sync::mpsc::UnboundedReceiver::close
     ///
     /// # Examples
     /// ```
