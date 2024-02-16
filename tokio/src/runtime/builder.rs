@@ -1,5 +1,5 @@
 use crate::runtime::handle::Handle;
-use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime};
+use crate::runtime::{blocking, driver, Callback, CallbackWorker, HistogramBuilder, Runtime};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use std::fmt;
@@ -73,10 +73,10 @@ pub struct Builder {
     pub(super) before_stop: Option<Callback>,
 
     /// To run before each worker thread is parked.
-    pub(super) before_park: Option<Callback>,
+    pub(super) before_park: Option<CallbackWorker>,
 
     /// To run after each thread is unparked.
-    pub(super) after_unpark: Option<Callback>,
+    pub(super) after_unpark: Option<CallbackWorker>,
 
     /// Customizable keep alive timeout for `BlockingPool`
     pub(super) keep_alive: Option<Duration>,
@@ -592,7 +592,7 @@ impl Builder {
     ///     .worker_threads(1)
     ///     .on_thread_park({
     ///         let barrier = barrier.clone();
-    ///         move || {
+    ///         move |_| {
     ///             let barrier = barrier.clone();
     ///             if once.swap(false, Ordering::Relaxed) {
     ///                 tokio::spawn(async move { barrier.wait().await; });
@@ -620,7 +620,7 @@ impl Builder {
     /// let runtime = runtime::Builder::new_current_thread()
     ///     .on_thread_park({
     ///         let barrier = barrier.clone();
-    ///         move || {
+    ///         move |_| {
     ///             let barrier = barrier.clone();
     ///             if once.swap(false, Ordering::Relaxed) {
     ///                 tokio::spawn(async move { barrier.wait().await; });
@@ -638,7 +638,7 @@ impl Builder {
     #[cfg(not(loom))]
     pub fn on_thread_park<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn() + Send + Sync + 'static,
+        F: Fn(usize) + Send + Sync + 'static,
     {
         self.before_park = Some(std::sync::Arc::new(f));
         self
@@ -659,7 +659,7 @@ impl Builder {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
-    ///     .on_thread_unpark(|| {
+    ///     .on_thread_unpark(|_| {
     ///         println!("thread unparking");
     ///     })
     ///     .build();
@@ -673,7 +673,7 @@ impl Builder {
     #[cfg(not(loom))]
     pub fn on_thread_unpark<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn() + Send + Sync + 'static,
+        F: Fn(usize) + Send + Sync + 'static,
     {
         self.after_unpark = Some(std::sync::Arc::new(f));
         self
