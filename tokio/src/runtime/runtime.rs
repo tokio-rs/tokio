@@ -389,7 +389,7 @@ impl Runtime {
     ///     // delivered to all tasks. So the spawned task may get canceled before
     ///     // it gets to print the message. To force a deterministic output for this
     ///     // example, we will wait until the task is finished.
-    ///     while !handle.is_finished() {}
+    ///     let _ = rt.block_on(handle);
     /// }
     /// ```
     pub fn enter(&self) -> EnterGuard<'_> {
