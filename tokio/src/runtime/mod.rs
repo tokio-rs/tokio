@@ -406,4 +406,7 @@ cfg_rt! {
 
     /// After thread starts / before thread stops
     type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
+
+    /// Before thread parks / after thread unparks
+    type CallbackWorker = std::sync::Arc<dyn Fn(usize) + Send + Sync>;
 }

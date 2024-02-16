@@ -2,7 +2,7 @@
 #![cfg(all(feature = "full", tokio_unstable, not(target_os = "wasi")))]
 
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::{atomic, Arc, Mutex};
 use std::task::Poll;
 use tokio::macros::support::poll_fn;
 
@@ -678,6 +678,90 @@ fn budget_exhaustion_yield_with_joins() {
     });
 
     assert_eq!(1, rt.metrics().budget_forced_yield_count());
+}
+
+#[test]
+fn on_thread_park_unpark() {
+    const THREADS: usize = 8;
+
+    // Keeps track whether or not each worker is parked
+    let mut bools = Vec::new();
+    for _ in 0..THREADS {
+        bools.push(atomic::AtomicBool::new(false));
+    }
+    let bools = Arc::new(bools);
+    let bools_park = bools.clone();
+    let bools_unpark = bools.clone();
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(THREADS)
+        .enable_all()
+        .on_thread_park(move |worker| {
+            // worker is parked
+            bools_park[worker].store(true, atomic::Ordering::Release);
+        })
+        .on_thread_unpark(move |worker| {
+            bools_unpark[worker].store(false, atomic::Ordering::Release);
+        })
+        .build()
+        .unwrap();
+    let metrics = rt.metrics();
+
+    rt.block_on(async {
+        // Spawn some tasks to do things, but less than the number of workers.  Some
+        // workers won't have any work to do and will stay parked the duration of the
+        // test.  We rely on bools to distinguish between a busy (unparked) worker that
+        // isn't polling, vs. ones that are merely parked the entire time.
+        for _ in 0..(THREADS - 1) {
+            tokio::spawn(async {
+                loop {
+                    tokio::time::sleep(Duration::from_millis(4)).await;
+                }
+            });
+        }
+
+        // Give the spawned tasks a chance to both poll and park.  Not really necessary.
+        tokio::time::sleep(Duration::from_millis(30)).await;
+
+        let _ = tokio::spawn(async move {
+            let mut counts = Vec::new();
+            for ii in 0..THREADS {
+                counts.push(metrics.worker_poll_count(ii));
+            }
+
+            let start_time = std::time::Instant::now();
+            while start_time.elapsed() < Duration::from_millis(100) {
+                // Uncomment the line below and the test fails (current worker is no
+                // longer "stuck" and not yielding back to tokio).
+
+                // tokio::task::yield_now().await;
+            }
+
+            let mut stuck = 0;
+            for ii in 0..THREADS {
+                let parked = bools[ii].load(atomic::Ordering::Acquire);
+                // Uncomment below to verify that some workers are not doing any polls,
+                // yet only one of them is not parked.
+
+                // if !parked {
+                //     println!("task {} is not parked", ii);
+                // }
+                // if metrics.worker_poll_count(ii) == counts[ii] {
+                //     println!("task {} has same poll count", ii);
+                // }
+
+                if !parked && metrics.worker_poll_count(ii) == counts[ii] {
+                    stuck += 1;
+                }
+            }
+
+            assert_eq!(
+                stuck, 1,
+                "should be exactly one non-polling, non-parked thread"
+            );
+        })
+        .await;
+    });
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
