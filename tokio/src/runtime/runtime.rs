@@ -367,12 +367,13 @@ impl Runtime {
     ///
     /// ```
     /// use tokio::runtime::Runtime;
+    /// use tokio::task::JoinHandle;
     ///
-    /// fn function_that_spawns(msg: String) {
+    /// fn function_that_spawns(msg: String) -> JoinHandle<()> {
     ///     // Had we not used `rt.enter` below, this would panic.
     ///     tokio::spawn(async move {
     ///         println!("{}", msg);
-    ///     });
+    ///     })
     /// }
     ///
     /// fn main() {
@@ -382,7 +383,13 @@ impl Runtime {
     ///
     ///     // By entering the context, we tie `tokio::spawn` to this executor.
     ///     let _guard = rt.enter();
-    ///     function_that_spawns(s);
+    ///     let handle = function_that_spawns(s);
+    ///
+    ///     // When a `Runtime` instance is dropped, a shutdown signal will be
+    ///     // delivered to all tasks. So the spawned task may get canceled before
+    ///     // it gets to print the message. To force a deterministic output for this
+    ///     // example, we will wait until the task is finished.
+    ///     while !handle.is_finished() {}
     /// }
     /// ```
     pub fn enter(&self) -> EnterGuard<'_> {
