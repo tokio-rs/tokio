@@ -7,6 +7,7 @@ use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::runtime::driver::{self, Driver};
 use crate::util::TryLock;
 
+use std::hint::black_box;
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 
@@ -71,7 +72,7 @@ impl Parker {
         // Only parking with zero is supported...
         assert_eq!(duration, Duration::from_millis(0));
 
-        if let Some(mut driver) = self.inner.shared.driver.try_lock() {
+        if let Some(mut driver) = black_box(self.inner.shared.driver.try_lock()) {
             driver.park_timeout(handle, duration);
         }
     }
