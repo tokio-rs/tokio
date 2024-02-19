@@ -630,6 +630,7 @@ pub mod stream {}
 #[cfg(docsrs)]
 pub mod doc;
 
+#[cfg(feature = "net")]
 #[cfg(docsrs)]
 #[allow(unused)]
 pub(crate) use self::doc::os;
