@@ -343,35 +343,9 @@ where
     /// * `Some(T)` if the task local value exists.
     /// * `None` if the task local value has already been taken.
     ///
-    ///
     /// Note that this function attempts to take the task local value even if
     /// the future has not yet completed. In that case, the value will no longer
     /// be available via the task local after the call to `take_value`.
-    ///
-    /// For example, the following code returns `Err` for accessing the `KEY` variable
-    /// in the async block of the `scope` function.
-    ///
-    /// ```
-    /// # async fn dox() {
-    /// tokio::task_local! {
-    ///     static KEY: u32;
-    /// }
-    ///
-    /// let fut = KEY.scope(42, async {
-    ///     // Since `take_value()` has already been called at this point,
-    ///     // `try_with` here will fail.
-    ///     assert!(KEY.try_with(|_| {}).is_err())
-    /// });
-    ///
-    /// let mut pinned = Box::pin(fut);
-    ///
-    /// // With this call, the task local value of fut is unset.
-    /// assert_eq!(pinned.as_mut().take_value(), Some(42));
-    ///
-    /// // Poll **after** invoking `take_value()`
-    /// let _ = pinned.as_mut().await;
-    /// # }
-    /// ```
     ///
     /// # Examples
     ///
