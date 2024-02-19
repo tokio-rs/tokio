@@ -340,8 +340,7 @@ where
     ///
     /// The function returns:
     ///
-    /// * `Some(T)` if the task local value exists, and unset the task local value
-    ///   in the Future.
+    /// * `Some(T)` if the task local value exists.
     /// * `None` if the task local value does not exist.
     ///
     /// # Note
