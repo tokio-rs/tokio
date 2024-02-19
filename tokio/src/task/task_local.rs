@@ -344,10 +344,9 @@ where
     /// * `None` if the task local value has already been taken.
     ///
     ///
-    /// Note that this function attempts to take the task local value regardless of
-    /// whether the `TaskLocalFuture` is completed or not. This means that if you
-    /// call this function before the `TaskLocalFuture` is completed, you need to
-    /// make sure that the access to the task local value in the `TaskLocalFuture` is safe.
+    /// Note that this function attempts to take the task local value even if
+    /// the future has not yet completed. In that case, the value will no longer
+    /// be available via the task local after the call to `take_value`.
     ///
     /// For example, the following code returns `Err` for accessing the `KEY` variable
     /// in the async block of the `scope` function.
