@@ -343,7 +343,6 @@ where
     /// * `Some(T)` if the task local value exists.
     /// * `None` if the task local value does not exist.
     ///
-    /// # Note
     ///
     /// Note that this function attempts to take the task local value regardless of
     /// whether the `TaskLocalFuture` is completed or not. This means that if you
