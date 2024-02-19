@@ -341,7 +341,7 @@ where
     /// The function returns:
     ///
     /// * `Some(T)` if the task local value exists.
-    /// * `None` if the task local value does not exist.
+    /// * `None` if the task local value has already been taken.
     ///
     ///
     /// Note that this function attempts to take the task local value regardless of
