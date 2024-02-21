@@ -117,3 +117,31 @@ async fn task_local_available_on_completion_drop() {
     assert_eq!(rx.await.unwrap(), 42);
     h.await.unwrap();
 }
+
+#[tokio::test]
+async fn take_value() {
+    tokio::task_local! {
+        static KEY: u32
+    }
+    let fut = KEY.scope(1, async {});
+    let mut pinned = Box::pin(fut);
+    assert_eq!(pinned.as_mut().take_value(), Some(1));
+    assert_eq!(pinned.as_mut().take_value(), None);
+}
+
+#[tokio::test]
+async fn poll_after_take_value_should_fail() {
+    tokio::task_local! {
+        static KEY: u32
+    }
+    let fut = KEY.scope(1, async {
+        let result = KEY.try_with(|_| {});
+        // The task local value no longer exists.
+        assert!(result.is_err());
+    });
+    let mut fut = Box::pin(fut);
+    fut.as_mut().take_value();
+
+    // Poll the future after `take_value` has been called
+    fut.await;
+}
