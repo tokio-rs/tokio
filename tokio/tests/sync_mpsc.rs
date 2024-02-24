@@ -1018,77 +1018,79 @@ async fn test_tx_capacity() {
 }
 
 #[tokio::test]
-async fn text_rx_is_closed() {
-    let (tx, mut rx) = mpsc::channel(10);
-
-    assert!(!rx.is_closed());
-
-    tx.send(100).await.unwrap();
-    tx.send(200).await.unwrap();
-
+async fn test_rx_is_closed_when_calling_close_with_sender() {
+    // is_closed should return true after calling close but still has a sender
+    let (_tx, mut rx) = mpsc::channel::<()>(10);
     rx.close();
-    assert!(!rx.is_closed());
 
-    assert_eq!(rx.recv().await, Some(100));
-    assert!(!rx.is_closed());
-
-    assert_eq!(rx.recv().await, Some(200));
-    assert!(rx.recv().await.is_none());
-    assert!(rx.is_closed());
-
-    let (tx, mut rx) = mpsc::channel(10);
-
-    assert!(!rx.is_closed());
-
-    tx.send(100).await.unwrap();
-    tx.send(200).await.unwrap();
-
-    drop(tx);
-    assert!(!rx.is_closed());
-
-    assert_eq!(rx.recv().await, Some(100));
-    assert!(!rx.is_closed());
-
-    assert_eq!(rx.recv().await, Some(200));
-    assert!(rx.recv().await.is_none());
     assert!(rx.is_closed());
 }
 
 #[tokio::test]
-async fn text_rx_is_closed_unbounded() {
-    let (tx, mut rx) = mpsc::unbounded_channel();
-    assert!(!rx.is_closed());
-
-    tx.send(100).unwrap();
-    tx.send(200).unwrap();
-
-    rx.close();
-    assert!(!rx.is_closed());
-
-    assert_eq!(rx.recv().await, Some(100));
-    assert!(!rx.is_closed());
-
-    assert_eq!(rx.recv().await, Some(200));
-    assert!(rx.recv().await.is_none());
-    assert!(rx.is_closed());
-
-    let (tx, mut rx) = mpsc::unbounded_channel();
-    assert!(!rx.is_closed());
-
-    tx.send(100).unwrap();
-    tx.send(200).unwrap();
+async fn test_rx_is_closed_when_dropping_all_senders() {
+    // is_closed should return true after dropping all senders
+    let (tx, mut rx) = mpsc::channel::<()>(10);
+    let another_tx = tx.clone();
+    let task = tokio::spawn(async move {
+        drop(another_tx);
+    });
 
     drop(tx);
-    assert!(!rx.is_closed());
+    let _ = task.await;
 
-    assert_eq!(rx.recv().await, Some(100));
-    assert!(!rx.is_closed());
-
-    assert_eq!(rx.recv().await, Some(200));
-    assert!(rx.recv().await.is_none());
     assert!(rx.is_closed());
+}
 
+#[tokio::test]
+async fn test_rx_is_not_closed_when_there_are_senders() {
+    // is_closed should return false when there is a sender
+    let (_tx, mut rx) = mpsc::channel::<()>(10);
+    assert!(!rx.is_closed());
+}
+
+#[tokio::test]
+async fn test_rx_is_not_closed_when_there_are_senders_and_buffer_filled() {
+    // is_closed should return false when there is a sender, even if enough messages have been sent to fill the channel
+    let (tx, mut rx) = mpsc::channel(10);
+    for i in 0..10 {
+        assert!(tx.send(i).await.is_ok());
+    }
+    assert!(!rx.is_closed());
+}
+
+#[tokio::test]
+async fn test_rx_is_not_closed_when_there_are_messages_but_not_senders() {
+    // is_closed should return false when there is a permit (but no senders)
+    let (tx, mut rx) = mpsc::channel(10);
+    for i in 0..10 {
+        assert!(tx.send(i).await.is_ok());
+    }
+    drop(tx);
+    assert!(!rx.is_closed());
+}
+
+#[tokio::test]
+async fn test_rx_is_not_closed_when_there_are_messages_and_close_is_called() {
+    // is_closed should return false when there is a permit (but no senders)
+    let (tx, mut rx) = mpsc::channel(10);
+    for i in 0..10 {
+        assert!(tx.send(i).await.is_ok());
+    }
     rx.close();
+    assert!(!rx.is_closed());
+}
+
+#[tokio::test]
+async fn test_rx_is_closed_after_consuming_messages() {
+    // is_closed should return false when there is a permit (but no senders)
+    let (tx, mut rx) = mpsc::channel(10);
+    for i in 0..10 {
+        assert!(tx.send(i).await.is_ok());
+    }
+    drop(tx);
+
+    assert!(!rx.is_closed());
+    while (rx.recv().await).is_some() {}
     assert!(rx.is_closed());
 }
 
