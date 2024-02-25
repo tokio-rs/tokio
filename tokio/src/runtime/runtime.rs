@@ -21,8 +21,8 @@ cfg_rt_multi_thread! {
 /// blocking pool, necessary for running asynchronous tasks.
 ///
 /// Instances of `Runtime` can be created using [`new`], or [`Builder`].
-/// However, most users will use the `#[tokio::main]` annotation on their
-/// entry point instead.
+/// However, most users will use the [`#[tokio::main]`][main] annotation on
+/// their entry point instead.
 ///
 /// See [module level][mod] documentation for more details.
 ///
@@ -86,6 +86,7 @@ cfg_rt_multi_thread! {
 /// [`new`]: method@Self::new
 /// [`Builder`]: struct@Builder
 /// [`Handle`]: struct@Handle
+/// [main]: macro@crate::main
 /// [`tokio::spawn`]: crate::spawn
 /// [`Arc::try_unwrap`]: std::sync::Arc::try_unwrap
 /// [Arc]: std::sync::Arc
