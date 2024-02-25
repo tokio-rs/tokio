@@ -520,3 +520,12 @@ async fn test_rx_is_closed_when_dropping_all_senders_except_weak_senders() {
     drop(tx);
     assert!(rx.is_closed());
 }
+
+#[tokio::test]
+async fn test_rx_unbounded_is_closed_when_dropping_all_senders_except_weak_senders() {
+    // is_closed should return true after dropping all senders except for a weak sender
+    let (tx, mut rx) = mpsc::unbounded_channel::<()>();
+    let _weak_sender = tx.clone().downgrade();
+    drop(tx);
+    assert!(rx.is_closed());
+}

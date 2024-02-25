@@ -1094,4 +1094,71 @@ async fn test_rx_is_closed_after_consuming_messages() {
     assert!(rx.is_closed());
 }
 
+#[tokio::test]
+async fn test_rx_unbounded_is_closed_when_calling_close_with_sender() {
+    // is_closed should return true after calling close but still has a sender
+    let (_tx, mut rx) = mpsc::unbounded_channel::<()>();
+    rx.close();
+
+    assert!(rx.is_closed());
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_is_closed_when_dropping_all_senders() {
+    // is_closed should return true after dropping all senders
+    let (tx, mut rx) = mpsc::unbounded_channel::<()>();
+    let another_tx = tx.clone();
+    let task = tokio::spawn(async move {
+        drop(another_tx);
+    });
+
+    drop(tx);
+    let _ = task.await;
+
+    assert!(rx.is_closed());
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_is_not_closed_when_there_are_senders() {
+    // is_closed should return false when there is a sender
+    let (_tx, mut rx) = mpsc::unbounded_channel::<()>();
+    assert!(!rx.is_closed());
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_is_not_closed_when_there_are_messages_but_not_senders() {
+    // is_closed should return false when there is a permit (but no senders)
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    for i in 0..10 {
+        assert!(tx.send(i).is_ok());
+    }
+    drop(tx);
+    assert!(!rx.is_closed());
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_is_not_closed_when_there_are_messages_and_close_is_called() {
+    // is_closed should return false when there is a permit (but no senders)
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    for i in 0..10 {
+        assert!(tx.send(i).is_ok());
+    }
+    rx.close();
+    assert!(!rx.is_closed());
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_is_closed_after_consuming_messages() {
+    // is_closed should return false when there is a permit (but no senders)
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    for i in 0..10 {
+        assert!(tx.send(i).is_ok());
+    }
+    drop(tx);
+
+    assert!(!rx.is_closed());
+    while (rx.recv().await).is_some() {}
+    assert!(rx.is_closed());
+}
+
 fn is_debug<T: fmt::Debug>(_: &T) {}
