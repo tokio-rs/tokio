@@ -1060,7 +1060,7 @@ async fn test_rx_is_not_closed_when_there_are_senders_and_buffer_filled() {
 
 #[tokio::test]
 async fn test_rx_is_not_closed_when_there_are_messages_but_not_senders() {
-    // is_closed should return false when there is a permit (but no senders)
+    // is_closed should return false when there are messages in the buffer, but no senders
     let (tx, mut rx) = mpsc::channel(10);
     for i in 0..10 {
         assert!(tx.send(i).await.is_ok());
@@ -1071,7 +1071,7 @@ async fn test_rx_is_not_closed_when_there_are_messages_but_not_senders() {
 
 #[tokio::test]
 async fn test_rx_is_not_closed_when_there_are_messages_and_close_is_called() {
-    // is_closed should return false when there is a permit (but no senders)
+    // is_closed should return false when there are messages in the buffer, and close is called
     let (tx, mut rx) = mpsc::channel(10);
     for i in 0..10 {
         assert!(tx.send(i).await.is_ok());
@@ -1135,7 +1135,7 @@ async fn test_rx_unbounded_is_not_closed_when_there_are_senders() {
 
 #[tokio::test]
 async fn test_rx_unbounded_is_not_closed_when_there_are_messages_but_not_senders() {
-    // is_closed should return false when there is a permit (but no senders)
+    // is_closed should return false when there are messages in the buffer, but no senders
     let (tx, mut rx) = mpsc::unbounded_channel();
     for i in 0..10 {
         assert!(tx.send(i).is_ok());
@@ -1146,7 +1146,7 @@ async fn test_rx_unbounded_is_not_closed_when_there_are_messages_but_not_senders
 
 #[tokio::test]
 async fn test_rx_unbounded_is_not_closed_when_there_are_messages_and_close_is_called() {
-    // is_closed should return false when there is a permit (but no senders)
+    // is_closed should return false when there are messages in the buffer, and close is called
     let (tx, mut rx) = mpsc::unbounded_channel();
     for i in 0..10 {
         assert!(tx.send(i).is_ok());
@@ -1157,7 +1157,7 @@ async fn test_rx_unbounded_is_not_closed_when_there_are_messages_and_close_is_ca
 
 #[tokio::test]
 async fn test_rx_unbounded_is_closed_after_consuming_messages() {
-    // is_closed should return false when there is a permit (but no senders)
+    // is_closed should return true after consuming messages
     let (tx, mut rx) = mpsc::unbounded_channel();
     for i in 0..10 {
         assert!(tx.send(i).is_ok());
