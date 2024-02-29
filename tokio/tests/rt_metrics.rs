@@ -681,7 +681,7 @@ fn budget_exhaustion_yield_with_joins() {
 }
 
 #[test]
-fn on_thread_park_unpark() {
+fn on_thread_park_unpark_id() {
     const THREADS: usize = 8;
 
     // Keeps track whether or not each worker is parked
@@ -696,11 +696,11 @@ fn on_thread_park_unpark() {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(THREADS)
         .enable_all()
-        .on_thread_park(move |worker| {
+        .on_thread_park_id(move |worker| {
             // worker is parked
             bools_park[worker].store(true, atomic::Ordering::Release);
         })
-        .on_thread_unpark(move |worker| {
+        .on_thread_unpark_id(move |worker| {
             bools_unpark[worker].store(false, atomic::Ordering::Release);
         })
         .build()
