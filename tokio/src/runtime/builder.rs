@@ -995,6 +995,7 @@ impl Builder {
         ///         }
         ///     });
         ///
+        ///     // Spawn a "stuck" task that doesn't yield properly (should be detected).
         ///     runtime.spawn(async { thread::sleep(time::Duration::from_secs(3)) });
         ///     runtime.block_on(async {
         ///          let _ = done_rx.await;
