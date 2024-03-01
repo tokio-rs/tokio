@@ -953,48 +953,51 @@ impl Builder {
         /// ```
         /// # use std::sync::atomic::{AtomicBool, Ordering};
         /// # use std::{thread, time};
-        /// # use tokio::runtime;
         ///
         /// fn main() {
         ///     const WORKERS: usize = 4;
         ///     const UNPARKED: AtomicBool = AtomicBool::new(false);
-        ///     static PARKED: [AtomicBool; WORKERS] = [UNPARKED; WORKERS];
+        ///     static IS_PARKED: [AtomicBool; WORKERS] = [UNPARKED; WORKERS];
         ///
-        ///     let runtime = runtime::Builder::new_multi_thread()
+        ///     let runtime = tokio::runtime::Builder::new_multi_thread()
         ///         .worker_threads(WORKERS)
-        ///         .on_thread_park_id(|id| PARKED[id].store(true, Ordering::Release))
-        ///         .on_thread_unpark_id(|id| PARKED[id].store(false, Ordering::Release))
+        ///         .on_thread_park_id(|id| IS_PARKED[id].store(true, Ordering::Release))
+        ///         .on_thread_unpark_id(|id| IS_PARKED[id].store(false, Ordering::Release))
         ///         .build()
         ///         .unwrap();
         ///
         ///     let metrics = runtime.handle().metrics();
+        ///     let (done_tx, done_rx) = tokio::sync::oneshot::channel();
         ///     thread::spawn(move || {
-        ///         let mut stuck_secs = [0; WORKERS];
+        ///         let mut stuck_since = [time::Instant::now(); WORKERS];
         ///         let mut prev_poll_counts = [None; WORKERS];
         ///         loop {
-        ///             thread::sleep(time::Duration::from_secs(1));
+        ///             thread::sleep(time::Duration::from_millis(250));
+        ///             let now = time::Instant::now();
         ///             for ii in 0..WORKERS {
-        ///                 if PARKED[ii].load(Ordering::Acquire) {
+        ///                 if IS_PARKED[ii].load(Ordering::Acquire) {
         ///                     prev_poll_counts[ii] = None;
         ///                 } else {
         ///                     let poll_count = metrics.worker_poll_count(ii);
         ///                     if Some(poll_count) == prev_poll_counts[ii] {
-        ///                         stuck_secs[ii] += 1;
-        ///                         println!("*** worker {} is stuck >= {} secs ***", ii, stuck_secs[ii]);
+        ///                         let duration = now.duration_since(stuck_since[ii]);
+        ///                         println!("*** worker {} is stuck for {:?} ***", ii, duration);
+        ///                         if duration > time::Duration::from_secs(1) {
+        ///                             let _ = done_tx.send(());
+        ///                             return;
+        ///                         }
         ///                     } else {
         ///                         prev_poll_counts[ii] = Some(poll_count);
-        ///                         stuck_secs[ii] = 0;
+        ///                         stuck_since[ii] = now;
         ///                     }
         ///                 }
         ///             }
         ///         }
         ///     });
         ///
-        ///     // Spawn a "stuck" task that never yields back to tokio
-        ///     runtime.spawn(async { loop {} });
+        ///     runtime.spawn(async { thread::sleep(time::Duration::from_secs(3)) });
         ///     runtime.block_on(async {
-        ///         // Do some work
-        /// # loop { tokio::task::yield_now().await; }
+        ///          let _ = done_rx.await;
         ///     });
         /// }
         /// ```
