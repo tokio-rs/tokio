@@ -939,9 +939,9 @@ impl Builder {
             self
         }
 
-        /// Same behavior as `on_thread_park` except the id of the thread that is parked is passed
-        /// to the callback function `f`.  The id corresponds to the same `usize` that is used in
-        /// calls to `RuntimeMetrics`.
+        /// Has the same behavior as `on_thread_park` except the id of the thread that is parked
+        /// is passed to the callback function `f`.  The id corresponds to the same `usize` that
+        /// is used in calls to `RuntimeMetrics`.
         ///
         /// Note: if both `on_thread_park` and `on_thread_park_id` are called, only the last one
         /// will be saved.
