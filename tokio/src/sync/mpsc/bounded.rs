@@ -465,8 +465,7 @@ impl<T> Receiver<T> {
 
     /// Checks if a channel is closed.
     ///
-    /// This method returns `true` if the channel has been closed and there are
-    /// no remaining messages in the channel's buffer. The channel is closed
+    /// This method returns `true` if the channel has been closed. The channel is closed
     /// when all [`Sender`] have been dropped, or when [`Receiver::close`] is called.
     ///
     /// [`Sender`]: crate::sync::mpsc::Sender
@@ -478,25 +477,38 @@ impl<T> Receiver<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(10);
+    ///     let (_tx, mut rx) = mpsc::channel::<()>(10);
     ///     assert!(!rx.is_closed());
-    ///
-    ///     tx.send(100).await.unwrap();
-    ///     tx.send(200).await.unwrap();
     ///
     ///     rx.close();
-    ///     assert!(!rx.is_closed());
-    ///     assert_eq!(rx.recv().await, Some(100));
-    ///
-    ///     assert!(!rx.is_closed());
-    ///     assert_eq!(rx.recv().await, Some(200));
-    ///     assert!(rx.recv().await.is_none());
     ///     
     ///     assert!(rx.is_closed());
     /// }
     /// ```
-    pub fn is_closed(&mut self) -> bool {
-        self.chan.is_closed_and_empty()
+    pub fn is_closed(&self) -> bool {
+        self.chan.is_closed()
+    }
+
+    /// Checks if a channel is empty.
+    ///
+    /// This method returns `true` if the channel has no messages.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(10);
+    ///     assert!(rx.is_empty());
+    ///
+    ///     tx.send(0).await.unwrap();
+    ///     assert!(!rx.is_empty());
+    /// }
+    ///
+    /// ```
+    pub fn is_empty(&mut self) -> bool {
+        self.chan.is_empty()
     }
 
     /// Polls to receive the next message on this channel.

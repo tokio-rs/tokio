@@ -1029,7 +1029,7 @@ async fn test_rx_is_closed_when_calling_close_with_sender() {
 #[tokio::test]
 async fn test_rx_is_closed_when_dropping_all_senders() {
     // is_closed should return true after dropping all senders
-    let (tx, mut rx) = mpsc::channel::<()>(10);
+    let (tx, rx) = mpsc::channel::<()>(10);
     let another_tx = tx.clone();
     let task = tokio::spawn(async move {
         drop(another_tx);
@@ -1044,14 +1044,14 @@ async fn test_rx_is_closed_when_dropping_all_senders() {
 #[tokio::test]
 async fn test_rx_is_not_closed_when_there_are_senders() {
     // is_closed should return false when there is a sender
-    let (_tx, mut rx) = mpsc::channel::<()>(10);
+    let (_tx, rx) = mpsc::channel::<()>(10);
     assert!(!rx.is_closed());
 }
 
 #[tokio::test]
 async fn test_rx_is_not_closed_when_there_are_senders_and_buffer_filled() {
     // is_closed should return false when there is a sender, even if enough messages have been sent to fill the channel
-    let (tx, mut rx) = mpsc::channel(10);
+    let (tx, rx) = mpsc::channel(10);
     for i in 0..10 {
         assert!(tx.send(i).await.is_ok());
     }
@@ -1059,47 +1059,94 @@ async fn test_rx_is_not_closed_when_there_are_senders_and_buffer_filled() {
 }
 
 #[tokio::test]
-async fn test_rx_is_not_closed_when_there_are_messages_but_not_senders() {
-    // is_closed should return false when there are messages in the buffer, but no senders
-    let (tx, mut rx) = mpsc::channel(10);
+async fn test_rx_is_closed_when_there_are_no_senders_and_there_are_messages() {
+    // is_closed should return true when there are messages in the buffer, but no senders
+    let (tx, rx) = mpsc::channel(10);
     for i in 0..10 {
         assert!(tx.send(i).await.is_ok());
     }
     drop(tx);
-    assert!(!rx.is_closed());
+    assert!(rx.is_closed());
 }
 
 #[tokio::test]
-async fn test_rx_is_not_closed_when_there_are_messages_and_close_is_called() {
-    // is_closed should return false when there are messages in the buffer, and close is called
+async fn test_rx_is_closed_when_there_are_messages_and_close_is_called() {
+    // is_closed should return true when there are messages in the buffer, and close is called
     let (tx, mut rx) = mpsc::channel(10);
     for i in 0..10 {
         assert!(tx.send(i).await.is_ok());
     }
     rx.close();
-    assert!(!rx.is_closed());
+    assert!(rx.is_closed());
 }
 
 #[tokio::test]
 async fn test_rx_is_not_closed_when_there_are_permits_but_not_senders() {
     // is_closed should return false when there is a permit (but no senders)
-    let (tx, mut rx) = mpsc::channel::<()>(10);
+    let (tx, rx) = mpsc::channel::<()>(10);
     let _permit = tx.reserve_owned().await.expect("Failed to reserve permit");
     assert!(!rx.is_closed());
 }
 
 #[tokio::test]
-async fn test_rx_is_closed_after_consuming_messages() {
-    // is_closed should return true after consuming messages
+async fn test_rx_is_empty_when_no_messages_were_sent() {
+    let (_tx, mut rx) = mpsc::channel::<()>(10);
+    assert!(rx.is_empty())
+}
+
+#[tokio::test]
+async fn test_rx_is_not_empty_when_there_are_messages_in_the_buffer() {
+    let (tx, mut rx) = mpsc::channel::<()>(10);
+    assert!(tx.send(()).await.is_ok());
+    assert!(!rx.is_empty())
+}
+
+#[tokio::test]
+async fn test_rx_is_not_empty_when_the_buffer_is_full() {
+    let (tx, mut rx) = mpsc::channel(10);
+    for i in 0..10 {
+        assert!(tx.send(i).await.is_ok());
+    }
+    assert!(!rx.is_empty())
+}
+
+#[tokio::test]
+async fn test_rx_is_not_empty_when_all_but_one_messages_are_consumed() {
+    let (tx, mut rx) = mpsc::channel(10);
+    for i in 0..10 {
+        assert!(tx.send(i).await.is_ok());
+    }
+
+    for _ in 0..9 {
+        assert!(rx.recv().await.is_some());
+    }
+
+    assert!(!rx.is_empty())
+}
+
+#[tokio::test]
+async fn test_rx_is_empty_when_all_messages_are_consumed() {
+    let (tx, mut rx) = mpsc::channel(10);
+    for i in 0..10 {
+        assert!(tx.send(i).await.is_ok());
+    }
+    while rx.try_recv().is_ok() {}
+    assert!(rx.is_empty())
+}
+
+#[tokio::test]
+async fn test_rx_is_empty_all_senders_are_dropped_and_messages_consumed() {
     let (tx, mut rx) = mpsc::channel(10);
     for i in 0..10 {
         assert!(tx.send(i).await.is_ok());
     }
     drop(tx);
 
-    assert!(!rx.is_closed());
-    while (rx.recv().await).is_some() {}
-    assert!(rx.is_closed());
+    for _ in 0..10 {
+        assert!(rx.recv().await.is_some());
+    }
+
+    assert!(rx.is_empty())
 }
 
 #[tokio::test]
@@ -1114,7 +1161,7 @@ async fn test_rx_unbounded_is_closed_when_calling_close_with_sender() {
 #[tokio::test]
 async fn test_rx_unbounded_is_closed_when_dropping_all_senders() {
     // is_closed should return true after dropping all senders
-    let (tx, mut rx) = mpsc::unbounded_channel::<()>();
+    let (tx, rx) = mpsc::unbounded_channel::<()>();
     let another_tx = tx.clone();
     let task = tokio::spawn(async move {
         drop(another_tx);
@@ -1129,44 +1176,82 @@ async fn test_rx_unbounded_is_closed_when_dropping_all_senders() {
 #[tokio::test]
 async fn test_rx_unbounded_is_not_closed_when_there_are_senders() {
     // is_closed should return false when there is a sender
-    let (_tx, mut rx) = mpsc::unbounded_channel::<()>();
+    let (_tx, rx) = mpsc::unbounded_channel::<()>();
     assert!(!rx.is_closed());
 }
 
 #[tokio::test]
-async fn test_rx_unbounded_is_not_closed_when_there_are_messages_but_not_senders() {
-    // is_closed should return false when there are messages in the buffer, but no senders
-    let (tx, mut rx) = mpsc::unbounded_channel();
+async fn test_rx_unbounded_is_closed_when_there_are_no_senders_and_there_are_messages() {
+    // is_closed should return true when there are messages in the buffer, but no senders
+    let (tx, rx) = mpsc::unbounded_channel();
     for i in 0..10 {
         assert!(tx.send(i).is_ok());
     }
     drop(tx);
-    assert!(!rx.is_closed());
+    assert!(rx.is_closed());
 }
 
 #[tokio::test]
-async fn test_rx_unbounded_is_not_closed_when_there_are_messages_and_close_is_called() {
-    // is_closed should return false when there are messages in the buffer, and close is called
+async fn test_rx_unbounded_is_closed_when_there_are_messages_and_close_is_called() {
+    // is_closed should return true when there are messages in the buffer, and close is called
     let (tx, mut rx) = mpsc::unbounded_channel();
     for i in 0..10 {
         assert!(tx.send(i).is_ok());
     }
     rx.close();
-    assert!(!rx.is_closed());
+    assert!(rx.is_closed());
 }
 
 #[tokio::test]
-async fn test_rx_unbounded_is_closed_after_consuming_messages() {
-    // is_closed should return true after consuming messages
+async fn test_rx_unbounded_is_empty_when_no_messages_were_sent() {
+    let (_tx, mut rx) = mpsc::unbounded_channel::<()>();
+    assert!(rx.is_empty())
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_is_not_empty_when_there_are_messages_in_the_buffer() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    assert!(tx.send(()).is_ok());
+    assert!(!rx.is_empty())
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_is_not_empty_when_all_but_one_messages_are_consumed() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    for i in 0..10 {
+        assert!(tx.send(i).is_ok());
+    }
+
+    for _ in 0..9 {
+        assert!(rx.recv().await.is_some());
+    }
+
+    assert!(!rx.is_empty())
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_is_empty_when_all_messages_are_consumed() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    for i in 0..10 {
+        assert!(tx.send(i).is_ok());
+    }
+    while rx.try_recv().is_ok() {}
+    assert!(rx.is_empty())
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_is_empty_all_senders_are_dropped_and_messages_consumed() {
     let (tx, mut rx) = mpsc::unbounded_channel();
     for i in 0..10 {
         assert!(tx.send(i).is_ok());
     }
     drop(tx);
 
-    assert!(!rx.is_closed());
-    while (rx.recv().await).is_some() {}
-    assert!(rx.is_closed());
+    for _ in 0..10 {
+        assert!(rx.recv().await.is_some());
+    }
+
+    assert!(rx.is_empty())
 }
 
 fn is_debug<T: fmt::Debug>(_: &T) {}

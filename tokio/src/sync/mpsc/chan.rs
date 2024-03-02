@@ -241,21 +241,23 @@ impl<T, S: Semaphore> Rx<T, S> {
         self.inner.notify_rx_closed.notify_waiters();
     }
 
-    pub(crate) fn is_closed_and_empty(&mut self) -> bool {
-        // There two internal states that can represent a closed channel that has no messages
+    pub(crate) fn is_closed(&self) -> bool {
+        // There two internal states that can represent a closed channel
         //
         //  1. When `close` is called.
-        //  In this case, the inner semaphore will be closed, and the channel has no
-        //  outstanding messages if the list is at the tail position.
+        //  In this case, the inner semaphore will be closed.
         //
         //  2. When all senders are dropped.
         //  In this case, the semaphore remains unclosed, and the `index` in the list won't
         //  reach the tail position. It is necessary to check the list if the last block is
-        //  `closed` and has no value available.
+        //  `closed`.
+        self.inner.semaphore.is_closed() || self.inner.tx_count.load(Acquire) == 0
+    }
+
+    pub(crate) fn is_empty(&mut self) -> bool {
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
-            (self.inner.semaphore.is_closed() && rx_fields.list.is_at_tail_position(&self.inner.tx))
-                || rx_fields.list.is_closed_and_empty(&self.inner.tx)
+            rx_fields.list.is_empty(&self.inner.tx)
         })
     }
 
