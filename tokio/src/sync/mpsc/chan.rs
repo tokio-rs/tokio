@@ -254,10 +254,10 @@ impl<T, S: Semaphore> Rx<T, S> {
         self.inner.semaphore.is_closed() || self.inner.tx_count.load(Acquire) == 0
     }
 
-    pub(crate) fn is_empty(&mut self) -> bool {
-        self.inner.rx_fields.with_mut(|rx_fields_ptr| {
-            let rx_fields = unsafe { &mut *rx_fields_ptr };
-            rx_fields.list.is_empty(&self.inner.tx)
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.rx_fields.with(|rx_fields_ptr| {
+            let rx_fields = unsafe { &*rx_fields_ptr };
+            rx_fields.list.is_empty()
         })
     }
 

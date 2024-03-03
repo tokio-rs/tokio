@@ -366,7 +366,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::unbounded_channel();
+    ///     let (tx, rx) = mpsc::unbounded_channel();
     ///     assert!(rx.is_empty());
     ///
     ///     tx.send(0).unwrap();
@@ -374,7 +374,7 @@ impl<T> UnboundedReceiver<T> {
     /// }
     ///
     /// ```
-    pub fn is_empty(&mut self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.chan.is_empty()
     }
 

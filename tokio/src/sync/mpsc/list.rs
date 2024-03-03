@@ -230,12 +230,7 @@ impl<T> fmt::Debug for Tx<T> {
 }
 
 impl<T> Rx<T> {
-    pub(crate) fn is_empty(&mut self, tx: &Tx<T>) -> bool {
-        // Advance `head`, if needed
-        if self.try_advancing_head() {
-            self.reclaim_blocks(tx);
-        }
-
+    pub(crate) fn is_empty(&self) -> bool {
         unsafe {
             let block = self.head.as_ref();
             !block.has_value(self.index)

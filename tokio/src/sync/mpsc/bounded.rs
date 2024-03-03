@@ -499,7 +499,7 @@ impl<T> Receiver<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(10);
+    ///     let (tx, rx) = mpsc::channel(10);
     ///     assert!(rx.is_empty());
     ///
     ///     tx.send(0).await.unwrap();
@@ -507,7 +507,7 @@ impl<T> Receiver<T> {
     /// }
     ///
     /// ```
-    pub fn is_empty(&mut self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.chan.is_empty()
     }
 

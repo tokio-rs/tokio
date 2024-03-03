@@ -1090,20 +1090,20 @@ async fn test_rx_is_not_closed_when_there_are_permits_but_not_senders() {
 
 #[tokio::test]
 async fn test_rx_is_empty_when_no_messages_were_sent() {
-    let (_tx, mut rx) = mpsc::channel::<()>(10);
+    let (_tx, rx) = mpsc::channel::<()>(10);
     assert!(rx.is_empty())
 }
 
 #[tokio::test]
 async fn test_rx_is_not_empty_when_there_are_messages_in_the_buffer() {
-    let (tx, mut rx) = mpsc::channel::<()>(10);
+    let (tx, rx) = mpsc::channel::<()>(10);
     assert!(tx.send(()).await.is_ok());
     assert!(!rx.is_empty())
 }
 
 #[tokio::test]
 async fn test_rx_is_not_empty_when_the_buffer_is_full() {
-    let (tx, mut rx) = mpsc::channel(10);
+    let (tx, rx) = mpsc::channel(10);
     for i in 0..10 {
         assert!(tx.send(i).await.is_ok());
     }
@@ -1204,13 +1204,13 @@ async fn test_rx_unbounded_is_closed_when_there_are_messages_and_close_is_called
 
 #[tokio::test]
 async fn test_rx_unbounded_is_empty_when_no_messages_were_sent() {
-    let (_tx, mut rx) = mpsc::unbounded_channel::<()>();
+    let (_tx, rx) = mpsc::unbounded_channel::<()>();
     assert!(rx.is_empty())
 }
 
 #[tokio::test]
 async fn test_rx_unbounded_is_not_empty_when_there_are_messages_in_the_buffer() {
-    let (tx, mut rx) = mpsc::unbounded_channel();
+    let (tx, rx) = mpsc::unbounded_channel();
     assert!(tx.send(()).is_ok());
     assert!(!rx.is_empty())
 }
