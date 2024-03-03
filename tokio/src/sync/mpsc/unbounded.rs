@@ -378,6 +378,25 @@ impl<T> UnboundedReceiver<T> {
         self.chan.is_empty()
     }
 
+    /// Returns the number of messages in the channel.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::unbounded_channel();
+    ///     assert_eq!(0, rx.len());
+    ///
+    ///     tx.send(0).unwrap();
+    ///     assert_eq!(1, rx.len());
+    /// }
+    /// ```
+    pub fn len(&self) -> usize {
+        self.chan.len()
+    }
+
     /// Polls to receive the next message on this channel.
     ///
     /// This method returns:

@@ -261,6 +261,13 @@ impl<T, S: Semaphore> Rx<T, S> {
         })
     }
 
+    pub(crate) fn len(&self) -> usize {
+        self.inner.rx_fields.with(|rx_fields_ptr| {
+            let rx_fields = unsafe { &*rx_fields_ptr };
+            rx_fields.list.len(&self.inner.tx)
+        })
+    }
+
     /// Receive the next value
     pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         use super::block::Read;

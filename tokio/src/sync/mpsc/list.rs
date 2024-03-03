@@ -237,6 +237,21 @@ impl<T> Rx<T> {
         }
     }
 
+    pub(crate) fn len(&self, tx: &Tx<T>) -> usize {
+        let tail_position = tx.tail_position.load(Acquire);
+        let tail = tx.block_tail.load(Acquire);
+
+        unsafe {
+            let tail_block = &mut *tail;
+
+            if tail_block.is_closed() {
+                tail_position - self.index - 1
+            } else {
+                tail_position - self.index
+            }
+        }
+    }
+
     /// Pops the next value off the queue.
     pub(crate) fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
         // Advance `head`, if needed

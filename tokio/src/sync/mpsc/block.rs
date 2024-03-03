@@ -208,6 +208,11 @@ impl<T> Block<T> {
         self.header.ready_slots.fetch_or(TX_CLOSED, Release);
     }
 
+    pub(crate) unsafe fn is_closed(&self) -> bool {
+        let ready_bits = self.header.ready_slots.load(Acquire);
+        is_tx_closed(ready_bits)
+    }
+
     /// Resets the block to a blank state. This enables reusing blocks in the
     /// channel.
     ///

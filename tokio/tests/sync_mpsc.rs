@@ -1150,6 +1150,60 @@ async fn test_rx_is_empty_all_senders_are_dropped_and_messages_consumed() {
 }
 
 #[tokio::test]
+async fn test_rx_len_on_empty_channel() {
+    let (_tx, rx) = mpsc::channel::<()>(100);
+    assert_eq!(rx.len(), 0);
+}
+
+#[tokio::test]
+async fn test_rx_len_on_empty_channel_without_senders() {
+    // when all senders are dropped, a "closed" value is added to the end of the linked list.
+    // here we test that the "closed" value does not change the len of the channel.
+
+    let (tx, rx) = mpsc::channel::<()>(100);
+    drop(tx);
+    assert_eq!(rx.len(), 0);
+}
+
+#[tokio::test]
+async fn test_rx_len_on_filled_channel() {
+    let (tx, rx) = mpsc::channel(100);
+
+    for i in 0..100 {
+        assert!(tx.send(i).await.is_ok());
+    }
+    assert_eq!(rx.len(), 100);
+}
+
+#[tokio::test]
+async fn test_rx_len_on_filled_channel_without_senders() {
+    let (tx, rx) = mpsc::channel(100);
+
+    for i in 0..100 {
+        assert!(tx.send(i).await.is_ok());
+    }
+    drop(tx);
+    assert_eq!(rx.len(), 100);
+}
+
+#[tokio::test]
+async fn test_rx_len_when_consuming_all_messages() {
+    let (tx, mut rx) = mpsc::channel(100);
+
+    for i in 0..100 {
+        assert!(tx.send(i).await.is_ok());
+        assert_eq!(rx.len(), i + 1);
+    }
+
+    drop(tx);
+
+    for i in (0..100).rev() {
+        assert!(rx.recv().await.is_some());
+        assert_eq!(rx.len(), i);
+    }
+}
+
+#[tokio::test]
 async fn test_rx_unbounded_is_closed_when_calling_close_with_sender() {
     // is_closed should return true after calling close but still has a sender
     let (_tx, mut rx) = mpsc::unbounded_channel::<()>();
@@ -1252,6 +1306,60 @@ async fn test_rx_unbounded_is_empty_all_senders_are_dropped_and_messages_consume
     }
 
     assert!(rx.is_empty())
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_len_on_empty_channel() {
+    let (_tx, rx) = mpsc::unbounded_channel::<()>();
+    assert_eq!(rx.len(), 0);
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_len_on_empty_channel_without_senders() {
+    // when all senders are dropped, a "closed" value is added to the end of the linked list.
+    // here we test that the "closed" value does not change the len of the channel.
+
+    let (tx, rx) = mpsc::unbounded_channel::<()>();
+    drop(tx);
+    assert_eq!(rx.len(), 0);
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_len_with_multiple_messages() {
+    let (tx, rx) = mpsc::unbounded_channel();
+
+    for i in 0..100 {
+        assert!(tx.send(i).is_ok());
+    }
+    assert_eq!(rx.len(), 100);
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_len_with_multiple_messages_and_dropped_senders() {
+    let (tx, rx) = mpsc::unbounded_channel();
+
+    for i in 0..100 {
+        assert!(tx.send(i).is_ok());
+    }
+    drop(tx);
+    assert_eq!(rx.len(), 100);
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_len_when_consuming_all_messages() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+
+    for i in 0..100 {
+        assert!(tx.send(i).is_ok());
+        assert_eq!(rx.len(), i + 1);
+    }
+
+    drop(tx);
+
+    for i in (0..100).rev() {
+        assert!(rx.recv().await.is_some());
+        assert_eq!(rx.len(), i);
+    }
 }
 
 fn is_debug<T: fmt::Debug>(_: &T) {}
