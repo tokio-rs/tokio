@@ -233,13 +233,14 @@ impl File {
     /// let std_file = std::fs::File::open("foo.txt").unwrap();
     /// let file = tokio::fs::File::from_std(std_file);
     /// ```
-    pub fn from_std(std: StdFile) -> File {
+    pub fn from_std(mut std: StdFile) -> File {
+        let pos = std.seek(SeekFrom::Current(0)).unwrap();
         File {
             std: Arc::new(std),
             inner: Mutex::new(Inner {
                 state: State::Idle(Some(Buf::with_capacity(0))),
                 last_write_err: None,
-                pos: 0,
+                pos,
             }),
         }
     }
