@@ -234,7 +234,7 @@ impl File {
     /// let file = tokio::fs::File::from_std(std_file);
     /// ```
     pub fn from_std(mut std: StdFile) -> File {
-        let pos = std.seek(SeekFrom::Current(0)).unwrap();
+        let pos = std.stream_position().unwrap();
         File {
             std: Arc::new(std),
             inner: Mutex::new(Inner {
