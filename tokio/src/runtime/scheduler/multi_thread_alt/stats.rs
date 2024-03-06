@@ -52,10 +52,10 @@ const TASK_POLL_TIME_EWMA_ALPHA: f64 = 0.1;
 const TARGET_GLOBAL_QUEUE_INTERVAL: f64 = Duration::from_micros(200).as_nanos() as f64;
 
 /// Max value for the global queue interval. This is 2x the previous default
-const MAX_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL: u32 = 127;
+const MAX_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL: u32 = 128;
 
 /// This is the previous default
-const TARGET_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL: u32 = 61;
+const TARGET_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL: u32 = 64;
 
 impl Stats {
     pub(crate) const DEFAULT_GLOBAL_QUEUE_INTERVAL: u32 =

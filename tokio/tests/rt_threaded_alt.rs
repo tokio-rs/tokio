@@ -617,8 +617,8 @@ fn test_tuning() {
     }
 
     let flag = Arc::new(AtomicBool::new(true));
-    let counter = Arc::new(AtomicUsize::new(61));
-    let interval = Arc::new(AtomicUsize::new(61));
+    let counter = Arc::new(AtomicUsize::new(64));
+    let interval = Arc::new(AtomicUsize::new(64));
 
     {
         let flag = flag.clone();

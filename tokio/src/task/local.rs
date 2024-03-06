@@ -387,10 +387,10 @@ cfg_rt! {
 const INITIAL_CAPACITY: usize = 64;
 
 /// Max number of tasks to poll per tick.
-const MAX_TASKS_PER_TICK: usize = 61;
+const MAX_TASKS_PER_TICK: usize = 64;
 
 /// How often it check the remote queue first.
-const REMOTE_FIRST_INTERVAL: u8 = 31;
+const REMOTE_FIRST_INTERVAL: u8 = 32;
 
 /// Context guard for `LocalSet`
 pub struct LocalEnterGuard {

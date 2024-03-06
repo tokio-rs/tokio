@@ -242,12 +242,12 @@
 //! to be scheduled: the global queue and the local queue. The runtime will prefer
 //! to choose the next task to schedule from the local queue, and will only pick a
 //! task from the global queue if the local queue is empty, or if it has picked
-//! a task from the local queue 31 times in a row. The number 31 can be
+//! a task from the local queue 32 times in a row. The number 32 can be
 //! changed using the [`global_queue_interval`] setting.
 //!
 //! The runtime will check for new IO or timer events whenever there are no
-//! tasks ready to be scheduled, or when it has scheduled 61 tasks in a row. The
-//! number 61 may be changed using the [`event_interval`] setting.
+//! tasks ready to be scheduled, or when it has scheduled 64 tasks in a row. The
+//! number 64 may be changed using the [`event_interval`] setting.
 //!
 //! When a task is woken from within a task running on the runtime, then the
 //! woken task is added directly to the local queue. Otherwise, the task is
@@ -280,8 +280,8 @@
 //! local queue.
 //!
 //! The runtime will check for new IO or timer events whenever there are no
-//! tasks ready to be scheduled, or when it has scheduled 61 tasks in a row. The
-//! number 61 may be changed using the [`event_interval`] setting.
+//! tasks ready to be scheduled, or when it has scheduled 64 tasks in a row. The
+//! number 64 may be changed using the [`event_interval`] setting.
 //!
 //! The multi thread runtime uses [the lifo slot optimization]: Whenever a task
 //! wakes up another task, the other task is added to the worker thread's lifo

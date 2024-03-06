@@ -322,7 +322,7 @@ mod group_c {
             let pool = runtime::Builder::new_multi_thread_alt()
                 .worker_threads(2)
                 // Set the intervals to avoid tuning logic
-                .global_queue_interval(61)
+                .global_queue_interval(64)
                 .local_queue_capacity(1)
                 .build()
                 .unwrap();
@@ -357,7 +357,7 @@ mod group_c {
             let pool = runtime::Builder::new_multi_thread_alt()
                 .worker_threads(2)
                 // Set the intervals to avoid tuning logic
-                .global_queue_interval(61)
+                .global_queue_interval(64)
                 .local_queue_capacity(DEPTH)
                 .build()
                 .unwrap();
@@ -460,7 +460,7 @@ fn mk_pool(num_threads: usize) -> Runtime {
     runtime::Builder::new_multi_thread_alt()
         .worker_threads(num_threads)
         // Set the intervals to avoid tuning logic
-        .global_queue_interval(61)
+        .global_queue_interval(64)
         .build()
         .unwrap()
 }

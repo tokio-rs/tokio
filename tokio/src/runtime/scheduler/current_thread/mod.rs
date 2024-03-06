@@ -112,7 +112,7 @@ const INITIAL_CAPACITY: usize = 64;
 /// Used if none is specified. This is a temporary constant and will be removed
 /// as we unify tuning logic between the multi-thread and current-thread
 /// schedulers.
-const DEFAULT_GLOBAL_QUEUE_INTERVAL: u32 = 31;
+const DEFAULT_GLOBAL_QUEUE_INTERVAL: u32 = 32;
 
 impl CurrentThread {
     pub(crate) fn new(

@@ -217,9 +217,10 @@ impl Builder {
     pub fn new_current_thread() -> Builder {
         #[cfg(loom)]
         const EVENT_INTERVAL: u32 = 4;
-        // The number `61` is fairly arbitrary. I believe this value was copied from golang.
+        // The number was `61` which was copied from golang previously, we
+        // changed it to `64` for better performance.
         #[cfg(not(loom))]
-        const EVENT_INTERVAL: u32 = 61;
+        const EVENT_INTERVAL: u32 = 64;
 
         Builder::new(Kind::CurrentThread, EVENT_INTERVAL)
     }
@@ -231,8 +232,9 @@ impl Builder {
         #[cfg(feature = "rt-multi-thread")]
         #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
         pub fn new_multi_thread() -> Builder {
-            // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-            Builder::new(Kind::MultiThread, 61)
+            // The number was `61` which was copied from golang previously, we
+            // changed it to `64` for better performance.
+            Builder::new(Kind::MultiThread, 64)
         }
 
         cfg_unstable! {
@@ -250,8 +252,9 @@ impl Builder {
             #[cfg(feature = "rt-multi-thread")]
             #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
             pub fn new_multi_thread_alt() -> Builder {
-                // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-                Builder::new(Kind::MultiThreadAlt, 61)
+                // The number was `61` which was copied from golang previously, we
+                // changed it to `64` for better performance.
+                Builder::new(Kind::MultiThreadAlt, 64)
             }
         }
     }
@@ -746,7 +749,7 @@ impl Builder {
     ///
     /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task.
     ///
-    /// By default the global queue interval is 31 for the current-thread scheduler. Please see
+    /// By default the global queue interval is 32 for the current-thread scheduler. Please see
     /// [the module documentation] for the default behavior of the multi-thread scheduler.
     ///
     /// Schedulers have a local queue of already-claimed tasks, and a global queue of incoming
@@ -764,7 +767,7 @@ impl Builder {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
-    ///     .global_queue_interval(31)
+    ///     .global_queue_interval(32)
     ///     .build();
     /// # }
     /// ```
@@ -778,7 +781,7 @@ impl Builder {
     ///
     /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task.
     ///
-    /// By default, the event interval is `61` for all scheduler types.
+    /// By default, the event interval is `64` for all scheduler types.
     ///
     /// Setting the event interval determines the effective "priority" of delivering
     /// these external events (which may wake up additional tasks), compared to
@@ -796,7 +799,7 @@ impl Builder {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
-    ///     .event_interval(31)
+    ///     .event_interval(32)
     ///     .build();
     /// # }
     /// ```
