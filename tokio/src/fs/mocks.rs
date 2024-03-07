@@ -65,7 +65,7 @@ impl Read for &'_ MockFile {
     }
 }
 
-impl Seek for MockFile {
+impl Seek for &'_ MockFile {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.inner_seek(pos)
     }
