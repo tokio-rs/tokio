@@ -241,14 +241,15 @@ impl<T> Rx<T> {
         let tail_position = tx.tail_position.load(Acquire);
         let tail = tx.block_tail.load(Acquire);
 
-        unsafe {
+        let is_closed = unsafe {
             let tail_block = &mut *tail;
+            tail_block.is_closed()
+        };
 
-            if tail_block.is_closed() {
-                tail_position - self.index - 1
-            } else {
-                tail_position - self.index
-            }
+        if is_closed {
+            tail_position - self.index - 1
+        } else {
+            tail_position - self.index
         }
     }
 
