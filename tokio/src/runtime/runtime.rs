@@ -385,10 +385,7 @@ impl Runtime {
     ///     let _guard = rt.enter();
     ///     let handle = function_that_spawns(s);
     ///
-    ///     // When a `Runtime` instance is dropped, a shutdown signal will be
-    ///     // delivered to all tasks. So the spawned task may get canceled before
-    ///     // it gets to print the message. To force a deterministic output for this
-    ///     // example, we will wait until the task is finished.
+    ///     // Wait for the task before we end the test.
     ///     rt.block_on(handle).unwrap();
     /// }
     /// ```
