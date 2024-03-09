@@ -230,10 +230,30 @@ impl<T> fmt::Debug for Tx<T> {
 }
 
 impl<T> Rx<T> {
-    pub(crate) fn is_empty(&self) -> bool {
-        unsafe {
-            let block = self.head.as_ref();
-            !block.has_value(self.index)
+    pub(crate) fn is_empty(&self, tx: &Tx<T>) -> bool {
+        let block = unsafe { self.head.as_ref() };
+        if block.has_value(self.index) {
+            return false;
+        }
+
+        // It is possible that a block has no value "now" but the list is still not empty.
+        // To be sure, it is necessary to check the tail position against the current index.
+        //
+        // One edge case is when all the senders are dropped, there will be a last block in the
+        // tail position, but it will be closed
+
+        let tail_position = tx.tail_position.load(Acquire);
+        if self.index == tail_position {
+            true
+        } else if tail_position - self.index == 1 {
+            let tail = tx.block_tail.load(Acquire);
+
+            unsafe {
+                let tail_block = &mut *tail;
+                tail_block.is_closed()
+            }
+        } else {
+            false
         }
     }
 

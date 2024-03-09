@@ -257,7 +257,7 @@ impl<T, S: Semaphore> Rx<T, S> {
     pub(crate) fn is_empty(&self) -> bool {
         self.inner.rx_fields.with(|rx_fields_ptr| {
             let rx_fields = unsafe { &*rx_fields_ptr };
-            rx_fields.list.is_empty()
+            rx_fields.list.is_empty(&self.inner.tx)
         })
     }
 
