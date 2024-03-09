@@ -263,7 +263,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// This method must be called in the context of a tokio runtime.
     ///
-    /// In the case of failure, it returns [`AsyncFdError`] that contains the original object
+    /// In the case of failure, it returns [`AsyncFdTryNewError`] that contains the original object
     /// passed to this function.
     ///
     /// # Panics
@@ -283,7 +283,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// implementing [`AsRawFd`], with a specific [`Interest`]. The backing
     /// file descriptor is cached at the time of creation.
     ///
-    /// In the case of failure, it returns [`AsyncFdError`] that contains the original object
+    /// In the case of failure, it returns [`AsyncFdTryNewError`] that contains the original object
     /// passed to this function.
     ///
     /// # Panics
