@@ -272,7 +272,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// feature flag is not enabled.
     #[inline]
     #[track_caller]
-    pub fn try_new(inner: T) -> Result<Self, AsyncFdError<T>>
+    pub fn try_new(inner: T) -> Result<Self, AsyncFdTryNewError<T>>
     where
         T: AsRawFd,
     {
@@ -292,7 +292,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// feature flag is not enabled.
     #[inline]
     #[track_caller]
-    pub fn try_with_interest(inner: T, interest: Interest) -> Result<Self, AsyncFdError<T>>
+    pub fn try_with_interest(inner: T, interest: Interest) -> Result<Self, AsyncFdTryNewError<T>>
     where
         T: AsRawFd,
     {
@@ -304,7 +304,7 @@ impl<T: AsRawFd> AsyncFd<T> {
         inner: T,
         handle: scheduler::Handle,
         interest: Interest,
-    ) -> Result<Self, AsyncFdError<T>> {
+    ) -> Result<Self, AsyncFdTryNewError<T>> {
         let fd = inner.as_raw_fd();
 
         match Registration::new_with_interest_and_handle(&mut SourceFd(&fd), interest, handle) {
@@ -312,7 +312,7 @@ impl<T: AsRawFd> AsyncFd<T> {
                 registration,
                 inner: Some(inner),
             }),
-            Err(cause) => Err(AsyncFdError { inner, cause }),
+            Err(cause) => Err(AsyncFdTryNewError { inner, cause }),
         }
     }
 
@@ -1318,12 +1318,12 @@ pub struct TryIoError(());
 ///
 /// [`try_new`]: AsyncFd::try_new
 /// [`try_with_interest`]: AsyncFd::try_with_interest
-pub struct AsyncFdError<T> {
+pub struct AsyncFdTryNewError<T> {
     inner: T,
     cause: io::Error,
 }
 
-impl<T> AsyncFdError<T> {
+impl<T> AsyncFdTryNewError<T> {
     /// Returns the original object passed to [`try_new`] or [`try_with_interest`]
     /// alongside the error that caused these functions to fail.
     ///
@@ -1334,22 +1334,26 @@ impl<T> AsyncFdError<T> {
     }
 }
 
-impl<T> fmt::Display for AsyncFdError<T> {
+impl<T> fmt::Display for AsyncFdTryNewError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.cause, f)
     }
 }
 
-impl<T> fmt::Debug for AsyncFdError<T> {
+impl<T> fmt::Debug for AsyncFdTryNewError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.cause, f)
     }
 }
 
-impl<T> Error for AsyncFdError<T> {}
+impl<T> Error for AsyncFdTryNewError<T> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.cause)
+    }
+}
 
-impl<T> From<AsyncFdError<T>> for io::Error {
-    fn from(value: AsyncFdError<T>) -> Self {
+impl<T> From<AsyncFdTryNewError<T>> for io::Error {
+    fn from(value: AsyncFdTryNewError<T>) -> Self {
         value.cause
     }
 }
