@@ -1316,20 +1316,15 @@ impl<T> Drop for Sender<T> {
 
             // Fetch the latest state.
             let current_state = self.shared.state.load();
-            let currrent_ref_count = current_state.0;
+            let currrent_state_inner = current_state.0;
 
-            // We try to update the state with compare_exchange.
-            //
-            // If another task closes the sender or clones the sender again while loading
-            // the latest state, the `compare_exchange` here will fail. In that case,
-            // we do nothing in this sender's drop.
             if self
                 .shared
                 .state
                 .0
                 .compare_exchange(
-                    currrent_ref_count,
-                    currrent_ref_count | CLOSED_BIT,
+                    currrent_state_inner,
+                    currrent_state_inner | CLOSED_BIT,
                     AcqRel,
                     Relaxed,
                 )
