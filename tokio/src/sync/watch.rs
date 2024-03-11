@@ -367,12 +367,12 @@ mod big_notify {
     }
 }
 
-use self::state::{AtomicState, Version, CLOSED_BIT};
+use self::state::{AtomicState, Version};
 mod state {
     use crate::loom::sync::atomic::AtomicUsize;
     use crate::loom::sync::atomic::Ordering;
 
-    pub(super) const CLOSED_BIT: usize = 1;
+    const CLOSED_BIT: usize = 1;
 
     // Using 2 as the step size preserves the `CLOSED_BIT`.
     const STEP_SIZE: usize = 2;
@@ -387,7 +387,7 @@ mod state {
     /// The CLOSED bit tracks whether the Sender has been dropped. Dropping all
     /// receivers does not set it.
     #[derive(Copy, Clone, Debug)]
-    pub(super) struct StateSnapshot(pub(super) usize);
+    pub(super) struct StateSnapshot(usize);
 
     /// The state stored in an atomic integer.
     ///
@@ -396,7 +396,7 @@ mod state {
     /// current state. This ensures that written values are seen by
     /// the `Receiver`s for a proper handover.
     #[derive(Debug)]
-    pub(super) struct AtomicState(pub(super) AtomicUsize);
+    pub(super) struct AtomicState(AtomicUsize);
 
     impl Version {
         /// Decrements the version.
@@ -448,6 +448,11 @@ mod state {
             // value is still protected by an exclusive lock during this
             // method.
             self.0.fetch_add(STEP_SIZE, Ordering::Release);
+        }
+
+        /// Set the closed bit in the state.
+        pub(super) fn set_closed(&self) {
+            self.0.fetch_or(CLOSED_BIT, Ordering::Release);
         }
     }
 }
@@ -1312,27 +1317,8 @@ impl<T> Sender<T> {
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
         if self.shared.ref_count_tx.fetch_sub(1, AcqRel) == 1 {
-            // Now that the sender's ref count is zero, so we attempt to close the sender.
-
-            // Fetch the latest state.
-            let current_state = self.shared.state.load();
-            let currrent_state_inner = current_state.0;
-
-            if self
-                .shared
-                .state
-                .0
-                .compare_exchange(
-                    currrent_state_inner,
-                    currrent_state_inner | CLOSED_BIT,
-                    AcqRel,
-                    Relaxed,
-                )
-                .is_ok()
-            {
-                // Only when last sender is dropped, we notify the receivers.
-                self.shared.notify_rx.notify_waiters();
-            }
+            self.shared.state.set_closed();
+            self.shared.notify_rx.notify_waiters();
         }
     }
 }
