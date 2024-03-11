@@ -368,12 +368,13 @@ impl Runtime {
     ///
     /// ```
     /// use tokio::runtime::Runtime;
+    /// use tokio::task::JoinHandle;
     ///
-    /// fn function_that_spawns(msg: String) {
+    /// fn function_that_spawns(msg: String) -> JoinHandle<()> {
     ///     // Had we not used `rt.enter` below, this would panic.
     ///     tokio::spawn(async move {
     ///         println!("{}", msg);
-    ///     });
+    ///     })
     /// }
     ///
     /// fn main() {
@@ -383,7 +384,10 @@ impl Runtime {
     ///
     ///     // By entering the context, we tie `tokio::spawn` to this executor.
     ///     let _guard = rt.enter();
-    ///     function_that_spawns(s);
+    ///     let handle = function_that_spawns(s);
+    ///
+    ///     // Wait for the task before we end the test.
+    ///     rt.block_on(handle).unwrap();
     /// }
     /// ```
     pub fn enter(&self) -> EnterGuard<'_> {
