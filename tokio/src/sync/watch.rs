@@ -148,7 +148,7 @@ pub struct Sender<T> {
 
 impl<T> Clone for Sender<T> {
     fn clone(&self) -> Self {
-        self.shared.ref_count_tx.fetch_add(1, AcqRel);
+        self.shared.ref_count_tx.fetch_add(1, Relaxed);
 
         Self {
             shared: self.shared.clone(),
