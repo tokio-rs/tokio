@@ -114,7 +114,7 @@
 use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::atomic::Ordering::Relaxed;
+use crate::loom::sync::atomic::Ordering::{AcqRel, Relaxed};
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 use std::mem;
@@ -144,6 +144,16 @@ pub struct Receiver<T> {
 #[derive(Debug)]
 pub struct Sender<T> {
     shared: Arc<Shared<T>>,
+}
+
+impl<T> Clone for Sender<T> {
+    fn clone(&self) -> Self {
+        self.shared.ref_count_tx.fetch_add(1, Relaxed);
+
+        Self {
+            shared: self.shared.clone(),
+        }
+    }
 }
 
 /// Returns a reference to the inner value.
@@ -237,6 +247,9 @@ struct Shared<T> {
 
     /// Tracks the number of `Receiver` instances.
     ref_count_rx: AtomicUsize,
+
+    /// Tracks the number of `Sender` instances.
+    ref_count_tx: AtomicUsize,
 
     /// Notifies waiting receivers that the value changed.
     notify_rx: big_notify::BigNotify,
@@ -485,6 +498,7 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
         value: RwLock::new(init),
         state: AtomicState::new(),
         ref_count_rx: AtomicUsize::new(1),
+        ref_count_tx: AtomicUsize::new(1),
         notify_rx: big_notify::BigNotify::new(),
         notify_tx: Notify::new(),
     });
@@ -1302,8 +1316,10 @@ impl<T> Sender<T> {
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        self.shared.state.set_closed();
-        self.shared.notify_rx.notify_waiters();
+        if self.shared.ref_count_tx.fetch_sub(1, AcqRel) == 1 {
+            self.shared.state.set_closed();
+            self.shared.notify_rx.notify_waiters();
+        }
     }
 }
 
