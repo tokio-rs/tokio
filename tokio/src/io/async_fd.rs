@@ -259,7 +259,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// time of creation.
     ///
     /// Only configures the [`Interest::READABLE`] and [`Interest::WRITABLE`] interests. For more
-    /// control, use [`AsyncFd::with_interest`].
+    /// control, use [`AsyncFd::try_with_interest`].
     ///
     /// This method must be called in the context of a tokio runtime.
     ///
