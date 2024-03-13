@@ -303,7 +303,7 @@ impl<T> Clone for PollSender<T> {
     }
 }
 
-impl<T: Send + 'static> Sink<T> for PollSender<T> {
+impl<T: Send> Sink<T> for PollSender<T> {
     type Error = PollSendError<T>;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
