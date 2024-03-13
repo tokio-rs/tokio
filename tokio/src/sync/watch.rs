@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
 
-//! A single-producer, multi-consumer channel that only retains the *last* sent
+//! A multi-producer, multi-consumer channel that only retains the *last* sent
 //! value.
 //!
 //! This channel is useful for watching for changes to a value from multiple
