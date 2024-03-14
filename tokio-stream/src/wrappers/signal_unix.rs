@@ -15,8 +15,8 @@ pub struct SignalStream {
 
 impl SignalStream {
     /// Create a new `SignalStream`.
-    pub fn new(interval: Signal) -> Self {
-        Self { inner: interval }
+    pub fn new(signal: Signal) -> Self {
+        Self { inner: signal }
     }
 
     /// Get back the inner `Signal`.

@@ -537,6 +537,7 @@ jobs:
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
+          qemu: '7.2'
 
       - uses: Swatinem/rust-cache@v2
       - name: Tests run with all features (including parking_lot)
@@ -576,6 +577,7 @@ jobs:
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
+          qemu: '7.2'
 
       - name: Remove `parking_lot` from `full` feature
         run: sed -i '0,/parking_lot/{/parking_lot/d;}' tokio/Cargo.toml
@@ -612,6 +614,7 @@ jobs:
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: i686-unknown-linux-gnu
+          qemu: '7.2'
 
       - uses: Swatinem/rust-cache@v2
       - name: test tokio --all-features

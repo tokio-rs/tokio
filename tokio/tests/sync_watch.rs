@@ -7,7 +7,9 @@ use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use tokio::sync::watch;
 use tokio_test::task::spawn;
-use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok};
+use tokio_test::{
+    assert_pending, assert_ready, assert_ready_eq, assert_ready_err, assert_ready_ok,
+};
 
 #[test]
 fn single_rx_recv() {
@@ -331,4 +333,38 @@ fn send_modify_panic() {
     tx.send_modify(|old| *old = "three");
     assert_ready_ok!(task.poll());
     assert_eq!(*rx.borrow_and_update(), "three");
+}
+
+#[tokio::test]
+async fn multiple_sender() {
+    let (tx1, mut rx) = watch::channel(0);
+    let tx2 = tx1.clone();
+
+    let mut t = spawn(async {
+        rx.changed().await.unwrap();
+        let v1 = *rx.borrow_and_update();
+        rx.changed().await.unwrap();
+        let v2 = *rx.borrow_and_update();
+        (v1, v2)
+    });
+
+    tx1.send(1).unwrap();
+    assert_pending!(t.poll());
+    tx2.send(2).unwrap();
+    assert_ready_eq!(t.poll(), (1, 2));
+}
+
+#[tokio::test]
+async fn reciever_is_notified_when_last_sender_is_dropped() {
+    let (tx1, mut rx) = watch::channel(0);
+    let tx2 = tx1.clone();
+
+    let mut t = spawn(rx.changed());
+    assert_pending!(t.poll());
+
+    drop(tx1);
+    assert!(!t.is_woken());
+    drop(tx2);
+
+    assert!(t.is_woken());
 }
