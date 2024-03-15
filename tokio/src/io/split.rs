@@ -6,7 +6,6 @@
 
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-use std::cell::UnsafeCell;
 use std::fmt;
 use std::io;
 use std::pin::Pin;
@@ -37,7 +36,7 @@ cfg_io_util! {
         let is_write_vectored = stream.is_write_vectored();
 
         let inner = Arc::new(Inner {
-            stream: Mutex::new(UnsafeCell::new(stream)),
+            stream: Mutex::new(stream),
             is_write_vectored,
         });
 
@@ -52,7 +51,7 @@ cfg_io_util! {
 }
 
 struct Inner<T> {
-    stream: Mutex<UnsafeCell<T>>,
+    stream: Mutex<T>,
     is_write_vectored: bool,
 }
 
@@ -61,7 +60,7 @@ impl<T> Inner<T> {
         let mut guard = self.stream.lock().unwrap();
 
         // safety: we do not move the stream.
-        let stream = unsafe { Pin::new_unchecked(guard.get_mut()) };
+        let stream = unsafe { Pin::new_unchecked(&mut *guard) };
 
         f(stream)
     }
@@ -94,7 +93,7 @@ impl<T> ReadHalf<T> {
                 .ok()
                 .expect("`Arc::try_unwrap` failed");
 
-            inner.stream.into_inner().unwrap().into_inner()
+            inner.stream.into_inner().unwrap()
         } else {
             panic!("Unrelated `split::Write` passed to `split::Read::unsplit`.")
         }
