@@ -578,6 +578,16 @@ impl<T> UnboundedSender<T> {
             chan: self.chan.downgrade(),
         }
     }
+
+    /// Returns the number of [`UnboundedSender`] handles.
+    pub fn strong_count(&self) -> usize {
+        self.chan.strong_count()
+    }
+
+    /// Returns the number of [`WeakUnboundedSender`] handles.
+    pub fn weak_count(&self) -> usize {
+        self.chan.weak_count()
+    }
 }
 
 impl<T> Clone for WeakUnboundedSender<T> {
@@ -588,12 +598,28 @@ impl<T> Clone for WeakUnboundedSender<T> {
     }
 }
 
+impl<T> Drop for WeakUnboundedSender<T> {
+    fn drop(&mut self) {
+        self.chan.decrement_weak_count();
+    }
+}
+
 impl<T> WeakUnboundedSender<T> {
     /// Tries to convert a `WeakUnboundedSender` into an [`UnboundedSender`].
     /// This will return `Some` if there are other `Sender` instances alive and
     /// the channel wasn't previously dropped, otherwise `None` is returned.
     pub fn upgrade(&self) -> Option<UnboundedSender<T>> {
         chan::Tx::upgrade(self.chan.clone()).map(UnboundedSender::new)
+    }
+
+    /// Returns the number of [`UnboundedSender`] handles.
+    pub fn strong_count(&self) -> usize {
+        self.chan.strong_count()
+    }
+
+    /// Returns the number of [`WeakUnboundedSender`] handles.
+    pub fn weak_count(&self) -> usize {
+        self.chan.weak_count()
     }
 }
 
