@@ -592,6 +592,8 @@ impl<T> UnboundedSender<T> {
 
 impl<T> Clone for WeakUnboundedSender<T> {
     fn clone(&self) -> Self {
+        self.chan.increment_weak_count();
+
         WeakUnboundedSender {
             chan: self.chan.clone(),
         }

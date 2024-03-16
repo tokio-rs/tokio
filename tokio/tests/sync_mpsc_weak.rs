@@ -533,17 +533,33 @@ async fn strong_and_weak_count() {
             assert_eq!(weak.weak_count(), 1);
             assert_eq!(weak.strong_count(), 2);
 
-            first_downgrade.notify_one();
-
-            second_downgrade.notified().await;
+            let weak2 = weak.clone();
 
             assert_eq!(tx.weak_count(), 2);
             assert_eq!(tx.strong_count(), 2);
             assert_eq!(weak.weak_count(), 2);
             assert_eq!(weak.strong_count(), 2);
+            assert_eq!(weak2.weak_count(), 2);
+            assert_eq!(weak2.strong_count(), 2);
+
+            first_downgrade.notify_one();
+
+            second_downgrade.notified().await;
+
+            assert_eq!(tx.weak_count(), 3);
+            assert_eq!(tx.strong_count(), 2);
+            assert_eq!(weak.weak_count(), 3);
+            assert_eq!(weak.strong_count(), 2);
+            assert_eq!(weak2.weak_count(), 3);
+            assert_eq!(weak2.strong_count(), 2);
 
             drop(weak);
+            assert_eq!(tx.weak_count(), 2);
+            assert_eq!(tx.strong_count(), 2);
+            assert_eq!(weak2.weak_count(), 2);
+            assert_eq!(weak2.strong_count(), 2);
 
+            drop(weak2);
             assert_eq!(tx.weak_count(), 1);
             assert_eq!(tx.strong_count(), 2);
 
@@ -553,14 +569,14 @@ async fn strong_and_weak_count() {
 
     first_downgrade.notified().await;
 
-    assert_eq!(tx.weak_count(), 1);
+    assert_eq!(tx.weak_count(), 2);
     assert_eq!(tx.strong_count(), 2);
 
     let weak = tx.downgrade();
 
-    assert_eq!(tx.weak_count(), 2);
+    assert_eq!(tx.weak_count(), 3);
     assert_eq!(tx.strong_count(), 2);
-    assert_eq!(weak.weak_count(), 2);
+    assert_eq!(weak.weak_count(), 3);
     assert_eq!(weak.strong_count(), 2);
 
     second_downgrade.notify_one();
@@ -596,17 +612,33 @@ async fn unbounded_strong_and_weak_count() {
             assert_eq!(weak.weak_count(), 1);
             assert_eq!(weak.strong_count(), 2);
 
-            first_downgrade.notify_one();
-
-            second_downgrade.notified().await;
+            let weak2 = weak.clone();
 
             assert_eq!(tx.weak_count(), 2);
             assert_eq!(tx.strong_count(), 2);
             assert_eq!(weak.weak_count(), 2);
             assert_eq!(weak.strong_count(), 2);
+            assert_eq!(weak2.weak_count(), 2);
+            assert_eq!(weak2.strong_count(), 2);
+
+            first_downgrade.notify_one();
+
+            second_downgrade.notified().await;
+
+            assert_eq!(tx.weak_count(), 3);
+            assert_eq!(tx.strong_count(), 2);
+            assert_eq!(weak.weak_count(), 3);
+            assert_eq!(weak.strong_count(), 2);
+            assert_eq!(weak2.weak_count(), 3);
+            assert_eq!(weak2.strong_count(), 2);
 
             drop(weak);
+            assert_eq!(tx.weak_count(), 2);
+            assert_eq!(tx.strong_count(), 2);
+            assert_eq!(weak2.weak_count(), 2);
+            assert_eq!(weak2.strong_count(), 2);
 
+            drop(weak2);
             assert_eq!(tx.weak_count(), 1);
             assert_eq!(tx.strong_count(), 2);
 
@@ -616,14 +648,14 @@ async fn unbounded_strong_and_weak_count() {
 
     first_downgrade.notified().await;
 
-    assert_eq!(tx.weak_count(), 1);
+    assert_eq!(tx.weak_count(), 2);
     assert_eq!(tx.strong_count(), 2);
 
     let weak = tx.downgrade();
 
-    assert_eq!(tx.weak_count(), 2);
+    assert_eq!(tx.weak_count(), 3);
     assert_eq!(tx.strong_count(), 2);
-    assert_eq!(weak.weak_count(), 2);
+    assert_eq!(weak.weak_count(), 3);
     assert_eq!(weak.strong_count(), 2);
 
     second_downgrade.notify_one();

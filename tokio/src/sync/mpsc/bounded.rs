@@ -1439,6 +1439,8 @@ impl<T> fmt::Debug for Sender<T> {
 
 impl<T> Clone for WeakSender<T> {
     fn clone(&self) -> Self {
+        self.chan.increment_weak_count();
+
         WeakSender {
             chan: self.chan.clone(),
         }

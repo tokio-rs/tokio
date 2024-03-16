@@ -144,7 +144,7 @@ impl<T, S> Tx<T, S> {
     }
 
     pub(super) fn downgrade(&self) -> Arc<Chan<T, S>> {
-        self.inner.tx_weak_count.fetch_add(1, Relaxed);
+        self.inner.increment_weak_count();
 
         self.inner.clone()
     }
@@ -469,6 +469,10 @@ impl<T, S> Chan<T, S> {
 
     pub(super) fn decrement_weak_count(&self) {
         self.tx_weak_count.fetch_sub(1, Relaxed);
+    }
+
+    pub(super) fn increment_weak_count(&self) {
+        self.tx_weak_count.fetch_add(1, Relaxed);
     }
 
     pub(super) fn strong_count(&self) -> usize {
