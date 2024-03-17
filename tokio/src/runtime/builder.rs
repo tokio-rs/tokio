@@ -825,7 +825,7 @@ impl Builder {
         ///   [`Runtime::block_on`] will panic.
         ///
         /// # Panics
-        /// This method panics if called on a runtime other than [`Kind::CurrentThread`].
+        /// This method panics if called on a runtime other than the current thread runtime.
         ///
         /// # Unstable
         ///
