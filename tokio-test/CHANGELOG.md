@@ -1,3 +1,13 @@
+# 0.4.4 (March 14, 2024)
+
+- task: mark `Spawn` as `#[must_use]` ([#6371])
+- test: increase MSRV to 1.63 ([#6126])
+- test: update category slug ([#5953])
+
+[#5953]: https://github.com/tokio-rs/tokio/pull/5953
+[#6126]: https://github.com/tokio-rs/tokio/pull/6126
+[#6371]: https://github.com/tokio-rs/tokio/pull/6371
+
 # 0.4.3 (August 23, 2023)
 
 - deps: fix minimum required version of `async-stream` ([#5347])

@@ -175,3 +175,48 @@ fn async_fd_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+#[test]
+#[cfg(unix)]
+fn async_fd_try_new_panic_caller() -> Result<(), Box<dyn Error>> {
+    use tokio::io::unix::AsyncFd;
+    use tokio::runtime::Builder;
+
+    let panic_location_file = test_panic(|| {
+        // Runtime without `enable_io` so it has no IO driver set.
+        let rt = Builder::new_current_thread().build().unwrap();
+        rt.block_on(async {
+            let fd = unix::MockFd;
+
+            let _ = AsyncFd::try_new(fd);
+        });
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+#[cfg(unix)]
+fn async_fd_try_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
+    use tokio::io::unix::AsyncFd;
+    use tokio::io::Interest;
+    use tokio::runtime::Builder;
+
+    let panic_location_file = test_panic(|| {
+        // Runtime without `enable_io` so it has no IO driver set.
+        let rt = Builder::new_current_thread().build().unwrap();
+        rt.block_on(async {
+            let fd = unix::MockFd;
+
+            let _ = AsyncFd::try_with_interest(fd, Interest::READABLE);
+        });
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}

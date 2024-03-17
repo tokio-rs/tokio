@@ -332,6 +332,50 @@ pin_project! {
     }
 }
 
+impl<T, F> TaskLocalFuture<T, F>
+where
+    T: 'static,
+{
+    /// Returns the value stored in the task local by this `TaskLocalFuture`.
+    ///
+    /// The function returns:
+    ///
+    /// * `Some(T)` if the task local value exists.
+    /// * `None` if the task local value has already been taken.
+    ///
+    /// Note that this function attempts to take the task local value even if
+    /// the future has not yet completed. In that case, the value will no longer
+    /// be available via the task local after the call to `take_value`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # async fn dox() {
+    /// tokio::task_local! {
+    ///     static KEY: u32;
+    /// }
+    ///
+    /// let fut = KEY.scope(42, async {
+    ///     // Do some async work
+    /// });
+    ///
+    /// let mut pinned = Box::pin(fut);
+    ///
+    /// // Complete the TaskLocalFuture
+    /// let _ = pinned.as_mut().await;
+    ///
+    /// // And here, we can take task local value
+    /// let value = pinned.as_mut().take_value();
+    ///
+    /// assert_eq!(value, Some(42));
+    /// # }
+    /// ```
+    pub fn take_value(self: Pin<&mut Self>) -> Option<T> {
+        let this = self.project();
+        this.slot.take()
+    }
+}
+
 impl<T: 'static, F: Future> Future for TaskLocalFuture<T, F> {
     type Output = F::Output;
 

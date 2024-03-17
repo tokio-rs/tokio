@@ -184,9 +184,11 @@ it, `rustfmt` will update your files locally instead.
 You can run loom tests with
 ```
 cd tokio # tokio crate in workspace
-LOOM_MAX_PREEMPTIONS=1 RUSTFLAGS="--cfg loom" \
+LOOM_MAX_PREEMPTIONS=1 LOOM_MAX_BRANCHES=10000 RUSTFLAGS="--cfg loom -C debug_assertions" \
     cargo test --lib --release --features full -- --test-threads=1 --nocapture
 ```
+Additionally, you can also add `--cfg tokio_unstable` to the `RUSTFLAGS` environment variable to
+run loom tests that test unstable features. 
 
 You can run miri tests with
 ```
@@ -368,14 +370,16 @@ A good commit message should describe what changed and why.
     and no more than 72 characters)
   * be entirely in lowercase with the exception of proper nouns, acronyms, and
     the words that refer to code, like function/variable names
-  * be prefixed with the name of the sub crate being changed (without the `tokio-`
-    prefix) and start with an imperative verb. If modifying `tokio` proper,
-    omit the crate prefix.
+  * start with an imperative verb
+  * not have a period at the end
+  * be prefixed with the name of the module being changed; usually this is the
+    same as the M-* label on the PR
 
   Examples:
 
-  * timer: introduce `Timeout` and deprecate `Deadline`
-  * export `Encoder`, `Decoder`, `Framed*` from tokio_codec
+  * time: introduce `Timeout` and deprecate `Deadline`
+  * codec: export `Encoder`, `Decoder`, `Framed*`
+  * ci: fix the FreeBSD ci configuration
 
 2. Keep the second line blank.
 3. Wrap all other lines at 72 columns (except for long URLs).
@@ -392,7 +396,7 @@ A good commit message should describe what changed and why.
 Sample complete commit message:
 
 ```txt
-subcrate: explain the commit in one line
+module: explain the commit in one line
 
 Body of commit message is a few lines of text, explaining things
 in more detail, possibly giving some background about the issue

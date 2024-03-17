@@ -741,7 +741,7 @@ impl<T> Sender<T> {
         self.shared.buffer[idx].read().unwrap().rem.load(SeqCst) == 0
     }
 
-    /// Returns the number of active receivers
+    /// Returns the number of active receivers.
     ///
     /// An active receiver is a [`Receiver`] handle returned from [`channel`] or
     /// [`subscribe`]. These are the handles that will receive values sent on
