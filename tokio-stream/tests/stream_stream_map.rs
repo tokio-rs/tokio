@@ -1,13 +1,18 @@
+use futures::stream::iter;
 use tokio_stream::{self as stream, pending, Stream, StreamExt, StreamMap};
 use tokio_test::{assert_ok, assert_pending, assert_ready, task};
+
+use std::{
+    future::{poll_fn, Future},
+    pin::{pin, Pin},
+    task::Poll,
+};
 
 mod support {
     pub(crate) mod mpsc;
 }
 
 use support::mpsc;
-
-use std::pin::Pin;
 
 macro_rules! assert_ready_some {
     ($($t:tt)*) => {
@@ -327,4 +332,148 @@ fn one_ready_many_none() {
 
 fn pin_box<T: Stream<Item = U> + 'static, U>(s: T) -> Pin<Box<dyn Stream<Item = U>>> {
     Box::pin(s)
+}
+
+type UsizeStream = Pin<Box<dyn Stream<Item = usize> + Send>>;
+
+#[tokio::test]
+async fn poll_recv_many_zero() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    stream_map.insert(0, Box::pin(pending()) as UsizeStream);
+
+    let n = poll_fn(|cx| stream_map.poll_recv_many(cx, &mut vec![], 0)).await;
+
+    assert_eq!(n, 0);
+}
+
+#[tokio::test]
+async fn poll_recv_many_empty() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    let n = poll_fn(|cx| stream_map.poll_recv_many(cx, &mut vec![], 1)).await;
+
+    assert_eq!(n, 0);
+}
+
+#[tokio::test]
+async fn poll_recv_many_pending() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    stream_map.insert(0, Box::pin(pending()) as UsizeStream);
+
+    let mut is_pending = false;
+    poll_fn(|cx| {
+        let poll = stream_map.poll_recv_many(cx, &mut vec![], 1);
+
+        is_pending = poll.is_pending();
+
+        return Poll::Ready(());
+    })
+    .await;
+
+    assert!(is_pending);
+}
+
+#[tokio::test]
+async fn poll_recv_many_not_enough() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    stream_map.insert(0, Box::pin(iter([0usize].into_iter())) as UsizeStream);
+    stream_map.insert(1, Box::pin(iter([1usize].into_iter())) as UsizeStream);
+
+    let mut buffer = vec![];
+    let n = poll_fn(|cx| stream_map.poll_recv_many(cx, &mut buffer, 3)).await;
+
+    assert_eq!(n, 2);
+    assert_eq!(buffer.len(), 2);
+    assert!(buffer.contains(&(0, 0)));
+    assert!(buffer.contains(&(1, 1)));
+}
+
+#[tokio::test]
+async fn poll_recv_many_enough() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    stream_map.insert(0, Box::pin(iter([0usize].into_iter())) as UsizeStream);
+    stream_map.insert(1, Box::pin(iter([1usize].into_iter())) as UsizeStream);
+
+    let mut buffer = vec![];
+    let n = poll_fn(|cx| stream_map.poll_recv_many(cx, &mut buffer, 2)).await;
+
+    assert_eq!(n, 2);
+    assert_eq!(buffer.len(), 2);
+    assert!(buffer.contains(&(0, 0)));
+    assert!(buffer.contains(&(1, 1)));
+}
+
+#[tokio::test]
+async fn recv_many_zero() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    stream_map.insert(0, Box::pin(pending()) as UsizeStream);
+
+    let n = poll_fn(|cx| pin!(stream_map.recv_many(&mut vec![], 0)).poll(cx)).await;
+
+    assert_eq!(n, 0);
+}
+
+#[tokio::test]
+async fn recv_many_empty() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    let n = stream_map.recv_many(&mut vec![], 1).await;
+
+    assert_eq!(n, 0);
+}
+
+#[tokio::test]
+async fn recv_many_pending() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    stream_map.insert(0, Box::pin(pending()) as UsizeStream);
+
+    let mut is_pending = false;
+    poll_fn(|cx| {
+        let poll = pin!(stream_map.recv_many(&mut vec![], 1)).poll(cx);
+
+        is_pending = poll.is_pending();
+
+        return Poll::Ready(());
+    })
+    .await;
+
+    assert!(is_pending);
+}
+
+#[tokio::test]
+async fn recv_many_not_enough() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    stream_map.insert(0, Box::pin(iter([0usize].into_iter())) as UsizeStream);
+    stream_map.insert(1, Box::pin(iter([1usize].into_iter())) as UsizeStream);
+
+    let mut buffer = vec![];
+    let n = poll_fn(|cx| pin!(stream_map.recv_many(&mut buffer, 3)).poll(cx)).await;
+
+    assert_eq!(n, 2);
+    assert_eq!(buffer.len(), 2);
+    assert!(buffer.contains(&(0, 0)));
+    assert!(buffer.contains(&(1, 1)));
+}
+
+#[tokio::test]
+async fn recv_many_enough() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    stream_map.insert(0, Box::pin(iter([0usize].into_iter())) as UsizeStream);
+    stream_map.insert(1, Box::pin(iter([1usize].into_iter())) as UsizeStream);
+
+    let mut buffer = vec![];
+    let n = poll_fn(|cx| pin!(stream_map.recv_many(&mut buffer, 2)).poll(cx)).await;
+
+    assert_eq!(n, 2);
+    assert_eq!(buffer.len(), 2);
+    assert!(buffer.contains(&(0, 0)));
+    assert!(buffer.contains(&(1, 1)));
 }

@@ -1,6 +1,7 @@
 use crate::Stream;
 
 use std::borrow::Borrow;
+use std::future::poll_fn;
 use std::hash::Hash;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -558,6 +559,80 @@ where
 impl<K, V> Default for StreamMap<K, V> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<K, V> StreamMap<K, V>
+where
+    K: Clone + Unpin,
+    V: Stream + Unpin,
+{
+    /// Polls to receive multiple items on this `StreamMap`, extending the provided `buffer`.
+    ///
+    /// This method returns:
+    /// * `Poll::Pending` if no items are available but the `StreamMap` is not empty.
+    /// * `Poll::Ready(count)` where `count` is the number of items successfully received and
+    ///   stored in `buffer`. This can be less than, or equal to, `limit`.
+    /// * `Poll::Ready(0)` if `limit` is set to zero or when the `StreamMap` is empty.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when an item is sent on any of the
+    /// underlying stream. Note that on multiple calls to `poll_recv_many`, only
+    /// the `Waker` from the `Context` passed to the most recent call is scheduled
+    /// to receive a wakeup.
+    ///
+    /// Note that this method does not guarantee that exactly `limit` items
+    /// are received. Rather, if at least one item is available, it returns
+    /// as many items as it can up to the given limit. This method returns
+    /// zero only if the `StreamMap` is empty (or if `limit` is zero).
+    pub fn poll_recv_many(
+        &mut self,
+        cx: &mut Context<'_>,
+        buffer: &mut Vec<(K, V::Item)>,
+        limit: usize,
+    ) -> Poll<usize> {
+        if limit == 0 {
+            return Poll::Ready(0);
+        }
+
+        let mut remaining = limit;
+
+        while remaining > 0 {
+            match self.poll_next_entry(cx) {
+                Poll::Ready(Some((idx, val))) => {
+                    remaining -= 1;
+                    let key = self.entries[idx].0.clone();
+                    buffer.push((key, val));
+                }
+                Poll::Ready(None) | Poll::Pending => break,
+            }
+        }
+
+        let added = limit - remaining;
+
+        if added > 0 {
+            Poll::Ready(added)
+        } else {
+            if self.entries.is_empty() {
+                Poll::Ready(0)
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    /// Receives multiple items on this [`StreamMap`], extending the provided `buffer`.
+    ///
+    /// This method returns the number of items that is appended to the `buffer`.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv_many` is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, it is guaranteed that no items were received on any of
+    /// the underlying streams.
+    pub async fn recv_many(&mut self, buffer: &mut Vec<(K, V::Item)>, limit: usize) -> usize {
+        poll_fn(|cx| self.poll_recv_many(cx, buffer, limit)).await
     }
 }
 
