@@ -1,7 +1,8 @@
 use crate::Stream;
 
+use futures::future::poll_fn;
+
 use std::borrow::Borrow;
-use std::future::poll_fn;
 use std::hash::Hash;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -612,12 +613,10 @@ where
 
         if added > 0 {
             Poll::Ready(added)
+        } else if self.entries.is_empty() {
+            Poll::Ready(0)
         } else {
-            if self.entries.is_empty() {
-                Poll::Ready(0)
-            } else {
-                Poll::Pending
-            }
+            Poll::Pending
         }
     }
 
@@ -628,7 +627,7 @@ where
     /// # Cancel safety
     ///
     /// This method is cancel safe. If `recv_many` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// [`tokio::select!`](tokio::select) statement and some other branch
     /// completes first, it is guaranteed that no items were received on any of
     /// the underlying streams.
     pub async fn recv_many(&mut self, buffer: &mut Vec<(K, V::Item)>, limit: usize) -> usize {

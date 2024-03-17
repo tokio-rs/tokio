@@ -368,7 +368,7 @@ async fn poll_recv_many_pending() {
 
         is_pending = poll.is_pending();
 
-        return Poll::Ready(());
+        Poll::Ready(())
     })
     .await;
 
@@ -439,7 +439,7 @@ async fn recv_many_pending() {
 
         is_pending = poll.is_pending();
 
-        return Poll::Ready(());
+        Poll::Ready(())
     })
     .await;
 
