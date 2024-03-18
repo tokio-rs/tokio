@@ -825,7 +825,7 @@ impl Builder {
         ///   [`Runtime::block_on`] will panic.
         ///
         /// # Panics
-        /// This method panics if called with [`UnhandledPanic::ShutdownRuntime`] 
+        /// This method panics if called with [`UnhandledPanic::ShutdownRuntime`]
         /// on a runtime other than the current thread runtime.
         ///
         /// # Unstable
