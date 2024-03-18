@@ -1,6 +1,4 @@
-use crate::Stream;
-
-use futures::future::poll_fn;
+use crate::{poll_fn, Stream};
 
 use std::borrow::Borrow;
 use std::hash::Hash;
@@ -518,9 +516,7 @@ where
     K: Unpin,
     V: Stream + Unpin,
 {
-    /// Polls the next value, includes the vec entry index
-    fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<Option<(usize, V::Item)>> {
-        let start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
+    fn poll_one(&mut self, cx: &mut Context<'_>, start: usize) -> Poll<Option<(usize, V::Item)>> {
         let mut idx = start;
 
         for _ in 0..self.entries.len() {
@@ -555,6 +551,13 @@ where
             Poll::Pending
         }
     }
+
+    /// Polls the next value, includes the vec entry index
+    fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<Option<(usize, V::Item)>> {
+        let start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
+
+        self.poll_one(cx, start)
+    }
 }
 
 impl<K, V> Default for StreamMap<K, V> {
@@ -568,6 +571,25 @@ where
     K: Clone + Unpin,
     V: Stream + Unpin,
 {
+    /// Receives multiple items on this [`StreamMap`], extending the provided `buffer`.
+    ///
+    /// This method returns the number of items that is appended to the `buffer`.
+    ///
+    /// Note that this method does not guarantee that exactly `limit` items
+    /// are received. Rather, if at least one item is available, it returns
+    /// as many items as it can up to the given limit. This method returns
+    /// zero only if the `StreamMap` is empty (or if `limit` is zero).
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `recv_many` is used as the event in a
+    /// [`tokio::select!`](tokio::select) statement and some other branch
+    /// completes first, it is guaranteed that no items were received on any of
+    /// the underlying streams.
+    pub async fn next_many(&mut self, buffer: &mut Vec<(K, V::Item)>, limit: usize) -> usize {
+        poll_fn(|cx| self.poll_next_many(cx, buffer, limit)).await
+    }
+
     /// Polls to receive multiple items on this `StreamMap`, extending the provided `buffer`.
     ///
     /// This method returns:
@@ -586,7 +608,7 @@ where
     /// are received. Rather, if at least one item is available, it returns
     /// as many items as it can up to the given limit. This method returns
     /// zero only if the `StreamMap` is empty (or if `limit` is zero).
-    pub fn poll_recv_many(
+    pub fn poll_next_many(
         &mut self,
         cx: &mut Context<'_>,
         buffer: &mut Vec<(K, V::Item)>,
@@ -597,15 +619,22 @@ where
         }
 
         let mut remaining = limit;
+        let mut start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
 
         while remaining > 0 {
-            match self.poll_next_entry(cx) {
+            match self.poll_one(cx, start) {
                 Poll::Ready(Some((idx, val))) => {
                     remaining -= 1;
                     let key = self.entries[idx].0.clone();
                     buffer.push((key, val));
                 }
                 Poll::Ready(None) | Poll::Pending => break,
+            }
+
+            // Some streams may have been removed during the call to `poll_one`,
+            // so we may need to regenerate the start index.
+            if start >= self.entries.len() {
+                start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
             }
         }
 
@@ -618,20 +647,6 @@ where
         } else {
             Poll::Pending
         }
-    }
-
-    /// Receives multiple items on this [`StreamMap`], extending the provided `buffer`.
-    ///
-    /// This method returns the number of items that is appended to the `buffer`.
-    ///
-    /// # Cancel safety
-    ///
-    /// This method is cancel safe. If `recv_many` is used as the event in a
-    /// [`tokio::select!`](tokio::select) statement and some other branch
-    /// completes first, it is guaranteed that no items were received on any of
-    /// the underlying streams.
-    pub async fn recv_many(&mut self, buffer: &mut Vec<(K, V::Item)>, limit: usize) -> usize {
-        poll_fn(|cx| self.poll_recv_many(cx, buffer, limit)).await
     }
 }
 
