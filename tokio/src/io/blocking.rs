@@ -21,9 +21,10 @@ pub(crate) struct Blocking<T> {
 pub(crate) struct Buf {
     buf: Vec<u8>,
     pos: usize,
+    max_buf_size: usize,
 }
 
-pub(crate) const MAX_BUF: usize = 2 * 1024 * 1024;
+pub(crate) const DEFAULT_MAX_BUF_SIZE: usize = 2 * 1024 * 1024;
 
 #[derive(Debug)]
 enum State<T> {
@@ -187,9 +188,14 @@ macro_rules! uninterruptibly {
 
 impl Buf {
     pub(crate) fn with_capacity(n: usize) -> Buf {
+        Self::with_capacity_and_max_buf_size(n, DEFAULT_MAX_BUF_SIZE)
+    }
+
+    pub(crate) fn with_capacity_and_max_buf_size(n: usize, max_buf_size: usize) -> Buf {
         Buf {
             buf: Vec::with_capacity(n),
             pos: 0,
+            max_buf_size,
         }
     }
 
@@ -217,7 +223,7 @@ impl Buf {
     pub(crate) fn copy_from(&mut self, src: &[u8]) -> usize {
         assert!(self.is_empty());
 
-        let n = cmp::min(src.len(), MAX_BUF);
+        let n = cmp::min(src.len(), self.max_buf_size);
 
         self.buf.extend_from_slice(&src[..n]);
         n
@@ -230,7 +236,7 @@ impl Buf {
     pub(crate) fn ensure_capacity_for(&mut self, bytes: &ReadBuf<'_>) {
         assert!(self.is_empty());
 
-        let len = cmp::min(bytes.remaining(), MAX_BUF);
+        let len = cmp::min(bytes.remaining(), self.max_buf_size);
 
         if self.buf.len() < len {
             self.buf.reserve(len - self.buf.len());
@@ -277,7 +283,7 @@ cfg_fs! {
         pub(crate) fn copy_from_bufs(&mut self, bufs: &[io::IoSlice<'_>]) -> usize {
             assert!(self.is_empty());
 
-            let mut rem = MAX_BUF;
+            let mut rem = self.max_buf_size;
             for buf in bufs {
                 if rem == 0 {
                     break
@@ -288,7 +294,7 @@ cfg_fs! {
                 rem -= len;
             }
 
-            MAX_BUF - rem
+            self.max_buf_size - rem
         }
     }
 }
