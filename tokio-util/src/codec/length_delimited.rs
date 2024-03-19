@@ -401,8 +401,8 @@ use std::{cmp, fmt, mem};
 /// `length_adjustment` can offset the maximum allowed value. For example if `length_adjustment`
 /// is `-1`, this means the length of the payload is going to be reported `1` byte more than its
 /// true value. So a payload of `255` bytes will be framed with a length of `256`. But `256` cannot
-/// be stored in a single byte `length_field_length`. So the previosly valid `max_frame_length` of
-/// `255` is now invalid. The case for a positive `length_adjustment` can be infered accordingly.
+/// be stored in a single byte `length_field_length`. So the previously valid `max_frame_length` of
+/// `255` is now invalid. The case for a positive `length_adjustment` can be inferred accordingly.
 ///
 /// [`max_frame_length`]: Builder::max_frame_length
 /// [`length_field_length`]: Builder::length_field_length
