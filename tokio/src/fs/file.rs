@@ -533,7 +533,7 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn set_max_buf_size(&mut self, max_buf_size: usize) {
+    pub async fn set_max_buf_size(&self, max_buf_size: usize) {
         let mut inner = self.inner.lock().await;
         inner.state = State::Idle(Some(Buf::with_capacity_and_max_buf_size(0, max_buf_size)));
     }
