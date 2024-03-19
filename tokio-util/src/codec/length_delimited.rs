@@ -1079,9 +1079,7 @@ impl Builder {
         // In order to prevent an overflow, we do the last part manually.
         let max_number = max_number + (max_number - 1);
 
-        let ajusted_max_number = saturating_add_signed(max_number, self.length_adjustment);
-
-        ajusted_max_number
+        saturating_add_signed(max_number, self.length_adjustment)
     }
 
     fn num_head_bytes(&self) -> usize {
