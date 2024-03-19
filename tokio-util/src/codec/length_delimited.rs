@@ -975,8 +975,6 @@ impl Builder {
     where
         T: AsyncRead,
     {
-        self.assert_compatiblity();
-
         FramedRead::new(upstream, self.new_codec())
     }
 
@@ -1003,8 +1001,6 @@ impl Builder {
     where
         T: AsyncWrite,
     {
-        self.assert_compatiblity();
-
         FramedWrite::new(inner, self.new_codec())
     }
 
@@ -1032,8 +1028,6 @@ impl Builder {
     where
         T: AsyncRead + AsyncWrite,
     {
-        self.assert_compatiblity();
-
         Framed::new(inner, self.new_codec())
     }
 
@@ -1065,19 +1059,14 @@ impl Builder {
             }
         }
 
-        // The smallest number that cannot be represneted using `length_field_len` bytes.
-        // For example for one byte, `max_number` would be 256.
-        let max_number = 1 << (8 * self.length_field_len);
+        let max_number = 2usize.saturating_pow((8 * self.length_field_len - 1) as u32);
+        let max_number = max_number + (max_number - 1);
 
-        // From the maximum length of bytes that `max_number` can represent, some could be taken away if
-        // `length_adjustment` is set. For example, if `length_field_len` is one byte, but its value also
-        // contains the length of the header, then `length_adjustment` would be one byte which consequently
-        // would make the allowed `max_frame_len`, 254 instead of 255.
         let ajusted_max_number = saturating_add_signed(max_number, self.length_adjustment);
 
-        if self.max_frame_len >= ajusted_max_number {
+        if self.max_frame_len > ajusted_max_number {
             panic!(
-                "max frame length exceeds the possible amount: {} >= {}",
+                "max frame length exceeds the possible amount: {} > {}",
                 self.max_frame_len, ajusted_max_number
             )
         }
