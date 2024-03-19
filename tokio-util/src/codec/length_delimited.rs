@@ -921,6 +921,10 @@ impl Builder {
 
     /// Create a configured length delimited `LengthDelimitedCodec`
     ///
+    /// # Panics
+    /// This method panics if the combination of `length_field_len`, `length_adjustment`,
+    /// and `max_frame_len` are incompatible with each other.
+    ///
     /// # Examples
     ///
     /// ```
@@ -931,10 +935,13 @@ impl Builder {
     ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
     ///     .num_skip(0)
+    ///     .max_frame_length(65535)
     ///     .new_codec();
     /// # }
     /// ```
     pub fn new_codec(&self) -> LengthDelimitedCodec {
+        self.assert_compatiblity();
+
         LengthDelimitedCodec {
             builder: *self,
             state: DecodeState::Head,
@@ -942,6 +949,10 @@ impl Builder {
     }
 
     /// Create a configured length delimited `FramedRead`
+    ///
+    /// # Panics
+    /// This method panics if the combination of `length_field_len`, `length_adjustment`,
+    /// and `max_frame_len` are incompatible with each other.
     ///
     /// # Examples
     ///
@@ -955,6 +966,7 @@ impl Builder {
     ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
     ///     .num_skip(0)
+    ///     .max_frame_length(65535)
     ///     .new_read(io);
     /// # }
     /// # pub fn main() {}
@@ -963,10 +975,16 @@ impl Builder {
     where
         T: AsyncRead,
     {
+        self.assert_compatiblity();
+
         FramedRead::new(upstream, self.new_codec())
     }
 
     /// Create a configured length delimited `FramedWrite`
+    ///
+    /// # Panics
+    /// This method panics if the combination of `length_field_len`, `length_adjustment`,
+    /// and `max_frame_len` are incompatible with each other.
     ///
     /// # Examples
     ///
@@ -976,6 +994,7 @@ impl Builder {
     /// # fn write_frame<T: AsyncWrite>(io: T) {
     /// LengthDelimitedCodec::builder()
     ///     .length_field_type::<u16>()
+    ///     .max_frame_length(65535)
     ///     .new_write(io);
     /// # }
     /// # pub fn main() {}
@@ -984,10 +1003,16 @@ impl Builder {
     where
         T: AsyncWrite,
     {
+        self.assert_compatiblity();
+
         FramedWrite::new(inner, self.new_codec())
     }
 
     /// Create a configured length delimited `Framed`
+    ///
+    /// # Panics
+    /// This method panics if the combination of `length_field_len`, `length_adjustment`,
+    /// and `max_frame_len` are incompatible with each other.
     ///
     /// # Examples
     ///
@@ -998,6 +1023,7 @@ impl Builder {
     /// # let _ =
     /// LengthDelimitedCodec::builder()
     ///     .length_field_type::<u16>()
+    ///     .max_frame_length(65535)
     ///     .new_framed(io);
     /// # }
     /// # pub fn main() {}
@@ -1006,6 +1032,8 @@ impl Builder {
     where
         T: AsyncRead + AsyncWrite,
     {
+        self.assert_compatiblity();
+
         Framed::new(inner, self.new_codec())
     }
 
@@ -1017,6 +1045,42 @@ impl Builder {
     fn get_num_skip(&self) -> usize {
         self.num_skip
             .unwrap_or(self.length_field_offset + self.length_field_len)
+    }
+
+    // Panics if the combination of `length_field_len`, `length_adjustment`, and `max_frame_len`
+    // are incompatible with each other.
+    fn assert_compatiblity(&self) {
+        // This function is basically `std::usize::saturating_add_signed`. Since it
+        // requires MSRV 1.66, its implementation is copied here.
+        //
+        // TODO: use the method from std when MSRV becomes >= 1.66
+        fn saturating_add_signed(num: usize, rhs: isize) -> usize {
+            let (res, overflow) = num.overflowing_add(rhs as usize);
+            if overflow == (rhs < 0) {
+                res
+            } else if overflow {
+                usize::MAX
+            } else {
+                0
+            }
+        }
+
+        // The smallest number that cannot be represneted using `length_field_len` bytes.
+        // For example for one byte, `max_number` would be 256.
+        let max_number = 1 << (8 * self.length_field_len);
+
+        // From the maximum length of bytes that `max_number` can represent, some could be taken away if
+        // `length_adjustment` is set. For example, if `length_field_len` is one byte, but its value also
+        // contains the length of the header, then `length_adjustment` would be one byte which consequently
+        // would make the allowed `max_frame_len`, 254 instead of 255.
+        let ajusted_max_number = saturating_add_signed(max_number, self.length_adjustment);
+
+        if self.max_frame_len >= ajusted_max_number {
+            panic!(
+                "max frame length exceeds the possible amount: {} >= {}",
+                self.max_frame_len, ajusted_max_number
+            )
+        }
     }
 }
 
