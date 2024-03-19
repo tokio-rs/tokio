@@ -695,7 +695,7 @@ fn encode_overflow() {
 }
 
 #[test]
-#[should_panic(expected = "max frame length exceeds the possible amount: 256 > 255")]
+#[should_panic(expected = "max frame length exceeds the allowed amount: 256 > 255")]
 fn frame_does_not_fit() {
     LengthDelimitedCodec::builder()
         .length_field_length(1)
@@ -704,7 +704,7 @@ fn frame_does_not_fit() {
 }
 
 #[test]
-#[should_panic(expected = "max frame length exceeds the possible amount: 255 > 254")]
+#[should_panic(expected = "max frame length exceeds the allowed amount: 255 > 254")]
 fn neg_adjusted_frame_does_not_fit() {
     LengthDelimitedCodec::builder()
         .length_field_length(1)
@@ -714,7 +714,7 @@ fn neg_adjusted_frame_does_not_fit() {
 }
 
 #[test]
-#[should_panic(expected = "max frame length exceeds the possible amount: 257 > 256")]
+#[should_panic(expected = "max frame length exceeds the allowed amount: 257 > 256")]
 fn pos_adjusted_frame_does_not_fit() {
     LengthDelimitedCodec::builder()
         .length_field_length(1)
@@ -726,7 +726,7 @@ fn pos_adjusted_frame_does_not_fit() {
 #[test]
 fn max_allowed_frame_fits() {
     LengthDelimitedCodec::builder()
-        .length_field_length(8)
+        .length_field_length(0usize.to_ne_bytes().len())
         .max_frame_length(usize::MAX)
         .new_codec();
 }

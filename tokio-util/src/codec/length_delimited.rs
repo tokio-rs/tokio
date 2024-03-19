@@ -386,6 +386,27 @@ use std::{cmp, fmt, mem};
 /// `Builder` enables constructing configured length delimited codecs. Note
 /// that not all configuration settings apply to both encoding and decoding. See
 /// the documentation for specific methods for more detail.
+///
+/// # Configuration Compatibility
+/// Not all combinations of [`max_frame_length`], [`length_field_length`], and
+/// [`length_adjustment`] is valid. For a combination of these values to be valid,
+/// the following must be true:
+/// ```text
+/// max_frame_length < 2^(length_field_length * 8) + length_adjustment
+/// ```
+/// For example in the simplest case where `length_adjustment` is `0` and `length_field_length`
+/// is one byte, the smallest number that cannot be represented by it is 256. So `max_frame_length`
+/// must be smaller than 256 for the configuration to be valid.
+///
+/// `length_adjustment` can offset the maximum allowed value. For example if `length_adjustment`
+/// is `-1`, this means the length of the payload is going to be reported `1` byte more than its
+/// true value. So a payload of `255` bytes will be framed with a length of `256`. But `256` cannot
+/// be stored in a single byte `length_field_length`. So the previosly valid `max_frame_length` of
+/// `255` is now invalid. The case for a positive `length_adjustment` can be infered accordingly.
+///
+/// [`max_frame_length`]: Builder::max_frame_length
+/// [`length_field_length`]: Builder::length_field_length
+/// [`length_adjustment`]: Builder::length_adjustment
 #[derive(Debug, Clone, Copy)]
 pub struct Builder {
     // Maximum frame length
@@ -1031,19 +1052,13 @@ impl Builder {
         Framed::new(inner, self.new_codec())
     }
 
-    fn num_head_bytes(&self) -> usize {
-        let num = self.length_field_offset + self.length_field_len;
-        cmp::max(num, self.num_skip.unwrap_or(0))
-    }
-
-    fn get_num_skip(&self) -> usize {
-        self.num_skip
-            .unwrap_or(self.length_field_offset + self.length_field_len)
-    }
-
-    // Panics if the combination of `length_field_len`, `length_adjustment`, and `max_frame_len`
-    // are incompatible with each other.
-    fn assert_compatiblity(&self) {
+    /// Returns the maximum frame length that is allowed based on the values configured
+    /// by [`length_field_length`] and [`length_adjustment`]. For info about how it is
+    /// computed, refer to the [`Builder`] documentation.
+    ///
+    /// [`length_field_length`]: Builder::length_field_length
+    /// [`length_adjustment`]: Builder::length_adjustment
+    pub fn max_allowed_frame_length(&self) -> usize {
         // This function is basically `std::usize::saturating_add_signed`. Since it
         // requires MSRV 1.66, its implementation is copied here.
         //
@@ -1059,15 +1074,35 @@ impl Builder {
             }
         }
 
+        // Calculate the maximum number that can be represented using `length_field_len` bytes.
         let max_number = 2usize.saturating_pow((8 * self.length_field_len - 1) as u32);
+        // In order to prevent an overflow, we do the last part manually.
         let max_number = max_number + (max_number - 1);
 
         let ajusted_max_number = saturating_add_signed(max_number, self.length_adjustment);
 
-        if self.max_frame_len > ajusted_max_number {
+        ajusted_max_number
+    }
+
+    fn num_head_bytes(&self) -> usize {
+        let num = self.length_field_offset + self.length_field_len;
+        cmp::max(num, self.num_skip.unwrap_or(0))
+    }
+
+    fn get_num_skip(&self) -> usize {
+        self.num_skip
+            .unwrap_or(self.length_field_offset + self.length_field_len)
+    }
+
+    // Panics if the combination of `length_field_len`, `length_adjustment`, and `max_frame_len`
+    // are incompatible with each other.
+    fn assert_compatiblity(&self) {
+        let max_allowed_frame_length = self.max_allowed_frame_length();
+
+        if self.max_frame_len > max_allowed_frame_length {
             panic!(
-                "max frame length exceeds the possible amount: {} > {}",
-                self.max_frame_len, ajusted_max_number
+                "max frame length exceeds the allowed amount: {} > {}",
+                self.max_frame_len, max_allowed_frame_length
             )
         }
     }
