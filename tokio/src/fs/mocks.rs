@@ -59,6 +59,12 @@ impl Read for MockFile {
     }
 }
 
+impl Seek for MockFile {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        self.inner_seek(pos)
+    }
+}
+
 impl Read for &'_ MockFile {
     fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
         self.inner_read(dst)
