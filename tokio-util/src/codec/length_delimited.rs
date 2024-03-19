@@ -87,6 +87,7 @@
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(0)   // default value
 //!     .num_skip(0) // Do not strip frame header
+//!     .max_frame_length(255)
 //!     .new_read(io);
 //! # }
 //! # pub fn main() {}
@@ -120,6 +121,7 @@
 //!     .length_field_offset(0) // default value
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(0)   // default value
+//!     .max_frame_length(255)
 //!     // `num_skip` is not needed, the default is to skip
 //!     .new_read(io);
 //! # }
@@ -153,6 +155,7 @@
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(-2)  // size of head
 //!     .num_skip(0)
+//!     .max_frame_length(253)
 //!     .new_read(io);
 //! # }
 //! # pub fn main() {}
@@ -187,6 +190,7 @@
 //!     .length_field_length(3)
 //!     .length_adjustment(2)  // remaining head
 //!     .num_skip(0)
+//!     .max_frame_length(257)
 //!     .new_read(io);
 //! # }
 //! # pub fn main() {}
@@ -231,6 +235,7 @@
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(1)  // length of hdr2
 //!     .num_skip(3) // length of hdr1 + LEN
+//!     .max_frame_length(256)
 //!     .new_read(io);
 //! # }
 //! # pub fn main() {}
@@ -277,6 +282,7 @@
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(-3)  // length of hdr1 + LEN, negative
 //!     .num_skip(3)
+//!     .max_frame_length(252)
 //!     .new_read(io);
 //! # }
 //! ```
@@ -316,6 +322,7 @@
 //!     .length_field_length(3)
 //!     .length_adjustment(0)  // default value
 //!     .num_skip(4) // skip the first 4 bytes
+//!     .max_frame_length(255)
 //!     .new_read(io);
 //! # }
 //! # pub fn main() {}
@@ -351,6 +358,7 @@
 //! # let _ =
 //! LengthDelimitedCodec::builder()
 //!     .length_field_type::<u16>()
+//!     .max_frame_length(255)
 //!     .new_write(io);
 //! # }
 //! # pub fn main() {}

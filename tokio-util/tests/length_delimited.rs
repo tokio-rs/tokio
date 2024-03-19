@@ -726,7 +726,7 @@ fn pos_adjusted_frame_does_not_fit() {
 #[test]
 fn max_allowed_frame_fits() {
     LengthDelimitedCodec::builder()
-        .length_field_length(0usize.to_ne_bytes().len())
+        .length_field_length(std::mem::size_of::<usize>())
         .max_frame_length(usize::MAX)
         .new_codec();
 }
