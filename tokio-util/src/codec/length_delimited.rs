@@ -87,7 +87,6 @@
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(0)   // default value
 //!     .num_skip(0) // Do not strip frame header
-//!     .max_frame_length(255)
 //!     .new_read(io);
 //! # }
 //! # pub fn main() {}
@@ -121,7 +120,6 @@
 //!     .length_field_offset(0) // default value
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(0)   // default value
-//!     .max_frame_length(255)
 //!     // `num_skip` is not needed, the default is to skip
 //!     .new_read(io);
 //! # }
@@ -155,7 +153,6 @@
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(-2)  // size of head
 //!     .num_skip(0)
-//!     .max_frame_length(253)
 //!     .new_read(io);
 //! # }
 //! # pub fn main() {}
@@ -190,7 +187,6 @@
 //!     .length_field_length(3)
 //!     .length_adjustment(2)  // remaining head
 //!     .num_skip(0)
-//!     .max_frame_length(257)
 //!     .new_read(io);
 //! # }
 //! # pub fn main() {}
@@ -235,7 +231,6 @@
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(1)  // length of hdr2
 //!     .num_skip(3) // length of hdr1 + LEN
-//!     .max_frame_length(256)
 //!     .new_read(io);
 //! # }
 //! # pub fn main() {}
@@ -282,7 +277,6 @@
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(-3)  // length of hdr1 + LEN, negative
 //!     .num_skip(3)
-//!     .max_frame_length(252)
 //!     .new_read(io);
 //! # }
 //! ```
@@ -322,7 +316,6 @@
 //!     .length_field_length(3)
 //!     .length_adjustment(0)  // default value
 //!     .num_skip(4) // skip the first 4 bytes
-//!     .max_frame_length(255)
 //!     .new_read(io);
 //! # }
 //! # pub fn main() {}
@@ -358,7 +351,6 @@
 //! # let _ =
 //! LengthDelimitedCodec::builder()
 //!     .length_field_type::<u16>()
-//!     .max_frame_length(255)
 //!     .new_write(io);
 //! # }
 //! # pub fn main() {}
@@ -395,28 +387,14 @@ use std::{cmp, fmt, mem};
 /// that not all configuration settings apply to both encoding and decoding. See
 /// the documentation for specific methods for more detail.
 ///
-/// # Configuration Compatibility
-/// Not all combinations of [`max_frame_length`], [`length_field_length`], and
-/// [`length_adjustment`] is valid. For a combination of these values to be valid,
-/// the following must be true:
-/// ```text
-/// max_frame_length < 2^(length_field_length * 8) + length_adjustment
-/// ```
-/// For example in the simplest case where `length_adjustment` is `0` and `length_field_length`
-/// is one byte, the smallest number that cannot be represented by it is 256. So `max_frame_length`
-/// must be smaller than 256 for the configuration to be valid.
-///
-/// `length_adjustment` can offset the maximum allowed value. For example if `length_adjustment`
-/// is `-1`, this means the length of the payload is going to be reported `1` byte more than its
-/// true value. So a payload of `255` bytes will be framed with a length of `256`. But `256` cannot
-/// be stored in a single byte `length_field_length`. So the previously valid `max_frame_length` of
-/// `255` is now invalid. The case for a positive `length_adjustment` can be inferred accordingly.
-///
-/// [`max_frame_length`]: Builder::max_frame_length
-/// [`length_field_length`]: Builder::length_field_length
-/// [`length_adjustment`]: Builder::length_adjustment
+/// Note that the if the value of [`Builder::max_frame_length`] becomes larger than
+/// what can actually fit in [`Builder::length_field_length`], it will be clipped to
+/// the maximum value that can fit.
 #[derive(Debug, Clone, Copy)]
 pub struct Builder {
+    // Indicates whether the value of `max_frame_len` is specified by the user or is adjusted
+    max_frame_len_adjusted: bool,
+
     // Maximum frame length
     max_frame_len: usize,
 
@@ -694,6 +672,8 @@ impl Builder {
     /// ```
     pub fn new() -> Builder {
         Builder {
+            max_frame_len_adjusted: false,
+
             // Default max frame length of 8MB
             max_frame_len: 8 * 1_024 * 1_024,
 
@@ -817,6 +797,10 @@ impl Builder {
     /// ```
     pub fn max_frame_length(&mut self, val: usize) -> &mut Self {
         self.max_frame_len = val;
+        self.max_frame_len_adjusted = false;
+
+        self.adjust_max_frame_len(false);
+
         self
     }
 
@@ -878,6 +862,9 @@ impl Builder {
     pub fn length_field_length(&mut self, val: usize) -> &mut Self {
         assert!(val > 0 && val <= 8, "invalid length field length");
         self.length_field_len = val;
+
+        self.adjust_max_frame_len(true);
+
         self
     }
 
@@ -921,6 +908,9 @@ impl Builder {
     /// ```
     pub fn length_adjustment(&mut self, val: isize) -> &mut Self {
         self.length_adjustment = val;
+
+        self.adjust_max_frame_len(true);
+
         self
     }
 
@@ -964,13 +954,10 @@ impl Builder {
     ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
     ///     .num_skip(0)
-    ///     .max_frame_length(65535)
     ///     .new_codec();
     /// # }
     /// ```
     pub fn new_codec(&self) -> LengthDelimitedCodec {
-        self.assert_compatiblity();
-
         LengthDelimitedCodec {
             builder: *self,
             state: DecodeState::Head,
@@ -995,7 +982,6 @@ impl Builder {
     ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
     ///     .num_skip(0)
-    ///     .max_frame_length(65535)
     ///     .new_read(io);
     /// # }
     /// # pub fn main() {}
@@ -1021,7 +1007,6 @@ impl Builder {
     /// # fn write_frame<T: AsyncWrite>(io: T) {
     /// LengthDelimitedCodec::builder()
     ///     .length_field_type::<u16>()
-    ///     .max_frame_length(65535)
     ///     .new_write(io);
     /// # }
     /// # pub fn main() {}
@@ -1048,7 +1033,6 @@ impl Builder {
     /// # let _ =
     /// LengthDelimitedCodec::builder()
     ///     .length_field_type::<u16>()
-    ///     .max_frame_length(65535)
     ///     .new_framed(io);
     /// # }
     /// # pub fn main() {}
@@ -1060,13 +1044,17 @@ impl Builder {
         Framed::new(inner, self.new_codec())
     }
 
-    /// Returns the maximum frame length that is allowed based on the values configured
-    /// by [`length_field_length`] and [`length_adjustment`]. For info about how it is
-    /// computed, refer to the [`Builder`] documentation.
-    ///
-    /// [`length_field_length`]: Builder::length_field_length
-    /// [`length_adjustment`]: Builder::length_adjustment
-    pub fn max_allowed_frame_length(&self) -> usize {
+    fn num_head_bytes(&self) -> usize {
+        let num = self.length_field_offset + self.length_field_len;
+        cmp::max(num, self.num_skip.unwrap_or(0))
+    }
+
+    fn get_num_skip(&self) -> usize {
+        self.num_skip
+            .unwrap_or(self.length_field_offset + self.length_field_len)
+    }
+
+    fn adjust_max_frame_len(&mut self, adjust_to_max: bool) {
         // This function is basically `std::usize::saturating_add_signed`. Since it
         // requires MSRV 1.66, its implementation is copied here.
         //
@@ -1087,29 +1075,15 @@ impl Builder {
         // In order to prevent an overflow, we do the last part manually.
         let max_number = max_number + (max_number - 1);
 
-        saturating_add_signed(max_number, self.length_adjustment)
-    }
+        let max_allowed_len = saturating_add_signed(max_number, self.length_adjustment);
 
-    fn num_head_bytes(&self) -> usize {
-        let num = self.length_field_offset + self.length_field_len;
-        cmp::max(num, self.num_skip.unwrap_or(0))
-    }
-
-    fn get_num_skip(&self) -> usize {
-        self.num_skip
-            .unwrap_or(self.length_field_offset + self.length_field_len)
-    }
-
-    // Panics if the combination of `length_field_len`, `length_adjustment`, and `max_frame_len`
-    // are incompatible with each other.
-    fn assert_compatiblity(&self) {
-        let max_allowed_frame_length = self.max_allowed_frame_length();
-
-        if self.max_frame_len > max_allowed_frame_length {
-            panic!(
-                "max frame length exceeds the allowed amount: {} > {}",
-                self.max_frame_len, max_allowed_frame_length
-            )
+        // We update the value of `max_frame_len` in two cases
+        // - Current value does not fit in `length_field_len` bytes
+        // - We have a larger `max_allowed_len` but only if the value has been adjusted before.
+        //   This is to prevent overriding `max_frame_len` provided by the user.
+        if self.max_frame_len > max_allowed_len || (adjust_to_max && self.max_frame_len_adjusted) {
+            self.max_frame_len = max_allowed_len;
+            self.max_frame_len_adjusted = true;
         }
     }
 }

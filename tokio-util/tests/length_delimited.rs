@@ -325,7 +325,6 @@ fn read_update_max_frame_len_in_flight() {
 fn read_one_byte_length_field() {
     let io = length_delimited::Builder::new()
         .length_field_length(1)
-        .max_frame_length(255)
         .new_read(mock! {
             data(b"\x09abcdefghi"),
         });
@@ -340,7 +339,6 @@ fn read_header_offset() {
     let io = length_delimited::Builder::new()
         .length_field_length(2)
         .length_field_offset(4)
-        .max_frame_length(65535)
         .new_read(mock! {
             data(b"zzzz\x00\x09abcdefghi"),
         });
@@ -362,7 +360,6 @@ fn read_single_multi_frame_one_packet_skip_none_adjusted() {
         .length_field_offset(2)
         .num_skip(0)
         .length_adjustment(4)
-        .max_frame_length(65539)
         .new_read(mock! {
             data(&d),
         });
@@ -403,7 +400,6 @@ fn read_single_multi_frame_one_packet_length_includes_head() {
     let io = length_delimited::Builder::new()
         .length_field_length(2)
         .length_adjustment(-2)
-        .max_frame_length(65533)
         .new_read(mock! {
             data(&d),
         });
@@ -583,7 +579,6 @@ fn write_single_frame_little_endian() {
 fn write_single_frame_with_short_length_field() {
     let io = length_delimited::Builder::new()
         .length_field_length(1)
-        .max_frame_length(255)
         .new_write(mock! {
             data(b"\x09"),
             data(b"abcdefghi"),
@@ -695,40 +690,53 @@ fn encode_overflow() {
 }
 
 #[test]
-#[should_panic(expected = "max frame length exceeds the allowed amount: 256 > 255")]
 fn frame_does_not_fit() {
-    LengthDelimitedCodec::builder()
+    let codec = LengthDelimitedCodec::builder()
         .length_field_length(1)
         .max_frame_length(256)
         .new_codec();
+
+    assert_eq!(codec.max_frame_length(), 255);
 }
 
 #[test]
-#[should_panic(expected = "max frame length exceeds the allowed amount: 255 > 254")]
 fn neg_adjusted_frame_does_not_fit() {
-    LengthDelimitedCodec::builder()
+    let codec = LengthDelimitedCodec::builder()
         .length_field_length(1)
         .length_adjustment(-1)
-        .max_frame_length(255)
         .new_codec();
+
+    assert_eq!(codec.max_frame_length(), 254);
 }
 
 #[test]
-#[should_panic(expected = "max frame length exceeds the allowed amount: 257 > 256")]
 fn pos_adjusted_frame_does_not_fit() {
-    LengthDelimitedCodec::builder()
+    let codec = LengthDelimitedCodec::builder()
         .length_field_length(1)
         .length_adjustment(1)
-        .max_frame_length(257)
         .new_codec();
+
+    assert_eq!(codec.max_frame_length(), 256);
 }
 
 #[test]
 fn max_allowed_frame_fits() {
-    LengthDelimitedCodec::builder()
+    let codec = LengthDelimitedCodec::builder()
         .length_field_length(std::mem::size_of::<usize>())
         .max_frame_length(usize::MAX)
         .new_codec();
+
+    assert_eq!(codec.max_frame_length(), usize::MAX);
+}
+
+#[test]
+fn smaller_frame_len_not_adjusted() {
+    let codec = LengthDelimitedCodec::builder()
+        .max_frame_length(10)
+        .length_field_length(std::mem::size_of::<usize>())
+        .new_codec();
+
+    assert_eq!(codec.max_frame_length(), 10);
 }
 
 // ===== Test utils =====
