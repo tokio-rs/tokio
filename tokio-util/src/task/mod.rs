@@ -13,3 +13,6 @@ pub use join_map::{JoinMap, JoinMapKeys};
 
 pub mod task_tracker;
 pub use task_tracker::TaskTracker;
+
+pub mod spawn_aborting;
+pub use spawn_aborting::spawn_aborting;
