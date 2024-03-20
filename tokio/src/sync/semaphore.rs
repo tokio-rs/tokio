@@ -75,12 +75,10 @@ use std::sync::Arc;
 ///     Ok(()) // Permit goes out of scope here, and is available again for acquisition
 /// }
 /// ```
-/// 
 /// ## Limit the number of outgoing requests being sent at the same time
 /// In some scenarios, it might be required to limit the number of outgoing
 /// requests being sent in parallel. This could be due to limits of a consumed
 /// API or the network resources of the system the application is running on.
-/// 
 /// This example uses an `Arc<Semaphore>` with 10 permits.
 /// Each task spawned is given a reference to the semaphore by cloning the `Arc<Semaphore>`.
 /// Before a task sends a request, it must acquire a permit from the semaphore by calling [`Semaphore::acquire`].
@@ -89,7 +87,6 @@ use std::sync::Arc;
 /// ```
 /// use std::sync::Arc;
 /// use tokio::sync::Semaphore;
-/// 
 /// #[tokio::main]
 /// async fn main() {
 ///     // Define maximum number of parallel requests.
