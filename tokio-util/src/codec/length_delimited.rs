@@ -940,10 +940,6 @@ impl Builder {
 
     /// Create a configured length delimited `LengthDelimitedCodec`
     ///
-    /// # Panics
-    /// This method panics if the combination of `length_field_len`, `length_adjustment`,
-    /// and `max_frame_len` are incompatible with each other.
-    ///
     /// # Examples
     ///
     /// ```
@@ -965,10 +961,6 @@ impl Builder {
     }
 
     /// Create a configured length delimited `FramedRead`
-    ///
-    /// # Panics
-    /// This method panics if the combination of `length_field_len`, `length_adjustment`,
-    /// and `max_frame_len` are incompatible with each other.
     ///
     /// # Examples
     ///
@@ -995,10 +987,6 @@ impl Builder {
 
     /// Create a configured length delimited `FramedWrite`
     ///
-    /// # Panics
-    /// This method panics if the combination of `length_field_len`, `length_adjustment`,
-    /// and `max_frame_len` are incompatible with each other.
-    ///
     /// # Examples
     ///
     /// ```
@@ -1019,10 +1007,6 @@ impl Builder {
     }
 
     /// Create a configured length delimited `Framed`
-    ///
-    /// # Panics
-    /// This method panics if the combination of `length_field_len`, `length_adjustment`,
-    /// and `max_frame_len` are incompatible with each other.
     ///
     /// # Examples
     ///
