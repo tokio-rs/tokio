@@ -462,3 +462,15 @@ fn any_delimiter_encoder() {
     codec.encode("chunk 2", &mut buf).unwrap();
     assert_eq!("chunk 1;--;chunk 2;--;", buf);
 }
+
+#[test]
+fn any_delimiter_encoder_bytes() {
+    let mut codec = AnyDelimiterCodec::new(b",".to_vec(), b";--;".to_vec());
+    let mut buf = BytesMut::new();
+
+    codec.encode(b"chunk 1", &mut buf).unwrap();
+    assert_eq!(b"chunk 1;--;", buf.as_ref());
+
+    codec.encode(b"chunk 2", &mut buf).unwrap();
+    assert_eq!(b"chunk 1;--;chunk 2;--;", buf.as_ref());
+}
