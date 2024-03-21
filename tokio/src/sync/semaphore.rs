@@ -109,12 +109,19 @@ use std::sync::Arc;
 ///             drop(_permit);
 ///             // Handle response.
 ///             // ...
+///
+///             response
 ///         });
 ///         jhs.push(jh);
 ///     }
+///     // Collect responses from tasks.
+///     let mut responses = Vec::new();
 ///     for jh in jhs {
-///         jh.await.unwrap();
+///         let response = jh.await.unwrap();
+///         responses.push(response);
 ///     }
+///     // Process responses.
+///     // ...
 /// }
 /// # async fn send_request(task_id: usize) {
 /// #     // Send request.
