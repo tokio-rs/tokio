@@ -82,11 +82,12 @@ use std::sync::Arc;
 /// requests being sent in parallel. This could be due to limits of a consumed
 /// API or the network resources of the system the application is running on.
 ///
-/// This example uses an `Arc<Semaphore>` with 10 permits.
-/// Each task spawned is given a reference to the semaphore by cloning the `Arc<Semaphore>`.
-/// Before a task sends a request, it must acquire a permit from the semaphore by calling [`Semaphore::acquire`].
-/// This ensures that at most 10 requests are sent in parallel at any given time.
-/// After a task has sent a request, it drops the permit to allow other tasks to send requests.
+/// This example uses an `Arc<Semaphore>` with 10 permits. Each task spawned is
+/// given a reference to the semaphore by cloning the `Arc<Semaphore>`. Before
+/// a task sends a request, it must acquire a permit from the semaphore by
+/// calling [`Semaphore::acquire`]. This ensures that at most 10 requests are
+/// sent in parallel at any given time. After a task has sent a request, it
+/// drops the permit to allow other tasks to send requests.
 ///
 /// ```
 /// use std::sync::Arc;
