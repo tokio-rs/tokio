@@ -231,7 +231,7 @@ fn flush_while_idle() {
 #[cfg_attr(miri, ignore)] // takes a really long time with miri
 fn read_with_buffer_larger_than_max() {
     // Chunks
-    let chunk_a = crate::io::blocking::MAX_BUF;
+    let chunk_a = crate::io::blocking::DEFAULT_MAX_BUF_SIZE;
     let chunk_b = chunk_a * 2;
     let chunk_c = chunk_a * 3;
     let chunk_d = chunk_a * 4;
@@ -303,7 +303,7 @@ fn read_with_buffer_larger_than_max() {
 #[cfg_attr(miri, ignore)] // takes a really long time with miri
 fn write_with_buffer_larger_than_max() {
     // Chunks
-    let chunk_a = crate::io::blocking::MAX_BUF;
+    let chunk_a = crate::io::blocking::DEFAULT_MAX_BUF_SIZE;
     let chunk_b = chunk_a * 2;
     let chunk_c = chunk_a * 3;
     let chunk_d = chunk_a * 4;
