@@ -1028,11 +1028,11 @@ impl Builder {
     }
 
     fn adjust_max_frame_len(&mut self) {
-        // This function is basically `std::usize::saturating_add_signed`. Since it
+        // This function is basically `std::u64::saturating_add_signed`. Since it
         // requires MSRV 1.66, its implementation is copied here.
         //
         // TODO: use the method from std when MSRV becomes >= 1.66
-        fn saturating_add_signed(num: u64, rhs: isize) -> u64 {
+        fn saturating_add_signed(num: u64, rhs: i64) -> u64 {
             let (res, overflow) = num.overflowing_add(rhs as u64);
             if overflow == (rhs < 0) {
                 res
@@ -1048,7 +1048,7 @@ impl Builder {
         // In order to prevent an overflow, we do the last part manually.
         let max_number = max_number + (max_number - 1);
 
-        let max_allowed_len = saturating_add_signed(max_number, self.length_adjustment);
+        let max_allowed_len = saturating_add_signed(max_number, self.length_adjustment as i64);
 
         if self.max_frame_len as u64 > max_allowed_len {
             self.max_frame_len = usize::try_from(max_allowed_len).unwrap_or(usize::MAX);
