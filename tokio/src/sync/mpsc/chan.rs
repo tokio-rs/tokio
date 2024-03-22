@@ -66,6 +66,9 @@ pub(super) struct Chan<T, S> {
     /// When this drops to zero, the send half of the channel is closed.
     tx_count: AtomicUsize,
 
+    /// Tracks the number of outstanding weak sender handles.
+    tx_weak_count: AtomicUsize,
+
     /// Only accessed by `Rx` handle.
     rx_fields: UnsafeCell<RxFields<T>>,
 }
@@ -115,6 +118,7 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
         semaphore,
         rx_waker: CachePadded::new(AtomicWaker::new()),
         tx_count: AtomicUsize::new(1),
+        tx_weak_count: AtomicUsize::new(0),
         rx_fields: UnsafeCell::new(RxFields {
             list: rx,
             rx_closed: false,
@@ -131,7 +135,17 @@ impl<T, S> Tx<T, S> {
         Tx { inner: chan }
     }
 
+    pub(super) fn strong_count(&self) -> usize {
+        self.inner.tx_count.load(Acquire)
+    }
+
+    pub(super) fn weak_count(&self) -> usize {
+        self.inner.tx_weak_count.load(Relaxed)
+    }
+
     pub(super) fn downgrade(&self) -> Arc<Chan<T, S>> {
+        self.inner.increment_weak_count();
+
         self.inner.clone()
     }
 
@@ -451,6 +465,22 @@ impl<T, S> Chan<T, S> {
 
         // Notify the rx task
         self.rx_waker.wake();
+    }
+
+    pub(super) fn decrement_weak_count(&self) {
+        self.tx_weak_count.fetch_sub(1, Relaxed);
+    }
+
+    pub(super) fn increment_weak_count(&self) {
+        self.tx_weak_count.fetch_add(1, Relaxed);
+    }
+
+    pub(super) fn strong_count(&self) -> usize {
+        self.tx_count.load(Acquire)
+    }
+
+    pub(super) fn weak_count(&self) -> usize {
+        self.tx_weak_count.load(Relaxed)
     }
 }
 
