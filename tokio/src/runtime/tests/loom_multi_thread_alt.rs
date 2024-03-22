@@ -1,3 +1,5 @@
+#![cfg(tokio_unstable)]
+
 mod queue;
 mod shutdown;
 mod yield_now;

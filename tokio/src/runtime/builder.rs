@@ -824,6 +824,10 @@ impl Builder {
         ///   will immediately terminate and further calls to
         ///   [`Runtime::block_on`] will panic.
         ///
+        /// # Panics
+        /// This method panics if called with [`UnhandledPanic::ShutdownRuntime`]
+        /// on a runtime other than the current thread runtime.
+        ///
         /// # Unstable
         ///
         /// This option is currently unstable and its implementation is
@@ -861,6 +865,10 @@ impl Builder {
         ///
         /// [`JoinHandle`]: struct@crate::task::JoinHandle
         pub fn unhandled_panic(&mut self, behavior: UnhandledPanic) -> &mut Self {
+            if !matches!(self.kind, Kind::CurrentThread) && matches!(behavior, UnhandledPanic::ShutdownRuntime) {
+                panic!("UnhandledPanic::ShutdownRuntime is only supported in current thread runtime");
+            }
+
             self.unhandled_panic = behavior;
             self
         }

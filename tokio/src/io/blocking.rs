@@ -23,7 +23,7 @@ pub(crate) struct Buf {
     pos: usize,
 }
 
-pub(crate) const MAX_BUF: usize = 2 * 1024 * 1024;
+pub(crate) const DEFAULT_MAX_BUF_SIZE: usize = 2 * 1024 * 1024;
 
 #[derive(Debug)]
 enum State<T> {
@@ -64,7 +64,7 @@ where
                         return Poll::Ready(Ok(()));
                     }
 
-                    buf.ensure_capacity_for(dst);
+                    buf.ensure_capacity_for(dst, DEFAULT_MAX_BUF_SIZE);
                     let mut inner = self.inner.take().unwrap();
 
                     self.state = State::Busy(sys::run(move || {
@@ -111,7 +111,7 @@ where
 
                     assert!(buf.is_empty());
 
-                    let n = buf.copy_from(src);
+                    let n = buf.copy_from(src, DEFAULT_MAX_BUF_SIZE);
                     let mut inner = self.inner.take().unwrap();
 
                     self.state = State::Busy(sys::run(move || {
@@ -214,10 +214,10 @@ impl Buf {
         n
     }
 
-    pub(crate) fn copy_from(&mut self, src: &[u8]) -> usize {
+    pub(crate) fn copy_from(&mut self, src: &[u8], max_buf_size: usize) -> usize {
         assert!(self.is_empty());
 
-        let n = cmp::min(src.len(), MAX_BUF);
+        let n = cmp::min(src.len(), max_buf_size);
 
         self.buf.extend_from_slice(&src[..n]);
         n
@@ -227,10 +227,10 @@ impl Buf {
         &self.buf[self.pos..]
     }
 
-    pub(crate) fn ensure_capacity_for(&mut self, bytes: &ReadBuf<'_>) {
+    pub(crate) fn ensure_capacity_for(&mut self, bytes: &ReadBuf<'_>, max_buf_size: usize) {
         assert!(self.is_empty());
 
-        let len = cmp::min(bytes.remaining(), MAX_BUF);
+        let len = cmp::min(bytes.remaining(), max_buf_size);
 
         if self.buf.len() < len {
             self.buf.reserve(len - self.buf.len());
@@ -274,10 +274,10 @@ cfg_fs! {
             ret
         }
 
-        pub(crate) fn copy_from_bufs(&mut self, bufs: &[io::IoSlice<'_>]) -> usize {
+        pub(crate) fn copy_from_bufs(&mut self, bufs: &[io::IoSlice<'_>], max_buf_size: usize) -> usize {
             assert!(self.is_empty());
 
-            let mut rem = MAX_BUF;
+            let mut rem = max_buf_size;
             for buf in bufs {
                 if rem == 0 {
                     break
@@ -288,7 +288,7 @@ cfg_fs! {
                 rem -= len;
             }
 
-            MAX_BUF - rem
+            max_buf_size - rem
         }
     }
 }

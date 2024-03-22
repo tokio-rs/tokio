@@ -243,13 +243,6 @@ impl<T> Block<T> {
     ///
     /// This indicates that the block is in its final state and will no longer
     /// be mutated.
-    ///
-    /// # Implementation
-    ///
-    /// The implementation walks each slot checking the `ready` flag. It might
-    /// be that it would make more sense to coalesce ready flags as bits in a
-    /// single atomic cell. However, this could have negative impact on cache
-    /// behavior as there would be many more mutations to a single slot.
     pub(crate) fn is_final(&self) -> bool {
         self.header.ready_slots.load(Acquire) & READY_MASK == READY_MASK
     }

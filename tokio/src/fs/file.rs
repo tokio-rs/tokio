@@ -3,7 +3,7 @@
 //! [`File`]: File
 
 use crate::fs::{asyncify, OpenOptions};
-use crate::io::blocking::Buf;
+use crate::io::blocking::{Buf, DEFAULT_MAX_BUF_SIZE};
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
 
@@ -90,6 +90,7 @@ use std::fs::File as StdFile;
 pub struct File {
     std: Arc<StdFile>,
     inner: Mutex<Inner>,
+    max_buf_size: usize,
 }
 
 struct Inner {
@@ -241,6 +242,7 @@ impl File {
                 last_write_err: None,
                 pos: 0,
             }),
+            max_buf_size: DEFAULT_MAX_BUF_SIZE,
         }
     }
 
@@ -508,6 +510,34 @@ impl File {
         let std = self.std.clone();
         asyncify(move || std.set_permissions(perm)).await
     }
+
+    /// Set the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.
+    ///
+    /// Although Tokio uses a sensible default value for this buffer size, this function would be
+    /// useful for changing that default depending on the situation.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    /// use tokio::io::AsyncWriteExt;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut file = File::open("foo.txt").await?;
+    ///
+    /// // Set maximum buffer size to 8 MiB
+    /// file.set_max_buf_size(8 * 1024 * 1024);
+    ///
+    /// let mut buf = vec![1; 1024 * 1024 * 1024];
+    ///
+    /// // Write the 1 GiB buffer in chunks up to 8 MiB each.
+    /// file.write_all(&mut buf).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_max_buf_size(&mut self, max_buf_size: usize) {
+        self.max_buf_size = max_buf_size;
+    }
 }
 
 impl AsyncRead for File {
@@ -531,7 +561,7 @@ impl AsyncRead for File {
                         return Poll::Ready(Ok(()));
                     }
 
-                    buf.ensure_capacity_for(dst);
+                    buf.ensure_capacity_for(dst, me.max_buf_size);
                     let std = me.std.clone();
 
                     inner.state = State::Busy(spawn_blocking(move || {
@@ -668,7 +698,7 @@ impl AsyncWrite for File {
                         None
                     };
 
-                    let n = buf.copy_from(src);
+                    let n = buf.copy_from(src, me.max_buf_size);
                     let std = me.std.clone();
 
                     let blocking_task_join_handle = spawn_mandatory_blocking(move || {
@@ -739,7 +769,7 @@ impl AsyncWrite for File {
                         None
                     };
 
-                    let n = buf.copy_from_bufs(bufs);
+                    let n = buf.copy_from_bufs(bufs, me.max_buf_size);
                     let std = me.std.clone();
 
                     let blocking_task_join_handle = spawn_mandatory_blocking(move || {
