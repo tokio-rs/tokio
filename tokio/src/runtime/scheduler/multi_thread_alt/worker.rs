@@ -1129,7 +1129,7 @@ impl Worker {
 
     fn park(&mut self, cx: &Context, mut core: Box<Core>) -> NextTaskResult {
         if let Some(f) = &cx.shared().config.before_park {
-            f();
+            f(core.index);
         }
 
         if self.can_transition_to_parked(&mut core) {
@@ -1140,7 +1140,7 @@ impl Worker {
         }
 
         if let Some(f) = &cx.shared().config.after_unpark {
-            f();
+            f(core.index);
         }
 
         Ok((None, core))

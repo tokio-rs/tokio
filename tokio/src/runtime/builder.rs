@@ -1,5 +1,5 @@
 use crate::runtime::handle::Handle;
-use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime};
+use crate::runtime::{blocking, driver, Callback, CallbackWorker, HistogramBuilder, Runtime};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use std::fmt;
@@ -73,10 +73,10 @@ pub struct Builder {
     pub(super) before_stop: Option<Callback>,
 
     /// To run before each worker thread is parked.
-    pub(super) before_park: Option<Callback>,
+    pub(super) before_park: Option<CallbackWorker>,
 
     /// To run after each thread is unparked.
-    pub(super) after_unpark: Option<Callback>,
+    pub(super) after_unpark: Option<CallbackWorker>,
 
     /// Customizable keep alive timeout for `BlockingPool`
     pub(super) keep_alive: Option<Duration>,
@@ -640,7 +640,7 @@ impl Builder {
     where
         F: Fn() + Send + Sync + 'static,
     {
-        self.before_park = Some(std::sync::Arc::new(f));
+        self.before_park = Some(std::sync::Arc::new(move |_id| f()));
         self
     }
 
@@ -675,7 +675,7 @@ impl Builder {
     where
         F: Fn() + Send + Sync + 'static,
     {
-        self.after_unpark = Some(std::sync::Arc::new(f));
+        self.after_unpark = Some(std::sync::Arc::new(move |_id| f()));
         self
     }
 
@@ -944,6 +944,92 @@ impl Builder {
         /// [`tokio::select!`]: crate::select
         pub fn rng_seed(&mut self, seed: RngSeed) -> &mut Self {
             self.seed_generator = RngSeedGenerator::new(seed);
+            self
+        }
+
+        /// Has the same behavior as `on_thread_park` except the id of the thread that is parked
+        /// is passed to the callback function `f`.  The id corresponds to the same `usize` that
+        /// is used in calls to `RuntimeMetrics`.
+        ///
+        /// Note: if both `on_thread_park` and `on_thread_park_id` are called, only the last one
+        /// will be saved.
+        ///
+        /// # Examples
+        ///
+        /// ## Stuck task detector
+        ///
+        /// ```
+        /// # use std::sync::atomic::{AtomicBool, Ordering};
+        /// # use std::{thread, time};
+        ///
+        /// fn main() {
+        ///     const WORKERS: usize = 4;
+        ///     const UNPARKED: AtomicBool = AtomicBool::new(false);
+        ///     static IS_PARKED: [AtomicBool; WORKERS] = [UNPARKED; WORKERS];
+        ///
+        ///     let runtime = tokio::runtime::Builder::new_multi_thread()
+        ///         .worker_threads(WORKERS)
+        ///         .on_thread_park_id(|id| IS_PARKED[id].store(true, Ordering::Release))
+        ///         .on_thread_unpark_id(|id| IS_PARKED[id].store(false, Ordering::Release))
+        ///         .build()
+        ///         .unwrap();
+        ///
+        ///     let metrics = runtime.handle().metrics();
+        ///     let (done_tx, done_rx) = tokio::sync::oneshot::channel();
+        ///     thread::spawn(move || {
+        ///         let mut stuck_since = [time::Instant::now(); WORKERS];
+        ///         let mut prev_poll_counts = [None; WORKERS];
+        ///         loop {
+        ///             thread::sleep(time::Duration::from_millis(250));
+        ///             let now = time::Instant::now();
+        ///             for ii in 0..WORKERS {
+        ///                 if IS_PARKED[ii].load(Ordering::Acquire) {
+        ///                     prev_poll_counts[ii] = None;
+        ///                 } else {
+        ///                     let poll_count = metrics.worker_poll_count(ii);
+        ///                     if Some(poll_count) == prev_poll_counts[ii] {
+        ///                         let duration = now.duration_since(stuck_since[ii]);
+        ///                         println!("*** worker {} is stuck for {:?} ***", ii, duration);
+        ///                         if duration > time::Duration::from_secs(1) {
+        ///                             let _ = done_tx.send(());
+        ///                             return;
+        ///                         }
+        ///                     } else {
+        ///                         prev_poll_counts[ii] = Some(poll_count);
+        ///                         stuck_since[ii] = now;
+        ///                     }
+        ///                 }
+        ///             }
+        ///         }
+        ///     });
+        ///
+        ///     // Spawn a "stuck" task that doesn't yield properly (should be detected).
+        ///     runtime.spawn(async { thread::sleep(time::Duration::from_secs(3)) });
+        ///     runtime.block_on(async {
+        ///          let _ = done_rx.await;
+        ///     });
+        /// }
+        /// ```
+        #[cfg(not(loom))]
+        pub fn on_thread_park_id<F>(&mut self, f: F) -> &mut Self
+            where
+                F: Fn(usize) + Send + Sync + 'static,
+        {
+            self.before_park = Some(std::sync::Arc::new(f));
+            self
+        }
+
+        /// Same behavior as `on_thread_unpark` except the id of the thread that is parked is passed
+        /// to the callback function `f`.  The id corresponds to the same `usize` that is used in
+        /// calls to `RuntimeMetrics`.
+        ///
+        /// See `on_thread_park_id` for example stuck thread detector.
+        #[cfg(not(loom))]
+        pub fn on_thread_unpark_id<F>(&mut self, f: F) -> &mut Self
+            where
+                F: Fn(usize) + Send + Sync + 'static,
+        {
+            self.after_unpark = Some(std::sync::Arc::new(f));
             self
         }
     }

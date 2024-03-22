@@ -2,7 +2,7 @@
     any(not(all(tokio_unstable, feature = "full")), target_family = "wasm"),
     allow(dead_code)
 )]
-use crate::runtime::Callback;
+use crate::runtime::CallbackWorker;
 use crate::util::RngSeedGenerator;
 
 pub(crate) struct Config {
@@ -16,10 +16,10 @@ pub(crate) struct Config {
     pub(crate) local_queue_capacity: usize,
 
     /// Callback for a worker parking itself
-    pub(crate) before_park: Option<Callback>,
+    pub(crate) before_park: Option<CallbackWorker>,
 
     /// Callback for a worker unparking itself
-    pub(crate) after_unpark: Option<Callback>,
+    pub(crate) after_unpark: Option<CallbackWorker>,
 
     /// The multi-threaded scheduler includes a per-worker LIFO slot used to
     /// store the last scheduled task. This can improve certain usage patterns,

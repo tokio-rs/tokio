@@ -100,6 +100,9 @@ pub(super) struct Worker {
 
 /// Core data
 struct Core {
+    /// Index of this core
+    index: usize,
+
     /// Used to schedule bookkeeping tasks every so often.
     tick: u32,
 
@@ -252,7 +255,7 @@ pub(super) fn create(
     let mut worker_metrics = Vec::with_capacity(size);
 
     // Create the local queues
-    for _ in 0..size {
+    for i in 0..size {
         let (steal, run_queue) = queue::local();
 
         let park = park.clone();
@@ -261,6 +264,7 @@ pub(super) fn create(
         let stats = Stats::new(&metrics);
 
         cores.push(Box::new(Core {
+            index: i,
             tick: 0,
             lifo_slot: None,
             lifo_enabled: !config.disable_lifo_slot,
@@ -306,10 +310,10 @@ pub(super) fn create(
 
     let mut launch = Launch(vec![]);
 
-    for (index, core) in cores.drain(..).enumerate() {
+    for core in cores.drain(..) {
         launch.0.push(Arc::new(Worker {
             handle: handle.clone(),
-            index,
+            index: core.index,
             core: AtomicCell::new(Some(core)),
         }));
     }
@@ -684,7 +688,7 @@ impl Context {
     /// after all the IOs get dispatched
     fn park(&self, mut core: Box<Core>) -> Box<Core> {
         if let Some(f) = &self.worker.handle.shared.config.before_park {
-            f();
+            f(core.index);
         }
 
         if core.transition_to_parked(&self.worker) {
@@ -702,7 +706,7 @@ impl Context {
         }
 
         if let Some(f) = &self.worker.handle.shared.config.after_unpark {
-            f();
+            f(core.index);
         }
         core
     }

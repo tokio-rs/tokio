@@ -351,7 +351,7 @@ impl Context {
         let mut driver = core.driver.take().expect("driver missing");
 
         if let Some(f) = &handle.shared.config.before_park {
-            let (c, ()) = self.enter(core, || f());
+            let (c, ()) = self.enter(core, || f(0));
             core = c;
         }
 
@@ -371,7 +371,7 @@ impl Context {
         }
 
         if let Some(f) = &handle.shared.config.after_unpark {
-            let (c, ()) = self.enter(core, || f());
+            let (c, ()) = self.enter(core, || f(0));
             core = c;
         }
 
