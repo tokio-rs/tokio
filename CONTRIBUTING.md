@@ -347,6 +347,29 @@ example would explicitly use `Timeout::new`. For example:
 /// # }
 ```
 
+### Benchmarks
+
+You can run benchmarks locally for the changes you've made to the tokio codebase.
+Tokio currently uses [Criterion](https://github.com/bheisler/criterion.rs) as its benchmarking tool. To run a benchmark
+against the changes you have made, for example, you can run;
+
+```bash
+cd benches
+
+# Run all benchmarks.
+cargo bench
+
+# Run all tests in the `benches/fs.rs` file
+cargo bench --bench fs
+
+# Run the `async_read_buf` benchmark in `benches/fs.rs` specifically.
+cargo bench async_read_buf
+
+# After running benches, you can check the statistics under `tokio/target/criterion/`
+```
+
+You can also refer to Criterion docs for additional options and details.
+
 ### Commits
 
 It is a recommended best practice to keep your changes as logically grouped as
