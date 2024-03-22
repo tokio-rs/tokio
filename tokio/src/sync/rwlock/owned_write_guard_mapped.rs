@@ -162,7 +162,11 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
     ///
     /// ```
     /// use std::sync::Arc;
-    /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
+    /// use tokio::sync::{
+    ///     RwLock,
+    ///     OwnedRwLockWriteGuard,
+    ///     OwnedRwLockMappedWriteGuard,
+    /// };
     ///
     /// # #[tokio::main]
     /// # async fn main() {
@@ -170,11 +174,11 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
     ///
     /// let guard = lock.clone().write_owned().await;
     /// let guard = OwnedRwLockWriteGuard::map(guard, |x| x);
-    /// assert!(Arc::ptr_eq(&lock, guard.rwlock()));
+    /// assert!(Arc::ptr_eq(&lock, OwnedRwLockMappedWriteGuard::rwlock(&guard)));
     /// # }
     /// ```
-    pub fn rwlock(&self) -> &Arc<RwLock<T>> {
-        &self.lock
+    pub fn rwlock(this: &Self) -> &Arc<RwLock<T>> {
+        &this.lock
     }
 }
 

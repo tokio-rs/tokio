@@ -155,14 +155,14 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
     /// let lock = Arc::new(RwLock::new(Foo(1)));
     ///
     /// let guard = lock.clone().read_owned().await;
-    /// assert!(Arc::ptr_eq(&lock, guard.rwlock()));
+    /// assert!(Arc::ptr_eq(&lock, OwnedRwLockReadGuard::rwlock(&guard)));
     ///
     /// let guard = OwnedRwLockReadGuard::map(guard, |f| &f.0);
-    /// assert!(Arc::ptr_eq(&lock, guard.rwlock()));
+    /// assert!(Arc::ptr_eq(&lock, OwnedRwLockReadGuard::rwlock(&guard)));
     /// # }
     /// ```
-    pub fn rwlock(&self) -> &Arc<RwLock<T>> {
-        &self.lock
+    pub fn rwlock(this: &Self) -> &Arc<RwLock<T>> {
+        &this.lock
     }
 }
 
