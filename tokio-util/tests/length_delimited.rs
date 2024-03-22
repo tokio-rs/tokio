@@ -739,6 +739,16 @@ fn smaller_frame_len_not_adjusted() {
     assert_eq!(codec.max_frame_length(), 10);
 }
 
+#[test]
+fn max_allowed_length_field() {
+    let codec = LengthDelimitedCodec::builder()
+        .length_field_length(8)
+        .max_frame_length(usize::MAX)
+        .new_codec();
+
+    assert_eq!(codec.max_frame_length(), usize::MAX);
+}
+
 // ===== Test utils =====
 
 struct Mock {
