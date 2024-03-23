@@ -76,6 +76,59 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
+/// ## Limit the number of outgoing requests being sent at the same time
+///
+/// In some scenarios, it might be required to limit the number of outgoing
+/// requests being sent in parallel. This could be due to limits of a consumed
+/// API or the network resources of the system the application is running on.
+///
+/// This example uses an `Arc<Semaphore>` with 10 permits. Each task spawned is
+/// given a reference to the semaphore by cloning the `Arc<Semaphore>`. Before
+/// a task sends a request, it must acquire a permit from the semaphore by
+/// calling [`Semaphore::acquire`]. This ensures that at most 10 requests are
+/// sent in parallel at any given time. After a task has sent a request, it
+/// drops the permit to allow other tasks to send requests.
+///
+/// ```
+/// use std::sync::Arc;
+/// use tokio::sync::Semaphore;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     // Define maximum number of parallel requests.
+///     let semaphore = Arc::new(Semaphore::new(10));
+///     // Spawn many tasks that will send requests.
+///     let mut jhs = Vec::new();
+///     for task_id in 0..100 {
+///         let semaphore = semaphore.clone();
+///         let jh = tokio::spawn(async move {
+///             // Acquire permit before sending request.
+///             let _permit = semaphore.acquire().await.unwrap();
+///             // Send the request.
+///             let response = send_request(task_id).await;
+///             // Drop the permit after the request has been sent.
+///             drop(_permit);
+///             // Handle response.
+///             // ...
+///
+///             response
+///         });
+///         jhs.push(jh);
+///     }
+///     // Collect responses from tasks.
+///     let mut responses = Vec::new();
+///     for jh in jhs {
+///         let response = jh.await.unwrap();
+///         responses.push(response);
+///     }
+///     // Process responses.
+///     // ...
+/// }
+/// # async fn send_request(task_id: usize) {
+/// #     // Send request.
+/// # }
+/// ```
+///
 /// ## Limit the number of incoming requests being handled at the same time
 ///
 /// Similar to limiting the number of simultaneously opened files, network handles

@@ -689,6 +689,66 @@ fn encode_overflow() {
     codec.encode(Bytes::from("hello"), &mut buf).unwrap();
 }
 
+#[test]
+fn frame_does_not_fit() {
+    let codec = LengthDelimitedCodec::builder()
+        .length_field_length(1)
+        .max_frame_length(256)
+        .new_codec();
+
+    assert_eq!(codec.max_frame_length(), 255);
+}
+
+#[test]
+fn neg_adjusted_frame_does_not_fit() {
+    let codec = LengthDelimitedCodec::builder()
+        .length_field_length(1)
+        .length_adjustment(-1)
+        .new_codec();
+
+    assert_eq!(codec.max_frame_length(), 254);
+}
+
+#[test]
+fn pos_adjusted_frame_does_not_fit() {
+    let codec = LengthDelimitedCodec::builder()
+        .length_field_length(1)
+        .length_adjustment(1)
+        .new_codec();
+
+    assert_eq!(codec.max_frame_length(), 256);
+}
+
+#[test]
+fn max_allowed_frame_fits() {
+    let codec = LengthDelimitedCodec::builder()
+        .length_field_length(std::mem::size_of::<usize>())
+        .max_frame_length(usize::MAX)
+        .new_codec();
+
+    assert_eq!(codec.max_frame_length(), usize::MAX);
+}
+
+#[test]
+fn smaller_frame_len_not_adjusted() {
+    let codec = LengthDelimitedCodec::builder()
+        .max_frame_length(10)
+        .length_field_length(std::mem::size_of::<usize>())
+        .new_codec();
+
+    assert_eq!(codec.max_frame_length(), 10);
+}
+
+#[test]
+fn max_allowed_length_field() {
+    let codec = LengthDelimitedCodec::builder()
+        .length_field_length(8)
+        .max_frame_length(usize::MAX)
+        .new_codec();
+
+    assert_eq!(codec.max_frame_length(), usize::MAX);
+}
+
 // ===== Test utils =====
 
 struct Mock {

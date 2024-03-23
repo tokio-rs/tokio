@@ -210,11 +210,10 @@ jobs:
         run: cargo hack test --each-feature
         working-directory: tests-build
 
-      # Check benchmarks. Run of benchmarks is done by bench.yml workflow.
+      # Check benchmarks.
       - name: Check benches
         run: cargo check --benches
         working-directory: benches
-        # bench.yml workflow runs benchmarks only on linux.
         if: startsWith(matrix.os, 'ubuntu')
 
   test-parking_lot:
