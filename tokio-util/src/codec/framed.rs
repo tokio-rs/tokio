@@ -19,7 +19,7 @@ pin_project! {
     ///
     /// You can create a `Framed` instance by using the [`Decoder::framed`] adapter, or
     /// by using the `new` function seen below.
-    /// 
+    ///
     /// # Cancellation safety
     ///
     /// * [`futures_util::sink::SinkExt::send`]: if send is used as the event in a
