@@ -582,7 +582,7 @@ where
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv_many` is used as the event in a
+    /// This method is cancel safe. If `next_many` is used as the event in a
     /// [`tokio::select!`](tokio::select) statement and some other branch
     /// completes first, it is guaranteed that no items were received on any of
     /// the underlying streams.
@@ -600,7 +600,7 @@ where
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided
     /// `Context` is scheduled to receive a wakeup when an item is sent on any of the
-    /// underlying stream. Note that on multiple calls to `poll_recv_many`, only
+    /// underlying stream. Note that on multiple calls to `poll_next_many`, only
     /// the `Waker` from the `Context` passed to the most recent call is scheduled
     /// to receive a wakeup.
     ///
@@ -627,14 +627,10 @@ where
                     remaining -= 1;
                     let key = self.entries[idx].0.clone();
                     buffer.push((key, val));
+
+                    start = idx.wrapping_add(1) % self.entries.len();
                 }
                 Poll::Ready(None) | Poll::Pending => break,
-            }
-
-            // Some streams may have been removed during the call to `poll_one`,
-            // so we may need to regenerate the start index.
-            if start >= self.entries.len() {
-                start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
             }
         }
 
