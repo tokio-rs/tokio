@@ -181,6 +181,28 @@ fn tempfile() -> NamedTempFile {
 }
 
 #[tokio::test]
+async fn set_max_buf_size_read() {
+    let mut tempfile = tempfile();
+    tempfile.write_all(HELLO).unwrap();
+    let mut file = File::open(tempfile.path()).await.unwrap();
+    let mut buf = [0; 1024];
+    file.set_max_buf_size(1);
+
+    // A single read operation reads a maximum of 1 byte.
+    assert_eq!(file.read(&mut buf).await.unwrap(), 1);
+}
+
+#[tokio::test]
+async fn set_max_buf_size_write() {
+    let tempfile = tempfile();
+    let mut file = File::create(tempfile.path()).await.unwrap();
+    file.set_max_buf_size(1);
+
+    // A single write operation writes a maximum of 1 byte.
+    assert_eq!(file.write(HELLO).await.unwrap(), 1);
+}
+
+#[tokio::test]
 #[cfg(unix)]
 async fn file_debug_fmt() {
     let tempfile = tempfile();
