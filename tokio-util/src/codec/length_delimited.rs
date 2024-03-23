@@ -1044,7 +1044,7 @@ impl Builder {
         }
 
         // Calculate the maximum number that can be represented using `length_field_len` bytes.
-        let max_number = match 1.checked_shl(8 * self.length_field_len) {
+        let max_number = match 1u64.checked_shl((8 * self.length_field_len) as u32) {
             Some(shl) => shl - 1,
             None => u64::MAX,
         };
