@@ -1044,9 +1044,10 @@ impl Builder {
         }
 
         // Calculate the maximum number that can be represented using `length_field_len` bytes.
-        let max_number = 2u64.saturating_pow((8 * self.length_field_len - 1) as u32);
-        // In order to prevent an overflow, we do the last part manually.
-        let max_number = max_number + (max_number - 1);
+        let max_number = match 1.checked_shl(8 * self.length_field_len) {
+            Some(shl) => shl - 1,
+            None => u64::MAX,
+        };
 
         let max_allowed_len = saturating_add_signed(max_number, self.length_adjustment as i64);
 
