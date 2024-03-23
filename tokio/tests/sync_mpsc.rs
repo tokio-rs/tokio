@@ -1204,6 +1204,35 @@ async fn test_rx_len_when_consuming_all_messages() {
 }
 
 #[tokio::test]
+async fn test_rx_len_when_close_is_called() {
+    let (tx, mut rx) = mpsc::channel(100);
+    tx.send(()).await.unwrap();
+    rx.close();
+
+    assert_eq!(rx.len(), 1);
+}
+
+#[tokio::test]
+async fn test_rx_len_when_close_is_called_before_dropping_sender() {
+    let (tx, mut rx) = mpsc::channel(100);
+    tx.send(()).await.unwrap();
+    rx.close();
+    drop(tx);
+
+    assert_eq!(rx.len(), 1);
+}
+
+#[tokio::test]
+async fn test_rx_len_when_close_is_called_after_dropping_sender() {
+    let (tx, mut rx) = mpsc::channel(100);
+    tx.send(()).await.unwrap();
+    drop(tx);
+    rx.close();
+
+    assert_eq!(rx.len(), 1);
+}
+
+#[tokio::test]
 async fn test_rx_unbounded_is_closed_when_calling_close_with_sender() {
     // is_closed should return true after calling close but still has a sender
     let (_tx, mut rx) = mpsc::unbounded_channel::<()>();
@@ -1360,6 +1389,35 @@ async fn test_rx_unbounded_len_when_consuming_all_messages() {
         assert!(rx.recv().await.is_some());
         assert_eq!(rx.len(), i);
     }
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_len_when_close_is_called() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    tx.send(()).unwrap();
+    rx.close();
+
+    assert_eq!(rx.len(), 1);
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_len_when_close_is_called_before_dropping_sender() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    tx.send(()).unwrap();
+    rx.close();
+    drop(tx);
+
+    assert_eq!(rx.len(), 1);
+}
+
+#[tokio::test]
+async fn test_rx_unbounded_len_when_close_is_called_after_dropping_sender() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    tx.send(()).unwrap();
+    drop(tx);
+    rx.close();
+
+    assert_eq!(rx.len(), 1);
 }
 
 fn is_debug<T: fmt::Debug>(_: &T) {}
