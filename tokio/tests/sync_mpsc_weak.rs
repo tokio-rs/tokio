@@ -511,3 +511,145 @@ fn test_tx_count_weak_unbounded_sender() {
 
     assert!(tx_weak.upgrade().is_none() && tx_weak2.upgrade().is_none());
 }
+
+#[tokio::test]
+async fn sender_strong_count_when_cloned() {
+    let (tx, _rx) = mpsc::channel::<()>(1);
+
+    let tx2 = tx.clone();
+
+    assert_eq!(tx.strong_count(), 2);
+    assert_eq!(tx2.strong_count(), 2);
+}
+
+#[tokio::test]
+async fn sender_weak_count_when_downgraded() {
+    let (tx, _rx) = mpsc::channel::<()>(1);
+
+    let weak = tx.downgrade();
+
+    assert_eq!(tx.weak_count(), 1);
+    assert_eq!(weak.weak_count(), 1);
+}
+
+#[tokio::test]
+async fn sender_strong_count_when_dropped() {
+    let (tx, _rx) = mpsc::channel::<()>(1);
+
+    let tx2 = tx.clone();
+
+    drop(tx2);
+
+    assert_eq!(tx.strong_count(), 1);
+}
+
+#[tokio::test]
+async fn sender_weak_count_when_dropped() {
+    let (tx, _rx) = mpsc::channel::<()>(1);
+
+    let weak = tx.downgrade();
+
+    drop(weak);
+
+    assert_eq!(tx.weak_count(), 0);
+}
+
+#[tokio::test]
+async fn sender_strong_and_weak_conut() {
+    let (tx, _rx) = mpsc::channel::<()>(1);
+
+    let tx2 = tx.clone();
+
+    let weak = tx.downgrade();
+    let weak2 = tx2.downgrade();
+
+    assert_eq!(tx.strong_count(), 2);
+    assert_eq!(tx2.strong_count(), 2);
+    assert_eq!(weak.strong_count(), 2);
+    assert_eq!(weak2.strong_count(), 2);
+
+    assert_eq!(tx.weak_count(), 2);
+    assert_eq!(tx2.weak_count(), 2);
+    assert_eq!(weak.weak_count(), 2);
+    assert_eq!(weak2.weak_count(), 2);
+
+    drop(tx2);
+    drop(weak2);
+
+    assert_eq!(tx.strong_count(), 1);
+    assert_eq!(weak.strong_count(), 1);
+
+    assert_eq!(tx.weak_count(), 1);
+    assert_eq!(weak.weak_count(), 1);
+}
+
+#[tokio::test]
+async fn unbounded_sender_strong_count_when_cloned() {
+    let (tx, _rx) = mpsc::unbounded_channel::<()>();
+
+    let tx2 = tx.clone();
+
+    assert_eq!(tx.strong_count(), 2);
+    assert_eq!(tx2.strong_count(), 2);
+}
+
+#[tokio::test]
+async fn unbounded_sender_weak_count_when_downgraded() {
+    let (tx, _rx) = mpsc::unbounded_channel::<()>();
+
+    let weak = tx.downgrade();
+
+    assert_eq!(tx.weak_count(), 1);
+    assert_eq!(weak.weak_count(), 1);
+}
+
+#[tokio::test]
+async fn unbounded_sender_strong_count_when_dropped() {
+    let (tx, _rx) = mpsc::unbounded_channel::<()>();
+
+    let tx2 = tx.clone();
+
+    drop(tx2);
+
+    assert_eq!(tx.strong_count(), 1);
+}
+
+#[tokio::test]
+async fn unbounded_sender_weak_count_when_dropped() {
+    let (tx, _rx) = mpsc::unbounded_channel::<()>();
+
+    let weak = tx.downgrade();
+
+    drop(weak);
+
+    assert_eq!(tx.weak_count(), 0);
+}
+
+#[tokio::test]
+async fn unbounded_sender_strong_and_weak_conut() {
+    let (tx, _rx) = mpsc::unbounded_channel::<()>();
+
+    let tx2 = tx.clone();
+
+    let weak = tx.downgrade();
+    let weak2 = tx2.downgrade();
+
+    assert_eq!(tx.strong_count(), 2);
+    assert_eq!(tx2.strong_count(), 2);
+    assert_eq!(weak.strong_count(), 2);
+    assert_eq!(weak2.strong_count(), 2);
+
+    assert_eq!(tx.weak_count(), 2);
+    assert_eq!(tx2.weak_count(), 2);
+    assert_eq!(weak.weak_count(), 2);
+    assert_eq!(weak2.weak_count(), 2);
+
+    drop(tx2);
+    drop(weak2);
+
+    assert_eq!(tx.strong_count(), 1);
+    assert_eq!(weak.strong_count(), 1);
+
+    assert_eq!(tx.weak_count(), 1);
+    assert_eq!(weak.weak_count(), 1);
+}
