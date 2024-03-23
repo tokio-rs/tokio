@@ -19,11 +19,18 @@ pin_project! {
     ///
     /// You can create a `Framed` instance by using the [`Decoder::framed`] adapter, or
     /// by using the `new` function seen below.
+    /// 
+    /// # Cancellation safety
+    ///
+    /// * [`futures_util::sink::SinkExt::send`]: if send is used as the event in a
+    /// `tokio::select!` statement and some other branch completes first, then it is
+    /// guaranteed that the message was not sent, but the message itself is lost.
     ///
     /// [`Stream`]: futures_core::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`Decoder::framed`]: crate::codec::Decoder::framed()
+    /// [`futures_util::sink::SinkExt::send`]: https://docs.rs/futures-util/latest/futures_util/sink/trait.SinkExt.html#method.send
     pub struct Framed<T, U> {
         #[pin]
         inner: FramedImpl<T, U, RWFrames>

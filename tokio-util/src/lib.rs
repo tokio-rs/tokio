@@ -17,20 +17,7 @@
 //! [`tokio`] crate. However, `tokio-util` _will_ respect Rust's
 //! semantic versioning policy, especially with regard to breaking changes.
 //!
-//! # Cancellation safety
-//!
-//! When using `tokio::select!` in a loop to receive messages from multiple sources,
-//! you should make sure that the receive call is cancellation safe to avoid
-//! losing messages. This section goes through various common methods and
-//! describes whether they are cancel safe.  The lists in this section are not
-//! exhaustive.
-//!
-//! * [`futures_util::sink::SinkExt::send`]: if send is used as the event in a
-//! `tokio::select!` statement and some other branch completes first, then it is
-//! guaranteed that the message was not sent, but the message itself is lost.
-//!
 //! [`tokio`]: https://docs.rs/tokio
-//! [`futures_util::sink::SinkExt::send`]: https://docs.rs/futures-util/latest/futures_util/sink/trait.SinkExt.html#method.send
 
 #[macro_use]
 mod cfg;
