@@ -18,10 +18,6 @@ pin_project! {
     /// examples on the [`codec`] module.
     ///
     /// # Cancellation safety
-    ///
-    /// * [`futures_util::sink::SinkExt::send`]: if send is used as the event in a
-    /// `tokio::select!` statement and some other branch completes first, then it is
-    /// guaranteed that the message was not sent, but the message itself is lost.
     /// * [`tokio_stream::StreamExt::next`]: This method is cancel safe. The returned
     /// future only holds onto a reference to the underlying stream, so dropping it will
     /// never lose a value.
@@ -29,7 +25,6 @@ pin_project! {
     /// [`Stream`]: futures_core::Stream
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`codec`]: crate::codec
-    /// [`futures_util::sink::SinkExt::send`]: futures_util::sink::SinkExt::send
     /// [`tokio_stream::StreamExt::next`]: https://docs.rs/tokio-stream/latest/tokio_stream/trait.StreamExt.html#method.next
     pub struct FramedRead<T, D> {
         #[pin]
