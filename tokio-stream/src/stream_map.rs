@@ -593,12 +593,6 @@ where
     ///   stored in `buffer`. This can be less than, or equal to, `limit`.
     /// * `Poll::Ready(0)` if `limit` is set to zero or when the `StreamMap` is empty.
     ///
-    /// When the method returns `Poll::Pending`, the `Waker` in the provided
-    /// `Context` is scheduled to receive a wakeup when an item is sent on any of the
-    /// underlying stream. Note that on multiple calls to `poll_next_many`, only
-    /// the `Waker` from the `Context` passed to the most recent call is scheduled
-    /// to receive a wakeup.
-    ///
     /// Note that this method does not guarantee that exactly `limit` items
     /// are received. Rather, if at least one item is available, it returns
     /// as many items as it can up to the given limit. This method returns
