@@ -614,7 +614,7 @@ where
         buffer: &mut Vec<(K, V::Item)>,
         limit: usize,
     ) -> Poll<usize> {
-        if limit == 0 {
+        if limit == 0 || self.entries.is_empty() {
             return Poll::Ready(0);
         }
 
