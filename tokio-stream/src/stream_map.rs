@@ -516,7 +516,9 @@ where
     K: Unpin,
     V: Stream + Unpin,
 {
-    fn poll_one(&mut self, cx: &mut Context<'_>, start: usize) -> Poll<Option<(usize, V::Item)>> {
+    /// Polls the next value, includes the vec entry index
+    fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<Option<(usize, V::Item)>> {
+        let start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
         let mut idx = start;
 
         for _ in 0..self.entries.len() {
@@ -550,13 +552,6 @@ where
         } else {
             Poll::Pending
         }
-    }
-
-    /// Polls the next value, includes the vec entry index
-    fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<Option<(usize, V::Item)>> {
-        let start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
-
-        self.poll_one(cx, start)
     }
 }
 
@@ -618,23 +613,53 @@ where
             return Poll::Ready(0);
         }
 
-        let mut remaining = limit;
-        let mut start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
+        let mut added = 0;
 
-        while remaining > 0 {
-            match self.poll_one(cx, start) {
-                Poll::Ready(Some((idx, val))) => {
-                    remaining -= 1;
-                    let key = self.entries[idx].0.clone();
-                    buffer.push((key, val));
+        let start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
+        let mut idx = start;
 
-                    start = idx.wrapping_add(1) % self.entries.len();
+        while added < limit {
+            // Indicates whether at least one stream returned a value when polled or not
+            let mut should_loop = false;
+
+            for _ in 0..self.entries.len() {
+                let (_, stream) = &mut self.entries[idx];
+
+                match Pin::new(stream).poll_next(cx) {
+                    Poll::Ready(Some(val)) => {
+                        added += 1;
+
+                        let key = self.entries[idx].0.clone();
+                        buffer.push((key, val));
+
+                        should_loop = true;
+
+                        idx = idx.wrapping_add(1) % self.entries.len();
+                    }
+                    Poll::Ready(None) => {
+                        // Remove the entry
+                        self.entries.swap_remove(idx);
+
+                        // Check if this was the last entry, if so the cursor needs
+                        // to wrap
+                        if idx == self.entries.len() {
+                            idx = 0;
+                        } else if idx < start && start <= self.entries.len() {
+                            // The stream being swapped into the current index has
+                            // already been polled, so skip it.
+                            idx = idx.wrapping_add(1) % self.entries.len();
+                        }
+                    }
+                    Poll::Pending => {
+                        idx = idx.wrapping_add(1) % self.entries.len();
+                    }
                 }
-                Poll::Ready(None) | Poll::Pending => break,
+            }
+
+            if !should_loop {
+                break;
             }
         }
-
-        let added = limit - remaining;
 
         if added > 0 {
             Poll::Ready(added)

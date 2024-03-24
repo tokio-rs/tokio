@@ -406,6 +406,49 @@ async fn poll_next_many_enough() {
 }
 
 #[tokio::test]
+async fn poll_next_many_correctly_loops_around() {
+    for _ in 0..10 {
+        let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+        stream_map.insert(0, Box::pin(iter([0usize].into_iter())) as UsizeStream);
+        stream_map.insert(1, Box::pin(iter([0usize, 1].into_iter())) as UsizeStream);
+        stream_map.insert(2, Box::pin(iter([0usize, 1, 2].into_iter())) as UsizeStream);
+
+        let mut buffer = vec![];
+
+        let n = poll_fn(|cx| stream_map.poll_next_many(cx, &mut buffer, 3)).await;
+        assert_eq!(n, 3);
+        assert_eq!(
+            std::mem::take(&mut buffer)
+                .into_iter()
+                .map(|(_, v)| v)
+                .collect::<Vec<_>>(),
+            vec![0, 0, 0]
+        );
+
+        let n = poll_fn(|cx| stream_map.poll_next_many(cx, &mut buffer, 2)).await;
+        assert_eq!(n, 2);
+        assert_eq!(
+            std::mem::take(&mut buffer)
+                .into_iter()
+                .map(|(_, v)| v)
+                .collect::<Vec<_>>(),
+            vec![1, 1]
+        );
+
+        let n = poll_fn(|cx| stream_map.poll_next_many(cx, &mut buffer, 1)).await;
+        assert_eq!(n, 1);
+        assert_eq!(
+            std::mem::take(&mut buffer)
+                .into_iter()
+                .map(|(_, v)| v)
+                .collect::<Vec<_>>(),
+            vec![2]
+        );
+    }
+}
+
+#[tokio::test]
 async fn next_many_zero() {
     let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
 
@@ -474,4 +517,47 @@ async fn next_many_enough() {
     assert_eq!(buffer.len(), 2);
     assert!(buffer.contains(&(0, 0)));
     assert!(buffer.contains(&(1, 1)));
+}
+
+#[tokio::test]
+async fn next_many_correctly_loops_around() {
+    for _ in 0..10 {
+        let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+        stream_map.insert(0, Box::pin(iter([0usize].into_iter())) as UsizeStream);
+        stream_map.insert(1, Box::pin(iter([0usize, 1].into_iter())) as UsizeStream);
+        stream_map.insert(2, Box::pin(iter([0usize, 1, 2].into_iter())) as UsizeStream);
+
+        let mut buffer = vec![];
+
+        let n = poll_fn(|cx| pin!(stream_map.next_many(&mut buffer, 3)).poll(cx)).await;
+        assert_eq!(n, 3);
+        assert_eq!(
+            std::mem::take(&mut buffer)
+                .into_iter()
+                .map(|(_, v)| v)
+                .collect::<Vec<_>>(),
+            vec![0, 0, 0]
+        );
+
+        let n = poll_fn(|cx| pin!(stream_map.next_many(&mut buffer, 2)).poll(cx)).await;
+        assert_eq!(n, 2);
+        assert_eq!(
+            std::mem::take(&mut buffer)
+                .into_iter()
+                .map(|(_, v)| v)
+                .collect::<Vec<_>>(),
+            vec![1, 1]
+        );
+
+        let n = poll_fn(|cx| pin!(stream_map.next_many(&mut buffer, 1)).poll(cx)).await;
+        assert_eq!(n, 1);
+        assert_eq!(
+            std::mem::take(&mut buffer)
+                .into_iter()
+                .map(|(_, v)| v)
+                .collect::<Vec<_>>(),
+            vec![2]
+        );
+    }
 }
