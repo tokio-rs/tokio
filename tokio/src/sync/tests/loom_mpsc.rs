@@ -188,3 +188,37 @@ fn try_recv() {
         }
     });
 }
+
+#[test]
+fn len_nonzero_after_send() {
+    loom::model(|| {
+        let (send, recv) = mpsc::channel(10);
+        let send2 = send.clone();
+
+        let join = thread::spawn(move || {
+            block_on(send2.send("message2")).unwrap();
+        });
+
+        block_on(send.send("message1")).unwrap();
+        assert!(recv.len() != 0);
+
+        join.join().unwrap();
+    });
+}
+
+#[test]
+fn nonempty_after_send() {
+    loom::model(|| {
+        let (send, recv) = mpsc::channel(10);
+        let send2 = send.clone();
+
+        let join = thread::spawn(move || {
+            block_on(send2.send("message2")).unwrap();
+        });
+
+        block_on(send.send("message1")).unwrap();
+        assert!(!recv.is_empty());
+
+        join.join().unwrap();
+    });
+}

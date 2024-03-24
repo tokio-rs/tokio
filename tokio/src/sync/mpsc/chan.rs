@@ -255,6 +255,33 @@ impl<T, S: Semaphore> Rx<T, S> {
         self.inner.notify_rx_closed.notify_waiters();
     }
 
+    pub(crate) fn is_closed(&self) -> bool {
+        // There two internal states that can represent a closed channel
+        //
+        //  1. When `close` is called.
+        //  In this case, the inner semaphore will be closed.
+        //
+        //  2. When all senders are dropped.
+        //  In this case, the semaphore remains unclosed, and the `index` in the list won't
+        //  reach the tail position. It is necessary to check the list if the last block is
+        //  `closed`.
+        self.inner.semaphore.is_closed() || self.inner.tx_count.load(Acquire) == 0
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.rx_fields.with(|rx_fields_ptr| {
+            let rx_fields = unsafe { &*rx_fields_ptr };
+            rx_fields.list.is_empty(&self.inner.tx)
+        })
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.inner.rx_fields.with(|rx_fields_ptr| {
+            let rx_fields = unsafe { &*rx_fields_ptr };
+            rx_fields.list.len(&self.inner.tx)
+        })
+    }
+
     /// Receive the next value
     pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         use super::block::Read;
