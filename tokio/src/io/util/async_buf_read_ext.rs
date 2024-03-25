@@ -267,6 +267,12 @@ cfg_io_util! {
         /// This function will return an I/O error if the underlying reader was
         /// read, but returned an error.
         ///
+        /// # Cancel safety
+        ///
+        /// This method is cancel safe. If you use it as the event in a
+        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// completes first, then it is guaranteed that no data was read.
+        ///
         /// [`consume`]: crate::io::AsyncBufReadExt::consume
         fn fill_buf(&mut self) -> FillBuf<'_, Self>
         where
