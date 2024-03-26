@@ -86,16 +86,43 @@ fn active_tasks_count() {
     let rt = current_thread();
     let metrics = rt.metrics();
     assert_eq!(0, metrics.active_tasks_count());
-    rt.spawn(async move {
+    rt.block_on(rt.spawn(async move {
         assert_eq!(1, metrics.active_tasks_count());
-    });
+    }))
+    .unwrap();
 
     let rt = threaded();
     let metrics = rt.metrics();
     assert_eq!(0, metrics.active_tasks_count());
-    rt.spawn(async move {
+    rt.block_on(rt.spawn(async move {
         assert_eq!(1, metrics.active_tasks_count());
-    });
+    }))
+    .unwrap();
+}
+
+#[test]
+fn spawned_tasks_count() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+    assert_eq!(0, metrics.spawned_tasks_count());
+
+    rt.block_on(rt.spawn(async move {
+        assert_eq!(1, metrics.spawned_tasks_count());
+    }))
+    .unwrap();
+
+    assert_eq!(1, rt.metrics().spawned_tasks_count());
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+    assert_eq!(0, metrics.spawned_tasks_count());
+
+    rt.block_on(rt.spawn(async move {
+        assert_eq!(1, metrics.spawned_tasks_count());
+    }))
+    .unwrap();
+
+    assert_eq!(1, rt.metrics().spawned_tasks_count());
 }
 
 #[test]
