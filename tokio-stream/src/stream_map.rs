@@ -1,4 +1,4 @@
-use crate::Stream;
+use crate::{poll_fn, Stream};
 
 use std::borrow::Borrow;
 use std::hash::Hash;
@@ -558,6 +558,110 @@ where
 impl<K, V> Default for StreamMap<K, V> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<K, V> StreamMap<K, V>
+where
+    K: Clone + Unpin,
+    V: Stream + Unpin,
+{
+    /// Receives multiple items on this [`StreamMap`], extending the provided `buffer`.
+    ///
+    /// This method returns the number of items that is appended to the `buffer`.
+    ///
+    /// Note that this method does not guarantee that exactly `limit` items
+    /// are received. Rather, if at least one item is available, it returns
+    /// as many items as it can up to the given limit. This method returns
+    /// zero only if the `StreamMap` is empty (or if `limit` is zero).
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If `next_many` is used as the event in a
+    /// [`tokio::select!`](tokio::select) statement and some other branch
+    /// completes first, it is guaranteed that no items were received on any of
+    /// the underlying streams.
+    pub async fn next_many(&mut self, buffer: &mut Vec<(K, V::Item)>, limit: usize) -> usize {
+        poll_fn(|cx| self.poll_next_many(cx, buffer, limit)).await
+    }
+
+    /// Polls to receive multiple items on this `StreamMap`, extending the provided `buffer`.
+    ///
+    /// This method returns:
+    /// * `Poll::Pending` if no items are available but the `StreamMap` is not empty.
+    /// * `Poll::Ready(count)` where `count` is the number of items successfully received and
+    ///   stored in `buffer`. This can be less than, or equal to, `limit`.
+    /// * `Poll::Ready(0)` if `limit` is set to zero or when the `StreamMap` is empty.
+    ///
+    /// Note that this method does not guarantee that exactly `limit` items
+    /// are received. Rather, if at least one item is available, it returns
+    /// as many items as it can up to the given limit. This method returns
+    /// zero only if the `StreamMap` is empty (or if `limit` is zero).
+    pub fn poll_next_many(
+        &mut self,
+        cx: &mut Context<'_>,
+        buffer: &mut Vec<(K, V::Item)>,
+        limit: usize,
+    ) -> Poll<usize> {
+        if limit == 0 || self.entries.is_empty() {
+            return Poll::Ready(0);
+        }
+
+        let mut added = 0;
+
+        let start = self::rand::thread_rng_n(self.entries.len() as u32) as usize;
+        let mut idx = start;
+
+        while added < limit {
+            // Indicates whether at least one stream returned a value when polled or not
+            let mut should_loop = false;
+
+            for _ in 0..self.entries.len() {
+                let (_, stream) = &mut self.entries[idx];
+
+                match Pin::new(stream).poll_next(cx) {
+                    Poll::Ready(Some(val)) => {
+                        added += 1;
+
+                        let key = self.entries[idx].0.clone();
+                        buffer.push((key, val));
+
+                        should_loop = true;
+
+                        idx = idx.wrapping_add(1) % self.entries.len();
+                    }
+                    Poll::Ready(None) => {
+                        // Remove the entry
+                        self.entries.swap_remove(idx);
+
+                        // Check if this was the last entry, if so the cursor needs
+                        // to wrap
+                        if idx == self.entries.len() {
+                            idx = 0;
+                        } else if idx < start && start <= self.entries.len() {
+                            // The stream being swapped into the current index has
+                            // already been polled, so skip it.
+                            idx = idx.wrapping_add(1) % self.entries.len();
+                        }
+                    }
+                    Poll::Pending => {
+                        idx = idx.wrapping_add(1) % self.entries.len();
+                    }
+                }
+            }
+
+            if !should_loop {
+                break;
+            }
+        }
+
+        if added > 0 {
+            Poll::Ready(added)
+        } else if self.entries.is_empty() {
+            Poll::Ready(0)
+        } else {
+            Poll::Pending
+        }
     }
 }
 

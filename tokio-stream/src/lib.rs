@@ -73,6 +73,9 @@
 #[macro_use]
 mod macros;
 
+mod poll_fn;
+pub(crate) use poll_fn::poll_fn;
+
 pub mod wrappers;
 
 mod stream_ext;
