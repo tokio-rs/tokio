@@ -17,6 +17,7 @@ use tokio::time;
 use tokio_test::assert_err;
 
 #[tokio::test]
+#[cfg_attr(panic = "abort", ignore)]
 async fn issue_2174() {
     let mut child = Command::new("sleep")
         .arg("2")

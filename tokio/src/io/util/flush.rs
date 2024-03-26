@@ -11,6 +11,7 @@ pin_project! {
     /// A future used to fully flush an I/O object.
     ///
     /// Created by the [`AsyncWriteExt::flush`][flush] function.
+    ///
     /// [flush]: crate::io::AsyncWriteExt::flush
     #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]

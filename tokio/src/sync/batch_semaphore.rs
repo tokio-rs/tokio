@@ -71,7 +71,7 @@ pub struct AcquireError(());
 pub(crate) struct Acquire<'a> {
     node: Waiter,
     semaphore: &'a Semaphore,
-    num_permits: u32,
+    num_permits: usize,
     queued: bool,
 }
 
@@ -262,13 +262,13 @@ impl Semaphore {
         self.permits.load(Acquire) & Self::CLOSED == Self::CLOSED
     }
 
-    pub(crate) fn try_acquire(&self, num_permits: u32) -> Result<(), TryAcquireError> {
+    pub(crate) fn try_acquire(&self, num_permits: usize) -> Result<(), TryAcquireError> {
         assert!(
-            num_permits as usize <= Self::MAX_PERMITS,
+            num_permits <= Self::MAX_PERMITS,
             "a semaphore may not have more than MAX_PERMITS permits ({})",
             Self::MAX_PERMITS
         );
-        let num_permits = (num_permits as usize) << Self::PERMIT_SHIFT;
+        let num_permits = num_permits << Self::PERMIT_SHIFT;
         let mut curr = self.permits.load(Acquire);
         loop {
             // Has the semaphore closed?
@@ -293,7 +293,7 @@ impl Semaphore {
         }
     }
 
-    pub(crate) fn acquire(&self, num_permits: u32) -> Acquire<'_> {
+    pub(crate) fn acquire(&self, num_permits: usize) -> Acquire<'_> {
         Acquire::new(self, num_permits)
     }
 
@@ -368,10 +368,35 @@ impl Semaphore {
         assert_eq!(rem, 0);
     }
 
+    /// Decrease a semaphore's permits by a maximum of `n`.
+    ///
+    /// If there are insufficient permits and it's not possible to reduce by `n`,
+    /// return the number of permits that were actually reduced.
+    pub(crate) fn forget_permits(&self, n: usize) -> usize {
+        if n == 0 {
+            return 0;
+        }
+
+        let mut curr_bits = self.permits.load(Acquire);
+        loop {
+            let curr = curr_bits >> Self::PERMIT_SHIFT;
+            let new = curr.saturating_sub(n);
+            match self.permits.compare_exchange_weak(
+                curr_bits,
+                new << Self::PERMIT_SHIFT,
+                AcqRel,
+                Acquire,
+            ) {
+                Ok(_) => return std::cmp::min(curr, n),
+                Err(actual) => curr_bits = actual,
+            };
+        }
+    }
+
     fn poll_acquire(
         &self,
         cx: &mut Context<'_>,
-        num_permits: u32,
+        num_permits: usize,
         node: Pin<&mut Waiter>,
         queued: bool,
     ) -> Poll<Result<(), AcquireError>> {
@@ -380,7 +405,7 @@ impl Semaphore {
         let needed = if queued {
             node.state.load(Acquire) << Self::PERMIT_SHIFT
         } else {
-            (num_permits as usize) << Self::PERMIT_SHIFT
+            num_permits << Self::PERMIT_SHIFT
         };
 
         let mut lock = None;
@@ -506,12 +531,12 @@ impl fmt::Debug for Semaphore {
 
 impl Waiter {
     fn new(
-        num_permits: u32,
+        num_permits: usize,
         #[cfg(all(tokio_unstable, feature = "tracing"))] ctx: trace::AsyncOpTracingCtx,
     ) -> Self {
         Waiter {
             waker: UnsafeCell::new(None),
-            state: AtomicUsize::new(num_permits as usize),
+            state: AtomicUsize::new(num_permits),
             pointers: linked_list::Pointers::new(),
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             ctx,
@@ -591,7 +616,7 @@ impl Future for Acquire<'_> {
 }
 
 impl<'a> Acquire<'a> {
-    fn new(semaphore: &'a Semaphore, num_permits: u32) -> Self {
+    fn new(semaphore: &'a Semaphore, num_permits: usize) -> Self {
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         return Self {
             node: Waiter::new(num_permits),
@@ -635,14 +660,14 @@ impl<'a> Acquire<'a> {
         });
     }
 
-    fn project(self: Pin<&mut Self>) -> (Pin<&mut Waiter>, &Semaphore, u32, &mut bool) {
+    fn project(self: Pin<&mut Self>) -> (Pin<&mut Waiter>, &Semaphore, usize, &mut bool) {
         fn is_unpin<T: Unpin>() {}
         unsafe {
             // Safety: all fields other than `node` are `Unpin`
 
             is_unpin::<&Semaphore>();
             is_unpin::<&mut bool>();
-            is_unpin::<u32>();
+            is_unpin::<usize>();
 
             let this = self.get_unchecked_mut();
             (
@@ -673,7 +698,7 @@ impl Drop for Acquire<'_> {
         // Safety: we have locked the wait list.
         unsafe { waiters.queue.remove(node) };
 
-        let acquired_permits = self.num_permits as usize - self.node.state.load(Acquire);
+        let acquired_permits = self.num_permits - self.node.state.load(Acquire);
         if acquired_permits > 0 {
             self.semaphore.add_permits_locked(acquired_permits, waiters);
         }

@@ -58,7 +58,7 @@ cfg_rt! {
     /// ```
     ///
     /// The generic parameter `T` in `JoinHandle<T>` is the return type of the spawned task.
-    /// If the return value is an i32, the join handle has type `JoinHandle<i32>`:
+    /// If the return value is an `i32`, the join handle has type `JoinHandle<i32>`:
     ///
     /// ```
     /// use tokio::task;

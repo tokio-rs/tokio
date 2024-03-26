@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.35.1"
+version = "1.36.0"
 edition = "2021"
 rust-version = "1.63"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -149,7 +149,7 @@ rand = "0.8.0"
 wasm-bindgen-test = "0.3.0"
 
 [target.'cfg(target_os = "freebsd")'.dev-dependencies]
-mio-aio = { version = "0.7.0", features = ["tokio"] }
+mio-aio = { version = "0.8.0", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.7", features = ["futures", "checkpoint"] }
@@ -164,3 +164,13 @@ rustc-args = ["--cfg", "tokio_unstable", "--cfg", "tokio_taskdump"]
 
 [package.metadata.playground]
 features = ["full", "test-util"]
+
+[package.metadata.cargo_check_external_types]
+# The following are types that are allowed to be exposed in Tokio's public API.
+# The standard library is allowed by default.
+allowed_external_types = [
+   "bytes::buf::buf_impl::Buf",
+   "bytes::buf::buf_mut::BufMut",
+
+   "tokio_macros::*",
+]

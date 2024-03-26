@@ -608,6 +608,10 @@ macro_rules! select {
 
     // ===== Entry point =====
 
+    ($(biased;)? else => $else:expr $(,)? ) => {{
+        $else
+    }};
+
     (biased; $p:pat = $($t:tt)* ) => {
         $crate::select!(@{ start=0; () } $p = $($t)*)
     };
@@ -617,6 +621,7 @@ macro_rules! select {
         // fair and avoids always polling the first future.
         $crate::select!(@{ start={ $crate::macros::support::thread_rng_n(BRANCHES) }; () } $p = $($t)*)
     };
+
     () => {
         compile_error!("select! requires at least one branch.")
     };

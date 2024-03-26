@@ -68,6 +68,18 @@ pub struct Permit<'a, T> {
     chan: &'a chan::Tx<T, Semaphore>,
 }
 
+/// An [`Iterator`] of [`Permit`] that can be used to hold `n` slots in the channel.
+///
+/// `PermitIterator` values are returned by [`Sender::reserve_many()`] and [`Sender::try_reserve_many()`]
+/// and are used to guarantee channel capacity before generating `n` messages to send.
+///
+/// [`Sender::reserve_many()`]: Sender::reserve_many
+/// [`Sender::try_reserve_many()`]: Sender::try_reserve_many
+pub struct PermitIterator<'a, T> {
+    chan: &'a chan::Tx<T, Semaphore>,
+    n: usize,
+}
+
 /// Owned permit to send one value into the channel.
 ///
 /// This is identical to the [`Permit`] type, except that it moves the sender
@@ -451,6 +463,73 @@ impl<T> Receiver<T> {
         self.chan.close();
     }
 
+    /// Checks if a channel is closed.
+    ///
+    /// This method returns `true` if the channel has been closed. The channel is closed
+    /// when all [`Sender`] have been dropped, or when [`Receiver::close`] is called.
+    ///
+    /// [`Sender`]: crate::sync::mpsc::Sender
+    /// [`Receiver::close`]: crate::sync::mpsc::Receiver::close
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (_tx, mut rx) = mpsc::channel::<()>(10);
+    ///     assert!(!rx.is_closed());
+    ///
+    ///     rx.close();
+    ///     
+    ///     assert!(rx.is_closed());
+    /// }
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        self.chan.is_closed()
+    }
+
+    /// Checks if a channel is empty.
+    ///
+    /// This method returns `true` if the channel has no messages.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel(10);
+    ///     assert!(rx.is_empty());
+    ///
+    ///     tx.send(0).await.unwrap();
+    ///     assert!(!rx.is_empty());
+    /// }
+    ///
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.chan.is_empty()
+    }
+
+    /// Returns the number of messages in the channel.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel(10);
+    ///     assert_eq!(0, rx.len());
+    ///
+    ///     tx.send(0).await.unwrap();
+    ///     assert_eq!(1, rx.len());
+    /// }
+    /// ```
+    pub fn len(&self) -> usize {
+        self.chan.len()
+    }
+
     /// Polls to receive the next message on this channel.
     ///
     /// This method returns:
@@ -464,8 +543,8 @@ impl<T> Receiver<T> {
     /// When the method returns `Poll::Pending`, the `Waker` in the provided
     /// `Context` is scheduled to receive a wakeup when a message is sent on any
     /// receiver, or when the channel is closed.  Note that on multiple calls to
-    /// `poll_recv`, only the `Waker` from the `Context` passed to the most
-    /// recent call is scheduled to receive a wakeup.
+    /// `poll_recv` or `poll_recv_many`, only the `Waker` from the `Context`
+    /// passed to the most recent call is scheduled to receive a wakeup.
     ///
     /// If this method returns `Poll::Pending` due to a spurious failure, then
     /// the `Waker` will be notified when the situation causing the spurious
@@ -474,6 +553,83 @@ impl<T> Receiver<T> {
     /// spurious failure.
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
+    }
+
+    /// Polls to receive multiple messages on this channel, extending the provided buffer.
+    ///
+    /// This method returns:
+    /// * `Poll::Pending` if no messages are available but the channel is not closed, or if a
+    ///   spurious failure happens.
+    /// * `Poll::Ready(count)` where `count` is the number of messages successfully received and
+    ///   stored in `buffer`. This can be less than, or equal to, `limit`.
+    /// * `Poll::Ready(0)` if `limit` is set to zero or when the channel is closed.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when a message is sent on any
+    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// `poll_recv` or `poll_recv_many`, only the `Waker` from the `Context`
+    /// passed to the most recent call is scheduled to receive a wakeup.
+    ///
+    /// Note that this method does not guarantee that exactly `limit` messages
+    /// are received. Rather, if at least one message is available, it returns
+    /// as many messages as it can up to the given limit. This method returns
+    /// zero only if the channel is closed (or if `limit` is zero).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::task::{Context, Poll};
+    /// use std::pin::Pin;
+    /// use tokio::sync::mpsc;
+    /// use futures::Future;
+    ///
+    /// struct MyReceiverFuture<'a> {
+    ///     receiver: mpsc::Receiver<i32>,
+    ///     buffer: &'a mut Vec<i32>,
+    ///     limit: usize,
+    /// }
+    ///
+    /// impl<'a> Future for MyReceiverFuture<'a> {
+    ///     type Output = usize; // Number of messages received
+    ///
+    ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    ///         let MyReceiverFuture { receiver, buffer, limit } = &mut *self;
+    ///
+    ///         // Now `receiver` and `buffer` are mutable references, and `limit` is copied
+    ///         match receiver.poll_recv_many(cx, *buffer, *limit) {
+    ///             Poll::Pending => Poll::Pending,
+    ///             Poll::Ready(count) => Poll::Ready(count),
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel(32);
+    ///     let mut buffer = Vec::new();
+    ///
+    ///     let my_receiver_future = MyReceiverFuture {
+    ///         receiver: rx,
+    ///         buffer: &mut buffer,
+    ///         limit: 3,
+    ///     };
+    ///
+    ///     for i in 0..10 {
+    ///         tx.send(i).await.unwrap();
+    ///     }
+    ///
+    ///     let count = my_receiver_future.await;
+    ///     assert_eq!(count, 3);
+    ///     assert_eq!(buffer, vec![0,1,2])
+    /// }
+    /// ```
+    pub fn poll_recv_many(
+        &mut self,
+        cx: &mut Context<'_>,
+        buffer: &mut Vec<T>,
+        limit: usize,
+    ) -> Poll<usize> {
+        self.chan.recv_many(cx, buffer, limit)
     }
 }
 
@@ -849,8 +1005,72 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub async fn reserve(&self) -> Result<Permit<'_, T>, SendError<()>> {
-        self.reserve_inner().await?;
+        self.reserve_inner(1).await?;
         Ok(Permit { chan: &self.chan })
+    }
+
+    /// Waits for channel capacity. Once capacity to send `n` messages is
+    /// available, it is reserved for the caller.
+    ///
+    /// If the channel is full or if there are fewer than `n` permits available, the function waits
+    /// for the number of unreceived messages to become `n` less than the channel capacity.
+    /// Capacity to send `n` message is then reserved for the caller.
+    ///
+    /// A [`PermitIterator`] is returned to track the reserved capacity.
+    /// You can call this [`Iterator`] until it is exhausted to
+    /// get a [`Permit`] and then call [`Permit::send`]. This function is similar to
+    /// [`try_reserve_many`] except it awaits for the slots to become available.
+    ///
+    /// If the channel is closed, the function returns a [`SendError`].
+    ///
+    /// Dropping [`PermitIterator`] without consuming it entirely releases the remaining
+    /// permits back to the channel.
+    ///
+    /// [`PermitIterator`]: PermitIterator
+    /// [`Permit`]: Permit
+    /// [`send`]: Permit::send
+    /// [`try_reserve_many`]: Sender::try_reserve_many
+    ///
+    /// # Cancel safety
+    ///
+    /// This channel uses a queue to ensure that calls to `send` and `reserve_many`
+    /// complete in the order they were requested. Cancelling a call to
+    /// `reserve_many` makes you lose your place in the queue.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(2);
+    ///
+    ///     // Reserve capacity
+    ///     let mut permit = tx.reserve_many(2).await.unwrap();
+    ///
+    ///     // Trying to send directly on the `tx` will fail due to no
+    ///     // available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Sending with the permit iterator succeeds
+    ///     permit.next().unwrap().send(456);
+    ///     permit.next().unwrap().send(457);
+    ///
+    ///     // The iterator should now be exhausted
+    ///     assert!(permit.next().is_none());
+    ///     
+    ///     // The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    ///     assert_eq!(rx.recv().await.unwrap(), 457);
+    /// }
+    /// ```
+    pub async fn reserve_many(&self, n: usize) -> Result<PermitIterator<'_, T>, SendError<()>> {
+        self.reserve_inner(n).await?;
+        Ok(PermitIterator {
+            chan: &self.chan,
+            n,
+        })
     }
 
     /// Waits for channel capacity, moving the `Sender` and returning an owned
@@ -934,16 +1154,19 @@ impl<T> Sender<T> {
     /// [`send`]: OwnedPermit::send
     /// [`Arc::clone`]: std::sync::Arc::clone
     pub async fn reserve_owned(self) -> Result<OwnedPermit<T>, SendError<()>> {
-        self.reserve_inner().await?;
+        self.reserve_inner(1).await?;
         Ok(OwnedPermit {
             chan: Some(self.chan),
         })
     }
 
-    async fn reserve_inner(&self) -> Result<(), SendError<()>> {
+    async fn reserve_inner(&self, n: usize) -> Result<(), SendError<()>> {
         crate::trace::async_trace_leaf().await;
 
-        match self.chan.semaphore().semaphore.acquire(1).await {
+        if n > self.max_capacity() {
+            return Err(SendError(()));
+        }
+        match self.chan.semaphore().semaphore.acquire(n).await {
             Ok(()) => Ok(()),
             Err(_) => Err(SendError(())),
         }
@@ -1000,6 +1223,91 @@ impl<T> Sender<T> {
         }
 
         Ok(Permit { chan: &self.chan })
+    }
+
+    /// Tries to acquire `n` slots in the channel without waiting for the slot to become
+    /// available.
+    ///
+    /// A [`PermitIterator`] is returned to track the reserved capacity.
+    /// You can call this [`Iterator`] until it is exhausted to
+    /// get a [`Permit`] and then call [`Permit::send`]. This function is similar to
+    /// [`reserve_many`] except it does not await for the slots to become available.
+    ///
+    /// If there are fewer than `n` permits available on the channel, then
+    /// this function will return a [`TrySendError::Full`]. If the channel is closed
+    /// this function will return a [`TrySendError::Closed`].
+    ///
+    /// Dropping [`PermitIterator`] without consuming it entirely releases the remaining
+    /// permits back to the channel.
+    ///
+    /// [`PermitIterator`]: PermitIterator
+    /// [`send`]: Permit::send
+    /// [`reserve_many`]: Sender::reserve_many
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(2);
+    ///
+    ///     // Reserve capacity
+    ///     let mut permit = tx.try_reserve_many(2).unwrap();
+    ///
+    ///     // Trying to send directly on the `tx` will fail due to no
+    ///     // available capacity.
+    ///     assert!(tx.try_send(123).is_err());
+    ///
+    ///     // Trying to reserve an additional slot on the `tx` will
+    ///     // fail because there is no capacity.
+    ///     assert!(tx.try_reserve().is_err());
+    ///
+    ///     // Sending with the permit iterator succeeds
+    ///     permit.next().unwrap().send(456);
+    ///     permit.next().unwrap().send(457);
+    ///
+    ///     // The iterator should now be exhausted
+    ///     assert!(permit.next().is_none());
+    ///
+    ///     // The value sent on the permit is received
+    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    ///     assert_eq!(rx.recv().await.unwrap(), 457);
+    ///     
+    ///     // Trying to call try_reserve_many with 0 will return an empty iterator
+    ///     let mut permit = tx.try_reserve_many(0).unwrap();
+    ///     assert!(permit.next().is_none());
+    ///
+    ///     // Trying to call try_reserve_many with a number greater than the channel
+    ///     // capacity will return an error
+    ///     let permit = tx.try_reserve_many(3);
+    ///     assert!(permit.is_err());
+    ///
+    ///     // Trying to call try_reserve_many on a closed channel will return an error
+    ///     drop(rx);
+    ///     let permit = tx.try_reserve_many(1);
+    ///     assert!(permit.is_err());
+    ///
+    ///     let permit = tx.try_reserve_many(0);
+    ///     assert!(permit.is_err());
+    /// }
+    /// ```
+    pub fn try_reserve_many(&self, n: usize) -> Result<PermitIterator<'_, T>, TrySendError<()>> {
+        if n > self.max_capacity() {
+            return Err(TrySendError::Full(()));
+        }
+
+        match self.chan.semaphore().semaphore.try_acquire(n) {
+            Ok(()) => {}
+            Err(TryAcquireError::Closed) => return Err(TrySendError::Closed(())),
+            Err(TryAcquireError::NoPermits) => return Err(TrySendError::Full(())),
+        }
+
+        Ok(PermitIterator {
+            chan: &self.chan,
+            n,
+        })
     }
 
     /// Tries to acquire a slot in the channel without waiting for the slot to become
@@ -1126,6 +1434,7 @@ impl<T> Sender<T> {
     /// towards RAII semantics, i.e. if all `Sender` instances of the
     /// channel were dropped and only `WeakSender` instances remain,
     /// the channel is closed.
+    #[must_use = "Downgrade creates a WeakSender without destroying the original non-weak sender."]
     pub fn downgrade(&self) -> WeakSender<T> {
         WeakSender {
             chan: self.chan.downgrade(),
@@ -1167,6 +1476,16 @@ impl<T> Sender<T> {
     pub fn max_capacity(&self) -> usize {
         self.chan.semaphore().bound
     }
+
+    /// Returns the number of [`Sender`] handles.
+    pub fn strong_count(&self) -> usize {
+        self.chan.strong_count()
+    }
+
+    /// Returns the number of [`WeakSender`] handles.
+    pub fn weak_count(&self) -> usize {
+        self.chan.weak_count()
+    }
 }
 
 impl<T> Clone for Sender<T> {
@@ -1187,9 +1506,17 @@ impl<T> fmt::Debug for Sender<T> {
 
 impl<T> Clone for WeakSender<T> {
     fn clone(&self) -> Self {
+        self.chan.increment_weak_count();
+
         WeakSender {
             chan: self.chan.clone(),
         }
+    }
+}
+
+impl<T> Drop for WeakSender<T> {
+    fn drop(&mut self) {
+        self.chan.decrement_weak_count();
     }
 }
 
@@ -1199,6 +1526,16 @@ impl<T> WeakSender<T> {
     /// previously dropped, otherwise `None` is returned.
     pub fn upgrade(&self) -> Option<Sender<T>> {
         chan::Tx::upgrade(self.chan.clone()).map(Sender::new)
+    }
+
+    /// Returns the number of [`Sender`] handles.
+    pub fn strong_count(&self) -> usize {
+        self.chan.strong_count()
+    }
+
+    /// Returns the number of [`WeakSender`] handles.
+    pub fn weak_count(&self) -> usize {
+        self.chan.weak_count()
     }
 }
 
@@ -1274,6 +1611,58 @@ impl<T> fmt::Debug for Permit<'_, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Permit")
             .field("chan", &self.chan)
+            .finish()
+    }
+}
+
+// ===== impl PermitIterator =====
+
+impl<'a, T> Iterator for PermitIterator<'a, T> {
+    type Item = Permit<'a, T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.n == 0 {
+            return None;
+        }
+
+        self.n -= 1;
+        Some(Permit { chan: self.chan })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let n = self.n;
+        (n, Some(n))
+    }
+}
+impl<T> ExactSizeIterator for PermitIterator<'_, T> {}
+impl<T> std::iter::FusedIterator for PermitIterator<'_, T> {}
+
+impl<T> Drop for PermitIterator<'_, T> {
+    fn drop(&mut self) {
+        use chan::Semaphore;
+
+        if self.n == 0 {
+            return;
+        }
+
+        let semaphore = self.chan.semaphore();
+
+        // Add the remaining permits back to the semaphore
+        semaphore.add_permits(self.n);
+
+        // If this is the last sender for this channel, wake the receiver so
+        // that it can be notified that the channel is closed.
+        if semaphore.is_closed() && semaphore.is_idle() {
+            self.chan.wake_rx();
+        }
+    }
+}
+
+impl<T> fmt::Debug for PermitIterator<'_, T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("PermitIterator")
+            .field("chan", &self.chan)
+            .field("capacity", &self.n)
             .finish()
     }
 }

@@ -14,8 +14,18 @@ use std::task::{Context, Poll};
 pin_project! {
     /// A [`Stream`] of messages decoded from an [`AsyncRead`].
     ///
+    /// For examples of how to use `FramedRead` with a codec, see the
+    /// examples on the [`codec`] module.
+    ///
+    /// # Cancellation safety
+    /// * [`tokio_stream::StreamExt::next`]: This method is cancel safe. The returned
+    /// future only holds onto a reference to the underlying stream, so dropping it will
+    /// never lose a value.
+    ///
     /// [`Stream`]: futures_core::Stream
     /// [`AsyncRead`]: tokio::io::AsyncRead
+    /// [`codec`]: crate::codec
+    /// [`tokio_stream::StreamExt::next`]: https://docs.rs/tokio-stream/latest/tokio_stream/trait.StreamExt.html#method.next
     pub struct FramedRead<T, D> {
         #[pin]
         inner: FramedImpl<T, D, ReadFrame>,

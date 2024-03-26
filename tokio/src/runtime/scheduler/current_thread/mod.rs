@@ -351,9 +351,6 @@ impl Context {
         let mut driver = core.driver.take().expect("driver missing");
 
         if let Some(f) = &handle.shared.config.before_park {
-            // Incorrect lint, the closures are actually different types so `f`
-            // cannot be passed as an argument to `enter`.
-            #[allow(clippy::redundant_closure)]
             let (c, ()) = self.enter(core, || f());
             core = c;
         }
@@ -374,9 +371,6 @@ impl Context {
         }
 
         if let Some(f) = &handle.shared.config.after_unpark {
-            // Incorrect lint, the closures are actually different types so `f`
-            // cannot be passed as an argument to `enter`.
-            #[allow(clippy::redundant_closure)]
             let (c, ()) = self.enter(core, || f());
             core = c;
         }
@@ -476,7 +470,7 @@ impl Handle {
 
             traces = trace_current_thread(&self.shared.owned, local, &self.shared.inject)
                 .into_iter()
-                .map(dump::Task::new)
+                .map(|(id, trace)| dump::Task::new(id, trace))
                 .collect();
 
             // Avoid double borrow panic

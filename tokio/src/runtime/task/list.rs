@@ -84,8 +84,8 @@ impl<S: 'static> OwnedTasks<S> {
         }
     }
 
-    /// Binds the provided task to this OwnedTasks instance. This fails if the
-    /// OwnedTasks has been closed.
+    /// Binds the provided task to this `OwnedTasks` instance. This fails if the
+    /// `OwnedTasks` has been closed.
     pub(crate) fn bind<T>(
         &self,
         task: T,
@@ -125,8 +125,8 @@ impl<S: 'static> OwnedTasks<S> {
         Some(notified)
     }
 
-    /// Asserts that the given task is owned by this OwnedTasks and convert it to
-    /// a LocalNotified, giving the thread permission to poll this task.
+    /// Asserts that the given task is owned by this `OwnedTasks` and convert it to
+    /// a `LocalNotified`, giving the thread permission to poll this task.
     #[inline]
     pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
         debug_assert_eq!(task.header().get_owner_id(), Some(self.id));
@@ -284,8 +284,8 @@ impl<S: 'static> LocalOwnedTasks<S> {
             unsafe { inner.list.remove(task.header_ptr()) })
     }
 
-    /// Asserts that the given task is owned by this LocalOwnedTasks and convert
-    /// it to a LocalNotified, giving the thread permission to poll this task.
+    /// Asserts that the given task is owned by this `LocalOwnedTasks` and convert
+    /// it to a `LocalNotified`, giving the thread permission to poll this task.
     #[inline]
     pub(crate) fn assert_owner(&self, task: Notified<S>) -> LocalNotified<S> {
         assert_eq!(task.header().get_owner_id(), Some(self.id));

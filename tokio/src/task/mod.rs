@@ -123,7 +123,7 @@
 //! all tasks on it.
 //!
 //! When tasks are shut down, it will stop running at whichever `.await` it has
-//! yielded at. All local variables are destroyed by running their detructor.
+//! yielded at. All local variables are destroyed by running their destructor.
 //! Once shutdown has completed, awaiting the [`JoinHandle`] will fail with a
 //! [cancelled error](crate::task::JoinError::is_cancelled).
 //!
@@ -167,7 +167,7 @@
 //! blocking operations there. This includes destructors of objects destroyed in
 //! async code.
 //!
-//! #### spawn_blocking
+//! #### `spawn_blocking`
 //!
 //! The `task::spawn_blocking` function is similar to the `task::spawn` function
 //! discussed in the previous section, but rather than spawning an
@@ -202,7 +202,7 @@
 //! # }
 //! ```
 //!
-//! #### block_in_place
+//! #### `block_in_place`
 //!
 //! When using the [multi-threaded runtime][rt-multi-thread], the [`task::block_in_place`]
 //! function is also available. Like `task::spawn_blocking`, this function
@@ -227,7 +227,7 @@
 //! # }
 //! ```
 //!
-//! #### yield_now
+//! #### `yield_now`
 //!
 //! In addition, this module provides a [`task::yield_now`] async function
 //! that is analogous to the standard library's [`thread::yield_now`]. Calling

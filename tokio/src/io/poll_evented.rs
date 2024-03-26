@@ -47,7 +47,7 @@ cfg_io_driver! {
     /// This clears the readiness state until a new readiness event is received.
     ///
     /// This allows the caller to implement additional functions. For example,
-    /// [`TcpListener`] implements poll_accept by using [`poll_read_ready`] and
+    /// [`TcpListener`] implements `poll_accept` by using [`poll_read_ready`] and
     /// [`clear_readiness`].
     ///
     /// ## Platform-specific events
@@ -135,6 +135,25 @@ impl<E: Source> PollEvented<E> {
         let mut inner = self.io.take().unwrap(); // As io shouldn't ever be None, just unwrap here.
         self.registration.deregister(&mut inner)?;
         Ok(inner)
+    }
+
+    #[cfg(all(feature = "process", target_os = "linux"))]
+    pub(crate) fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.registration
+            .poll_read_ready(cx)
+            .map_err(io::Error::from)
+            .map_ok(|_| ())
+    }
+
+    /// Re-register under new runtime with `interest`.
+    #[cfg(all(feature = "process", target_os = "linux"))]
+    pub(crate) fn reregister(&mut self, interest: Interest) -> io::Result<()> {
+        let io = self.io.as_mut().unwrap(); // As io shouldn't ever be None, just unwrap here.
+        let _ = self.registration.deregister(io);
+        self.registration =
+            Registration::new_with_interest_and_handle(io, interest, scheduler::Handle::current())?;
+
+        Ok(())
     }
 }
 

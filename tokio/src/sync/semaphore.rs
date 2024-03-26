@@ -76,6 +76,59 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
+/// ## Limit the number of outgoing requests being sent at the same time
+///
+/// In some scenarios, it might be required to limit the number of outgoing
+/// requests being sent in parallel. This could be due to limits of a consumed
+/// API or the network resources of the system the application is running on.
+///
+/// This example uses an `Arc<Semaphore>` with 10 permits. Each task spawned is
+/// given a reference to the semaphore by cloning the `Arc<Semaphore>`. Before
+/// a task sends a request, it must acquire a permit from the semaphore by
+/// calling [`Semaphore::acquire`]. This ensures that at most 10 requests are
+/// sent in parallel at any given time. After a task has sent a request, it
+/// drops the permit to allow other tasks to send requests.
+///
+/// ```
+/// use std::sync::Arc;
+/// use tokio::sync::Semaphore;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     // Define maximum number of parallel requests.
+///     let semaphore = Arc::new(Semaphore::new(10));
+///     // Spawn many tasks that will send requests.
+///     let mut jhs = Vec::new();
+///     for task_id in 0..100 {
+///         let semaphore = semaphore.clone();
+///         let jh = tokio::spawn(async move {
+///             // Acquire permit before sending request.
+///             let _permit = semaphore.acquire().await.unwrap();
+///             // Send the request.
+///             let response = send_request(task_id).await;
+///             // Drop the permit after the request has been sent.
+///             drop(_permit);
+///             // Handle response.
+///             // ...
+///
+///             response
+///         });
+///         jhs.push(jh);
+///     }
+///     // Collect responses from tasks.
+///     let mut responses = Vec::new();
+///     for jh in jhs {
+///         let response = jh.await.unwrap();
+///         responses.push(response);
+///     }
+///     // Process responses.
+///     // ...
+/// }
+/// # async fn send_request(task_id: usize) {
+/// #     // Send request.
+/// # }
+/// ```
+///
 /// ## Limit the number of incoming requests being handled at the same time
 ///
 /// Similar to limiting the number of simultaneously opened files, network handles
@@ -481,6 +534,14 @@ impl Semaphore {
         self.ll_sem.release(n);
     }
 
+    /// Decrease a semaphore's permits by a maximum of `n`.
+    ///
+    /// If there are insufficient permits and it's not possible to reduce by `n`,
+    /// return the number of permits that were actually reduced.
+    pub fn forget_permits(&self, n: usize) -> usize {
+        self.ll_sem.forget_permits(n)
+    }
+
     /// Acquires a permit from the semaphore.
     ///
     /// If the semaphore has been closed, this returns an [`AcquireError`].
@@ -565,7 +626,7 @@ impl Semaphore {
     pub async fn acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, AcquireError> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         trace::async_op(
-            || self.ll_sem.acquire(n),
+            || self.ll_sem.acquire(n as usize),
             self.resource_span.clone(),
             "Semaphore::acquire_many",
             "poll",
@@ -574,7 +635,7 @@ impl Semaphore {
         .await?;
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        self.ll_sem.acquire(n).await?;
+        self.ll_sem.acquire(n as usize).await?;
 
         Ok(SemaphorePermit {
             sem: self,
@@ -646,7 +707,7 @@ impl Semaphore {
     /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
     /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
     pub fn try_acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, TryAcquireError> {
-        match self.ll_sem.try_acquire(n) {
+        match self.ll_sem.try_acquire(n as usize) {
             Ok(()) => Ok(SemaphorePermit {
                 sem: self,
                 permits: n,
@@ -764,14 +825,14 @@ impl Semaphore {
     ) -> Result<OwnedSemaphorePermit, AcquireError> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = trace::async_op(
-            || self.ll_sem.acquire(n),
+            || self.ll_sem.acquire(n as usize),
             self.resource_span.clone(),
             "Semaphore::acquire_many_owned",
             "poll",
             true,
         );
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let inner = self.ll_sem.acquire(n);
+        let inner = self.ll_sem.acquire(n as usize);
 
         inner.await?;
         Ok(OwnedSemaphorePermit {
@@ -855,7 +916,7 @@ impl Semaphore {
         self: Arc<Self>,
         n: u32,
     ) -> Result<OwnedSemaphorePermit, TryAcquireError> {
-        match self.ll_sem.try_acquire(n) {
+        match self.ll_sem.try_acquire(n as usize) {
             Ok(()) => Ok(OwnedSemaphorePermit {
                 sem: self,
                 permits: n,

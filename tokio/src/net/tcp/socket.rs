@@ -185,6 +185,16 @@ impl TcpSocket {
         Ok(TcpSocket { inner })
     }
 
+    /// Sets value for the `SO_KEEPALIVE` option on this socket.
+    pub fn set_keepalive(&self, keepalive: bool) -> io::Result<()> {
+        self.inner.set_keepalive(keepalive)
+    }
+
+    /// Gets the value of the `SO_KEEPALIVE` option on this socket.
+    pub fn keepalive(&self) -> io::Result<bool> {
+        self.inner.keepalive()
+    }
+
     /// Allows the socket to bind to an in-use address.
     ///
     /// Behavior is platform specific. Refer to the target platform's
@@ -777,38 +787,36 @@ impl fmt::Debug for TcpSocket {
     }
 }
 
-#[cfg(unix)]
-impl AsRawFd for TcpSocket {
-    fn as_raw_fd(&self) -> RawFd {
-        self.inner.as_raw_fd()
+cfg_unix! {
+    impl AsRawFd for TcpSocket {
+        fn as_raw_fd(&self) -> RawFd {
+            self.inner.as_raw_fd()
+        }
     }
-}
 
-#[cfg(unix)]
-impl AsFd for TcpSocket {
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+    impl AsFd for TcpSocket {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        }
     }
-}
 
-#[cfg(unix)]
-impl FromRawFd for TcpSocket {
-    /// Converts a `RawFd` to a `TcpSocket`.
-    ///
-    /// # Notes
-    ///
-    /// The caller is responsible for ensuring that the socket is in
-    /// non-blocking mode.
-    unsafe fn from_raw_fd(fd: RawFd) -> TcpSocket {
-        let inner = socket2::Socket::from_raw_fd(fd);
-        TcpSocket { inner }
+    impl FromRawFd for TcpSocket {
+        /// Converts a `RawFd` to a `TcpSocket`.
+        ///
+        /// # Notes
+        ///
+        /// The caller is responsible for ensuring that the socket is in
+        /// non-blocking mode.
+        unsafe fn from_raw_fd(fd: RawFd) -> TcpSocket {
+            let inner = socket2::Socket::from_raw_fd(fd);
+            TcpSocket { inner }
+        }
     }
-}
 
-#[cfg(unix)]
-impl IntoRawFd for TcpSocket {
-    fn into_raw_fd(self) -> RawFd {
-        self.inner.into_raw_fd()
+    impl IntoRawFd for TcpSocket {
+        fn into_raw_fd(self) -> RawFd {
+            self.inner.into_raw_fd()
+        }
     }
 }
 

@@ -20,10 +20,21 @@ pin_project! {
     /// You can create a `Framed` instance by using the [`Decoder::framed`] adapter, or
     /// by using the `new` function seen below.
     ///
+    /// # Cancellation safety
+    ///
+    /// * [`futures_util::sink::SinkExt::send`]: if send is used as the event in a
+    /// `tokio::select!` statement and some other branch completes first, then it is
+    /// guaranteed that the message was not sent, but the message itself is lost.
+    /// * [`tokio_stream::StreamExt::next`]: This method is cancel safe. The returned
+    /// future only holds onto a reference to the underlying stream, so dropping it will
+    /// never lose a value.
+    ///
     /// [`Stream`]: futures_core::Stream
     /// [`Sink`]: futures_sink::Sink
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`Decoder::framed`]: crate::codec::Decoder::framed()
+    /// [`futures_util::sink::SinkExt::send`]: futures_util::sink::SinkExt::send
+    /// [`tokio_stream::StreamExt::next`]: https://docs.rs/tokio-stream/latest/tokio_stream/trait.StreamExt.html#method.next
     pub struct Framed<T, U> {
         #[pin]
         inner: FramedImpl<T, U, RWFrames>
@@ -130,7 +141,7 @@ impl<T, U> Framed<T, U> {
     /// things like gzip or TLS, which require both read and write access to the
     /// underlying object.
     ///
-    /// This objects takes a stream and a readbuffer and a writebuffer. These field
+    /// This objects takes a stream and a `readbuffer` and a `writebuffer`. These field
     /// can be obtained from an existing `Framed` with the [`into_parts`] method.
     ///
     /// If you want to work more directly with the streams and sink, consider

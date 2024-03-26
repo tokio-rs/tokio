@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(unix)]
+#![cfg(panic = "unwind")]
 
 use std::error::Error;
 use tokio::runtime::Builder;

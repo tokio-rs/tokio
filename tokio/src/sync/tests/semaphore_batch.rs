@@ -268,7 +268,7 @@ fn release_permits_at_drop() {
 
     let sem = Arc::new(Semaphore::new(1));
 
-    struct ReleaseOnDrop(Option<OwnedSemaphorePermit>);
+    struct ReleaseOnDrop(#[allow(dead_code)] Option<OwnedSemaphorePermit>);
 
     impl ArcWake for ReleaseOnDrop {
         fn wake_by_ref(_arc_self: &Arc<Self>) {}
@@ -286,4 +286,25 @@ fn release_permits_at_drop() {
         let mut cx = std::task::Context::from_waker(&waker);
         assert!(fut.as_mut().poll(&mut cx).is_pending());
     }
+}
+
+#[test]
+fn forget_permits_basic() {
+    let s = Semaphore::new(10);
+    assert_eq!(s.forget_permits(4), 4);
+    assert_eq!(s.available_permits(), 6);
+    assert_eq!(s.forget_permits(10), 6);
+    assert_eq!(s.available_permits(), 0);
+}
+
+#[test]
+fn update_permits_many_times() {
+    let s = Semaphore::new(5);
+    let mut acquire = task::spawn(s.acquire(7));
+    assert_pending!(acquire.poll());
+    s.release(5);
+    assert_ready_ok!(acquire.poll());
+    assert_eq!(s.available_permits(), 3);
+    assert_eq!(s.forget_permits(3), 3);
+    assert_eq!(s.available_permits(), 0);
 }

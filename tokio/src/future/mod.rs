@@ -6,6 +6,7 @@
 pub(crate) mod maybe_done;
 
 mod poll_fn;
+#[allow(unused_imports)]
 pub use poll_fn::poll_fn;
 
 cfg_process! {

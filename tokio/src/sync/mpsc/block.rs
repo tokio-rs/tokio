@@ -168,6 +168,19 @@ impl<T> Block<T> {
         Some(Read::Value(value.assume_init()))
     }
 
+    /// Returns true if there is a value in the slot to be consumed
+    ///
+    /// # Safety
+    ///
+    /// To maintain safety, the caller must ensure:
+    ///
+    /// * No concurrent access to the slot.
+    pub(crate) fn has_value(&self, slot_index: usize) -> bool {
+        let offset = offset(slot_index);
+        let ready_bits = self.header.ready_slots.load(Acquire);
+        is_ready(ready_bits, offset)
+    }
+
     /// Writes a value to the block at the given offset.
     ///
     /// # Safety
@@ -193,6 +206,11 @@ impl<T> Block<T> {
     /// Signal to the receiver that the sender half of the list is closed.
     pub(crate) unsafe fn tx_close(&self) {
         self.header.ready_slots.fetch_or(TX_CLOSED, Release);
+    }
+
+    pub(crate) unsafe fn is_closed(&self) -> bool {
+        let ready_bits = self.header.ready_slots.load(Acquire);
+        is_tx_closed(ready_bits)
     }
 
     /// Resets the block to a blank state. This enables reusing blocks in the
@@ -243,13 +261,6 @@ impl<T> Block<T> {
     ///
     /// This indicates that the block is in its final state and will no longer
     /// be mutated.
-    ///
-    /// # Implementation
-    ///
-    /// The implementation walks each slot checking the `ready` flag. It might
-    /// be that it would make more sense to coalesce ready flags as bits in a
-    /// single atomic cell. However, this could have negative impact on cache
-    /// behavior as there would be many more mutations to a single slot.
     pub(crate) fn is_final(&self) -> bool {
         self.header.ready_slots.load(Acquire) & READY_MASK == READY_MASK
     }

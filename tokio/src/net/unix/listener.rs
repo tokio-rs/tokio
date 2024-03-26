@@ -50,6 +50,11 @@ cfg_net_unix! {
 }
 
 impl UnixListener {
+    pub(crate) fn new(listener: mio::net::UnixListener) -> io::Result<UnixListener> {
+        let io = PollEvented::new(listener)?;
+        Ok(UnixListener { io })
+    }
+
     /// Creates a new `UnixListener` bound to the specified path.
     ///
     /// # Panics
@@ -72,7 +77,7 @@ impl UnixListener {
 
     /// Creates new [`UnixListener`] from a [`std::os::unix::net::UnixListener`].
     ///
-    /// This function is intended to be used to wrap a UnixListener from the
+    /// This function is intended to be used to wrap a `UnixListener` from the
     /// standard library in the Tokio equivalent.
     ///
     /// # Notes

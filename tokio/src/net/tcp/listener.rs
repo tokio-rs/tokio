@@ -58,7 +58,7 @@ cfg_net! {
 
 impl TcpListener {
     cfg_not_wasi! {
-        /// Creates a new TcpListener, which will be bound to the specified address.
+        /// Creates a new `TcpListener`, which will be bound to the specified address.
         ///
         /// The returned listener is ready for accepting connections.
         ///

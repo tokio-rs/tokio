@@ -23,7 +23,7 @@ async fn test_with_sleep() {
     set.detach_all();
     assert_eq!(set.len(), 0);
 
-    assert!(matches!(set.join_next().await, None));
+    assert!(set.join_next().await.is_none());
 
     for i in 0..10 {
         set.spawn(async move {
@@ -41,7 +41,7 @@ async fn test_with_sleep() {
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(set.join_next().await, None));
+    assert!(set.join_next().await.is_none());
 
     // Do it again.
     for i in 0..10 {
@@ -59,7 +59,7 @@ async fn test_with_sleep() {
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(set.join_next().await, None));
+    assert!(set.join_next().await.is_none());
 }
 
 #[tokio::test]
@@ -226,4 +226,81 @@ async fn join_set_coop() {
     }
     assert!(coop_count >= 1);
     assert_eq!(count, TASK_NUM);
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn try_join_next() {
+    const TASK_NUM: u32 = 1000;
+
+    let (send, recv) = tokio::sync::watch::channel(());
+
+    let mut set = JoinSet::new();
+
+    for _ in 0..TASK_NUM {
+        let mut recv = recv.clone();
+        set.spawn(async move { recv.changed().await.unwrap() });
+    }
+    drop(recv);
+
+    assert!(set.try_join_next().is_none());
+
+    send.send_replace(());
+    send.closed().await;
+
+    let mut count = 0;
+    loop {
+        match set.try_join_next() {
+            Some(Ok(())) => {
+                count += 1;
+            }
+            Some(Err(err)) => panic!("failed: {}", err),
+            None => {
+                break;
+            }
+        }
+    }
+
+    assert_eq!(count, TASK_NUM);
+}
+
+#[cfg(tokio_unstable)]
+#[tokio::test(flavor = "current_thread")]
+async fn try_join_next_with_id() {
+    const TASK_NUM: u32 = 1000;
+
+    let (send, recv) = tokio::sync::watch::channel(());
+
+    let mut set = JoinSet::new();
+    let mut spawned = std::collections::HashSet::with_capacity(TASK_NUM as usize);
+
+    for _ in 0..TASK_NUM {
+        let mut recv = recv.clone();
+        let handle = set.spawn(async move { recv.changed().await.unwrap() });
+
+        spawned.insert(handle.id());
+    }
+    drop(recv);
+
+    assert!(set.try_join_next_with_id().is_none());
+
+    send.send_replace(());
+    send.closed().await;
+
+    let mut count = 0;
+    let mut joined = std::collections::HashSet::with_capacity(TASK_NUM as usize);
+    loop {
+        match set.try_join_next_with_id() {
+            Some(Ok((id, ()))) => {
+                count += 1;
+                joined.insert(id);
+            }
+            Some(Err(err)) => panic!("failed: {}", err),
+            None => {
+                break;
+            }
+        }
+    }
+
+    assert_eq!(count, TASK_NUM);
+    assert_eq!(joined, spawned);
 }

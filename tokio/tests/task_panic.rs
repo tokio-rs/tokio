@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
-#![allow(clippy::declare_interior_mutable_const)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))]
+#![cfg(panic = "unwind")]
 
 use futures::future;
 use std::error::Error;
@@ -12,7 +12,6 @@ mod support {
 }
 use support::panic::test_panic;
 
-#[cfg(panic = "unwind")]
 #[test]
 fn block_in_place_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -28,13 +27,12 @@ fn block_in_place_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn local_set_spawn_local_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _local = task::LocalSet::new();
 
-        let _ = task::spawn_local(async {});
+        task::spawn_local(async {});
     });
 
     // The panic location should be in this file
@@ -43,7 +41,6 @@ fn local_set_spawn_local_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn local_set_block_on_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -61,7 +58,6 @@ fn local_set_block_on_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn spawn_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -74,7 +70,6 @@ fn spawn_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn local_key_sync_scope_panic_caller() -> Result<(), Box<dyn Error>> {
     tokio::task_local! {
@@ -95,7 +90,6 @@ fn local_key_sync_scope_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn local_key_with_panic_caller() -> Result<(), Box<dyn Error>> {
     tokio::task_local! {
@@ -112,7 +106,6 @@ fn local_key_with_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn local_key_get_panic_caller() -> Result<(), Box<dyn Error>> {
     tokio::task_local! {

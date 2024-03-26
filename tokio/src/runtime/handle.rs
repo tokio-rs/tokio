@@ -463,7 +463,7 @@ cfg_taskdump! {
         /// ## Debug Info Must Be Available
         ///
         /// To produce task traces, the application must **not** be compiled
-        /// with split debuginfo. On Linux, including debuginfo within the
+        /// with `split debuginfo`. On Linux, including `debuginfo` within the
         /// application binary is the (correct) default. You can further ensure
         /// this behavior with the following directive in your `Cargo.toml`:
         ///
@@ -475,7 +475,7 @@ cfg_taskdump! {
         /// ## Unstable Features
         ///
         /// This functionality is **unstable**, and requires both the
-        /// `tokio_unstable` and `tokio_taskdump` cfg flags to be set.
+        /// `tokio_unstable` and `tokio_taskdump` `cfg` flags to be set.
         ///
         /// You can do this by setting the `RUSTFLAGS` environment variable
         /// before invoking `cargo`; e.g.:
@@ -495,7 +495,7 @@ cfg_taskdump! {
         ///
         /// ## Platform Requirements
         ///
-        /// Task dumps are supported on Linux atop aarch64, x86 and x86_64.
+        /// Task dumps are supported on Linux atop `aarch64`, `x86` and `x86_64`.
         ///
         /// ## Current Thread Runtime Requirements
         ///

@@ -330,6 +330,73 @@ impl<T> UnboundedReceiver<T> {
         self.chan.close();
     }
 
+    /// Checks if a channel is closed.
+    ///
+    /// This method returns `true` if the channel has been closed. The channel is closed
+    /// when all [`UnboundedSender`] have been dropped, or when [`UnboundedReceiver::close`] is called.
+    ///
+    /// [`UnboundedSender`]: crate::sync::mpsc::UnboundedSender
+    /// [`UnboundedReceiver::close`]: crate::sync::mpsc::UnboundedReceiver::close
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (_tx, mut rx) = mpsc::unbounded_channel::<()>();
+    ///     assert!(!rx.is_closed());
+    ///
+    ///     rx.close();
+    ///     
+    ///     assert!(rx.is_closed());
+    /// }
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        self.chan.is_closed()
+    }
+
+    /// Checks if a channel is empty.
+    ///
+    /// This method returns `true` if the channel has no messages.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::unbounded_channel();
+    ///     assert!(rx.is_empty());
+    ///
+    ///     tx.send(0).unwrap();
+    ///     assert!(!rx.is_empty());
+    /// }
+    ///
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.chan.is_empty()
+    }
+
+    /// Returns the number of messages in the channel.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::unbounded_channel();
+    ///     assert_eq!(0, rx.len());
+    ///
+    ///     tx.send(0).unwrap();
+    ///     assert_eq!(1, rx.len());
+    /// }
+    /// ```
+    pub fn len(&self) -> usize {
+        self.chan.len()
+    }
+
     /// Polls to receive the next message on this channel.
     ///
     /// This method returns:
@@ -343,8 +410,8 @@ impl<T> UnboundedReceiver<T> {
     /// When the method returns `Poll::Pending`, the `Waker` in the provided
     /// `Context` is scheduled to receive a wakeup when a message is sent on any
     /// receiver, or when the channel is closed.  Note that on multiple calls to
-    /// `poll_recv`, only the `Waker` from the `Context` passed to the most
-    /// recent call is scheduled to receive a wakeup.
+    /// `poll_recv` or `poll_recv_many`, only the `Waker` from the `Context`
+    /// passed to the most recent call is scheduled to receive a wakeup.
     ///
     /// If this method returns `Poll::Pending` due to a spurious failure, then
     /// the `Waker` will be notified when the situation causing the spurious
@@ -353,6 +420,83 @@ impl<T> UnboundedReceiver<T> {
     /// spurious failure.
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.chan.recv(cx)
+    }
+
+    /// Polls to receive multiple messages on this channel, extending the provided buffer.
+    ///
+    /// This method returns:
+    /// * `Poll::Pending` if no messages are available but the channel is not closed, or if a
+    ///   spurious failure happens.
+    /// * `Poll::Ready(count)` where `count` is the number of messages successfully received and
+    ///   stored in `buffer`. This can be less than, or equal to, `limit`.
+    /// * `Poll::Ready(0)` if `limit` is set to zero or when the channel is closed.
+    ///
+    /// When the method returns `Poll::Pending`, the `Waker` in the provided
+    /// `Context` is scheduled to receive a wakeup when a message is sent on any
+    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// `poll_recv` or `poll_recv_many`, only the `Waker` from the `Context`
+    /// passed to the most recent call is scheduled to receive a wakeup.
+    ///
+    /// Note that this method does not guarantee that exactly `limit` messages
+    /// are received. Rather, if at least one message is available, it returns
+    /// as many messages as it can up to the given limit. This method returns
+    /// zero only if the channel is closed (or if `limit` is zero).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::task::{Context, Poll};
+    /// use std::pin::Pin;
+    /// use tokio::sync::mpsc;
+    /// use futures::Future;
+    ///
+    /// struct MyReceiverFuture<'a> {
+    ///     receiver: mpsc::UnboundedReceiver<i32>,
+    ///     buffer: &'a mut Vec<i32>,
+    ///     limit: usize,
+    /// }
+    ///
+    /// impl<'a> Future for MyReceiverFuture<'a> {
+    ///     type Output = usize; // Number of messages received
+    ///
+    ///     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    ///         let MyReceiverFuture { receiver, buffer, limit } = &mut *self;
+    ///
+    ///         // Now `receiver` and `buffer` are mutable references, and `limit` is copied
+    ///         match receiver.poll_recv_many(cx, *buffer, *limit) {
+    ///             Poll::Pending => Poll::Pending,
+    ///             Poll::Ready(count) => Poll::Ready(count),
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::unbounded_channel::<i32>();
+    ///     let mut buffer = Vec::new();
+    ///
+    ///     let my_receiver_future = MyReceiverFuture {
+    ///         receiver: rx,
+    ///         buffer: &mut buffer,
+    ///         limit: 3,
+    ///     };
+    ///
+    ///     for i in 0..10 {
+    ///         tx.send(i).expect("Unable to send integer");
+    ///     }
+    ///
+    ///     let count = my_receiver_future.await;
+    ///     assert_eq!(count, 3);
+    ///     assert_eq!(buffer, vec![0,1,2])
+    /// }
+    /// ```
+    pub fn poll_recv_many(
+        &mut self,
+        cx: &mut Context<'_>,
+        buffer: &mut Vec<T>,
+        limit: usize,
+    ) -> Poll<usize> {
+        self.chan.recv_many(cx, buffer, limit)
     }
 }
 
@@ -495,18 +639,37 @@ impl<T> UnboundedSender<T> {
     /// towards RAII semantics, i.e. if all `UnboundedSender` instances of the
     /// channel were dropped and only `WeakUnboundedSender` instances remain,
     /// the channel is closed.
+    #[must_use = "Downgrade creates a WeakSender without destroying the original non-weak sender."]
     pub fn downgrade(&self) -> WeakUnboundedSender<T> {
         WeakUnboundedSender {
             chan: self.chan.downgrade(),
         }
     }
+
+    /// Returns the number of [`UnboundedSender`] handles.
+    pub fn strong_count(&self) -> usize {
+        self.chan.strong_count()
+    }
+
+    /// Returns the number of [`WeakUnboundedSender`] handles.
+    pub fn weak_count(&self) -> usize {
+        self.chan.weak_count()
+    }
 }
 
 impl<T> Clone for WeakUnboundedSender<T> {
     fn clone(&self) -> Self {
+        self.chan.increment_weak_count();
+
         WeakUnboundedSender {
             chan: self.chan.clone(),
         }
+    }
+}
+
+impl<T> Drop for WeakUnboundedSender<T> {
+    fn drop(&mut self) {
+        self.chan.decrement_weak_count();
     }
 }
 
@@ -516,6 +679,16 @@ impl<T> WeakUnboundedSender<T> {
     /// the channel wasn't previously dropped, otherwise `None` is returned.
     pub fn upgrade(&self) -> Option<UnboundedSender<T>> {
         chan::Tx::upgrade(self.chan.clone()).map(UnboundedSender::new)
+    }
+
+    /// Returns the number of [`UnboundedSender`] handles.
+    pub fn strong_count(&self) -> usize {
+        self.chan.strong_count()
+    }
+
+    /// Returns the number of [`WeakUnboundedSender`] handles.
+    pub fn weak_count(&self) -> usize {
+        self.chan.weak_count()
     }
 }
 

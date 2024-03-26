@@ -462,7 +462,7 @@ where
     ///  * `Some((key, Ok(value)))` if one of the tasks in this `JoinMap` has
     ///    completed. The `value` is the return value of that ask, and `key` is
     ///    the key associated with the task.
-    ///  * `Some((key, Err(err))` if one of the tasks in this JoinMap` has
+    ///  * `Some((key, Err(err))` if one of the tasks in this `JoinMap` has
     ///    panicked or been aborted. `key` is the key associated  with the task
     ///    that panicked or was aborted.
     ///  * `None` if the `JoinMap` is empty.
@@ -878,7 +878,7 @@ impl<K: Eq> Eq for Key<K> {}
 #[derive(Debug, Clone)]
 pub struct JoinMapKeys<'a, K, V> {
     iter: hashbrown::hash_map::Keys<'a, Key<K>, AbortHandle>,
-    /// To make it easier to change JoinMap in the future, keep V as a generic
+    /// To make it easier to change `JoinMap` in the future, keep V as a generic
     /// parameter.
     _value: PhantomData<&'a V>,
 }

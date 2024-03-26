@@ -42,8 +42,8 @@ pub(crate) struct EntryInOneOfTheLists<'a, T> {
 
 type Lists<T> = Mutex<ListsInner<T>>;
 
-/// The linked lists hold strong references to the ListEntry items, and the
-/// ListEntry items also hold a strong reference back to the Lists object, but
+/// The linked lists hold strong references to the `ListEntry` items, and the
+/// `ListEntry` items also hold a strong reference back to the Lists object, but
 /// the destructor of the `IdleNotifiedSet` will clear the two lists, so once
 /// that object is destroyed, no ref-cycles will remain.
 struct ListsInner<T> {
@@ -186,6 +186,34 @@ impl<T> IdleNotifiedSet<T> {
         if should_update_waker {
             lock.waker = Some(waker.clone());
         }
+
+        // Pop the entry, returning None if empty.
+        let entry = lock.notified.pop_back()?;
+
+        lock.idle.push_front(entry.clone());
+
+        // Safety: We are holding the lock.
+        entry.my_list.with_mut(|ptr| unsafe {
+            *ptr = List::Idle;
+        });
+
+        drop(lock);
+
+        // Safety: We just put the entry in the idle list, so it is in one of the lists.
+        Some(EntryInOneOfTheLists { entry, set: self })
+    }
+
+    /// Tries to pop an entry from the notified list to poll it. The entry is moved to
+    /// the idle list atomically.
+    pub(crate) fn try_pop_notified(&mut self) -> Option<EntryInOneOfTheLists<'_, T>> {
+        // We don't decrement the length because this call moves the entry to
+        // the idle list rather than removing it.
+        if self.length == 0 {
+            // Fast path.
+            return None;
+        }
+
+        let mut lock = self.lists.lock();
 
         // Pop the entry, returning None if empty.
         let entry = lock.notified.pop_back()?;

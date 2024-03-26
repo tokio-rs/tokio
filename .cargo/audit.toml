@@ -1,8 +1,0 @@
-# See https://github.com/rustsec/rustsec/blob/59e1d2ad0b9cbc6892c26de233d4925074b4b97b/cargo-audit/audit.toml.example for example.
-
-[advisories]
-ignore = [
-    # We depend on nix 0.22 only via mio-aio, a dev-dependency.
-    # https://github.com/tokio-rs/tokio/pull/4255#issuecomment-974786349
-    "RUSTSEC-2021-0119",
-]

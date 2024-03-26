@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support panic recovery
+#![cfg(panic = "unwind")]
 
 struct PanicsOnDrop;
 
@@ -9,7 +10,6 @@ impl Drop for PanicsOnDrop {
     }
 }
 
-#[cfg(panic = "unwind")]
 #[tokio::test]
 async fn test_panics_do_not_propagate_when_dropping_join_handle() {
     let join_handle = tokio::spawn(async move { PanicsOnDrop });

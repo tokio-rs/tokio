@@ -218,6 +218,7 @@ where
             // Make sure we've got room for at least one byte to read to ensure
             // that we don't get a spurious 0 that looks like EOF.
             state.buffer.reserve(1);
+            #[allow(clippy::blocks_in_conditions)]
             let bytect = match poll_read_buf(pinned.inner.as_mut(), cx, &mut state.buffer).map_err(
                 |err| {
                     trace!("Got an error, going to errored state");

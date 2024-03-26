@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![allow(clippy::declare_interior_mutable_const)]
 #![cfg(all(feature = "full", tokio_unstable))]
 
 #[cfg(not(target_os = "wasi"))]

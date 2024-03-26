@@ -218,6 +218,15 @@ impl<T> Tx<T> {
             let _ = Box::from_raw(block.as_ptr());
         }
     }
+
+    pub(crate) fn is_closed(&self) -> bool {
+        let tail = self.block_tail.load(Acquire);
+
+        unsafe {
+            let tail_block = &*tail;
+            tail_block.is_closed()
+        }
+    }
 }
 
 impl<T> fmt::Debug for Tx<T> {
@@ -230,6 +239,24 @@ impl<T> fmt::Debug for Tx<T> {
 }
 
 impl<T> Rx<T> {
+    pub(crate) fn is_empty(&self, tx: &Tx<T>) -> bool {
+        let block = unsafe { self.head.as_ref() };
+        if block.has_value(self.index) {
+            return false;
+        }
+
+        // It is possible that a block has no value "now" but the list is still not empty.
+        // To be sure, it is necessary to check the length of the list.
+        self.len(tx) == 0
+    }
+
+    pub(crate) fn len(&self, tx: &Tx<T>) -> usize {
+        // When all the senders are dropped, there will be a last block in the tail position,
+        // but it will be closed
+        let tail_position = tx.tail_position.load(Acquire);
+        tail_position - self.index - (tx.is_closed() as usize)
+    }
+
     /// Pops the next value off the queue.
     pub(crate) fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
         // Advance `head`, if needed

@@ -15,7 +15,7 @@ pub(crate) struct Level {
     /// The least-significant bit represents slot zero.
     occupied: u64,
 
-    /// Slots. We access these via the EntryInner `current_list` as well, so this needs to be an UnsafeCell.
+    /// Slots. We access these via the EntryInner `current_list` as well, so this needs to be an `UnsafeCell`.
     slot: [EntryList; LEVEL_MULT],
 }
 
@@ -267,7 +267,7 @@ mod test {
         for level in 1..5 {
             for pos in level..64 {
                 let a = pos * 64_usize.pow(level as u32);
-                assert_eq!(pos as usize, slot_for(a as u64, level));
+                assert_eq!(pos, slot_for(a as u64, level));
             }
         }
     }

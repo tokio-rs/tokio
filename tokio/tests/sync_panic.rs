@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))]
+#![cfg(panic = "unwind")]
 
 use std::{error::Error, sync::Arc};
 use tokio::{
@@ -12,7 +13,6 @@ mod support {
 }
 use support::panic::test_panic;
 
-#[cfg(panic = "unwind")]
 #[test]
 fn broadcast_channel_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -25,7 +25,6 @@ fn broadcast_channel_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn mutex_blocking_lock_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -42,7 +41,6 @@ fn mutex_blocking_lock_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn oneshot_blocking_recv_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -59,7 +57,6 @@ fn oneshot_blocking_recv_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn rwlock_with_max_readers_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -72,7 +69,6 @@ fn rwlock_with_max_readers_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn rwlock_blocking_read_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -89,7 +85,6 @@ fn rwlock_blocking_read_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn rwlock_blocking_write_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -106,7 +101,6 @@ fn rwlock_blocking_write_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn mpsc_bounded_channel_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -119,7 +113,6 @@ fn mpsc_bounded_channel_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn mpsc_bounded_receiver_blocking_recv_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -136,7 +129,6 @@ fn mpsc_bounded_receiver_blocking_recv_panic_caller() -> Result<(), Box<dyn Erro
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn mpsc_bounded_sender_blocking_send_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -153,7 +145,6 @@ fn mpsc_bounded_sender_blocking_send_panic_caller() -> Result<(), Box<dyn Error>
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn mpsc_unbounded_receiver_blocking_recv_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -170,7 +161,6 @@ fn mpsc_unbounded_receiver_blocking_recv_panic_caller() -> Result<(), Box<dyn Er
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn semaphore_merge_unrelated_owned_permits() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -187,7 +177,6 @@ fn semaphore_merge_unrelated_owned_permits() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
 fn semaphore_merge_unrelated_permits() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
