@@ -607,7 +607,7 @@ impl File {
     /// use tokio::io::AsyncSeekExt;
     ///
     /// # async fn dox() -> std::io::Result<()> {
-    /// let mut file = File::open("foo.txt").await?;
+    /// let mut file = File::create("foo.txt").await?;
     /// file.write_at(b"foo", 5).await?;
     ///
     /// assert_eq!(file.stream_position().await.unwrap(), 0);
@@ -644,7 +644,7 @@ impl File {
     /// use tokio::io::AsyncSeekExt;
     ///
     /// # async fn dox() -> std::io::Result<()> {
-    /// let mut file = File::open("foo.txt").await?;
+    /// let file = File::open("foo.txt").await?;
     /// let mut buf = vec![0_u8; 10];
     /// file.seek_read(&mut buf, 5).await?;
     /// # Ok(())
@@ -692,7 +692,7 @@ impl File {
     /// use tokio::io::AsyncSeekExt;
     ///
     /// # async fn dox() -> std::io::Result<()> {
-    /// let mut file = File::open("foo.txt").await?;
+    /// let file = File::create("foo.txt").await?;
     /// file.seek_write(b"foo", 5).await?;
     /// # Ok(())
     /// # }

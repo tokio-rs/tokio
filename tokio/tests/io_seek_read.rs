@@ -3,7 +3,7 @@
 
 #[tokio::test]
 #[cfg(windows)]
-async fn read_at() {
+async fn seek_read() {
     use tempfile::tempdir;
     use tokio::fs;
     use tokio::io::AsyncSeekExt;

@@ -3,7 +3,7 @@
 
 #[tokio::test]
 #[cfg(windows)]
-async fn write_at() {
+async fn seek_write() {
     use tempfile::tempdir;
     use tokio::fs;
     use tokio::fs::OpenOptions;
