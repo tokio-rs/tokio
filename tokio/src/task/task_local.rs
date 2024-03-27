@@ -277,6 +277,7 @@ impl<T: Copy + 'static> LocalKey<T> {
     }
 }
 
+#[allow(clippy::should_implement_trait)]
 impl<T: Clone + 'static> LocalKey<T> {
     /// Returns a clone of the task-local value
     /// if the task-local value implements `Clone`.
