@@ -24,6 +24,9 @@ mod cfg;
 
 mod loom;
 
+#[macro_use]
+mod tracing;
+
 cfg_codec! {
     pub mod codec;
 }
