@@ -561,7 +561,7 @@ impl File {
     /// let mut file = File::open("foo.txt").await?;
     /// file.read_at(&mut buf, 5).await?;
     ///
-    /// assert_eq!(file.stream_position().await.unwrap(), 0);
+    /// assert_eq!(file.stream_position().await?, 0);
     /// # Ok(())
     /// # }
     /// ```
@@ -610,7 +610,7 @@ impl File {
     /// let mut file = File::create("foo.txt").await?;
     /// file.write_at(b"foo", 5).await?;
     ///
-    /// assert_eq!(file.stream_position().await.unwrap(), 0);
+    /// assert_eq!(file.stream_position().await?, 0);
     /// # Ok(())
     /// # }
     /// ```
@@ -641,7 +641,6 @@ impl File {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::io::AsyncSeekExt;
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let file = File::open("foo.txt").await?;
@@ -689,7 +688,6 @@ impl File {
     ///
     /// ```no_run
     /// use tokio::fs::File;
-    /// use tokio::io::AsyncSeekExt;
     ///
     /// # async fn dox() -> std::io::Result<()> {
     /// let file = File::create("foo.txt").await?;
