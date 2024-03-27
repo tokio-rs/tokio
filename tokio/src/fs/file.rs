@@ -652,7 +652,7 @@ impl File {
     /// ```
     #[cfg(windows)]
     #[cfg_attr(docsrs, doc(cfg(windows)))]
-    pub async fn seek_read(&self, buf: &[u8], offset: u64) -> io::Result<usize> {
+    pub async fn seek_read(&self, buf: &mut [u8], offset: u64) -> io::Result<usize> {
         fn _read_at(std: &StdFile, n: usize, offset: u64) -> io::Result<Vec<u8>> {
             use std::os::windows::fs::FileExt;
             let mut buf: Vec<u8> = vec![0; n];

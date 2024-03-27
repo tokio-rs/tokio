@@ -2,7 +2,7 @@
 #![cfg(all(feature = "full", not(target_os = "wasi")))]
 
 #[tokio::test]
-#[cfg(unix)]
+#[cfg(windows)]
 async fn write_at() {
     use tempfile::tempdir;
     use tokio::fs;
@@ -22,5 +22,5 @@ async fn write_at() {
     let contents = fs::read(file_path.as_path()).await.unwrap();
     assert_eq!(contents, b"HelloWorld");
 
-    assert_eq!(file.stream_position().await.unwrap(), 0);
+    assert_eq!(file.stream_position().await.unwrap(), 10);
 }
