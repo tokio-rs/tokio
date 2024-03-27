@@ -18,7 +18,7 @@ async fn write_at() {
         .await
         .unwrap();
 
-    assert_eq!(file.write_at(b"World", 5).await.unwrap(), 5);
+    assert_eq!(file.seek_write(b"World", 5).await.unwrap(), 5);
     let contents = fs::read(file_path.as_path()).await.unwrap();
     assert_eq!(contents, b"HelloWorld");
 
