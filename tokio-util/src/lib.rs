@@ -24,10 +24,10 @@ mod cfg;
 
 mod loom;
 
-#[macro_use]
-mod tracing;
-
 cfg_codec! {
+    #[macro_use]
+    mod tracing;
+
     pub mod codec;
 }
 
