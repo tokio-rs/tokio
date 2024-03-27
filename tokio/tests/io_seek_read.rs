@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] 
+#![cfg(all(feature = "full", not(target_os = "wasi")))]
 
 #[tokio::test]
 #[cfg(windows)]
@@ -7,7 +7,7 @@ async fn read_at() {
     use tempfile::tempdir;
     use tokio::fs;
     use tokio::io::AsyncSeekExt;
-    
+
     let temp_dir = tempdir().unwrap();
     let file_path = temp_dir.path().join("a.txt");
     fs::write(&file_path, b"HelloWorld").await.unwrap();
