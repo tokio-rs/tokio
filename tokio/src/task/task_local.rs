@@ -277,6 +277,20 @@ impl<T: Copy + 'static> LocalKey<T> {
     }
 }
 
+#[allow(clippy::should_implement_trait)]
+impl<T: Clone + 'static> LocalKey<T> {
+    /// Returns a clone of the task-local value
+    /// if the task-local value implements `Clone`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the task local doesn't have a value set.
+    #[track_caller]
+    pub fn clone(&'static self) -> T {
+        self.with(|v| v.clone())
+    }
+}
+
 impl<T: 'static> fmt::Debug for LocalKey<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.pad("LocalKey { .. }")
