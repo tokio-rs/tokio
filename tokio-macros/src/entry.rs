@@ -28,6 +28,7 @@ impl RuntimeFlavor {
 struct FinalConfig {
     flavor: RuntimeFlavor,
     worker_threads: Option<usize>,
+    time_auto_advance: Option<bool>,
     start_paused: Option<bool>,
     crate_name: Option<Path>,
 }
@@ -36,6 +37,7 @@ struct FinalConfig {
 const DEFAULT_ERROR_CONFIG: FinalConfig = FinalConfig {
     flavor: RuntimeFlavor::CurrentThread,
     worker_threads: None,
+    time_auto_advance: None,
     start_paused: None,
     crate_name: None,
 };
@@ -45,6 +47,7 @@ struct Configuration {
     default_flavor: RuntimeFlavor,
     flavor: Option<RuntimeFlavor>,
     worker_threads: Option<(usize, Span)>,
+    time_auto_advance: Option<(bool, Span)>,
     start_paused: Option<(bool, Span)>,
     is_test: bool,
     crate_name: Option<Path>,
@@ -60,6 +63,7 @@ impl Configuration {
             },
             flavor: None,
             worker_threads: None,
+            time_auto_advance: None,
             start_paused: None,
             is_test,
             crate_name: None,
@@ -95,6 +99,23 @@ impl Configuration {
             return Err(syn::Error::new(span, "`worker_threads` may not be 0."));
         }
         self.worker_threads = Some((worker_threads, span));
+        Ok(())
+    }
+
+    fn set_time_auto_advance(
+        &mut self,
+        time_auto_advance: syn::Lit,
+        span: Span,
+    ) -> Result<(), syn::Error> {
+        if self.time_auto_advance.is_some() {
+            return Err(syn::Error::new(
+                span,
+                "`time_auto_advance` set multiple times.",
+            ));
+        }
+
+        let time_auto_advance = parse_bool(time_auto_advance, span, "time_auto_advance")?;
+        self.time_auto_advance = Some((time_auto_advance, span));
         Ok(())
     }
 
@@ -151,6 +172,18 @@ impl Configuration {
             }
         };
 
+        let time_auto_advance = match (flavor, self.time_auto_advance) {
+            (F::Threaded, Some((_, time_auto_advance_span))) => {
+                let msg = format!(
+                    "The `time_auto_advance` option requires the `current_thread` runtime flavor. Use `#[{}(flavor = \"current_thread\")]`",
+                    self.macro_name(),
+                );
+                return Err(syn::Error::new(time_auto_advance_span, msg));
+            }
+            (F::CurrentThread, Some((time_auto_advance, _))) => Some(time_auto_advance),
+            (_, None) => None,
+        };
+
         let start_paused = match (flavor, self.start_paused) {
             (F::Threaded, Some((_, start_paused_span))) => {
                 let msg = format!(
@@ -167,6 +200,7 @@ impl Configuration {
             crate_name: self.crate_name.clone(),
             flavor,
             worker_threads,
+            time_auto_advance,
             start_paused,
         })
     }
@@ -265,6 +299,10 @@ fn build_config(
                     "flavor" => {
                         config.set_flavor(lit.clone(), syn::spanned::Spanned::span(lit))?;
                     }
+                    "time_auto_advance" => {
+                        config
+                            .set_time_auto_advance(lit.clone(), syn::spanned::Spanned::span(lit))?;
+                    }
                     "start_paused" => {
                         config.set_start_paused(lit.clone(), syn::spanned::Spanned::span(lit))?;
                     }
@@ -307,7 +345,11 @@ fn build_config(
                         format!("The `{}` attribute requires an argument.", name)
                     }
                     name => {
-                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`", name)
+                        format!(
+                            concat!("Unknown attribute {} is specified; expected one of:",
+                                    " `flavor`, `worker_threads`, `time_auto_advance`, `start_paused`, `crate`"),
+                            name
+                        )
                     }
                 };
                 return Err(syn::Error::new_spanned(path, msg));
@@ -355,6 +397,9 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     };
     if let Some(v) = config.worker_threads {
         rt = quote_spanned! {last_stmt_start_span=> #rt.worker_threads(#v) };
+    }
+    if let Some(v) = config.time_auto_advance {
+        rt = quote_spanned! {last_stmt_start_span=> #rt.time_auto_advance(#v) };
     }
     if let Some(v) = config.start_paused {
         rt = quote_spanned! {last_stmt_start_span=> #rt.start_paused(#v) };
