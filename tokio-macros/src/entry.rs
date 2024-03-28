@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream, TokenTree};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream, Parser};
-use syn::{braced, Attribute, Ident, Path, Signature, Visibility};
+use syn::{braced, parse_quote, Attribute, Ident, Path, Signature, Stmt, Visibility};
 
 // syn::AttributeArgs does not implement syn::Parse
 type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
@@ -380,7 +380,64 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         }
     };
 
-    let body = input.body();
+    let unit_type = Box::new(parse_quote! { () });
+    let never_type = Box::new(parse_quote! { ! });
+
+    let output_type = match &input.sig.output {
+        // For functions with no return value syn doesn't print anything,
+        // but that doesn't work as `Output` for our boxed `Future`, so
+        // default to `()` (the same type as the function output).
+        syn::ReturnType::Default => &unit_type,
+        syn::ReturnType::Type(_, ret_type) if ret_type == &never_type => &unit_type,
+        syn::ReturnType::Type(_, ret_type) => ret_type,
+    };
+
+    enum ContainsLoopVisitor {
+        Found,
+        NotFound,
+    }
+
+    impl syn::visit::Visit<'_> for ContainsLoopVisitor {
+        fn visit_expr_loop(&mut self, _: &syn::ExprLoop) {
+            *self = ContainsLoopVisitor::Found;
+        }
+
+        fn visit_macro(&mut self, mac: &syn::Macro) {
+            // if the last segment of the macro is panic
+            if let Some(ident) = mac.path.get_ident() {
+                if ident == "panic" {
+                    *self = ContainsLoopVisitor::Found;
+                }
+            }
+        }
+    }
+
+    let mut visitor = ContainsLoopVisitor::NotFound;
+
+    for stmt in &input.stmts {
+        let Ok(node): Result<Stmt, _> = syn::parse2(stmt.clone()) else {
+            continue;
+        };
+
+        syn::visit::visit_stmt(&mut visitor, &node);
+
+        if let ContainsLoopVisitor::Found = visitor {
+            break;
+        }
+    }
+
+    let contains_loop = matches!(visitor, ContainsLoopVisitor::Found);
+
+    let body = if output_type == &unit_type || output_type == &never_type || contains_loop {
+        input.body()
+    } else {
+        let body = input.body();
+        input.stmts = vec![quote! {
+            let main_body: #output_type = #body;
+            main_body
+        }];
+        input.body()
+    };
 
     // For test functions pin the body to the stack and use `Pin<&mut dyn
     // Future>` to reduce the amount of `Runtime::block_on` (and related
@@ -392,13 +449,6 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     // We don't do this for the main function as it should only be used once so
     // there will be no benefit.
     let body = if is_test {
-        let output_type = match &input.sig.output {
-            // For functions with no return value syn doesn't print anything,
-            // but that doesn't work as `Output` for our boxed `Future`, so
-            // default to `()` (the same type as the function output).
-            syn::ReturnType::Default => quote! { () },
-            syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
-        };
         quote! {
             let body = async #body;
             #crate_path::pin!(body);
