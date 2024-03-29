@@ -46,7 +46,7 @@ use std::task::{Context, Poll};
 /// # }
 /// ```
 #[cfg_attr(not(feature = "io"), allow(unreachable_pub))]
-pub fn poll_read_buf<T: AsyncRead, B: BufMut>(
+pub fn poll_read_buf<T: AsyncRead + ?Sized, B: BufMut>(
     io: Pin<&mut T>,
     cx: &mut Context<'_>,
     buf: &mut B,
