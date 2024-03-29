@@ -524,17 +524,28 @@ impl Inner {
                 shared = lock_result.0;
                 let timeout_result = lock_result.1;
 
+                // Even if the condvar "timed out", if the pool is entering the
+                // shutdown phase, we want to perform the cleanup logic.
+                if shared.shutdown {
+                    // Work was produced, and we "took" it (by decrementing num_notify).
+                    // This means that num_idle was decremented once for our wakeup.
+                    // But, since we are exiting, we need to "undo" that, as we'll stay idle.
+                    self.metrics.inc_num_idle_threads();
+
+                    // NOTE: Technically we should also do num_notify++ and notify again,
+                    // but since we're shutting down anyway, that won't be necessary.
+                    break;
+                }
+
                 if shared.num_notify != 0 {
                     // We have received a legitimate wakeup,
                     // acknowledge it by decrementing the counter
                     // and transition to the BUSY state.
                     shared.num_notify -= 1;
-                    break;
+                    continue 'main;
                 }
 
-                // Even if the condvar "timed out", if the pool is entering the
-                // shutdown phase, we want to perform the cleanup logic.
-                if !shared.shutdown && timeout_result.timed_out() {
+                if timeout_result.timed_out() {
                     // We'll join the prior timed-out thread's JoinHandle after dropping the lock.
                     // This isn't done when shutting down, because the thread calling shutdown will
                     // handle joining everything.
@@ -547,25 +558,17 @@ impl Inner {
                 // Spurious wakeup detected, go back to sleep.
             }
 
-            if shared.shutdown {
-                // Drain the queue
-                while let Some(task) = shared.queue.pop_front() {
-                    self.metrics.dec_queue_depth();
-                    drop(shared);
+            // SHUTDOWN
+            // Drain the queue
+            while let Some(task) = shared.queue.pop_front() {
+                self.metrics.dec_queue_depth();
+                drop(shared);
 
-                    task.shutdown_or_run_if_mandatory();
+                task.shutdown_or_run_if_mandatory();
 
-                    shared = self.shared.lock();
-                }
-
-                // Work was produced, and we "took" it (by decrementing num_notify).
-                // This means that num_idle was decremented once for our wakeup.
-                // But, since we are exiting, we need to "undo" that, as we'll stay idle.
-                self.metrics.inc_num_idle_threads();
-                // NOTE: Technically we should also do num_notify++ and notify again,
-                // but since we're shutting down anyway, that won't be necessary.
-                break;
+                shared = self.shared.lock();
             }
+            break;
         }
 
         // Thread exit
