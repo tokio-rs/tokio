@@ -758,6 +758,10 @@ impl Builder {
     ///
     /// [the module documentation]: crate::runtime#multi-threaded-runtime-behavior-at-the-time-of-writing
     ///
+    /// # Panics
+    ///
+    /// This function will panic if 0 is passed as an argument.
+    ///
     /// # Examples
     ///
     /// ```
@@ -769,6 +773,7 @@ impl Builder {
     /// # }
     /// ```
     pub fn global_queue_interval(&mut self, val: u32) -> &mut Self {
+        assert!(val > 0, "global_queue_interval must be greater than 0");
         self.global_queue_interval = Some(val);
         self
     }
