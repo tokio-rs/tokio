@@ -1089,7 +1089,7 @@ rt_test! {
         use std::thread;
 
         thread_local!(
-            static R: RefCell<Option<Runtime>> = RefCell::new(None);
+            static R: RefCell<Option<Runtime>> = const { RefCell::new(None) };
         );
 
         thread::spawn(|| {
@@ -1402,7 +1402,7 @@ rt_test! {
         }
 
         std::thread_local! {
-            static TL_DATA: RefCell<Option<TLData>> = RefCell::new(None);
+            static TL_DATA: RefCell<Option<TLData>> = const { RefCell::new(None) };
         };
 
         let (send, recv) = channel();
