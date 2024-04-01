@@ -772,6 +772,7 @@ impl Builder {
     ///     .build();
     /// # }
     /// ```
+    #[track_caller]
     pub fn global_queue_interval(&mut self, val: u32) -> &mut Self {
         assert!(val > 0, "global_queue_interval must be greater than 0");
         self.global_queue_interval = Some(val);
