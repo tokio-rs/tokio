@@ -664,7 +664,6 @@ impl Worker {
     /// Ensure core's state is set correctly for the worker to start using.
     fn reset_acquired_core(&mut self, cx: &Context, synced: &mut Synced, core: &mut Core) {
         self.global_queue_interval = core.stats.tuned_global_queue_interval(&cx.shared().config);
-        debug_assert!(self.global_queue_interval > 1);
 
         // Reset `lifo_enabled` here in case the core was previously stolen from
         // a task that had the LIFO slot disabled.
