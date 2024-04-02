@@ -83,6 +83,11 @@ pub(crate) fn is_cancelled<T>(node: &Arc<TreeNode<T>>) -> bool {
     node.inner.lock().unwrap().is_cancelled.is_some()
 }
 
+/// Returns whether or not the node is cancelled
+pub(crate) fn with_cancelled<T, R>(node: &Arc<TreeNode<T>>, f: impl FnOnce(&Option<T>) -> R) -> R {
+    f(&node.inner.lock().unwrap().is_cancelled)
+}
+
 /// Creates a child node
 pub(crate) fn child_node<T: Clone>(parent: &Arc<TreeNode<T>>) -> Arc<TreeNode<T>> {
     let mut locked_parent = parent.inner.lock().unwrap();
