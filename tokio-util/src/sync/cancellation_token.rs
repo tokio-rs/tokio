@@ -53,7 +53,7 @@ use pin_project_lite::pin_project;
 /// }
 /// ```
 pub struct CancellationToken {
-    inner: Arc<tree_node::TreeNode>,
+    inner: Arc<tree_node::TreeNode<()>>,
 }
 
 impl std::panic::UnwindSafe for CancellationToken {}
@@ -196,7 +196,7 @@ impl CancellationToken {
     /// `false` from `is_cancelled` on another child node. However, once the
     /// call to `cancel` returns, all child nodes have been fully cancelled.
     pub fn cancel(&self) {
-        tree_node::cancel(&self.inner);
+        tree_node::cancel(&self.inner, ());
     }
 
     /// Returns `true` if the `CancellationToken` is cancelled.
