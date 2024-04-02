@@ -16,7 +16,7 @@ env:
   # Change to specific Rust release to pin
   rust_stable: stable
   rust_nightly: nightly-2023-10-21
-  rust_clippy: '1.76'
+  rust_clippy: '1.77'
   # When updating this, also update:
   # - README.md
   # - tokio/README.md

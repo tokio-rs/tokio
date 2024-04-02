@@ -150,7 +150,7 @@ fn socketpair() -> (FileDescriptor, FileDescriptor) {
 
 fn drain(mut fd: &FileDescriptor) {
     let mut buf = [0u8; 512];
-
+    #[allow(clippy::unused_io_amount)]
     loop {
         match fd.read(&mut buf[..]) {
             Err(e) if e.kind() == ErrorKind::WouldBlock => break,
