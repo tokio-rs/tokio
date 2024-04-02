@@ -502,11 +502,13 @@ fn global_queue_interval_set_to_one() {
     // Perform a simple work.
     let cnt = Arc::new(AtomicUsize::new(0));
     rt.block_on(async {
+        let mut set = tokio::task::JoinSet::new();
         for _ in 0..10 {
             let cnt = cnt.clone();
-            tokio::spawn(async move { cnt.fetch_add(1, Relaxed) })
-                .await
-                .unwrap();
+            set.spawn(async move { cnt.fetch_add(1, Relaxed) });
+        }
+        while let Some(res) = set.join_next().await {
+            res.unwrap();
         }
     });
     assert_eq!(cnt.load(Relaxed), 10);
