@@ -494,7 +494,7 @@ fn max_blocking_threads_set_to_zero() {
 /// when global_queue_interval is set to 1.
 #[test]
 fn global_queue_interval_set_to_one() {
-    let rt = tokio::runtime::Builder::new_multi_thread()
+    let rt = tokio::runtime::Builder::new_multi_thread_alt()
         .global_queue_interval(1)
         .build()
         .unwrap();
