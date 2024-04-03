@@ -10,8 +10,8 @@ use tokio_test::{assert_err, assert_ok};
 use futures::future::poll_fn;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 
@@ -484,6 +484,34 @@ fn max_blocking_threads_set_to_zero() {
         .max_blocking_threads(0)
         .build()
         .unwrap();
+}
+
+/// Regression test for #6445.
+///
+/// After #6445, setting `global_queue_interval` to 1 is now technically valid.
+/// This test confirms that there is no regression in `multi_thread_runtime`
+/// when global_queue_interval is set to 1.
+#[test]
+fn global_queue_interval_set_to_one() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .global_queue_interval(1)
+        .build()
+        .unwrap();
+
+    // Perform a simple work.
+    let cnt = Arc::new(AtomicUsize::new(0));
+    rt.block_on(async {
+        let mut set = tokio::task::JoinSet::new();
+        for _ in 0..10 {
+            let cnt = cnt.clone();
+            set.spawn(async move { cnt.fetch_add(1, Ordering::Relaxed) });
+        }
+
+        while let Some(res) = set.join_next().await {
+            res.unwrap();
+        }
+    });
+    assert_eq!(cnt.load(Relaxed), 10);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
