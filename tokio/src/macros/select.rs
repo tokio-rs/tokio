@@ -605,6 +605,11 @@ macro_rules! select {
     (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr => $h:expr, $($r:tt)* ) => {
         $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
     };
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr, if let $z:pat = $c:expr => $h:block $($r:tt)* ) => {{
+        if let $z = $c {
+            $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
+        }
+    }};
 
     // ===== Entry point =====
 

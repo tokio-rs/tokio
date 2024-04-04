@@ -629,6 +629,23 @@ async fn mut_ref_patterns() {
     };
 }
 
+#[maybe_tokio_test]
+async fn if_let_patterns() {
+    let maybe_x = Some(10);
+    let mut result = 0;
+
+    async fn foo(x: u32) -> u32 {
+        x
+    }
+
+    tokio::select! {
+        res = foo(x), if let Some(x) = maybe_x => { result = res; }
+        else => { result = 0 }
+    };
+
+    assert_eq!(result, 10);
+}
+
 #[cfg(tokio_unstable)]
 mod unstable {
     use tokio::runtime::RngSeed;
