@@ -52,6 +52,7 @@ macro_rules! assert_closed {
     };
 }
 
+#[allow(unused)]
 trait AssertSend: Send + Sync {}
 impl AssertSend for broadcast::Sender<i32> {}
 impl AssertSend for broadcast::Receiver<i32> {}
