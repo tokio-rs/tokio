@@ -164,17 +164,20 @@
 //! file.write_all(b"First line.\n").await?;
 //! file.write_all(b"Second line.\n").await?;
 //! file.write_all(b"Third line.\n").await?;
+//!
+//! // Due to the BufWriter, the actual write and spawn_blocking
+//! // call happens when you flush.
 //! file.flush().await?;
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! Manually use [`std::fs`] inside `spawn_blocking`.
+//! Manually use [`std::fs`] inside [`spawn_blocking`].
 //!
 //! ```no_run
-//! use tokio::task::spawn_blocking;
 //! use std::fs::File;
-//! use std::io::Write;
+//! use std::io::{self, Write};
+//! use tokio::task::spawn_blocking;
 //!
 //! # async fn dox() -> std::io::Result<()> {
 //! spawn_blocking(move || {
@@ -183,12 +186,20 @@
 //!     file.write_all(b"First line.\n")?;
 //!     file.write_all(b"Second line.\n")?;
 //!     file.write_all(b"Third line.\n")?;
-//!     file.flush()?;
-//!     tokio::io::Result::Ok(())
-//! }).await??;
+//!
+//!     // Unlike Tokio's file, the std::fs file does
+//!     // not need flush.
+//!
+//!     io::Result::Ok(())
+//! }).await.unwrap()?;
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! It's also good to be aware of [`File::set_max_buf_size`], which controls the
+//! maximum amount of bytes that Tokio's [`File`] will read or write in a single
+//! [`spawn_blocking`] call. The default is two megabytes, but this is subject
+//! to change.
 //!
 //! [`spawn_blocking`]: fn@crate::task::spawn_blocking
 //! [`AsyncRead`]: trait@crate::io::AsyncRead
