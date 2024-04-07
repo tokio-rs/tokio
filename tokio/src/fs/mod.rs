@@ -3,8 +3,8 @@
 //! Asynchronous file utilities.
 //!
 //! This module contains utility methods for working with the file system
-//! asynchronously. This involves reading and writing to files, but also things
-//! such as working with directories.
+//! asynchronously. This includes reading/writing to files, and working with
+//! directories.
 //!
 //! Be aware that most operating systems do not provide asynchronous file system
 //! APIs. Because of that, Tokio will use ordinary blocking file operations
@@ -59,10 +59,16 @@
 //!
 //! The main type for interacting with files is [`File`]. It can be used to read
 //! from and write to a given file. This is done using the [`AsyncRead`] and
-//! [`AsyncWrite`] traits.
+//! [`AsyncWrite`] traits. This type is generally used when you want to do
+//! something more complex than just reading or writing the entire contents in
+//! one go.
 //!
-//! This type is generally used when you want to do something more complex than
-//! just reading or writing the entire contents in one go.
+//! **Note:** It is important to use [`flush`] when writing to a Tokio
+//! [`File`]. This is because calls to `write` will return before the write has
+//! finished, and [`flush`] will wait for the write to finish. (The write will
+//! happen even if you don't flush; it will just happen later.) This is
+//! different from [`std::fs::File`], and is due to the fact that `File` uses
+//! `spawn_blocking` behind the scenes.
 //!
 //! For example, to count the number of lines in a file without loading the
 //! entire file into memory:
@@ -106,15 +112,12 @@
 //! file.write_all(b"First line.\n").await?;
 //! file.write_all(b"Second line.\n").await?;
 //! file.write_all(b"Third line.\n").await?;
+//!
+//! // Remember to call `flush` after writing!
 //! file.flush().await?;
 //! # Ok(())
 //! # }
 //! ```
-//!
-//! Note that it is important to [`flush`] when writing to a Tokio file. This is
-//! different from [`std::fs::File`], but required because Tokio's file uses a
-//! thread pool behind the scenes. Using `flush` ensures that the file has been
-//! fully written.
 //!
 //! ## Tuning your file IO
 //!
