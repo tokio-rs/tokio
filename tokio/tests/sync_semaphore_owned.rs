@@ -114,6 +114,22 @@ fn merge_unrelated_permits() {
     p1.merge(p2)
 }
 
+#[test]
+fn detach() {
+    let sem = Arc::new(Semaphore::new(5));
+    let mut p1 = sem.clone().try_acquire_many_owned(3).unwrap();
+    assert_eq!(sem.available_permits(), 2);
+    let mut p2 = p1.detach(1).unwrap();
+    assert_eq!(sem.available_permits(), 2);
+    assert!(p1.detach(0).is_none());
+    drop(p1);
+    assert_eq!(sem.available_permits(), 4);
+    assert!(p2.detach(1).is_none());
+    assert!(p2.detach(2).is_none());
+    drop(p2);
+    assert_eq!(sem.available_permits(), 5);
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn stress_test() {
