@@ -968,6 +968,25 @@ impl<'a> SemaphorePermit<'a> {
     /// Forgets the permit **without** releasing it back to the semaphore.
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn main() {
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(10));
+    /// {
+    ///     let permit = sem.try_acquire_many(5).unwrap();
+    ///     assert_eq!(sem.available_permits(), 5);
+    ///     permit.forget();
+    /// }
+    ///
+    /// // Since we forgot the permit, available permits won't go back to its initial value.
+    /// assert_eq!(sem.available_permits(), 5);
+    /// # }
+    /// ```
     pub fn forget(mut self) {
         self.permits = 0;
     }
@@ -981,6 +1000,31 @@ impl<'a> SemaphorePermit<'a> {
     ///
     /// This function panics if permits from different [`Semaphore`] instances
     /// are merged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn main() {
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(10));
+    /// let mut permit = sem.try_acquire().unwrap();
+    ///
+    /// for _ in 0..9 {
+    ///     let _permit = sem.try_acquire().unwrap();
+    ///     // Merge individual permits into a single one.
+    ///     permit.merge(_permit)
+    /// }
+    ///
+    /// assert_eq!(sem.available_permits(), 0);
+    ///
+    /// // Release all permits in a single batch.
+    /// drop(permit);
+    ///
+    /// assert_eq!(sem.available_permits(), 10);
+    /// # }
+    /// ```
     #[track_caller]
     pub fn merge(&mut self, mut other: Self) {
         assert!(
@@ -994,6 +1038,23 @@ impl<'a> SemaphorePermit<'a> {
     /// Splits `n` permits from `self` and returns a new [`SemaphorePermit`] instance that holds `n` permits.
     ///
     /// If there are insufficient permits and it's not possible to reduce by `n`, returns `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn main() {
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(3));
+    ///
+    /// let mut p1 = sem.try_acquire_many(3).unwrap();
+    /// let p2 = p1.split(1).unwrap();
+    ///
+    /// assert_eq!(p1.num_permits(), 2);
+    /// assert_eq!(p2.num_permits(), 1);
+    /// # }
+    /// ```
     pub fn split(&mut self, n: u32) -> Option<Self> {
         if n > self.permits {
             return None;
@@ -1017,6 +1078,25 @@ impl OwnedSemaphorePermit {
     /// Forgets the permit **without** releasing it back to the semaphore.
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn main() {
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(10));
+    /// {
+    ///     let permit = sem.clone().try_acquire_many_owned(5).unwrap();
+    ///     assert_eq!(sem.available_permits(), 5);
+    ///     permit.forget();
+    /// }
+    ///
+    /// // Since we forgot the permit, available permits won't go back to its initial value.
+    /// assert_eq!(sem.available_permits(), 5);
+    /// # }
+    /// ```
     pub fn forget(mut self) {
         self.permits = 0;
     }
@@ -1030,6 +1110,31 @@ impl OwnedSemaphorePermit {
     ///
     /// This function panics if permits from different [`Semaphore`] instances
     /// are merged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn main() {
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(10));
+    /// let mut permit = sem.clone().try_acquire_owned().unwrap();
+    ///
+    /// for _ in 0..9 {
+    ///     let _permit = sem.clone().try_acquire_owned().unwrap();
+    ///     // Merge individual permits into a single one.
+    ///     permit.merge(_permit)
+    /// }
+    ///
+    /// assert_eq!(sem.available_permits(), 0);
+    ///
+    /// // Release all permits in a single batch.
+    /// drop(permit);
+    ///
+    /// assert_eq!(sem.available_permits(), 10);
+    /// # }
+    /// ```
     #[track_caller]
     pub fn merge(&mut self, mut other: Self) {
         assert!(
@@ -1047,6 +1152,23 @@ impl OwnedSemaphorePermit {
     /// # Note
     ///
     /// It will clone the owned `Arc<Semaphore>` to construct the new instance.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn main() {
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(3));
+    ///
+    /// let mut p1 = sem.try_acquire_many_owned(3).unwrap();
+    /// let p2 = p1.split(1).unwrap();
+    ///
+    /// assert_eq!(p1.num_permits(), 2);
+    /// assert_eq!(p2.num_permits(), 1);
+    /// # }
+    /// ```
     pub fn split(&mut self, n: u32) -> Option<Self> {
         if n > self.permits {
             return None;
