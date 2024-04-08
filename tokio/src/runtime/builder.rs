@@ -838,7 +838,7 @@ impl Builder {
         ///
         /// This option is currently unstable and its implementation is
         /// incomplete. The API may change or be removed in the future. See
-        /// tokio-rs/tokio#4516 for more details.
+        /// issue [tokio-rs/tokio#4516] for more details.
         ///
         /// # Examples
         ///
@@ -870,6 +870,7 @@ impl Builder {
         /// ```
         ///
         /// [`JoinHandle`]: struct@crate::task::JoinHandle
+        /// [tokio-rs/tokio#4516]: https://github.com/tokio-rs/tokio/issues/4516
         pub fn unhandled_panic(&mut self, behavior: UnhandledPanic) -> &mut Self {
             if !matches!(self.kind, Kind::CurrentThread) && matches!(behavior, UnhandledPanic::ShutdownRuntime) {
                 panic!("UnhandledPanic::ShutdownRuntime is only supported in current thread runtime");
@@ -895,7 +896,7 @@ impl Builder {
         /// is stealable.
         ///
         /// Consider trying this option when the task "scheduled" time is high
-        /// but the runtime is underutilized. Use tokio-rs/tokio-metrics to
+        /// but the runtime is underutilized. Use [tokio-rs/tokio-metrics] to
         /// collect this data.
         ///
         /// # Unstable
@@ -903,7 +904,7 @@ impl Builder {
         /// This configuration option is considered a workaround for the LIFO
         /// slot not being stealable. When the slot becomes stealable, we will
         /// revisit whether or not this option is necessary. See
-        /// tokio-rs/tokio#4941.
+        /// issue [tokio-rs/tokio#4941].
         ///
         /// # Examples
         ///
@@ -915,6 +916,9 @@ impl Builder {
         ///     .build()
         ///     .unwrap();
         /// ```
+        ///
+        /// [tokio-rs/tokio-metrics]: https://github.com/tokio-rs/tokio-metrics
+        /// [tokio-rs/tokio#4941]: https://github.com/tokio-rs/tokio/issues/4941
         pub fn disable_lifo_slot(&mut self) -> &mut Self {
             self.disable_lifo_slot = true;
             self
