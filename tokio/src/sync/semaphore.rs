@@ -990,9 +990,9 @@ impl<'a> SemaphorePermit<'a> {
         self.permits += other.permits;
         other.permits = 0;
     }
-    
+
     /// Detaches `n` permits from `self` and returns a new [`SemaphorePermit`] instance that holds `n` permits.
-    /// 
+    ///
     /// It guarantees at least one permit held by both `self` and the new instance.
     ///
     /// If there are insufficient permits and it's not possible to reduce by `n`, returns `None`.
@@ -1000,9 +1000,9 @@ impl<'a> SemaphorePermit<'a> {
         if n == 0 || n >= self.permits {
             return None;
         }
-        
+
         self.permits -= n;
-        
+
         Some(Self {
             sem: self.sem,
             permits: n,
@@ -1042,9 +1042,9 @@ impl OwnedSemaphorePermit {
     /// It guarantees at least one permit held by both `self` and the new instance.
     ///
     /// If there are insufficient permits and it's not possible to reduce by `n`, returns `None`.
-    /// 
+    ///
     /// # Note
-    /// 
+    ///
     /// It will clone the owned `Arc<Semaphore>` to construct the new instance.
     pub fn detach(&mut self, n: u32) -> Option<Self> {
         if n == 0 || n >= self.permits {
