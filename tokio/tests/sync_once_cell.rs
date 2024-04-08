@@ -2,7 +2,6 @@
 #![cfg(feature = "full")]
 
 use std::mem;
-use std::ops::Drop;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tokio::runtime;
