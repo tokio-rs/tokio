@@ -17,4 +17,3 @@ members = [
 
 [workspace.metadata.spellcheck]
 config = "spellcheck.toml"
-
