@@ -990,6 +990,27 @@ impl<'a> SemaphorePermit<'a> {
         self.permits += other.permits;
         other.permits = 0;
     }
+
+    /// Splits `n` permits from `self` and returns a new [`SemaphorePermit`] instance that holds `n` permits.
+    ///
+    /// If there are insufficient permits and it's not possible to reduce by `n`, returns `None`.
+    pub fn split(&mut self, n: u32) -> Option<Self> {
+        if n > self.permits {
+            return None;
+        }
+
+        self.permits -= n;
+
+        Some(Self {
+            sem: self.sem,
+            permits: n,
+        })
+    }
+
+    /// Returns the number of permits held by `self`.
+    pub fn num_permits(&self) -> u32 {
+        self.permits
+    }
 }
 
 impl OwnedSemaphorePermit {
@@ -1019,9 +1040,34 @@ impl OwnedSemaphorePermit {
         other.permits = 0;
     }
 
+    /// Splits `n` permits from `self` and returns a new [`OwnedSemaphorePermit`] instance that holds `n` permits.
+    ///
+    /// If there are insufficient permits and it's not possible to reduce by `n`, returns `None`.
+    ///
+    /// # Note
+    ///
+    /// It will clone the owned `Arc<Semaphore>` to construct the new instance.
+    pub fn split(&mut self, n: u32) -> Option<Self> {
+        if n > self.permits {
+            return None;
+        }
+
+        self.permits -= n;
+
+        Some(Self {
+            sem: self.sem.clone(),
+            permits: n,
+        })
+    }
+
     /// Returns the [`Semaphore`] from which this permit was acquired.
     pub fn semaphore(&self) -> &Arc<Semaphore> {
         &self.sem
+    }
+
+    /// Returns the number of permits held by `self`.
+    pub fn num_permits(&self) -> u32 {
+        self.permits
     }
 }
 
