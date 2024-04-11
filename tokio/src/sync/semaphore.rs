@@ -1050,7 +1050,9 @@ impl<'a> SemaphorePermit<'a> {
     /// assert_eq!(p1.num_permits(), 2);
     /// assert_eq!(p2.num_permits(), 1);
     /// ```
-    pub fn split(&mut self, n: u32) -> Option<Self> {
+    pub fn split(&mut self, n: usize) -> Option<Self> {
+        let n = u32::try_from(n).ok()?;
+
         if n > self.permits {
             return None;
         }
@@ -1064,8 +1066,8 @@ impl<'a> SemaphorePermit<'a> {
     }
 
     /// Returns the number of permits held by `self`.
-    pub fn num_permits(&self) -> u32 {
-        self.permits
+    pub fn num_permits(&self) -> usize {
+        self.permits as usize
     }
 }
 
@@ -1159,7 +1161,9 @@ impl OwnedSemaphorePermit {
     /// assert_eq!(p1.num_permits(), 2);
     /// assert_eq!(p2.num_permits(), 1);
     /// ```
-    pub fn split(&mut self, n: u32) -> Option<Self> {
+    pub fn split(&mut self, n: usize) -> Option<Self> {
+        let n = u32::try_from(n).ok()?;
+
         if n > self.permits {
             return None;
         }
@@ -1178,8 +1182,8 @@ impl OwnedSemaphorePermit {
     }
 
     /// Returns the number of permits held by `self`.
-    pub fn num_permits(&self) -> u32 {
-        self.permits
+    pub fn num_permits(&self) -> usize {
+        self.permits as usize
     }
 }
 
