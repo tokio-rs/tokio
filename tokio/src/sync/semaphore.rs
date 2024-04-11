@@ -995,10 +995,7 @@ impl<'a> SemaphorePermit<'a> {
     ///
     /// If there are insufficient permits and it's not possible to reduce by `n`, returns `None`.
     pub fn split(&mut self, n: usize) -> Option<Self> {
-        let n = match u32::try_from(n) {
-            Ok(n) => n,
-            Err(_) => return None,
-        };
+        let n = u32::try_from(n).ok()?;
 
         if n > self.permits {
             return None;
@@ -1053,10 +1050,7 @@ impl OwnedSemaphorePermit {
     ///
     /// It will clone the owned `Arc<Semaphore>` to construct the new instance.
     pub fn split(&mut self, n: usize) -> Option<Self> {
-        let n = match u32::try_from(n) {
-            Ok(n) => n,
-            Err(_) => return None,
-        };
+        let n = u32::try_from(n).ok()?;
 
         if n > self.permits {
             return None;
