@@ -152,20 +152,28 @@ When updating this, also update:
 cargo +1.77 clippy --all --tests --all-features
 ```
 
-When building documentation normally, the markers that list the features
-required for various parts of Tokio are missing. To build the documentation
-correctly, use this command:
+When building documentation, a simple `cargo doc` is not sufficient. To produce
+documentation equivalent to what will be produced in docs.rs's builds of Tokio's
+docs, please use:
 
 ```
-RUSTDOCFLAGS="--cfg docsrs" RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+RUSTDOCFLAGS="--cfg docsrs --cfg tokio_unstable" RUSTFLAGS="--cfg docsrs --cfg tokio_unstable" cargo +nightly doc --all-features [--open]
 ```
 
-To build documentation including Tokio's unstable features, it is necessary to
-pass `--cfg tokio_unstable` to both RustDoc *and* rustc. To build the
-documentation for unstable features, use this command:
+This turns on indicators to display the Cargo features required for
+conditionally compiled APIs in Tokio, and it enables documentation of unstable
+Tokio features. Notice that it is necessary to pass cfg flags to both RustDoc
+*and* rustc.
+
+There is a more concise way to build docs.rs-equivalent docs by using [`cargo
+docs-rs`], which reads the above documentation flags out of Tokio's Cargo.toml
+as docs.rs itself does.
+
+[`cargo docs-rs`]: https://github.com/dtolnay/cargo-docs-rs
 
 ```
-RUSTDOCFLAGS="--cfg docsrs --cfg tokio_unstable" RUSTFLAGS="--cfg docsrs --cfg tokio_unstable" cargo +nightly doc --all-features
+cargo install cargo-docs-rs
+cargo +nightly docs-rs [--open]
 ```
 
 The `cargo fmt` command does not work on the Tokio codebase. You can use the
