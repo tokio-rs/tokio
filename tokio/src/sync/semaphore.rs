@@ -972,7 +972,6 @@ impl<'a> SemaphorePermit<'a> {
     /// # Examples
     ///
     /// ```
-    /// # fn main() {
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
@@ -985,7 +984,6 @@ impl<'a> SemaphorePermit<'a> {
     ///
     /// // Since we forgot the permit, available permits won't go back to its initial value.
     /// assert_eq!(sem.available_permits(), 5);
-    /// # }
     /// ```
     pub fn forget(mut self) {
         self.permits = 0;
@@ -1004,7 +1002,6 @@ impl<'a> SemaphorePermit<'a> {
     /// # Examples
     ///
     /// ```
-    /// # fn main() {
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
@@ -1023,7 +1020,6 @@ impl<'a> SemaphorePermit<'a> {
     /// drop(permit);
     ///
     /// assert_eq!(sem.available_permits(), 10);
-    /// # }
     /// ```
     #[track_caller]
     pub fn merge(&mut self, mut other: Self) {
@@ -1042,7 +1038,6 @@ impl<'a> SemaphorePermit<'a> {
     /// # Examples
     ///
     /// ```
-    /// # fn main() {
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
@@ -1053,7 +1048,6 @@ impl<'a> SemaphorePermit<'a> {
     ///
     /// assert_eq!(p1.num_permits(), 2);
     /// assert_eq!(p2.num_permits(), 1);
-    /// # }
     /// ```
     pub fn split(&mut self, n: u32) -> Option<Self> {
         if n > self.permits {
@@ -1082,7 +1076,6 @@ impl OwnedSemaphorePermit {
     /// # Examples
     ///
     /// ```
-    /// # fn main() {
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
@@ -1095,7 +1088,6 @@ impl OwnedSemaphorePermit {
     ///
     /// // Since we forgot the permit, available permits won't go back to its initial value.
     /// assert_eq!(sem.available_permits(), 5);
-    /// # }
     /// ```
     pub fn forget(mut self) {
         self.permits = 0;
@@ -1114,7 +1106,6 @@ impl OwnedSemaphorePermit {
     /// # Examples
     ///
     /// ```
-    /// # fn main() {
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
@@ -1133,7 +1124,6 @@ impl OwnedSemaphorePermit {
     /// drop(permit);
     ///
     /// assert_eq!(sem.available_permits(), 10);
-    /// # }
     /// ```
     #[track_caller]
     pub fn merge(&mut self, mut other: Self) {
@@ -1156,7 +1146,6 @@ impl OwnedSemaphorePermit {
     /// # Examples
     ///
     /// ```
-    /// # fn main() {
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
@@ -1167,7 +1156,6 @@ impl OwnedSemaphorePermit {
     ///
     /// assert_eq!(p1.num_permits(), 2);
     /// assert_eq!(p2.num_permits(), 1);
-    /// # }
     /// ```
     pub fn split(&mut self, n: u32) -> Option<Self> {
         if n > self.permits {
