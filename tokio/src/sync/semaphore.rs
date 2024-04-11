@@ -982,7 +982,8 @@ impl<'a> SemaphorePermit<'a> {
     ///     permit.forget();
     /// }
     ///
-    /// // Since we forgot the permit, available permits won't go back to its initial value.
+    /// // Since we forgot the permit, available permits won't go back to its initial value
+    /// // even after the permit is dropped.
     /// assert_eq!(sem.available_permits(), 5);
     /// ```
     pub fn forget(mut self) {
@@ -1087,6 +1088,7 @@ impl OwnedSemaphorePermit {
     /// }
     ///
     /// // Since we forgot the permit, available permits won't go back to its initial value.
+    /// // even after the permit is dropped.
     /// assert_eq!(sem.available_permits(), 5);
     /// ```
     pub fn forget(mut self) {
