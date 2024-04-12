@@ -59,6 +59,7 @@ jobs:
       - minrust
       - minimal-versions
       - fmt
+      - markdown-lint
       - clippy
       - docs
       - loom-compile
@@ -82,6 +83,7 @@ jobs:
     needs:
       - clippy
       - fmt
+      - markdown-lint
       - docs
       - minrust
     steps:
@@ -744,6 +746,13 @@ jobs:
             printf "Please run \`rustfmt --edition 2021 \$(git ls-files '*.rs')\` to fix rustfmt errors.\nSee CONTRIBUTING.md for more details.\n" >&2
             exit 1
           fi
+
+  markdown-lint:
+    name: markdown-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v16
 
   clippy:
     name: clippy
