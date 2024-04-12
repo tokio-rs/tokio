@@ -1,13 +1,14 @@
-# Tokio
+## Tokio
 
-A runtime for writing reliable, asynchronous, and slim applications with the Rust programming
-language.
+A runtime for writing reliable, asynchronous, and slim applications with the Rust programming language.
 
 Tokio is:
 
 - **Fast**: Tokio's zero-cost abstractions give you bare-metal performance.
-- **Reliable**: Tokio leverages Rust's ownership, type system, and concurrency model to reduce bugs
+
+* **Reliable**: Tokio leverages Rust's ownership, type system, and concurrency model to reduce bugs
   and ensure thread safety.
+
 - **Scalable**: Tokio has a minimal footprint, and handles backpressure and cancellation naturally.
 
 [![Crates.io][crates-badge]][crates-url]
@@ -156,7 +157,8 @@ The Tokio repository contains multiple crates. Each crate has its own changelog.
 
 - [`tokio` changelog](https://github.com/tokio-rs/tokio/blob/master/tokio/CHANGELOG.md)
 - [`tokio-util` changelog](https://github.com/tokio-rs/tokio/blob/master/tokio-util/CHANGELOG.md)
-- [`tokio-stream` changelog](https://github.com/tokio-rs/tokio/blob/master/tokio-stream/CHANGELOG.md)
+- [`tokio-stream`
+  changelog](https://github.com/tokio-rs/tokio/blob/master/tokio-stream/CHANGELOG.md)
 - [`tokio-macros`changelog](https://github.com/tokio-rs/tokio/blob/master/tokio-macros/CHANGELOG.md)
 - [`tokio-test` changelog](https://github.com/tokio-rs/tokio/blob/master/tokio-test/CHANGELOG.md)
 
