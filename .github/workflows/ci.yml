@@ -16,7 +16,7 @@ env:
   # Change to specific Rust release to pin
   rust_stable: stable
   rust_nightly: nightly-2023-10-21
-  rust_clippy: '1.77'
+  rust_clippy: "1.77"
   # When updating this, also update:
   # - README.md
   # - tokio/README.md
@@ -25,7 +25,7 @@ env:
   # - tokio-util/Cargo.toml
   # - tokio-test/Cargo.toml
   # - tokio-stream/Cargo.toml
-  rust_min: '1.63'
+  rust_min: "1.63"
 
 defaults:
   run:
@@ -104,7 +104,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -136,7 +136,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -166,7 +166,7 @@ jobs:
       - name: Install Rust ${{ env.rust_nightly }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_nightly }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -178,7 +178,7 @@ jobs:
         run: |
           set -euxo pipefail
           RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run --workspace --exclude tokio-macros --exclude tests-build --all-features --tests
-  
+
   test-integration-tests-per-feature:
     needs: basics
     name: Run integration tests for each feature
@@ -194,7 +194,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-hack
         uses: taiki-e/install-action@v2
         with:
@@ -234,7 +234,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
 
       - name: Enable parking_lot send_guard feature
         # Inserts the line "plsend = ["parking_lot/send_guard"]" right after [features]
@@ -281,7 +281,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
 
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
@@ -320,7 +320,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -354,7 +354,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -388,7 +388,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -538,7 +538,7 @@ jobs:
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
-          qemu: '7.2'
+          qemu: "7.2"
 
       - uses: Swatinem/rust-cache@v2
       - name: Tests run with all features (including parking_lot)
@@ -578,7 +578,7 @@ jobs:
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
-          qemu: '7.2'
+          qemu: "7.2"
 
       - name: Remove `parking_lot` from `full` feature
         run: sed -i '0,/parking_lot/{/parking_lot/d;}' tokio/Cargo.toml
@@ -615,7 +615,7 @@ jobs:
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: i686-unknown-linux-gnu
-          qemu: '7.2'
+          qemu: "7.2"
 
       - uses: Swatinem/rust-cache@v2
       - name: test tokio --all-features
@@ -662,7 +662,10 @@ jobs:
           # Try with unstable feature flags
           - { name: "--unstable", rustflags: "--cfg tokio_unstable -Dwarnings" }
           # Try with unstable and taskdump feature flags
-          - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump" }
+          - {
+              name: "--unstable --taskdump",
+              rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump",
+            }
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_nightly }}
@@ -1037,4 +1040,3 @@ jobs:
           sed '1d; $d' spellcheck.dic | LC_ALL=en_US.UTF8 sort -uc
       - name: Run cargo-spellcheck
         run: cargo spellcheck --code 1
-
