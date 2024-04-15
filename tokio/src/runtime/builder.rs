@@ -49,6 +49,9 @@ pub struct Builder {
     /// Whether or not to enable the time driver
     enable_time: bool,
 
+    /// Whether or not clock should auto-advance when sleeping while time is paused.
+    enable_time_auto_advance: bool,
+
     /// Whether or not the clock should start paused.
     start_paused: bool,
 
@@ -270,6 +273,9 @@ impl Builder {
 
             // Time defaults to "off"
             enable_time: false,
+
+            // Auto-advance defaults to "on"
+            enable_time_auto_advance: true,
 
             // The clock starts not-paused
             start_paused: false,
@@ -715,6 +721,7 @@ impl Builder {
             },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
+            enable_time_auto_advance: self.enable_time_auto_advance,
             start_paused: self.start_paused,
             nevents: self.nevents,
         }
@@ -1211,6 +1218,26 @@ cfg_time! {
         /// ```
         pub fn enable_time(&mut self) -> &mut Self {
             self.enable_time = true;
+            self
+        }
+
+        /// Sets auto-advance feature for paused timer.
+        ///
+        /// Read more at [crate::time::pause] doc.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_current_thread()
+        ///     .enable_time()
+        ///     .time_auto_advance(false)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        pub fn time_auto_advance(&mut self, time_auto_advance: bool) -> &mut Self {
+            self.enable_time_auto_advance = time_auto_advance;
             self
         }
     }
