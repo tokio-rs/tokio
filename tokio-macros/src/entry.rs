@@ -471,7 +471,7 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
         Err(e) => return token_stream_with_error(item, e),
     };
     let config = if let Some(attr) = input.attrs().find(|attr| is_test_attribute(*attr)) {
-        let msg = "second test attribute is supplied, consider removing it or ordering it after `tokio::test`";
+        let msg = "second test attribute is supplied, consider removing or changing the order of your test attributes";
         Err(syn::Error::new_spanned(attr, msg))
     } else {
         AttributeArgs::parse_terminated
