@@ -82,20 +82,7 @@ error: second test attribute is supplied, consider removing or changing the orde
 45 | #[test]
    | ^^^^^^^
 
-error: duplicated attribute
-  --> $DIR/macros_invalid_input.rs:45:1
-   |
-45 | #[test]
-   | ^^^^^^^
-   |
-
 error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> $DIR/macros_invalid_input.rs:49:1
-   |
-49 | #[::core::prelude::v1::test]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: duplicated attribute
   --> $DIR/macros_invalid_input.rs:49:1
    |
 49 | #[::core::prelude::v1::test]
