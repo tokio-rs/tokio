@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream, TokenTree};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream, Parser};
-use syn::{braced, parse_quote, Attribute, Ident, Path, Signature, Visibility};
+use syn::{braced, Attribute, Ident, Path, Signature, Visibility};
 
 // syn::AttributeArgs does not implement syn::Parse
 type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
@@ -443,6 +443,25 @@ pub(crate) fn main(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
     }
 }
 
+// Check whether given attribute is `#[test]` or `#[::core::prelude::v1::test]`.
+fn is_test_attribute(attr: &Attribute) -> bool {
+    let syn::Meta::Path(ref path) = attr.meta else {
+        return false;
+    };
+    let segments = ["core", "prelude", "v1", "test"];
+    if path.leading_colon.is_none() {
+        return path.segments.len() == 1
+            && path.segments[0].arguments.is_none()
+            && path.segments[0].ident == "test";
+    } else if path.segments.len() != segments.len() {
+        return false;
+    }
+    path.segments
+        .iter()
+        .zip(segments.into_iter())
+        .all(|(segment, path)| segment.arguments.is_none() && segment.ident == path)
+}
+
 pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) -> TokenStream {
     // If any of the steps for this macro fail, we still want to expand to an item that is as close
     // to the expected output as possible. This helps out IDEs such that completions and other
@@ -451,13 +470,8 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
         Ok(it) => it,
         Err(e) => return token_stream_with_error(item, e),
     };
-    let test_attr: Attribute = parse_quote! { #[test] };
-    let qualified_test_attr = parse_quote! { #[::core::prelude::v1::test] };
-    let config = if let Some(attr) = input
-        .attrs()
-        .find(|attr| **attr == test_attr || **attr == qualified_test_attr)
-    {
-        let msg = "second test attribute is supplied, try to order it after `tokio::test`";
+    let config = if let Some(attr) = input.attrs().find(|attr| is_test_attribute(*attr)) {
+        let msg = "second test attribute is supplied, consider removing it or ordering it after `tokio::test`";
         Err(syn::Error::new_spanned(attr, msg))
     } else {
         AttributeArgs::parse_terminated

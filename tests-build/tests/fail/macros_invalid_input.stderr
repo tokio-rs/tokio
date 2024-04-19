@@ -76,7 +76,7 @@ error: Failed to parse value of `crate` as path: "456"
 41 | #[tokio::test(crate = "456")]
    |                       ^^^^^
 
-error: second test attribute is supplied, try to order it after `tokio::test`
+error: second test attribute is supplied, consider removing it or ordering it after `tokio::test`
   --> $DIR/macros_invalid_input.rs:45:1
    |
 45 | #[test]
@@ -94,16 +94,16 @@ note: the lint level is defined here
 1  | #![deny(duplicate_macro_attributes)]
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: second test attribute is supplied, try to order it after `tokio::test`
+error: second test attribute is supplied, consider removing it or ordering it after `tokio::test`
   --> $DIR/macros_invalid_input.rs:49:1
    |
-49 | #[::core::prelude::v1::test::test]
+49 | #[::core::prelude::v1::test]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: duplicated attribute
   --> $DIR/macros_invalid_input.rs:49:1
    |
-49 | #[::core::prelude::v1::test::test]
+49 | #[::core::prelude::v1::test]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 note: the lint level is defined here
