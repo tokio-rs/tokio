@@ -445,8 +445,9 @@ pub(crate) fn main(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
 
 // Check whether given attribute is `#[test]` or `#[::core::prelude::v1::test]`.
 fn is_test_attribute(attr: &Attribute) -> bool {
-    let syn::Meta::Path(ref path) = attr.meta else {
-        return false;
+    let path = match &attr.meta {
+        syn::Meta::Path(path) => path,
+        _ => return false,
     };
     let segments = ["core", "prelude", "v1", "test"];
     if path.leading_colon.is_none() {
@@ -458,7 +459,7 @@ fn is_test_attribute(attr: &Attribute) -> bool {
     }
     path.segments
         .iter()
-        .zip(segments.into_iter())
+        .zip(segments)
         .all(|(segment, path)| segment.arguments.is_none() && segment.ident == path)
 }
 
@@ -470,7 +471,7 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
         Ok(it) => it,
         Err(e) => return token_stream_with_error(item, e),
     };
-    let config = if let Some(attr) = input.attrs().find(|attr| is_test_attribute(*attr)) {
+    let config = if let Some(attr) = input.attrs().find(|attr| is_test_attribute(attr)) {
         let msg = "second test attribute is supplied, consider removing or changing the order of your test attributes";
         Err(syn::Error::new_spanned(attr, msg))
     } else {
