@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream, TokenTree};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream, Parser};
-use syn::{braced, Attribute, Ident, Path, Signature, Visibility};
+use syn::{braced, parse_quote, Attribute, Ident, Path, Signature, Visibility};
 
 // syn::AttributeArgs does not implement syn::Parse
 type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
@@ -360,7 +360,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         rt = quote_spanned! {last_stmt_start_span=> #rt.start_paused(#v) };
     }
 
-    let header = if is_test {
+    let generated_attrs = if is_test {
         quote! {
             #[::core::prelude::v1::test]
         }
@@ -410,7 +410,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         }
     };
 
-    input.into_tokens(header, body, last_block)
+    input.into_tokens(generated_attrs, body, last_block)
 }
 
 fn token_stream_with_error(mut tokens: TokenStream, error: syn::Error) -> TokenStream {
@@ -451,8 +451,13 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
         Ok(it) => it,
         Err(e) => return token_stream_with_error(item, e),
     };
-    let config = if let Some(attr) = input.attrs().find(|attr| attr.meta.path().is_ident("test")) {
-        let msg = "second test attribute is supplied";
+    let test_attr: Attribute = parse_quote! { #[test] };
+    let qualified_test_attr = parse_quote! { #[::core::prelude::v1::test] };
+    let config = if let Some(attr) = input
+        .attrs()
+        .find(|attr| **attr == test_attr || **attr == qualified_test_attr)
+    {
+        let msg = "second test attribute is supplied, try to order it after `tokio::test`";
         Err(syn::Error::new_spanned(attr, msg))
     } else {
         AttributeArgs::parse_terminated
@@ -493,13 +498,11 @@ impl ItemFn {
     /// Convert our local function item into a token stream.
     fn into_tokens(
         self,
-        header: proc_macro2::TokenStream,
+        generated_attrs: proc_macro2::TokenStream,
         body: proc_macro2::TokenStream,
         last_block: proc_macro2::TokenStream,
     ) -> TokenStream {
         let mut tokens = proc_macro2::TokenStream::new();
-        header.to_tokens(&mut tokens);
-
         // Outer attributes are simply streamed as-is.
         for attr in self.outer_attrs {
             attr.to_tokens(&mut tokens);
@@ -512,6 +515,9 @@ impl ItemFn {
             attr.style = syn::AttrStyle::Outer;
             attr.to_tokens(&mut tokens);
         }
+
+        // Add generated macros at the end, so macros processed later are aware of them.
+        generated_attrs.to_tokens(&mut tokens);
 
         self.vis.to_tokens(&mut tokens);
         self.sig.to_tokens(&mut tokens);
