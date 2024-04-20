@@ -57,6 +57,9 @@ where
 /// it will return a tuple of the number of bytes copied from a to b
 /// and the number of bytes copied from b to a, in that order.
 ///
+/// It uses two 8Kb buffers for transferring bytes between `a` and `b` by default.
+/// To set your own buffers sizes use [`copy_bidirectional_with_size()`].
+///
 /// [`shutdown()`]: crate::io::AsyncWriteExt::shutdown
 ///
 /// # Errors
@@ -74,8 +77,26 @@ where
     A: AsyncRead + AsyncWrite + Unpin + ?Sized,
     B: AsyncRead + AsyncWrite + Unpin + ?Sized,
 {
-    let mut a_to_b = TransferState::Running(CopyBuffer::new());
-    let mut b_to_a = TransferState::Running(CopyBuffer::new());
+    copy_bidirectional_impl(a, b, CopyBuffer::new(super::DEFAULT_BUF_SIZE), CopyBuffer::new(super::DEFAULT_BUF_SIZE)).await
+}
+
+/// The same as the [`copy_bidirectional()`], but allows to set the underlying `a` to `b` and `b` to `a` buffers sizes.
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+pub async fn copy_bidirectional_with_size<A, B>(a: &mut A, b: &mut B, a_to_b_buf_size: usize, b_to_a_buf_size: usize) -> Result<(u64, u64), std::io::Error>
+    where
+        A: AsyncRead + AsyncWrite + Unpin + ?Sized,
+        B: AsyncRead + AsyncWrite + Unpin + ?Sized,
+{
+    copy_bidirectional_impl(a, b, CopyBuffer::new(a_to_b_buf_size), CopyBuffer::new(b_to_a_buf_size)).await
+}
+
+async fn copy_bidirectional_impl<A, B>(a: &mut A, b: &mut B, a_to_b_buffer: CopyBuffer, b_to_a_buffer: CopyBuffer) -> Result<(u64, u64), std::io::Error>
+    where
+        A: AsyncRead + AsyncWrite + Unpin + ?Sized,
+        B: AsyncRead + AsyncWrite + Unpin + ?Sized,
+{
+    let mut a_to_b = TransferState::Running(a_to_b_buffer);
+    let mut b_to_a = TransferState::Running(b_to_a_buffer);
     poll_fn(|cx| {
         let a_to_b = transfer_one_direction(cx, &mut a_to_b, a, b)?;
         let b_to_a = transfer_one_direction(cx, &mut b_to_a, b, a)?;
@@ -87,5 +108,5 @@ where
 
         Poll::Ready(Ok((a_to_b, b_to_a)))
     })
-    .await
+        .await
 }
