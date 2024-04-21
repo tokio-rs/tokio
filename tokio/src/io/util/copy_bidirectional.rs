@@ -58,7 +58,7 @@ where
 /// and the number of bytes copied from b to a, in that order.
 ///
 /// It uses two 8Kb buffers for transferring bytes between `a` and `b` by default.
-/// To set your own buffers sizes use [`copy_bidirectional_with_size()`].
+/// To set your own buffers sizes use [`copy_bidirectional_with_sizes()`].
 ///
 /// [`shutdown()`]: crate::io::AsyncWriteExt::shutdown
 ///
@@ -72,7 +72,7 @@ where
 ///
 /// Returns a tuple of bytes copied `a` to `b` and bytes copied `b` to `a`.
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
-pub async fn copy_bidirectional<A, B>(a: &mut A, b: &mut B) -> Result<(u64, u64), std::io::Error>
+pub async fn copy_bidirectional<A, B>(a: &mut A, b: &mut B) -> io::Result<(u64, u64)>
 where
     A: AsyncRead + AsyncWrite + Unpin + ?Sized,
     B: AsyncRead + AsyncWrite + Unpin + ?Sized,
@@ -88,12 +88,12 @@ where
 
 /// The same as the [`copy_bidirectional()`], but allows to set the underlying `a` to `b` and `b` to `a` buffers sizes.
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
-pub async fn copy_bidirectional_with_size<A, B>(
+pub async fn copy_bidirectional_with_sizes<A, B>(
     a: &mut A,
     b: &mut B,
     a_to_b_buf_size: usize,
     b_to_a_buf_size: usize,
-) -> Result<(u64, u64), std::io::Error>
+) -> io::Result<(u64, u64)>
 where
     A: AsyncRead + AsyncWrite + Unpin + ?Sized,
     B: AsyncRead + AsyncWrite + Unpin + ?Sized,
@@ -112,7 +112,7 @@ async fn copy_bidirectional_impl<A, B>(
     b: &mut B,
     a_to_b_buffer: CopyBuffer,
     b_to_a_buffer: CopyBuffer,
-) -> Result<(u64, u64), std::io::Error>
+) -> io::Result<(u64, u64)>
 where
     A: AsyncRead + AsyncWrite + Unpin + ?Sized,
     B: AsyncRead + AsyncWrite + Unpin + ?Sized,
