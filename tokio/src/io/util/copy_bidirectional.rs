@@ -57,7 +57,7 @@ where
 /// it will return a tuple of the number of bytes copied from a to b
 /// and the number of bytes copied from b to a, in that order.
 ///
-/// It uses two 8Kb buffers for transferring bytes between `a` and `b` by default.
+/// It uses two 8 Kb buffers for transferring bytes between `a` and `b` by default.
 /// To set your own buffers sizes use [`copy_bidirectional_with_sizes()`].
 ///
 /// [`shutdown()`]: crate::io::AsyncWriteExt::shutdown
