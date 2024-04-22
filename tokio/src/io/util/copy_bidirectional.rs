@@ -86,7 +86,10 @@ where
     .await
 }
 
-/// The same as the [`copy_bidirectional()`], but allows to set the underlying `a` to `b` and `b` to `a` buffers sizes.
+/// Copies data in both directions between `a` and `b` using buffers of the specified size.
+///
+/// This method is the same as the [`copy_bidirectional()`], except that it allows you to set the
+/// size of the internal buffers used when copying data.
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub async fn copy_bidirectional_with_sizes<A, B>(
     a: &mut A,
