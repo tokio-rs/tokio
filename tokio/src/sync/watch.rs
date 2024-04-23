@@ -1185,12 +1185,18 @@ impl<T> Sender<T> {
     /// Completes when all receivers have dropped.
     ///
     /// This allows the producer to get notified when interest in the produced
-    /// values is canceled and immediately stop doing work.
+    /// values is canceled and immediately stop doing work. Once a channel is
+    /// closed, the only way to reopen it is to call [`Sender::subscribe`] to
+    /// get a new receiver.
+    ///
+    /// If the channel becomes closed for a brief amount of time (e.g., the last
+    /// receiver is dropped and then `subscribe` is called), then this call to
+    /// `closed` might return, but it is also possible that it does not "notice"
+    /// that the channel was closed for a brief amount of time.
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. Once the channel is closed, it stays closed
-    /// forever and all future calls to `closed` will return immediately.
+    /// This method is cancel safe.
     ///
     /// # Examples
     ///

@@ -202,7 +202,6 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 #[proc_macro_attribute]
-#[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args.into(), item.into(), true).into()
 }
@@ -267,7 +266,6 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 #[proc_macro_attribute]
-#[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args.into(), item.into(), false).into()
 }

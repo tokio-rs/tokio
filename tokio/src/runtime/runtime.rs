@@ -491,7 +491,8 @@ impl std::panic::RefUnwindSafe for Runtime {}
 
 cfg_metrics! {
     impl Runtime {
-        /// TODO
+        /// Returns a view that lets you get information about how the runtime
+        /// is performing.
         pub fn metrics(&self) -> crate::runtime::RuntimeMetrics {
             self.handle.metrics()
         }
