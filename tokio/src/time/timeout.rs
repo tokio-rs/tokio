@@ -6,7 +6,7 @@
 
 use crate::{
     runtime::coop,
-    time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
+    time::{error::Elapsed, Duration, Instant, Sleep},
     util::trace,
 };
 
@@ -87,14 +87,7 @@ pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F>
 where
     F: Future,
 {
-    let location = trace::caller_location();
-
-    let deadline = Instant::now().checked_add(duration);
-    let delay = match deadline {
-        Some(deadline) => Sleep::new_timeout(deadline, location),
-        None => Sleep::far_future(location),
-    };
-    Timeout::new_with_delay(future, delay)
+    Timeout::new_with_delay(future, Instant::now().checked_add(duration))
 }
 
 /// Requires a `Future` to complete before the specified instant in time.
@@ -146,11 +139,14 @@ pub fn timeout_at<F>(deadline: Instant, future: F) -> Timeout<F>
 where
     F: Future,
 {
-    let delay = sleep_until(deadline);
+    use crate::runtime::scheduler;
+    let handle = scheduler::Handle::current();
 
     Timeout {
         value: future,
-        delay,
+        deadline: Some(deadline),
+        delay: None,
+        handle,
     }
 }
 
@@ -162,13 +158,23 @@ pin_project! {
         #[pin]
         value: T,
         #[pin]
-        delay: Sleep,
+        delay: Option<Sleep>,
+        deadline : Option<Instant>,
+        handle: crate::runtime::scheduler::Handle,
     }
 }
 
 impl<T> Timeout<T> {
-    pub(crate) fn new_with_delay(value: T, delay: Sleep) -> Timeout<T> {
-        Timeout { value, delay }
+    pub(crate) fn new_with_delay(value: T, deadline: Option<Instant>) -> Timeout<T> {
+        use crate::runtime::scheduler;
+        let handle = scheduler::Handle::current();
+
+        Timeout {
+            value,
+            deadline,
+            delay: None,
+            handle,
+        }
     }
 
     /// Gets a reference to the underlying value in this timeout.
@@ -194,7 +200,7 @@ where
     type Output = Result<T::Output, Elapsed>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        let me = self.project();
+        let mut me = self.project();
 
         let had_budget_before = coop::has_budget_remaining();
 
@@ -205,10 +211,25 @@ where
 
         let has_budget_now = coop::has_budget_remaining();
 
+        // If the above inner future is ready, the below code will not be executed.
+        // This lazy initiation is for performance purposes,
+        // it can avoid unnecessary of `Sleep` creation and drop.
+        if me.delay.is_none() {
+            let location = trace::caller_location();
+            let delay = match me.deadline {
+                Some(deadline) => {
+                    Sleep::new_timeout_with_handle(*deadline, location, me.handle.clone())
+                }
+                None => Sleep::far_future(location),
+            };
+            me.delay.as_mut().set(Some(delay));
+        }
+
         let delay = me.delay;
 
         let poll_delay = || -> Poll<Self::Output> {
-            match delay.poll(cx) {
+            // Safety: we have just assigned it a value of `Some`.
+            match delay.as_pin_mut().unwrap().poll(cx) {
                 Poll::Ready(()) => Poll::Ready(Err(Elapsed::new())),
                 Poll::Pending => Poll::Pending,
             }

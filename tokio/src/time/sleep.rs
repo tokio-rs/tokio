@@ -256,6 +256,16 @@ impl Sleep {
         use crate::runtime::scheduler;
 
         let handle = scheduler::Handle::current();
+        Self::new_timeout_with_handle(deadline, location, handle)
+    }
+
+    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
+    #[track_caller]
+    pub(crate) fn new_timeout_with_handle(
+        deadline: Instant,
+        location: Option<&'static Location<'static>>,
+        handle: crate::runtime::scheduler::Handle,
+    ) -> Sleep {
         let entry = TimerEntry::new(&handle, deadline);
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]

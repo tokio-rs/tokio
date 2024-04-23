@@ -90,3 +90,8 @@ harness = false
 name = "time_now"
 path = "time_now.rs"
 harness = false
+
+[[bench]]
+name = "time_timeout"
+path = "time_timeout.rs"
+harness = false
