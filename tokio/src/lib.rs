@@ -674,7 +674,6 @@ cfg_macros! {
 
     // Always fail if rt is not enabled.
     cfg_not_rt! {
-        #[cfg(not(test))]
         #[doc(inline)]
         pub use tokio_macros::main_fail as main;
 
