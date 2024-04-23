@@ -141,7 +141,9 @@ where
 {
     use crate::runtime::scheduler;
     let handle = scheduler::Handle::current();
-
+    // Panic if the time driver is not enabled
+    let _ = handle.driver().time();
+    
     Timeout {
         value: future,
         deadline: Some(deadline),
@@ -168,6 +170,8 @@ impl<T> Timeout<T> {
     pub(crate) fn new_with_delay(value: T, deadline: Option<Instant>) -> Timeout<T> {
         use crate::runtime::scheduler;
         let handle = scheduler::Handle::current();
+        // Panic if the time driver is not enabled
+        let _ = handle.driver().time();
 
         Timeout {
             value,
