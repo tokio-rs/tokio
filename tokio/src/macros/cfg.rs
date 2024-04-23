@@ -384,7 +384,7 @@ macro_rules! cfg_not_rt {
 macro_rules! cfg_rt_multi_thread {
     ($($item:item)*) => {
         $(
-            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(feature = "rt-multi-thread")]
             #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
             $item
         )*
