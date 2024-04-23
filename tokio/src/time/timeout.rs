@@ -143,7 +143,7 @@ where
     let handle = scheduler::Handle::current();
     // Panic if the time driver is not enabled
     let _ = handle.driver().time();
-    
+
     Timeout {
         value: future,
         deadline: Some(deadline),
