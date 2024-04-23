@@ -144,6 +144,26 @@ impl<L: Link> LinkedList<L, L::Target> {
         }
     }
 
+    /// Removes the firt element from a list and returns it, or None if it is
+    /// empty.
+    pub(crate) fn pop_front(&mut self) -> Option<L::Handle> {
+        unsafe {
+            let head = self.head?;
+            self.head = L::pointers(head).as_ref().get_next();
+
+            if let Some(next) = L::pointers(head).as_ref().get_next() {
+                L::pointers(next).as_mut().set_prev(None);
+            } else {
+                self.tail = None;
+            }
+
+            L::pointers(head).as_mut().set_prev(None);
+            L::pointers(head).as_mut().set_next(None);
+
+            Some(L::from_raw(head))
+        }
+    }
+
     /// Removes the last element from a list and returns it, or None if it is
     /// empty.
     pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
