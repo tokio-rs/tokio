@@ -141,7 +141,7 @@ where
     F: Future,
 {
     let handle = scheduler::Handle::current();
-    // Panic if the time driver is not enabled
+    // Panic if the time driver is not enabled.
     let _ = handle.driver().time();
 
     Timeout {
@@ -170,7 +170,7 @@ impl<T> Timeout<T> {
     #[track_caller]
     pub(crate) fn new_with_delay(value: T, deadline: Option<Instant>) -> Timeout<T> {
         let handle = scheduler::Handle::current();
-        // Panic if the time driver is not enabled
+        // Panic if the time driver is not enabled.
         let _ = handle.driver().time();
 
         Timeout {
@@ -217,7 +217,7 @@ where
 
         // If the above inner future is ready, the below code will not be executed.
         // This lazy initiation is for performance purposes,
-        // it can avoid unnecessary of `Sleep` creation and drop.
+        // it can avoid the unnecessary creation and drop of `Sleep`.
         if me.delay.is_none() {
             let location = trace::caller_location();
             let delay = match me.deadline {
