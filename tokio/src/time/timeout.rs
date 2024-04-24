@@ -144,11 +144,11 @@ where
     // Panic if the time driver is not enabled.
     let _ = handle.driver().time();
 
+    let delay = Sleep::new_timeout_with_handle(deadline, trace::caller_location(), handle);
+
     Timeout {
         value: future,
-        deadline: Some(deadline),
-        delay: None,
-        handle,
+        delay,
     }
 }
 
@@ -160,9 +160,7 @@ pin_project! {
         #[pin]
         value: T,
         #[pin]
-        delay: Option<Sleep>,
-        deadline : Option<Instant>,
-        handle: scheduler::Handle,
+        delay: Sleep,
     }
 }
 
@@ -173,12 +171,14 @@ impl<T> Timeout<T> {
         // Panic if the time driver is not enabled.
         let _ = handle.driver().time();
 
-        Timeout {
-            value,
-            deadline,
-            delay: None,
-            handle,
-        }
+        let deadline = match deadline {
+            Some(deadline) => deadline,
+            None => Instant::far_future(),
+        };
+
+        let delay = Sleep::new_timeout_with_handle(deadline, trace::caller_location(), handle);
+
+        Timeout { value, delay }
     }
 
     /// Gets a reference to the underlying value in this timeout.
@@ -204,7 +204,7 @@ where
     type Output = Result<T::Output, Elapsed>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        let mut me = self.project();
+        let me = self.project();
 
         let had_budget_before = coop::has_budget_remaining();
 
@@ -215,25 +215,10 @@ where
 
         let has_budget_now = coop::has_budget_remaining();
 
-        // If the above inner future is ready, the below code will not be executed.
-        // This lazy initiation is for performance purposes,
-        // it can avoid the unnecessary creation and drop of `Sleep`.
-        if me.delay.is_none() {
-            let location = trace::caller_location();
-            let delay = match me.deadline {
-                Some(deadline) => {
-                    Sleep::new_timeout_with_handle(*deadline, location, me.handle.clone())
-                }
-                None => Sleep::far_future(location),
-            };
-            me.delay.as_mut().set(Some(delay));
-        }
-
         let delay = me.delay;
 
         let poll_delay = || -> Poll<Self::Output> {
-            // Safety: we have just assigned it a value of `Some`.
-            match delay.as_pin_mut().unwrap().poll(cx) {
+            match delay.poll(cx) {
                 Poll::Ready(()) => Poll::Ready(Err(Elapsed::new())),
                 Poll::Pending => Poll::Pending,
             }

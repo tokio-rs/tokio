@@ -496,10 +496,6 @@ impl TimerEntry {
         unsafe { &*self.inner.get() }
     }
 
-    pub(crate) fn deadline(&self) -> Instant {
-        self.deadline
-    }
-
     pub(crate) fn is_elapsed(&self) -> bool {
         !self.inner().state.might_be_registered() && self.registered
     }
