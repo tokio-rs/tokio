@@ -5,11 +5,30 @@
 use std::time::{Duration, Instant};
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use tokio::time::{sleep, timeout};
+use tokio::{
+    runtime::Runtime,
+    time::{sleep, timeout},
+};
 
 // a vevry quick async task, but might timeout
 async fn quick_job() -> usize {
     1
+}
+
+fn build_run_time(workers: usize) -> Runtime {
+    if workers == 1 {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .worker_threads(workers)
+            .build()
+            .unwrap()
+    } else {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .worker_threads(workers)
+            .build()
+            .unwrap()
+    }
 }
 
 fn single_thread_scheduler_timeout(c: &mut Criterion) {
@@ -21,12 +40,7 @@ fn multi_thread_scheduler_timeout(c: &mut Criterion) {
 }
 
 fn do_timeout_test(c: &mut Criterion, workers: usize, name: &str) {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .worker_threads(workers)
-        .build()
-        .unwrap();
-
+    let runtime = build_run_time(workers);
     c.bench_function(name, |b| {
         b.iter_custom(|iters| {
             let start = Instant::now();
@@ -62,11 +76,7 @@ fn multi_thread_scheduler_sleep(c: &mut Criterion) {
 }
 
 fn do_sleep_test(c: &mut Criterion, workers: usize, name: &str) {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .worker_threads(workers)
-        .build()
-        .unwrap();
+    let runtime = build_run_time(workers);
 
     c.bench_function(name, |b| {
         b.iter_custom(|iters| {
