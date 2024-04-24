@@ -482,7 +482,7 @@ impl Interval {
         } else {
             timeout
                 .checked_add(self.period)
-                .unwrap_or_else(|| Instant::far_future())
+                .unwrap_or_else(Instant::far_future)
         };
 
         // When we arrive here, the internal delay returned `Poll::Ready`.
