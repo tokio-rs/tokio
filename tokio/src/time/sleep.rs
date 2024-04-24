@@ -396,7 +396,7 @@ impl Sleep {
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
-            let me = self.as_mut().project();
+            let me = self.project();
             let _resource_enter = me.inner.ctx.resource_span.enter();
             me.inner.ctx.async_op_span =
                 tracing::trace_span!("runtime.resource.async_op", source = "Sleep::reset");
@@ -406,15 +406,9 @@ impl Sleep {
                 tracing::trace_span!("runtime.resource.async_op.poll");
 
             let duration = {
-                let clock = self.as_mut().project().entry.as_pin_mut().unwrap().clock();
-                let time_source = self
-                    .as_mut()
-                    .project()
-                    .entry
-                    .as_pin_mut()
-                    .unwrap()
-                    .driver()
-                    .time_source();
+                let entry_ref = me.entry.as_ref().get_ref().as_ref().unwrap();
+                let clock = entry_ref.clock();
+                let time_source = entry_ref.driver().time_source();
                 let now = time_source.now(clock);
                 let deadline_tick = time_source.deadline_to_tick(deadline);
                 deadline_tick.saturating_sub(now)
