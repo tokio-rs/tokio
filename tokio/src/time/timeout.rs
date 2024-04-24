@@ -6,6 +6,7 @@
 
 use crate::{
     runtime::coop,
+    runtime::scheduler,
     time::{error::Elapsed, Duration, Instant, Sleep},
     util::trace,
 };
@@ -139,7 +140,6 @@ pub fn timeout_at<F>(deadline: Instant, future: F) -> Timeout<F>
 where
     F: Future,
 {
-    use crate::runtime::scheduler;
     let handle = scheduler::Handle::current();
     // Panic if the time driver is not enabled
     let _ = handle.driver().time();
@@ -162,13 +162,12 @@ pin_project! {
         #[pin]
         delay: Option<Sleep>,
         deadline : Option<Instant>,
-        handle: crate::runtime::scheduler::Handle,
+        handle: scheduler::Handle,
     }
 }
 
 impl<T> Timeout<T> {
     pub(crate) fn new_with_delay(value: T, deadline: Option<Instant>) -> Timeout<T> {
-        use crate::runtime::scheduler;
         let handle = scheduler::Handle::current();
         // Panic if the time driver is not enabled
         let _ = handle.driver().time();
