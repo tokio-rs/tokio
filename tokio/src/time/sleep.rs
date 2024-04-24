@@ -387,11 +387,16 @@ impl Sleep {
 
     fn reset_inner(mut self: Pin<&mut Self>, deadline: Instant) {
         self.as_mut().lazy_init_timer_entry(deadline);
-        self.as_mut().project().entry.as_pin_mut().unwrap().reset(deadline, true);
-    
+        self.as_mut()
+            .project()
+            .entry
+            .as_pin_mut()
+            .unwrap()
+            .reset(deadline, true);
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
-            let me = self.as_mut();
+            let me = self.as_mut().project();
             let _resource_enter = me.inner.ctx.resource_span.enter();
             me.inner.ctx.async_op_span =
                 tracing::trace_span!("runtime.resource.async_op", source = "Sleep::reset");
