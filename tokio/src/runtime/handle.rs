@@ -355,9 +355,9 @@ impl Handle {
     pub fn runtime_flavor(&self) -> RuntimeFlavor {
         match self.inner {
             scheduler::Handle::CurrentThread(_) => RuntimeFlavor::CurrentThread,
-            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(feature = "rt-multi-thread")]
             scheduler::Handle::MultiThread(_) => RuntimeFlavor::MultiThread,
-            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
             scheduler::Handle::MultiThreadAlt(_) => RuntimeFlavor::MultiThreadAlt,
         }
     }
@@ -385,9 +385,9 @@ impl Handle {
         pub fn id(&self) -> runtime::Id {
             let owned_id = match &self.inner {
                 scheduler::Handle::CurrentThread(handle) => handle.owned_id(),
-                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(feature = "rt-multi-thread")]
                 scheduler::Handle::MultiThread(handle) => handle.owned_id(),
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 scheduler::Handle::MultiThreadAlt(handle) => handle.owned_id(),
             };
             owned_id.into()
