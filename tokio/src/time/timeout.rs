@@ -167,6 +167,7 @@ pin_project! {
 }
 
 impl<T> Timeout<T> {
+    #[track_caller]
     pub(crate) fn new_with_delay(value: T, deadline: Option<Instant>) -> Timeout<T> {
         let handle = scheduler::Handle::current();
         // Panic if the time driver is not enabled
