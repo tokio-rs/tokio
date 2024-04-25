@@ -75,7 +75,7 @@ const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 /// The largest safe integer to use for ticks.
 ///
 /// This value should be updated if any other signal values are added above.
-pub(super) const MAX_SAFE_MILLIS_DURATION: u64 = u64::MAX - 2;
+pub(super) const MAX_SAFE_MILLIS_DURATION: u64 = STATE_MIN_VALUE - 1;
 
 /// This structure holds the current shared state of the timer - its scheduled
 /// time (if registered), or otherwise the result of the timer completing, as
