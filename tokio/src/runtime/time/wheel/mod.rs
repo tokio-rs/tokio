@@ -290,7 +290,7 @@ fn level_for(elapsed: u64, when: u64) -> usize {
     let leading_zeros = masked.leading_zeros() as usize;
     let significant = 63 - leading_zeros;
 
-    significant / 6
+    significant / NUM_LEVELS
 }
 
 #[cfg(all(test, not(loom)))]

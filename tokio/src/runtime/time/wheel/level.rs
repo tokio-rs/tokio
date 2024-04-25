@@ -114,7 +114,7 @@ impl Level {
         let now_slot = (now / slot_range(self.level)) as usize;
         let occupied = self.occupied.rotate_right(now_slot as u32);
         let zeros = occupied.trailing_zeros() as usize;
-        let slot = (zeros + now_slot) % 64;
+        let slot = (zeros + now_slot) % LEVEL_MULT;
 
         Some(slot)
     }
