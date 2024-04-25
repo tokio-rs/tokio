@@ -5,7 +5,7 @@ mod level;
 pub(crate) use self::level::Expiration;
 use self::level::Level;
 
-use std::ptr::NonNull;
+use std::{array, ptr::NonNull};
 
 use super::EntryList;
 
@@ -35,7 +35,7 @@ pub(crate) struct Wheel {
     /// * ~ 4 min slots / ~ 4 hr range
     /// * ~ 4 hr slots / ~ 12 day range
     /// * ~ 12 day slots / ~ 2 yr range
-    levels: Vec<Level>,
+    levels: Box<[Level; NUM_LEVELS]>,
 
     /// Entries queued for firing
     pending: EntryList,
@@ -52,11 +52,9 @@ pub(super) const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
 impl Wheel {
     /// Creates a new timing wheel.
     pub(crate) fn new() -> Wheel {
-        let levels = (0..NUM_LEVELS).map(Level::new).collect();
-
         Wheel {
             elapsed: 0,
-            levels,
+            levels: Box::new(array::from_fn(Level::new)),
             pending: EntryList::new(),
         }
     }
