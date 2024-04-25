@@ -372,7 +372,6 @@ impl Sleep {
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
-            let me = self.project();
             let _resource_enter = me.inner.ctx.resource_span.enter();
             me.inner.ctx.async_op_span =
                 tracing::trace_span!("runtime.resource.async_op", source = "Sleep::reset");
