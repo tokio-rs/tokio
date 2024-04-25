@@ -6,8 +6,7 @@
 
 use crate::{
     runtime::coop,
-    runtime::scheduler,
-    time::{error::Elapsed, Duration, Instant, Sleep},
+    time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
     util::trace,
 };
 
@@ -88,7 +87,14 @@ pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F>
 where
     F: Future,
 {
-    Timeout::new_with_delay(future, Instant::now().checked_add(duration))
+    let location = trace::caller_location();
+
+    let deadline = Instant::now().checked_add(duration);
+    let delay = match deadline {
+        Some(deadline) => Sleep::new_timeout(deadline, location),
+        None => Sleep::far_future(location),
+    };
+    Timeout::new_with_delay(future, delay)
 }
 
 /// Requires a `Future` to complete before the specified instant in time.
@@ -140,11 +146,7 @@ pub fn timeout_at<F>(deadline: Instant, future: F) -> Timeout<F>
 where
     F: Future,
 {
-    let handle = scheduler::Handle::current();
-    // Panic if the time driver is not enabled.
-    let _ = handle.driver().time();
-
-    let delay = Sleep::new_timeout_with_handle(deadline, trace::caller_location(), handle);
+    let delay = sleep_until(deadline);
 
     Timeout {
         value: future,
@@ -165,19 +167,7 @@ pin_project! {
 }
 
 impl<T> Timeout<T> {
-    #[track_caller]
-    pub(crate) fn new_with_delay(value: T, deadline: Option<Instant>) -> Timeout<T> {
-        let handle = scheduler::Handle::current();
-        // Panic if the time driver is not enabled.
-        let _ = handle.driver().time();
-
-        let deadline = match deadline {
-            Some(deadline) => deadline,
-            None => Instant::far_future(),
-        };
-
-        let delay = Sleep::new_timeout_with_handle(deadline, trace::caller_location(), handle);
-
+    pub(crate) fn new_with_delay(value: T, delay: Sleep) -> Timeout<T> {
         Timeout { value, delay }
     }
 

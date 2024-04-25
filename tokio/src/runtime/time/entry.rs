@@ -301,7 +301,7 @@ pub(crate) struct TimerEntry {
     ///
     /// This is manipulated only under the inner mutex. TODO: Can we use loom
     /// cells for this?
-    inner: StdUnsafeCell<TimerShared>,
+    inner: StdUnsafeCell<Option<TimerShared>>,
     /// Deadline for the timer. This is used to register on the first
     /// poll, as we can't register prior to being pinned.
     deadline: Instant,
@@ -477,27 +477,36 @@ unsafe impl linked_list::Link for TimerShared {
 
 impl TimerEntry {
     #[track_caller]
-    pub(crate) fn new(handle: &scheduler::Handle, deadline: Instant) -> Self {
+    pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
         // Panic if the time driver is not enabled
         let _ = handle.driver().time();
 
-        let driver = handle.clone();
-
         Self {
-            driver,
-            inner: StdUnsafeCell::new(TimerShared::new()),
+            driver: handle,
+            inner: StdUnsafeCell::new(None),
             deadline,
             registered: false,
             _m: std::marker::PhantomPinned,
         }
     }
 
-    fn inner(&self) -> &TimerShared {
-        unsafe { &*self.inner.get() }
+    fn inner(&self) -> Option<&TimerShared> {
+        unsafe { &*self.inner.get() }.as_ref()
+    }
+
+    fn inner_mut(&mut self) -> &mut Option<TimerShared> {
+        unsafe { &mut *self.inner.get() }
+    }
+
+    pub(crate) fn deadline(&self) -> Instant {
+        self.deadline
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
-        !self.inner().state.might_be_registered() && self.registered
+        match self.inner() {
+            Some(inner) => !inner.state.might_be_registered() && self.registered,
+            None => false,
+        }
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.
@@ -524,23 +533,31 @@ impl TimerEntry {
         // driver did so far and happens-before everything the driver does in
         // the future. While we have the lock held, we also go ahead and
         // deregister the entry if necessary.
-        unsafe { self.driver().clear_entry(NonNull::from(self.inner())) };
+
+        if let Some(inner) = self.inner() {
+            unsafe { self.driver().clear_entry(NonNull::from(inner)) };
+        }
     }
 
     pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant, reregister: bool) {
-        unsafe { self.as_mut().get_unchecked_mut() }.deadline = new_time;
-        unsafe { self.as_mut().get_unchecked_mut() }.registered = reregister;
+        let this = unsafe { self.as_mut().get_unchecked_mut() };
+        this.deadline = new_time;
+        this.registered = reregister;
+        this.inner_mut().get_or_insert(TimerShared::new());
 
         let tick = self.driver().time_source().deadline_to_tick(new_time);
 
-        if self.inner().extend_expiration(tick).is_ok() {
+        if self.inner().unwrap().extend_expiration(tick).is_ok() {
             return;
         }
 
         if reregister {
             unsafe {
-                self.driver()
-                    .reregister(&self.driver.driver().io, tick, self.inner().into());
+                self.driver().reregister(
+                    &self.driver.driver().io,
+                    tick,
+                    self.inner().unwrap().into(),
+                );
             }
         }
     }
@@ -562,7 +579,8 @@ impl TimerEntry {
 
         let this = unsafe { self.get_unchecked_mut() };
 
-        this.inner().state.poll(cx.waker())
+        this.inner_mut().get_or_insert(TimerShared::new());
+        this.inner().unwrap().state.poll(cx.waker())
     }
 
     pub(crate) fn driver(&self) -> &super::Handle {
