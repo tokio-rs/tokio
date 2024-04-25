@@ -187,7 +187,7 @@ impl StateCell {
                 break Err(cur_state);
             }
 
-            match self.state.compare_exchange(
+            match self.state.compare_exchange_weak(
                 cur_state,
                 STATE_PENDING_FIRE,
                 Ordering::AcqRel,
