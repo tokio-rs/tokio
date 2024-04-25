@@ -490,12 +490,13 @@ impl TimerEntry {
         }
     }
 
-    fn inner(&self) -> Option<&TimerShared> {
-        unsafe { &*self.inner.get() }.as_ref()
+    fn is_inner_init(&self) -> bool {
+        unsafe { &*self.inner.get() }.is_some()
     }
 
-    fn inner_mut(&mut self) -> &mut Option<TimerShared> {
-        unsafe { &mut *self.inner.get() }
+    // This lazy initialization is for performance purposes.
+    fn inner(&self) -> &TimerShared {
+        unsafe { &mut *self.inner.get() }.get_or_insert(TimerShared::new())
     }
 
     pub(crate) fn deadline(&self) -> Instant {
@@ -503,14 +504,15 @@ impl TimerEntry {
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
-        match self.inner() {
-            Some(inner) => !inner.state.might_be_registered() && self.registered,
-            None => false,
-        }
+        self.is_inner_init() && !self.inner().state.might_be_registered() && self.registered
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.
     pub(crate) fn cancel(self: Pin<&mut Self>) {
+        // Avoid calling the `clear_entry` method, because it has not been initialized yet.
+        if !self.is_inner_init() {
+            return;
+        }
         // We need to perform an acq/rel fence with the driver thread, and the
         // simplest way to do so is to grab the driver lock.
         //
@@ -533,31 +535,24 @@ impl TimerEntry {
         // driver did so far and happens-before everything the driver does in
         // the future. While we have the lock held, we also go ahead and
         // deregister the entry if necessary.
-
-        if let Some(inner) = self.inner() {
-            unsafe { self.driver().clear_entry(NonNull::from(inner)) };
-        }
+        unsafe { self.driver().clear_entry(NonNull::from(self.inner())) };
     }
 
     pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant, reregister: bool) {
         let this = unsafe { self.as_mut().get_unchecked_mut() };
         this.deadline = new_time;
         this.registered = reregister;
-        this.inner_mut().get_or_insert(TimerShared::new());
 
         let tick = self.driver().time_source().deadline_to_tick(new_time);
 
-        if self.inner().unwrap().extend_expiration(tick).is_ok() {
+        if self.inner().extend_expiration(tick).is_ok() {
             return;
         }
 
         if reregister {
             unsafe {
-                self.driver().reregister(
-                    &self.driver.driver().io,
-                    tick,
-                    self.inner().unwrap().into(),
-                );
+                self.driver()
+                    .reregister(&self.driver.driver().io, tick, self.inner().into());
             }
         }
     }
@@ -579,8 +574,7 @@ impl TimerEntry {
 
         let this = unsafe { self.get_unchecked_mut() };
 
-        this.inner_mut().get_or_insert(TimerShared::new());
-        this.inner().unwrap().state.poll(cx.waker())
+        this.inner().state.poll(cx.waker())
     }
 
     pub(crate) fn driver(&self) -> &super::Handle {
