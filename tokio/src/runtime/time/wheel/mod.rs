@@ -128,7 +128,6 @@ impl Wheel {
                 );
 
                 let level = self.level_for(when);
-
                 self.levels[level].remove_entry(item);
             }
         }
@@ -265,7 +264,6 @@ impl Wheel {
     }
 
     /// Obtains the list of entries that need processing for the given expiration.
-    ///
     fn take_entries(&mut self, expiration: &Expiration) -> EntryList {
         self.levels[expiration.level].take_slot(expiration.slot)
     }

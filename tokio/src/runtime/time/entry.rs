@@ -193,12 +193,8 @@ impl StateCell {
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
-                Ok(_) => {
-                    break Ok(());
-                }
-                Err(actual_state) => {
-                    cur_state = actual_state;
-                }
+                Ok(_) => break Ok(()),
+                Err(actual_state) => cur_state = actual_state,
             }
         }
     }
@@ -266,12 +262,8 @@ impl StateCell {
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
-                Ok(_) => {
-                    return Ok(());
-                }
-                Err(true_prior) => {
-                    prior = true_prior;
-                }
+                Ok(_) => return Ok(()),
+                Err(true_prior) => prior = true_prior,
             }
         }
     }
