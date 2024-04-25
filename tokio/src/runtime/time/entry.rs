@@ -556,9 +556,7 @@ impl TimerEntry {
             self.as_mut().reset(deadline, true);
         }
 
-        let this = unsafe { self.get_unchecked_mut() };
-
-        this.inner().state.poll(cx.waker())
+        self.inner().state.poll(cx.waker())
     }
 
     pub(crate) fn driver(&self) -> &super::Handle {
