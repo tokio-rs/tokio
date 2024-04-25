@@ -178,11 +178,11 @@ impl Wheel {
         }
 
         // Check all levels
-        for level in 0..NUM_LEVELS {
-            if let Some(expiration) = self.levels[level].next_expiration(self.elapsed) {
+        for (level_num, level) in self.levels.iter().enumerate() {
+            if let Some(expiration) = level.next_expiration(self.elapsed) {
                 // There cannot be any expirations at a higher level that happen
                 // before this one.
-                debug_assert!(self.no_expirations_before(level + 1, expiration.deadline));
+                debug_assert!(self.no_expirations_before(level_num + 1, expiration.deadline));
 
                 return Some(expiration);
             }
@@ -201,8 +201,8 @@ impl Wheel {
     fn no_expirations_before(&self, start_level: usize, before: u64) -> bool {
         let mut res = true;
 
-        for l2 in start_level..NUM_LEVELS {
-            if let Some(e2) = self.levels[l2].next_expiration(self.elapsed) {
+        for level in &self.levels[start_level..] {
+            if let Some(e2) = level.next_expiration(self.elapsed) {
                 if e2.deadline < before {
                     res = false;
                 }
