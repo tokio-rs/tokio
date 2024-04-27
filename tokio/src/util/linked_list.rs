@@ -144,7 +144,7 @@ impl<L: Link> LinkedList<L, L::Target> {
         }
     }
 
-    /// Removes the firt element from a list and returns it, or None if it is
+    /// Removes the first element from a list and returns it, or None if it is
     /// empty.
     pub(crate) fn pop_front(&mut self) -> Option<L::Handle> {
         unsafe {
