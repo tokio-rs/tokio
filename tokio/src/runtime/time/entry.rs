@@ -75,7 +75,7 @@ const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 /// The largest safe integer to use for ticks.
 ///
 /// This value should be updated if any other signal values are added above.
-pub(super) const MAX_SAFE_MILLIS_DURATION: u64 = u64::MAX - 2;
+pub(super) const MAX_SAFE_MILLIS_DURATION: u64 = STATE_MIN_VALUE - 1;
 
 /// This structure holds the current shared state of the timer - its scheduled
 /// time (if registered), or otherwise the result of the timer completing, as
@@ -187,18 +187,14 @@ impl StateCell {
                 break Err(cur_state);
             }
 
-            match self.state.compare_exchange(
+            match self.state.compare_exchange_weak(
                 cur_state,
                 STATE_PENDING_FIRE,
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
-                Ok(_) => {
-                    break Ok(());
-                }
-                Err(actual_state) => {
-                    cur_state = actual_state;
-                }
+                Ok(_) => break Ok(()),
+                Err(actual_state) => cur_state = actual_state,
             }
         }
     }
@@ -266,12 +262,8 @@ impl StateCell {
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
-                Ok(_) => {
-                    return Ok(());
-                }
-                Err(true_prior) => {
-                    prior = true_prior;
-                }
+                Ok(_) => return Ok(()),
+                Err(true_prior) => prior = true_prior,
             }
         }
     }
@@ -564,9 +556,7 @@ impl TimerEntry {
             self.as_mut().reset(deadline, true);
         }
 
-        let this = unsafe { self.get_unchecked_mut() };
-
-        this.inner().state.poll(cx.waker())
+        self.inner().state.poll(cx.waker())
     }
 
     pub(crate) fn driver(&self) -> &super::Handle {
