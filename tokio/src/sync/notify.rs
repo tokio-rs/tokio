@@ -307,7 +307,7 @@ impl AtomicNotification {
 
     fn load(&self, ordering: Ordering) -> Option<Notification> {
         let data = self.0.load(ordering);
-        let notification = match data & NOTIFICATION_TYPE_MASK {
+        match data & NOTIFICATION_TYPE_MASK {
             NOTIFICATION_NONE => None,
             NOTIFICATION_ONE => {
                 match (data & NOTIFICATION_NOTIFY_ONE_STRATEGY_MASK)
@@ -324,8 +324,7 @@ impl AtomicNotification {
             }
             NOTIFICATION_ALL => Some(Notification::All),
             _ => unreachable!(),
-        };
-        notification
+        }
     }
 
     /// Clears the notification.
