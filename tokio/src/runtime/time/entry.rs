@@ -496,7 +496,13 @@ impl TimerEntry {
 
     // This lazy initialization is for performance purposes.
     fn inner(&self) -> &TimerShared {
-        unsafe { &mut *self.inner.get() }.get_or_insert(TimerShared::new())
+        let inner = unsafe { &*self.inner.get() };
+        if inner.is_none() {
+            unsafe {
+                *(&mut *self.inner.get()) = Some(TimerShared::new());
+            }
+        }
+        return inner.as_ref().unwrap();
     }
 
     pub(crate) fn deadline(&self) -> Instant {
