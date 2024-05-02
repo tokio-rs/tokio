@@ -6,7 +6,7 @@ use tokio::{
     time::{sleep, timeout},
 };
 
-// a vevry quick async task, but might timeout
+// a very quick async task, but might timeout
 async fn quick_job() -> usize {
     1
 }
