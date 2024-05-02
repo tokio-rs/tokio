@@ -551,11 +551,23 @@ impl<T> Receiver<T> {
     ///     // Making a reservation drops the capacity by one.
     ///     let permit = tx.reserve().await.unwrap();
     ///     assert_eq!(rx.capacity(), 4);
+    ///     assert_eq!(rx.len(), 0);
     ///
     ///     // Sending and receiving a value increases the capacity by one.
     ///     permit.send(());
+    ///     assert_eq!(rx.len(), 1);
     ///     rx.recv().await.unwrap();
     ///     assert_eq!(rx.capacity(), 5);
+    ///
+    ///     // Directly sending a message drops the capacity by one.
+    ///     tx.send(());
+    ///     assert_eq!(rx.capacity(), 4);
+    ///     assert_eq!(rx.len(), 1);
+    ///
+    ///     // Receiving the message increases the capacity by one.
+    ///     rx.recv().await.unwrap();
+    ///     assert_eq!(rx.capacity(), 5);
+    ///     assert_eq!(rx.len(), 0);
     /// }
     /// ```
     /// [`capacity`]: Receiver::capacity
