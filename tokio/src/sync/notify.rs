@@ -224,7 +224,7 @@ struct Waiter {
     waker: UnsafeCell<Option<Waker>>,
 
     /// Notification for this waiter. Uses 2 bits to store if and how was
-    /// notified, 2 bits for storing if it was woken up using FIFO or LIFO, and
+    /// notified, 1 bit for storing if it was woken up using FIFO or LIFO, and
     /// the rest of it is unused.
     /// * if it's `None`, then `waker` is protected by the `waiters` lock.
     /// * if it's `Some`, then `waker` is exclusively owned by the
@@ -267,14 +267,11 @@ const NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT: usize = 2;
 const NOTIFICATION_TYPE_MASK: usize = (1 << NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT) - 1;
 const NOTIFICATION_NOTIFY_ONE_STRATEGY_MASK: usize = !NOTIFICATION_TYPE_MASK;
 
-// Unspecified wakeup order
-const NOTIFICATION_NOTIFY_ONE_STRATEGY_NONE: usize = 0;
-
 // Fifo (default) wakeup order
-const NOTIFICATION_NOTIFY_ONE_STRATEGY_FIFO: usize = 1;
+const NOTIFICATION_NOTIFY_ONE_STRATEGY_FIFO: usize = 0;
 
 // Lifo wakeup order
-const NOTIFICATION_NOTIFY_ONE_STRATEGY_LIFO: usize = 2;
+const NOTIFICATION_NOTIFY_ONE_STRATEGY_LIFO: usize = 1;
 
 /// Notification for a `Waiter`.
 /// This struct is equivalent to `Option<Notification>`, but uses
@@ -284,40 +281,45 @@ struct AtomicNotification(AtomicUsize);
 
 impl AtomicNotification {
     fn none() -> Self {
-        AtomicNotification(AtomicUsize::new(0))
+        AtomicNotification(AtomicUsize::new(NOTIFICATION_NONE))
     }
 
     /// Store-release a notification.
     /// This method should be called exactly once.
-    fn store_release(&self, notification: Notification, strategy: Option<NotifyOneStrategy>) {
-        let data: usize = match strategy {
-            None => notification as usize & NOTIFICATION_TYPE_MASK,
-            Some(strategy) => {
-                (((strategy as usize) << NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT)
+    fn store_release(&self, notification: Notification) {
+        let data: usize = match notification {
+            Notification::All => NOTIFICATION_ALL & NOTIFICATION_TYPE_MASK,
+            Notification::One(NotifyOneStrategy::Fifo) => {
+                (((NOTIFICATION_NOTIFY_ONE_STRATEGY_FIFO) << NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT)
                     & NOTIFICATION_NOTIFY_ONE_STRATEGY_MASK)
-                    | (notification as usize & NOTIFICATION_TYPE_MASK)
+                    | (NOTIFICATION_ONE & NOTIFICATION_TYPE_MASK)
+            }
+            Notification::One(NotifyOneStrategy::Lifo) => {
+                (((NOTIFICATION_NOTIFY_ONE_STRATEGY_LIFO) << NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT)
+                    & NOTIFICATION_NOTIFY_ONE_STRATEGY_MASK)
+                    | (NOTIFICATION_ONE & NOTIFICATION_TYPE_MASK)
             }
         };
         self.0.store(data, Release);
     }
 
-    fn load(&self, ordering: Ordering) -> (Option<Notification>, Option<NotifyOneStrategy>) {
+
+    fn load(&self, ordering: Ordering) -> Option<Notification> {
         let data = self.0.load(ordering);
         let notification = match data & NOTIFICATION_TYPE_MASK {
             NOTIFICATION_NONE => None,
-            NOTIFICATION_ONE => Some(Notification::One),
+            NOTIFICATION_ONE => {
+                match (data & NOTIFICATION_NOTIFY_ONE_STRATEGY_MASK) >> NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT
+                {
+                    NOTIFICATION_NOTIFY_ONE_STRATEGY_FIFO => Some(Notification::One(NotifyOneStrategy::Fifo)),
+                    NOTIFICATION_NOTIFY_ONE_STRATEGY_LIFO => Some(Notification::One(NotifyOneStrategy::Lifo)),
+                    _ => unreachable!(),
+                }
+            },
             NOTIFICATION_ALL => Some(Notification::All),
             _ => unreachable!(),
         };
-        let strategy = match (data & NOTIFICATION_NOTIFY_ONE_STRATEGY_MASK)
-            >> NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT
-        {
-            NOTIFICATION_NOTIFY_ONE_STRATEGY_NONE => None,
-            NOTIFICATION_NOTIFY_ONE_STRATEGY_FIFO => Some(NotifyOneStrategy::Fifo),
-            NOTIFICATION_NOTIFY_ONE_STRATEGY_LIFO => Some(NotifyOneStrategy::Lifo),
-            _ => unreachable!(),
-        };
-        (notification, strategy)
+        notification
     }
 
     /// Clears the notification.
@@ -325,22 +327,22 @@ impl AtomicNotification {
     /// notification. It uses relaxed ordering and should be only
     /// used once the atomic notification is no longer shared.
     fn clear(&self) {
-        self.0.store(0, Relaxed);
+        self.0.store(NOTIFICATION_NONE, Relaxed);
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 #[repr(usize)]
-enum Notification {
-    One = NOTIFICATION_ONE,
-    All = NOTIFICATION_ALL,
+enum NotifyOneStrategy {
+    Fifo,
+    Lifo,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 #[repr(usize)]
-enum NotifyOneStrategy {
-    Fifo = NOTIFICATION_NOTIFY_ONE_STRATEGY_FIFO,
-    Lifo = NOTIFICATION_NOTIFY_ONE_STRATEGY_LIFO,
+enum Notification {
+    One(NotifyOneStrategy),
+    All,
 }
 
 /// List used in `Notify::notify_waiters`. It wraps a guarded linked list
@@ -389,7 +391,7 @@ impl Drop for NotifyWaitersList<'_> {
             while let Some(waiter) = self.list.pop_back() {
                 // Safety: we never make mutable references to waiters.
                 let waiter = unsafe { waiter.as_ref() };
-                waiter.notification.store_release(Notification::All, None);
+                waiter.notification.store_release(Notification::All);
             }
         }
     }
@@ -728,7 +730,7 @@ impl Notify {
                         }
 
                         // This waiter is unlinked and will not be shared ever again, release it.
-                        waiter.notification.store_release(Notification::All, None);
+                        waiter.notification.store_release(Notification::All);
                     }
                     None => {
                         break 'outer;
@@ -803,7 +805,7 @@ fn notify_locked(
             // This waiter is unlinked and will not be shared ever again, release it.
             waiter
                 .notification
-                .store_release(Notification::One, Some(strategy));
+                .store_release(Notification::One(strategy));
 
             if waiters.is_empty() {
                 // As this the **final** waiter in the list, the state
@@ -1063,8 +1065,7 @@ impl Notified<'_> {
                         ready!(crate::trace::trace_leaf(&mut ctx));
                     }
 
-                    let (notification, _) = waiter.notification.load(Acquire);
-                    if notification.is_some() {
+                    if waiter.notification.load(Acquire).is_some() {
                         // Safety: waiter is already unlinked and will not be shared again,
                         // so we have an exclusive access to `waker`.
                         drop(unsafe { waiter.waker.with_mut(|waker| (*waker).take()) });
@@ -1084,8 +1085,7 @@ impl Notified<'_> {
                     // We hold the lock and notifications are set only with the lock held,
                     // so this can be relaxed, because the happens-before relationship is
                     // established through the mutex.
-                    let (notification, _) = waiter.notification.load(Acquire);
-                    if notification.is_some() {
+                    if waiter.notification.load(Relaxed).is_some() {
                         // Safety: waiter is already unlinked and will not be shared again,
                         // so we have an exclusive access to `waker`.
                         old_waker = unsafe { waiter.waker.with_mut(|waker| (*waker).take()) };
@@ -1187,7 +1187,7 @@ impl Drop for Notified<'_> {
 
             // We hold the lock, so this field is not concurrently accessed by
             // `notify_*` functions and we can use the relaxed ordering.
-            let (notification, strategy) = waiter.notification.load(Relaxed);
+            let notification = waiter.notification.load(Relaxed);
 
             // remove the entry from the list (if not already removed)
             //
@@ -1204,9 +1204,9 @@ impl Drop for Notified<'_> {
             // See if the node was notified but not received. In this case, if
             // the notification was triggered via `notify_one`, it must be sent
             // to the next waiter.
-            if notification == Some(Notification::One) {
+            if let Some(Notification::One(strategy)) = notification {
                 if let Some(waker) =
-                    notify_locked(&mut waiters, &notify.state, notify_state, strategy.unwrap())
+                    notify_locked(&mut waiters, &notify.state, notify_state, strategy)
                 {
                     drop(waiters);
                     waker.wake();
