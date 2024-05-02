@@ -560,7 +560,7 @@ impl<T> Receiver<T> {
     ///     assert_eq!(rx.capacity(), 5);
     ///
     ///     // Directly sending a message drops the capacity by one.
-    ///     tx.send(());
+    ///     tx.send(()).await.unwrap();
     ///     assert_eq!(rx.capacity(), 4);
     ///     assert_eq!(rx.len(), 1);
     ///
