@@ -1,7 +1,3 @@
-//! Benchmark spawning a task onto the basic and threaded Tokio executors.
-//! This essentially measure the time to enqueue a task in the local and remote
-//! case.
-
 use std::time::{Duration, Instant};
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
@@ -19,7 +15,6 @@ fn build_run_time(workers: usize) -> Runtime {
     if workers == 1 {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
-            .worker_threads(workers)
             .build()
             .unwrap()
     } else {
