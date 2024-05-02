@@ -499,7 +499,7 @@ impl TimerEntry {
         let inner = unsafe { &*self.inner.get() };
         if inner.is_none() {
             unsafe {
-                *(&mut *self.inner.get()) = Some(TimerShared::new());
+                *self.inner.get() = Some(TimerShared::new());
             }
         }
         return inner.as_ref().unwrap();
