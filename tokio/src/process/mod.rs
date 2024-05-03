@@ -669,7 +669,14 @@ impl Command {
     /// Sets the child process's user ID. This translates to a
     /// `setuid` call in the child process. Failure in the `setuid`
     /// call will cause the spawn to fail.
-    #[cfg(unix)]
+    #[cfg(target_os = "nto")]
+    pub fn uid(&mut self, id: u32) -> &mut Command {
+      let signed_id = id as i32;
+      self.std.uid(signed_id);
+      self
+    }
+
+    #[cfg(all(unix, not(target_os = "nto")))]
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn uid(&mut self, id: u32) -> &mut Command {
         self.std.uid(id);
@@ -678,10 +685,18 @@ impl Command {
 
     /// Similar to `uid` but sets the group ID of the child process. This has
     /// the same semantics as the `uid` field.
-    #[cfg(unix)]
+    #[cfg(target_os = "nto")]
+    pub fn gid(&mut self, id: u32) -> &mut Command {
+      let signed_gid = id as i32;
+      self.std.gid(signed_gid);
+      self
+    }
+
+    #[cfg(all(unix, not(target_os = "nto")))]
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn gid(&mut self, id: u32) -> &mut Command {
-        self.std.gid(id);
+      let signed_gid = id as i32;
+        self.std.gid(signed_gid);
         self
     }
 

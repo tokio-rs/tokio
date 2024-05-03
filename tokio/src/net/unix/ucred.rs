@@ -60,7 +60,7 @@ pub(crate) use self::impl_solaris::get_peer_cred;
 #[cfg(target_os = "aix")]
 pub(crate) use self::impl_aix::get_peer_cred;
 
-#[cfg(any(target_os = "espidf", target_os = "vita"))]
+#[cfg(any(target_os = "espidf", target_os = "vita", target_os = "nto"))]
 pub(crate) use self::impl_noproc::get_peer_cred;
 
 #[cfg(any(
@@ -307,7 +307,7 @@ pub(crate) mod impl_aix {
     }
 }
 
-#[cfg(any(target_os = "espidf", target_os = "vita"))]
+#[cfg(any(target_os = "espidf", target_os = "vita", target_os = "nto"))]
 pub(crate) mod impl_noproc {
     use crate::net::unix::UnixStream;
     use std::io;
