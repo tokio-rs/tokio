@@ -289,9 +289,9 @@ cfg_io_util! {
 }
 
 impl<R, W> Future for Copy<'_, R, W>
-    where
-        R: AsyncRead + Unpin + ?Sized,
-        W: AsyncWrite + Unpin + ?Sized,
+where
+    R: AsyncRead + Unpin + ?Sized,
+    W: AsyncWrite + Unpin + ?Sized,
 {
     type Output = io::Result<u64>;
 
