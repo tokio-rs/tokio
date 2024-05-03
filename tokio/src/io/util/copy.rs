@@ -95,27 +95,10 @@ impl CopyBuffer {
         ))]
         // Keep track of task budget
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
-
-        // Flushing helper for the writer
-        let flush_writer = || {
-            ready!(writer.as_mut().poll_flush(cx))?;
-            #[cfg(any(
-                feature = "fs",
-                feature = "io-std",
-                feature = "net",
-                feature = "process",
-                feature = "rt",
-                feature = "signal",
-                feature = "sync",
-                feature = "time",
-            ))]
-            coop.made_progress();
-            self.need_flush = false;
-
-            Poll::Ready(Ok(()))
-        };
-
         loop {
+            // Keep track of the read future status
+            let mut is_read_pending = false;
+
             let is_buffer_empty = self.pos == self.cap;
             let is_buffer_not_full = self.cap < self.buf.len();
 
@@ -156,21 +139,33 @@ impl CopyBuffer {
                         return Poll::Ready(Err(err));
                     }
                     Poll::Pending => {
-                        // Try flushing when the reader has no progress to avoid deadlock
-                        // when the reader depends on buffered writer.
-                        if self.need_flush {
-                            ready!(flush_writer())?;
-                        }
-
-                        return Poll::Pending;
+                        // Rather than returning now, try to flush when the reader has no
+                        // progress to avoid deadlock when the reader depends on buffered writer.
+                        is_read_pending = true;
                     }
                 }
             }
 
-            // Try flushing before writing, to be sure that any eventual flush operation
-            // started during a pending read can be terminated properly.
+            // Try flushing before writing, either because the reader has no progress or to
+            // be sure that this same flush operation is terminated properly.
             if self.need_flush {
-                ready!(flush_writer())?;
+                ready!(writer.as_mut().poll_flush(cx))?;
+                #[cfg(any(
+                    feature = "fs",
+                    feature = "io-std",
+                    feature = "net",
+                    feature = "process",
+                    feature = "rt",
+                    feature = "signal",
+                    feature = "sync",
+                    feature = "time",
+                ))]
+                coop.made_progress();
+                self.need_flush = false;
+            }
+
+            if is_read_pending {
+                return Poll::Pending;
             }
 
             // If our buffer has some data, let's write it out!
