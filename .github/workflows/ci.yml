@@ -67,7 +67,7 @@ jobs:
       - x86_64-fortanix-unknown-sgx
       - check-redox
       - wasm32-unknown-unknown
-      - wasm32-wasi
+      - wasm32-wasip1
       - check-external-types
       - check-fuzzing
       - check-unstable-mt-counters
@@ -908,15 +908,15 @@ jobs:
         run: wasm-pack test --node -- --features "macros sync"
         working-directory: tokio
 
-  wasm32-wasi:
+  wasm32-wasip1:
     name: ${{ matrix.target }}
     needs: basics
     runs-on: ubuntu-latest
     strategy:
       matrix:
         target:
-          - wasm32-wasi
-          - wasm32-wasi-preview1-threads
+          - wasm32-wasip1
+          - wasm32-wasip1-threads
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_stable }}
@@ -935,36 +935,36 @@ jobs:
       - name: WASI test tokio full
         run: cargo test -p tokio --target ${{ matrix.target }} --features full
         env:
-          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          CARGO_TARGET_WASM32_WASI_PREVIEW1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-util full
         run: cargo test -p tokio-util --target ${{ matrix.target }} --features full
         env:
-          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          CARGO_TARGET_WASM32_WASI_PREVIEW1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-stream
         run: cargo test -p tokio-stream --target ${{ matrix.target }} --features time,net,io-util,sync
         env:
-          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          CARGO_TARGET_WASM32_WASI_PREVIEW1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: test tests-integration --features wasi-rt
         # TODO: this should become: `cargo hack wasi test --each-feature`
         run: cargo wasi test --test rt_yield --features wasi-rt
-        if: matrix.target == 'wasm32-wasi'
+        if: matrix.target == 'wasm32-wasip1'
         working-directory: tests-integration
 
       - name: test tests-integration --features wasi-threads-rt
         run: cargo test --target ${{ matrix.target }} --features wasi-threads-rt
-        if: matrix.target == 'wasm32-wasi-preview1-threads'
+        if: matrix.target == 'wasm32-wasip1-threads'
         working-directory: tests-integration
         env:
-          CARGO_TARGET_WASM32_WASI_PREVIEW1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
   check-external-types:

@@ -21,9 +21,7 @@ impl TimeSource {
 
     pub(crate) fn instant_to_tick(&self, t: Instant) -> u64 {
         // round up
-        let dur: Duration = t
-            .checked_duration_since(self.start_time)
-            .unwrap_or_else(|| Duration::from_secs(0));
+        let dur: Duration = t.saturating_duration_since(self.start_time);
         let ms = dur.as_millis();
 
         ms.try_into().unwrap_or(MAX_SAFE_MILLIS_DURATION)
