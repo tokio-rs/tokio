@@ -277,6 +277,9 @@ pub use self::copy::copy;
 mod try_exists;
 pub use self::try_exists::try_exists;
 
+mod walk_dir;
+pub use self::walk_dir::walk_dir;
+
 #[cfg(test)]
 mod mocks;
 
