@@ -32,8 +32,8 @@ impl CopyBuffer {
         cx: &mut Context<'_>,
         reader: Pin<&mut R>,
     ) -> Poll<io::Result<()>>
-    where
-        R: AsyncRead + ?Sized,
+        where
+            R: AsyncRead + ?Sized,
     {
         let me = &mut *self;
         let mut buf = ReadBuf::new(&mut me.buf);
@@ -54,9 +54,9 @@ impl CopyBuffer {
         mut reader: Pin<&mut R>,
         mut writer: Pin<&mut W>,
     ) -> Poll<io::Result<usize>>
-    where
-        R: AsyncRead + ?Sized,
-        W: AsyncWrite + ?Sized,
+        where
+            R: AsyncRead + ?Sized,
+            W: AsyncWrite + ?Sized,
     {
         let me = &mut *self;
         match writer.as_mut().poll_write(cx, &me.buf[me.pos..me.cap]) {
@@ -78,9 +78,9 @@ impl CopyBuffer {
         mut reader: Pin<&mut R>,
         mut writer: Pin<&mut W>,
     ) -> Poll<io::Result<u64>>
-    where
-        R: AsyncRead + ?Sized,
-        W: AsyncWrite + ?Sized,
+        where
+            R: AsyncRead + ?Sized,
+            W: AsyncWrite + ?Sized,
     {
         ready!(crate::trace::trace_leaf(cx));
         #[cfg(any(
@@ -95,6 +95,26 @@ impl CopyBuffer {
         ))]
         // Keep track of task budget
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+
+        // Flushing helper for the writer
+        let flush_writer = || {
+            ready!(writer.as_mut().poll_flush(cx))?;
+            #[cfg(any(
+                feature = "fs",
+                feature = "io-std",
+                feature = "net",
+                feature = "process",
+                feature = "rt",
+                feature = "signal",
+                feature = "sync",
+                feature = "time",
+            ))]
+            coop.made_progress();
+            self.need_flush = false;
+
+            Poll::Ready(Ok(()))
+        };
+
         loop {
             // If our buffer is empty, then we need to read some data to
             // continue.
@@ -134,24 +154,18 @@ impl CopyBuffer {
                         // Try flushing when the reader has no progress to avoid deadlock
                         // when the reader depends on buffered writer.
                         if self.need_flush {
-                            ready!(writer.as_mut().poll_flush(cx))?;
-                            #[cfg(any(
-                                feature = "fs",
-                                feature = "io-std",
-                                feature = "net",
-                                feature = "process",
-                                feature = "rt",
-                                feature = "signal",
-                                feature = "sync",
-                                feature = "time",
-                            ))]
-                            coop.made_progress();
-                            self.need_flush = false;
+                            ready!(flush_writer())?;
                         }
 
                         return Poll::Pending;
                     }
                 }
+            }
+
+            // Try flushing before writing, to be sure that any eventual flush operation
+            // started during a pending read can be terminated properly.
+            if self.need_flush {
+                ready!(flush_writer())?;
             }
 
             // If our buffer has some data, let's write it out!
@@ -275,9 +289,9 @@ cfg_io_util! {
 }
 
 impl<R, W> Future for Copy<'_, R, W>
-where
-    R: AsyncRead + Unpin + ?Sized,
-    W: AsyncWrite + Unpin + ?Sized,
+    where
+        R: AsyncRead + Unpin + ?Sized,
+        W: AsyncWrite + Unpin + ?Sized,
 {
     type Output = io::Result<u64>;
 
