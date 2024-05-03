@@ -54,7 +54,7 @@ pub(crate) fn read_until_slice_internal<R: AsyncBufRead + ?Sized>(
     loop {
         let (done, used) = {
             let available = ready!(reader.as_mut().poll_fill_buf(cx))?;
-            if let Some(i) = search(delimiter, &mut match_len, available) {
+            if let Some(i) = search(delimiter, available, &mut match_len) {
                 buf.extend_from_slice(&available[..i]);
                 (true, i)
             } else {
@@ -70,10 +70,11 @@ pub(crate) fn read_until_slice_internal<R: AsyncBufRead + ?Sized>(
     }
 }
 
-/// Searches a partial needle in the haystack.
-///
-/// Returns the position of the end of the needle in the haystack if found.
-fn search(needle: &[u8], match_len: &mut usize, haystack: &[u8]) -> Option<usize> {
+/// Returns the first index matching the `needle` in the `haystack`. `match_len` specifies how
+/// many bytes from the needle were already matched during the previous lookup.
+/// If we reach the end of the `haystack` with a partial match, then this is a partial match,
+/// and we update the `match_len` value accordingly, even though we still return `None`.
+fn search(needle: &[u8], haystack: &[u8], match_len: &mut usize) -> Option<usize> {
     let haystack_len = haystack.len();
     let needle_len = needle.len();
     #[allow(clippy::needless_range_loop)]
@@ -108,16 +109,16 @@ mod tests {
         let haystack = b"123abc456\0\xffabc\n";
         let mut match_len = 0;
 
-        assert_eq!(search(b"ab", &mut match_len, haystack), Some(5));
+        assert_eq!(search(b"ab", haystack, &mut match_len), Some(5));
         assert_eq!(match_len, 2);
         match_len = 0;
-        assert_eq!(search(&[0xff], &mut match_len, haystack), Some(11));
+        assert_eq!(search(&[0xff], haystack, &mut match_len), Some(11));
         assert_eq!(match_len, 1);
         match_len = 0;
-        assert_eq!(search(b"\n", &mut match_len, haystack), Some(15));
+        assert_eq!(search(b"\n", haystack, &mut match_len), Some(15));
         assert_eq!(match_len, 1);
         match_len = 0;
-        assert_eq!(search(b"\r", &mut match_len, haystack), None);
+        assert_eq!(search(b"\r", haystack, &mut match_len), None);
         assert_eq!(match_len, 0);
     }
 
@@ -127,9 +128,9 @@ mod tests {
         let haystack2 = b"\n987gfd";
         let mut match_len = 0;
 
-        assert_eq!(search(b"\r\n", &mut match_len, haystack1), None);
+        assert_eq!(search(b"\r\n", haystack1, &mut match_len), None);
         assert_eq!(match_len, 1);
-        assert_eq!(search(b"\r\n", &mut match_len, haystack2), Some(1));
+        assert_eq!(search(b"\r\n", haystack2, &mut match_len), Some(1));
         assert_eq!(match_len, 2);
     }
 
@@ -139,9 +140,9 @@ mod tests {
         let haystack2 = b"a\n987gfd";
         let mut match_len = 0;
 
-        assert_eq!(search(b"\r\n", &mut match_len, haystack1), None);
+        assert_eq!(search(b"\r\n", haystack1, &mut match_len), None);
         assert_eq!(match_len, 1);
-        assert_eq!(search(b"\r\n", &mut match_len, haystack2), None);
+        assert_eq!(search(b"\r\n", haystack2, &mut match_len), None);
         assert_eq!(match_len, 0);
     }
 
@@ -150,7 +151,7 @@ mod tests {
         let haystack = b"\r";
         let mut match_len = 0;
 
-        assert_eq!(search(b"\r\n", &mut match_len, haystack), None);
+        assert_eq!(search(b"\r\n", haystack, &mut match_len), None);
         assert_eq!(match_len, 1);
     }
 }

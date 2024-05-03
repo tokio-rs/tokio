@@ -186,7 +186,7 @@ async fn read_until_slice_small_buffer() {
 }
 
 #[tokio::test]
-async fn read_until_slice_delimiter_splitted() {
+async fn read_until_slice_split_delimiter() {
     let mock = Builder::new()
         .read(b"Some\r")
         .read(b"Other\n")
