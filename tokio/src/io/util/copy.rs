@@ -116,11 +116,16 @@ impl CopyBuffer {
         };
 
         loop {
-            // If our buffer is empty, then we need to read some data to
-            // continue.
-            if self.pos == self.cap && !self.read_done {
-                self.pos = 0;
-                self.cap = 0;
+            let is_buffer_empty = self.pos == self.cap;
+            let is_buffer_not_full = self.cap < self.buf.len();
+
+            // If our buffer is empty or not full yet, then we try to read some
+            // data to continue.
+            if (is_buffer_empty || is_buffer_not_full) && !self.read_done {
+                if is_buffer_empty {
+                    self.pos = 0;
+                    self.cap = 0;
+                }
 
                 match self.poll_fill_buf(cx, reader.as_mut()) {
                     Poll::Ready(Ok(())) => {
