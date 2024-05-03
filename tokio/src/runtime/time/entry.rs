@@ -293,7 +293,7 @@ pub(crate) struct TimerEntry {
     ///
     /// This is manipulated only under the inner mutex. TODO: Can we use loom
     /// cells for this?
-    inner: StdUnsafeCell<TimerShared>,
+    inner: StdUnsafeCell<Option<TimerShared>>,
     /// Deadline for the timer. This is used to register on the first
     /// poll, as we can't register prior to being pinned.
     deadline: Instant,
@@ -469,23 +469,32 @@ unsafe impl linked_list::Link for TimerShared {
 
 impl TimerEntry {
     #[track_caller]
-    pub(crate) fn new(handle: &scheduler::Handle, deadline: Instant) -> Self {
+    pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
         // Panic if the time driver is not enabled
         let _ = handle.driver().time();
 
-        let driver = handle.clone();
-
         Self {
-            driver,
-            inner: StdUnsafeCell::new(TimerShared::new()),
+            driver: handle,
+            inner: StdUnsafeCell::new(None),
             deadline,
             registered: false,
             _m: std::marker::PhantomPinned,
         }
     }
 
+    fn is_inner_init(&self) -> bool {
+        unsafe { &*self.inner.get() }.is_some()
+    }
+
+    // This lazy initialization is for performance purposes.
     fn inner(&self) -> &TimerShared {
-        unsafe { &*self.inner.get() }
+        let inner = unsafe { &*self.inner.get() };
+        if inner.is_none() {
+            unsafe {
+                *self.inner.get() = Some(TimerShared::new());
+            }
+        }
+        return inner.as_ref().unwrap();
     }
 
     pub(crate) fn deadline(&self) -> Instant {
@@ -493,11 +502,15 @@ impl TimerEntry {
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
-        !self.inner().state.might_be_registered() && self.registered
+        self.is_inner_init() && !self.inner().state.might_be_registered() && self.registered
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.
     pub(crate) fn cancel(self: Pin<&mut Self>) {
+        // Avoid calling the `clear_entry` method, because it has not been initialized yet.
+        if !self.is_inner_init() {
+            return;
+        }
         // We need to perform an acq/rel fence with the driver thread, and the
         // simplest way to do so is to grab the driver lock.
         //
@@ -524,8 +537,9 @@ impl TimerEntry {
     }
 
     pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant, reregister: bool) {
-        unsafe { self.as_mut().get_unchecked_mut() }.deadline = new_time;
-        unsafe { self.as_mut().get_unchecked_mut() }.registered = reregister;
+        let this = unsafe { self.as_mut().get_unchecked_mut() };
+        this.deadline = new_time;
+        this.registered = reregister;
 
         let tick = self.driver().time_source().deadline_to_tick(new_time);
 
