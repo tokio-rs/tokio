@@ -59,6 +59,7 @@ cfg_io_util! {
 
     mod read_to_string;
     mod read_until;
+    mod read_until_slice;
 
     mod repeat;
     pub use repeat::{repeat, Repeat};
