@@ -328,6 +328,8 @@ pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, Ti
 ///
 /// Note that this structure is located inside the `TimerEntry` structure.
 pub(crate) struct TimerShared {
+    /// The shard id. We should never change it.
+    shard_id: u32,
     /// A link within the doubly-linked list of timers on a particular level and
     /// slot. Valid only if state is equal to Registered.
     ///
@@ -372,8 +374,9 @@ generate_addr_of_methods! {
 }
 
 impl TimerShared {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(shard_id: u32) -> Self {
         Self {
+            shard_id,
             cached_when: AtomicU64::new(0),
             true_when: AtomicU64::new(0),
             pointers: linked_list::Pointers::new(),
@@ -443,6 +446,11 @@ impl TimerShared {
     pub(super) fn might_be_registered(&self) -> bool {
         self.state.might_be_registered()
     }
+
+    /// Gets the shard id.
+    pub(super) fn shard_id(&self) -> u32 {
+        self.shard_id
+    }
 }
 
 unsafe impl linked_list::Link for TimerShared {
@@ -490,8 +498,10 @@ impl TimerEntry {
     fn inner(&self) -> &TimerShared {
         let inner = unsafe { &*self.inner.get() };
         if inner.is_none() {
+            let shard_id =
+                super::rand::thread_rng_n(self.driver.driver().time().inner.get_shard_size());
             unsafe {
-                *self.inner.get() = Some(TimerShared::new());
+                *self.inner.get() = Some(TimerShared::new(shard_id));
             }
         }
         return inner.as_ref().unwrap();
