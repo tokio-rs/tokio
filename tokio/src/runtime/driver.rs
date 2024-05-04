@@ -364,6 +364,7 @@ cfg_not_time! {
         _enable: bool,
         io_stack: IoStack,
         _clock: &Clock,
+        _workers: usize,
     ) -> (TimeDriver, TimeHandle) {
         (io_stack, ())
     }
