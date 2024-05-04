@@ -581,6 +581,14 @@ impl Encoder<Bytes> for LengthDelimitedCodec {
     type Error = io::Error;
 
     fn encode(&mut self, data: Bytes, dst: &mut BytesMut) -> Result<(), io::Error> {
+        <Self as Encoder<&'_ [u8]>>::encode(self, &data, dst)
+    }
+}
+
+impl<'a> Encoder<&'a [u8]> for LengthDelimitedCodec {
+    type Error = io::Error;
+
+    fn encode(&mut self, data: &'a [u8], dst: &mut BytesMut) -> Result<(), io::Error> {
         let n = data.len();
 
         if n > self.builder.max_frame_len {
