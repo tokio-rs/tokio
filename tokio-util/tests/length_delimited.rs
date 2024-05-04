@@ -70,6 +70,9 @@ macro_rules! assert_done {
     }};
 }
 
+type MockFramedWrite =
+    tokio_util::codec::FramedWrite<Mock, tokio_util::codec::LengthDelimitedCodec>;
+
 #[test]
 fn read_empty_io_yields_nothing() {
     let io = Box::pin(FramedRead::new(mock!(), LengthDelimitedCodec::new()));
@@ -423,9 +426,15 @@ fn write_single_frame_length_adjusted() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
-        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
         assert!(io.get_ref().calls.is_empty());
     });
 }
@@ -436,7 +445,9 @@ fn write_nothing_yields_nothing() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.poll_flush(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io, cx
+        ));
     });
 }
 
@@ -453,9 +464,15 @@ fn write_single_frame_one_packet() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
-        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
         assert!(io.get_ref().calls.is_empty());
     });
 }
@@ -477,16 +494,28 @@ fn write_single_multi_frame_one_packet() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("123")));
 
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("hello world")));
 
-        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
         assert!(io.get_ref().calls.is_empty());
     });
 }
@@ -510,20 +539,38 @@ fn write_single_multi_frame_multi_packet() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
 
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("123")));
 
-        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
 
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("hello world")));
 
-        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
         assert!(io.get_ref().calls.is_empty());
     });
 }
@@ -544,12 +591,24 @@ fn write_single_frame_would_block() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-        assert_pending!(io.as_mut().poll_flush(cx));
-        assert_pending!(io.as_mut().poll_flush(cx));
-        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert_pending!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
+        assert_pending!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
 
         assert!(io.get_ref().calls.is_empty());
     });
@@ -567,10 +626,16 @@ fn write_single_frame_little_endian() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
         assert!(io.get_ref().calls.is_empty());
     });
 }
@@ -587,10 +652,16 @@ fn write_single_frame_with_short_length_field() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
 
         assert!(io.get_ref().calls.is_empty());
     });
@@ -604,7 +675,10 @@ fn write_max_frame_len() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_err!(io.as_mut().start_send(Bytes::from("abcdef")));
 
         assert!(io.get_ref().calls.is_empty());
@@ -621,10 +695,16 @@ fn write_update_max_frame_len_at_rest() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
 
-        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
 
         io.encoder_mut().set_max_frame_length(5);
 
@@ -646,14 +726,23 @@ fn write_update_max_frame_len_in_flight() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
 
-        assert_pending!(io.as_mut().poll_flush(cx));
+        assert_pending!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
 
         io.encoder_mut().set_max_frame_length(5);
 
-        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
 
         assert_err!(io.as_mut().start_send(Bytes::from("abcdef")));
         assert!(io.get_ref().calls.is_empty());
@@ -666,10 +755,16 @@ fn write_zero() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ready_ok!(<MockFramedWrite as futures::Sink<Bytes>>::poll_ready(
+            io.as_mut(),
+            cx
+        ));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
 
-        assert_ready_err!(io.as_mut().poll_flush(cx));
+        assert_ready_err!(<MockFramedWrite as futures::Sink<Bytes>>::poll_flush(
+            io.as_mut(),
+            cx
+        ));
 
         assert!(io.get_ref().calls.is_empty());
     });
