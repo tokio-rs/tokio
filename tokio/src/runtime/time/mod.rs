@@ -120,12 +120,12 @@ impl Driver {
     ///
     /// Specifying the source of time is useful when testing.
     pub(crate) fn new(park: IoStack, clock: &Clock, shards: u32) -> (Driver, Handle) {
-        let time_source = TimeSource::new(clock);
+        assert!(shards > 0);
 
-        let mut wheels = vec![];
-        for _ in 0..shards {
-            wheels.push(Mutex::new(wheel::Wheel::new()));
-        }
+        let time_source = TimeSource::new(clock);
+        let wheels: Vec<_> = (0..shards)
+            .map(|_| Mutex::new(wheel::Wheel::new()))
+            .collect();
 
         let handle = Handle {
             time_source,
@@ -174,7 +174,7 @@ impl Driver {
         // Finds out the min expiration time to park.
         let mut next_wake: Option<u64> = None;
         for id in 0..rt_handle.time().inner.get_shard_size() {
-            let lock = unsafe { rt_handle.time().inner.lock_sharded_wheel(id) };
+            let lock = rt_handle.time().inner.lock_sharded_wheel(id);
 
             if let Some(expiration_time) = lock.next_expiration_time() {
                 next_wake = Some(match next_wake {
