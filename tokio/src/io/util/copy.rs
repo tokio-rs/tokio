@@ -7,6 +7,7 @@ use std::task::{Context, Poll};
 
 #[derive(Debug)]
 pub(super) struct CopyBuffer {
+    flush_in_progress: bool,
     read_done: bool,
     need_flush: bool,
     pos: usize,
@@ -18,6 +19,7 @@ pub(super) struct CopyBuffer {
 impl CopyBuffer {
     pub(super) fn new(buf_size: usize) -> Self {
         Self {
+            flush_in_progress: false,
             read_done: false,
             need_flush: false,
             pos: 0,
@@ -148,7 +150,11 @@ impl CopyBuffer {
 
             // Try flushing before writing, either because the reader has no progress or to
             // be sure that this same flush operation is terminated properly.
-            if self.need_flush {
+            if is_read_pending || self.flush_in_progress {
+                if is_read_pending {
+                    self.flush_in_progress = true;
+                }
+
                 ready!(writer.as_mut().poll_flush(cx))?;
                 #[cfg(any(
                     feature = "fs",
@@ -162,6 +168,7 @@ impl CopyBuffer {
                 ))]
                 coop.made_progress();
                 self.need_flush = false;
+                self.flush_in_progress = false;
             }
 
             if is_read_pending {
