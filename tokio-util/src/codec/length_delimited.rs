@@ -623,7 +623,7 @@ impl<'a> Encoder<&'a [u8]> for LengthDelimitedCodec {
         }
 
         // Write the frame to the buffer
-        dst.extend_from_slice(&data[..]);
+        dst.extend_from_slice(data);
 
         Ok(())
     }
