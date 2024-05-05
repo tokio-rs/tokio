@@ -46,7 +46,7 @@ async fn test_crate_not_path_invalid() {}
 async fn test_has_second_test_attr() {}
 
 #[tokio::test]
-#[::core::prelude::v1::test]
+#[tokio::test]
 async fn test_has_generated_second_test_attr() {}
 
 fn main() {}
