@@ -443,24 +443,33 @@ pub(crate) fn main(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
     }
 }
 
-// Check whether given attribute is `#[test]` or `#[::core::prelude::v1::test]`.
+// Check whether given attribute is a test attribute of forms:
+// * `#[test]`
+// * `#[core::prelude::*::test]` or `#[::core::prelude::*::test]`
+// * `#[std::prelude::*::test]` or `#[::std::prelude::*::test]`
 fn is_test_attribute(attr: &Attribute) -> bool {
     let path = match &attr.meta {
         syn::Meta::Path(path) => path,
         _ => return false,
     };
-    let segments = ["core", "prelude", "v1", "test"];
-    if path.leading_colon.is_none() {
-        return path.segments.len() == 1
-            && path.segments[0].arguments.is_none()
-            && path.segments[0].ident == "test";
-    } else if path.segments.len() != segments.len() {
+    let candidates = [
+        ["core", "prelude", "*", "test"],
+        ["std", "prelude", "*", "test"],
+    ];
+    if path.leading_colon.is_none()
+        && path.segments.len() == 1
+        && path.segments[0].arguments.is_none()
+        && path.segments[0].ident == "test"
+    {
+        return true;
+    } else if path.segments.len() != candidates[0].len() {
         return false;
     }
-    path.segments
-        .iter()
-        .zip(segments)
-        .all(|(segment, path)| segment.arguments.is_none() && segment.ident == path)
+    candidates.into_iter().any(|segments| {
+        path.segments.iter().zip(segments).all(|(segment, path)| {
+            segment.arguments.is_none() && (path == "*" || segment.ident == path)
+        })
+    })
 }
 
 pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) -> TokenStream {
