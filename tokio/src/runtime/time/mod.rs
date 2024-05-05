@@ -172,17 +172,12 @@ impl Driver {
         assert!(!handle.is_shutdown());
 
         // Finds out the min expiration time to park.
-        let mut next_wake: Option<u64> = None;
-        for id in 0..rt_handle.time().inner.get_shard_size() {
-            let lock = rt_handle.time().inner.lock_sharded_wheel(id);
-
-            if let Some(expiration_time) = lock.next_expiration_time() {
-                next_wake = Some(match next_wake {
-                    Some(t) => t.min(expiration_time),
-                    None => expiration_time,
-                });
-            }
-        }
+        let next_wake = (0..rt_handle.time().inner.get_shard_size())
+            .filter_map(|id| {
+                let lock = rt_handle.time().inner.lock_sharded_wheel(id);
+                lock.next_expiration_time()
+            })
+            .min();
 
         rt_handle.time().inner.set_next_wake(
             next_wake.map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap())),
@@ -264,12 +259,16 @@ impl Handle {
         let shards = self.inner.get_shard_size();
         // For fairness, randomly select one to start.
         let start = rand::thread_rng_n(shards);
-        for i in start..shards + start {
-            self.process_at_sharded_time(i, now);
-        }
+
+        let next_wake_up = (start..shards + start)
+            .filter_map(|i| self.process_at_sharded_time(i, now))
+            .min();
+
+        self.inner.set_next_wake(next_wake_up);
     }
 
-    pub(self) fn process_at_sharded_time(&self, id: u32, mut now: u64) {
+    // Returns the next wakeup time of this shard.
+    pub(self) fn process_at_sharded_time(&self, id: u32, mut now: u64) -> Option<NonZeroU64> {
         let mut waker_list = WakeList::new();
         let mut lock = self.inner.lock_sharded_wheel(id);
 
@@ -300,15 +299,13 @@ impl Handle {
                 }
             }
         }
-
-        self.inner.set_next_wake(
-            lock.poll_at()
-                .map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap())),
-        );
-
+        let next_wake_up = lock
+            .poll_at()
+            .map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
         drop(lock);
 
         waker_list.wake_all();
+        next_wake_up
     }
 
     /// Removes a registered timer from the driver.
