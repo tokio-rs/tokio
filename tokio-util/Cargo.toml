@@ -29,7 +29,7 @@ codec = []
 time = ["tokio/time","slab"]
 io = []
 io-util = ["io", "tokio/rt", "tokio/io-util"]
-rt = ["tokio/rt", "tokio/sync", "futures-util", "hashbrown"]
+rt = ["tokio/rt", "tokio/sync", "futures-util", "hashbrown", "ahash"]
 
 __docs_rs = ["futures-util"]
 
@@ -46,6 +46,7 @@ tracing = { version = "0.1.25", default-features = false, features = ["std"], op
 
 [target.'cfg(tokio_unstable)'.dependencies]
 hashbrown = { version = "0.14.0", optional = true }
+ahash = { version = "0.8.7", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }
