@@ -518,7 +518,7 @@ impl TimerEntry {
                 Some(scheduler::Context::MultiThread(ctx)) => ctx.get_worker_index() as u32,
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 Some(scheduler::Context::MultiThreadAlt(ctx)) => ctx.get_worker_index() as u32,
-                _ => crate::runtime::context::thread_rng_n(shard_size),
+                _ => context::thread_rng_n(shard_size),
             });
             id % shard_size
         }
