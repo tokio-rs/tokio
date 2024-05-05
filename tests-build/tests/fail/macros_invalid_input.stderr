@@ -83,9 +83,33 @@ error: second test attribute is supplied, consider removing or changing the orde
    | ^^^^^^^
 
 error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> $DIR/macros_invalid_input.rs:48:1
+  --> $DIR/macros_invalid_input.rs:49:1
    |
-48 | #[tokio::test]
+49 | #[::core::prelude::v1::test]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> $DIR/macros_invalid_input.rs:53:1
+   |
+53 | #[core::prelude::rust_2015::test]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> $DIR/macros_invalid_input.rs:57:1
+   |
+57 | #[::std::prelude::rust_2018::test]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> $DIR/macros_invalid_input.rs:61:1
+   |
+61 | #[std::prelude::rust_2021::test]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> $DIR/macros_invalid_input.rs:64:1
+   |
+64 | #[tokio::test]
    | ^^^^^^^^^^^^^^
    |
    = note: this error originates in the attribute macro `tokio::test` (in Nightly builds, run with -Z macro-backtrace for more info)
