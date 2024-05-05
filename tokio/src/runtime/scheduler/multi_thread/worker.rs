@@ -742,7 +742,7 @@ impl Context {
     pub(crate) fn defer(&self, waker: &Waker) {
         self.defer.defer(waker);
     }
-    
+
     #[allow(dead_code)]
     pub(crate) fn get_worker_index(&self) -> usize {
         self.worker.index
