@@ -1010,7 +1010,7 @@ jobs:
       - name: check for unknown lints and cfgs
         run: cargo check --all-features --tests
         env:
-          RUSTFLAGS: -Dwarnings --check-cfg=cfg(loom) --check-cfg=cfg(tokio_unstable) --check-cfg=cfg(tokio_taskdump) -Funexpected_cfgs -Funknown_lints
+          RUSTFLAGS: -Dwarnings --check-cfg=cfg(loom) --check-cfg=cfg(tokio_unstable) --check-cfg=cfg(tokio_taskdump) --check-cfg=cfg(fuzzing) --check-cfg=cfg(mio_unsupported_force_poll_poll) --check-cfg=cfg(tokio_internal_mt_counters) --check-cfg=cfg(fs) --check-cfg=cfg(tokio_no_parking_lot) -Funexpected_cfgs -Funknown_lints
 
   check-fuzzing:
     name: check-fuzzing
