@@ -57,7 +57,11 @@ async fn open_options_create_new() {
 async fn open_options_mode() {
     let mode = format!("{:?}", OpenOptions::new().mode(0o644));
     // TESTING HACK: use Debug output to check the stored data
-    assert!(mode.contains("mode: 420 ") || mode.contains("mode: 0o000644 "), "mode is: {}", mode);
+    assert!(
+        mode.contains("mode: 420 ") || mode.contains("mode: 0o000644 "),
+        "mode is: {}",
+        mode
+    );
 }
 
 #[tokio::test]
