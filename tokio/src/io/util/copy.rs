@@ -127,9 +127,9 @@ impl CopyBuffer {
                         coop.made_progress();
                         return Poll::Ready(Err(err));
                     }
-                    // Ignore pending reads when our buffer is not empty, because
-                    // we can try to write data immediately.
                     Poll::Pending => {
+                        // Ignore pending reads when our buffer is not empty, because
+                        // we can try to write data immediately.
                         if self.pos == self.cap {
                             // Try flushing when the reader has no progress to avoid deadlock
                             // when the reader depends on buffered writer.
