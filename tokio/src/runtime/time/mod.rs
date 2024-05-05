@@ -162,7 +162,7 @@ impl Driver {
 
         // Advance time forward to the end of time.
 
-        handle.process_at_time(u64::MAX);
+        handle.process_at_time(0, u64::MAX);
 
         self.park.shutdown(rt_handle);
     }
@@ -251,14 +251,14 @@ impl Handle {
     /// Runs timer related logic, and returns the next wakeup time
     pub(self) fn process(&self, clock: &Clock) {
         let now = self.time_source().now(clock);
-
-        self.process_at_time(now);
+        // For fairness, randomly select one to start.
+        let shards = self.inner.get_shard_size();
+        let start = crate::runtime::context::thread_rng_n(shards);
+        self.process_at_time(start, now);
     }
 
-    pub(self) fn process_at_time(&self, now: u64) {
+    pub(self) fn process_at_time(&self, start: u32, now: u64) {
         let shards = self.inner.get_shard_size();
-        // For fairness, randomly select one to start.
-        let start = crate::runtime::context::thread_rng_n(shards);
 
         let next_wake_up = (start..shards + start)
             .filter_map(|i| self.process_at_sharded_time(i, now))
