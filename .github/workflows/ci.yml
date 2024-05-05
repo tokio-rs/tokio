@@ -1010,7 +1010,7 @@ jobs:
       - name: check tokio
         run: cargo check --all-features
         env:
-          RUSTFLAGS: -Dwarnings --check-cfg=cfg(loom) --check-cfg=cfg(tokio_unstable) -Funexpected_cfgs -Funknown_lints
+          RUSTFLAGS: -Dwarnings --check-cfg=cfg(loom) --check-cfg=cfg(tokio_unstable) --check-cfg=cfg(tokio_taskdump) -Funexpected_cfgs -Funknown_lints
 
   check-fuzzing:
     name: check-fuzzing
