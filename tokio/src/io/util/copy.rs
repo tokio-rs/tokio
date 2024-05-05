@@ -189,10 +189,6 @@ impl CopyBuffer {
                 "writer returned length larger than input slice"
             );
 
-            if self.pos != self.cap {
-                continue;
-            }
-
             // All data has been written, the buffer can be considered empty again
             self.pos = 0;
             self.cap = 0;
