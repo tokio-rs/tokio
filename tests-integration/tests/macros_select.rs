@@ -4,7 +4,10 @@ use futures::channel::oneshot;
 use futures::executor::block_on;
 use std::thread;
 
-#[cfg_attr(target_os = "wasi", ignore = "WASI: std::thread::spawn not supported")]
+#[cfg_attr(
+    not(feature = "rt-multi-thread"),
+    ignore = "WASI: std::thread::spawn not supported"
+)]
 #[test]
 fn join_with_select() {
     block_on(async {

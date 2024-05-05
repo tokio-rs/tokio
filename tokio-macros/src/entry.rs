@@ -418,7 +418,6 @@ fn token_stream_with_error(mut tokens: TokenStream, error: syn::Error) -> TokenS
     tokens
 }
 
-#[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub(crate) fn main(args: TokenStream, item: TokenStream, rt_multi_thread: bool) -> TokenStream {
     // If any of the steps for this macro fail, we still want to expand to an item that is as close
     // to the expected output as possible. This helps out IDEs such that completions and other

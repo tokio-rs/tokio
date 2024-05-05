@@ -1,3 +1,4 @@
+#![allow(unknown_lints, unexpected_cfgs)]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,

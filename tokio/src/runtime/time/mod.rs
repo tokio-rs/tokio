@@ -23,9 +23,10 @@ use crate::loom::sync::Mutex;
 use crate::runtime::driver::{self, IoHandle, IoStack};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
+use crate::util::WakeList;
 
 use std::fmt;
-use std::{num::NonZeroU64, ptr::NonNull, task::Waker};
+use std::{num::NonZeroU64, ptr::NonNull};
 
 /// Time implementation that drives [`Sleep`][sleep], [`Interval`][interval], and [`Timeout`][timeout].
 ///
@@ -253,8 +254,7 @@ impl Handle {
     }
 
     pub(self) fn process_at_time(&self, mut now: u64) {
-        let mut waker_list: [Option<Waker>; 32] = Default::default();
-        let mut waker_idx = 0;
+        let mut waker_list = WakeList::new();
 
         let mut lock = self.inner.lock();
 
@@ -273,19 +273,13 @@ impl Handle {
 
             // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
             if let Some(waker) = unsafe { entry.fire(Ok(())) } {
-                waker_list[waker_idx] = Some(waker);
+                waker_list.push(waker);
 
-                waker_idx += 1;
-
-                if waker_idx == waker_list.len() {
+                if !waker_list.can_push() {
                     // Wake a batch of wakers. To avoid deadlock, we must do this with the lock temporarily dropped.
                     drop(lock);
 
-                    for waker in waker_list.iter_mut() {
-                        waker.take().unwrap().wake();
-                    }
-
-                    waker_idx = 0;
+                    waker_list.wake_all();
 
                     lock = self.inner.lock();
                 }
@@ -299,9 +293,7 @@ impl Handle {
 
         drop(lock);
 
-        for waker in &mut waker_list[0..waker_idx] {
-            waker.take().unwrap().wake();
-        }
+        waker_list.wake_all();
     }
 
     /// Removes a registered timer from the driver.
