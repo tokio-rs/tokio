@@ -1006,9 +1006,9 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
       - name: don't allow warnings
-        run: sed -i '/#!\[allow(unknown_lints, unexpected_cfgs)\]/d' */src/lib.rs
-      - name: check tokio
-        run: cargo check --all-features
+        run: sed -i '/#!\[allow(unknown_lints, unexpected_cfgs)\]/d' */src/lib.rs */tests/*.rs
+      - name: check for unknown lints and cfgs
+        run: cargo check --all-features --tests
         env:
           RUSTFLAGS: -Dwarnings --check-cfg=cfg(loom) --check-cfg=cfg(tokio_unstable) --check-cfg=cfg(tokio_taskdump) -Funexpected_cfgs -Funknown_lints
 

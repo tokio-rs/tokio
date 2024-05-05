@@ -1,3 +1,4 @@
+#![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 

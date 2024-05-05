@@ -1,3 +1,5 @@
+#![allow(unknown_lints, unexpected_cfgs)]
+
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 mod tests {
     use std::rc::Rc;
