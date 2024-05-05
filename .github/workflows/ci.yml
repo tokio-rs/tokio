@@ -599,10 +599,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust ${{ env.rust_nightly }}
+      # This check is broken on newer nightlies.
+      - name: Install Rust nightly-2023-10-21
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: nightly-2023-10-21
           components: rust-src
 
       - name: Install cargo-nextest
