@@ -57,7 +57,7 @@ struct Context {
     #[cfg(feature = "rt")]
     runtime: Cell<EnterRuntime>,
 
-    #[cfg(any(feature = "rt", feature = "macros"))]
+    #[cfg(any(feature = "rt", feature = "macros", feature = "time"))]
     rng: Cell<Option<FastRand>>,
 
     /// Tracks the amount of "work" a task may still do before yielding back to
