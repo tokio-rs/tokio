@@ -129,26 +129,28 @@ impl CopyBuffer {
                     }
                     // Ignore pending reads when our buffer is not empty, because
                     // we can try to write data immediately.
-                    Poll::Pending => if self.pos == self.cap {
-                        // Try flushing when the reader has no progress to avoid deadlock
-                        // when the reader depends on buffered writer.
-                        if self.need_flush {
-                            ready!(writer.as_mut().poll_flush(cx))?;
-                            #[cfg(any(
-                                feature = "fs",
-                                feature = "io-std",
-                                feature = "net",
-                                feature = "process",
-                                feature = "rt",
-                                feature = "signal",
-                                feature = "sync",
-                                feature = "time",
-                            ))]
-                            coop.made_progress();
-                            self.need_flush = false;
-                        }
+                    Poll::Pending => {
+                        if self.pos == self.cap {
+                            // Try flushing when the reader has no progress to avoid deadlock
+                            // when the reader depends on buffered writer.
+                            if self.need_flush {
+                                ready!(writer.as_mut().poll_flush(cx))?;
+                                #[cfg(any(
+                                    feature = "fs",
+                                    feature = "io-std",
+                                    feature = "net",
+                                    feature = "process",
+                                    feature = "rt",
+                                    feature = "signal",
+                                    feature = "sync",
+                                    feature = "time",
+                                ))]
+                                coop.made_progress();
+                                self.need_flush = false;
+                            }
 
-                        return Poll::Pending;
+                            return Poll::Pending;
+                        }
                     }
                 }
             }
