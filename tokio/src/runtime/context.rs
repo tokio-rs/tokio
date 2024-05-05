@@ -3,7 +3,7 @@ use crate::runtime::coop;
 
 use std::cell::Cell;
 
-#[cfg(any(feature = "rt", feature = "macros"))]
+#[cfg(any(feature = "rt", feature = "macros", feature = "time"))]
 use crate::util::rand::FastRand;
 
 cfg_rt! {
