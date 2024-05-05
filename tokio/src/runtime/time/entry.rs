@@ -513,7 +513,7 @@ impl TimerEntry {
         let shard_size = self.driver.driver().time().inner.get_shard_size();
         let id = context::with_scheduler(|ctx| match ctx {
             #[cfg(feature = "rt")]
-            Some(scheduler::Context::CurrentThread(ctx)) => 0,
+            Some(scheduler::Context::CurrentThread(_ctx)) => 0,
             #[cfg(feature = "rt-multi-thread")]
             Some(scheduler::Context::MultiThread(ctx)) => ctx.get_worker_index() as u32,
             #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
