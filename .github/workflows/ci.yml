@@ -1005,6 +1005,8 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_nightly }}
+      - name: don't allow warnings
+        run: sed -i '/#!\[allow(unknown_lints, unexpected_cfgs)\]/d' */src/lib.rs
       - name: check tokio
         run: cargo check --all-features
         env:
