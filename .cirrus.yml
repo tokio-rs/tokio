@@ -4,7 +4,7 @@ freebsd_instance:
   image_family: freebsd-14-0
 env:
   RUST_STABLE: stable
-  RUST_NIGHTLY: nightly-2023-10-21
+  RUST_NIGHTLY: nightly-2024-05-05
   RUSTFLAGS: -D warnings
 
 # Test FreeBSD in a full VM on cirrus-ci.com.  Test the i686 target too, in the

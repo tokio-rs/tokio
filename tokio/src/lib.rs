@@ -1,3 +1,4 @@
+#![allow(unknown_lints, unexpected_cfgs)]
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
@@ -446,13 +447,9 @@
 // least 32 bits, which a lot of components in Tokio currently assumes.
 //
 // TODO: improve once we have MSRV access to const eval to make more flexible.
-#[cfg(not(any(
-    target_pointer_width = "32",
-    target_pointer_width = "64",
-    target_pointer_width = "128"
-)))]
+#[cfg(not(any(target_pointer_width = "32", target_pointer_width = "64")))]
 compile_error! {
-    "Tokio requires the platform pointer width to be 32, 64, or 128 bits"
+    "Tokio requires the platform pointer width to be at least 32 bits"
 }
 
 #[cfg(all(

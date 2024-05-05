@@ -1,3 +1,4 @@
+#![allow(unknown_lints, unexpected_cfgs)]
 #![cfg(all(
     tokio_unstable,
     tokio_taskdump,
