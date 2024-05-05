@@ -100,7 +100,7 @@ tokio_thread_local! {
             #[cfg(feature = "rt")]
             runtime: Cell::new(EnterRuntime::NotEntered),
 
-            #[cfg(any(feature = "rt", feature = "macros"))]
+            #[cfg(any(feature = "rt", feature = "macros", feature = "time"))]
             rng: Cell::new(None),
 
             budget: Cell::new(coop::Budget::unconstrained()),

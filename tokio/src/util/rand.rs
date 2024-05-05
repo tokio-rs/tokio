@@ -1,7 +1,5 @@
-#[cfg(any(feature = "rt", feature = "time"))]
-mod rt;
-
 cfg_rt! {
+    mod rt;
     pub(crate) use rt::RngSeedGenerator;
 
     cfg_unstable! {

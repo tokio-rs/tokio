@@ -49,7 +49,7 @@ cfg_rt! {
     pub(crate) mod sharded_list;
 }
 
-#[cfg(any(feature = "rt", feature = "macros"))]
+#[cfg(any(feature = "rt", feature = "macros", feature = "time"))]
 pub(crate) mod rand;
 
 cfg_rt! {

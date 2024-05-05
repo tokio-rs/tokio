@@ -527,7 +527,7 @@ impl TimerEntry {
     cfg_not_rt! {
         fn get_shard_id(&self) -> u32 {
             let shard_size = self.driver.driver().time().inner.get_shard_size();
-            let id = crate::runtime::context::thread_rng_n(shard_size);
+            let id = context::thread_rng_n(shard_size);
             id % shard_size
         }
     }
