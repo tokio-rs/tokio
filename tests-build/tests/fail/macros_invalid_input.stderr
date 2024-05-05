@@ -87,3 +87,5 @@ error: second test attribute is supplied, consider removing or changing the orde
    |
 48 | #[tokio::test]
    | ^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the attribute macro `tokio::test` (in Nightly builds, run with -Z macro-backtrace for more info)
