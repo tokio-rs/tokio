@@ -258,7 +258,7 @@ impl Handle {
     pub(self) fn process_at_time(&self, now: u64) {
         let shards = self.inner.get_shard_size();
         // For fairness, randomly select one to start.
-        let start = rand::thread_rng_n(shards);
+        let start = crate::runtime::context::thread_rng_n(shards);
 
         let next_wake_up = (start..shards + start)
             .filter_map(|i| self.process_at_sharded_time(i, now))
@@ -436,25 +436,6 @@ impl Inner {
 impl fmt::Debug for Inner {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Inner").finish()
-    }
-}
-
-mod rand {
-    use crate::util::rand::FastRand;
-    use std::cell::Cell;
-
-    // Used by `TimerEntry`.
-    pub(crate) fn thread_rng_n(n: u32) -> u32 {
-        thread_local! {
-            static THREAD_RNG: Cell<FastRand> = Cell::new(FastRand::new());
-        }
-
-        THREAD_RNG.with(|cell_rng| {
-            let mut rng = cell_rng.get();
-            let ret = rng.fastrand_n(n);
-            cell_rng.set(rng);
-            ret
-        })
     }
 }
 
