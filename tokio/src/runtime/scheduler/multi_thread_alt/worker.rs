@@ -1311,6 +1311,10 @@ impl Context {
     fn shared(&self) -> &Shared {
         &self.handle.shared
     }
+
+    pub(crate) fn get_worker_index(&self) -> usize {
+        self.index
+    }
 }
 
 impl Core {
