@@ -58,6 +58,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::atomic::Ordering;
 
+use crate::runtime::context;
 use crate::runtime::scheduler;
 use crate::sync::AtomicWaker;
 use crate::time::Instant;
@@ -498,13 +499,23 @@ impl TimerEntry {
     fn inner(&self) -> &TimerShared {
         let inner = unsafe { &*self.inner.get() };
         if inner.is_none() {
-            let shard_id =
-                super::rand::thread_rng_n(self.driver.driver().time().inner.get_shard_size());
+            let shard_id = self.get_shard_id();
             unsafe {
                 *self.inner.get() = Some(TimerShared::new(shard_id));
             }
         }
         return inner.as_ref().unwrap();
+    }
+
+    fn get_shard_id(&self) -> u32 {
+        let shard_size = self.driver.driver().time().inner.get_shard_size();
+        use scheduler::Context::MultiThread;
+        let id = context::with_scheduler(|ctx| match ctx {
+            Some(MultiThread(ctx)) => ctx.get_worker_index() as u32,
+            Some(_) => 1,
+            _ => super::rand::thread_rng_n(shard_size),
+        });
+        id % shard_size
     }
 
     pub(crate) fn deadline(&self) -> Instant {
