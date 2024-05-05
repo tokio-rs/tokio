@@ -511,15 +511,13 @@ impl TimerEntry {
     // Otherwise, we use a random number generator to obtain the shard id.
     fn get_shard_id(&self) -> u32 {
         let shard_size = self.driver.driver().time().inner.get_shard_size();
-        use scheduler::Context::MultiThread;
-
-        #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-        use scheduler::Context::MultiThreadAlt;
         let id = context::with_scheduler(|ctx| match ctx {
-            Some(MultiThread(ctx)) => ctx.get_worker_index() as u32,
+            #[cfg(feature = "rt")]
+            Some(scheduler::Context::CurrentThread(ctx)) => 0,
+            #[cfg(feature = "rt-multi-thread")]
+            Some(scheduler::Context::MultiThread(ctx)) => ctx.get_worker_index() as u32,
             #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-            Some(MultiThreadAlt(ctx)) => ctx.get_worker_index() as u32,
-            Some(_) => 0,
+            Some(scheduler::Context::MultiThreadAlt(ctx)) => ctx.get_worker_index() as u32,
             _ => crate::runtime::context::thread_rng_n(shard_size),
         });
         id % shard_size
