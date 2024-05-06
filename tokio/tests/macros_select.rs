@@ -1,4 +1,4 @@
-#![allow(unknown_lints, unexpected_cfgs)]
+#![cfg_attr(not(check_cfg), allow(unknown_lints, unexpected_cfgs))]
 #![cfg(feature = "macros")]
 #![allow(clippy::disallowed_names)]
 

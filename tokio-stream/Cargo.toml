@@ -15,6 +15,7 @@ description = """
 Utilities to work with `Stream` and `tokio`.
 """
 categories = ["asynchronous"]
+exclude = ["build.rs"]
 
 [features]
 default = ["time"]

@@ -15,6 +15,7 @@ description = """
 Additional utilities for working with Tokio.
 """
 categories = ["asynchronous"]
+exclude = ["build.rs"]
 
 [features]
 # No features on by default
