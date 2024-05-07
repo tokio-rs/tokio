@@ -673,8 +673,7 @@ impl Command {
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn uid(&mut self, id: u32) -> &mut Command {
         #[cfg(target_os = "nto")]
-        self.std.uid(id as i32);
-        #[cfg(not(target_os = "nto"))]
+        let id = id as i32;
         self.std.uid(id);
         self
     }
