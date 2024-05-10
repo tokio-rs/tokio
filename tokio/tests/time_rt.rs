@@ -88,3 +88,34 @@ async fn timeout_value() {
     assert!(res.is_err());
     assert!(Instant::now() >= now + dur);
 }
+
+#[test]
+fn ready_in_busy_loop() {
+    async fn never_pending() {}
+
+    let handle = std::thread::spawn(|| {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                tokio::spawn(async move {
+                    let mut timer = tokio::time::interval(tokio::time::Duration::from_millis(2));
+                    loop {
+                        tokio::select! {
+                            _= timer.tick() => {
+                               break;
+                            }
+                            _ = never_pending() => {}
+                        }
+                    }
+                })
+                .await
+                .unwrap();
+            });
+    });
+
+    std::thread::sleep(std::time::Duration::from_millis(10));
+
+    assert!(handle.is_finished());
+}

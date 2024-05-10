@@ -412,6 +412,19 @@ impl Sleep {
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
+        let time_source = &me.entry.driver().time_source();
+        let now_tick = time_source.now(me.entry.clock());
+        let deadline_tick = time_source.deadline_to_tick(me.entry.deadline());
+
+        // If the deadline has been reached, then we return here without checking the state of TimerEntry.
+        // This ensures that even if the state of TimerEntry is not maintained by the Timer Driver,
+        // it can expire as expected.
+        // See <https://github.com/tokio-rs/tokio/issues/6545>
+        if deadline_tick <= now_tick {
+            me.entry.cancel();
+            return Poll::Ready(Ok(()));
+        }
+
         let result = me.entry.poll_elapsed(cx).map(move |r| {
             coop.made_progress();
             r
