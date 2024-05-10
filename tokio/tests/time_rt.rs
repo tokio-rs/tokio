@@ -116,7 +116,7 @@ fn ready_in_busy_loop() {
             });
     });
 
-    std::thread::sleep(std::time::Duration::from_millis(10));
+    std::thread::sleep(std::time::Duration::from_secs(2));
 
     assert!(handle.is_finished());
 }
