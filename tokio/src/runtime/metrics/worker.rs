@@ -44,7 +44,7 @@ pub(crate) struct WorkerMetrics {
     /// current-thread scheduler.
     pub(crate) queue_depth: AtomicUsize,
 
-    /// If `Some`, tracks the the number of polls by duration range.
+    /// If `Some`, tracks the number of polls by duration range.
     pub(super) poll_count_histogram: Option<Histogram>,
 }
 

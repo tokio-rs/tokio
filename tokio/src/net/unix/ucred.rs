@@ -49,7 +49,8 @@ pub(crate) use self::impl_bsd::get_peer_cred;
     target_os = "macos",
     target_os = "ios",
     target_os = "tvos",
-    target_os = "watchos"
+    target_os = "watchos",
+    target_os = "visionos"
 ))]
 pub(crate) use self::impl_macos::get_peer_cred;
 
@@ -196,7 +197,8 @@ pub(crate) mod impl_bsd {
     target_os = "macos",
     target_os = "ios",
     target_os = "tvos",
-    target_os = "watchos"
+    target_os = "watchos",
+    target_os = "visionos"
 ))]
 pub(crate) mod impl_macos {
     use crate::net::unix::{self, UnixStream};

@@ -450,6 +450,7 @@ impl Launch {
 }
 
 fn run(worker: Arc<Worker>) {
+    #[allow(dead_code)]
     struct AbortOnPanic;
 
     impl Drop for AbortOnPanic {
@@ -984,8 +985,6 @@ impl Core {
         let next = self
             .stats
             .tuned_global_queue_interval(&worker.handle.shared.config);
-
-        debug_assert!(next > 1);
 
         // Smooth out jitter
         if abs_diff(self.global_queue_interval, next) > 2 {

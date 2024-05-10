@@ -17,13 +17,16 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+#[allow(unused)]
 trait AssertSend: Send {}
 impl AssertSend for oneshot::Sender<i32> {}
 impl AssertSend for oneshot::Receiver<i32> {}
 
+#[allow(unused)]
 trait SenderExt {
     fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()>;
 }
+
 impl<T> SenderExt for oneshot::Sender<T> {
     fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         tokio::pin! {

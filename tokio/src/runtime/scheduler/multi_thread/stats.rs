@@ -63,7 +63,7 @@ impl Stats {
         let tasks_per_interval = (TARGET_GLOBAL_QUEUE_INTERVAL / self.task_poll_time_ewma) as u32;
 
         cmp::max(
-            // We don't want to return less than 2 as that would result in the
+            // If we are using self-tuning, we don't want to return less than 2 as that would result in the
             // global queue always getting checked first.
             2,
             cmp::min(

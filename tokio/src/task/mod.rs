@@ -318,10 +318,8 @@
 cfg_rt! {
     pub use crate::runtime::task::{JoinError, JoinHandle};
 
-    cfg_not_wasi! {
-        mod blocking;
-        pub use blocking::spawn_blocking;
-    }
+    mod blocking;
+    pub use blocking::spawn_blocking;
 
     mod spawn;
     pub use spawn::spawn;

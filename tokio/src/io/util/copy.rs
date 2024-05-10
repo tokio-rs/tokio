@@ -16,14 +16,14 @@ pub(super) struct CopyBuffer {
 }
 
 impl CopyBuffer {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(buf_size: usize) -> Self {
         Self {
             read_done: false,
             need_flush: false,
             pos: 0,
             cap: 0,
             amt: 0,
-            buf: vec![0; super::DEFAULT_BUF_SIZE].into_boxed_slice(),
+            buf: vec![0; buf_size].into_boxed_slice(),
         }
     }
 
@@ -269,7 +269,7 @@ cfg_io_util! {
         Copy {
             reader,
             writer,
-            buf: CopyBuffer::new()
+            buf: CopyBuffer::new(super::DEFAULT_BUF_SIZE)
         }.await
     }
 }

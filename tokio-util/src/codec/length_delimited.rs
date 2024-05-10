@@ -639,7 +639,6 @@ mod builder {
     impl LengthFieldType for u64 {}
 
     #[cfg(any(
-        target_pointer_width = "8",
         target_pointer_width = "16",
         target_pointer_width = "32",
         target_pointer_width = "64",

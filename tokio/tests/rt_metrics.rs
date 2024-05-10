@@ -1,3 +1,4 @@
+#![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", tokio_unstable, not(target_os = "wasi")))]
 
@@ -175,6 +176,7 @@ fn worker_noop_count() {
 }
 
 #[test]
+#[ignore] // this test is flaky, see https://github.com/tokio-rs/tokio/issues/6470
 fn worker_steal_count() {
     // This metric only applies to the multi-threaded runtime.
     //

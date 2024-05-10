@@ -8,6 +8,7 @@ use std::process::ExitStatus;
 /// An interface for waiting on a process to exit.
 pub(crate) trait Wait {
     /// Get the identifier for this process or diagnostics.
+    #[allow(dead_code)]
     fn id(&self) -> u32;
     /// Try waiting for a process to exit in a non-blocking manner.
     fn try_wait(&mut self) -> io::Result<Option<ExitStatus>>;

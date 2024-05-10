@@ -465,6 +465,10 @@ impl<T, S: Semaphore> Rx<T, S> {
             }
         })
     }
+
+    pub(super) fn semaphore(&self) -> &S {
+        &self.inner.semaphore
+    }
 }
 
 impl<T, S: Semaphore> Drop for Rx<T, S> {

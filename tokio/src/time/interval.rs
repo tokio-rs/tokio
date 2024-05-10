@@ -480,7 +480,9 @@ impl Interval {
             self.missed_tick_behavior
                 .next_timeout(timeout, now, self.period)
         } else {
-            timeout + self.period
+            timeout
+                .checked_add(self.period)
+                .unwrap_or_else(Instant::far_future)
         };
 
         // When we arrive here, the internal delay returned `Poll::Ready`.
