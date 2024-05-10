@@ -89,6 +89,7 @@ async fn timeout_value() {
     assert!(Instant::now() >= now + dur);
 }
 
+#[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 #[test]
 fn ready_in_busy_loop() {
     async fn never_pending() {}
