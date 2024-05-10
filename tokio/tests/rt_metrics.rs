@@ -137,7 +137,7 @@ fn worker_park_count() {
     let rt = current_thread();
     let metrics = rt.metrics();
     rt.block_on(async {
-        time::sleep(Duration::from_millis(1)).await;
+        time::sleep(Duration::from_millis(100)).await;
     });
     drop(rt);
     assert!(1 <= metrics.worker_park_count(0));
@@ -145,7 +145,7 @@ fn worker_park_count() {
     let rt = threaded();
     let metrics = rt.metrics();
     rt.block_on(async {
-        time::sleep(Duration::from_millis(1)).await;
+        time::sleep(Duration::from_millis(100)).await;
     });
     drop(rt);
     assert!(1 <= metrics.worker_park_count(0));
@@ -160,7 +160,7 @@ fn worker_noop_count() {
     let rt = current_thread();
     let metrics = rt.metrics();
     rt.block_on(async {
-        time::sleep(Duration::from_millis(1)).await;
+        time::sleep(Duration::from_millis(100)).await;
     });
     drop(rt);
     assert!(0 < metrics.worker_noop_count(0));
@@ -168,7 +168,7 @@ fn worker_noop_count() {
     let rt = threaded();
     let metrics = rt.metrics();
     rt.block_on(async {
-        time::sleep(Duration::from_millis(1)).await;
+        time::sleep(Duration::from_millis(100)).await;
     });
     drop(rt);
     assert!(0 < metrics.worker_noop_count(0));
