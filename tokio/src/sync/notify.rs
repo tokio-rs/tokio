@@ -613,7 +613,7 @@ impl Notify {
     /// This function behaves similar to `notify_one`. The only difference is that it wakes
     /// the most recently added waiter instead of the oldest waiter.
     ///
-    /// Check the `notify_one` documentation for more info and
+    /// Check the [`notify_one`] documentation for more info and
     /// examples.
     pub fn notify_one_last_in(&self) {
         self.notify_with_strategy(NotifyOneStrategy::Lifo);
