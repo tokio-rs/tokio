@@ -126,11 +126,11 @@ pub(super) enum Scheduler {
     CurrentThread(CurrentThread),
 
     /// Execute tasks across multiple threads.
-    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+    #[cfg(feature = "rt-multi-thread")]
     MultiThread(MultiThread),
 
     /// Execute tasks across multiple threads.
-    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
     MultiThreadAlt(MultiThreadAlt),
 }
 
@@ -147,40 +147,38 @@ impl Runtime {
         }
     }
 
-    cfg_not_wasi! {
-        /// Creates a new runtime instance with default configuration values.
-        ///
-        /// This results in the multi threaded scheduler, I/O driver, and time driver being
-        /// initialized.
-        ///
-        /// Most applications will not need to call this function directly. Instead,
-        /// they will use the  [`#[tokio::main]` attribute][main]. When a more complex
-        /// configuration is necessary, the [runtime builder] may be used.
-        ///
-        /// See [module level][mod] documentation for more details.
-        ///
-        /// # Examples
-        ///
-        /// Creating a new `Runtime` with default configuration values.
-        ///
-        /// ```
-        /// use tokio::runtime::Runtime;
-        ///
-        /// let rt = Runtime::new()
-        ///     .unwrap();
-        ///
-        /// // Use the runtime...
-        /// ```
-        ///
-        /// [mod]: index.html
-        /// [main]: ../attr.main.html
-        /// [threaded scheduler]: index.html#threaded-scheduler
-        /// [runtime builder]: crate::runtime::Builder
-        #[cfg(feature = "rt-multi-thread")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
-        pub fn new() -> std::io::Result<Runtime> {
-            Builder::new_multi_thread().enable_all().build()
-        }
+    /// Creates a new runtime instance with default configuration values.
+    ///
+    /// This results in the multi threaded scheduler, I/O driver, and time driver being
+    /// initialized.
+    ///
+    /// Most applications will not need to call this function directly. Instead,
+    /// they will use the  [`#[tokio::main]` attribute][main]. When a more complex
+    /// configuration is necessary, the [runtime builder] may be used.
+    ///
+    /// See [module level][mod] documentation for more details.
+    ///
+    /// # Examples
+    ///
+    /// Creating a new `Runtime` with default configuration values.
+    ///
+    /// ```
+    /// use tokio::runtime::Runtime;
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// // Use the runtime...
+    /// ```
+    ///
+    /// [mod]: index.html
+    /// [main]: ../attr.main.html
+    /// [threaded scheduler]: index.html#threaded-scheduler
+    /// [runtime builder]: crate::runtime::Builder
+    #[cfg(feature = "rt-multi-thread")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+    pub fn new() -> std::io::Result<Runtime> {
+        Builder::new_multi_thread().enable_all().build()
     }
 
     /// Returns a handle to the runtime's spawner.
@@ -347,9 +345,9 @@ impl Runtime {
 
         match &self.scheduler {
             Scheduler::CurrentThread(exec) => exec.block_on(&self.handle.inner, future),
-            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(feature = "rt-multi-thread")]
             Scheduler::MultiThread(exec) => exec.block_on(&self.handle.inner, future),
-            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
             Scheduler::MultiThreadAlt(exec) => exec.block_on(&self.handle.inner, future),
         }
     }
@@ -469,13 +467,13 @@ impl Drop for Runtime {
                 let _guard = context::try_set_current(&self.handle.inner);
                 current_thread.shutdown(&self.handle.inner);
             }
-            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(feature = "rt-multi-thread")]
             Scheduler::MultiThread(multi_thread) => {
                 // The threaded scheduler drops its tasks on its worker threads, which is
                 // already in the runtime's context.
                 multi_thread.shutdown(&self.handle.inner);
             }
-            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
             Scheduler::MultiThreadAlt(multi_thread) => {
                 // The threaded scheduler drops its tasks on its worker threads, which is
                 // already in the runtime's context.

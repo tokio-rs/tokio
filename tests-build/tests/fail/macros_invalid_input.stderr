@@ -76,20 +76,40 @@ error: Failed to parse value of `crate` as path: "456"
 41 | #[tokio::test(crate = "456")]
    |                       ^^^^^
 
-error: second test attribute is supplied
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
   --> $DIR/macros_invalid_input.rs:45:1
    |
 45 | #[test]
    | ^^^^^^^
 
-error: duplicated attribute
-  --> $DIR/macros_invalid_input.rs:45:1
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> $DIR/macros_invalid_input.rs:49:1
    |
-45 | #[test]
-   | ^^^^^^^
+49 | #[::core::prelude::v1::test]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> $DIR/macros_invalid_input.rs:53:1
    |
-note: the lint level is defined here
-  --> $DIR/macros_invalid_input.rs:1:9
+53 | #[core::prelude::rust_2015::test]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> $DIR/macros_invalid_input.rs:57:1
    |
-1  | #![deny(duplicate_macro_attributes)]
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+57 | #[::std::prelude::rust_2018::test]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> $DIR/macros_invalid_input.rs:61:1
+   |
+61 | #[std::prelude::rust_2021::test]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> $DIR/macros_invalid_input.rs:64:1
+   |
+64 | #[tokio::test]
+   | ^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the attribute macro `tokio::test` (in Nightly builds, run with -Z macro-backtrace for more info)

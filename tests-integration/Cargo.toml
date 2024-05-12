@@ -39,6 +39,7 @@ rt-process-signal = ["rt-net", "tokio/process", "tokio/signal"]
 # This is an explicit feature so we can use `cargo hack` testing single features
 # instead of all possible permutations.
 wasi-rt = ["rt", "macros", "sync"]
+wasi-threads-rt = ["wasi-rt", "rt-multi-thread"]
 
 full = [
     "macros",

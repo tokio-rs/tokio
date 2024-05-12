@@ -49,7 +49,7 @@ fn single_timer() {
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
             let entry = TimerEntry::new(
-                &handle_.inner,
+                handle_.inner.clone(),
                 handle_.inner.driver().clock().now() + Duration::from_secs(1),
             );
             pin!(entry);
@@ -83,7 +83,7 @@ fn drop_timer() {
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
             let entry = TimerEntry::new(
-                &handle_.inner,
+                handle_.inner.clone(),
                 handle_.inner.driver().clock().now() + Duration::from_secs(1),
             );
             pin!(entry);
@@ -117,7 +117,7 @@ fn change_waker() {
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
             let entry = TimerEntry::new(
-                &handle_.inner,
+                handle_.inner.clone(),
                 handle_.inner.driver().clock().now() + Duration::from_secs(1),
             );
             pin!(entry);
@@ -157,7 +157,7 @@ fn reset_future() {
         let start = handle.inner.driver().clock().now();
 
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(&handle_.inner, start + Duration::from_secs(1));
+            let entry = TimerEntry::new(handle_.inner.clone(), start + Duration::from_secs(1));
             pin!(entry);
 
             let _ = entry
@@ -219,7 +219,7 @@ fn poll_process_levels() {
 
     for i in 0..normal_or_miri(1024, 64) {
         let mut entry = Box::pin(TimerEntry::new(
-            &handle.inner,
+            handle.inner.clone(),
             handle.inner.driver().clock().now() + Duration::from_millis(i),
         ));
 
@@ -253,7 +253,7 @@ fn poll_process_levels_targeted() {
     let handle = rt.handle();
 
     let e1 = TimerEntry::new(
-        &handle.inner,
+        handle.inner.clone(),
         handle.inner.driver().clock().now() + Duration::from_millis(193),
     );
     pin!(e1);

@@ -1,3 +1,4 @@
+#![allow(unknown_lints, unexpected_cfgs)]
 #![warn(
     missing_debug_implementations,
     missing_docs,
