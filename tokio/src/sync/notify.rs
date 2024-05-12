@@ -255,23 +255,16 @@ generate_addr_of_methods! {
 }
 
 // No notification.
-const NOTIFICATION_NONE: usize = 0;
+const NOTIFICATION_NONE: usize = 0b000;
 
 // Notification type used by `notify_one`.
-const NOTIFICATION_ONE: usize = 1;
+const NOTIFICATION_ONE: usize = 0b001;
+
+// Notification type used by `notify_one_last_in`.
+const NOTIFICATION_ONE_LAST_IN: usize = 0b101;
 
 // Notification type used by `notify_waiters`.
-const NOTIFICATION_ALL: usize = 2;
-
-const NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT: usize = 2;
-const NOTIFICATION_TYPE_MASK: usize = (1 << NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT) - 1;
-const NOTIFICATION_NOTIFY_ONE_STRATEGY_MASK: usize = !NOTIFICATION_TYPE_MASK;
-
-// Fifo (default) wakeup order
-const NOTIFICATION_NOTIFY_ONE_STRATEGY_FIFO: usize = 0;
-
-// Lifo wakeup order
-const NOTIFICATION_NOTIFY_ONE_STRATEGY_LIFO: usize = 1;
+const NOTIFICATION_ALL: usize = 0b010;
 
 /// Notification for a `Waiter`.
 /// This struct is equivalent to `Option<Notification>`, but uses
@@ -288,40 +281,19 @@ impl AtomicNotification {
     /// This method should be called exactly once.
     fn store_release(&self, notification: Notification) {
         let data: usize = match notification {
-            Notification::All => NOTIFICATION_ALL & NOTIFICATION_TYPE_MASK,
-            Notification::One(NotifyOneStrategy::Fifo) => {
-                (((NOTIFICATION_NOTIFY_ONE_STRATEGY_FIFO)
-                    << NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT)
-                    & NOTIFICATION_NOTIFY_ONE_STRATEGY_MASK)
-                    | (NOTIFICATION_ONE & NOTIFICATION_TYPE_MASK)
-            }
-            Notification::One(NotifyOneStrategy::Lifo) => {
-                (((NOTIFICATION_NOTIFY_ONE_STRATEGY_LIFO)
-                    << NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT)
-                    & NOTIFICATION_NOTIFY_ONE_STRATEGY_MASK)
-                    | (NOTIFICATION_ONE & NOTIFICATION_TYPE_MASK)
-            }
+            Notification::All => NOTIFICATION_ALL,
+            Notification::One(NotifyOneStrategy::Fifo) => NOTIFICATION_ONE,
+            Notification::One(NotifyOneStrategy::Lifo) => NOTIFICATION_ONE_LAST_IN,
         };
         self.0.store(data, Release);
     }
 
     fn load(&self, ordering: Ordering) -> Option<Notification> {
         let data = self.0.load(ordering);
-        match data & NOTIFICATION_TYPE_MASK {
+        match data {
             NOTIFICATION_NONE => None,
-            NOTIFICATION_ONE => {
-                match (data & NOTIFICATION_NOTIFY_ONE_STRATEGY_MASK)
-                    >> NOTIFICATION_NOTIFY_ONE_STRATEGY_SHIFT
-                {
-                    NOTIFICATION_NOTIFY_ONE_STRATEGY_FIFO => {
-                        Some(Notification::One(NotifyOneStrategy::Fifo))
-                    }
-                    NOTIFICATION_NOTIFY_ONE_STRATEGY_LIFO => {
-                        Some(Notification::One(NotifyOneStrategy::Lifo))
-                    }
-                    _ => unreachable!(),
-                }
-            }
+            NOTIFICATION_ONE => Some(Notification::One(NotifyOneStrategy::Fifo)),
+            NOTIFICATION_ONE_LAST_IN => Some(Notification::One(NotifyOneStrategy::Lifo)),
             NOTIFICATION_ALL => Some(Notification::All),
             _ => unreachable!(),
         }
