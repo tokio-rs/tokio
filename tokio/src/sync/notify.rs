@@ -610,8 +610,8 @@ impl Notify {
 
     /// Notifies the last waiting task.
     ///
-    /// This function behaves identically to `notify_one` but using a
-    /// LIFO algorithm to notify waiters from the queue, if there are any.
+    /// This function behaves similar to `notify_one`. The only difference is that it wakes
+    /// the most recently added waiter instead of the oldest waiter.
     ///
     /// Check the `notify_one` documentation for more info and
     /// examples.
