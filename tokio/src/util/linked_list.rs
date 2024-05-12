@@ -151,8 +151,8 @@ impl<L: Link> LinkedList<L, L::Target> {
             let head = self.head?;
             self.head = L::pointers(head).as_ref().get_next();
 
-            if let Some(next) = L::pointers(head).as_ref().get_next() {
-                L::pointers(next).as_mut().set_prev(None);
+            if let Some(new_head) = L::pointers(head).as_ref().get_next() {
+                L::pointers(new_head).as_mut().set_prev(None);
             } else {
                 self.tail = None;
             }
