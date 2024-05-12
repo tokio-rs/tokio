@@ -587,6 +587,8 @@ impl Notify {
     ///
     /// Check the [`notify_one()`] documentation for more info and
     /// examples.
+    ///
+    /// [`notify_one()`]: Notify::notify_one
     pub fn notify_one_last_in(&self) {
         self.notify_with_strategy(NotifyOneStrategy::Lifo);
     }
