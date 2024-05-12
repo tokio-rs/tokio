@@ -173,11 +173,11 @@ fn notified_multi_notify_drop_one_last_in() {
 
     notify.notify_one_last_in();
 
-    drop(notified1);
+    drop(notified3);
 
     // latest waiter added should be the one to woken up
-    assert_ready!(notified3.poll());
-    assert_pending!(notified2.poll());
+    assert_ready!(notified2.poll());
+    assert_pending!(notified1.poll());
 }
 
 #[test]
