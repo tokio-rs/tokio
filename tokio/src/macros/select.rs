@@ -26,9 +26,9 @@ macro_rules! doc {
         /// expression.
         ///
         /// Additionally, each branch may include an optional `if` precondition. If the
-        /// precondition returns `false`, then the branch is disabled. The provided
-        /// `<async expression>` is still evaluated but the resulting future is never
-        /// polled. This capability is useful when using `select!` within a loop.
+        /// precondition returns `false`, then the branch is disabled and the provided
+        /// `<async expression>` will not be evaluated. This capability is useful when
+        /// using `select!` within a loop.
         ///
         /// The complete lifecycle of a `select!` expression is as follows:
         ///
@@ -479,12 +479,12 @@ doc! {macro_rules! select {
 
         // First, invoke all the pre-conditions. For any that return true,
         // set the appropriate bit in `disabled`.
-        $(
-            if !$c {
-                let mask: __tokio_select_util::Mask = 1 << $crate::count!( $($skip)* );
-                disabled |= mask;
-            }
-        )*
+        // $(
+        //     if !$c {
+        //         let mask: __tokio_select_util::Mask = 1 << $crate::count!( $($skip)* );
+        //         disabled |= mask;
+        //     }
+        // )*
 
         // Create a scope to separate polling from handling the output. This
         // adds borrow checker flexibility when using the macro.
@@ -495,13 +495,23 @@ doc! {macro_rules! select {
             // We can't use the `pin!` macro for this because `futures` is a
             // tuple and the standard library provides no way to pin-project to
             // the fields of a tuple.
-            let mut futures = ( $( $fut , )+ );
+            let mut futures = ( $( $crate::select!(@ { none = $fut }), )+ );
 
             // This assignment makes sure that the `poll_fn` closure only has a
             // reference to the futures, instead of taking ownership of them.
             // This mitigates the issue described in
             // <https://internals.rust-lang.org/t/surprising-soundness-trouble-around-pollfn/17484>
             let mut futures = &mut futures;
+
+            $(
+                if $c {
+                    let ( $($skip,)* ref mut fut, .. ) = &mut *futures;
+                    *fut= ::core::option::Option::Some($fut);
+                } else {
+                    let mask: __tokio_select_util::Mask = 1 << $crate::count!( $($skip)* );
+                    disabled |= mask;
+                }
+            )*
 
             $crate::macros::support::poll_fn(|cx| {
                 // Track if any branch returns pending. If no branch completes
@@ -539,6 +549,11 @@ doc! {macro_rules! select {
                                 // Extract the future for this branch from the
                                 // tuple
                                 let ( $($skip,)* fut, .. ) = &mut *futures;
+                                let fut = if let Some(fut) = fut {
+                                    fut
+                                } else {
+                                    continue;
+                                };
 
                                 // Safety: future is stored on the stack above
                                 // and never moved.
@@ -557,6 +572,8 @@ doc! {macro_rules! select {
 
                                 // Disable the future from future polling.
                                 disabled |= mask;
+                                let ( $($skip,)* ref mut fut, .. ) = &mut *futures;
+                                *fut= ::core::option::Option::None;
 
                                 // The future returned a value, check if matches
                                 // the specified pattern.
@@ -628,6 +645,9 @@ doc! {macro_rules! select {
     };
     (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr => $h:expr, $($r:tt)* ) => {
         $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
+    };
+    (@ { none=$_:expr }) => {
+        ::core::option::Option::None
     };
 
     // ===== Entry point =====

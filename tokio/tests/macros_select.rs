@@ -362,6 +362,18 @@ async fn disable_with_if() {
 }
 
 #[maybe_tokio_test]
+async fn disable_with_if_not_evaluated() {
+    use futures::future::ready;
+    let mut value = Some(5);
+    loop {
+        tokio::select! {
+            _ = ready(value.take().unwrap()), if value.is_some() => {},
+            else => break,
+        };
+    }
+}
+
+#[maybe_tokio_test]
 async fn join_with_select() {
     use tokio_test::task;
 
