@@ -106,6 +106,24 @@ fn assert_no_unnecessary_polls() {
     });
 }
 
+// #[test]
+// fn new_test() {
+//     loom::model(|| {
+//         let rt = Builder::new_current_thread().build().unwrap();
+//
+//         let jh = rt.spawn(async {});
+//
+//         let bg = std::thread::spawn(move || {
+//             jh.poll();
+//         });
+//
+//         rt.block_on(async {});
+//
+//         rt.shutdown();
+//         bg.join();
+//     });
+// }
+
 struct BlockedFuture {
     rx: Receiver<()>,
     num_polls: Arc<AtomicUsize>,

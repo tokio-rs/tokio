@@ -60,7 +60,7 @@ fn test_panicky_waker() {
     // which would otherwise log.
     //
     // We can't however leaved it uncommented, because it's global.
-    // panic::set_hook(Box::new(|_| ()));
+    panic::set_hook(Box::new(|_| ()));
 
     const NUM_NOTIFY: usize = 2;
 
