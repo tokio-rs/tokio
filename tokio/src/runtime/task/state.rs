@@ -371,22 +371,21 @@ impl State {
             .map_err(|_| ())
     }
 
-    /// Tries to unset the `JOIN_INTEREST` flag.
-    ///
-    /// Returns `Ok` if the operation happens before the task transitions to a
-    /// completed state, `Err` otherwise.
-    pub(super) fn unset_join_interested(&self) -> UpdateResult {
-        self.fetch_update(|curr| {
-            assert!(curr.is_join_interested());
+    /// Unsets the `JOIN_INTEREST` flag. If `COMPLETE` is not set, the `JOIN_WAKER`
+    /// flag is also unset.
+    pub(super) fn transition_to_join_handle_dropped(&self) -> Snapshot {
+        self.fetch_update_action(|mut snapshot| {
+            assert!(snapshot.is_join_interested());
 
-            if curr.is_complete() {
-                return None;
+            snapshot.unset_join_interested();
+
+            if !snapshot.is_complete() {
+                // If `COMPLETE` is unset we also unset `JOIN_WAKER` to give the
+                // `JoinHandle` exclusive access to the waker to drop it.
+                snapshot.unset_join_waker();
             }
 
-            let mut next = curr;
-            next.unset_join_interested();
-
-            Some(next)
+            (snapshot, Some(snapshot))
         })
     }
 
@@ -420,6 +419,26 @@ impl State {
             assert!(curr.is_join_waker_set());
 
             if curr.is_complete() {
+                return None;
+            }
+
+            let mut next = curr;
+            next.unset_join_waker();
+
+            Some(next)
+        })
+    }
+
+    /// Unsets the `JOIN_WAKER` bit only if the `JOIN_INTEREST` is still set.
+    ///
+    /// Returns `Ok` has been unset, `Err` otherwise. This operation requires
+    /// the task to be completed.
+    pub(super) fn unset_waker_if_join_interested(&self) -> UpdateResult {
+        self.fetch_update(|curr| {
+            assert!(curr.is_complete());
+            assert!(curr.is_join_waker_set());
+
+            if !curr.is_join_interested() {
                 return None;
             }
 

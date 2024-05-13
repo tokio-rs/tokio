@@ -284,9 +284,11 @@ where
     }
 
     pub(super) fn drop_join_handle_slow(self) {
-        // Try to unset `JOIN_INTEREST`. This must be done as a first step in
+        // Try to unset `JOIN_INTEREST` and `JOIN_WAKER`. This must be done as a first step in
         // case the task concurrently completed.
-        if self.state().unset_join_interested().is_err() {
+        let snapshot = self.state().transition_to_join_handle_dropped();
+
+        if snapshot.is_complete() {
             // It is our responsibility to drop the output. This is critical as
             // the task output may not be `Send` and as such must remain with
             // the scheduler or `JoinHandle`. i.e. if the output remains in the
@@ -301,6 +303,25 @@ where
             }));
         }
 
+        if !snapshot.is_join_waker_set() {
+            // If the JOIN_WAKER flag is unset at this point, the task is either
+            // already terminal or not complete so the `JoinHandle` is responsible
+            // for dropping the waker.
+            // Safety:
+            // If the JOIN_WAKER bit is not set the join handle has exclusive
+            // access to the waker as per rule 2 in task/mod.rs.
+            // This can only be the case at this point in two scenarios:
+            // 1. The task completed and the runtime unset `JOIN_WAKER` flag
+            //    after accessing the waker during task completion. So the
+            //    `JoinHandle` is the only one to access the  join waker here.
+            // 2. The task is not completed so the `JoinHandle` was able to unset
+            //    `JOIN_WAKER` bit itself to get mutable access to the waker.
+            //    The runtime will not access the waker when this flag is unset.
+            unsafe {
+                self.trailer().set_waker(None);
+            }
+        }
+
         // Drop the `JoinHandle` reference, possibly deallocating the task
         self.drop_reference();
     }
@@ -311,7 +332,6 @@ where
     fn complete(self) {
         // The future has completed and its output has been written to the task
         // stage. We transition from running to complete.
-
         let snapshot = self.state().transition_to_complete();
 
         // We catch panics here in case dropping the future or waking the
@@ -320,13 +340,33 @@ where
             if !snapshot.is_join_interested() {
                 // The `JoinHandle` is not interested in the output of
                 // this task. It is our responsibility to drop the
-                // output.
+                // output. The join waker was already dropped by the
+                // `JoinHandle` before.
                 self.core().drop_future_or_output();
             } else if snapshot.is_join_waker_set() {
                 // Notify the waker. Reading the waker field is safe per rule 4
                 // in task/mod.rs, since the JOIN_WAKER bit is set and the call
                 // to transition_to_complete() above set the COMPLETE bit.
                 self.trailer().wake_join();
+
+                // If JOIN_INTEREST is still set at this point the `JoinHandle`
+                // was not dropped since setting COMPLETE so we unset JOIN_WAKER
+                // to give the responsibility of dropping the join waker back to
+                // the `JoinHandle`. `JoinHandle` is able to drop the waker when
+                // itself gets dropped.
+                if self.state().unset_waker_if_join_interested().is_err() {
+                    // Unsetting JOIN_WAKER flag will fail if JOIN_INTERESTED is
+                    // not set to indicate that the runtime has the responsibility
+                    // to drop the join waker here as per rule 7 in task/mod.rs.
+                    // Safety:
+                    // If JOIN_INTEREST got unset since setting COMPLETE we are
+                    // the only ones to have access to the join waker and need
+                    // to drop it here because the `JoinHandle` of the task
+                    // already got dropped.
+                    unsafe {
+                        self.trailer().set_waker(None);
+                    }
+                }
             }
         }));
 

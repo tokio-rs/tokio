@@ -10,6 +10,7 @@ mod yield_now;
 /// In order to speed up the C
 use crate::runtime::tests::loom_oneshot as oneshot;
 use crate::runtime::{self, Runtime};
+use crate::sync::mpsc::channel;
 use crate::{spawn, task};
 use tokio_test::assert_ok;
 
@@ -458,4 +459,33 @@ impl<T: Future> Future for Track<T> {
             arc: me.arc.clone(),
         })
     }
+}
+
+#[test]
+fn drop_tasks_with_reference_cycle() {
+    loom::model(|| {
+        let pool = mk_pool(2);
+
+        pool.block_on(async move {
+            let (tx, mut rx) = channel(1);
+
+            let (a_closer, mut wait_for_close_a) = channel::<()>(1);
+            let (b_closer, mut wait_for_close_b) = channel::<()>(1);
+
+            let a = spawn(async move {
+                let b = rx.recv().await.unwrap();
+
+                futures::future::select(std::pin::pin!(b), std::pin::pin!(a_closer.send(()))).await;
+            });
+
+            let b = spawn(async move {
+                let _ = a.await;
+                let _ = b_closer.send(()).await;
+            });
+
+            tx.send(b).await.unwrap();
+
+            futures::future::join(wait_for_close_a.recv(), wait_for_close_b.recv()).await;
+        });
+    });
 }

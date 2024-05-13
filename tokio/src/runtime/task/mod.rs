@@ -94,9 +94,14 @@
 //!       `JoinHandle` needs to (i) successfully set `JOIN_WAKER` to zero if it is
 //!       not already zero to gain exclusive access to the waker field per rule
 //!       2, (ii) write a waker, and (iii) successfully set `JOIN_WAKER` to one.
+//!       If the `JoinHandle` unsets `JOIN_WAKER` in the process of being dropped
+//!       to clear the waker field, only steps (i) and (ii) are relevant.
 //!
 //!    6. The `JoinHandle` can change `JOIN_WAKER` only if COMPLETE is zero (i.e.
 //!       the task hasn't yet completed).
+//!
+//!    7. If `JOIN_INTEREST` is zero and COMPLETE is one, then the runtime has
+//!       exclusive (mutable) access to the waker field.
 //!
 //!    Rule 6 implies that the steps (i) or (iii) of rule 5 may fail due to a
 //!    race. If step (i) fails, then the attempt to write a waker is aborted. If
