@@ -153,7 +153,8 @@ wasm-bindgen-test = "0.3.0"
 mio-aio = { version = "0.8.0", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = { version = "0.7", features = ["futures", "checkpoint"] }
+loom = { git = "https://github.com/wenym1/loom", rev = "4edf9435", features = ["futures", "checkpoint"] }
+#loom = { path = "/Users/william/repo/loom", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true

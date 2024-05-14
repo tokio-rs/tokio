@@ -629,30 +629,20 @@ impl<T> Sender<T> {
 
         #[rustversion::since(1.70)]
         fn consume_inner<T>(inner: Arc<Inner<T>>) -> Result<(), T> {
-            #[cfg(not(loom))]
-            {
-                if let Some(inner) = Arc::into_inner(inner) {
-                    if let Some(t) = inner.value.with_mut(|ptr| unsafe {
-                        // SAFETY: we have successfully returned with `Some`, which means we are the
-                        // only accessor to `ptr`.
-                        //
-                        // Note: value can be `None` even though we have previously set it as `Some`,
-                        // because the value may have been consumed by receiver before we reach here.
-                        (*ptr).take()
-                    }) {
-                        Err(t)
-                    } else {
-                        Ok(())
-                    }
+            if let Some(inner) = Arc::into_inner(inner) {
+                if let Some(t) = inner.value.with_mut(|ptr| unsafe {
+                    // SAFETY: we have successfully returned with `Some`, which means we are the
+                    // only accessor to `ptr`.
+                    //
+                    // Note: value can be `None` even though we have previously set it as `Some`,
+                    // because the value may have been consumed by receiver before we reach here.
+                    (*ptr).take()
+                }) {
+                    Err(t)
                 } else {
                     Ok(())
                 }
-            }
-
-            #[cfg(loom)]
-            {
-                drop(inner);
-                // The `loom::sync::Arc` does not implement `into_inner` yet.
+            } else {
                 Ok(())
             }
         }
