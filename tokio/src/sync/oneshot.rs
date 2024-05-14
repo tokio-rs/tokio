@@ -627,7 +627,22 @@ impl<T> Sender<T> {
             )
         });
 
-        Ok(())
+        if let Some(inner) = Arc::into_inner(inner) {
+            if let Some(value) = inner.value.with_mut(|ptr| unsafe {
+                // SAFETY: we have successfully returned with `Some`, which means we are the
+                // only accessor the ptr.
+                //
+                // Note: value can be `None` even though we have previously set it as `Some`,
+                // because the value may have been consumed by receiver before we reach here.
+                (*ptr).take()
+            }) {
+                Err(value)
+            } else {
+                Ok(())
+            }
+        } else {
+            Ok(())
+        }
     }
 
     /// Waits for the associated [`Receiver`] handle to close.
