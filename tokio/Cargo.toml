@@ -92,7 +92,6 @@ time = []
 tokio-macros = { version = "~2.2.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.11"
-rustversion = { git = "https://github.com/wenym1/rustversion", rev = "0b11410" }
 
 # Everything else is optional...
 bytes = { version = "1.0.0", optional = true }
@@ -153,8 +152,7 @@ wasm-bindgen-test = "0.3.0"
 mio-aio = { version = "0.8.0", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = { git = "https://github.com/wenym1/loom", rev = "4edf9435", features = ["futures", "checkpoint"] }
-#loom = { path = "/Users/william/repo/loom", features = ["futures", "checkpoint"] }
+loom = { version = "0.7", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true
