@@ -651,6 +651,7 @@ impl<T> Sender<T> {
 
             #[cfg(loom)]
             {
+                drop(inner);
                 // The `loom::sync::Arc` does not implement `into_inner` yet.
                 Ok(())
             }
