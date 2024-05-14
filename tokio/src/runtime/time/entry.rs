@@ -542,8 +542,9 @@ impl TimerEntry {
 
     /// Cancels and deregisters the timer. This operation is irreversible.
     pub(crate) fn cancel(self: Pin<&mut Self>) {
-        // Avoid calling the `clear_entry` method, because it has not been initialized yet.
-        if !self.is_inner_init() {
+        // Avoid calling the `clear_entry` method, because it has not been
+        // initialized or registered.
+        if !self.is_inner_init() || !self.inner().might_be_registered() {
             return;
         }
         // We need to perform an acq/rel fence with the driver thread, and the
