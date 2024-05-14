@@ -627,22 +627,32 @@ impl<T> Sender<T> {
             )
         });
 
-        if let Some(inner) = Arc::into_inner(inner) {
-            if let Some(t) = inner.value.with_mut(|ptr| unsafe {
-                // SAFETY: we have successfully returned with `Some`, which means we are the
-                // only accessor to `ptr`.
-                //
-                // Note: value can be `None` even though we have previously set it as `Some`,
-                // because the value may have been consumed by receiver before we reach here.
-                (*ptr).take()
-            }) {
-                Err(t)
+        #[rustversion::since(1.70)]
+        fn consume_inner<T>(inner: Arc<Inner<T>>) -> Result<(), T> {
+            if let Some(inner) = Arc::into_inner(inner) {
+                if let Some(t) = inner.value.with_mut(|ptr| unsafe {
+                    // SAFETY: we have successfully returned with `Some`, which means we are the
+                    // only accessor to `ptr`.
+                    //
+                    // Note: value can be `None` even though we have previously set it as `Some`,
+                    // because the value may have been consumed by receiver before we reach here.
+                    (*ptr).take()
+                }) {
+                    Err(t)
+                } else {
+                    Ok(())
+                }
             } else {
                 Ok(())
             }
-        } else {
+        }
+
+        #[rustversion::before(1.70)]
+        fn consume_inner<T>(_inner: Arc<Inner<T>>) -> Result<(), T> {
             Ok(())
         }
+
+        consume_inner(inner)
     }
 
     /// Waits for the associated [`Receiver`] handle to close.
