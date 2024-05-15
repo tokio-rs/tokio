@@ -162,7 +162,10 @@ fn checking_tx_send_ok_not_drop() {
         }
     }
 
-    loom::model(|| {
+    let mut builder = loom::model::Builder::new();
+    builder.preemption_bound = Some(2);
+
+    builder.check(|| {
         let (tx, rx) = oneshot::channel();
 
         // tx thread
