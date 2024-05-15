@@ -1075,11 +1075,9 @@ impl<T> Drop for Receiver<T> {
             let state = inner.close();
 
             if state.is_complete() {
-                drop(unsafe {
-                    // SAFETY: we have ensured that the `VALUE_SENT` bit has been set,
-                    // so only the receiver can access the value.
-                    inner.consume_value()
-                });
+                // SAFETY: we have ensured that the `VALUE_SENT` bit has been set,
+                // so only the receiver can access the value.
+                drop(unsafe { inner.consume_value() });
             }
 
             #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -1260,10 +1258,9 @@ impl<T> Drop for Inner<T> {
             }
         }
 
+        // SAFETY: we have `&mut self`, and therefore we have
+        // exclusive access to the value.
         unsafe {
-            // SAFETY: we have `&mut self`, and therefore we have
-            // exclusive access to the value.
-            //
             // Note: the assertion holds because if the value has been sent by sender,
             // we must ensure that the value must have been consumed by the receiver before
             // dropping the `Inner`.
