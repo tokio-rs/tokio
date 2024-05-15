@@ -339,9 +339,6 @@ pub(crate) struct TimerShared {
     /// registered.
     cached_when: AtomicU64,
 
-    /// The true expiration time. Set by the timer future, read by the driver.
-    true_when: AtomicU64,
-
     /// Current state. This records whether the timer entry is currently under
     /// the ownership of the driver, and if not, its current state (not
     /// complete, fired, error, etc).
@@ -356,7 +353,6 @@ unsafe impl Sync for TimerShared {}
 impl std::fmt::Debug for TimerShared {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TimerShared")
-            .field("when", &self.true_when.load(Ordering::Relaxed))
             .field("cached_when", &self.cached_when.load(Ordering::Relaxed))
             .field("state", &self.state)
             .finish()
@@ -375,7 +371,6 @@ impl TimerShared {
     pub(super) fn new() -> Self {
         Self {
             cached_when: AtomicU64::new(0),
-            true_when: AtomicU64::new(0),
             pointers: linked_list::Pointers::new(),
             state: StateCell::default(),
             _p: PhantomPinned,
