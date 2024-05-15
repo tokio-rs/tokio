@@ -176,12 +176,9 @@ fn checking_tx_send_ok_not_drop() {
             }
         });
 
-        // rx thread
-        let rx_thread_join_handle = thread::spawn(move || {
-            drop(rx);
-        });
+        // main thread is the rx thread
+        drop(rx);
 
         tx_thread_join_handle.join().unwrap();
-        rx_thread_join_handle.join().unwrap();
     });
 }
