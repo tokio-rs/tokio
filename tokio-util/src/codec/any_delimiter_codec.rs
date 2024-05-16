@@ -2,7 +2,7 @@ use crate::codec::decoder::Decoder;
 use crate::codec::encoder::Encoder;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use std::{cmp, fmt, io, str, usize};
+use std::{cmp, fmt, io, usize};
 
 const DEFAULT_SEEK_DELIMITERS: &[u8] = b",;\n\r";
 const DEFAULT_SEQUENCE_WRITER: &[u8] = b",";
@@ -211,14 +211,14 @@ impl Decoder for AnyDelimiterCodec {
 
 impl<T> Encoder<T> for AnyDelimiterCodec
 where
-    T: AsRef<str>,
+    T: AsRef<[u8]>,
 {
     type Error = AnyDelimiterCodecError;
 
     fn encode(&mut self, chunk: T, buf: &mut BytesMut) -> Result<(), AnyDelimiterCodecError> {
         let chunk = chunk.as_ref();
         buf.reserve(chunk.len() + 1);
-        buf.put(chunk.as_bytes());
+        buf.put(chunk);
         buf.put(self.sequence_writer.as_ref());
 
         Ok(())
