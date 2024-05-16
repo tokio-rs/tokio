@@ -1,3 +1,36 @@
+# 0.7.11 (May 4th, 2024)
+
+This release updates the MSRV to 1.63. ([#6126])
+
+### Added
+
+- either: implement `Sink` for `Either` ([#6239])
+- time: add `DelayQueue::deadline` ([#6163])
+- time: add `FutureExt::timeout` ([#6276])
+
+### Changed
+
+- codec: assert compatibility between `LengthDelimitedCodec` options ([#6414])
+- codec: make tracing feature optional for codecs ([#6434])
+- io: add `T: ?Sized` to `tokio_util::io::poll_read_buf` ([#6441])
+- sync: remove `'static` bound on `impl Sink for PollSender` ([#6397])
+
+### Documented
+
+- codec: add examples for `FramedRead` and `FramedWrite` ([#6310])
+- codec: document cancel safety of `SinkExt::send` and `StreamExt::next` ([#6417])
+
+[#6126]: https://github.com/tokio-rs/tokio/pull/6126
+[#6163]: https://github.com/tokio-rs/tokio/pull/6163
+[#6239]: https://github.com/tokio-rs/tokio/pull/6239
+[#6276]: https://github.com/tokio-rs/tokio/pull/6276
+[#6310]: https://github.com/tokio-rs/tokio/pull/6310
+[#6397]: https://github.com/tokio-rs/tokio/pull/6397
+[#6414]: https://github.com/tokio-rs/tokio/pull/6414
+[#6417]: https://github.com/tokio-rs/tokio/pull/6417
+[#6434]: https://github.com/tokio-rs/tokio/pull/6434
+[#6441]: https://github.com/tokio-rs/tokio/pull/6441
+
 # 0.7.10 (October 24th, 2023)
 
 ### Added
