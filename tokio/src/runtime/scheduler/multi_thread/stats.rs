@@ -1,6 +1,5 @@
 use crate::runtime::{Config, MetricsBatch, WorkerMetrics};
 
-use std::cmp;
 use std::time::{Duration, Instant};
 
 /// Per-worker statistics. This is used for both tuning the scheduler and
@@ -62,15 +61,9 @@ impl Stats {
         // As of Rust 1.45, casts from f64 -> u32 are saturating, which is fine here.
         let tasks_per_interval = (TARGET_GLOBAL_QUEUE_INTERVAL / self.task_poll_time_ewma) as u32;
 
-        cmp::max(
-            // If we are using self-tuning, we don't want to return less than 2 as that would result in the
-            // global queue always getting checked first.
-            2,
-            cmp::min(
-                MAX_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL,
-                tasks_per_interval,
-            ),
-        )
+        // If we are using self-tuning, we don't want to return less than 2 as that would result in the
+        // global queue always getting checked first.
+        tasks_per_interval.clamp(2, MAX_TASKS_POLLED_PER_GLOBAL_QUEUE_INTERVAL)
     }
 
     pub(crate) fn submit(&mut self, to: &WorkerMetrics) {
