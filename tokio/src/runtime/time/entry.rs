@@ -494,37 +494,13 @@ impl TimerEntry {
     fn inner(&self) -> &TimerShared {
         let inner = unsafe { &*self.inner.get() };
         if inner.is_none() {
-            let shard_id = self.get_shard_id();
+            let shard_size = self.driver.driver().time().inner.get_shard_size();
+            let shard_id = generate_shard_id(shard_size);
             unsafe {
                 *self.inner.get() = Some(TimerShared::new(shard_id));
             }
         }
         return inner.as_ref().unwrap();
-    }
-
-    // Gets the shard id. If current thread is a worker thread, we use its worker index as a shard id.
-    // Otherwise, we use a random number generator to obtain the shard id.
-    cfg_rt! {
-        fn get_shard_id(&self) -> u32 {
-            let shard_size = self.driver.driver().time().inner.get_shard_size();
-            let id = context::with_scheduler(|ctx| match ctx {
-                Some(scheduler::Context::CurrentThread(_ctx)) => 0,
-                #[cfg(feature = "rt-multi-thread")]
-                Some(scheduler::Context::MultiThread(ctx)) => ctx.get_worker_index() as u32,
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Some(scheduler::Context::MultiThreadAlt(ctx)) => ctx.get_worker_index() as u32,
-                _ => context::thread_rng_n(shard_size),
-            });
-            id % shard_size
-        }
-    }
-
-    cfg_not_rt! {
-        fn get_shard_id(&self) -> u32 {
-            let shard_size = self.driver.driver().time().inner.get_shard_size();
-            let id = context::thread_rng_n(shard_size);
-            id % shard_size
-        }
     }
 
     pub(crate) fn deadline(&self) -> Instant {
@@ -676,5 +652,27 @@ impl TimerHandle {
 impl Drop for TimerEntry {
     fn drop(&mut self) {
         unsafe { Pin::new_unchecked(self) }.as_mut().cancel();
+    }
+}
+
+// Generates a shard id. If current thread is a worker thread, we use its worker index as a shard id.
+// Otherwise, we use a random number generator to obtain the shard id.
+cfg_rt! {
+    fn generate_shard_id(shard_size: u32) -> u32 {
+        let id = context::with_scheduler(|ctx| match ctx {
+            Some(scheduler::Context::CurrentThread(_ctx)) => 0,
+            #[cfg(feature = "rt-multi-thread")]
+            Some(scheduler::Context::MultiThread(ctx)) => ctx.get_worker_index() as u32,
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            Some(scheduler::Context::MultiThreadAlt(ctx)) => ctx.get_worker_index() as u32,
+            _ => context::thread_rng_n(shard_size),
+        });
+        id % shard_size
+    }
+}
+
+cfg_not_rt! {
+    fn generate_shard_id(shard_size: usize) -> u32 {
+        context::thread_rng_n(shard_size) % shard_size
     }
 }
