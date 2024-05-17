@@ -673,6 +673,6 @@ cfg_rt! {
 
 cfg_not_rt! {
     fn generate_shard_id(shard_size: u32) -> u32 {
-        context::thread_rng_n(shard_size) % shard_size
+        context::thread_rng_n(shard_size)
     }
 }
