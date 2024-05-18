@@ -21,7 +21,7 @@ pub(crate) use write_guard::RwLockWriteGuard;
 pub(crate) use write_guard_mapped::RwLockMappedWriteGuard;
 
 #[cfg(not(loom))]
-const MAX_READS: u32 = std::u32::MAX >> 3;
+const MAX_READS: u32 = u32::MAX >> 3;
 
 #[cfg(loom)]
 const MAX_READS: u32 = 10;
