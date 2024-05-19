@@ -133,6 +133,12 @@
 //! end of the task, then the [`JoinHandle`] will instead report that the task
 //! exited normally.
 //!
+//! Be aware that tasks spawned using [`spawn_blocking`] cannot be aborted
+//! because they are not async. If you call `abort` on a `spawn_blocking`
+//! task, then this *will not have any effect*, and the task will continue
+//! running normally. The exception is if the task has not started running
+//! yet; in that case, calling `abort` may prevent the task from starting.
+//!
 //! Be aware that calls to [`JoinHandle::abort`] just schedule the task for
 //! cancellation, and will return before the cancellation has completed. To wait
 //! for cancellation to complete, wait for the task to finish by awaiting the

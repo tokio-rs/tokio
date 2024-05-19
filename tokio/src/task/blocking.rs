@@ -103,14 +103,11 @@ cfg_rt! {
     /// their own. If you want to spawn an ordinary thread, you should use
     /// [`thread::spawn`] instead.
     ///
-    /// Closures spawned using `spawn_blocking` cannot be cancelled abruptly; there
-    /// is no standard low level API to cause a thread to stop running.  However,
-    /// a useful pattern is to pass some form of "cancellation token" into
-    /// the thread.  This could be an [`AtomicBool`] that the task checks periodically.
-    /// Another approach is to have the thread primarily read or write from a channel,
-    /// and to exit when the channel closes; assuming the other side of the channel is dropped
-    /// when cancellation occurs, this will cause the blocking task thread to exit
-    /// soon after as well.
+    /// Be aware that tasks spawned using `spawn_blocking` cannot be aborted
+    /// because they are not async. If you call [`abort`] on a `spawn_blocking`
+    /// task, then this *will not have any effect*, and the task will continue
+    /// running normally. The exception is if the task has not started running
+    /// yet; in that case, calling `abort` may prevent the task from starting.
     ///
     /// When you shut down the executor, it will wait indefinitely for all blocking operations to
     /// finish. You can use [`shutdown_timeout`] to stop waiting for them after a
@@ -152,6 +149,7 @@ cfg_rt! {
     /// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout
     /// [bridgesync]: https://tokio.rs/tokio/topics/bridging
     /// [`AtomicBool`]: struct@std::sync::atomic::AtomicBool
+    /// [`abort`]: crate::task::JoinHandle::abort
     ///
     /// # Examples
     ///
