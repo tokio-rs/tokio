@@ -1,6 +1,11 @@
 #![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", tokio_unstable, not(target_os = "wasi")))]
+#![cfg(all(
+    feature = "full",
+    tokio_unstable,
+    not(target_os = "wasi"),
+    target_has_atomic = "64"
+))]
 
 use std::future::Future;
 use std::sync::{Arc, Barrier, Mutex};

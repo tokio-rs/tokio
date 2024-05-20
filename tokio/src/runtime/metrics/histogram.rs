@@ -168,7 +168,7 @@ impl Default for HistogramBuilder {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_has_atomic = "64"))]
 mod test {
     use super::*;
 

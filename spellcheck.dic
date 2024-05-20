@@ -34,6 +34,7 @@ amongst
 api
 APIs
 async
+atomics
 awaitable
 backend
 backpressure
