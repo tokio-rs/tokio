@@ -30,6 +30,33 @@ use crate::loom::sync::atomic::AtomicU64;
 use std::fmt;
 use std::{num::NonZeroU64, ptr::NonNull};
 
+struct AtomicOptionNonZeroU64(AtomicU64);
+
+// A helper type to store the `next_wake`.
+impl AtomicOptionNonZeroU64 {
+    fn new(val: Option<u64>) -> Self {
+        Self {
+            0: AtomicU64::new(Self::turn(val)),
+        }
+    }
+
+    fn store(&self, val: Option<u64>) {
+        self.0.store(Self::turn(val), Ordering::Relaxed);
+    }
+
+    fn load(&self) -> Option<NonZeroU64> {
+        NonZeroU64::new(self.0.load(Ordering::Relaxed))
+    }
+
+    fn turn(val: Option<u64>) -> u64 {
+        match val {
+            Some(0) => 1,
+            Some(i) => i,
+            None => 0,
+        }
+    }
+}
+
 /// Time implementation that drives [`Sleep`][sleep], [`Interval`][interval], and [`Timeout`][timeout].
 ///
 /// A `Driver` instance tracks the state necessary for managing time and
@@ -94,7 +121,7 @@ pub(crate) struct Driver {
 /// Timer state shared between `Driver`, `Handle`, and `Registration`.
 struct Inner {
     /// The earliest time at which we promise to wake up without unparking.
-    next_wake: AtomicU64,
+    next_wake: AtomicOptionNonZeroU64,
 
     /// Sharded Timer wheels.
     wheels: Box<[Mutex<wheel::Wheel>]>,
@@ -130,7 +157,7 @@ impl Driver {
         let handle = Handle {
             time_source,
             inner: Inner {
-                next_wake: AtomicU64::new(0),
+                next_wake: AtomicOptionNonZeroU64::new(Some(0)),
                 wheels: wheels.into_boxed_slice(),
                 is_shutdown: AtomicBool::new(false),
                 #[cfg(feature = "test-util")]
@@ -179,9 +206,7 @@ impl Driver {
             })
             .min();
 
-        rt_handle.time().inner.set_next_wake(
-            next_wake.map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap())),
-        );
+        rt_handle.time().inner.next_wake.store(next_wake);
 
         match next_wake {
             Some(when) => {
@@ -264,11 +289,11 @@ impl Handle {
             .filter_map(|i| self.process_at_sharded_time(i, now))
             .min();
 
-        self.inner.set_next_wake(next_wake_up);
+        self.inner.next_wake.store(next_wake_up);
     }
 
     // Returns the next wakeup time of this shard.
-    pub(self) fn process_at_sharded_time(&self, id: u32, mut now: u64) -> Option<NonZeroU64> {
+    pub(self) fn process_at_sharded_time(&self, id: u32, mut now: u64) -> Option<u64> {
         let mut waker_list = WakeList::new();
         let mut lock = self.inner.lock_sharded_wheel(id);
 
@@ -299,9 +324,7 @@ impl Handle {
                 }
             }
         }
-        let next_wake_up = lock
-            .poll_at()
-            .map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
+        let next_wake_up = lock.poll_at();
         drop(lock);
 
         waker_list.wake_all();
@@ -366,7 +389,8 @@ impl Handle {
                     Ok(when) => {
                         if self
                             .inner
-                            .get_next_wake()
+                            .next_wake
+                            .load()
                             .map(|next_wake| when < next_wake.get())
                             .unwrap_or(true)
                         {
@@ -420,16 +444,6 @@ impl Inner {
     // Gets the number of shards.
     fn get_shard_size(&self) -> u32 {
         self.wheels.len() as u32
-    }
-
-    fn set_next_wake(&self, value: Option<NonZeroU64>) {
-        let val = value.map(|v| v.get()).unwrap_or(0);
-        self.next_wake.store(val, Ordering::Relaxed);
-    }
-
-    fn get_next_wake(&self) -> Option<NonZeroU64> {
-        let val = self.next_wake.load(Ordering::Relaxed);
-        NonZeroU64::new(val)
     }
 }
 
