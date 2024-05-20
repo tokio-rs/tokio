@@ -35,9 +35,7 @@ struct AtomicOptionNonZeroU64(AtomicU64);
 // A helper type to store the `next_wake`.
 impl AtomicOptionNonZeroU64 {
     fn new(val: Option<u64>) -> Self {
-        Self {
-            0: AtomicU64::new(Self::turn(val)),
-        }
+        Self(AtomicU64::new(Self::turn(val)))
     }
 
     fn store(&self, val: Option<u64>) {
