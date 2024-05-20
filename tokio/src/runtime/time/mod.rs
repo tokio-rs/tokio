@@ -155,7 +155,7 @@ impl Driver {
         let handle = Handle {
             time_source,
             inner: Inner {
-                next_wake: AtomicOptionNonZeroU64::new(Some(0)),
+                next_wake: AtomicOptionNonZeroU64::new(None),
                 wheels: wheels.into_boxed_slice(),
                 is_shutdown: AtomicBool::new(false),
                 #[cfg(feature = "test-util")]
