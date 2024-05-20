@@ -1,4 +1,4 @@
-use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use crate::{loom::sync::atomic::Ordering::Relaxed, util::metric_atomics::MetricAtomicU64};
 
 /// Retrieves metrics from the Tokio runtime.
 ///
@@ -10,15 +10,15 @@ use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
 #[derive(Debug)]
 pub(crate) struct SchedulerMetrics {
     /// Number of tasks that are scheduled from outside the runtime.
-    pub(super) remote_schedule_count: AtomicU64,
-    pub(super) budget_forced_yield_count: AtomicU64,
+    pub(super) remote_schedule_count: MetricAtomicU64,
+    pub(super) budget_forced_yield_count: MetricAtomicU64,
 }
 
 impl SchedulerMetrics {
     pub(crate) fn new() -> SchedulerMetrics {
         SchedulerMetrics {
-            remote_schedule_count: AtomicU64::new(0),
-            budget_forced_yield_count: AtomicU64::new(0),
+            remote_schedule_count: MetricAtomicU64::new(0),
+            budget_forced_yield_count: MetricAtomicU64::new(0),
         }
     }
 

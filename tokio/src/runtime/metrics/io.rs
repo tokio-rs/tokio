@@ -1,12 +1,12 @@
 #![cfg_attr(not(feature = "net"), allow(dead_code))]
 
-use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use crate::{loom::sync::atomic::Ordering::Relaxed, util::metric_atomics::MetricAtomicU64};
 
 #[derive(Default)]
 pub(crate) struct IoDriverMetrics {
-    pub(super) fd_registered_count: AtomicU64,
-    pub(super) fd_deregistered_count: AtomicU64,
-    pub(super) ready_count: AtomicU64,
+    pub(super) fd_registered_count: MetricAtomicU64,
+    pub(super) fd_deregistered_count: MetricAtomicU64,
+    pub(super) ready_count: MetricAtomicU64,
 }
 
 impl IoDriverMetrics {
