@@ -34,24 +34,17 @@ struct AtomicOptionNonZeroU64(AtomicU64);
 
 // A helper type to store the `next_wake`.
 impl AtomicOptionNonZeroU64 {
-    fn new(val: Option<u64>) -> Self {
-        Self(AtomicU64::new(Self::turn(val)))
+    fn new(val: Option<NonZeroU64>) -> Self {
+        Self(AtomicU64::new(val.map_or(0, NonZeroU64::get)))
     }
 
-    fn store(&self, val: Option<u64>) {
-        self.0.store(Self::turn(val), Ordering::Relaxed);
+    fn store(&self, val: Option<NonZeroU64>) {
+        self.0
+            .store(val.map_or(0, NonZeroU64::get), Ordering::Relaxed);
     }
 
     fn load(&self) -> Option<NonZeroU64> {
         NonZeroU64::new(self.0.load(Ordering::Relaxed))
-    }
-
-    fn turn(val: Option<u64>) -> u64 {
-        match val {
-            Some(0) => 1,
-            Some(i) => i,
-            None => 0,
-        }
     }
 }
 
@@ -197,16 +190,20 @@ impl Driver {
         assert!(!handle.is_shutdown());
 
         // Finds out the min expiration time to park.
-        let next_wake = (0..rt_handle.time().inner.get_shard_size())
+        let expiration_time = (0..rt_handle.time().inner.get_shard_size())
             .filter_map(|id| {
                 let lock = rt_handle.time().inner.lock_sharded_wheel(id);
                 lock.next_expiration_time()
             })
             .min();
 
-        rt_handle.time().inner.next_wake.store(next_wake);
+        rt_handle
+            .time()
+            .inner
+            .next_wake
+            .store(next_wake_time(expiration_time));
 
-        match next_wake {
+        match expiration_time {
             Some(when) => {
                 let now = handle.time_source.now(rt_handle.clock());
                 // Note that we effectively round up to 1ms here - this avoids
@@ -270,6 +267,23 @@ impl Driver {
     }
 }
 
+// Helper function to turn expiration_time into next_wake_time.
+// Since the `park_timeout` will round up to 1ms for avoiding very
+// short-duration microsecond-resolution sleeps, we do the same here.
+// The conversion is as follows
+// None => None
+// Some(0) => Some(1)
+// Some(i) => Some(i)
+fn next_wake_time(expiration_time: Option<u64>) -> Option<NonZeroU64> {
+    expiration_time.and_then(|v| {
+        if v == 0 {
+            NonZeroU64::new(1)
+        } else {
+            NonZeroU64::new(v)
+        }
+    })
+}
+
 impl Handle {
     /// Runs timer related logic, and returns the next wakeup time
     pub(self) fn process(&self, clock: &Clock) {
@@ -283,11 +297,11 @@ impl Handle {
     pub(self) fn process_at_time(&self, start: u32, now: u64) {
         let shards = self.inner.get_shard_size();
 
-        let next_wake_up = (start..shards + start)
+        let expiration_time = (start..shards + start)
             .filter_map(|i| self.process_at_sharded_time(i, now))
             .min();
 
-        self.inner.next_wake.store(next_wake_up);
+        self.inner.next_wake.store(next_wake_time(expiration_time));
     }
 
     // Returns the next wakeup time of this shard.
