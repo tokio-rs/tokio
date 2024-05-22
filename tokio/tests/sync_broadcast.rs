@@ -286,8 +286,6 @@ fn zero_capacity() {
 #[should_panic]
 #[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn capacity_too_big() {
-    use std::usize;
-
     broadcast::channel::<()>(1 + (usize::MAX >> 1));
 }
 
