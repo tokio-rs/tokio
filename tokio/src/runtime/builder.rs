@@ -702,7 +702,7 @@ impl Builder {
         }
     }
 
-    fn get_cfg(&self) -> driver::Cfg {
+    fn get_cfg(&self, workers: usize) -> driver::Cfg {
         driver::Cfg {
             enable_pause_time: match self.kind {
                 Kind::CurrentThread => true,
@@ -715,6 +715,7 @@ impl Builder {
             enable_time: self.enable_time,
             start_paused: self.start_paused,
             nevents: self.nevents,
+            workers,
         }
     }
 
@@ -1095,7 +1096,7 @@ impl Builder {
         use crate::runtime::scheduler::{self, CurrentThread};
         use crate::runtime::{runtime::Scheduler, Config};
 
-        let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+        let (driver, driver_handle) = driver::Driver::new(self.get_cfg(1))?;
 
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
@@ -1248,7 +1249,7 @@ cfg_rt_multi_thread! {
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
-            let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+            let (driver, driver_handle) = driver::Driver::new(self.get_cfg(core_threads))?;
 
             // Create the blocking pool
             let blocking_pool =
@@ -1295,7 +1296,7 @@ cfg_rt_multi_thread! {
                 use crate::runtime::scheduler::MultiThreadAlt;
 
                 let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
-                let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+                let (driver, driver_handle) = driver::Driver::new(self.get_cfg(core_threads))?;
 
                 // Create the blocking pool
                 let blocking_pool =

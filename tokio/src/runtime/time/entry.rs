@@ -58,6 +58,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::atomic::Ordering;
 
+use crate::runtime::context;
 use crate::runtime::scheduler;
 use crate::sync::AtomicWaker;
 use crate::time::Instant;
@@ -328,6 +329,8 @@ pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, Ti
 ///
 /// Note that this structure is located inside the `TimerEntry` structure.
 pub(crate) struct TimerShared {
+    /// The shard id. We should never change it.
+    shard_id: u32,
     /// A link within the doubly-linked list of timers on a particular level and
     /// slot. Valid only if state is equal to Registered.
     ///
@@ -368,8 +371,9 @@ generate_addr_of_methods! {
 }
 
 impl TimerShared {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(shard_id: u32) -> Self {
         Self {
+            shard_id,
             cached_when: AtomicU64::new(0),
             pointers: linked_list::Pointers::new(),
             state: StateCell::default(),
@@ -438,6 +442,11 @@ impl TimerShared {
     pub(super) fn might_be_registered(&self) -> bool {
         self.state.might_be_registered()
     }
+
+    /// Gets the shard id.
+    pub(super) fn shard_id(&self) -> u32 {
+        self.shard_id
+    }
 }
 
 unsafe impl linked_list::Link for TimerShared {
@@ -485,8 +494,10 @@ impl TimerEntry {
     fn inner(&self) -> &TimerShared {
         let inner = unsafe { &*self.inner.get() };
         if inner.is_none() {
+            let shard_size = self.driver.driver().time().inner.get_shard_size();
+            let shard_id = generate_shard_id(shard_size);
             unsafe {
-                *self.inner.get() = Some(TimerShared::new());
+                *self.inner.get() = Some(TimerShared::new(shard_id));
             }
         }
         return inner.as_ref().unwrap();
@@ -641,5 +652,27 @@ impl TimerHandle {
 impl Drop for TimerEntry {
     fn drop(&mut self) {
         unsafe { Pin::new_unchecked(self) }.as_mut().cancel();
+    }
+}
+
+// Generates a shard id. If current thread is a worker thread, we use its worker index as a shard id.
+// Otherwise, we use a random number generator to obtain the shard id.
+cfg_rt! {
+    fn generate_shard_id(shard_size: u32) -> u32 {
+        let id = context::with_scheduler(|ctx| match ctx {
+            Some(scheduler::Context::CurrentThread(_ctx)) => 0,
+            #[cfg(feature = "rt-multi-thread")]
+            Some(scheduler::Context::MultiThread(ctx)) => ctx.get_worker_index() as u32,
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            Some(scheduler::Context::MultiThreadAlt(ctx)) => ctx.get_worker_index() as u32,
+            None => context::thread_rng_n(shard_size),
+        });
+        id % shard_size
+    }
+}
+
+cfg_not_rt! {
+    fn generate_shard_id(shard_size: u32) -> u32 {
+        context::thread_rng_n(shard_size)
     }
 }
