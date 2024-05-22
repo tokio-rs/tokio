@@ -634,7 +634,7 @@ impl<'a, T: 'static> Builder<'a, T> {
     ///
     /// This method panics if called outside of a Tokio runtime.
     ///
-    /// [`LocalSet`]: crate::task::LocalSet
+    /// [`JoinSet`]: crate::task::JoinSet
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
     pub fn spawn_blocking<F>(self, f: F) -> std::io::Result<AbortHandle>
@@ -644,6 +644,28 @@ impl<'a, T: 'static> Builder<'a, T> {
         T: Send,
     {
         Ok(self.joinset.insert(self.builder.spawn_blocking(f)?))
+    }
+
+    /// Spawn the blocking code on the blocking threadpool of the provided
+    /// runtime handle with this builder's settings, and store it in the
+    /// [`JoinSet`].
+    ///
+    /// # Returns
+    ///
+    /// An [`AbortHandle`] that can be used to remotely cancel the task.
+    ///
+    /// [`JoinSet`]: crate::task::JoinSet
+    /// [`AbortHandle`]: crate::task::AbortHandle
+    #[track_caller]
+    pub fn spawn_blocking_on<F>(self, f: F, handle: &Handle) -> std::io::Result<AbortHandle>
+    where
+        F: FnOnce() -> T,
+        F: Send + 'static,
+        T: Send,
+    {
+        Ok(self
+            .joinset
+            .insert(self.builder.spawn_blocking_on(f, handle)?))
     }
 
     /// Spawn the provided task on the current [`LocalSet`] with this builder's
