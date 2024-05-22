@@ -115,8 +115,6 @@ impl RuntimeMetrics {
     }
 
     cfg_64bit_metrics! {
-
-
             /// Returns the number of tasks scheduled from **outside** of the runtime.
             ///
             /// The remote schedule count starts at zero when the runtime is created and

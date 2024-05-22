@@ -227,6 +227,7 @@ macro_rules! cfg_metrics {
     }
 }
 
+/// Some metrics require 64-bit atomics.
 macro_rules! cfg_64bit_metrics {
     ($($item:item)*) => {
         $(
@@ -235,19 +236,15 @@ macro_rules! cfg_64bit_metrics {
             $item
         )*
     }
-
 }
 
 macro_rules! cfg_no_64bit_metrics {
     ($($item:item)*) => {
         $(
-            // For now, metrics is only disabled in loom tests.
-            // When stabilized, it might have a dedicated feature flag.
             #[cfg(not(target_has_atomic = "64"))]
             $item
         )*
     }
-
 }
 
 macro_rules! cfg_not_metrics {

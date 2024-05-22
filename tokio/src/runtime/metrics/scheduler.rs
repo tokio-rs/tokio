@@ -1,4 +1,5 @@
-use crate::{loom::sync::atomic::Ordering::Relaxed, util::metric_atomics::MetricAtomicU64};
+use crate::loom::sync::atomic::Ordering::Relaxed;
+use crate::util::metric_atomics::MetricAtomicU64;
 
 /// Retrieves metrics from the Tokio runtime.
 ///
@@ -24,11 +25,11 @@ impl SchedulerMetrics {
 
     /// Increment the number of tasks scheduled externally
     pub(crate) fn inc_remote_schedule_count(&self) {
-        self.remote_schedule_count.fetch_add(1, Relaxed);
+        self.remote_schedule_count.add(1, Relaxed);
     }
 
     /// Increment the number of tasks forced to yield due to budget exhaustion
     pub(crate) fn inc_budget_forced_yield_count(&self) {
-        self.budget_forced_yield_count.fetch_add(1, Relaxed);
+        self.budget_forced_yield_count.add(1, Relaxed);
     }
 }
