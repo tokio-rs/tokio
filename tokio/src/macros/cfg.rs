@@ -218,8 +218,6 @@ macro_rules! cfg_macros {
 macro_rules! cfg_metrics {
     ($($item:item)*) => {
         $(
-            // For now, metrics is only disabled in loom tests.
-            // When stabilized, it might have a dedicated feature flag.
             #[cfg(tokio_unstable)]
             #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
             $item
@@ -231,7 +229,7 @@ macro_rules! cfg_metrics {
 macro_rules! cfg_64bit_metrics {
     ($($item:item)*) => {
         $(
-            #[cfg(all(target_has_atomic = "64"))]
+            #[cfg(target_has_atomic = "64")]
             #[cfg_attr(docsrs, doc(cfg(target_has_atomic = "64")))]
             $item
         )*
