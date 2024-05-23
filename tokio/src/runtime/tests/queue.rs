@@ -7,18 +7,21 @@ use std::time::Duration;
 
 #[allow(unused)]
 macro_rules! assert_metrics {
-    ($stats:ident, $field:ident == $v:expr) => {{
-        use crate::runtime::WorkerMetrics;
-        use std::sync::atomic::Ordering::Relaxed;
+    ($stats:ident, $field:ident == $v:expr) => {
+        #[cfg(target_has_atomic = "64")]
+        {
+            use crate::runtime::WorkerMetrics;
+            use std::sync::atomic::Ordering::Relaxed;
 
-        let worker = WorkerMetrics::new();
-        $stats.submit(&worker);
+            let worker = WorkerMetrics::new();
+            $stats.submit(&worker);
 
-        let expect = $v;
-        let actual = worker.$field.load(Relaxed);
+            let expect = $v;
+            let actual = worker.$field.load(Relaxed);
 
-        assert!(actual == expect, "expect = {}; actual = {}", expect, actual)
-    }};
+            assert!(actual == expect, "expect = {}; actual = {}", expect, actual)
+        }
+    };
 }
 
 fn new_stats() -> Stats {

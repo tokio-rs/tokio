@@ -1,7 +1,8 @@
+use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::atomic::Ordering::Relaxed;
-use crate::loom::sync::atomic::{AtomicU64, AtomicUsize};
 use crate::runtime::metrics::Histogram;
 use crate::runtime::Config;
+use crate::util::metric_atomics::MetricAtomicU64;
 
 /// Retrieve runtime worker metrics.
 ///
@@ -14,31 +15,31 @@ use crate::runtime::Config;
 #[repr(align(128))]
 pub(crate) struct WorkerMetrics {
     ///  Number of times the worker parked.
-    pub(crate) park_count: AtomicU64,
+    pub(crate) park_count: MetricAtomicU64,
 
     /// Number of times the worker woke then parked again without doing work.
-    pub(crate) noop_count: AtomicU64,
+    pub(crate) noop_count: MetricAtomicU64,
 
     /// Number of tasks the worker stole.
-    pub(crate) steal_count: AtomicU64,
+    pub(crate) steal_count: MetricAtomicU64,
 
     /// Number of times the worker stole
-    pub(crate) steal_operations: AtomicU64,
+    pub(crate) steal_operations: MetricAtomicU64,
 
     /// Number of tasks the worker polled.
-    pub(crate) poll_count: AtomicU64,
+    pub(crate) poll_count: MetricAtomicU64,
 
     /// EWMA task poll time, in nanoseconds.
-    pub(crate) mean_poll_time: AtomicU64,
+    pub(crate) mean_poll_time: MetricAtomicU64,
 
     /// Amount of time the worker spent doing work vs. parking.
-    pub(crate) busy_duration_total: AtomicU64,
+    pub(crate) busy_duration_total: MetricAtomicU64,
 
     /// Number of tasks scheduled for execution on the worker's local queue.
-    pub(crate) local_schedule_count: AtomicU64,
+    pub(crate) local_schedule_count: MetricAtomicU64,
 
     /// Number of tasks moved from the local queue to the global queue to free space.
-    pub(crate) overflow_count: AtomicU64,
+    pub(crate) overflow_count: MetricAtomicU64,
 
     /// Number of tasks currently in the local queue. Used only by the
     /// current-thread scheduler.
@@ -60,15 +61,15 @@ impl WorkerMetrics {
 
     pub(crate) fn new() -> WorkerMetrics {
         WorkerMetrics {
-            park_count: AtomicU64::new(0),
-            noop_count: AtomicU64::new(0),
-            steal_count: AtomicU64::new(0),
-            steal_operations: AtomicU64::new(0),
-            poll_count: AtomicU64::new(0),
-            mean_poll_time: AtomicU64::new(0),
-            overflow_count: AtomicU64::new(0),
-            busy_duration_total: AtomicU64::new(0),
-            local_schedule_count: AtomicU64::new(0),
+            park_count: MetricAtomicU64::new(0),
+            noop_count: MetricAtomicU64::new(0),
+            steal_count: MetricAtomicU64::new(0),
+            steal_operations: MetricAtomicU64::new(0),
+            poll_count: MetricAtomicU64::new(0),
+            mean_poll_time: MetricAtomicU64::new(0),
+            overflow_count: MetricAtomicU64::new(0),
+            busy_duration_total: MetricAtomicU64::new(0),
+            local_schedule_count: MetricAtomicU64::new(0),
             queue_depth: AtomicUsize::new(0),
             poll_count_histogram: None,
         }

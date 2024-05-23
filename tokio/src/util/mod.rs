@@ -5,6 +5,8 @@ cfg_io_driver! {
 #[cfg(feature = "rt")]
 pub(crate) mod atomic_cell;
 
+pub(crate) mod metric_atomics;
+
 #[cfg(any(feature = "rt", feature = "signal", feature = "process"))]
 pub(crate) mod once_cell;
 
