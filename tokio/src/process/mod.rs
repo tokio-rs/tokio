@@ -544,11 +544,9 @@ impl Command {
 
     /// Sets configuration for the child process's standard input (stdin) handle.
     ///
-    /// Defaults to [`inherit`] when used with `spawn` or `status`, and
-    /// defaults to [`piped`] when used with `output`.
+    /// Defaults to [`inherit`].
     ///
     /// [`inherit`]: std::process::Stdio::inherit
-    /// [`piped`]: std::process::Stdio::piped
     ///
     /// # Examples
     ///
