@@ -150,7 +150,7 @@ impl Wheel {
         let wake_up = self.next_expiration().map(|expiration| expiration.deadline);
         min_option(wake_up, self.overflow_when)
     }
-    /// Pushs the entry into overflow.
+    /// Pushes the entry into overflow.
     pub(super) fn push_to_overflow(&mut self, entry: TimerHandle) {
         unsafe {
             entry.mark_overflow();
