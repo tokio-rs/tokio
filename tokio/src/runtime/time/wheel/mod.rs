@@ -37,8 +37,11 @@ pub(crate) struct Wheel {
     /// * ~ 12 day slots / ~ 2 yr range
     levels: Box<[Level; NUM_LEVELS]>,
 
-    /// Entries queued for firing
-    pending: EntryList,
+    // The next wakeup time of the overflow.
+    overflow_when: Option<u64>,
+
+    // The overflow entry list.
+    overflow: EntryList,
 }
 
 /// Number of levels. Each level has 64 slots. By using 6 levels with 64 slots
@@ -54,8 +57,9 @@ impl Wheel {
     pub(crate) fn new() -> Wheel {
         Wheel {
             elapsed: 0,
+            overflow_when: None,
             levels: Box::new(array::from_fn(Level::new)),
-            pending: EntryList::new(),
+            overflow: EntryList::new(),
         }
     }
 
@@ -96,6 +100,11 @@ impl Wheel {
             return Err((item, InsertError::Elapsed));
         }
 
+        if self.is_overflow(when) {
+            self.push_to_overflow(item);
+            return Ok(when);
+        }
+
         // Get the level at which the entry should be stored
         let level = self.level_for(when);
 
@@ -115,11 +124,14 @@ impl Wheel {
 
     /// Removes `item` from the timing wheel.
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
+        if item.as_ref().is_overflow() {
+            self.overflow.remove(item);
+            return;
+        }
+
         unsafe {
             let when = item.as_ref().cached_when();
-            if when == u64::MAX {
-                self.pending.remove(item);
-            } else {
+            if when != u64::MAX {
                 debug_assert!(
                     self.elapsed <= when,
                     "elapsed={}; when={}",
@@ -135,47 +147,35 @@ impl Wheel {
 
     /// Instant at which to poll.
     pub(crate) fn poll_at(&self) -> Option<u64> {
-        self.next_expiration().map(|expiration| expiration.deadline)
+        let wake_up = self.next_expiration().map(|expiration| expiration.deadline);
+        min_option(wake_up, self.overflow_when)
+    }
+    /// Pushs the entry into overflow.
+    pub(super) fn push_to_overflow(&mut self, entry: TimerHandle) {
+        unsafe {
+            entry.mark_overflow();
+            self.try_update_overflow_when(entry.cached_when());
+        }
+        self.overflow.push_front(entry);
     }
 
     /// Advances the timer up to the instant represented by `now`.
-    pub(crate) fn poll(&mut self, now: u64) -> Option<TimerHandle> {
-        loop {
-            if let Some(handle) = self.pending.pop_back() {
-                return Some(handle);
-            }
-
-            match self.next_expiration() {
-                Some(ref expiration) if expiration.deadline <= now => {
-                    self.process_expiration(expiration);
-
-                    self.set_elapsed(expiration.deadline);
-                }
-                _ => {
-                    // in this case the poll did not indicate an expiration
-                    // _and_ we were not able to find a next expiration in
-                    // the current list of timers.  advance to the poll's
-                    // current time and do nothing else.
-                    self.set_elapsed(now);
-                    break;
-                }
+    pub(crate) fn poll(&mut self, now: u64) -> Option<Expiration> {
+        match self.next_expiration() {
+            Some(expiration) if expiration.deadline <= now => Some(expiration),
+            _ => {
+                // in this case the poll did not indicate an expiration
+                // _and_ we were not able to find a next expiration in
+                // the current list of timers.  advance to the poll's
+                // current time and do nothing else.
+                self.set_elapsed(now);
+                None
             }
         }
-
-        self.pending.pop_back()
     }
 
     /// Returns the instant at which the next timeout expires.
     fn next_expiration(&self) -> Option<Expiration> {
-        if !self.pending.is_empty() {
-            // Expire immediately as we have things pending firing
-            return Some(Expiration {
-                level: 0,
-                slot: 0,
-                deadline: self.elapsed,
-            });
-        }
-
         // Check all levels
         for (level_num, level) in self.levels.iter().enumerate() {
             if let Some(expiration) = level.next_expiration(self.elapsed) {
@@ -190,10 +190,26 @@ impl Wheel {
         None
     }
 
+    /// Returns the instant at which the next timeout expires.
+    fn next_expiration_deadline(&self) -> Option<u64> {
+        // Check all levels
+        let mut deadline = None;
+        for (level_num, level) in self.levels.iter().enumerate() {
+            if let Some(expiration) = level.next_expiration(self.elapsed) {
+                // There cannot be any expirations at a higher level that happen
+                // before this one.
+                debug_assert!(self.no_expirations_before(level_num + 1, expiration.deadline));
+                deadline = Some(expiration.deadline);
+                break;
+            }
+        }
+        min_option(deadline, self.overflow_when)
+    }
+
     /// Returns the tick at which this timer wheel next needs to perform some
     /// processing, or None if there are no timers registered.
     pub(super) fn next_expiration_time(&self) -> Option<u64> {
-        self.next_expiration().map(|ex| ex.deadline)
+        self.next_expiration_deadline()
     }
 
     /// Used for debug assertions
@@ -211,46 +227,17 @@ impl Wheel {
         res
     }
 
-    /// iteratively find entries that are between the wheel's current
-    /// time and the expiration time.  for each in that population either
-    /// queue it for notification (in the case of the last level) or tier
-    /// it down to the next level (in all other cases).
-    pub(crate) fn process_expiration(&mut self, expiration: &Expiration) {
-        // Note that we need to take _all_ of the entries off the list before
-        // processing any of them. This is important because it's possible that
-        // those entries might need to be reinserted into the same slot.
-        //
-        // This happens only on the highest level, when an entry is inserted
-        // more than MAX_DURATION into the future. When this happens, we wrap
-        // around, and process some entries a multiple of MAX_DURATION before
-        // they actually need to be dropped down a level. We then reinsert them
-        // back into the same position; we must make sure we don't then process
-        // those entries again or we'll end up in an infinite loop.
-        let mut entries = self.take_entries(expiration);
-
-        while let Some(item) = entries.pop_back() {
-            if expiration.level == 0 {
-                debug_assert_eq!(unsafe { item.cached_when() }, expiration.deadline);
-            }
-
-            // Try to expire the entry; this is cheap (doesn't synchronize) if
-            // the timer is not expired, and updates cached_when.
-            match unsafe { item.mark_pending(expiration.deadline) } {
-                Ok(()) => {
-                    // Item was expired
-                    self.pending.push_front(item);
-                }
-                Err(expiration_tick) => {
-                    let level = level_for(expiration.deadline, expiration_tick);
-                    unsafe {
-                        self.levels[level].add_entry(item);
-                    }
-                }
-            }
-        }
+    pub(super) fn add_entry(
+        &mut self,
+        entry: TimerHandle,
+        expiration: Expiration,
+        expiration_tick: u64,
+    ) {
+        let level = level_for(expiration.deadline, expiration_tick);
+        unsafe { self.levels[level].add_entry(entry) };
     }
 
-    fn set_elapsed(&mut self, when: u64) {
+    pub(super) fn set_elapsed(&mut self, when: u64) {
         assert!(
             self.elapsed <= when,
             "elapsed={:?}; when={:?}",
@@ -263,14 +250,52 @@ impl Wheel {
         }
     }
 
-    /// Obtains the list of entries that need processing for the given expiration.
-    fn take_entries(&mut self, expiration: &Expiration) -> EntryList {
-        self.levels[expiration.level].take_slot(expiration.slot)
+    pub(super) fn get_mut_entries(&mut self, expiration: &Expiration) -> &mut EntryList {
+        self.levels[expiration.level].get_mut_entries(expiration.slot)
+    }
+
+    pub(super) fn mark_empty(&mut self, expiration: &Expiration) {
+        self.levels[expiration.level].mark_empty(expiration.slot);
+    }
+
+    /// Checks whether we should check the overflow entry list.
+    pub(super) fn might_check_overflow(&self, now: u64) -> bool {
+        if self.overflow_when.map_or(false, |when| when <= now) {
+            return true;
+        }
+        false
+    }
+
+    pub(super) fn take_overflow(&mut self) -> EntryList {
+        self.overflow_when = None;
+        std::mem::take(&mut self.overflow)
     }
 
     fn level_for(&self, when: u64) -> usize {
         level_for(self.elapsed, when)
     }
+
+    // Returns whether when is overflow.
+    pub(super) fn is_overflow(&self, when: u64) -> bool {
+        is_overflow(self.elapsed, when)
+    }
+
+    // Attemps to update the overflow_when. This updae will only be successful
+    // if overflow_when is None, or when is  than overflow_when.
+    fn try_update_overflow_when(&mut self, when: u64) {
+        if let Some(overflow_when) = self.overflow_when {
+            if when < overflow_when {
+                self.overflow_when = Some(when)
+            }
+        } else {
+            self.overflow_when = Some(when)
+        }
+    }
+}
+
+fn min_option(a: Option<u64>, b: Option<u64>) -> Option<u64> {
+    a.map(|a_val| b.map_or(a_val, |b_val| a_val.min(b_val)))
+        .or(b)
 }
 
 fn level_for(elapsed: u64, when: u64) -> usize {
@@ -289,6 +314,20 @@ fn level_for(elapsed: u64, when: u64) -> usize {
     let significant = 63 - leading_zeros;
 
     significant / NUM_LEVELS
+}
+
+// Checks if the when is overflow
+fn is_overflow(elapsed: u64, when: u64) -> bool {
+    const SLOT_MASK: u64 = (1 << 6) - 1;
+
+    // Mask in the trailing bits ignored by the level calculation in order to cap
+    // the possible leading zeros
+    let masked = elapsed ^ when | SLOT_MASK;
+
+    if masked >= MAX_DURATION {
+        return true;
+    }
+    false
 }
 
 #[cfg(all(test, not(loom)))]

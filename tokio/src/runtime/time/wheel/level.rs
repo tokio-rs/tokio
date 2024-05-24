@@ -20,7 +20,7 @@ pub(crate) struct Level {
 }
 
 /// Indicates when a slot must be processed next.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Expiration {
     /// The level containing the slot.
     pub(crate) level: usize,
@@ -140,10 +140,15 @@ impl Level {
         }
     }
 
-    pub(crate) fn take_slot(&mut self, slot: usize) -> EntryList {
-        self.occupied &= !occupied_bit(slot);
+    pub(crate) fn get_mut_entries(&mut self, slot: usize) -> &mut EntryList {
+        &mut self.slot[slot]
+    }
 
-        std::mem::take(&mut self.slot[slot])
+    // Marks the slot empty. The caller must ensure all
+    // entries in the slot have been popped out.
+    pub(crate) fn mark_empty(&mut self, slot: usize) {
+        debug_assert!(self.slot[slot].is_empty());
+        self.occupied &= !occupied_bit(slot);
     }
 }
 
