@@ -13,6 +13,7 @@ concurrency:
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
+  RUSTUP_WINDOWS_PATH_ADD_BIN: 1
   # Change to specific Rust release to pin
   rust_stable: stable
   rust_nightly: nightly-2024-05-05

@@ -40,7 +40,7 @@ fn do_timeout_test(c: &mut Criterion, workers: usize, name: &str) {
         b.iter_custom(|iters| {
             let start = Instant::now();
             runtime.block_on(async {
-                black_box(spawn_timeout_job(iters as usize, workers).await);
+                black_box(spawn_timeout_job(iters as usize, workers)).await;
             });
             start.elapsed()
         })
@@ -77,7 +77,7 @@ fn do_sleep_test(c: &mut Criterion, workers: usize, name: &str) {
         b.iter_custom(|iters| {
             let start = Instant::now();
             runtime.block_on(async {
-                black_box(spawn_sleep_job(iters as usize, workers).await);
+                black_box(spawn_sleep_job(iters as usize, workers)).await;
             });
             start.elapsed()
         })

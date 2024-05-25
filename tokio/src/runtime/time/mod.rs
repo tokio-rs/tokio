@@ -12,6 +12,7 @@ use entry::{EntryList, TimerHandle, TimerShared, MAX_SAFE_MILLIS_DURATION};
 
 mod handle;
 pub(crate) use self::handle::Handle;
+use self::wheel::Wheel;
 
 mod source;
 pub(crate) use source::TimeSource;
@@ -25,8 +26,27 @@ use crate::time::error::Error;
 use crate::time::{Clock, Duration};
 use crate::util::WakeList;
 
+use crate::loom::sync::atomic::AtomicU64;
 use std::fmt;
 use std::{num::NonZeroU64, ptr::NonNull};
+
+struct AtomicOptionNonZeroU64(AtomicU64);
+
+// A helper type to store the `next_wake`.
+impl AtomicOptionNonZeroU64 {
+    fn new(val: Option<NonZeroU64>) -> Self {
+        Self(AtomicU64::new(val.map_or(0, NonZeroU64::get)))
+    }
+
+    fn store(&self, val: Option<NonZeroU64>) {
+        self.0
+            .store(val.map_or(0, NonZeroU64::get), Ordering::Relaxed);
+    }
+
+    fn load(&self) -> Option<NonZeroU64> {
+        NonZeroU64::new(self.0.load(Ordering::Relaxed))
+    }
+}
 
 /// Time implementation that drives [`Sleep`][sleep], [`Interval`][interval], and [`Timeout`][timeout].
 ///
@@ -91,8 +111,11 @@ pub(crate) struct Driver {
 
 /// Timer state shared between `Driver`, `Handle`, and `Registration`.
 struct Inner {
-    // The state is split like this so `Handle` can access `is_shutdown` without locking the mutex
-    pub(super) state: Mutex<InnerState>,
+    /// The earliest time at which we promise to wake up without unparking.
+    next_wake: AtomicOptionNonZeroU64,
+
+    /// Sharded Timer wheels.
+    wheels: Box<[Mutex<wheel::Wheel>]>,
 
     /// True if the driver is being shutdown.
     pub(super) is_shutdown: AtomicBool,
@@ -107,15 +130,6 @@ struct Inner {
     did_wake: AtomicBool,
 }
 
-/// Time state shared which must be protected by a `Mutex`
-struct InnerState {
-    /// The earliest time at which we promise to wake up without unparking.
-    next_wake: Option<NonZeroU64>,
-
-    /// Timer wheel.
-    wheel: wheel::Wheel,
-}
-
 // ===== impl Driver =====
 
 impl Driver {
@@ -123,18 +137,20 @@ impl Driver {
     /// thread and `time_source` to get the current time and convert to ticks.
     ///
     /// Specifying the source of time is useful when testing.
-    pub(crate) fn new(park: IoStack, clock: &Clock) -> (Driver, Handle) {
+    pub(crate) fn new(park: IoStack, clock: &Clock, shards: u32) -> (Driver, Handle) {
+        assert!(shards > 0);
+
         let time_source = TimeSource::new(clock);
+        let wheels: Vec<_> = (0..shards)
+            .map(|_| Mutex::new(wheel::Wheel::new()))
+            .collect();
 
         let handle = Handle {
             time_source,
             inner: Inner {
-                state: Mutex::new(InnerState {
-                    next_wake: None,
-                    wheel: wheel::Wheel::new(),
-                }),
+                next_wake: AtomicOptionNonZeroU64::new(None),
+                wheels: wheels.into_boxed_slice(),
                 is_shutdown: AtomicBool::new(false),
-
                 #[cfg(feature = "test-util")]
                 did_wake: AtomicBool::new(false),
             },
@@ -164,24 +180,30 @@ impl Driver {
 
         // Advance time forward to the end of time.
 
-        handle.process_at_time(u64::MAX);
+        handle.process_at_time(0, u64::MAX);
 
         self.park.shutdown(rt_handle);
     }
 
     fn park_internal(&mut self, rt_handle: &driver::Handle, limit: Option<Duration>) {
         let handle = rt_handle.time();
-        let mut lock = handle.inner.state.lock();
-
         assert!(!handle.is_shutdown());
 
-        let next_wake = lock.wheel.next_expiration_time();
-        lock.next_wake =
-            next_wake.map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
+        // Finds out the min expiration time to park.
+        let expiration_time = (0..rt_handle.time().inner.get_shard_size())
+            .filter_map(|id| {
+                let lock = rt_handle.time().inner.lock_sharded_wheel(id);
+                lock.next_expiration_time()
+            })
+            .min();
 
-        drop(lock);
+        rt_handle
+            .time()
+            .inner
+            .next_wake
+            .store(next_wake_time(expiration_time));
 
-        match next_wake {
+        match expiration_time {
             Some(when) => {
                 let now = handle.time_source.now(rt_handle.clock());
                 // Note that we effectively round up to 1ms here - this avoids
@@ -245,30 +267,59 @@ impl Driver {
     }
 }
 
+// Helper function to turn expiration_time into next_wake_time.
+// Since the `park_timeout` will round up to 1ms for avoiding very
+// short-duration microsecond-resolution sleeps, we do the same here.
+// The conversion is as follows
+// None => None
+// Some(0) => Some(1)
+// Some(i) => Some(i)
+fn next_wake_time(expiration_time: Option<u64>) -> Option<NonZeroU64> {
+    expiration_time.and_then(|v| {
+        if v == 0 {
+            NonZeroU64::new(1)
+        } else {
+            NonZeroU64::new(v)
+        }
+    })
+}
+
 impl Handle {
     /// Runs timer related logic, and returns the next wakeup time
     pub(self) fn process(&self, clock: &Clock) {
         let now = self.time_source().now(clock);
-
-        self.process_at_time(now);
+        // For fairness, randomly select one to start.
+        let shards = self.inner.get_shard_size();
+        let start = crate::runtime::context::thread_rng_n(shards);
+        self.process_at_time(start, now);
     }
 
-    pub(self) fn process_at_time(&self, mut now: u64) {
+    pub(self) fn process_at_time(&self, start: u32, now: u64) {
+        let shards = self.inner.get_shard_size();
+
+        let expiration_time = (start..shards + start)
+            .filter_map(|i| self.process_at_sharded_time(i, now))
+            .min();
+
+        self.inner.next_wake.store(next_wake_time(expiration_time));
+    }
+
+    // Returns the next wakeup time of this shard.
+    pub(self) fn process_at_sharded_time(&self, id: u32, mut now: u64) -> Option<u64> {
         let mut waker_list = WakeList::new();
+        let mut lock = self.inner.lock_sharded_wheel(id);
 
-        let mut lock = self.inner.lock();
-
-        if now < lock.wheel.elapsed() {
+        if now < lock.elapsed() {
             // Time went backwards! This normally shouldn't happen as the Rust language
             // guarantees that an Instant is monotonic, but can happen when running
             // Linux in a VM on a Windows host due to std incorrectly trusting the
             // hardware clock to be monotonic.
             //
             // See <https://github.com/tokio-rs/tokio/issues/3619> for more information.
-            now = lock.wheel.elapsed();
+            now = lock.elapsed();
         }
 
-        while let Some(entry) = lock.wheel.poll(now) {
+        while let Some(entry) = lock.poll(now) {
             debug_assert!(unsafe { entry.is_pending() });
 
             // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
@@ -281,19 +332,15 @@ impl Handle {
 
                     waker_list.wake_all();
 
-                    lock = self.inner.lock();
+                    lock = self.inner.lock_sharded_wheel(id);
                 }
             }
         }
-
-        lock.next_wake = lock
-            .wheel
-            .poll_at()
-            .map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
-
+        let next_wake_up = lock.poll_at();
         drop(lock);
 
         waker_list.wake_all();
+        next_wake_up
     }
 
     /// Removes a registered timer from the driver.
@@ -308,10 +355,10 @@ impl Handle {
     /// `add_entry` must not be called concurrently.
     pub(self) unsafe fn clear_entry(&self, entry: NonNull<TimerShared>) {
         unsafe {
-            let mut lock = self.inner.lock();
+            let mut lock = self.inner.lock_sharded_wheel(entry.as_ref().shard_id());
 
             if entry.as_ref().might_be_registered() {
-                lock.wheel.remove(entry);
+                lock.remove(entry);
             }
 
             entry.as_ref().handle().fire(Ok(()));
@@ -331,12 +378,12 @@ impl Handle {
         entry: NonNull<TimerShared>,
     ) {
         let waker = unsafe {
-            let mut lock = self.inner.lock();
+            let mut lock = self.inner.lock_sharded_wheel(entry.as_ref().shard_id());
 
             // We may have raced with a firing/deregistration, so check before
             // deregistering.
             if unsafe { entry.as_ref().might_be_registered() } {
-                lock.wheel.remove(entry);
+                lock.remove(entry);
             }
 
             // Now that we have exclusive control of this entry, mint a handle to reinsert it.
@@ -350,10 +397,12 @@ impl Handle {
                 // Note: We don't have to worry about racing with some other resetting
                 // thread, because add_entry and reregister require exclusive control of
                 // the timer entry.
-                match unsafe { lock.wheel.insert(entry) } {
+                match unsafe { lock.insert(entry) } {
                     Ok(when) => {
-                        if lock
+                        if self
+                            .inner
                             .next_wake
+                            .load()
                             .map(|next_wake| when < next_wake.get())
                             .unwrap_or(true)
                         {
@@ -389,14 +438,24 @@ impl Handle {
 // ===== impl Inner =====
 
 impl Inner {
-    /// Locks the driver's inner structure
-    pub(super) fn lock(&self) -> crate::loom::sync::MutexGuard<'_, InnerState> {
-        self.state.lock()
+    /// Locks the driver's sharded wheel structure.
+    pub(super) fn lock_sharded_wheel(
+        &self,
+        shard_id: u32,
+    ) -> crate::loom::sync::MutexGuard<'_, Wheel> {
+        let index = shard_id % (self.wheels.len() as u32);
+        // Safety: This modulo operation ensures that the index is not out of bounds.
+        unsafe { self.wheels.get_unchecked(index as usize).lock() }
     }
 
     // Check whether the driver has been shutdown
     pub(super) fn is_shutdown(&self) -> bool {
         self.is_shutdown.load(Ordering::SeqCst)
+    }
+
+    // Gets the number of shards.
+    fn get_shard_size(&self) -> u32 {
+        self.wheels.len() as u32
     }
 }
 

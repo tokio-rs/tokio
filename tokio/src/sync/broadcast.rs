@@ -129,7 +129,6 @@ use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
 use std::task::{Context, Poll, Waker};
-use std::usize;
 
 /// Sending-half of the [`broadcast`] channel.
 ///
