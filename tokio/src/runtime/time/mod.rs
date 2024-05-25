@@ -333,7 +333,7 @@ impl Handle {
             // back into the same position; we must make sure we don't then process
             // those entries again or we'll end up in an infinite loop.
 
-            // This can also happens when other threads concurrently add entry to
+            // This can also happens when other threads concurrently add entries to
             // this currently traversing slot.
             let count = lock.get_entries_count(&expiration);
             for _ in 0..count {
@@ -364,8 +364,6 @@ impl Handle {
                 }
             }
             lock.occupied_bit_maintain(&expiration);
-            // This slot maybe empty,
-            // lock.mark_empty(&expiration);
             lock.set_elapsed(expiration.deadline);
         }
 

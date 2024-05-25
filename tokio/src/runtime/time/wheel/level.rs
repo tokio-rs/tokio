@@ -130,7 +130,6 @@ impl Level {
     pub(crate) unsafe fn remove_entry(&mut self, item: NonNull<TimerShared>) {
         let slot = slot_for(unsafe { item.as_ref().cached_when() }, self.level);
 
-        unsafe { self.slot[slot].remove(item) };
         if self.slot[slot].is_empty() {
             // The bit is currently set
             debug_assert!(self.occupied & occupied_bit(slot) != 0);
@@ -140,15 +139,15 @@ impl Level {
         }
     }
 
-    pub(crate) fn get_entries_count(&self, slot: usize) -> usize {
+    pub(super) fn get_entries_count(&self, slot: usize) -> usize {
         self.slot[slot].count()
     }
 
-    pub(crate) fn get_mut_entries(&mut self, slot: usize) -> &mut EntryList {
+    pub(super) fn get_mut_entries(&mut self, slot: usize) -> &mut EntryList {
         &mut self.slot[slot]
     }
 
-    pub(crate) fn occupied_bit_maintain(&mut self, slot: usize) {
+    pub(super) fn occupied_bit_maintain(&mut self, slot: usize) {
         if self.slot[slot].is_empty() {
             self.occupied &= !occupied_bit(slot);
         } else {
