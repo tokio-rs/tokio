@@ -47,15 +47,35 @@ use std::{
 #[derive(Debug)]
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub struct DuplexStream {
-    read: Arc<Mutex<Pipe>>,
-    write: Arc<Mutex<Pipe>>,
+    read: Arc<Mutex<SimplexStream>>,
+    write: Arc<Mutex<SimplexStream>>,
 }
 
-/// A unidirectional IO over a piece of memory.
+/// A unidirectional pipe to read and write bytes in memory.
 ///
-/// Data can be written to the pipe, and reading will return that data.
+/// Writing to the `SimplexStream` will allow that data to be read again, it is used as in-memory IO type.
+///
+/// You can [`split`](crate::io::split()) the `SimplexStream` so you can have a separate read and write handle.
+///
+/// # Example
+///
+/// ```
+/// # async fn ex() -> std::io::Result<()> {
+/// # use tokio::io::{AsyncReadExt, AsyncWriteExt, split};
+/// let (mut receiver, mut sender) = split(tokio::io::simplex(64));
+///
+/// sender.write_all(b"ping").await?;
+///
+/// let mut buf = [0u8; 4];
+/// receiver.read_exact(&mut buf).await?;
+/// assert_eq!(&buf, b"ping");
+///
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
-struct Pipe {
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+pub struct SimplexStream {
     /// The buffer storing the bytes written, also read from.
     ///
     /// Using a `BytesMut` because it has efficient `Buf` and `BufMut`
@@ -83,8 +103,8 @@ struct Pipe {
 /// written to a side before the write returns `Poll::Pending`.
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub fn duplex(max_buf_size: usize) -> (DuplexStream, DuplexStream) {
-    let one = Arc::new(Mutex::new(Pipe::new(max_buf_size)));
-    let two = Arc::new(Mutex::new(Pipe::new(max_buf_size)));
+    let one = Arc::new(Mutex::new(simplex(max_buf_size)));
+    let two = Arc::new(Mutex::new(simplex(max_buf_size)));
 
     (
         DuplexStream {
@@ -161,19 +181,24 @@ impl Drop for DuplexStream {
     }
 }
 
-// ===== impl Pipe =====
+// ===== impl SimplexStream =====
 
-impl Pipe {
-    fn new(max_buf_size: usize) -> Self {
-        Pipe {
-            buffer: BytesMut::new(),
-            is_closed: false,
-            max_buf_size,
-            read_waker: None,
-            write_waker: None,
-        }
+/// Creates unidirectional buffer that acts like pair of connected single direction sockets.
+///
+/// The `max_buf_size` argument is the maximum amount of bytes that can be
+/// written to a buffer before the it returns `Poll::Pending`.
+#[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
+pub fn simplex(max_buf_size: usize) -> SimplexStream {
+    SimplexStream {
+        buffer: BytesMut::new(),
+        is_closed: false,
+        max_buf_size,
+        read_waker: None,
+        write_waker: None,
     }
+}
 
+impl SimplexStream {
     fn close_write(&mut self) {
         self.is_closed = true;
         // needs to notify any readers that no more data will come
@@ -269,7 +294,7 @@ impl Pipe {
     }
 }
 
-impl AsyncRead for Pipe {
+impl AsyncRead for SimplexStream {
     cfg_coop! {
         fn poll_read(
             self: Pin<&mut Self>,
@@ -299,7 +324,7 @@ impl AsyncRead for Pipe {
     }
 }
 
-impl AsyncWrite for Pipe {
+impl AsyncWrite for SimplexStream {
     cfg_coop! {
         fn poll_write(
             self: Pin<&mut Self>,
