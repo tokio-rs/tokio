@@ -328,11 +328,6 @@ impl EntryList {
         self.list.push_front(val);
     }
 
-    pub(super) unsafe fn remove(&mut self, node: NonNull<TimerShared>) -> Option<TimerHandle> {
-        self.counter -= 1;
-        self.list.remove(node)
-    }
-
     pub(super) fn is_empty(&self) -> bool {
         self.counter == 0
     }
