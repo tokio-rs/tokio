@@ -2626,7 +2626,7 @@ pub enum PipeEnd {
 /// Information about a named pipe.
 ///
 /// Constructed through [`NamedPipeServer::info`] or [`NamedPipeClient::info`].
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct PipeInfo {
     /// Indicates the mode of a named pipe.
