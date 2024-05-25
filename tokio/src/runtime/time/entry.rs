@@ -70,9 +70,8 @@ use std::{marker::PhantomPinned, pin::Pin, ptr::NonNull};
 type TimerResult = Result<(), crate::time::error::Error>;
 
 const STATE_DEREGISTERED: u64 = u64::MAX;
-const STATE_OVERFLOW: u64 = STATE_DEREGISTERED - 1;
-const STATE_FIRE: u64 = STATE_DEREGISTERED - 2;
-const STATE_MIN_VALUE: u64 = STATE_FIRE;
+const STATE_FIRING: u64 = STATE_DEREGISTERED - 1;
+const STATE_MIN_VALUE: u64 = STATE_FIRING;
 /// The largest safe integer to use for ticks.
 ///
 /// This value should be updated if any other signal values are added above.
@@ -121,15 +120,6 @@ impl StateCell {
             result: UnsafeCell::new(Ok(())),
             waker: AtomicWaker::new(),
         }
-    }
-
-    /// Marks this timer as being moved to the overflow list.
-    fn mark_overflow(&self) {
-        self.state.store(STATE_OVERFLOW, Ordering::Relaxed);
-    }
-
-    fn is_overflow(&self) -> bool {
-        self.state.load(Ordering::Relaxed) == STATE_OVERFLOW
     }
 
     /// Returns the current expiration time, or None if not currently scheduled.
@@ -194,7 +184,7 @@ impl StateCell {
 
             match self.state.compare_exchange_weak(
                 cur_state,
-                STATE_FIRE,
+                STATE_FIRING,
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
@@ -250,10 +240,9 @@ impl StateCell {
 
     /// Attempts to adjust the timer to a new timestamp.
     ///
-    /// If the timer has already been fired, is firing, or the new
+    /// If the timer has already been fired, is pending firing, or the new
     /// timestamp is earlier than the old timestamp, (or occasionally
-    /// spuriously), or the timer is in the overflow,
-    /// returns Err without changing the timer's state. In this
+    /// spuriously) returns Err without changing the timer's state. In this
     /// case, the timer must be deregistered and re-registered.
     fn extend_expiration(&self, new_timestamp: u64) -> Result<(), ()> {
         let mut prior = self.state.load(Ordering::Relaxed);
@@ -327,8 +316,39 @@ pub(crate) struct TimerHandle {
     inner: NonNull<TimerShared>,
 }
 
-pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, TimerShared>;
+#[derive(Debug, Default)]
+pub(super) struct EntryList {
+    counter: usize,
+    list: crate::util::linked_list::LinkedList<TimerShared, TimerShared>,
+}
 
+impl EntryList {
+    pub(super) fn push_front(&mut self, val: TimerHandle) {
+        self.counter += 1;
+        self.list.push_front(val);
+    }
+
+    pub(super) unsafe fn remove(&mut self, node: NonNull<TimerShared>) -> Option<TimerHandle> {
+        self.counter -= 1;
+        self.list.remove(node)
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.counter == 0
+    }
+
+    pub(super) fn pop_back(&mut self) -> Option<TimerHandle> {
+        let node = self.list.pop_back();
+        if node.is_some() {
+            self.counter -= 1;
+        }
+        node
+    }
+
+    pub(super) fn count(&self) -> usize {
+        self.counter
+    }
+}
 /// The shared state structure of a timer. This structure is shared between the
 /// frontend (`Entry`) and driver backend.
 ///
@@ -451,10 +471,6 @@ impl TimerShared {
     /// Gets the shard id.
     pub(super) fn shard_id(&self) -> u32 {
         self.shard_id
-    }
-
-    pub(super) fn is_overflow(&self) -> bool {
-        self.state.is_overflow()
     }
 }
 
@@ -650,14 +666,6 @@ impl TimerHandle {
     /// the entry must not be in any wheel linked lists.
     pub(super) unsafe fn fire(self, completed_state: TimerResult) -> Option<Waker> {
         self.inner.as_ref().state.fire(completed_state)
-    }
-
-    /// Marks the entry is in wheel's overflow entry list.
-    /// SAFETY: The driver lock must be held while invoking this function, and
-    /// the entry must not be in any wheel linked lists,
-    /// and will be pushed into the overflow entry list.
-    pub(super) unsafe fn mark_overflow(&self) {
-        self.inner.as_ref().state.mark_overflow();
     }
 }
 

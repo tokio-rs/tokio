@@ -294,108 +294,78 @@ impl Handle {
         self.process_at_time(start, now);
     }
 
-    pub(self) fn process_at_time(&self, start: u32, mut now: u64) {
+    pub(self) fn process_at_time(&self, start: u32, now: u64) {
         let shards = self.inner.get_shard_size();
 
         let expiration_time = (start..shards + start)
-            .filter_map(|id| {
-                let lock = self.inner.lock_sharded_wheel(id);
-                if now < lock.elapsed() {
-                    // Time went backwards! This normally shouldn't happen as the Rust language
-                    // guarantees that an Instant is monotonic, but can happen when running
-                    // Linux in a VM on a Windows host due to std incorrectly trusting the
-                    // hardware clock to be monotonic.
-                    //
-                    // See <https://github.com/tokio-rs/tokio/issues/3619> for more information.
-                    now = lock.elapsed();
-                }
-                drop(lock);
-                self.process_at_sharded_overflow(id, now);
-                self.process_at_sharded_levels(id, now)
-            })
+            .filter_map(|i| self.process_at_sharded_time(i, now))
             .min();
 
         self.inner.next_wake.store(next_wake_time(expiration_time));
     }
 
-    // Attempts to handle the entries in the overflow of this shard.
-    pub(self) fn process_at_sharded_overflow(&self, id: u32, now: u64) {
-        let mut lock = self.inner.lock_sharded_wheel(id);
-        if !lock.might_check_overflow(now) {
-            return;
-        }
-        // Note that we need to take _all_ of the entries off the overflwo list
-        // before processing any of them. This is important because it's possible
-        // that those entries might need to be reinserted into the same slot.
-        //
-        // This happens only on the overflow entry list, when an entry is inserted
-        // more than MAX_DURATION into the future. When this happens, we then reinsert
-        // them back into the same position; we must make sure we don't then process
-        // those entries again or we'll end up in an infinite loop.
-        let mut overflow = lock.take_overflow();
-        let mut waker_list = WakeList::new();
-        while let Some(entry) = overflow.pop_back() {
-            unsafe {
-                entry.set_expiration(entry.cached_when());
-                if let Err((entry, crate::time::error::InsertError::Elapsed)) = lock.insert(entry) {
-                    if let Some(waker) = entry.fire(Ok(())) {
-                        waker_list.push(waker);
-                    }
-                    if !waker_list.can_push() {
-                        // Wake a batch of wakers. To avoid deadlock,
-                        // we must do this with the lock temporarily dropped.
-                        drop(lock);
-                        waker_list.wake_all();
-
-                        lock = self.inner.lock_sharded_wheel(id);
-                    }
-                }
-            }
-        }
-
-        drop(lock);
-        waker_list.wake_all();
-    }
-
     // Returns the next wakeup time of this shard.
-    pub(self) fn process_at_sharded_levels(&self, id: u32, now: u64) -> Option<u64> {
+    pub(self) fn process_at_sharded_time(&self, id: u32, mut now: u64) -> Option<u64> {
         let mut waker_list = WakeList::new();
         let mut lock = self.inner.lock_sharded_wheel(id);
+
+        if now < lock.elapsed() {
+            // Time went backwards! This normally shouldn't happen as the Rust language
+            // guarantees that an Instant is monotonic, but can happen when running
+            // Linux in a VM on a Windows host due to std incorrectly trusting the
+            // hardware clock to be monotonic.
+            //
+            // See <https://github.com/tokio-rs/tokio/issues/3619> for more information.
+            now = lock.elapsed();
+        }
 
         while let Some(expiration) = lock.poll(now) {
-            while let Some(entry) = lock.get_mut_entries(&expiration).pop_back() {
-                // Try to expire the entry; this is cheap (doesn't synchronize) if
-                // the timer is not expired, and updates cached_when.
-                match unsafe { entry.mark_firing(expiration.deadline) } {
-                    Ok(()) => {
-                        // Entry was expired.
-                        // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
-                        if let Some(waker) = unsafe { entry.fire(Ok(())) } {
-                            waker_list.push(waker);
+            // Gets the number of entries in this slot, which will be
+            // the maximum number of times we traverse.
+            // Limiting the maximum number of iterations is very important,
+            // because it's possible that those entries might need to be
+            // reinserted into the same slot.
 
-                            if !waker_list.can_push() {
-                                // Wake a batch of wakers. To avoid deadlock,
-                                // we must do this with the lock temporarily dropped.
-                                drop(lock);
-                                waker_list.wake_all();
+            // This happens on the highest level, when an entry is inserted
+            // more than MAX_DURATION into the future. When this happens, we wrap
+            // around, and process some entries a multiple of MAX_DURATION before
+            // they actually need to be dropped down a level. We then reinsert them
+            // back into the same position; we must make sure we don't then process
+            // those entries again or we'll end up in an infinite loop.
 
-                                lock = self.inner.lock_sharded_wheel(id);
+            // This can also happens when other threads concurrently add entry to
+            // this currently traversing slot.
+            let count = lock.get_entries_count(&expiration);
+            for _ in 0..count {
+                if let Some(entry) = lock.get_mut_entries(&expiration).pop_back() {
+                    // Try to expire the entry; this is cheap (doesn't synchronize) if
+                    // the timer is not expired, and updates cached_when.
+                    match unsafe { entry.mark_firing(expiration.deadline) } {
+                        Ok(()) => {
+                            // Entry was expired.
+                            // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
+                            if let Some(waker) = unsafe { entry.fire(Ok(())) } {
+                                waker_list.push(waker);
+
+                                if !waker_list.can_push() {
+                                    // Wake a batch of wakers. To avoid deadlock,
+                                    // we must do this with the lock temporarily dropped.
+                                    drop(lock);
+                                    waker_list.wake_all();
+
+                                    lock = self.inner.lock_sharded_wheel(id);
+                                }
                             }
                         }
-                    }
-                    Err(expiration_tick) => {
-                        // If the Entry is extended to a overflow expiration,
-                        // then push it into the overflow entry list.
-                        if lock.is_overflow(expiration_tick) {
-                            lock.push_to_overflow(entry);
-                        } else {
+                        Err(expiration_tick) => {
                             lock.add_entry(entry, expiration.clone(), expiration_tick);
                         }
                     }
                 }
             }
-            // the slot is empty here
-            lock.mark_empty(&expiration);
+            lock.occupied_bit_maintain(&expiration);
+            // This slot maybe empty,
+            // lock.mark_empty(&expiration);
             lock.set_elapsed(expiration.deadline);
         }
 

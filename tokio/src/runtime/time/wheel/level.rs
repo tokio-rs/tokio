@@ -140,15 +140,20 @@ impl Level {
         }
     }
 
+    pub(crate) fn get_entries_count(&self, slot: usize) -> usize {
+        self.slot[slot].count()
+    }
+
     pub(crate) fn get_mut_entries(&mut self, slot: usize) -> &mut EntryList {
         &mut self.slot[slot]
     }
 
-    // Marks the slot empty. The caller must ensure all
-    // entries in the slot have been popped out.
-    pub(crate) fn mark_empty(&mut self, slot: usize) {
-        debug_assert!(self.slot[slot].is_empty());
-        self.occupied &= !occupied_bit(slot);
+    pub(crate) fn occupied_bit_maintain(&mut self, slot: usize) {
+        if self.slot[slot].is_empty() {
+            self.occupied &= !occupied_bit(slot);
+        } else {
+            self.occupied |= occupied_bit(slot);
+        }
     }
 }
 
