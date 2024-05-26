@@ -1,3 +1,4 @@
+#![allow(unknown_lints, unexpected_cfgs)]
 #![cfg(all(feature = "full", tokio_unstable))]
 
 use tokio::task;

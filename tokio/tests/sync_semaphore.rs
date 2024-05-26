@@ -88,6 +88,32 @@ fn merge_unrelated_permits() {
     p1.merge(p2);
 }
 
+#[test]
+fn split() {
+    let sem = Semaphore::new(5);
+    let mut p1 = sem.try_acquire_many(3).unwrap();
+    assert_eq!(sem.available_permits(), 2);
+    assert_eq!(p1.num_permits(), 3);
+    let mut p2 = p1.split(1).unwrap();
+    assert_eq!(sem.available_permits(), 2);
+    assert_eq!(p1.num_permits(), 2);
+    assert_eq!(p2.num_permits(), 1);
+    let p3 = p1.split(0).unwrap();
+    assert_eq!(p3.num_permits(), 0);
+    drop(p1);
+    assert_eq!(sem.available_permits(), 4);
+    let p4 = p2.split(1).unwrap();
+    assert_eq!(p2.num_permits(), 0);
+    assert_eq!(p4.num_permits(), 1);
+    assert!(p2.split(1).is_none());
+    drop(p2);
+    assert_eq!(sem.available_permits(), 4);
+    drop(p3);
+    assert_eq!(sem.available_permits(), 4);
+    drop(p4);
+    assert_eq!(sem.available_permits(), 5);
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn stress_test() {

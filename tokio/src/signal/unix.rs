@@ -485,10 +485,12 @@ impl Signal {
 }
 
 // Work around for abstracting streams internally
+#[cfg(feature = "process")]
 pub(crate) trait InternalStream {
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>>;
 }
 
+#[cfg(feature = "process")]
 impl InternalStream for Signal {
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
         self.poll_recv(cx)

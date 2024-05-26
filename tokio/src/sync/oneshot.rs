@@ -1072,7 +1072,14 @@ impl<T> Receiver<T> {
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         if let Some(inner) = self.inner.as_ref() {
-            inner.close();
+            let state = inner.close();
+
+            if state.is_complete() {
+                // SAFETY: we have ensured that the `VALUE_SENT` bit has been set,
+                // so only the receiver can access the value.
+                drop(unsafe { inner.consume_value() });
+            }
+
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             self.resource_span.in_scope(|| {
                 tracing::trace!(
@@ -1202,7 +1209,7 @@ impl<T> Inner<T> {
     }
 
     /// Called by `Receiver` to indicate that the value will never be received.
-    fn close(&self) {
+    fn close(&self) -> State {
         let prev = State::set_closed(&self.state);
 
         if prev.is_tx_task_set() && !prev.is_complete() {
@@ -1210,6 +1217,8 @@ impl<T> Inner<T> {
                 self.tx_task.with_task(Waker::wake_by_ref);
             }
         }
+
+        prev
     }
 
     /// Consumes the value. This function does not check `state`.
@@ -1247,6 +1256,15 @@ impl<T> Drop for Inner<T> {
             unsafe {
                 self.tx_task.drop_task();
             }
+        }
+
+        // SAFETY: we have `&mut self`, and therefore we have
+        // exclusive access to the value.
+        unsafe {
+            // Note: the assertion holds because if the value has been sent by sender,
+            // we must ensure that the value must have been consumed by the receiver before
+            // dropping the `Inner`.
+            debug_assert!(self.consume_value().is_none());
         }
     }
 }

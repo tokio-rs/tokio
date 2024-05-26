@@ -13,9 +13,10 @@ concurrency:
 env:
   RUSTFLAGS: -Dwarnings
   RUST_BACKTRACE: 1
+  RUSTUP_WINDOWS_PATH_ADD_BIN: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2023-10-21
+  rust_nightly: nightly-2024-05-05
   rust_clippy: '1.77'
   # When updating this, also update:
   # - README.md
@@ -67,7 +68,7 @@ jobs:
       - x86_64-fortanix-unknown-sgx
       - check-redox
       - wasm32-unknown-unknown
-      - wasm32-wasi
+      - wasm32-wasip1
       - check-external-types
       - check-fuzzing
       - check-unstable-mt-counters
@@ -908,17 +909,22 @@ jobs:
         run: wasm-pack test --node -- --features "macros sync"
         working-directory: tokio
 
-  wasm32-wasi:
-    name: wasm32-wasi
+  wasm32-wasip1:
+    name: ${{ matrix.target }}
     needs: basics
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - wasm32-wasip1
+          - wasm32-wasip1-threads
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.rust_stable }}
-          targets: wasm32-wasi
+          targets: ${{ matrix.target }}
 
       # Install dependencies
       - name: Install cargo-hack, wasmtime, and cargo-wasi
@@ -928,27 +934,39 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       - name: WASI test tokio full
-        run: cargo test -p tokio --target wasm32-wasi --features full
+        run: cargo test -p tokio --target ${{ matrix.target }} --features full
         env:
-          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-util full
-        run: cargo test -p tokio-util --target wasm32-wasi --features full
+        run: cargo test -p tokio-util --target ${{ matrix.target }} --features full
         env:
-          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-stream
-        run: cargo test -p tokio-stream --target wasm32-wasi --features time,net,io-util,sync
+        run: cargo test -p tokio-stream --target ${{ matrix.target }} --features time,net,io-util,sync
         env:
-          CARGO_TARGET_WASM32_WASI_RUNNER: "wasmtime run --"
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: test tests-integration --features wasi-rt
         # TODO: this should become: `cargo hack wasi test --each-feature`
         run: cargo wasi test --test rt_yield --features wasi-rt
+        if: matrix.target == 'wasm32-wasip1'
         working-directory: tests-integration
+
+      - name: test tests-integration --features wasi-threads-rt
+        run: cargo test --target ${{ matrix.target }} --features wasi-threads-rt
+        if: matrix.target == 'wasm32-wasip1-threads'
+        working-directory: tests-integration
+        env:
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
   check-external-types:
     name: check-external-types (${{ matrix.os }})
@@ -977,6 +995,23 @@ jobs:
       - name: check-external-types
         run: cargo check-external-types --all-features
         working-directory: tokio
+
+  check-unexpected-lints-cfgs:
+    name: check unexpected lints and cfgs
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_nightly }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.rust_nightly }}
+      - name: don't allow warnings
+        run: sed -i '/#!\[allow(unknown_lints, unexpected_cfgs)\]/d' */src/lib.rs */tests/*.rs
+      - name: check for unknown lints and cfgs
+        run: cargo check --all-features --tests
+        env:
+          RUSTFLAGS: -Dwarnings --check-cfg=cfg(loom,tokio_unstable,tokio_taskdump,fuzzing,mio_unsupported_force_poll_poll,tokio_internal_mt_counters,fs,tokio_no_parking_lot,tokio_no_tuning_tests) -Funexpected_cfgs -Funknown_lints
 
   check-fuzzing:
     name: check-fuzzing

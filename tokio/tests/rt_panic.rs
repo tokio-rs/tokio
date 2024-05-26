@@ -70,6 +70,18 @@ fn builder_max_blocking_threads_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[test]
+fn builder_global_queue_interval_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = Builder::new_multi_thread().global_queue_interval(0).build();
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
 fn current_thread() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()

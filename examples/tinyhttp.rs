@@ -259,11 +259,11 @@ mod date {
         unix_date: u64,
     }
 
-    thread_local!(static LAST: RefCell<LastRenderedNow> = RefCell::new(LastRenderedNow {
+    thread_local!(static LAST: RefCell<LastRenderedNow> = const { RefCell::new(LastRenderedNow {
         bytes: [0; 128],
         amt: 0,
         unix_date: 0,
-    }));
+    }) });
 
     impl fmt::Display for Now {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
