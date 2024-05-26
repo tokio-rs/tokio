@@ -15,18 +15,21 @@ fn require_unpin<T: Unpin>(_t: &T) {}
 #[allow(dead_code)]
 struct Invalid;
 
+#[allow(unused)]
 trait AmbiguousIfSend<A> {
     fn some_item(&self) {}
 }
 impl<T: ?Sized> AmbiguousIfSend<()> for T {}
 impl<T: ?Sized + Send> AmbiguousIfSend<Invalid> for T {}
 
+#[allow(unused)]
 trait AmbiguousIfSync<A> {
     fn some_item(&self) {}
 }
 impl<T: ?Sized> AmbiguousIfSync<()> for T {}
 impl<T: ?Sized + Sync> AmbiguousIfSync<Invalid> for T {}
 
+#[allow(unused)]
 trait AmbiguousIfUnpin<A> {
     fn some_item(&self) {}
 }

@@ -8,7 +8,10 @@ impl Handle {
     }
 
     pub(crate) fn num_blocking_threads(&self) -> usize {
-        self.blocking_spawner.num_threads()
+        // workers are currently spawned using spawn_blocking
+        self.blocking_spawner
+            .num_threads()
+            .saturating_sub(self.num_workers())
     }
 
     pub(crate) fn num_idle_blocking_threads(&self) -> usize {

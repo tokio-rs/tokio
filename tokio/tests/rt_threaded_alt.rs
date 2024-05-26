@@ -1,3 +1,4 @@
+#![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))]
 #![cfg(tokio_unstable)]
@@ -18,7 +19,7 @@ use std::task::{Context, Poll, Waker};
 
 macro_rules! cfg_metrics {
     ($($t:tt)*) => {
-        #[cfg(tokio_unstable)]
+        #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
         {
             $( $t )*
         }
@@ -485,6 +486,33 @@ fn max_blocking_threads_set_to_zero() {
         .max_blocking_threads(0)
         .build()
         .unwrap();
+}
+
+/// Regression test for #6445.
+///
+/// After #6445, setting `global_queue_interval` to 1 is now technically valid.
+/// This test confirms that there is no regression in `multi_thread_runtime`
+/// when global_queue_interval is set to 1.
+#[test]
+fn global_queue_interval_set_to_one() {
+    let rt = tokio::runtime::Builder::new_multi_thread_alt()
+        .global_queue_interval(1)
+        .build()
+        .unwrap();
+
+    // Perform a simple work.
+    let cnt = Arc::new(AtomicUsize::new(0));
+    rt.block_on(async {
+        let mut set = tokio::task::JoinSet::new();
+        for _ in 0..10 {
+            let cnt = cnt.clone();
+            set.spawn(async move { cnt.fetch_add(1, Relaxed) });
+        }
+        while let Some(res) = set.join_next().await {
+            res.unwrap();
+        }
+    });
+    assert_eq!(cnt.load(Relaxed), 10);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

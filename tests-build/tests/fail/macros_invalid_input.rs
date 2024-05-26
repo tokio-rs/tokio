@@ -45,4 +45,24 @@ async fn test_crate_not_path_invalid() {}
 #[test]
 async fn test_has_second_test_attr() {}
 
+#[tokio::test]
+#[::core::prelude::v1::test]
+async fn test_has_second_test_attr_v1() {}
+
+#[tokio::test]
+#[core::prelude::rust_2015::test]
+async fn test_has_second_test_attr_rust_2015() {}
+
+#[tokio::test]
+#[::std::prelude::rust_2018::test]
+async fn test_has_second_test_attr_rust_2018() {}
+
+#[tokio::test]
+#[std::prelude::rust_2021::test]
+async fn test_has_second_test_attr_rust_2021() {}
+
+#[tokio::test]
+#[tokio::test]
+async fn test_has_generated_second_test_attr() {}
+
 fn main() {}

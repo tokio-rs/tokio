@@ -8,6 +8,7 @@ use tokio::sync::Notify;
 use tokio_test::task::spawn;
 use tokio_test::*;
 
+#[allow(unused)]
 trait AssertSend: Send + Sync {}
 impl AssertSend for Notify {}
 

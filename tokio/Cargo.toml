@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.36.0"
+version = "1.37.0"
 edition = "2021"
 rust-version = "1.63"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -118,7 +118,7 @@ signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = { version = "0.2.149" }
-nix = { version = "0.27.1", default-features = false, features = ["fs", "socket"] }
+nix = { version = "0.29.0", default-features = false, features = ["aio", "fs", "socket"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.48"
@@ -149,7 +149,7 @@ rand = "0.8.0"
 wasm-bindgen-test = "0.3.0"
 
 [target.'cfg(target_os = "freebsd")'.dev-dependencies]
-mio-aio = { version = "0.8.0", features = ["tokio"] }
+mio-aio = { version = "0.9.0", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.7", features = ["futures", "checkpoint"] }

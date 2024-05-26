@@ -179,6 +179,12 @@ impl<T> JoinHandle<T> {
     /// already completed at the time it was cancelled, but most likely it
     /// will fail with a [cancelled] `JoinError`.
     ///
+    /// Be aware that tasks spawned using [`spawn_blocking`] cannot be aborted
+    /// because they are not async. If you call `abort` on a `spawn_blocking`
+    /// task, then this *will not have any effect*, and the task will continue
+    /// running normally. The exception is if the task has not started running
+    /// yet; in that case, calling `abort` may prevent the task from starting.
+    ///
     /// See also [the module level docs] for more information on cancellation.
     ///
     /// ```rust
@@ -210,6 +216,7 @@ impl<T> JoinHandle<T> {
     ///
     /// [cancelled]: method@super::error::JoinError::is_cancelled
     /// [the module level docs]: crate::task#cancellation
+    /// [`spawn_blocking`]: crate::task::spawn_blocking
     pub fn abort(&self) {
         self.raw.remote_abort();
     }

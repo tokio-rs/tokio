@@ -5,6 +5,7 @@ use mio_aio::{AioFsyncMode, SourceApi};
 use std::{
     future::Future,
     io, mem,
+    os::fd::AsFd,
     os::unix::io::{AsRawFd, RawFd},
     pin::{pin, Pin},
     task::{Context, Poll},
@@ -17,9 +18,9 @@ mod aio {
     use super::*;
 
     #[derive(Debug)]
-    struct TokioSource(mio_aio::Source<nix::sys::aio::AioFsync>);
+    struct TokioSource<'fd>(mio_aio::Source<nix::sys::aio::AioFsync<'fd>>);
 
-    impl AioSource for TokioSource {
+    impl<'fd> AioSource for TokioSource<'fd> {
         fn register(&mut self, kq: RawFd, token: usize) {
             self.0.register_raw(kq, token)
         }
@@ -29,9 +30,9 @@ mod aio {
     }
 
     /// A very crude implementation of an AIO-based future
-    struct FsyncFut(Aio<TokioSource>);
+    struct FsyncFut<'fd>(Aio<TokioSource<'fd>>);
 
-    impl FsyncFut {
+    impl<'fd> FsyncFut<'fd> {
         pub fn submit(self: Pin<&mut Self>) -> io::Result<()> {
             let p = unsafe { self.map_unchecked_mut(|s| &mut s.0 .0) };
             match p.submit() {
@@ -41,7 +42,7 @@ mod aio {
         }
     }
 
-    impl Future for FsyncFut {
+    impl<'fd> Future for FsyncFut<'fd> {
         type Output = io::Result<()>;
 
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -134,7 +135,7 @@ mod aio {
     #[tokio::test]
     async fn fsync() {
         let f = tempfile().unwrap();
-        let fd = f.as_raw_fd();
+        let fd = f.as_fd();
         let mode = AioFsyncMode::O_SYNC;
         let source = TokioSource(mio_aio::Fsync::fsync(fd, mode, 0));
         let poll_aio = Aio::new_for_aio(source).unwrap();

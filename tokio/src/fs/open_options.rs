@@ -442,7 +442,6 @@ feature! {
         /// # Examples
         ///
         /// ```no_run
-        /// use libc;
         /// use tokio::fs::OpenOptions;
         /// use std::io;
         ///

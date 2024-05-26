@@ -489,12 +489,10 @@ async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
 #[cfg(target_os = "linux")]
 async fn anon_pipe_from_owned_fd() -> std::io::Result<()> {
     use nix::fcntl::OFlag;
-    use std::os::unix::io::{FromRawFd, OwnedFd};
 
     const DATA: &[u8] = b"this is some data to write to the pipe";
 
-    let fds = nix::unistd::pipe2(OFlag::O_CLOEXEC | OFlag::O_NONBLOCK)?;
-    let (rx_fd, tx_fd) = unsafe { (OwnedFd::from_raw_fd(fds.0), OwnedFd::from_raw_fd(fds.1)) };
+    let (rx_fd, tx_fd) = nix::unistd::pipe2(OFlag::O_CLOEXEC | OFlag::O_NONBLOCK)?;
 
     let mut rx = pipe::Receiver::from_owned_fd(rx_fd)?;
     let mut tx = pipe::Sender::from_owned_fd(tx_fd)?;

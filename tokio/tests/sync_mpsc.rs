@@ -21,6 +21,7 @@ mod support {
     pub(crate) mod mpsc_stream;
 }
 
+#[allow(unused)]
 trait AssertSend: Send {}
 impl AssertSend for mpsc::Sender<i32> {}
 impl AssertSend for mpsc::Receiver<i32> {}

@@ -15,6 +15,7 @@ async fn compat_file_seek() -> futures_util::io::Result<()> {
         .read(true)
         .write(true)
         .create(true)
+        .truncate(true)
         .open(temp_file)
         .await?
         .compat_write();
