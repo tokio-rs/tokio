@@ -22,7 +22,7 @@ fn notify_notified_one() {
 }
 
 #[test]
-fn notify_multi_notified_one_first_in() {
+fn notify_multi_notified_one_first() {
     let notify = Notify::new();
     let mut notified1 = spawn(async { notify.notified().await });
     let mut notified2 = spawn(async { notify.notified().await });
@@ -38,7 +38,7 @@ fn notify_multi_notified_one_first_in() {
 }
 
 #[test]
-fn notify_multi_notified_one_last_in() {
+fn notify_multi_notified_one_last() {
     let notify = Notify::new();
     let mut notified1 = spawn(async { notify.notified().await });
     let mut notified2 = spawn(async { notify.notified().await });
@@ -48,7 +48,7 @@ fn notify_multi_notified_one_last_in() {
     assert_pending!(notified2.poll());
 
     // should wakeup the last one
-    notify.notify_one_last_in();
+    notify.notify_one_last();
     assert_pending!(notified1.poll());
     assert_ready!(notified2.poll());
 }
@@ -138,7 +138,7 @@ fn notified_multi_notify_drop_one() {
 }
 
 #[test]
-fn notified_multi_notify_drop_one_first_in() {
+fn notified_multi_notify_drop_one_first() {
     let notify = Notify::new();
     let mut notified1 = spawn(async { notify.notified().await });
     let mut notified2 = spawn(async { notify.notified().await });
@@ -160,7 +160,7 @@ fn notified_multi_notify_drop_one_first_in() {
 }
 
 #[test]
-fn notified_multi_notify_drop_one_last_in() {
+fn notified_multi_notify_drop_one_last() {
     let notify = Notify::new();
     let mut notified1 = spawn(async { notify.notified().await });
     let mut notified2 = spawn(async { notify.notified().await });
@@ -171,7 +171,7 @@ fn notified_multi_notify_drop_one_last_in() {
     assert_pending!(notified2.poll());
     assert_pending!(notified3.poll());
 
-    notify.notify_one_last_in();
+    notify.notify_one_last();
 
     drop(notified3);
 
