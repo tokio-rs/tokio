@@ -544,11 +544,9 @@ impl Command {
 
     /// Sets configuration for the child process's standard input (stdin) handle.
     ///
-    /// Defaults to [`inherit`] when used with `spawn` or `status`, and
-    /// defaults to [`piped`] when used with `output`.
+    /// Defaults to [`inherit`].
     ///
     /// [`inherit`]: std::process::Stdio::inherit
-    /// [`piped`]: std::process::Stdio::piped
     ///
     /// # Examples
     ///
@@ -672,6 +670,8 @@ impl Command {
     #[cfg(unix)]
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn uid(&mut self, id: u32) -> &mut Command {
+        #[cfg(target_os = "nto")]
+        let id = id as i32;
         self.std.uid(id);
         self
     }
@@ -681,6 +681,8 @@ impl Command {
     #[cfg(unix)]
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn gid(&mut self, id: u32) -> &mut Command {
+        #[cfg(target_os = "nto")]
+        let id = id as i32;
         self.std.gid(id);
         self
     }

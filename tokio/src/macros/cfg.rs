@@ -218,10 +218,28 @@ macro_rules! cfg_macros {
 macro_rules! cfg_metrics {
     ($($item:item)*) => {
         $(
-            // For now, metrics is only disabled in loom tests.
-            // When stabilized, it might have a dedicated feature flag.
-            #[cfg(all(tokio_unstable, not(loom)))]
+            #[cfg(tokio_unstable)]
             #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+            $item
+        )*
+    }
+}
+
+/// Some metrics require 64-bit atomics.
+macro_rules! cfg_64bit_metrics {
+    ($($item:item)*) => {
+        $(
+            #[cfg(target_has_atomic = "64")]
+            #[cfg_attr(docsrs, doc(cfg(target_has_atomic = "64")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_no_64bit_metrics {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(target_has_atomic = "64"))]
             $item
         )*
     }
@@ -230,7 +248,7 @@ macro_rules! cfg_metrics {
 macro_rules! cfg_not_metrics {
     ($($item:item)*) => {
         $(
-            #[cfg(not(all(tokio_unstable, not(loom))))]
+            #[cfg(not(tokio_unstable))]
             $item
         )*
     }
@@ -238,7 +256,7 @@ macro_rules! cfg_not_metrics {
 
 macro_rules! cfg_not_rt_and_metrics_and_net {
     ($($item:item)*) => {
-        $( #[cfg(not(all(feature = "net", feature = "rt", all(tokio_unstable, not(loom)))))]$item )*
+        $( #[cfg(not(all(feature = "net", feature = "rt", tokio_unstable)))]$item )*
     }
 }
 
