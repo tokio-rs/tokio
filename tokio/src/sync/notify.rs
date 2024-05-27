@@ -260,8 +260,8 @@ const NOTIFICATION_NONE: usize = 0b000;
 // Notification type used by `notify_one`.
 const NOTIFICATION_ONE: usize = 0b001;
 
-// Notification type used by `notify_one_last`.
-const NOTIFICATION_ONE_LAST: usize = 0b101;
+// Notification type used by `notify_last`.
+const NOTIFICATION_LAST: usize = 0b101;
 
 // Notification type used by `notify_waiters`.
 const NOTIFICATION_ALL: usize = 0b010;
@@ -283,7 +283,7 @@ impl AtomicNotification {
         let data: usize = match notification {
             Notification::All => NOTIFICATION_ALL,
             Notification::One(NotifyOneStrategy::Fifo) => NOTIFICATION_ONE,
-            Notification::One(NotifyOneStrategy::Lifo) => NOTIFICATION_ONE_LAST,
+            Notification::One(NotifyOneStrategy::Lifo) => NOTIFICATION_LAST,
         };
         self.0.store(data, Release);
     }
@@ -293,7 +293,7 @@ impl AtomicNotification {
         match data {
             NOTIFICATION_NONE => None,
             NOTIFICATION_ONE => Some(Notification::One(NotifyOneStrategy::Fifo)),
-            NOTIFICATION_ONE_LAST => Some(Notification::One(NotifyOneStrategy::Lifo)),
+            NOTIFICATION_LAST => Some(Notification::One(NotifyOneStrategy::Lifo)),
             NOTIFICATION_ALL => Some(Notification::All),
             _ => unreachable!(),
         }
@@ -589,7 +589,7 @@ impl Notify {
     /// examples.
     ///
     /// [`notify_one()`]: Notify::notify_one
-    pub fn notify_one_last(&self) {
+    pub fn notify_last(&self) {
         self.notify_with_strategy(NotifyOneStrategy::Lifo);
     }
 
