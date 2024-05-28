@@ -40,7 +40,7 @@ fn fits_256_one_at_a_time() {
         local.push_back_or_overflow(task, &inject, &mut stats);
     }
 
-    cfg_metrics! {
+    cfg_unstable_metrics! {
         assert_metrics!(stats, overflow_count == 0);
     }
 
@@ -98,7 +98,7 @@ fn overflow() {
         local.push_back_or_overflow(task, &inject, &mut stats);
     }
 
-    cfg_metrics! {
+    cfg_unstable_metrics! {
         assert_metrics!(stats, overflow_count == 1);
     }
 
@@ -128,7 +128,7 @@ fn steal_batch() {
 
     assert!(steal1.steal_into(&mut local2, &mut stats).is_some());
 
-    cfg_metrics! {
+    cfg_unstable_metrics! {
         assert_metrics!(stats, steal_count == 2);
     }
 
@@ -184,7 +184,7 @@ fn stress1() {
                 thread::yield_now();
             }
 
-            cfg_metrics! {
+            cfg_unstable_metrics! {
                 assert_metrics!(stats, steal_count == n as _);
             }
 

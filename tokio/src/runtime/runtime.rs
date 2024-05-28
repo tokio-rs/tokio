@@ -455,6 +455,12 @@ impl Runtime {
     pub fn shutdown_background(self) {
         self.shutdown_timeout(Duration::from_nanos(0));
     }
+
+    /// Returns a view that lets you get information about how the runtime
+    /// is performing.
+    pub fn metrics(&self) -> crate::runtime::RuntimeMetrics {
+        self.handle.metrics()
+    }
 }
 
 #[allow(clippy::single_match)] // there are comments in the error branch, so we don't want if-let
@@ -486,13 +492,3 @@ impl Drop for Runtime {
 impl std::panic::UnwindSafe for Runtime {}
 
 impl std::panic::RefUnwindSafe for Runtime {}
-
-cfg_metrics! {
-    impl Runtime {
-        /// Returns a view that lets you get information about how the runtime
-        /// is performing.
-        pub fn metrics(&self) -> crate::runtime::RuntimeMetrics {
-            self.handle.metrics()
-        }
-    }
-}

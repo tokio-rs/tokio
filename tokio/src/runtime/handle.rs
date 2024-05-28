@@ -22,6 +22,8 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::{error, fmt};
 
+use super::RuntimeMetrics;
+
 /// Runtime context guard.
 ///
 /// Returned by [`Runtime::enter`] and [`Handle::enter`], the context guard exits
@@ -393,17 +395,11 @@ impl Handle {
             owned_id.into()
         }
     }
-}
 
-cfg_metrics! {
-    use crate::runtime::RuntimeMetrics;
-
-    impl Handle {
-        /// Returns a view that lets you get information about how the runtime
-        /// is performing.
-        pub fn metrics(&self) -> RuntimeMetrics {
-            RuntimeMetrics::new(self.clone())
-        }
+    /// Returns a view that lets you get information about how the runtime
+    /// is performing.
+    pub fn metrics(&self) -> RuntimeMetrics {
+        RuntimeMetrics::new(self.clone())
     }
 }
 
