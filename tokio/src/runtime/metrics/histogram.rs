@@ -1,5 +1,5 @@
-use crate::loom::sync::atomic::Ordering::Relaxed;
 use crate::util::metric_atomics::MetricAtomicU64;
+use std::sync::atomic::Ordering::Relaxed;
 
 use std::cmp;
 use std::ops::Range;

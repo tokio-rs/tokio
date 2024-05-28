@@ -17,7 +17,7 @@ cfg_not_rt_and_metrics_and_net! {
 
 cfg_net! {
     cfg_rt! {
-        cfg_metrics! {
+        cfg_unstable_metrics! {
             pub(crate) use crate::runtime::IoDriverMetrics;
         }
     }
