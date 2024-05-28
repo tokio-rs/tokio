@@ -1,6 +1,6 @@
 #[cfg(tokio_unstable)]
 use crate::runtime;
-use crate::runtime::{context, scheduler, RuntimeFlavor};
+use crate::runtime::{context, scheduler, RuntimeFlavor, RuntimeMetrics};
 
 /// Handle to the runtime.
 ///
@@ -21,8 +21,6 @@ use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 use std::future::Future;
 use std::marker::PhantomData;
 use std::{error, fmt};
-
-use super::RuntimeMetrics;
 
 /// Runtime context guard.
 ///
