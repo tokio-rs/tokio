@@ -1,8 +1,8 @@
-use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::atomic::Ordering::Relaxed;
 use crate::runtime::metrics::Histogram;
 use crate::runtime::Config;
 use crate::util::metric_atomics::MetricAtomicU64;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::Relaxed;
 
 /// Retrieve runtime worker metrics.
 ///
