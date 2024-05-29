@@ -20,7 +20,6 @@ pub(crate) struct Level {
 }
 
 /// Indicates when a slot must be processed next.
-#[derive(Debug, Clone)]
 pub(crate) struct Expiration {
     /// The level containing the slot.
     pub(crate) level: usize,

@@ -187,7 +187,7 @@ impl Wheel {
     pub(super) fn add_entry(
         &mut self,
         entry: TimerHandle,
-        expiration: Expiration,
+        expiration: &Expiration,
         expiration_tick: u64,
     ) {
         let level = level_for(expiration.deadline, expiration_tick);

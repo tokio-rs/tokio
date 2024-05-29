@@ -358,7 +358,7 @@ impl Handle {
                             }
                         }
                         Err(expiration_tick) => {
-                            lock.add_entry(entry, expiration.clone(), expiration_tick);
+                            lock.add_entry(entry, &expiration, expiration_tick);
                         }
                     }
                 }
