@@ -401,8 +401,8 @@ where
         };
 
         // If we heavily call `spawn_blocking`, there might be no available thread to
-        // run this core. Expect the task in the lifo_slot, all tasks in cores can be
-        // stolen, so we move the task ouf of the lifo_slot to the run_queue.
+        // run this core. Except for the task in the lifo_slot, all tasks can be
+        // stolen, so we move the task out of the lifo_slot to the run_queue.
         if let Some(task) = core.lifo_slot.take() {
             core.run_queue
                 .push_back_or_overflow(task, &*cx.worker.handle, &mut core.stats);
