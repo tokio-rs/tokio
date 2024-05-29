@@ -957,7 +957,7 @@ impl Builder {
         }
     }
 
-    cfg_metrics! {
+    cfg_unstable_metrics! {
         /// Enables tracking the distribution of task poll times.
         ///
         /// Task poll times are not instrumented by default as doing so requires

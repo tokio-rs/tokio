@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(unix, feature = "full"))]
 
-use std::os::unix::io::{AsRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -13,7 +13,7 @@ use std::{
     task::{Context, Waker},
 };
 
-use nix::unistd::{close, read, write};
+use nix::unistd::{read, write};
 
 use futures::poll;
 
@@ -58,18 +58,18 @@ impl TestWaker {
 
 #[derive(Debug)]
 struct FileDescriptor {
-    fd: RawFd,
+    fd: std::os::fd::OwnedFd,
 }
 
 impl AsRawFd for FileDescriptor {
     fn as_raw_fd(&self) -> RawFd {
-        self.fd
+        self.fd.as_raw_fd()
     }
 }
 
 impl Read for &FileDescriptor {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        read(self.fd, buf).map_err(io::Error::from)
+        read(self.fd.as_raw_fd(), buf).map_err(io::Error::from)
     }
 }
 
@@ -81,7 +81,7 @@ impl Read for FileDescriptor {
 
 impl Write for &FileDescriptor {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        write(self.fd, buf).map_err(io::Error::from)
+        write(&self.fd, buf).map_err(io::Error::from)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -96,12 +96,6 @@ impl Write for FileDescriptor {
 
     fn flush(&mut self) -> io::Result<()> {
         (self as &Self).flush()
-    }
-}
-
-impl Drop for FileDescriptor {
-    fn drop(&mut self) {
-        let _ = close(self.fd);
     }
 }
 
@@ -133,17 +127,10 @@ fn socketpair() -> (FileDescriptor, FileDescriptor) {
         SockFlag::empty(),
     )
     .expect("socketpair");
-    let fds = (
-        FileDescriptor {
-            fd: fd_a.into_raw_fd(),
-        },
-        FileDescriptor {
-            fd: fd_b.into_raw_fd(),
-        },
-    );
+    let fds = (FileDescriptor { fd: fd_a }, FileDescriptor { fd: fd_b });
 
-    set_nonblocking(fds.0.fd);
-    set_nonblocking(fds.1.fd);
+    set_nonblocking(fds.0.fd.as_raw_fd());
+    set_nonblocking(fds.1.fd.as_raw_fd());
 
     fds
 }

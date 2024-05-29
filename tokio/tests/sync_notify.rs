@@ -22,6 +22,38 @@ fn notify_notified_one() {
 }
 
 #[test]
+fn notify_multi_notified_one() {
+    let notify = Notify::new();
+    let mut notified1 = spawn(async { notify.notified().await });
+    let mut notified2 = spawn(async { notify.notified().await });
+
+    // add two waiters into the queue
+    assert_pending!(notified1.poll());
+    assert_pending!(notified2.poll());
+
+    // should wakeup the first one
+    notify.notify_one();
+    assert_ready!(notified1.poll());
+    assert_pending!(notified2.poll());
+}
+
+#[test]
+fn notify_multi_notified_last() {
+    let notify = Notify::new();
+    let mut notified1 = spawn(async { notify.notified().await });
+    let mut notified2 = spawn(async { notify.notified().await });
+
+    // add two waiters into the queue
+    assert_pending!(notified1.poll());
+    assert_pending!(notified2.poll());
+
+    // should wakeup the last one
+    notify.notify_last();
+    assert_pending!(notified1.poll());
+    assert_ready!(notified2.poll());
+}
+
+#[test]
 fn notified_one_notify() {
     let notify = Notify::new();
     let mut notified = spawn(async { notify.notified().await });
@@ -103,6 +135,49 @@ fn notified_multi_notify_drop_one() {
 
     assert!(notified2.is_woken());
     assert_ready!(notified2.poll());
+}
+
+#[test]
+fn notified_multi_notify_one_drop() {
+    let notify = Notify::new();
+    let mut notified1 = spawn(async { notify.notified().await });
+    let mut notified2 = spawn(async { notify.notified().await });
+    let mut notified3 = spawn(async { notify.notified().await });
+
+    // add waiters by order of poll execution
+    assert_pending!(notified1.poll());
+    assert_pending!(notified2.poll());
+    assert_pending!(notified3.poll());
+
+    // by default fifo
+    notify.notify_one();
+
+    drop(notified1);
+
+    // next waiter should be the one to be to woken up
+    assert_ready!(notified2.poll());
+    assert_pending!(notified3.poll());
+}
+
+#[test]
+fn notified_multi_notify_last_drop() {
+    let notify = Notify::new();
+    let mut notified1 = spawn(async { notify.notified().await });
+    let mut notified2 = spawn(async { notify.notified().await });
+    let mut notified3 = spawn(async { notify.notified().await });
+
+    // add waiters by order of poll execution
+    assert_pending!(notified1.poll());
+    assert_pending!(notified2.poll());
+    assert_pending!(notified3.poll());
+
+    notify.notify_last();
+
+    drop(notified3);
+
+    // latest waiter added should be the one to woken up
+    assert_ready!(notified2.poll());
+    assert_pending!(notified1.poll());
 }
 
 #[test]

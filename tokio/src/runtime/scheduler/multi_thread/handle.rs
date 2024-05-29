@@ -9,9 +9,7 @@ use crate::util::RngSeedGenerator;
 
 use std::fmt;
 
-cfg_metrics! {
-    mod metrics;
-}
+mod metrics;
 
 cfg_taskdump! {
     mod taskdump;
