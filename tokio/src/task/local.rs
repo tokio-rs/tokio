@@ -598,7 +598,7 @@ impl LocalSet {
     /// allowing it to call [`spawn_local`] to spawn additional `!Send` futures.
     /// Any local futures spawned on the local set will be driven in the
     /// background until the future passed to `run_until` completes. When the future
-    /// passed to `run` finishes, any local futures which have not completed
+    /// passed to `run_until` finishes, any local futures which have not completed
     /// will remain on the local set, and will be driven on subsequent calls to
     /// `run_until` or when [awaiting the local set] itself.
     ///
