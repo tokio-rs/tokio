@@ -39,6 +39,7 @@ stabilize more metrics.
 
 - taskdump: allow building taskdump docs on non-unix machines ([#6564])
 - time: check for overflow in `Interval::poll_tick` ([#6487])
+- sync: fix incorrect `is_empty` on mpsc block boundaries ([#6603])
 
 ### Documented
 
@@ -95,6 +96,7 @@ stabilize more metrics.
 [#6590]: https://github.com/tokio-rs/tokio/pull/6590
 [#6596]: https://github.com/tokio-rs/tokio/pull/6596
 [#6599]: https://github.com/tokio-rs/tokio/pull/6599
+[#6603]: https://github.com/tokio-rs/tokio/pull/6603
 
 # 1.37.0 (March 28th, 2024)
 
