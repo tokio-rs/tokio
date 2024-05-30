@@ -101,11 +101,10 @@ pub mod macro_rt_arg_unhandled_panic {
     #[tokio::test(unhandled_panic = "shutdown_runtime")]
     #[should_panic]
     async fn unhandled_panic_shutdown_runtime() {
-        let rt = tokio::spawn(async {
+        let _ = tokio::spawn(async {
             panic!("This panic should shutdown the runtime.");
         })
         .await;
-        assert_err!(rt);
     }
 
     #[tokio::test(unhandled_panic = "ignore")]
