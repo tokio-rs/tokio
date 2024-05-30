@@ -4,7 +4,7 @@ name = "tokio-macros"
 # - Remove path dependencies
 # - Update CHANGELOG.md.
 # - Create "tokio-macros-1.x.y" git tag.
-version = "2.2.0"
+version = "2.3.0"
 edition = "2021"
 rust-version = "1.63"
 authors = ["Tokio Contributors <team@tokio.rs>"]
