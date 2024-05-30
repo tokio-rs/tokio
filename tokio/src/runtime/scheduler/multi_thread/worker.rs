@@ -395,10 +395,18 @@ where
         let cx = maybe_cx.expect("no .is_some() == false cases above should lead here");
 
         // Get the worker core. If none is set, then blocking is fine!
-        let core = match cx.core.borrow_mut().take() {
+        let mut core = match cx.core.borrow_mut().take() {
             Some(core) => core,
             None => return Ok(()),
         };
+
+        // If we heavily call `spawn_blocking`, there might be no available thread to
+        // run this core. Except for the task in the lifo_slot, all tasks can be
+        // stolen, so we move the task out of the lifo_slot to the run_queue.
+        if let Some(task) = core.lifo_slot.take() {
+            core.run_queue
+                .push_back_or_overflow(task, &*cx.worker.handle, &mut core.stats);
+        }
 
         // We are taking the core from the context and sending it to another
         // thread.
