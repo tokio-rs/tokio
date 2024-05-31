@@ -52,7 +52,7 @@ impl SpawnerMetrics {
     }
 
     fn dec_num_threads(&self) {
-        self.num_threads.increment();
+        self.num_threads.decrement();
     }
 
     fn inc_num_idle_threads(&self) {
