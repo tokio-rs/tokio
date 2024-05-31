@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.37.0"
+version = "1.38.0"
 edition = "2021"
 rust-version = "1.63"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -89,7 +89,7 @@ test-util = ["rt", "sync", "time"]
 time = []
 
 [dependencies]
-tokio-macros = { version = "~2.2.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "~2.3.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.11"
 

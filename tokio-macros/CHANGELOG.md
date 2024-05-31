@@ -1,3 +1,9 @@
+# 2.3.0 (May 30th, 2024)
+
+- macros: make `#[tokio::test]` append `#[test]` at the end of the attribute list ([#6497])
+
+[#6497]: https://github.com/tokio-rs/tokio/pull/6497
+
 # 2.2.0 (November 19th, 2023)
 
 ### Changed
