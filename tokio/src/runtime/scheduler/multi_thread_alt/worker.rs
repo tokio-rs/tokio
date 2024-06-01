@@ -74,7 +74,7 @@ use std::cmp;
 use std::task::Waker;
 use std::time::Duration;
 
-cfg_metrics! {
+cfg_unstable_metrics! {
     mod metrics;
 }
 
@@ -1310,6 +1310,11 @@ impl Context {
 
     fn shared(&self) -> &Shared {
         &self.handle.shared
+    }
+
+    #[cfg_attr(not(feature = "time"), allow(dead_code))]
+    pub(crate) fn get_worker_index(&self) -> usize {
+        self.index
     }
 }
 

@@ -163,20 +163,22 @@ cfg_rt! {
         }
     }
 
-    cfg_metrics! {
+    impl Handle {
+        pub(crate) fn num_workers(&self) -> usize {
+            match self {
+                Handle::CurrentThread(_) => 1,
+                #[cfg(feature = "rt-multi-thread")]
+                Handle::MultiThread(handle) => handle.num_workers(),
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Handle::MultiThreadAlt(handle) => handle.num_workers(),
+            }
+        }
+    }
+
+    cfg_unstable_metrics! {
         use crate::runtime::{SchedulerMetrics, WorkerMetrics};
 
         impl Handle {
-            pub(crate) fn num_workers(&self) -> usize {
-                match self {
-                    Handle::CurrentThread(_) => 1,
-                    #[cfg(feature = "rt-multi-thread")]
-                    Handle::MultiThread(handle) => handle.num_workers(),
-                    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                    Handle::MultiThreadAlt(handle) => handle.num_workers(),
-                }
-            }
-
             pub(crate) fn num_blocking_threads(&self) -> usize {
                 match_flavor!(self, Handle(handle) => handle.num_blocking_threads())
             }

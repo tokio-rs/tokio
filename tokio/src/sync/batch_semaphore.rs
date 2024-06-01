@@ -127,7 +127,7 @@ impl Semaphore {
     /// implementation used three bits, so we will continue to reserve them to
     /// avoid a breaking change if additional flags need to be added in the
     /// future.
-    pub(crate) const MAX_PERMITS: usize = std::usize::MAX >> 3;
+    pub(crate) const MAX_PERMITS: usize = usize::MAX >> 3;
     const CLOSED: usize = 1;
     // The least-significant bit in the number of permits is reserved to use
     // as a flag indicating that the semaphore has been closed. Consequently
