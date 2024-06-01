@@ -209,7 +209,7 @@ use proc_macro::TokenStream;
 /// [`Builder::unhandled_panic`].
 ///
 /// ```ignore
-/// #[tokio::main(unhandled_panic = "shutdown_runtime")]
+/// #[tokio::main(flavor = "current_thread", unhandled_panic = "shutdown_runtime")]
 /// async fn main() {
 ///     let _ = tokio::spawn(async {
 ///         panic!("This panic will shutdown the runtime.");
@@ -217,7 +217,7 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 ///
-/// Equivalent code not using `#[tokio::test]`
+/// Equivalent code not using `#[tokio::main]`
 ///
 /// ```ignore
 /// fn main() {
@@ -468,7 +468,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// [`Builder::unhandled_panic`].
 ///
 /// ```ignore
-/// #[tokio::test(unhandled_panic = "shutdown_runtime")]
+/// #[tokio::test(flavor = "current_thread", unhandled_panic = "shutdown_runtime")]
 /// async fn my_test() {
 ///     let _ = tokio::spawn(async {
 ///         panic!("This panic will shutdown the runtime.");

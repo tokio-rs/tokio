@@ -98,7 +98,7 @@ pub mod issue_5243 {
 pub mod macro_rt_arg_unhandled_panic {
     use tokio_test::assert_err;
 
-    #[tokio::test(unhandled_panic = "shutdown_runtime")]
+    #[tokio::test(flavor = "current_thread", unhandled_panic = "shutdown_runtime")]
     #[should_panic]
     async fn unhandled_panic_shutdown_runtime() {
         let _ = tokio::spawn(async {
@@ -107,7 +107,7 @@ pub mod macro_rt_arg_unhandled_panic {
         .await;
     }
 
-    #[tokio::test(unhandled_panic = "ignore")]
+    #[tokio::test(flavor = "current_thread", unhandled_panic = "ignore")]
     async fn unhandled_panic_ignore() {
         let rt = tokio::spawn(async {
             panic!("This panic should be forwarded to rt as an error.");
