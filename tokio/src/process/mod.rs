@@ -325,6 +325,12 @@ impl Command {
         &self.std
     }
 
+    /// Cheaply convert to a `&mut std::process::Command` for places where the type from the
+    /// standard library is expected.
+    pub fn as_std_mut(&mut self) -> &mut StdCommand {
+        &mut self.std
+    }
+
     /// Adds an argument to pass to the program.
     ///
     /// Only one argument can be passed per use. So instead of:
