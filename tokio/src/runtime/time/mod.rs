@@ -320,6 +320,8 @@ impl Handle {
         }
 
         while let Some(expiration) = lock.poll(now) {
+            lock.set_elapsed(expiration.deadline);
+
             // Gets the number of entries in this slot, which will be
             // the maximum number of times we traverse.
             // Limiting the maximum number of iterations is very important,
@@ -364,7 +366,6 @@ impl Handle {
                 }
             }
             lock.occupied_bit_maintain(&expiration);
-            lock.set_elapsed(expiration.deadline);
         }
 
         let next_wake_up = lock.poll_at();
