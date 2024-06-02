@@ -334,9 +334,6 @@ impl Handle {
             // they actually need to be dropped down a level. We then reinsert them
             // back into the same position; we must make sure we don't then process
             // those entries again or we'll end up in an infinite loop.
-
-            // This can also happens when other threads concurrently add entries to
-            // this currently traversing slot.
             let count = lock.get_entries_count(&expiration);
             for _ in 0..count {
                 if let Some(entry) = lock.get_mut_entries(&expiration).pop_back() {
