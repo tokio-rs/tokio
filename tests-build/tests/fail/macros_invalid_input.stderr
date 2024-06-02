@@ -76,40 +76,46 @@ error: Failed to parse value of `crate` as path: "456"
 41 | #[tokio::test(crate = "456")]
    |                       ^^^^^
 
-error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> tests/fail/macros_invalid_input.rs:45:1
+error: The `unhandled_panic` option requires the `current_thread` runtime flavor. Use `#[tokio::test(flavor = "current_thread")]`
+  --> tests/fail/macros_invalid_input.rs:44:58
    |
-45 | #[test]
+44 | #[tokio::test(flavor = "multi_thread", unhandled_panic = "shutdown_runtime")]
+   |                                                          ^^^^^^^^^^^^^^^^^^
+
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> tests/fail/macros_invalid_input.rs:48:1
+   |
+48 | #[test]
    | ^^^^^^^
 
 error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> tests/fail/macros_invalid_input.rs:49:1
+  --> tests/fail/macros_invalid_input.rs:52:1
    |
-49 | #[::core::prelude::v1::test]
+52 | #[::core::prelude::v1::test]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> tests/fail/macros_invalid_input.rs:53:1
+  --> tests/fail/macros_invalid_input.rs:56:1
    |
-53 | #[core::prelude::rust_2015::test]
+56 | #[core::prelude::rust_2015::test]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> tests/fail/macros_invalid_input.rs:57:1
+  --> tests/fail/macros_invalid_input.rs:60:1
    |
-57 | #[::std::prelude::rust_2018::test]
+60 | #[::std::prelude::rust_2018::test]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> tests/fail/macros_invalid_input.rs:61:1
-   |
-61 | #[std::prelude::rust_2021::test]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: second test attribute is supplied, consider removing or changing the order of your test attributes
   --> tests/fail/macros_invalid_input.rs:64:1
    |
-64 | #[tokio::test]
+64 | #[std::prelude::rust_2021::test]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> tests/fail/macros_invalid_input.rs:67:1
+   |
+67 | #[tokio::test]
    | ^^^^^^^^^^^^^^
    |
    = note: this error originates in the attribute macro `tokio::test` (in Nightly builds, run with -Z macro-backtrace for more info)

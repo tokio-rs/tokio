@@ -75,7 +75,7 @@ struct Configuration {
     start_paused: Option<(bool, Span)>,
     is_test: bool,
     crate_name: Option<Path>,
-    unhandled_panic: Option<UnhandledPanic>,
+    unhandled_panic: Option<(UnhandledPanic, Span)>,
 }
 
 impl Configuration {
@@ -161,7 +161,7 @@ impl Configuration {
         let unhandled_panic = parse_string(unhandled_panic, span, "unhandled_panic")?;
         let unhandled_panic =
             UnhandledPanic::from_str(&unhandled_panic).map_err(|err| syn::Error::new(span, err))?;
-        self.unhandled_panic = Some(unhandled_panic);
+        self.unhandled_panic = Some((unhandled_panic, span));
         Ok(())
     }
 
@@ -211,12 +211,24 @@ impl Configuration {
             (_, None) => None,
         };
 
+        let unhandled_panic = match (flavor, self.unhandled_panic) {
+            (F::Threaded, Some((_, unhandled_panic_span))) => {
+                let msg = format!(
+                    "The `unhandled_panic` option requires the `current_thread` runtime flavor. Use `#[{}(flavor = \"current_thread\")]`",
+                    self.macro_name(),
+                );
+                return Err(syn::Error::new(unhandled_panic_span, msg));
+            }
+            (F::CurrentThread, Some((unhandled_panic, _))) => Some(unhandled_panic),
+            (_, None) => None,
+        };
+
         Ok(FinalConfig {
             crate_name: self.crate_name.clone(),
-            unhandled_panic: self.unhandled_panic,
             flavor,
             worker_threads,
             start_paused,
+            unhandled_panic,
         })
     }
 }

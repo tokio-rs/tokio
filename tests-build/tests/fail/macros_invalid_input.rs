@@ -41,6 +41,9 @@ async fn test_crate_not_path_int() {}
 #[tokio::test(crate = "456")]
 async fn test_crate_not_path_invalid() {}
 
+#[tokio::test(flavor = "multi_thread", unhandled_panic = "shutdown_runtime")]
+async fn test_multi_thread_with_unhandled_panic() {}
+
 #[tokio::test]
 #[test]
 async fn test_has_second_test_attr() {}

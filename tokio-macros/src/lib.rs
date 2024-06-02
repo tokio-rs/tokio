@@ -208,6 +208,8 @@ use proc_macro::TokenStream;
 /// Available options are `shutdown_runtime` and `ignore`. For more details, see
 /// [`Builder::unhandled_panic`].
 ///
+/// This option is only compatible with the `current_thread` runtime.
+///
 /// ```ignore
 /// #[tokio::main(flavor = "current_thread", unhandled_panic = "shutdown_runtime")]
 /// async fn main() {
@@ -466,6 +468,8 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// Available options are `shutdown_runtime` and `ignore`. For more details, see
 /// [`Builder::unhandled_panic`].
+///
+/// This option is only compatible with the `current_thread` runtime.
 ///
 /// ```ignore
 /// #[tokio::test(flavor = "current_thread", unhandled_panic = "shutdown_runtime")]
