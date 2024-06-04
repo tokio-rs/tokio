@@ -148,6 +148,10 @@ impl<T: Stream> Stream for Spawn<T> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.future.as_mut().poll_next(cx)
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.future.size_hint()
+    }
 }
 
 impl MockTask {
