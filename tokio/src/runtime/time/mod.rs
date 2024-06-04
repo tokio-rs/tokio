@@ -334,32 +334,41 @@ impl Handle {
             // they actually need to be dropped down a level. We then reinsert them
             // back into the same position; we must make sure we don't then process
             // those entries again or we'll end up in an infinite loop.
-            let count = lock.get_entries_count(&expiration);
-            for _ in 0..count {
-                if let Some(entry) = lock.get_mut_entries(&expiration).pop_back() {
-                    // Try to expire the entry; this is cheap (doesn't synchronize) if
-                    // the timer is not expired, and updates cached_when.
-                    match unsafe { entry.mark_firing(expiration.deadline) } {
-                        Ok(()) => {
-                            // Entry was expired.
-                            // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
-                            if let Some(waker) = unsafe { entry.fire(Ok(())) } {
-                                waker_list.push(waker);
+            let mut max_traversals = if expiration.level == wheel::MAX_LEVEL_INDEX{
+                lock.highest_level_counter(expiration.slot)
+            } else {
+                usize::MAX
+            };
+            while let Some(entry) = lock.get_mut_entries(&expiration).pop_back() {
+                lock.highest_level_counter_decrease(expiration.level, expiration.slot);
+                // Try to expire the entry; this is cheap (doesn't synchronize) if
+                // the timer is not expired, and updates cached_when.
+                match unsafe { entry.mark_firing(expiration.deadline) } {
+                    Ok(()) => {
+                        // Entry was expired.
+                        // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
+                        if let Some(waker) = unsafe { entry.fire(Ok(())) } {
+                            waker_list.push(waker);
 
-                                if !waker_list.can_push() {
-                                    // Wake a batch of wakers. To avoid deadlock,
-                                    // we must do this with the lock temporarily dropped.
-                                    drop(lock);
-                                    waker_list.wake_all();
+                            if !waker_list.can_push() {
+                                // Wake a batch of wakers. To avoid deadlock,
+                                // we must do this with the lock temporarily dropped.
+                                drop(lock);
+                                waker_list.wake_all();
 
-                                    lock = self.inner.lock_sharded_wheel(id);
-                                }
+                                lock = self.inner.lock_sharded_wheel(id);
                             }
                         }
-                        Err(expiration_tick) => {
-                            lock.add_entry(entry, &expiration, expiration_tick);
-                        }
                     }
+                    Err(expiration_tick) => {
+                        lock.reinsert_entry(entry, &expiration, expiration_tick);
+                    }
+                }
+                max_traversals -= 1;
+                // We have reached the maximum number of traversals,
+                // we should end the traversal to avoid an infinite loop.
+                if max_traversals == 0 {
+                    break;
                 }
             }
             lock.occupied_bit_maintain(&expiration);

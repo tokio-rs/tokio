@@ -36,12 +36,17 @@ pub(crate) struct Wheel {
     /// * ~ 4 hr slots / ~ 12 day range
     /// * ~ 12 day slots / ~ 2 yr range
     levels: Box<[Level; NUM_LEVELS]>,
+
+    highest_level_counter: [usize; level::LEVEL_MULT],
 }
 
 /// Number of levels. Each level has 64 slots. By using 6 levels with 64 slots
 /// each, the timer is able to track time up to 2 years into the future with a
 /// precision of 1 millisecond.
-const NUM_LEVELS: usize = 6;
+pub(super) const NUM_LEVELS: usize = 6;
+
+/// The max level index.
+pub(super) const MAX_LEVEL_INDEX: usize = NUM_LEVELS - 1;
 
 /// The maximum duration of a `Sleep`.
 pub(super) const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
@@ -52,6 +57,7 @@ impl Wheel {
         Wheel {
             elapsed: 0,
             levels: Box::new(array::from_fn(Level::new)),
+            highest_level_counter: array::from_fn(|_| 0),
         }
     }
 
@@ -95,9 +101,9 @@ impl Wheel {
         // Get the level at which the entry should be stored
         let level = self.level_for(when);
 
-        unsafe {
-            self.levels[level].add_entry(item);
-        }
+        let slot = unsafe { self.levels[level].add_entry(item) };
+
+        self.highest_level_counter_increase(level, slot);
 
         debug_assert!({
             self.levels[level]
@@ -122,9 +128,22 @@ impl Wheel {
                 );
 
                 let level = self.level_for(when);
-                self.levels[level].remove_entry(item);
+                let slot = self.levels[level].remove_entry(item);
+                self.highest_level_counter_decrease(level, slot);
             }
         }
+    }
+
+    /// Reinsert `item` to the timing wheel.
+    pub(super) fn reinsert_entry(
+        &mut self,
+        entry: TimerHandle,
+        expiration: &Expiration,
+        expiration_tick: u64,
+    ) {
+        let level = level_for(expiration.deadline, expiration_tick);
+        let slot = unsafe { self.levels[level].add_entry(entry) };
+        self.highest_level_counter_increase(level, slot);
     }
 
     /// Instant at which to poll.
@@ -184,16 +203,6 @@ impl Wheel {
         res
     }
 
-    pub(super) fn add_entry(
-        &mut self,
-        entry: TimerHandle,
-        expiration: &Expiration,
-        expiration_tick: u64,
-    ) {
-        let level = level_for(expiration.deadline, expiration_tick);
-        unsafe { self.levels[level].add_entry(entry) };
-    }
-
     pub(super) fn set_elapsed(&mut self, when: u64) {
         assert!(
             self.elapsed <= when,
@@ -207,16 +216,29 @@ impl Wheel {
         }
     }
 
-    pub(super) fn get_entries_count(&mut self, expiration: &Expiration) -> usize {
-        self.levels[expiration.level].get_entries_count(expiration.slot)
-    }
-
     pub(super) fn get_mut_entries(&mut self, expiration: &Expiration) -> &mut EntryList {
         self.levels[expiration.level].get_mut_entries(expiration.slot)
     }
 
     pub(super) fn occupied_bit_maintain(&mut self, expiration: &Expiration) {
         self.levels[expiration.level].occupied_bit_maintain(expiration.slot);
+    }
+
+    /// Gets the number of `item` in the specified slot at the highest level.
+    pub(super) fn highest_level_counter(&self, slot: usize) -> usize {
+        self.highest_level_counter[slot]
+    }
+
+    pub(super) fn highest_level_counter_increase(&mut self, level: usize, slot: usize) {
+        if level == MAX_LEVEL_INDEX {
+            self.highest_level_counter[slot] += 1;
+        }
+    }
+
+    pub(super) fn highest_level_counter_decrease(&mut self, level: usize, slot: usize) {
+        if level == MAX_LEVEL_INDEX {
+            self.highest_level_counter[slot] -= 1;
+        }
     }
 
     fn level_for(&self, when: u64) -> usize {

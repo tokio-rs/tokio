@@ -316,39 +316,8 @@ pub(crate) struct TimerHandle {
     inner: NonNull<TimerShared>,
 }
 
-#[derive(Debug, Default)]
-pub(super) struct EntryList {
-    count: usize,
-    list: crate::util::linked_list::LinkedList<TimerShared, TimerShared>,
-}
+pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, TimerShared>;
 
-impl EntryList {
-    pub(super) fn push_front(&mut self, node: TimerHandle) {
-        self.count += 1;
-        self.list.push_front(node);
-    }
-
-    pub(super) unsafe fn remove(&mut self, node: NonNull<TimerShared>) {
-        self.list.remove(node);
-        self.count -= 1;
-    }
-
-    pub(super) fn is_empty(&self) -> bool {
-        self.count == 0
-    }
-
-    pub(super) fn pop_back(&mut self) -> Option<TimerHandle> {
-        let node = self.list.pop_back();
-        if node.is_some() {
-            self.count -= 1;
-        }
-        node
-    }
-
-    pub(super) fn count(&self) -> usize {
-        self.count
-    }
-}
 /// The shared state structure of a timer. This structure is shared between the
 /// frontend (`Entry`) and driver backend.
 ///

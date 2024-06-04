@@ -34,7 +34,7 @@ pub(crate) struct Expiration {
 /// Level multiplier.
 ///
 /// Being a power of 2 is very important.
-const LEVEL_MULT: usize = 64;
+pub(super) const LEVEL_MULT: usize = 64;
 
 impl Level {
     pub(crate) fn new(level: usize) -> Level {
@@ -80,7 +80,7 @@ impl Level {
             // pseudo-ring buffer, and we rotate around them indefinitely. If we
             // compute a deadline before now, and it's the top level, it
             // therefore means we're actually looking at a slot in the future.
-            debug_assert_eq!(self.level, super::NUM_LEVELS - 1);
+            debug_assert_eq!(self.level, super::MAX_LEVEL_INDEX);
 
             deadline += level_range;
         }
@@ -118,15 +118,17 @@ impl Level {
         Some(slot)
     }
 
-    pub(crate) unsafe fn add_entry(&mut self, item: TimerHandle) {
+    pub(crate) unsafe fn add_entry(&mut self, item: TimerHandle) -> usize {
         let slot = slot_for(item.cached_when(), self.level);
 
         self.slot[slot].push_front(item);
 
         self.occupied |= occupied_bit(slot);
+
+        slot
     }
 
-    pub(crate) unsafe fn remove_entry(&mut self, item: NonNull<TimerShared>) {
+    pub(crate) unsafe fn remove_entry(&mut self, item: NonNull<TimerShared>) -> usize {
         let slot = slot_for(unsafe { item.as_ref().cached_when() }, self.level);
 
         unsafe { self.slot[slot].remove(item) };
@@ -137,10 +139,7 @@ impl Level {
             // Unset the bit
             self.occupied ^= occupied_bit(slot);
         }
-    }
-
-    pub(super) fn get_entries_count(&self, slot: usize) -> usize {
-        self.slot[slot].count()
+        slot
     }
 
     pub(super) fn get_mut_entries(&mut self, slot: usize) -> &mut EntryList {
