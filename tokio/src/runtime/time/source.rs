@@ -38,6 +38,7 @@ impl TimeSource {
     }
 
     #[cfg(test)]
+    #[allow(dead_code)]
     pub(super) fn start_time(&self) -> Instant {
         self.start_time
     }
