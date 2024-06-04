@@ -22,9 +22,11 @@ impl TimeSource {
     pub(crate) fn instant_to_tick(&self, t: Instant) -> u64 {
         // round up
         let dur: Duration = t.saturating_duration_since(self.start_time);
-        let ms = dur.as_millis();
-
-        ms.try_into().unwrap_or(MAX_SAFE_MILLIS_DURATION)
+        let ms = dur
+            .as_millis()
+            .try_into()
+            .unwrap_or(MAX_SAFE_MILLIS_DURATION);
+        ms.min(MAX_SAFE_MILLIS_DURATION)
     }
 
     pub(crate) fn tick_to_duration(&self, t: u64) -> Duration {
@@ -33,5 +35,11 @@ impl TimeSource {
 
     pub(crate) fn now(&self, clock: &Clock) -> u64 {
         self.instant_to_tick(clock.now())
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(super) fn start_time(&self) -> Instant {
+        self.start_time
     }
 }
