@@ -38,7 +38,7 @@ impl TimeSource {
     }
 
     #[cfg(test)]
-    pub(crate) fn start_time(&self) -> Instant {
+    pub(super) fn start_time(&self) -> Instant {
         self.start_time
     }
 }
