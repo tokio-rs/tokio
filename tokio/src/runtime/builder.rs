@@ -199,9 +199,9 @@ pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync +
 #[derive(Clone, Copy)]
 pub(crate) enum Kind {
     CurrentThread,
-    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+    #[cfg(feature = "rt-multi-thread")]
     MultiThread,
-    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
     MultiThreadAlt,
 }
 
@@ -224,35 +224,33 @@ impl Builder {
         Builder::new(Kind::CurrentThread, EVENT_INTERVAL)
     }
 
-    cfg_not_wasi! {
-        /// Returns a new builder with the multi thread scheduler selected.
+    /// Returns a new builder with the multi thread scheduler selected.
+    ///
+    /// Configuration methods can be chained on the return value.
+    #[cfg(feature = "rt-multi-thread")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+    pub fn new_multi_thread() -> Builder {
+        // The number `61` is fairly arbitrary. I believe this value was copied from golang.
+        Builder::new(Kind::MultiThread, 61)
+    }
+
+    cfg_unstable! {
+        /// Returns a new builder with the alternate multi thread scheduler
+        /// selected.
+        ///
+        /// The alternate multi threaded scheduler is an in-progress
+        /// candidate to replace the existing multi threaded scheduler. It
+        /// currently does not scale as well to 16+ processors.
+        ///
+        /// This runtime flavor is currently **not considered production
+        /// ready**.
         ///
         /// Configuration methods can be chained on the return value.
         #[cfg(feature = "rt-multi-thread")]
         #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
-        pub fn new_multi_thread() -> Builder {
+        pub fn new_multi_thread_alt() -> Builder {
             // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-            Builder::new(Kind::MultiThread, 61)
-        }
-
-        cfg_unstable! {
-            /// Returns a new builder with the alternate multi thread scheduler
-            /// selected.
-            ///
-            /// The alternate multi threaded scheduler is an in-progress
-            /// candidate to replace the existing multi threaded scheduler. It
-            /// currently does not scale as well to 16+ processors.
-            ///
-            /// This runtime flavor is currently **not considered production
-            /// ready**.
-            ///
-            /// Configuration methods can be chained on the return value.
-            #[cfg(feature = "rt-multi-thread")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
-            pub fn new_multi_thread_alt() -> Builder {
-                // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-                Builder::new(Kind::MultiThreadAlt, 61)
-            }
+            Builder::new(Kind::MultiThreadAlt, 61)
         }
     }
 
@@ -697,26 +695,27 @@ impl Builder {
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_runtime(),
-            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(feature = "rt-multi-thread")]
             Kind::MultiThread => self.build_threaded_runtime(),
-            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
             Kind::MultiThreadAlt => self.build_alt_threaded_runtime(),
         }
     }
 
-    fn get_cfg(&self) -> driver::Cfg {
+    fn get_cfg(&self, workers: usize) -> driver::Cfg {
         driver::Cfg {
             enable_pause_time: match self.kind {
                 Kind::CurrentThread => true,
-                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(feature = "rt-multi-thread")]
                 Kind::MultiThread => false,
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 Kind::MultiThreadAlt => false,
             },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
             start_paused: self.start_paused,
             nevents: self.nevents,
+            workers,
         }
     }
 
@@ -758,6 +757,10 @@ impl Builder {
     ///
     /// [the module documentation]: crate::runtime#multi-threaded-runtime-behavior-at-the-time-of-writing
     ///
+    /// # Panics
+    ///
+    /// This function will panic if 0 is passed as an argument.
+    ///
     /// # Examples
     ///
     /// ```
@@ -768,7 +771,9 @@ impl Builder {
     ///     .build();
     /// # }
     /// ```
+    #[track_caller]
     pub fn global_queue_interval(&mut self, val: u32) -> &mut Self {
+        assert!(val > 0, "global_queue_interval must be greater than 0");
         self.global_queue_interval = Some(val);
         self
     }
@@ -832,7 +837,7 @@ impl Builder {
         ///
         /// This option is currently unstable and its implementation is
         /// incomplete. The API may change or be removed in the future. See
-        /// tokio-rs/tokio#4516 for more details.
+        /// issue [tokio-rs/tokio#4516] for more details.
         ///
         /// # Examples
         ///
@@ -864,6 +869,7 @@ impl Builder {
         /// ```
         ///
         /// [`JoinHandle`]: struct@crate::task::JoinHandle
+        /// [tokio-rs/tokio#4516]: https://github.com/tokio-rs/tokio/issues/4516
         pub fn unhandled_panic(&mut self, behavior: UnhandledPanic) -> &mut Self {
             if !matches!(self.kind, Kind::CurrentThread) && matches!(behavior, UnhandledPanic::ShutdownRuntime) {
                 panic!("UnhandledPanic::ShutdownRuntime is only supported in current thread runtime");
@@ -889,7 +895,7 @@ impl Builder {
         /// is stealable.
         ///
         /// Consider trying this option when the task "scheduled" time is high
-        /// but the runtime is underutilized. Use tokio-rs/tokio-metrics to
+        /// but the runtime is underutilized. Use [tokio-rs/tokio-metrics] to
         /// collect this data.
         ///
         /// # Unstable
@@ -897,7 +903,7 @@ impl Builder {
         /// This configuration option is considered a workaround for the LIFO
         /// slot not being stealable. When the slot becomes stealable, we will
         /// revisit whether or not this option is necessary. See
-        /// tokio-rs/tokio#4941.
+        /// issue [tokio-rs/tokio#4941].
         ///
         /// # Examples
         ///
@@ -909,6 +915,9 @@ impl Builder {
         ///     .build()
         ///     .unwrap();
         /// ```
+        ///
+        /// [tokio-rs/tokio-metrics]: https://github.com/tokio-rs/tokio-metrics
+        /// [tokio-rs/tokio#4941]: https://github.com/tokio-rs/tokio/issues/4941
         pub fn disable_lifo_slot(&mut self) -> &mut Self {
             self.disable_lifo_slot = true;
             self
@@ -948,7 +957,7 @@ impl Builder {
         }
     }
 
-    cfg_metrics! {
+    cfg_unstable_metrics! {
         /// Enables tracking the distribution of task poll times.
         ///
         /// Task poll times are not instrumented by default as doing so requires
@@ -1087,7 +1096,7 @@ impl Builder {
         use crate::runtime::scheduler::{self, CurrentThread};
         use crate::runtime::{runtime::Scheduler, Config};
 
-        let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+        let (driver, driver_handle) = driver::Driver::new(self.get_cfg(1))?;
 
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
@@ -1240,7 +1249,7 @@ cfg_rt_multi_thread! {
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
-            let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+            let (driver, driver_handle) = driver::Driver::new(self.get_cfg(core_threads))?;
 
             // Create the blocking pool
             let blocking_pool =
@@ -1287,7 +1296,7 @@ cfg_rt_multi_thread! {
                 use crate::runtime::scheduler::MultiThreadAlt;
 
                 let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
-                let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+                let (driver, driver_handle) = driver::Driver::new(self.get_cfg(core_threads))?;
 
                 // Create the blocking pool
                 let blocking_pool =

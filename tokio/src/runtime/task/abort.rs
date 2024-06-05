@@ -11,7 +11,14 @@ use std::panic::{RefUnwindSafe, UnwindSafe};
 /// Dropping an `AbortHandle` releases the permission to terminate the task
 /// --- it does *not* abort the task.
 ///
+/// Be aware that tasks spawned using [`spawn_blocking`] cannot be aborted
+/// because they are not async. If you call `abort` on a `spawn_blocking` task,
+/// then this *will not have any effect*, and the task will continue running
+/// normally. The exception is if the task has not started running yet; in that
+/// case, calling `abort` may prevent the task from starting.
+///
 /// [`JoinHandle`]: crate::task::JoinHandle
+/// [`spawn_blocking`]: crate::task::spawn_blocking
 #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub struct AbortHandle {
     raw: RawTask,
@@ -31,11 +38,18 @@ impl AbortHandle {
     /// If the task was already cancelled, such as by [`JoinHandle::abort`],
     /// this method will do nothing.
     ///
+    /// Be aware that tasks spawned using [`spawn_blocking`] cannot be aborted
+    /// because they are not async. If you call `abort` on a `spawn_blocking`
+    /// task, then this *will not have any effect*, and the task will continue
+    /// running normally. The exception is if the task has not started running
+    /// yet; in that case, calling `abort` may prevent the task from starting.
+    ///
     /// See also [the module level docs] for more information on cancellation.
     ///
     /// [cancelled]: method@super::error::JoinError::is_cancelled
     /// [`JoinHandle::abort`]: method@super::JoinHandle::abort
     /// [the module level docs]: crate::task#cancellation
+    /// [`spawn_blocking`]: crate::task::spawn_blocking
     pub fn abort(&self) {
         self.raw.remote_abort();
     }

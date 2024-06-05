@@ -1,3 +1,4 @@
+#![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
@@ -34,7 +35,7 @@ async fn local_current_thread_scheduler() {
 #[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool() {
     thread_local! {
-        static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        static ON_RT_THREAD: Cell<bool> = const { Cell::new(false) };
     }
 
     ON_RT_THREAD.with(|cell| cell.set(true));
@@ -55,7 +56,7 @@ async fn local_threadpool() {
 #[tokio::test(flavor = "multi_thread")]
 async fn localset_future_threadpool() {
     thread_local! {
-        static ON_LOCAL_THREAD: Cell<bool> = Cell::new(false);
+        static ON_LOCAL_THREAD: Cell<bool> = const { Cell::new(false) };
     }
 
     ON_LOCAL_THREAD.with(|cell| cell.set(true));
@@ -118,7 +119,7 @@ async fn local_threadpool_timer() {
     // This test ensures that runtime services like the timer are properly
     // set for the local task set.
     thread_local! {
-        static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        static ON_RT_THREAD: Cell<bool> = const { Cell::new(false) };
     }
 
     ON_RT_THREAD.with(|cell| cell.set(true));
@@ -158,7 +159,7 @@ fn enter_guard_spawn() {
 #[should_panic]
 fn local_threadpool_blocking_in_place() {
     thread_local! {
-        static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        static ON_RT_THREAD: Cell<bool> = const { Cell::new(false) };
     }
 
     ON_RT_THREAD.with(|cell| cell.set(true));
@@ -182,7 +183,7 @@ fn local_threadpool_blocking_in_place() {
 #[tokio::test(flavor = "multi_thread")]
 async fn local_threadpool_blocking_run() {
     thread_local! {
-        static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        static ON_RT_THREAD: Cell<bool> = const { Cell::new(false) };
     }
 
     ON_RT_THREAD.with(|cell| cell.set(true));
@@ -212,7 +213,7 @@ async fn local_threadpool_blocking_run() {
 async fn all_spawns_are_local() {
     use futures::future;
     thread_local! {
-        static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        static ON_RT_THREAD: Cell<bool> = const { Cell::new(false) };
     }
 
     ON_RT_THREAD.with(|cell| cell.set(true));
@@ -238,7 +239,7 @@ async fn all_spawns_are_local() {
 #[tokio::test(flavor = "multi_thread")]
 async fn nested_spawn_is_local() {
     thread_local! {
-        static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        static ON_RT_THREAD: Cell<bool> = const { Cell::new(false) };
     }
 
     ON_RT_THREAD.with(|cell| cell.set(true));
@@ -274,7 +275,7 @@ async fn nested_spawn_is_local() {
 #[test]
 fn join_local_future_elsewhere() {
     thread_local! {
-        static ON_RT_THREAD: Cell<bool> = Cell::new(false);
+        static ON_RT_THREAD: Cell<bool> = const { Cell::new(false) };
     }
 
     ON_RT_THREAD.with(|cell| cell.set(true));

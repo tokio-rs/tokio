@@ -58,6 +58,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::atomic::Ordering;
 
+use crate::runtime::context;
 use crate::runtime::scheduler;
 use crate::sync::AtomicWaker;
 use crate::time::Instant;
@@ -75,7 +76,7 @@ const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 /// The largest safe integer to use for ticks.
 ///
 /// This value should be updated if any other signal values are added above.
-pub(super) const MAX_SAFE_MILLIS_DURATION: u64 = u64::MAX - 2;
+pub(super) const MAX_SAFE_MILLIS_DURATION: u64 = STATE_MIN_VALUE - 1;
 
 /// This structure holds the current shared state of the timer - its scheduled
 /// time (if registered), or otherwise the result of the timer completing, as
@@ -187,18 +188,14 @@ impl StateCell {
                 break Err(cur_state);
             }
 
-            match self.state.compare_exchange(
+            match self.state.compare_exchange_weak(
                 cur_state,
                 STATE_PENDING_FIRE,
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
-                Ok(_) => {
-                    break Ok(());
-                }
-                Err(actual_state) => {
-                    cur_state = actual_state;
-                }
+                Ok(_) => break Ok(()),
+                Err(actual_state) => cur_state = actual_state,
             }
         }
     }
@@ -266,12 +263,8 @@ impl StateCell {
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {
-                Ok(_) => {
-                    return Ok(());
-                }
-                Err(true_prior) => {
-                    prior = true_prior;
-                }
+                Ok(_) => return Ok(()),
+                Err(true_prior) => prior = true_prior,
             }
         }
     }
@@ -301,7 +294,7 @@ pub(crate) struct TimerEntry {
     ///
     /// This is manipulated only under the inner mutex. TODO: Can we use loom
     /// cells for this?
-    inner: StdUnsafeCell<TimerShared>,
+    inner: StdUnsafeCell<Option<TimerShared>>,
     /// Deadline for the timer. This is used to register on the first
     /// poll, as we can't register prior to being pinned.
     deadline: Instant,
@@ -336,6 +329,8 @@ pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, Ti
 ///
 /// Note that this structure is located inside the `TimerEntry` structure.
 pub(crate) struct TimerShared {
+    /// The shard id. We should never change it.
+    shard_id: u32,
     /// A link within the doubly-linked list of timers on a particular level and
     /// slot. Valid only if state is equal to Registered.
     ///
@@ -346,9 +341,6 @@ pub(crate) struct TimerShared {
     /// Generally owned by the driver, but is accessed by the entry when not
     /// registered.
     cached_when: AtomicU64,
-
-    /// The true expiration time. Set by the timer future, read by the driver.
-    true_when: AtomicU64,
 
     /// Current state. This records whether the timer entry is currently under
     /// the ownership of the driver, and if not, its current state (not
@@ -364,7 +356,6 @@ unsafe impl Sync for TimerShared {}
 impl std::fmt::Debug for TimerShared {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TimerShared")
-            .field("when", &self.true_when.load(Ordering::Relaxed))
             .field("cached_when", &self.cached_when.load(Ordering::Relaxed))
             .field("state", &self.state)
             .finish()
@@ -380,10 +371,10 @@ generate_addr_of_methods! {
 }
 
 impl TimerShared {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(shard_id: u32) -> Self {
         Self {
+            shard_id,
             cached_when: AtomicU64::new(0),
-            true_when: AtomicU64::new(0),
             pointers: linked_list::Pointers::new(),
             state: StateCell::default(),
             _p: PhantomPinned,
@@ -451,6 +442,11 @@ impl TimerShared {
     pub(super) fn might_be_registered(&self) -> bool {
         self.state.might_be_registered()
     }
+
+    /// Gets the shard id.
+    pub(super) fn shard_id(&self) -> u32 {
+        self.shard_id
+    }
 }
 
 unsafe impl linked_list::Link for TimerShared {
@@ -477,23 +473,34 @@ unsafe impl linked_list::Link for TimerShared {
 
 impl TimerEntry {
     #[track_caller]
-    pub(crate) fn new(handle: &scheduler::Handle, deadline: Instant) -> Self {
+    pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
         // Panic if the time driver is not enabled
         let _ = handle.driver().time();
 
-        let driver = handle.clone();
-
         Self {
-            driver,
-            inner: StdUnsafeCell::new(TimerShared::new()),
+            driver: handle,
+            inner: StdUnsafeCell::new(None),
             deadline,
             registered: false,
             _m: std::marker::PhantomPinned,
         }
     }
 
+    fn is_inner_init(&self) -> bool {
+        unsafe { &*self.inner.get() }.is_some()
+    }
+
+    // This lazy initialization is for performance purposes.
     fn inner(&self) -> &TimerShared {
-        unsafe { &*self.inner.get() }
+        let inner = unsafe { &*self.inner.get() };
+        if inner.is_none() {
+            let shard_size = self.driver.driver().time().inner.get_shard_size();
+            let shard_id = generate_shard_id(shard_size);
+            unsafe {
+                *self.inner.get() = Some(TimerShared::new(shard_id));
+            }
+        }
+        return inner.as_ref().unwrap();
     }
 
     pub(crate) fn deadline(&self) -> Instant {
@@ -501,11 +508,15 @@ impl TimerEntry {
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
-        !self.inner().state.might_be_registered() && self.registered
+        self.is_inner_init() && !self.inner().state.might_be_registered() && self.registered
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.
     pub(crate) fn cancel(self: Pin<&mut Self>) {
+        // Avoid calling the `clear_entry` method, because it has not been initialized yet.
+        if !self.is_inner_init() {
+            return;
+        }
         // We need to perform an acq/rel fence with the driver thread, and the
         // simplest way to do so is to grab the driver lock.
         //
@@ -532,8 +543,9 @@ impl TimerEntry {
     }
 
     pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant, reregister: bool) {
-        unsafe { self.as_mut().get_unchecked_mut() }.deadline = new_time;
-        unsafe { self.as_mut().get_unchecked_mut() }.registered = reregister;
+        let this = unsafe { self.as_mut().get_unchecked_mut() };
+        this.deadline = new_time;
+        this.registered = reregister;
 
         let tick = self.driver().time_source().deadline_to_tick(new_time);
 
@@ -564,9 +576,7 @@ impl TimerEntry {
             self.as_mut().reset(deadline, true);
         }
 
-        let this = unsafe { self.get_unchecked_mut() };
-
-        this.inner().state.poll(cx.waker())
+        self.inner().state.poll(cx.waker())
     }
 
     pub(crate) fn driver(&self) -> &super::Handle {
@@ -642,5 +652,27 @@ impl TimerHandle {
 impl Drop for TimerEntry {
     fn drop(&mut self) {
         unsafe { Pin::new_unchecked(self) }.as_mut().cancel();
+    }
+}
+
+// Generates a shard id. If current thread is a worker thread, we use its worker index as a shard id.
+// Otherwise, we use a random number generator to obtain the shard id.
+cfg_rt! {
+    fn generate_shard_id(shard_size: u32) -> u32 {
+        let id = context::with_scheduler(|ctx| match ctx {
+            Some(scheduler::Context::CurrentThread(_ctx)) => 0,
+            #[cfg(feature = "rt-multi-thread")]
+            Some(scheduler::Context::MultiThread(ctx)) => ctx.get_worker_index() as u32,
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            Some(scheduler::Context::MultiThreadAlt(ctx)) => ctx.get_worker_index() as u32,
+            None => context::thread_rng_n(shard_size),
+        });
+        id % shard_size
+    }
+}
+
+cfg_not_rt! {
+    fn generate_shard_id(shard_size: u32) -> u32 {
+        context::thread_rng_n(shard_size)
     }
 }

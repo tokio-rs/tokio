@@ -502,7 +502,7 @@ impl Handle {
     }
 }
 
-cfg_metrics! {
+cfg_unstable_metrics! {
     impl Handle {
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
             &self.shared.scheduler_metrics

@@ -112,6 +112,7 @@ impl Driver {
         // Drain the pipe completely so we can receive a new readiness event
         // if another signal has come in.
         let mut buf = [0; 128];
+        #[allow(clippy::unused_io_amount)]
         loop {
             match self.receiver.read(&mut buf) {
                 Ok(0) => panic!("EOF on self-pipe"),

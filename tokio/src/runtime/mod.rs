@@ -388,21 +388,18 @@ cfg_rt! {
     mod thread_id;
     pub(crate) use thread_id::ThreadId;
 
-    cfg_metrics! {
-        mod metrics;
-        pub use metrics::{RuntimeMetrics, HistogramScale};
+    pub(crate) mod metrics;
+    pub use metrics::RuntimeMetrics;
 
-        pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics, HistogramBuilder};
+    cfg_unstable_metrics! {
+        pub use metrics::HistogramScale;
 
         cfg_net! {
-        pub(crate) use metrics::IoDriverMetrics;
+            pub(crate) use metrics::IoDriverMetrics;
         }
     }
 
-    cfg_not_metrics! {
-        pub(crate) mod metrics;
-        pub(crate) use metrics::{SchedulerMetrics, WorkerMetrics, MetricsBatch, HistogramBuilder};
-    }
+    pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics, HistogramBuilder};
 
     /// After thread starts / before thread stops
     type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;

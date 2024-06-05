@@ -467,10 +467,10 @@ impl<K, V> StreamMap<K, V> {
     /// assert!(map.remove(&1).is_some());
     /// assert!(map.remove(&1).is_none());
     /// ```
-    pub fn remove<Q: ?Sized>(&mut self, k: &Q) -> Option<V>
+    pub fn remove<Q>(&mut self, k: &Q) -> Option<V>
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
         for i in 0..self.entries.len() {
             if self.entries[i].0.borrow() == k {
@@ -496,10 +496,10 @@ impl<K, V> StreamMap<K, V> {
     /// assert_eq!(map.contains_key(&1), true);
     /// assert_eq!(map.contains_key(&2), false);
     /// ```
-    pub fn contains_key<Q: ?Sized>(&self, k: &Q) -> bool
+    pub fn contains_key<Q>(&self, k: &Q) -> bool
     where
         K: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
         for i in 0..self.entries.len() {
             if self.entries[i].0.borrow() == k {

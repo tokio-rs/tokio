@@ -206,7 +206,7 @@ fn move_children_to_parent(node: &mut Inner, parent: &mut Inner) {
     for child in std::mem::take(&mut node.children) {
         {
             let mut child_locked = child.inner.lock().unwrap();
-            child_locked.parent = node.parent.clone();
+            child_locked.parent.clone_from(&node.parent);
             child_locked.parent_idx = parent.children.len();
         }
         parent.children.push(child);

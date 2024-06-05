@@ -23,7 +23,7 @@ use tokio::task::{spawn_local, JoinHandle, LocalSet};
 ///
 /// ```
 /// use std::rc::Rc;
-/// use tokio::{self, task };
+/// use tokio::task;
 /// use tokio_util::task::LocalPoolHandle;
 ///
 /// #[tokio::main(flavor = "current_thread")]

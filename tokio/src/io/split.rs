@@ -79,8 +79,7 @@ impl<T> ReadHalf<T> {
     ///
     /// If this `ReadHalf` and the given `WriteHalf` do not originate from the
     /// same `split` operation this method will panic.
-    /// This can be checked ahead of time by comparing the stream ID
-    /// of the two halves.
+    /// This can be checked ahead of time by calling [`is_pair_of()`](Self::is_pair_of).
     #[track_caller]
     pub fn unsplit(self, wr: WriteHalf<T>) -> T
     where

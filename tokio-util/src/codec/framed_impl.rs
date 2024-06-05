@@ -12,7 +12,6 @@ use std::borrow::{Borrow, BorrowMut};
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tracing::trace;
 
 pin_project! {
     #[derive(Debug)]

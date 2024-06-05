@@ -264,16 +264,16 @@ impl<T: 'static> LocalKey<T> {
     }
 }
 
-impl<T: Copy + 'static> LocalKey<T> {
+impl<T: Clone + 'static> LocalKey<T> {
     /// Returns a copy of the task-local value
-    /// if the task-local value implements `Copy`.
+    /// if the task-local value implements `Clone`.
     ///
     /// # Panics
     ///
     /// This function will panic if the task local doesn't have a value set.
     #[track_caller]
     pub fn get(&'static self) -> T {
-        self.with(|v| *v)
+        self.with(|v| v.clone())
     }
 }
 

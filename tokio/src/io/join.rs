@@ -1,6 +1,6 @@
 //! Join two values implementing `AsyncRead` and `AsyncWrite` into a single one.
 
-use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
+use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
 use std::io;
 use std::pin::Pin;
@@ -113,5 +113,18 @@ where
 
     fn is_write_vectored(&self) -> bool {
         self.writer.is_write_vectored()
+    }
+}
+
+impl<R, W> AsyncBufRead for Join<R, W>
+where
+    R: AsyncBufRead,
+{
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        self.project().reader.poll_fill_buf(cx)
+    }
+
+    fn consume(self: Pin<&mut Self>, amt: usize) {
+        self.project().reader.consume(amt)
     }
 }

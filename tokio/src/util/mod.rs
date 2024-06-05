@@ -5,6 +5,8 @@ cfg_io_driver! {
 #[cfg(feature = "rt")]
 pub(crate) mod atomic_cell;
 
+pub(crate) mod metric_atomics;
+
 #[cfg(any(feature = "rt", feature = "signal", feature = "process"))]
 pub(crate) mod once_cell;
 
@@ -19,6 +21,8 @@ pub(crate) mod once_cell;
     // rt and signal use `Notify`, which requires `WakeList`.
     feature = "rt",
     feature = "signal",
+    // time driver uses `WakeList` in `Handle::process_at_time`.
+    feature = "time",
 ))]
 mod wake_list;
 #[cfg(any(
@@ -28,6 +32,7 @@ mod wake_list;
     feature = "fs",
     feature = "rt",
     feature = "signal",
+    feature = "time",
 ))]
 pub(crate) use wake_list::WakeList;
 
@@ -46,7 +51,7 @@ cfg_rt! {
     pub(crate) mod sharded_list;
 }
 
-#[cfg(any(feature = "rt", feature = "macros"))]
+#[cfg(any(feature = "rt", feature = "macros", feature = "time"))]
 pub(crate) mod rand;
 
 cfg_rt! {
