@@ -241,6 +241,22 @@ impl CancellationToken {
     pub fn drop_guard(self) -> DropGuard {
         DropGuard { inner: Some(self) }
     }
+
+    /// Runs a future to completion and returns its result unless the `CompletionToken` is
+    /// cancelled. In that case the function returns `None` and the future gets dropped.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is not cancel safe since the input future gets dropped on cancel.
+    pub async fn run_until_cancelled<F>(&self, fut: F) -> Option<F::Output>
+    where
+        F: std::future::Future,
+    {
+        tokio::select! {
+            _ = self.cancelled() => None,
+            fut_result = fut => Some(fut_result),
+        }
+    }
 }
 
 // ===== impl WaitForCancellationFuture =====
