@@ -334,7 +334,7 @@ impl Handle {
             // they actually need to be dropped down a level. We then reinsert them
             // back into the same position; we must make sure we don't then process
             // those entries again or we'll end up in an infinite loop.
-            let mut max_traversals = if expiration.level == wheel::MAX_LEVEL_INDEX{
+            let mut max_traversals = if expiration.level == wheel::MAX_LEVEL_INDEX {
                 lock.highest_level_counter(expiration.slot)
             } else {
                 usize::MAX
