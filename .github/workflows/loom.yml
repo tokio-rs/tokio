@@ -1,6 +1,6 @@
 on:
   push:
-    branches: ["*"]
+    branches: ["master", "tokio-*.x"]
   pull_request:
     types: [labeled, opened, synchronize, reopened]
     branches: ["master", "tokio-*.x"]
@@ -26,7 +26,7 @@ jobs:
   loom-sync:
     name: loom tokio::sync
     # base_ref is null when it's not a pull request
-    # if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-sync') || (github.base_ref == null))
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-sync') || (github.base_ref == null))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
   loom-time-driver:
     name: loom time driver
     # base_ref is null when it's not a pull request
-    # if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-time-driver') || (github.base_ref == null))
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-time-driver') || (github.base_ref == null))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +58,7 @@ jobs:
   loom-current-thread:
     name: loom current-thread scheduler
     # base_ref is null when it's not a pull request
-    # if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-current-thread') || (github.base_ref == null))
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-current-thread') || (github.base_ref == null))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -74,7 +74,7 @@ jobs:
   loom-multi-thread:
     name: loom multi-thread scheduler
     # base_ref is null when it's not a pull request
-    # if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-multi-thread') || (github.base_ref == null))
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-multi-thread') || (github.base_ref == null))
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -99,7 +99,7 @@ jobs:
   loom-multi-thread-alt:
     name: loom ALT multi-thread scheduler
     # base_ref is null when it's not a pull request
-    # if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-multi-thread-alt') || (github.base_ref == null))
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-multi-thread-alt') || (github.base_ref == null))
     runs-on: ubuntu-latest
     strategy:
       matrix:

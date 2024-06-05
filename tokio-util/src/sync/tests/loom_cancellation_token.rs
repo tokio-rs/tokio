@@ -187,10 +187,9 @@ fn run_until_cancelled_completes() {
             };
 
             if let Some(res) = token.run_until_cancelled(fut).await {
-                assert!(res, 42);
+                assert_eq!(res, 42);
             } else {
-                // Should not happen since we are not cancelling the token
-                assert!(false);
+                panic!("Should not happen since we are not cancelling the token");
             }
         });
     });
@@ -204,16 +203,14 @@ fn run_until_cancelled_with_cancel() {
             let token1 = token.clone();
 
             let th1 = std::thread::spawn(move || {
-                std::time::sleep(std::time::Duration::from_millis(500));
+                std::thread::sleep(std::time::Duration::from_millis(500));
                 token1.cancel();
             });
 
             if let None = token.run_until_cancelled(std::future::pending).await {
                 assert!(true);
             } else {
-                // This branch should not be entered since we cancel the token before the future
-                // finishes
-                assert!(false);
+                panic!("Should not happen since token got cancelled before future could finish");
             }
 
             assert_ok!(th1.join());
