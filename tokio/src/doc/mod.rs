@@ -43,5 +43,5 @@ impl mio::event::Source for NotDefinedHere {
     }
 }
 
-#[cfg(feature = "net")]
+#[cfg(any(feature = "net", feature = "fs"))]
 pub mod os;
