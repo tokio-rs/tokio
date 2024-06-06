@@ -69,7 +69,7 @@ use std::{marker::PhantomPinned, pin::Pin, ptr::NonNull};
 
 type TimerResult = Result<(), crate::time::error::Error>;
 
-const STATE_DEREGISTERED: u64 = u64::MAX;
+pub(super) const STATE_DEREGISTERED: u64 = u64::MAX;
 const STATE_FIRING: u64 = STATE_DEREGISTERED - 1;
 const STATE_MIN_VALUE: u64 = STATE_FIRING;
 /// The largest safe integer to use for ticks.
@@ -169,8 +169,13 @@ impl StateCell {
         // we shouldn't be able to "miss" a transition to a fired state, even
         // with relaxed ordering.
         let mut cur_state = self.state.load(Ordering::Relaxed);
-
         loop {
+            // This entry in current `guarded_list` can not be removed in its original entry list.
+            // Because its state is STATE_DEREGISTERED, it has been fired.
+            if cur_state == STATE_DEREGISTERED {
+                break Err(cur_state);
+            }
+
             // improve the error message for things like
             // https://github.com/tokio-rs/tokio/issues/3675
             assert!(

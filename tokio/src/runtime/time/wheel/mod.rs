@@ -7,6 +7,7 @@ use self::level::Level;
 
 use std::{array, ptr::NonNull};
 
+use super::entry::MAX_SAFE_MILLIS_DURATION;
 use super::EntryList;
 
 /// Timing wheel implementation.
@@ -114,7 +115,7 @@ impl Wheel {
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
             let when = item.as_ref().true_when();
-            if when != u64::MAX {
+            if when <= MAX_SAFE_MILLIS_DURATION {
                 debug_assert!(
                     self.elapsed <= when,
                     "elapsed={}; when={}",

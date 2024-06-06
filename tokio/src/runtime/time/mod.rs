@@ -8,7 +8,7 @@
 
 mod entry;
 pub(crate) use entry::TimerEntry;
-use entry::{EntryList, TimerHandle, TimerShared, MAX_SAFE_MILLIS_DURATION};
+use entry::{EntryList, TimerHandle, TimerShared, MAX_SAFE_MILLIS_DURATION, STATE_DEREGISTERED};
 
 mod handle;
 pub(crate) use self::handle::Handle;
@@ -362,9 +362,10 @@ impl Handle {
                             }
                         }
                     }
-                    Err(expiration_tick) => {
+                    Err(state) if state == STATE_DEREGISTERED => {}
+                    Err(state) => {
                         // Safety: This Entry has not expired.
-                        unsafe { lock.reinsert_entry(entry, deadline, expiration_tick) };
+                        unsafe { lock.reinsert_entry(entry, deadline, state) };
                     }
                 }
             }
