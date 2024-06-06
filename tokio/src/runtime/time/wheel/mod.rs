@@ -123,13 +123,16 @@ impl Wheel {
                 );
 
                 let level = self.level_for(when);
+                // If the entry is not contained in the `slot` list,
+                // then it is contained by a guarded list.
                 self.levels[level].remove_entry(item);
             }
         }
     }
 
     /// Reinserts `item` to the timing wheel.
-    pub(super) fn reinsert_entry(&mut self, entry: TimerHandle, elapsed: u64, when: u64) {
+    /// Safety: This entry must not have expired.
+    pub(super) unsafe fn reinsert_entry(&mut self, entry: TimerHandle, elapsed: u64, when: u64) {
         let level = level_for(elapsed, when);
         unsafe { self.levels[level].add_entry(entry) };
     }

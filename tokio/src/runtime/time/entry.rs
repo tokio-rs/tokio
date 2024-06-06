@@ -313,7 +313,7 @@ unsafe impl Sync for TimerEntry {}
 /// memory safety, all operations are unsafe.
 #[derive(Debug)]
 pub(crate) struct TimerHandle {
-    pub(super) inner: NonNull<TimerShared>,
+    inner: NonNull<TimerShared>,
 }
 
 pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, TimerShared>;
@@ -586,6 +586,10 @@ impl TimerHandle {
     /// the entry must not be in any wheel linked lists.
     pub(super) unsafe fn fire(self, completed_state: TimerResult) -> Option<Waker> {
         self.inner.as_ref().state.fire(completed_state)
+    }
+
+    pub(super) fn inner(&self) -> NonNull<TimerShared> {
+        self.inner
     }
 }
 

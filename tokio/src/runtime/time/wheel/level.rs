@@ -121,7 +121,7 @@ impl Level {
     pub(crate) unsafe fn add_entry(&mut self, item: TimerHandle) {
         let slot = slot_for(item.true_when(), self.level);
 
-        self.slot[slot].push_front(item.inner);
+        self.slot[slot].push_front(item.inner());
 
         self.occupied |= occupied_bit(slot);
     }

@@ -321,13 +321,23 @@ impl Handle {
 
         while let Some(expiration) = lock.poll(now) {
             lock.set_elapsed(expiration.deadline);
+            // Note that we need to take _all_ of the entries off the list before
+            // processing any of them. This is important because it's possible that
+            // those entries might need to be reinserted into the same slot.
+            //
+            // This happens only on the highest level, when an entry is inserted
+            // more than MAX_DURATION into the future. When this happens, we wrap
+            // around, and process some entries a multiple of MAX_DURATION before
+            // they actually need to be dropped down a level. We then reinsert them
+            // back into the same position; we must make sure we don't then process
+            // those entries again or we'll end up in an infinite loop.
+            let unguarded_list = lock.take_entries(&expiration);
             // It is critical for `GuardedLinkedList` safety that the guard node is
             // pinned in memory and is not dropped until the guarded list is dropped.
             let guard = TimerShared::new(id);
             pin!(guard);
-
             let guard_ptr = NonNull::from(guard.as_ref().get_ref());
-            let unguarded_list = lock.take_entries(&expiration);
+            // GuardedLinkedList ensures that the concurrent drop of Entry in this slot is safe.
             let mut guarded_list = unguarded_list.into_guarded(guard_ptr);
 
             while let Some(entry) = guarded_list.pop_back() {
@@ -353,17 +363,8 @@ impl Handle {
                         }
                     }
                     Err(expiration_tick) => {
-                        // It's possible that those entries might need to be reinserted into
-                        // the same slot. If we found them, we should break this loop to avoid
-                        // the infinite loop.
-
-                        // This happens on the highest level, when an entry is inserted
-                        // more than MAX_DURATION into the future. When this happens, we wrap
-                        // around, and process some entries a multiple of MAX_DURATION before
-                        // they actually need to be dropped down a level. We then reinsert them
-                        // back into the same position; we must make sure we don't then process
-                        // those entries again or we'll end up in an infinite loop.
-                        lock.reinsert_entry(entry, deadline, expiration_tick);
+                        // Safety: This Entry has not expired.
+                        unsafe { lock.reinsert_entry(entry, deadline, expiration_tick) };
                     }
                 }
             }
