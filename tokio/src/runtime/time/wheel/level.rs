@@ -121,7 +121,7 @@ impl Level {
     pub(crate) unsafe fn add_entry(&mut self, item: TimerHandle) {
         let slot = slot_for(item.true_when(), self.level);
 
-        self.slot[slot].push_front(item);
+        self.slot[slot].push_front(item.inner);
 
         self.occupied |= occupied_bit(slot);
     }
@@ -131,16 +131,13 @@ impl Level {
 
         unsafe { self.slot[slot].remove(item) };
         if self.slot[slot].is_empty() {
-            // The bit is currently set
-            debug_assert!(self.occupied & occupied_bit(slot) != 0);
-
             // Unset the bit
             self.occupied ^= occupied_bit(slot);
         }
     }
 
-    pub(super) fn get_mut_entries(&mut self, slot: usize) -> &mut EntryList {
-        &mut self.slot[slot]
+    pub(super) fn take_slot(&mut self, slot: usize) -> EntryList {
+        std::mem::take(&mut self.slot[slot])
     }
 
     pub(super) fn occupied_bit_maintain(&mut self, slot: usize) {

@@ -313,7 +313,7 @@ unsafe impl Sync for TimerEntry {}
 /// memory safety, all operations are unsafe.
 #[derive(Debug)]
 pub(crate) struct TimerHandle {
-    inner: NonNull<TimerShared>,
+    pub(super) inner: NonNull<TimerShared>,
 }
 
 pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, TimerShared>;
@@ -331,9 +331,6 @@ pub(crate) struct TimerShared {
     /// Only accessed under the entry lock.
     pointers: linked_list::Pointers<TimerShared>,
 
-    /// The last poll count of this entry.
-    last_poll_count: AtomicU64,
-
     /// Current state. This records whether the timer entry is currently under
     /// the ownership of the driver, and if not, its current state (not
     /// complete, fired, error, etc).
@@ -348,10 +345,6 @@ unsafe impl Sync for TimerShared {}
 impl std::fmt::Debug for TimerShared {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TimerShared")
-            .field(
-                "last_poll_count",
-                &self.last_poll_count.load(Ordering::Relaxed),
-            )
             .field("state", &self.state)
             .finish()
     }
@@ -369,25 +362,10 @@ impl TimerShared {
     pub(super) fn new(shard_id: u32) -> Self {
         Self {
             shard_id,
-            last_poll_count: AtomicU64::new(0),
             pointers: linked_list::Pointers::new(),
             state: StateCell::default(),
             _p: PhantomPinned,
         }
-    }
-
-    /// Gets the cached time-of-expiration value.
-    pub(super) fn last_poll_count(&self) -> u64 {
-        // This field is only accessed under the driver lock, so we can use relaxed.
-        self.last_poll_count.load(Ordering::Relaxed)
-    }
-
-    /// Sets the poll_count of this entry.
-    ///
-    /// SAFETY: Must be called with the driver lock held, and when this entry is
-    /// not in any timer wheel lists.
-    unsafe fn set_last_poll_count(&self, poll_count: u64) {
-        self.last_poll_count.store(poll_count, Ordering::Relaxed);
     }
 
     /// Returns the true time-of-expiration value, with relaxed memory ordering.
@@ -431,16 +409,16 @@ impl TimerShared {
 }
 
 unsafe impl linked_list::Link for TimerShared {
-    type Handle = TimerHandle;
+    type Handle = NonNull<TimerShared>;
 
     type Target = TimerShared;
 
     fn as_raw(handle: &Self::Handle) -> NonNull<Self::Target> {
-        handle.inner
+        *handle
     }
 
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
-        TimerHandle { inner: ptr }
+        ptr
     }
 
     unsafe fn pointers(
@@ -571,14 +549,6 @@ impl TimerEntry {
 }
 
 impl TimerHandle {
-    pub(super) unsafe fn last_poll_count(&self) -> u64 {
-        unsafe { self.inner.as_ref().last_poll_count() }
-    }
-
-    pub(super) unsafe fn set_last_poll_count(&self, poll_count: u64) {
-        unsafe { self.inner.as_ref().set_last_poll_count(poll_count) }
-    }
-
     pub(super) unsafe fn true_when(&self) -> u64 {
         unsafe { self.inner.as_ref().true_when() }
     }

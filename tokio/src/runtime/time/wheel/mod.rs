@@ -36,8 +36,6 @@ pub(crate) struct Wheel {
     /// * ~ 4 hr slots / ~ 12 day range
     /// * ~ 12 day slots / ~ 2 yr range
     levels: Box<[Level; NUM_LEVELS]>,
-    /// A counter of how many times we polled the timer wheel.
-    poll_count: u64,
 }
 
 /// Number of levels. Each level has 64 slots. By using 6 levels with 64 slots
@@ -57,7 +55,6 @@ impl Wheel {
         Wheel {
             elapsed: 0,
             levels: Box::new(array::from_fn(Level::new)),
-            poll_count: 0,
         }
     }
 
@@ -128,19 +125,6 @@ impl Wheel {
                 let level = self.level_for(when);
                 self.levels[level].remove_entry(item);
             }
-        }
-    }
-
-    /// Sets the entry's last_poll_count. If this entry has been set the same poll_count,
-    /// return Err(poll_count), which means we duplicate process this entry.
-    pub(super) fn set_poll_count(&self, entry: &TimerHandle) -> Result<(), u64> {
-        let poll_count = self.poll_count();
-        let last_poll_count = unsafe { entry.last_poll_count() };
-        if poll_count != last_poll_count {
-            unsafe { entry.set_last_poll_count(poll_count) };
-            Ok(())
-        } else {
-            Err(poll_count)
         }
     }
 
@@ -220,20 +204,13 @@ impl Wheel {
         }
     }
 
-    pub(super) fn get_mut_entries(&mut self, expiration: &Expiration) -> &mut EntryList {
-        self.levels[expiration.level].get_mut_entries(expiration.slot)
+    /// Obtains the list of entries that need processing for the given expiration.
+    pub(super) fn take_entries(&mut self, expiration: &Expiration) -> EntryList {
+        self.levels[expiration.level].take_slot(expiration.slot)
     }
 
     pub(super) fn occupied_bit_maintain(&mut self, expiration: &Expiration) {
         self.levels[expiration.level].occupied_bit_maintain(expiration.slot);
-    }
-
-    pub(super) fn poll_count(&self) -> u64 {
-        self.poll_count
-    }
-
-    pub(super) fn poll_count_increase(&mut self) {
-        self.poll_count += 1;
     }
 
     fn level_for(&self, when: u64) -> usize {

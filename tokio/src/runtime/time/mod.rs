@@ -308,7 +308,6 @@ impl Handle {
     pub(self) fn process_at_sharded_time(&self, id: u32, mut now: u64) -> Option<u64> {
         let mut waker_list = WakeList::new();
         let mut lock = self.inner.lock_sharded_wheel(id);
-        lock.poll_count_increase();
 
         if now < lock.elapsed() {
             // Time went backwards! This normally shouldn't happen as the Rust language
@@ -322,8 +321,17 @@ impl Handle {
 
         while let Some(expiration) = lock.poll(now) {
             lock.set_elapsed(expiration.deadline);
+            // It is critical for `GuardedLinkedList` safety that the guard node is
+            // pinned in memory and is not dropped until the guarded list is dropped.
+            let guard = TimerShared::new(id);
+            pin!(guard);
 
-            while let Some(entry) = lock.get_mut_entries(&expiration).pop_back() {
+            let guard_ptr = NonNull::from(guard.as_ref().get_ref());
+            let unguarded_list = lock.take_entries(&expiration);
+            let mut guarded_list = unguarded_list.into_guarded(guard_ptr);
+
+            while let Some(entry) = guarded_list.pop_back() {
+                let entry = unsafe { entry.as_ref().handle() };
                 let deadline = expiration.deadline;
                 // Try to expire the entry; this is cheap (doesn't synchronize) if
                 // the timer is not expired, and updates cached_when.
@@ -355,10 +363,6 @@ impl Handle {
                         // they actually need to be dropped down a level. We then reinsert them
                         // back into the same position; we must make sure we don't then process
                         // those entries again or we'll end up in an infinite loop.
-                        if let Err(_poll_count) = lock.set_poll_count(&entry) {
-                            lock.reinsert_entry(entry, deadline, expiration_tick);
-                            break;
-                        }
                         lock.reinsert_entry(entry, deadline, expiration_tick);
                     }
                 }
