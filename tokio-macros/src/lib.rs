@@ -210,18 +210,22 @@ use proc_macro::TokenStream;
 ///
 /// This option is only compatible with the `current_thread` runtime.
 ///
-/// ```ignore
+/// ```no_run
+/// #[cfg(tokio_unstable)]
 /// #[tokio::main(flavor = "current_thread", unhandled_panic = "shutdown_runtime")]
 /// async fn main() {
 ///     let _ = tokio::spawn(async {
 ///         panic!("This panic will shutdown the runtime.");
 ///     }).await;
 /// }
+/// # #[cfg(not(tokio_unstable))]
+/// # fn main() { }
 /// ```
 ///
 /// Equivalent code not using `#[tokio::main]`
 ///
-/// ```ignore
+/// ```no_run
+/// #[cfg(tokio_unstable)]
 /// fn main() {
 ///     tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
@@ -234,6 +238,8 @@ use proc_macro::TokenStream;
 ///             }).await;
 ///         })
 /// }
+/// # #[cfg(not(tokio_unstable))]
+/// # fn main() { }
 /// ```
 ///
 /// **Note**: This option depends on Tokio's [unstable API][unstable]. See [the
@@ -471,18 +477,22 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// This option is only compatible with the `current_thread` runtime.
 ///
-/// ```ignore
+/// ```no_run
+/// #[cfg(tokio_unstable)]
 /// #[tokio::test(flavor = "current_thread", unhandled_panic = "shutdown_runtime")]
 /// async fn my_test() {
 ///     let _ = tokio::spawn(async {
 ///         panic!("This panic will shutdown the runtime.");
 ///     }).await;
 /// }
+/// # #[cfg(not(tokio_unstable))]
+/// # fn main() { }
 /// ```
 ///
 /// Equivalent code not using `#[tokio::test]`
 ///
-/// ```ignore
+/// ```no_run
+/// #[cfg(tokio_unstable)]
 /// #[test]
 /// fn my_test() {
 ///     tokio::runtime::Builder::new_current_thread()
@@ -496,6 +506,8 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///             }).await;
 ///         })
 /// }
+/// # #[cfg(not(tokio_unstable))]
+/// # fn main() { }
 /// ```
 ///
 /// **Note**: This option depends on Tokio's [unstable API][unstable]. See [the
