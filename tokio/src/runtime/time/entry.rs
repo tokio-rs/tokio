@@ -170,7 +170,8 @@ impl StateCell {
         // with relaxed ordering.
         let mut cur_state = self.state.load(Ordering::Relaxed);
         loop {
-            // This entry in current `guarded_list` can not be removed in its original entry list.
+            // This entry is in the `guarded_list`, so it can not be removed
+            // from the entry list with the same `level` and `slot`.
             // Because its state is STATE_DEREGISTERED, it has been fired.
             if cur_state == STATE_DEREGISTERED {
                 break Err(cur_state);
