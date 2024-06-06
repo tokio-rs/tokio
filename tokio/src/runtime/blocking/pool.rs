@@ -7,11 +7,12 @@ use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle};
+use crate::util::metric_atomics::MetricAtomicUsize;
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::io;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 pub(crate) struct BlockingPool {
@@ -26,9 +27,9 @@ pub(crate) struct Spawner {
 
 #[derive(Default)]
 pub(crate) struct SpawnerMetrics {
-    num_threads: AtomicUsize,
-    num_idle_threads: AtomicUsize,
-    queue_depth: AtomicUsize,
+    num_threads: MetricAtomicUsize,
+    num_idle_threads: MetricAtomicUsize,
+    queue_depth: MetricAtomicUsize,
 }
 
 impl SpawnerMetrics {
@@ -47,27 +48,27 @@ impl SpawnerMetrics {
     }
 
     fn inc_num_threads(&self) {
-        self.num_threads.fetch_add(1, Ordering::Relaxed);
+        self.num_threads.increment();
     }
 
     fn dec_num_threads(&self) {
-        self.num_threads.fetch_sub(1, Ordering::Relaxed);
+        self.num_threads.decrement();
     }
 
     fn inc_num_idle_threads(&self) {
-        self.num_idle_threads.fetch_add(1, Ordering::Relaxed);
+        self.num_idle_threads.increment();
     }
 
     fn dec_num_idle_threads(&self) -> usize {
-        self.num_idle_threads.fetch_sub(1, Ordering::Relaxed)
+        self.num_idle_threads.decrement()
     }
 
     fn inc_queue_depth(&self) {
-        self.queue_depth.fetch_add(1, Ordering::Relaxed);
+        self.queue_depth.increment();
     }
 
     fn dec_queue_depth(&self) {
-        self.queue_depth.fetch_sub(1, Ordering::Relaxed);
+        self.queue_depth.decrement();
     }
 }
 

@@ -45,3 +45,31 @@ impl MetricAtomicU64 {
         pub(crate) fn new(_value: u64) -> Self { Self { } }
     }
 }
+
+#[cfg_attr(not(all(tokio_unstable, feature = "rt")), allow(dead_code))]
+/// `AtomicUsize` for use in metrics.
+///
+/// This exposes simplified APIs for use in metrics & uses `std::sync` instead of Loom to avoid polluting loom logs with metric information.
+#[derive(Debug, Default)]
+pub(crate) struct MetricAtomicUsize {
+    value: std::sync::atomic::AtomicUsize,
+}
+
+#[cfg_attr(not(all(tokio_unstable, feature = "rt")), allow(dead_code))]
+impl MetricAtomicUsize {
+    pub(crate) fn load(&self, ordering: Ordering) -> usize {
+        self.value.load(ordering)
+    }
+
+    pub(crate) fn store(&self, val: usize, ordering: Ordering) {
+        self.value.store(val, ordering)
+    }
+
+    pub(crate) fn increment(&self) -> usize {
+        self.value.fetch_add(1, Ordering::Relaxed)
+    }
+
+    pub(crate) fn decrement(&self) -> usize {
+        self.value.fetch_sub(1, Ordering::Relaxed)
+    }
+}
