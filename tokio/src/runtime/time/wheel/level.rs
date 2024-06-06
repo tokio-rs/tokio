@@ -34,7 +34,7 @@ pub(crate) struct Expiration {
 /// Level multiplier.
 ///
 /// Being a power of 2 is very important.
-pub(super) const LEVEL_MULT: usize = 64;
+const LEVEL_MULT: usize = 64;
 
 impl Level {
     pub(crate) fn new(level: usize) -> Level {

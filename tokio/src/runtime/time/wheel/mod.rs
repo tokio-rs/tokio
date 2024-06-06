@@ -41,7 +41,7 @@ pub(crate) struct Wheel {
 /// Number of levels. Each level has 64 slots. By using 6 levels with 64 slots
 /// each, the timer is able to track time up to 2 years into the future with a
 /// precision of 1 millisecond.
-pub(super) const NUM_LEVELS: usize = 6;
+const NUM_LEVELS: usize = 6;
 
 /// The max level index.
 pub(super) const MAX_LEVEL_INDEX: usize = NUM_LEVELS - 1;
