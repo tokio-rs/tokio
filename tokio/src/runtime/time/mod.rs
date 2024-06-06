@@ -308,6 +308,7 @@ impl Handle {
     pub(self) fn process_at_sharded_time(&self, id: u32, mut now: u64) -> Option<u64> {
         let mut waker_list = WakeList::new();
         let mut lock = self.inner.lock_sharded_wheel(id);
+        lock.poll_count_increase();
 
         if now < lock.elapsed() {
             // Time went backwards! This normally shouldn't happen as the Rust language
@@ -322,28 +323,11 @@ impl Handle {
         while let Some(expiration) = lock.poll(now) {
             lock.set_elapsed(expiration.deadline);
 
-            // Gets the number of entries in this slot, which will be
-            // the maximum number of times we traverse.
-            // Limiting the maximum number of iterations is very important,
-            // because it's possible that those entries might need to be
-            // reinserted into the same slot.
-
-            // This happens on the highest level, when an entry is inserted
-            // more than MAX_DURATION into the future. When this happens, we wrap
-            // around, and process some entries a multiple of MAX_DURATION before
-            // they actually need to be dropped down a level. We then reinsert them
-            // back into the same position; we must make sure we don't then process
-            // those entries again or we'll end up in an infinite loop.
-            let mut max_traversals = if expiration.level == wheel::MAX_LEVEL_INDEX {
-                lock.highest_level_counter(expiration.slot)
-            } else {
-                usize::MAX
-            };
             while let Some(entry) = lock.get_mut_entries(&expiration).pop_back() {
-                lock.highest_level_counter_decrease(expiration.level, expiration.slot);
+                let deadline = expiration.deadline;
                 // Try to expire the entry; this is cheap (doesn't synchronize) if
                 // the timer is not expired, and updates cached_when.
-                match unsafe { entry.mark_firing(expiration.deadline) } {
+                match unsafe { entry.mark_firing(deadline) } {
                     Ok(()) => {
                         // Entry was expired.
                         // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
@@ -361,14 +345,22 @@ impl Handle {
                         }
                     }
                     Err(expiration_tick) => {
-                        lock.reinsert_entry(entry, &expiration, expiration_tick);
+                        // It's possible that those entries might need to be reinserted into
+                        // the same slot. If we found them, we should break this loop to avoid
+                        // the infinite loop.
+
+                        // This happens on the highest level, when an entry is inserted
+                        // more than MAX_DURATION into the future. When this happens, we wrap
+                        // around, and process some entries a multiple of MAX_DURATION before
+                        // they actually need to be dropped down a level. We then reinsert them
+                        // back into the same position; we must make sure we don't then process
+                        // those entries again or we'll end up in an infinite loop.
+                        if let Err(_poll_count) = lock.set_poll_count(&entry) {
+                            lock.reinsert_entry(entry, deadline, expiration_tick);
+                            break;
+                        }
+                        lock.reinsert_entry(entry, deadline, expiration_tick);
                     }
-                }
-                max_traversals -= 1;
-                // We have reached the maximum number of traversals,
-                // we should end the traversal to avoid an infinite loop.
-                if max_traversals == 0 {
-                    break;
                 }
             }
             lock.occupied_bit_maintain(&expiration);

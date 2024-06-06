@@ -36,8 +36,8 @@ pub(crate) struct Wheel {
     /// * ~ 4 hr slots / ~ 12 day range
     /// * ~ 12 day slots / ~ 2 yr range
     levels: Box<[Level; NUM_LEVELS]>,
-
-    highest_level_counter: [usize; level::LEVEL_MULT],
+    /// A counter of how many times we polled the timer wheel.
+    poll_count: u64,
 }
 
 /// Number of levels. Each level has 64 slots. By using 6 levels with 64 slots
@@ -57,7 +57,7 @@ impl Wheel {
         Wheel {
             elapsed: 0,
             levels: Box::new(array::from_fn(Level::new)),
-            highest_level_counter: array::from_fn(|_| 0),
+            poll_count: 0,
         }
     }
 
@@ -92,7 +92,7 @@ impl Wheel {
         &mut self,
         item: TimerHandle,
     ) -> Result<u64, (TimerHandle, InsertError)> {
-        let when = item.sync_when();
+        let when = item.true_when();
 
         if when <= self.elapsed {
             return Err((item, InsertError::Elapsed));
@@ -101,9 +101,7 @@ impl Wheel {
         // Get the level at which the entry should be stored
         let level = self.level_for(when);
 
-        let slot = unsafe { self.levels[level].add_entry(item) };
-
-        self.highest_level_counter_increase(level, slot);
+        unsafe { self.levels[level].add_entry(item) };
 
         debug_assert!({
             self.levels[level]
@@ -118,7 +116,7 @@ impl Wheel {
     /// Removes `item` from the timing wheel.
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
-            let when = item.as_ref().cached_when();
+            let when = item.as_ref().true_when();
             if when != u64::MAX {
                 debug_assert!(
                     self.elapsed <= when,
@@ -128,22 +126,28 @@ impl Wheel {
                 );
 
                 let level = self.level_for(when);
-                let slot = self.levels[level].remove_entry(item);
-                self.highest_level_counter_decrease(level, slot);
+                self.levels[level].remove_entry(item);
             }
         }
     }
 
-    /// Reinsert `item` to the timing wheel.
-    pub(super) fn reinsert_entry(
-        &mut self,
-        entry: TimerHandle,
-        expiration: &Expiration,
-        expiration_tick: u64,
-    ) {
-        let level = level_for(expiration.deadline, expiration_tick);
-        let slot = unsafe { self.levels[level].add_entry(entry) };
-        self.highest_level_counter_increase(level, slot);
+    /// Sets the entry's last_poll_count. If this entry has been set the same poll_count,
+    /// return Err(poll_count), which means we duplicate process this entry.
+    pub(super) fn set_poll_count(&self, entry: &TimerHandle) -> Result<(), u64> {
+        let poll_count = self.poll_count();
+        let last_poll_count = unsafe { entry.last_poll_count() };
+        if poll_count != last_poll_count {
+            unsafe { entry.set_last_poll_count(poll_count) };
+            Ok(())
+        } else {
+            Err(poll_count)
+        }
+    }
+
+    /// Reinserts `item` to the timing wheel.
+    pub(super) fn reinsert_entry(&mut self, entry: TimerHandle, elapsed: u64, when: u64) {
+        let level = level_for(elapsed, when);
+        unsafe { self.levels[level].add_entry(entry) };
     }
 
     /// Instant at which to poll.
@@ -224,21 +228,12 @@ impl Wheel {
         self.levels[expiration.level].occupied_bit_maintain(expiration.slot);
     }
 
-    /// Gets the number of `item` in the specified slot at the highest level.
-    pub(super) fn highest_level_counter(&self, slot: usize) -> usize {
-        self.highest_level_counter[slot]
+    pub(super) fn poll_count(&self) -> u64 {
+        self.poll_count
     }
 
-    pub(super) fn highest_level_counter_increase(&mut self, level: usize, slot: usize) {
-        if level == MAX_LEVEL_INDEX {
-            self.highest_level_counter[slot] += 1;
-        }
-    }
-
-    pub(super) fn highest_level_counter_decrease(&mut self, level: usize, slot: usize) {
-        if level == MAX_LEVEL_INDEX {
-            self.highest_level_counter[slot] -= 1;
-        }
+    pub(super) fn poll_count_increase(&mut self) {
+        self.poll_count += 1;
     }
 
     fn level_for(&self, when: u64) -> usize {
