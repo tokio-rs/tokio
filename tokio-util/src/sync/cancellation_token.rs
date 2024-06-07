@@ -99,6 +99,18 @@ pin_project! {
     }
 }
 
+pin_project! {
+    /// A Future that is resolved once the corresponding [`CancellationToken`]
+    /// is cancelled or a given Future gets resolved. It is biased towards the
+    /// Future completion.
+    #[must_use = "futures do nothing unless polled"]
+    struct RunUntilCancelledFuture<'a, F: Future> {
+        cancellation_token: &'a CancellationToken,
+        #[pin]
+        future: F,
+    }
+}
+
 // ===== impl CancellationToken =====
 
 impl core::fmt::Debug for CancellationToken {
@@ -250,11 +262,35 @@ impl CancellationToken {
     /// This method is not cancel safe since the input future gets dropped on cancel.
     pub async fn run_until_cancelled<F>(&self, fut: F) -> Option<F::Output>
     where
-        F: std::future::Future,
+        F: Future,
     {
-        tokio::select! {
-            _ = self.cancelled() => None,
-            fut_result = fut => Some(fut_result),
+        RunUntilCancelledFuture {
+            cancellation_token: self,
+            future: fut,
+        }
+        .await
+    }
+}
+
+// ===== impl RunUntilCancelledFuture =====
+
+impl<'a, F: Future> core::fmt::Debug for RunUntilCancelledFuture<'a, F> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("RunUntilCancelledFuture").finish()
+    }
+}
+
+impl<'a, F: Future> Future for RunUntilCancelledFuture<'a, F> {
+    type Output = Option<F::Output>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+        if let Poll::Ready(res) = this.future.as_mut().poll(cx) {
+            Poll::Ready(Some(res))
+        } else if this.cancellation_token.is_cancelled() {
+            Poll::Ready(None)
+        } else {
+            Poll::Pending
         }
     }
 }
