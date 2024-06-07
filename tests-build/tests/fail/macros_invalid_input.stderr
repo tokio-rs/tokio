@@ -1,115 +1,121 @@
 error: the `async` keyword is missing from the function declaration
- --> $DIR/macros_invalid_input.rs:6:1
+ --> tests/fail/macros_invalid_input.rs:6:1
   |
 6 | fn main_is_not_async() {}
   | ^^
 
-error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`
- --> $DIR/macros_invalid_input.rs:8:15
+error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`.
+ --> tests/fail/macros_invalid_input.rs:8:15
   |
 8 | #[tokio::main(foo)]
   |               ^^^
 
 error: Must have specified ident
-  --> $DIR/macros_invalid_input.rs:11:15
+  --> tests/fail/macros_invalid_input.rs:11:15
    |
 11 | #[tokio::main(threadpool::bar)]
    |               ^^^^^^^^^^^^^^^
 
 error: the `async` keyword is missing from the function declaration
-  --> $DIR/macros_invalid_input.rs:15:1
+  --> tests/fail/macros_invalid_input.rs:15:1
    |
 15 | fn test_is_not_async() {}
    | ^^
 
-error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`
-  --> $DIR/macros_invalid_input.rs:17:15
+error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`.
+  --> tests/fail/macros_invalid_input.rs:17:15
    |
 17 | #[tokio::test(foo)]
    |               ^^^
 
-error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`
-  --> $DIR/macros_invalid_input.rs:20:15
+error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`
+  --> tests/fail/macros_invalid_input.rs:20:15
    |
 20 | #[tokio::test(foo = 123)]
    |               ^^^^^^^^^
 
 error: Failed to parse value of `flavor` as string.
-  --> $DIR/macros_invalid_input.rs:23:24
+  --> tests/fail/macros_invalid_input.rs:23:24
    |
 23 | #[tokio::test(flavor = 123)]
    |                        ^^^
 
 error: No such runtime flavor `foo`. The runtime flavors are `current_thread` and `multi_thread`.
-  --> $DIR/macros_invalid_input.rs:26:24
+  --> tests/fail/macros_invalid_input.rs:26:24
    |
 26 | #[tokio::test(flavor = "foo")]
    |                        ^^^^^
 
 error: The `start_paused` option requires the `current_thread` runtime flavor. Use `#[tokio::test(flavor = "current_thread")]`
-  --> $DIR/macros_invalid_input.rs:29:55
+  --> tests/fail/macros_invalid_input.rs:29:55
    |
 29 | #[tokio::test(flavor = "multi_thread", start_paused = false)]
    |                                                       ^^^^^
 
 error: Failed to parse value of `worker_threads` as integer.
-  --> $DIR/macros_invalid_input.rs:32:57
+  --> tests/fail/macros_invalid_input.rs:32:57
    |
 32 | #[tokio::test(flavor = "multi_thread", worker_threads = "foo")]
    |                                                         ^^^^^
 
 error: The `worker_threads` option requires the `multi_thread` runtime flavor. Use `#[tokio::test(flavor = "multi_thread")]`
-  --> $DIR/macros_invalid_input.rs:35:59
+  --> tests/fail/macros_invalid_input.rs:35:59
    |
 35 | #[tokio::test(flavor = "current_thread", worker_threads = 4)]
    |                                                           ^
 
 error: Failed to parse value of `crate` as path.
-  --> $DIR/macros_invalid_input.rs:38:23
+  --> tests/fail/macros_invalid_input.rs:38:23
    |
 38 | #[tokio::test(crate = 456)]
    |                       ^^^
 
 error: Failed to parse value of `crate` as path: "456"
-  --> $DIR/macros_invalid_input.rs:41:23
+  --> tests/fail/macros_invalid_input.rs:41:23
    |
 41 | #[tokio::test(crate = "456")]
    |                       ^^^^^
 
-error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> $DIR/macros_invalid_input.rs:45:1
+error: The `unhandled_panic` option requires the `current_thread` runtime flavor. Use `#[tokio::test(flavor = "current_thread")]`
+  --> tests/fail/macros_invalid_input.rs:44:58
    |
-45 | #[test]
+44 | #[tokio::test(flavor = "multi_thread", unhandled_panic = "shutdown_runtime")]
+   |                                                          ^^^^^^^^^^^^^^^^^^
+
+error: second test attribute is supplied, consider removing or changing the order of your test attributes
+  --> tests/fail/macros_invalid_input.rs:48:1
+   |
+48 | #[test]
    | ^^^^^^^
 
 error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> $DIR/macros_invalid_input.rs:49:1
+  --> tests/fail/macros_invalid_input.rs:52:1
    |
-49 | #[::core::prelude::v1::test]
+52 | #[::core::prelude::v1::test]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> $DIR/macros_invalid_input.rs:53:1
+  --> tests/fail/macros_invalid_input.rs:56:1
    |
-53 | #[core::prelude::rust_2015::test]
+56 | #[core::prelude::rust_2015::test]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> $DIR/macros_invalid_input.rs:57:1
+  --> tests/fail/macros_invalid_input.rs:60:1
    |
-57 | #[::std::prelude::rust_2018::test]
+60 | #[::std::prelude::rust_2018::test]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> $DIR/macros_invalid_input.rs:61:1
+  --> tests/fail/macros_invalid_input.rs:64:1
    |
-61 | #[std::prelude::rust_2021::test]
+64 | #[std::prelude::rust_2021::test]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: second test attribute is supplied, consider removing or changing the order of your test attributes
-  --> $DIR/macros_invalid_input.rs:64:1
+  --> tests/fail/macros_invalid_input.rs:67:1
    |
-64 | #[tokio::test]
+67 | #[tokio::test]
    | ^^^^^^^^^^^^^^
    |
    = note: this error originates in the attribute macro `tokio::test` (in Nightly builds, run with -Z macro-backtrace for more info)
