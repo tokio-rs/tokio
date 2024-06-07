@@ -102,3 +102,11 @@ impl Drop for AbortHandle {
         self.raw.drop_abort_handle();
     }
 }
+
+impl Clone for AbortHandle {
+    /// Returns a cloned `AbortHandle` that can be used to remotely abort this task.
+    fn clone(&self) -> Self {
+        self.raw.ref_inc();
+        Self::new(self.raw)
+    }
+}

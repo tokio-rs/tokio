@@ -119,6 +119,29 @@ fn drop_abort_handle2() {
     handle.assert_dropped();
 }
 
+#[test]
+fn drop_abort_handle_clone() {
+    let (ad, handle) = AssertDrop::new();
+    let (notified, join) = unowned(
+        async {
+            drop(ad);
+            unreachable!()
+        },
+        NoopSchedule,
+        Id::next(),
+    );
+    let abort = join.abort_handle();
+    let abort_clone = abort.clone();
+    drop(join);
+    handle.assert_not_dropped();
+    drop(notified);
+    handle.assert_not_dropped();
+    drop(abort);
+    handle.assert_not_dropped();
+    drop(abort_clone);
+    handle.assert_dropped();
+}
+
 // Shutting down through Notified works
 #[test]
 fn create_shutdown1() {
