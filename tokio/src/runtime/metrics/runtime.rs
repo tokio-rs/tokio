@@ -75,7 +75,15 @@ impl RuntimeMetrics {
             self.handle.inner.num_blocking_threads()
         }
 
-        /// Returns the number of active tasks in the runtime.
+        #[deprecated = "Renamed to num_active_tasks"]
+        /// Renamed to [`RuntimeMetrics::num_active_tasks`]
+        pub fn active_tasks_count(&self) -> usize {
+            self.num_active_tasks()
+        }
+
+        /// Returns the current number of active tasks in the runtime.
+        ///
+        /// This value increases and decreases over time as tasks are spawned and as they are completed or cancelled.
         ///
         /// # Examples
         ///
@@ -86,12 +94,36 @@ impl RuntimeMetrics {
         /// async fn main() {
         ///    let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.active_tasks_count();
+        ///     let n = metrics.num_active_tasks();
         ///     println!("Runtime has {} active tasks", n);
         /// }
         /// ```
-        pub fn active_tasks_count(&self) -> usize {
+        pub fn num_active_tasks(&self) -> usize {
             self.handle.inner.active_tasks_count()
+        }
+
+        /// Returns the number of tasks spawned in this runtime since it was created.
+        ///
+        /// This count starts at zero when the runtime is created and increases by one each time a task is spawned.
+        ///
+        /// The counter is monotonically increasing. It is never decremented or
+        /// reset to zero.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///    let metrics = Handle::current().metrics();
+        ///
+        ///     let n = metrics.spawned_tasks_count();
+        ///     println!("Runtime has had {} tasks spawned", n);
+        /// }
+        /// ```
+        pub fn spawned_tasks_count(&self) -> u64 {
+            self.handle.inner.spawned_tasks_count()
         }
 
         /// Returns the number of idle threads, which have spawned by the runtime
