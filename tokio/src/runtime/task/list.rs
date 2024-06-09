@@ -170,8 +170,10 @@ impl<S: 'static> OwnedTasks<S> {
         self.list.len()
     }
 
-    pub(crate) fn spawned_tasks_count(&self) -> u64 {
-        self.list.added()
+    cfg_64bit_metrics! {
+        pub(crate) fn spawned_tasks_count(&self) -> u64 {
+            self.list.added()
+        }
     }
 
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {

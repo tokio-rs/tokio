@@ -102,30 +102,6 @@ impl RuntimeMetrics {
             self.handle.inner.active_tasks_count()
         }
 
-        /// Returns the number of tasks spawned in this runtime since it was created.
-        ///
-        /// This count starts at zero when the runtime is created and increases by one each time a task is spawned.
-        ///
-        /// The counter is monotonically increasing. It is never decremented or
-        /// reset to zero.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::Handle;
-        ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///    let metrics = Handle::current().metrics();
-        ///
-        ///     let n = metrics.spawned_tasks_count();
-        ///     println!("Runtime has had {} tasks spawned", n);
-        /// }
-        /// ```
-        pub fn spawned_tasks_count(&self) -> u64 {
-            self.handle.inner.spawned_tasks_count()
-        }
-
         /// Returns the number of idle threads, which have spawned by the runtime
         /// for `spawn_blocking` calls.
         ///
@@ -151,271 +127,295 @@ impl RuntimeMetrics {
         }
 
         cfg_64bit_metrics! {
-                /// Returns the number of tasks scheduled from **outside** of the runtime.
-                ///
-                /// The remote schedule count starts at zero when the runtime is created and
-                /// increases by one each time a task is woken from **outside** of the
-                /// runtime. This usually means that a task is spawned or notified from a
-                /// non-runtime thread and must be queued using the Runtime's injection
-                /// queue, which tends to be slower.
-                ///
-                /// The counter is monotonically increasing. It is never decremented or
-                /// reset to zero.
-                ///
-                /// # Examples
-                ///
-                /// ```
-                /// use tokio::runtime::Handle;
-                ///
-                /// #[tokio::main]
-                /// async fn main() {
-                ///     let metrics = Handle::current().metrics();
-                ///
-                ///     let n = metrics.remote_schedule_count();
-                ///     println!("{} tasks were scheduled from outside the runtime", n);
-                /// }
-                /// ```
-                pub fn remote_schedule_count(&self) -> u64 {
-                    self.handle
-                        .inner
-                        .scheduler_metrics()
-                        .remote_schedule_count
-                        .load(Relaxed)
-                }
+            /// Returns the number of tasks spawned in this runtime since it was created.
+            ///
+            /// This count starts at zero when the runtime is created and increases by one each time a task is spawned.
+            ///
+            /// The counter is monotonically increasing. It is never decremented or
+            /// reset to zero.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            /// use tokio::runtime::Handle;
+            ///
+            /// #[tokio::main]
+            /// async fn main() {
+            ///    let metrics = Handle::current().metrics();
+            ///
+            ///     let n = metrics.spawned_tasks_count();
+            ///     println!("Runtime has had {} tasks spawned", n);
+            /// }
+            /// ```
+            pub fn spawned_tasks_count(&self) -> u64 {
+                self.handle.inner.spawned_tasks_count()
+            }
 
-                /// Returns the number of times that tasks have been forced to yield back to the scheduler
-                /// after exhausting their task budgets.
-                ///
-                /// This count starts at zero when the runtime is created and increases by one each time a task yields due to exhausting its budget.
-                ///
-                /// The counter is monotonically increasing. It is never decremented or
-                /// reset to zero.
-                pub fn budget_forced_yield_count(&self) -> u64 {
-                    self.handle
-                        .inner
-                        .scheduler_metrics()
-                        .budget_forced_yield_count
-                        .load(Relaxed)
-                }
+            /// Returns the number of tasks scheduled from **outside** of the runtime.
+            ///
+            /// The remote schedule count starts at zero when the runtime is created and
+            /// increases by one each time a task is woken from **outside** of the
+            /// runtime. This usually means that a task is spawned or notified from a
+            /// non-runtime thread and must be queued using the Runtime's injection
+            /// queue, which tends to be slower.
+            ///
+            /// The counter is monotonically increasing. It is never decremented or
+            /// reset to zero.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            /// use tokio::runtime::Handle;
+            ///
+            /// #[tokio::main]
+            /// async fn main() {
+            ///     let metrics = Handle::current().metrics();
+            ///
+            ///     let n = metrics.remote_schedule_count();
+            ///     println!("{} tasks were scheduled from outside the runtime", n);
+            /// }
+            /// ```
+            pub fn remote_schedule_count(&self) -> u64 {
+                self.handle
+                    .inner
+                    .scheduler_metrics()
+                    .remote_schedule_count
+                    .load(Relaxed)
+            }
 
-                /// Returns the total number of times the given worker thread has parked.
-                ///
-                /// The worker park count starts at zero when the runtime is created and
-                /// increases by one each time the worker parks the thread waiting for new
-                /// inbound events to process. This usually means the worker has processed
-                /// all pending work and is currently idle.
-                ///
-                /// The counter is monotonically increasing. It is never decremented or
-                /// reset to zero.
-                ///
-                /// # Arguments
-                ///
-                /// `worker` is the index of the worker being queried. The given value must
-                /// be between 0 and `num_workers()`. The index uniquely identifies a single
-                /// worker and will continue to identify the worker throughout the lifetime
-                /// of the runtime instance.
-                ///
-                /// # Panics
-                ///
-                /// The method panics when `worker` represents an invalid worker, i.e. is
-                /// greater than or equal to `num_workers()`.
-                ///
-                /// # Examples
-                ///
-                /// ```
-                /// use tokio::runtime::Handle;
-                ///
-                /// #[tokio::main]
-                /// async fn main() {
-                ///     let metrics = Handle::current().metrics();
-                ///
-                ///     let n = metrics.worker_park_count(0);
-                ///     println!("worker 0 parked {} times", n);
-                /// }
-                /// ```
-                pub fn worker_park_count(&self, worker: usize) -> u64 {
-                    self.handle
-                        .inner
-                        .worker_metrics(worker)
-                        .park_count
-                        .load(Relaxed)
-                }
+            /// Returns the number of times that tasks have been forced to yield back to the scheduler
+            /// after exhausting their task budgets.
+            ///
+            /// This count starts at zero when the runtime is created and increases by one each time a task yields due to exhausting its budget.
+            ///
+            /// The counter is monotonically increasing. It is never decremented or
+            /// reset to zero.
+            pub fn budget_forced_yield_count(&self) -> u64 {
+                self.handle
+                    .inner
+                    .scheduler_metrics()
+                    .budget_forced_yield_count
+                    .load(Relaxed)
+            }
 
-                /// Returns the number of times the given worker thread unparked but
-                /// performed no work before parking again.
-                ///
-                /// The worker no-op count starts at zero when the runtime is created and
-                /// increases by one each time the worker unparks the thread but finds no
-                /// new work and goes back to sleep. This indicates a false-positive wake up.
-                ///
-                /// The counter is monotonically increasing. It is never decremented or
-                /// reset to zero.
-                ///
-                /// # Arguments
-                ///
-                /// `worker` is the index of the worker being queried. The given value must
-                /// be between 0 and `num_workers()`. The index uniquely identifies a single
-                /// worker and will continue to identify the worker throughout the lifetime
-                /// of the runtime instance.
-                ///
-                /// # Panics
-                ///
-                /// The method panics when `worker` represents an invalid worker, i.e. is
-                /// greater than or equal to `num_workers()`.
-                ///
-                /// # Examples
-                ///
-                /// ```
-                /// use tokio::runtime::Handle;
-                ///
-                /// #[tokio::main]
-                /// async fn main() {
-                ///     let metrics = Handle::current().metrics();
-                ///
-                ///     let n = metrics.worker_noop_count(0);
-                ///     println!("worker 0 had {} no-op unparks", n);
-                /// }
-                /// ```
-                pub fn worker_noop_count(&self, worker: usize) -> u64 {
-                    self.handle
-                        .inner
-                        .worker_metrics(worker)
-                        .noop_count
-                        .load(Relaxed)
-                }
+            /// Returns the total number of times the given worker thread has parked.
+            ///
+            /// The worker park count starts at zero when the runtime is created and
+            /// increases by one each time the worker parks the thread waiting for new
+            /// inbound events to process. This usually means the worker has processed
+            /// all pending work and is currently idle.
+            ///
+            /// The counter is monotonically increasing. It is never decremented or
+            /// reset to zero.
+            ///
+            /// # Arguments
+            ///
+            /// `worker` is the index of the worker being queried. The given value must
+            /// be between 0 and `num_workers()`. The index uniquely identifies a single
+            /// worker and will continue to identify the worker throughout the lifetime
+            /// of the runtime instance.
+            ///
+            /// # Panics
+            ///
+            /// The method panics when `worker` represents an invalid worker, i.e. is
+            /// greater than or equal to `num_workers()`.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            /// use tokio::runtime::Handle;
+            ///
+            /// #[tokio::main]
+            /// async fn main() {
+            ///     let metrics = Handle::current().metrics();
+            ///
+            ///     let n = metrics.worker_park_count(0);
+            ///     println!("worker 0 parked {} times", n);
+            /// }
+            /// ```
+            pub fn worker_park_count(&self, worker: usize) -> u64 {
+                self.handle
+                    .inner
+                    .worker_metrics(worker)
+                    .park_count
+                    .load(Relaxed)
+            }
 
-                /// Returns the number of tasks the given worker thread stole from
-                /// another worker thread.
-                ///
-                /// This metric only applies to the **multi-threaded** runtime and will
-                /// always return `0` when using the current thread runtime.
-                ///
-                /// The worker steal count starts at zero when the runtime is created and
-                /// increases by `N` each time the worker has processed its scheduled queue
-                /// and successfully steals `N` more pending tasks from another worker.
-                ///
-                /// The counter is monotonically increasing. It is never decremented or
-                /// reset to zero.
-                ///
-                /// # Arguments
-                ///
-                /// `worker` is the index of the worker being queried. The given value must
-                /// be between 0 and `num_workers()`. The index uniquely identifies a single
-                /// worker and will continue to identify the worker throughout the lifetime
-                /// of the runtime instance.
-                ///
-                /// # Panics
-                ///
-                /// The method panics when `worker` represents an invalid worker, i.e. is
-                /// greater than or equal to `num_workers()`.
-                ///
-                /// # Examples
-                ///
-                /// ```
-                /// use tokio::runtime::Handle;
-                ///
-                /// #[tokio::main]
-                /// async fn main() {
-                ///     let metrics = Handle::current().metrics();
-                ///
-                ///     let n = metrics.worker_steal_count(0);
-                ///     println!("worker 0 has stolen {} tasks", n);
-                /// }
-                /// ```
-                pub fn worker_steal_count(&self, worker: usize) -> u64 {
-                    self.handle
-                        .inner
-                        .worker_metrics(worker)
-                        .steal_count
-                        .load(Relaxed)
-                }
+            /// Returns the number of times the given worker thread unparked but
+            /// performed no work before parking again.
+            ///
+            /// The worker no-op count starts at zero when the runtime is created and
+            /// increases by one each time the worker unparks the thread but finds no
+            /// new work and goes back to sleep. This indicates a false-positive wake up.
+            ///
+            /// The counter is monotonically increasing. It is never decremented or
+            /// reset to zero.
+            ///
+            /// # Arguments
+            ///
+            /// `worker` is the index of the worker being queried. The given value must
+            /// be between 0 and `num_workers()`. The index uniquely identifies a single
+            /// worker and will continue to identify the worker throughout the lifetime
+            /// of the runtime instance.
+            ///
+            /// # Panics
+            ///
+            /// The method panics when `worker` represents an invalid worker, i.e. is
+            /// greater than or equal to `num_workers()`.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            /// use tokio::runtime::Handle;
+            ///
+            /// #[tokio::main]
+            /// async fn main() {
+            ///     let metrics = Handle::current().metrics();
+            ///
+            ///     let n = metrics.worker_noop_count(0);
+            ///     println!("worker 0 had {} no-op unparks", n);
+            /// }
+            /// ```
+            pub fn worker_noop_count(&self, worker: usize) -> u64 {
+                self.handle
+                    .inner
+                    .worker_metrics(worker)
+                    .noop_count
+                    .load(Relaxed)
+            }
 
-                /// Returns the number of times the given worker thread stole tasks from
-                /// another worker thread.
-                ///
-                /// This metric only applies to the **multi-threaded** runtime and will
-                /// always return `0` when using the current thread runtime.
-                ///
-                /// The worker steal count starts at zero when the runtime is created and
-                /// increases by one each time the worker has processed its scheduled queue
-                /// and successfully steals more pending tasks from another worker.
-                ///
-                /// The counter is monotonically increasing. It is never decremented or
-                /// reset to zero.
-                ///
-                /// # Arguments
-                ///
-                /// `worker` is the index of the worker being queried. The given value must
-                /// be between 0 and `num_workers()`. The index uniquely identifies a single
-                /// worker and will continue to identify the worker throughout the lifetime
-                /// of the runtime instance.
-                ///
-                /// # Panics
-                ///
-                /// The method panics when `worker` represents an invalid worker, i.e. is
-                /// greater than or equal to `num_workers()`.
-                ///
-                /// # Examples
-                ///
-                /// ```
-                /// use tokio::runtime::Handle;
-                ///
-                /// #[tokio::main]
-                /// async fn main() {
-                ///     let metrics = Handle::current().metrics();
-                ///
-                ///     let n = metrics.worker_steal_operations(0);
-                ///     println!("worker 0 has stolen tasks {} times", n);
-                /// }
-                /// ```
-                pub fn worker_steal_operations(&self, worker: usize) -> u64 {
-                    self.handle
-                        .inner
-                        .worker_metrics(worker)
-                        .steal_operations
-                        .load(Relaxed)
-                }
+            /// Returns the number of tasks the given worker thread stole from
+            /// another worker thread.
+            ///
+            /// This metric only applies to the **multi-threaded** runtime and will
+            /// always return `0` when using the current thread runtime.
+            ///
+            /// The worker steal count starts at zero when the runtime is created and
+            /// increases by `N` each time the worker has processed its scheduled queue
+            /// and successfully steals `N` more pending tasks from another worker.
+            ///
+            /// The counter is monotonically increasing. It is never decremented or
+            /// reset to zero.
+            ///
+            /// # Arguments
+            ///
+            /// `worker` is the index of the worker being queried. The given value must
+            /// be between 0 and `num_workers()`. The index uniquely identifies a single
+            /// worker and will continue to identify the worker throughout the lifetime
+            /// of the runtime instance.
+            ///
+            /// # Panics
+            ///
+            /// The method panics when `worker` represents an invalid worker, i.e. is
+            /// greater than or equal to `num_workers()`.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            /// use tokio::runtime::Handle;
+            ///
+            /// #[tokio::main]
+            /// async fn main() {
+            ///     let metrics = Handle::current().metrics();
+            ///
+            ///     let n = metrics.worker_steal_count(0);
+            ///     println!("worker 0 has stolen {} tasks", n);
+            /// }
+            /// ```
+            pub fn worker_steal_count(&self, worker: usize) -> u64 {
+                self.handle
+                    .inner
+                    .worker_metrics(worker)
+                    .steal_count
+                    .load(Relaxed)
+            }
 
-                /// Returns the number of tasks the given worker thread has polled.
-                ///
-                /// The worker poll count starts at zero when the runtime is created and
-                /// increases by one each time the worker polls a scheduled task.
-                ///
-                /// The counter is monotonically increasing. It is never decremented or
-                /// reset to zero.
-                ///
-                /// # Arguments
-                ///
-                /// `worker` is the index of the worker being queried. The given value must
-                /// be between 0 and `num_workers()`. The index uniquely identifies a single
-                /// worker and will continue to identify the worker throughout the lifetime
-                /// of the runtime instance.
-                ///
-                /// # Panics
-                ///
-                /// The method panics when `worker` represents an invalid worker, i.e. is
-                /// greater than or equal to `num_workers()`.
-                ///
-                /// # Examples
-                ///
-                /// ```
-                /// use tokio::runtime::Handle;
-                ///
-                /// #[tokio::main]
-                /// async fn main() {
-                ///     let metrics = Handle::current().metrics();
-                ///
-                ///     let n = metrics.worker_poll_count(0);
-                ///     println!("worker 0 has polled {} tasks", n);
-                /// }
-                /// ```
-                pub fn worker_poll_count(&self, worker: usize) -> u64 {
-                    self.handle
-                        .inner
-                        .worker_metrics(worker)
-                        .poll_count
-                        .load(Relaxed)
-                }
+            /// Returns the number of times the given worker thread stole tasks from
+            /// another worker thread.
+            ///
+            /// This metric only applies to the **multi-threaded** runtime and will
+            /// always return `0` when using the current thread runtime.
+            ///
+            /// The worker steal count starts at zero when the runtime is created and
+            /// increases by one each time the worker has processed its scheduled queue
+            /// and successfully steals more pending tasks from another worker.
+            ///
+            /// The counter is monotonically increasing. It is never decremented or
+            /// reset to zero.
+            ///
+            /// # Arguments
+            ///
+            /// `worker` is the index of the worker being queried. The given value must
+            /// be between 0 and `num_workers()`. The index uniquely identifies a single
+            /// worker and will continue to identify the worker throughout the lifetime
+            /// of the runtime instance.
+            ///
+            /// # Panics
+            ///
+            /// The method panics when `worker` represents an invalid worker, i.e. is
+            /// greater than or equal to `num_workers()`.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            /// use tokio::runtime::Handle;
+            ///
+            /// #[tokio::main]
+            /// async fn main() {
+            ///     let metrics = Handle::current().metrics();
+            ///
+            ///     let n = metrics.worker_steal_operations(0);
+            ///     println!("worker 0 has stolen tasks {} times", n);
+            /// }
+            /// ```
+            pub fn worker_steal_operations(&self, worker: usize) -> u64 {
+                self.handle
+                    .inner
+                    .worker_metrics(worker)
+                    .steal_operations
+                    .load(Relaxed)
+            }
+
+            /// Returns the number of tasks the given worker thread has polled.
+            ///
+            /// The worker poll count starts at zero when the runtime is created and
+            /// increases by one each time the worker polls a scheduled task.
+            ///
+            /// The counter is monotonically increasing. It is never decremented or
+            /// reset to zero.
+            ///
+            /// # Arguments
+            ///
+            /// `worker` is the index of the worker being queried. The given value must
+            /// be between 0 and `num_workers()`. The index uniquely identifies a single
+            /// worker and will continue to identify the worker throughout the lifetime
+            /// of the runtime instance.
+            ///
+            /// # Panics
+            ///
+            /// The method panics when `worker` represents an invalid worker, i.e. is
+            /// greater than or equal to `num_workers()`.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            /// use tokio::runtime::Handle;
+            ///
+            /// #[tokio::main]
+            /// async fn main() {
+            ///     let metrics = Handle::current().metrics();
+            ///
+            ///     let n = metrics.worker_poll_count(0);
+            ///     println!("worker 0 has polled {} tasks", n);
+            /// }
+            /// ```
+            pub fn worker_poll_count(&self, worker: usize) -> u64 {
+                self.handle
+                    .inner
+                    .worker_metrics(worker)
+                    .poll_count
+                    .load(Relaxed)
+            }
 
             /// Returns the amount of time the given worker thread has been busy.
             ///
