@@ -282,10 +282,7 @@ impl CancellationToken {
         }
 
         RunUntilCancelledFuture {
-            cancellation: WaitForCancellationFuture {
-                cancellation_token: self,
-                future: self.inner.notified(),
-            },
+            cancellation: self.cancelled(),
             future: fut,
         }
         .await
