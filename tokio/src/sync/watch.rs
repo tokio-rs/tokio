@@ -156,6 +156,12 @@ impl<T> Clone for Sender<T> {
     }
 }
 
+impl<T: Default> Default for Sender<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
 /// Returns a reference to the inner value.
 ///
 /// Outstanding borrows hold a read lock on the inner value. This means that
