@@ -248,7 +248,7 @@ impl CancellationToken {
     ///
     /// # Cancel safety
     ///
-    /// This method is not cancel safe since the input future gets dropped on cancel.
+    /// This method is only cancel safe if `fut` is cancel safe.
     pub async fn run_until_cancelled<F>(&self, fut: F) -> Option<F::Output>
     where
         F: Future,
