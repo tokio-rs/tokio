@@ -1,8 +1,8 @@
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering;
 
-use crate::util::metric_atomics::{MetricAtomicUsize, MetricAtomicU64};
 use crate::loom::sync::{Mutex, MutexGuard};
+use crate::util::metric_atomics::{MetricAtomicU64, MetricAtomicUsize};
 
 use super::linked_list::{Link, LinkedList};
 
