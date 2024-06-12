@@ -1,14 +1,68 @@
 use crate::runtime::time::{TimerHandle, TimerShared};
 use crate::time::error::InsertError;
+use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
 
 mod level;
 pub(crate) use self::level::Expiration;
 use self::level::Level;
 
+use std::pin::Pin;
 use std::{array, ptr::NonNull};
 
 use super::entry::MAX_SAFE_MILLIS_DURATION;
-use super::EntryList;
+use super::Handle;
+
+/// List used in `Handle::process_at_sharded_time`. It wraps a guarded linked list
+/// and gates the access to it on the lock of the `Wheel` with the specified `wheel_id`.
+/// It also empties the list on drop.
+pub(super) struct EntryWaitersList<'a> {
+    // GuardedLinkedList ensures that the concurrent drop of Entry in this slot is safe.
+    list: GuardedLinkedList<TimerShared, <TimerShared as linked_list::Link>::Target>,
+    is_empty: bool,
+    wheel_id: u32,
+    handle: &'a Handle,
+}
+
+impl<'a> Drop for EntryWaitersList<'a> {
+    fn drop(&mut self) {
+        // If the list is not empty, we unlink all waiters from it.
+        // We do not wake the waiters to avoid double panics.
+        if !self.is_empty {
+            let _lock = self.handle.inner.lock_sharded_wheel(self.wheel_id);
+            while self.list.pop_back().is_some() {}
+        }
+    }
+}
+
+impl<'a> EntryWaitersList<'a> {
+    fn new(
+        unguarded_list: LinkedList<TimerShared, <TimerShared as linked_list::Link>::Target>,
+        guard: Pin<&'a TimerShared>,
+        wheel_id: u32,
+        handle: &'a Handle,
+    ) -> Self {
+        let guard_ptr = NonNull::from(guard.get_ref());
+        let list = unguarded_list.into_guarded(guard_ptr);
+        Self {
+            list,
+            is_empty: false,
+            wheel_id,
+            handle,
+        }
+    }
+
+    /// Removes the last element from the guarded list. Modifying this list
+    /// requires an exclusive access to the Wheel with the specified `wheel_id`.
+    pub(super) fn pop_back_locked(&mut self, _wheel: &mut Wheel) -> Option<NonNull<TimerShared>> {
+        let result = self.list.pop_back();
+        if result.is_none() {
+            // Save information about emptiness to avoid waiting for lock
+            // in the destructor.
+            self.is_empty = true;
+        }
+        result
+    }
+}
 
 /// Timing wheel implementation.
 ///
@@ -208,9 +262,26 @@ impl Wheel {
         }
     }
 
-    /// Obtains the list of entries that need processing for the given expiration.
-    pub(super) fn take_entries(&mut self, expiration: &Expiration) -> EntryList {
-        self.levels[expiration.level].take_slot(expiration.slot)
+    /// Obtains the guarded list of entries that need processing for the given expiration.
+    pub(super) fn get_waiters_list<'a>(
+        &mut self,
+        expiration: &Expiration,
+        guard: Pin<&'a TimerShared>,
+        wheel_id: u32,
+        handle: &'a Handle,
+    ) -> EntryWaitersList<'a> {
+        // Note that we need to take _all_ of the entries off the list before
+        // processing any of them. This is important because it's possible that
+        // those entries might need to be reinserted into the same slot.
+        //
+        // This happens only on the highest level, when an entry is inserted
+        // more than MAX_DURATION into the future. When this happens, we wrap
+        // around, and process some entries a multiple of MAX_DURATION before
+        // they actually need to be dropped down a level. We then reinsert them
+        // back into the same position; we must make sure we don't then process
+        // those entries again or we'll end up in an infinite loop.
+        let unguarded_list = self.levels[expiration.level].take_slot(expiration.slot);
+        EntryWaitersList::new(unguarded_list, guard, wheel_id, handle)
     }
 
     pub(super) fn occupied_bit_maintain(&mut self, expiration: &Expiration) {

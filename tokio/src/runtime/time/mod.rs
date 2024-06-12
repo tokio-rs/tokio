@@ -321,26 +321,19 @@ impl Handle {
 
         while let Some(expiration) = lock.poll(now) {
             lock.set_elapsed(expiration.deadline);
-            // Note that we need to take _all_ of the entries off the list before
-            // processing any of them. This is important because it's possible that
-            // those entries might need to be reinserted into the same slot.
-            //
-            // This happens only on the highest level, when an entry is inserted
-            // more than MAX_DURATION into the future. When this happens, we wrap
-            // around, and process some entries a multiple of MAX_DURATION before
-            // they actually need to be dropped down a level. We then reinsert them
-            // back into the same position; we must make sure we don't then process
-            // those entries again or we'll end up in an infinite loop.
-            let unguarded_list = lock.take_entries(&expiration);
             // It is critical for `GuardedLinkedList` safety that the guard node is
             // pinned in memory and is not dropped until the guarded list is dropped.
             let guard = TimerShared::new(id);
             pin!(guard);
-            let guard_ptr = NonNull::from(guard.as_ref().get_ref());
-            // GuardedLinkedList ensures that the concurrent drop of Entry in this slot is safe.
-            let mut guarded_list = unguarded_list.into_guarded(guard_ptr);
 
-            while let Some(entry) = guarded_list.pop_back() {
+            // * This list will be still guarded by the lock of the Wheel with the specefied id.
+            //   `EntryWaitersList` wrapper makes sure we hold the lock to modify it.
+            // * This wrapper will empty the list on drop. It is critical for safety
+            //   that we will not leave any list entry with a pointer to the local
+            //   guard node after this function returns / panics.
+            let mut list = lock.get_waiters_list(&expiration, guard.as_ref(), id, self);
+
+            while let Some(entry) = list.pop_back_locked(&mut lock) {
                 let entry = unsafe { entry.as_ref().handle() };
                 let deadline = expiration.deadline;
                 // Try to expire the entry; this is cheap (doesn't synchronize) if
