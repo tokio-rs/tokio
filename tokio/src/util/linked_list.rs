@@ -351,35 +351,13 @@ feature! {
         _marker: PhantomData<*const L>,
     }
 
-    /// Helper trait to turn a linked list to a guarded linked list.
-    ///
-    /// # Safety
-    ///
-    /// Implementations must guarantee that `Target` types are pinned in memory.
-    pub(crate) unsafe trait IntoNonNull {
-        /// This is usually a pointer-ish type.
-        type Target;
-        fn into_non_null(self) -> NonNull<Self::Target>;
-    }
-
-    unsafe impl<T> IntoNonNull for NonNull<T> {
-        type Target = T;
-        fn into_non_null(self) -> NonNull<Self::Target> {
-            self
-        }
-    }
-
-    impl<U, L> LinkedList<L, L::Target>
-    where
-        L: Link<Handle = U>,
-        U: IntoNonNull<Target = L::Target>,
-    {
+    impl<U, L: Link<Handle = U>> LinkedList<L, L::Target> {
         /// Turns a linked list into the guarded version by linking the guard node
         /// with the head and tail nodes. Like with other nodes, you should guarantee
         /// that the guard node is pinned in memory.
         pub(crate) fn into_guarded(self, guard_handle: L::Handle) -> GuardedLinkedList<L, L::Target> {
             // `guard_handle` is a NonNull pointer, we don't have to care about dropping it.
-            let guard = U::into_non_null(guard_handle);
+            let guard = L::as_raw(&guard_handle);
 
             unsafe {
                 if let Some(head) = self.head {
