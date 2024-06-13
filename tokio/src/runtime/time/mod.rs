@@ -8,7 +8,7 @@
 
 mod entry;
 pub(crate) use entry::TimerEntry;
-use entry::{EntryList, TimerHandle, TimerShared, MAX_SAFE_MILLIS_DURATION, STATE_DEREGISTERED};
+use entry::{EntryList, TimerHandle, TimerShared, MAX_SAFE_MILLIS_DURATION};
 
 mod handle;
 pub(crate) use self::handle::Handle;
@@ -342,7 +342,7 @@ impl Handle {
                 match unsafe { entry.mark_firing(deadline) } {
                     Ok(()) => {
                         // Entry was expired.
-                        // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
+                        // SAFETY: We hold the driver lock, andcargo test --doc --workspace --all-features just removed the entry from any linked lists.
                         if let Some(waker) = unsafe { entry.fire(Ok(())) } {
                             waker_list.push(waker);
 
@@ -356,7 +356,6 @@ impl Handle {
                             }
                         }
                     }
-                    Err(state) if state == STATE_DEREGISTERED => {}
                     Err(state) => {
                         // Safety: This Entry has not expired.
                         unsafe { lock.reinsert_entry(entry, deadline, state) };
