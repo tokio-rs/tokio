@@ -325,16 +325,17 @@ impl Handle {
             // pinned in memory and is not dropped until the guarded list is dropped.
             let guard = TimerShared::new(id);
             pin!(guard);
+            let guard_handle = guard.as_ref().get_ref().handle();
 
             // * This list will be still guarded by the lock of the Wheel with the specefied id.
             //   `EntryWaitersList` wrapper makes sure we hold the lock to modify it.
             // * This wrapper will empty the list on drop. It is critical for safety
             //   that we will not leave any list entry with a pointer to the local
             //   guard node after this function returns / panics.
-            let mut list = lock.get_waiters_list(&expiration, guard.as_ref(), id, self);
+            // Safety: The `TimerShared` inside this `TimerHandle` is pinned in the memory.
+            let mut list = unsafe { lock.get_waiters_list(&expiration, guard_handle, id, self) };
 
             while let Some(entry) = list.pop_back_locked(&mut lock) {
-                let entry = unsafe { entry.as_ref().handle() };
                 let deadline = expiration.deadline;
                 // Try to expire the entry; this is cheap (doesn't synchronize) if
                 // the timer is not expired, and updates cached_when.

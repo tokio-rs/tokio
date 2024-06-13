@@ -415,16 +415,16 @@ impl TimerShared {
 }
 
 unsafe impl linked_list::Link for TimerShared {
-    type Handle = NonNull<TimerShared>;
+    type Handle = TimerHandle;
 
     type Target = TimerShared;
 
     fn as_raw(handle: &Self::Handle) -> NonNull<Self::Target> {
-        *handle
+        handle.inner
     }
 
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
-        ptr
+        TimerHandle { inner: ptr }
     }
 
     unsafe fn pointers(
@@ -592,10 +592,6 @@ impl TimerHandle {
     /// the entry must not be in any wheel linked lists.
     pub(super) unsafe fn fire(self, completed_state: TimerResult) -> Option<Waker> {
         self.inner.as_ref().state.fire(completed_state)
-    }
-
-    pub(super) fn inner(&self) -> NonNull<TimerShared> {
-        self.inner
     }
 }
 

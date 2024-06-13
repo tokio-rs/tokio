@@ -6,7 +6,6 @@ mod level;
 pub(crate) use self::level::Expiration;
 use self::level::Level;
 
-use std::pin::Pin;
 use std::{array, ptr::NonNull};
 
 use super::entry::MAX_SAFE_MILLIS_DURATION;
@@ -37,12 +36,11 @@ impl<'a> Drop for EntryWaitersList<'a> {
 impl<'a> EntryWaitersList<'a> {
     fn new(
         unguarded_list: LinkedList<TimerShared, <TimerShared as linked_list::Link>::Target>,
-        guard: Pin<&'a TimerShared>,
+        guard_handle: TimerHandle,
         wheel_id: u32,
         handle: &'a Handle,
     ) -> Self {
-        let guard_ptr = NonNull::from(guard.get_ref());
-        let list = unguarded_list.into_guarded(guard_ptr);
+        let list = unguarded_list.into_guarded(guard_handle);
         Self {
             list,
             is_empty: false,
@@ -53,7 +51,7 @@ impl<'a> EntryWaitersList<'a> {
 
     /// Removes the last element from the guarded list. Modifying this list
     /// requires an exclusive access to the Wheel with the specified `wheel_id`.
-    pub(super) fn pop_back_locked(&mut self, _wheel: &mut Wheel) -> Option<NonNull<TimerShared>> {
+    pub(super) fn pop_back_locked(&mut self, _wheel: &mut Wheel) -> Option<TimerHandle> {
         let result = self.list.pop_back();
         if result.is_none() {
             // Save information about emptiness to avoid waiting for lock
@@ -263,10 +261,11 @@ impl Wheel {
     }
 
     /// Obtains the guarded list of entries that need processing for the given expiration.
-    pub(super) fn get_waiters_list<'a>(
+    /// Safety: The `TimerShared` inside `guard_handle` must be pinned in the memory.
+    pub(super) unsafe fn get_waiters_list<'a>(
         &mut self,
         expiration: &Expiration,
-        guard: Pin<&'a TimerShared>,
+        guard_handle: TimerHandle,
         wheel_id: u32,
         handle: &'a Handle,
     ) -> EntryWaitersList<'a> {
@@ -281,7 +280,7 @@ impl Wheel {
         // back into the same position; we must make sure we don't then process
         // those entries again or we'll end up in an infinite loop.
         let unguarded_list = self.levels[expiration.level].take_slot(expiration.slot);
-        EntryWaitersList::new(unguarded_list, guard, wheel_id, handle)
+        EntryWaitersList::new(unguarded_list, guard_handle, wheel_id, handle)
     }
 
     pub(super) fn occupied_bit_maintain(&mut self, expiration: &Expiration) {
