@@ -170,6 +170,10 @@ impl StateCell {
         // with relaxed ordering.
         let mut cur_state = self.state.load(Ordering::Relaxed);
         loop {
+            // Because its state is STATE_DEREGISTERED, it has been fired.
+            if cur_state == STATE_DEREGISTERED {
+                break Err(cur_state);
+            }
             // improve the error message for things like
             // https://github.com/tokio-rs/tokio/issues/3675
             assert!(
