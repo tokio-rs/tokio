@@ -479,7 +479,38 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         }
     };
 
-    input.into_tokens(generated_attrs, body, last_block)
+    let input = input.into_tokens(generated_attrs, body, last_block);
+
+    if is_test {
+        input
+    } else {
+        replace_with_prefix(input)
+    }
+}
+
+fn replace_with_prefix(input: TokenStream) -> TokenStream {
+    use std::str::FromStr;
+
+    fn get_name(f: &str) -> &str {
+        let rpos = f.find('(').unwrap();
+        let name = &f[..rpos];
+        let lpos = name.rfind(' ').unwrap() + 1;
+        &name[lpos..]
+    }
+
+    fn add_prefix(input: &str, name: &str) -> String {
+        input.replacen(&format!("fn {name}"), &format!("fn prefix_{name}"), 1)
+    }
+
+    let input = input.to_string();
+    let name = get_name(&input);
+    let input = add_prefix(&input, name);
+
+    TokenStream::from_str(&format! {"
+        use prefix_{name} as main;
+        {input}
+    "})
+    .unwrap()
 }
 
 fn token_stream_with_error(mut tokens: TokenStream, error: syn::Error) -> TokenStream {
