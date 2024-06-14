@@ -47,6 +47,29 @@ impl RuntimeMetrics {
         self.handle.inner.num_workers()
     }
 
+    /// Returns the current number of active tasks in the runtime.
+    ///
+    /// This value increases and decreases over time as tasks are spawned and as they are completed or cancelled.
+    ///
+    /// To see the total number of spawned tasks, see `spawned_tasks_count`. Note that this API currently requires using `--cfg tokio_unstable`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///    let metrics = Handle::current().metrics();
+    ///
+    ///     let n = metrics.num_active_tasks();
+    ///     println!("Runtime has {} active tasks", n);
+    /// }
+    /// ```
+    pub fn num_active_tasks(&self) -> usize {
+        self.handle.inner.num_active_tasks()
+    }
+
     cfg_unstable_metrics! {
 
         /// Returns the number of additional threads spawned by the runtime.
@@ -78,7 +101,7 @@ impl RuntimeMetrics {
         #[deprecated = "Renamed to num_alive_tasks"]
         /// Renamed to [`RuntimeMetrics::num_alive_tasks`]
         pub fn active_tasks_count(&self) -> usize {
-            self.num_alive_tasks()
+            self.num_active_tasks()
         }
 
         /// Returns the current number of alive tasks in the runtime.
