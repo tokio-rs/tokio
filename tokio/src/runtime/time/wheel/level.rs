@@ -20,7 +20,6 @@ pub(crate) struct Level {
 }
 
 /// Indicates when a slot must be processed next.
-#[derive(Debug)]
 pub(crate) struct Expiration {
     /// The level containing the slot.
     pub(crate) level: usize,
@@ -81,7 +80,7 @@ impl Level {
             // pseudo-ring buffer, and we rotate around them indefinitely. If we
             // compute a deadline before now, and it's the top level, it
             // therefore means we're actually looking at a slot in the future.
-            debug_assert_eq!(self.level, super::NUM_LEVELS - 1);
+            debug_assert_eq!(self.level, super::MAX_LEVEL_INDEX);
 
             deadline += level_range;
         }
@@ -120,7 +119,7 @@ impl Level {
     }
 
     pub(crate) unsafe fn add_entry(&mut self, item: TimerHandle) {
-        let slot = slot_for(item.cached_when(), self.level);
+        let slot = slot_for(item.true_when(), self.level);
 
         self.slot[slot].push_front(item);
 
@@ -128,22 +127,25 @@ impl Level {
     }
 
     pub(crate) unsafe fn remove_entry(&mut self, item: NonNull<TimerShared>) {
-        let slot = slot_for(unsafe { item.as_ref().cached_when() }, self.level);
+        let slot = slot_for(unsafe { item.as_ref().true_when() }, self.level);
 
         unsafe { self.slot[slot].remove(item) };
         if self.slot[slot].is_empty() {
-            // The bit is currently set
-            debug_assert!(self.occupied & occupied_bit(slot) != 0);
-
             // Unset the bit
             self.occupied ^= occupied_bit(slot);
         }
     }
 
-    pub(crate) fn take_slot(&mut self, slot: usize) -> EntryList {
-        self.occupied &= !occupied_bit(slot);
-
+    pub(super) fn take_slot(&mut self, slot: usize) -> EntryList {
         std::mem::take(&mut self.slot[slot])
+    }
+
+    pub(super) fn occupied_bit_maintain(&mut self, slot: usize) {
+        if self.slot[slot].is_empty() {
+            self.occupied &= !occupied_bit(slot);
+        } else {
+            self.occupied |= occupied_bit(slot);
+        }
     }
 }
 

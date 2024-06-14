@@ -8,7 +8,7 @@
 
 mod entry;
 pub(crate) use entry::TimerEntry;
-use entry::{EntryList, TimerHandle, TimerShared, MAX_SAFE_MILLIS_DURATION};
+use entry::{EntryList, TimerHandle, TimerShared, MAX_SAFE_MILLIS_DURATION, STATE_DEREGISTERED};
 
 mod handle;
 pub(crate) use self::handle::Handle;
@@ -319,23 +319,53 @@ impl Handle {
             now = lock.elapsed();
         }
 
-        while let Some(entry) = lock.poll(now) {
-            debug_assert!(unsafe { entry.is_pending() });
+        while let Some(expiration) = lock.poll(now) {
+            lock.set_elapsed(expiration.deadline);
+            // It is critical for `GuardedLinkedList` safety that the guard node is
+            // pinned in memory and is not dropped until the guarded list is dropped.
+            let guard = TimerShared::new(id);
+            pin!(guard);
+            let guard_handle = guard.as_ref().get_ref().handle();
 
-            // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
-            if let Some(waker) = unsafe { entry.fire(Ok(())) } {
-                waker_list.push(waker);
+            // * This list will be still guarded by the lock of the Wheel with the specefied id.
+            //   `EntryWaitersList` wrapper makes sure we hold the lock to modify it.
+            // * This wrapper will empty the list on drop. It is critical for safety
+            //   that we will not leave any list entry with a pointer to the local
+            //   guard node after this function returns / panics.
+            // Safety: The `TimerShared` inside this `TimerHandle` is pinned in the memory.
+            let mut list = unsafe { lock.get_waiters_list(&expiration, guard_handle, id, self) };
 
-                if !waker_list.can_push() {
-                    // Wake a batch of wakers. To avoid deadlock, we must do this with the lock temporarily dropped.
-                    drop(lock);
+            while let Some(entry) = list.pop_back_locked(&mut lock) {
+                let deadline = expiration.deadline;
+                // Try to expire the entry; this is cheap (doesn't synchronize) if
+                // the timer is not expired, and updates cached_when.
+                match unsafe { entry.mark_firing(deadline) } {
+                    Ok(()) => {
+                        // Entry was expired.
+                        // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
+                        if let Some(waker) = unsafe { entry.fire(Ok(())) } {
+                            waker_list.push(waker);
 
-                    waker_list.wake_all();
+                            if !waker_list.can_push() {
+                                // Wake a batch of wakers. To avoid deadlock,
+                                // we must do this with the lock temporarily dropped.
+                                drop(lock);
+                                waker_list.wake_all();
 
-                    lock = self.inner.lock_sharded_wheel(id);
+                                lock = self.inner.lock_sharded_wheel(id);
+                            }
+                        }
+                    }
+                    Err(state) if state == STATE_DEREGISTERED => {}
+                    Err(state) => {
+                        // Safety: This Entry has not expired.
+                        unsafe { lock.reinsert_entry(entry, deadline, state) };
+                    }
                 }
             }
+            lock.occupied_bit_maintain(&expiration);
         }
+
         let next_wake_up = lock.poll_at();
         drop(lock);
 
