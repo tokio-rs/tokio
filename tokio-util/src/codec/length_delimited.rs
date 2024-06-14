@@ -79,26 +79,28 @@
 //! frame head in the yielded `BytesMut`.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
+//! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # fn bind_read<T: AsyncRead>(io: T) {
-//! LengthDelimitedCodec::builder()
+//! # #[tokio::main]
+//! # async fn main() {
+//! # let io: &[u8] = b"\x00\x0BHello world";
+//! let mut reader = LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(0)   // default value
-//!     .num_skip(0) // Do not strip frame header
 //!     .new_read(io);
+//! # let res = reader.next().await.unwrap().unwrap().to_vec();
+//! # assert_eq!(res, b"Hello world");
 //! # }
-//! # pub fn main() {}
 //! ```
 //!
 //! The following frame will be decoded as such:
 //!
 //! ```text
-//!          INPUT                           DECODED
-//! +-- len ---+--- Payload ---+     +-- len ---+--- Payload ---+
-//! | \x00\x0B |  Hello world  | --> | \x00\x0B |  Hello world  |
-//! +----------+---------------+     +----------+---------------+
+//!          INPUT                        DECODED
+//! +-- len ---+--- Payload ---+     +--- Payload ---+
+//! | \x00\x0B |  Hello world  | --> |  Hello world  |
+//! +----------+---------------+     +---------------+
 //! ```
 //!
 //! The value of the length field is 11 (`\x0B`) which represents the length
@@ -113,30 +115,35 @@
 //! frame head in the yielded `BytesMut`.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
+//! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # fn bind_read<T: AsyncRead>(io: T) {
-//! LengthDelimitedCodec::builder()
+//! # #[tokio::main]
+//! # async fn main() {
+//! # let io: &[u8] = b"\x00\x0BHello world";
+//! let mut reader = LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
 //!     .length_field_type::<u16>()
-//!     .length_adjustment(0)   // default value
-//!     // `num_skip` is not needed, the default is to skip
+//!     .length_adjustment(2)   // Add head size to length
+//!     .num_skip(0)            // Do NOT skip the head
 //!     .new_read(io);
+//! # let res = reader.next().await.unwrap().unwrap().to_vec();
+//! # assert_eq!(res, b"\x00\x0BHello world");
 //! # }
-//! # pub fn main() {}
 //! ```
 //!
 //! The following frame will be decoded as such:
 //!
 //! ```text
-//!          INPUT                        DECODED
-//! +-- len ---+--- Payload ---+     +--- Payload ---+
-//! | \x00\x0B |  Hello world  | --> |  Hello world  |
-//! +----------+---------------+     +---------------+
+//!          INPUT                           DECODED
+//! +-- len ---+--- Payload ---+     +-- len ---+--- Payload ---+
+//! | \x00\x0B |  Hello world  | --> | \x00\x0B |  Hello world  |
+//! +----------+---------------+     +----------+---------------+
 //! ```
 //!
 //! This is similar to the first example, the only difference is that the
-//! frame head is **not** included in the yielded `BytesMut` value.
+//! frame head is **included** in the yielded `BytesMut` value. To archive
+//! this, we need to add header size to the length with `length_adjustment`,
+//! and set `num_skip` to `0` to prevent skipping the head.
 //!
 //! ## Example 3
 //!
@@ -145,26 +152,28 @@
 //! **includes** the frame head length.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
+//! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # fn bind_read<T: AsyncRead>(io: T) {
-//! LengthDelimitedCodec::builder()
+//! # #[tokio::main]
+//! # async fn main() {
+//! # let io: &[u8] = b"\x00\x0DHello world";
+//! let mut reader = LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(-2)  // size of head
-//!     .num_skip(0)
 //!     .new_read(io);
+//! # let res = reader.next().await.unwrap().unwrap().to_vec();
+//! # assert_eq!(res, b"Hello world");
 //! # }
-//! # pub fn main() {}
 //! ```
 //!
 //! The following frame will be decoded as such:
 //!
 //! ```text
 //!          INPUT                           DECODED
-//! +-- len ---+--- Payload ---+     +-- len ---+--- Payload ---+
-//! | \x00\x0D |  Hello world  | --> | \x00\x0D |  Hello world  |
-//! +----------+---------------+     +----------+---------------+
+//! +-- len ---+--- Payload ---+     +--- Payload ---+
+//! | \x00\x0D |  Hello world  | --> |  Hello world  |
+//! +----------+---------------+     +---------------+
 //! ```
 //!
 //! In most cases, the length field represents the length of the payload
@@ -179,17 +188,20 @@
 //! frame head, including the frame head in the yielded `BytesMut`.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
+//! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # fn bind_read<T: AsyncRead>(io: T) {
-//! LengthDelimitedCodec::builder()
+//! # #[tokio::main]
+//! # async fn main() {
+//! # let io: &[u8] = b"\x00\x00\x0B\xCA\xFEHello world";
+//! let mut reader = LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
 //!     .length_field_length(3)
-//!     .length_adjustment(2)  // remaining head
+//!     .length_adjustment(3 + 2)  // len field and remaining head
 //!     .num_skip(0)
 //!     .new_read(io);
+//! # let res = reader.next().await.unwrap().unwrap().to_vec();
+//! # assert_eq!(res, b"\x00\x00\x0B\xCA\xFEHello world");
 //! # }
-//! # pub fn main() {}
 //! ```
 //!
 //! The following frame will be decoded as such:
@@ -223,17 +235,20 @@
 //! included.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
+//! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # fn bind_read<T: AsyncRead>(io: T) {
-//! LengthDelimitedCodec::builder()
+//! # #[tokio::main]
+//! # async fn main() {
+//! # let io: &[u8] = b"\xCA\x00\x0B\xFEHello world";
+//! let mut reader = LengthDelimitedCodec::builder()
 //!     .length_field_offset(1) // length of hdr1
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(1)  // length of hdr2
 //!     .num_skip(3) // length of hdr1 + LEN
 //!     .new_read(io);
+//! # let res = reader.next().await.unwrap().unwrap().to_vec();
+//! # assert_eq!(res, b"\xFEHello world");
 //! # }
-//! # pub fn main() {}
 //! ```
 //!
 //! The following frame will be decoded as such:
@@ -269,15 +284,19 @@
 //! length.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
+//! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # fn bind_read<T: AsyncRead>(io: T) {
-//! LengthDelimitedCodec::builder()
+//! # #[tokio::main]
+//! # async fn main() {
+//! # let io: &[u8] = b"\xCA\x00\x0F\xFEHello world";
+//! let mut reader = LengthDelimitedCodec::builder()
 //!     .length_field_offset(1) // length of hdr1
 //!     .length_field_type::<u16>()
 //!     .length_adjustment(-3)  // length of hdr1 + LEN, negative
 //!     .num_skip(3)
 //!     .new_read(io);
+//! # let res = reader.next().await.unwrap().unwrap().to_vec();
+//! # assert_eq!(res, b"\xFEHello world");
 //! # }
 //! ```
 //!
@@ -308,17 +327,20 @@
 //! frame head, excluding the 4th byte from the yielded `BytesMut`.
 //!
 //! ```
-//! # use tokio::io::AsyncRead;
+//! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # fn bind_read<T: AsyncRead>(io: T) {
-//! LengthDelimitedCodec::builder()
+//! # #[tokio::main]
+//! # async fn main() {
+//! # let io: &[u8] = b"\x00\x00\x0B\xFFHello world";
+//! let mut reader = LengthDelimitedCodec::builder()
 //!     .length_field_offset(0) // default value
 //!     .length_field_length(3)
 //!     .length_adjustment(0)  // default value
 //!     .num_skip(4) // skip the first 4 bytes
 //!     .new_read(io);
+//! # let res = reader.next().await.unwrap().unwrap().to_vec();
+//! # assert_eq!(res, b"Hello world");
 //! # }
-//! # pub fn main() {}
 //! ```
 //!
 //! The following frame will be decoded as such:
