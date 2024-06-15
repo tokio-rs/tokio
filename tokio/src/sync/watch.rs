@@ -1324,6 +1324,22 @@ impl<T> Sender<T> {
     pub fn receiver_count(&self) -> usize {
         self.shared.ref_count_rx.load(Relaxed)
     }
+
+    /// Returns `true` if senders belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let (tx, rx) = tokio::sync::watch::channel(true);
+    /// let tx2 = tx.clone();
+    /// assert!(tx.same_channel(&tx2));
+    ///
+    /// let (tx3, rx3) = tokio::sync::watch::channel(true);
+    /// assert!(!tx3.same_channel(&tx2));
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.shared, &other.shared)
+    }
 }
 
 impl<T> Drop for Sender<T> {
