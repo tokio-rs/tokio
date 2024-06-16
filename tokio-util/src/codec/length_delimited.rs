@@ -141,8 +141,8 @@
 //! ```
 //!
 //! This is similar to the first example, the only difference is that the
-//! frame head is **included** in the yielded `BytesMut` value. To archive
-//! this, we need to add header size to the length with `length_adjustment`,
+//! frame head is **included** in the yielded `BytesMut` value. To achieve
+//! this, we need to add the header size to the length with `length_adjustment`,
 //! and set `num_skip` to `0` to prevent skipping the head.
 //!
 //! ## Example 3
