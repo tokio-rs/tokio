@@ -1,4 +1,4 @@
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 cfg_64bit_metrics! {
     use std::sync::atomic::AtomicU64;
@@ -52,11 +52,17 @@ impl MetricAtomicU64 {
 /// This exposes simplified APIs for use in metrics & uses `std::sync` instead of Loom to avoid polluting loom logs with metric information.
 #[derive(Debug, Default)]
 pub(crate) struct MetricAtomicUsize {
-    value: std::sync::atomic::AtomicUsize,
+    value: AtomicUsize,
 }
 
 #[cfg_attr(not(all(tokio_unstable, feature = "rt")), allow(dead_code))]
 impl MetricAtomicUsize {
+    pub(crate) fn new(value: usize) -> Self {
+        Self {
+            value: AtomicUsize::new(value),
+        }
+    }
+
     pub(crate) fn load(&self, ordering: Ordering) -> usize {
         self.value.load(ordering)
     }
