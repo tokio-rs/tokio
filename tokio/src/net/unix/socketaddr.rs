@@ -22,6 +22,16 @@ impl SocketAddr {
     pub fn as_pathname(&self) -> Option<&Path> {
         self.0.as_pathname()
     }
+
+    /// Returns the contents of this address without the leading null byte
+    /// if it is an abstract namespace.
+    ///
+    /// Documentation reflected in [`SocketAddr`]
+    ///
+    /// [`SocketAddr`]: std::os::unix::net::SocketAddr
+    pub fn as_abstract_name(&self) -> Option<&[u8]> {
+        self.0.as_abstract_namespace()
+    }
 }
 
 impl fmt::Debug for SocketAddr {
