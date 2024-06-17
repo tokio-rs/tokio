@@ -106,9 +106,11 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
         self.count.load(Ordering::Relaxed)
     }
 
-    /// Gets the total number of elements added to this list.
-    pub(crate) fn added(&self) -> u64 {
-        self.added.load(Ordering::Relaxed)
+    cfg_64bit_metrics! {
+        /// Gets the total number of elements added to this list.
+        pub(crate) fn added(&self) -> u64 {
+            self.added.load(Ordering::Relaxed)
+        }
     }
 
     /// Returns whether the linked list does not contain any node.
