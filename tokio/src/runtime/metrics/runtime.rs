@@ -51,7 +51,7 @@ impl RuntimeMetrics {
     ///
     /// This value increases and decreases over time as tasks are spawned and as they are completed or cancelled.
     ///
-    /// To see the total number of spawned tasks, see `spawned_tasks_count`. Note that this API currently requires using `--cfg tokio_unstable`.
+    /// To see the total number of spawned tasks, see `spawned_tasks_count`.
     ///
     /// # Examples
     ///
