@@ -75,7 +75,7 @@
 //!
 //! ## Example 1
 //!
-//! The following will parse a `u16` length field at offset 0, including the
+//! The following will parse a `u16` length field at offset 0, omitting the
 //! frame head in the yielded `BytesMut`.
 //!
 //! ```
@@ -111,7 +111,7 @@
 //!
 //! ## Example 2
 //!
-//! The following will parse a `u16` length field at offset 0, omitting the
+//! The following will parse a `u16` length field at offset 0, including the
 //! frame head in the yielded `BytesMut`.
 //!
 //! ```
@@ -147,7 +147,7 @@
 //!
 //! ## Example 3
 //!
-//! The following will parse a `u16` length field at offset 0, including the
+//! The following will parse a `u16` length field at offset 0, omitting the
 //! frame head in the yielded `BytesMut`. In this case, the length field
 //! **includes** the frame head length.
 //!
