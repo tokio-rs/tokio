@@ -81,10 +81,15 @@ pub mod wrappers;
 
 mod stream_ext;
 pub use stream_ext::{collect::FromStream, StreamExt};
-pub use stream_ext::{
-    AllFuture, AnyFuture, Chain, Filter, FilterMap, FoldFuture, Fuse, Map, MapWhile, Merge, Next,
-    Peekable, Skip, SkipWhile, Take, TakeWhile, Then, TryNext,
-};
+/// Adapters for types that implement the `Stream` trait.
+/// Created through the tokio [`StreamExt`](crate::stream_ext::StreamExt) methods.
+pub mod adapters {
+    pub use crate::stream_ext::{
+        AllFuture, AnyFuture, Chain, Filter, FilterMap, FoldFuture, Fuse, Map, MapWhile, Merge,
+        Next, Peekable, Skip, SkipWhile, Take, TakeWhile, Then, TryNext,
+    };
+}
+
 cfg_time! {
     pub use stream_ext::timeout::{Elapsed, Timeout};
 }

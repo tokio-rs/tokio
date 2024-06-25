@@ -1,4 +1,4 @@
-use tokio_stream::{self as stream, Chain, Stream, StreamExt};
+use tokio_stream::{self as stream, Stream, StreamExt};
 use tokio_test::{assert_pending, assert_ready, task};
 
 mod support {
@@ -6,6 +6,7 @@ mod support {
 }
 
 use support::mpsc;
+use tokio_stream::adapters::Chain;
 
 #[tokio::test]
 async fn basic_usage() {
