@@ -82,7 +82,7 @@ pub mod wrappers;
 mod stream_ext;
 pub use stream_ext::{collect::FromStream, StreamExt};
 /// Adapters for types that implement the `Stream` trait.
-/// Created through the tokio [`StreamExt`](crate::stream_ext::StreamExt) methods.
+/// Created through the tokio [`StreamExt`] methods.
 pub mod adapters {
     pub use crate::stream_ext::{
         AllFuture, AnyFuture, Chain, Filter, FilterMap, FoldFuture, Fuse, Map, MapWhile, Merge,
