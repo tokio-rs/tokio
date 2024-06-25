@@ -41,10 +41,10 @@ async fn basic_usage() {
 
 fn visibility_test<I, S1, S2>(s1: S1, s2: S2) -> Chain<S1, S2>
 where
-	S1: Stream<Item=I>,
-	S2: Stream<Item=I>,
+    S1: Stream<Item = I>,
+    S2: Stream<Item = I>,
 {
-	s1.chain(s2)
+    s1.chain(s2)
 }
 
 #[tokio::test]
