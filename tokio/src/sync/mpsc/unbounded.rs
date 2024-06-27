@@ -348,7 +348,7 @@ impl<T> UnboundedReceiver<T> {
     ///     assert!(!rx.is_closed());
     ///
     ///     rx.close();
-    ///     
+    ///
     ///     assert!(rx.is_closed());
     /// }
     /// ```
@@ -497,6 +497,16 @@ impl<T> UnboundedReceiver<T> {
         limit: usize,
     ) -> Poll<usize> {
         self.chan.recv_many(cx, buffer, limit)
+    }
+
+    /// Returns the number of [`UnboundedSender`] handles.
+    pub fn strong_count(&self) -> usize {
+        self.chan.strong_count()
+    }
+
+    /// Returns the number of [`WeakUnboundedSender`] handles.
+    pub fn weak_count(&self) -> usize {
+        self.chan.weak_count()
     }
 }
 

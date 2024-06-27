@@ -711,6 +711,16 @@ impl<T> Receiver<T> {
     ) -> Poll<usize> {
         self.chan.recv_many(cx, buffer, limit)
     }
+
+    /// Returns the number of [`Sender`] handles.
+    pub fn strong_count(&self) -> usize {
+        self.chan.strong_count()
+    }
+
+    /// Returns the number of [`WeakSender`] handles.
+    pub fn weak_count(&self) -> usize {
+        self.chan.weak_count()
+    }
 }
 
 impl<T> fmt::Debug for Receiver<T> {
