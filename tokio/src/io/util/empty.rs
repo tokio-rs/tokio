@@ -134,10 +134,12 @@ impl AsyncWrite for Empty {
 }
 
 impl AsyncSeek for Empty {
+    #[inline]
     fn start_seek(self: Pin<&mut Self>, _position: SeekFrom) -> io::Result<()> {
         Ok(())
     }
 
+    #[inline]
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
         ready!(crate::trace::trace_leaf(cx));
         ready!(poll_proceed_and_make_progress(cx));
