@@ -1,6 +1,5 @@
 #![cfg(feature = "full")]
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt};
-use tokio_test::assert_ok;
 
 #[tokio::test]
 async fn empty_read_is_cooperative() {
@@ -38,9 +37,25 @@ async fn empty_seek() {
 
     let mut empty = tokio::io::empty();
 
-    let pos = assert_ok!(empty.seek(SeekFrom::Start(0)).await);
-    assert_eq!(pos, 0);
+    assert!(matches!(empty.seek(SeekFrom::Start(0)).await, Ok(0)));
+    assert!(matches!(empty.seek(SeekFrom::Start(1)).await, Ok(0)));
+    assert!(matches!(empty.seek(SeekFrom::Start(u64::MAX)).await, Ok(0)));
 
-    let pos = assert_ok!(empty.seek(SeekFrom::Start(8)).await);
-    assert_eq!(pos, 0);
+    assert!(matches!(empty.seek(SeekFrom::End(i64::MIN)).await, Ok(0)));
+    assert!(matches!(empty.seek(SeekFrom::End(-1)).await, Ok(0)));
+    assert!(matches!(empty.seek(SeekFrom::End(0)).await, Ok(0)));
+    assert!(matches!(empty.seek(SeekFrom::End(1)).await, Ok(0)));
+    assert!(matches!(empty.seek(SeekFrom::End(i64::MAX)).await, Ok(0)));
+
+    assert!(matches!(
+        empty.seek(SeekFrom::Current(i64::MIN)).await,
+        Ok(0)
+    ));
+    assert!(matches!(empty.seek(SeekFrom::Current(-1)).await, Ok(0)));
+    assert!(matches!(empty.seek(SeekFrom::Current(0)).await, Ok(0)));
+    assert!(matches!(empty.seek(SeekFrom::Current(1)).await, Ok(0)));
+    assert!(matches!(
+        empty.seek(SeekFrom::Current(i64::MAX)).await,
+        Ok(0)
+    ));
 }
