@@ -89,11 +89,12 @@ pub mod adapters {
         Next, Peekable, Skip, SkipWhile, Take, TakeWhile, Then, TryNext,
     };
     cfg_time! {
-        pub use crate::stream_ext::{ChunksTimeout, Timeout, TimeoutRepeating};
+        pub use crate::stream_ext::{ChunksTimeout, timeout::Elapsed, Timeout, TimeoutRepeating};
     }
 }
 
 cfg_time! {
+    #[doc(hidden)]
     pub use stream_ext::timeout::{Elapsed, Timeout};
 }
 
