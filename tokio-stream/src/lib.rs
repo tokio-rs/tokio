@@ -88,6 +88,9 @@ pub mod adapters {
         AllFuture, AnyFuture, Chain, Filter, FilterMap, FoldFuture, Fuse, Map, MapWhile, Merge,
         Next, Peekable, Skip, SkipWhile, Take, TakeWhile, Then, TryNext,
     };
+    cfg_time! {
+        pub use crate::stream_ext::{ChunksTimeout, Timeout, TimeoutRepeating};
+    }
 }
 
 cfg_time! {

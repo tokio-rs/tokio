@@ -61,13 +61,13 @@ pub use peekable::Peekable;
 cfg_time! {
     pub(crate) mod timeout;
     pub(crate) mod timeout_repeating;
-    use timeout::Timeout;
-    use timeout_repeating::TimeoutRepeating;
+    pub use timeout::Timeout;
+    pub use timeout_repeating::TimeoutRepeating;
     use tokio::time::{Duration, Interval};
     mod throttle;
     use throttle::{throttle, Throttle};
     mod chunks_timeout;
-    use chunks_timeout::ChunksTimeout;
+    pub use chunks_timeout::ChunksTimeout;
 }
 
 /// An extension trait for the [`Stream`] trait that provides a variety of
