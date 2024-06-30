@@ -533,8 +533,8 @@ cfg_unstable_metrics! {
             self.blocking_spawner.queue_depth()
         }
 
-        pub(crate) fn active_tasks_count(&self) -> usize {
-            self.shared.owned.active_tasks_count()
+        pub(crate) fn alive_tasks_count(&self) -> usize {
+            self.shared.owned.alive_tasks_count()
         }
 
         cfg_64bit_metrics! {

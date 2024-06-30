@@ -193,8 +193,8 @@ cfg_rt! {
                 match_flavor!(self, Handle(handle) => handle.num_idle_blocking_threads())
             }
 
-            pub(crate) fn active_tasks_count(&self) -> usize {
-                match_flavor!(self, Handle(handle) => handle.active_tasks_count())
+            pub(crate) fn alive_tasks_count(&self) -> usize {
+                match_flavor!(self, Handle(handle) => handle.alive_tasks_count())
             }
 
             pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
