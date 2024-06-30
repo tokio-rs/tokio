@@ -93,22 +93,22 @@ fn blocking_queue_depth() {
 }
 
 #[test]
-fn num_active_tasks() {
+fn num_alive_tasks() {
     let rt = current_thread();
     let metrics = rt.metrics();
-    assert_eq!(0, metrics.num_active_tasks());
+    assert_eq!(0, metrics.num_alive_tasks());
     rt.block_on(rt.spawn(async move {
-        assert_eq!(1, metrics.num_active_tasks());
+        assert_eq!(1, metrics.num_alive_tasks());
     }))
     .unwrap();
 
-    assert_eq!(0, rt.metrics().num_active_tasks());
+    assert_eq!(0, rt.metrics().num_alive_tasks());
 
     let rt = threaded();
     let metrics = rt.metrics();
-    assert_eq!(0, metrics.num_active_tasks());
+    assert_eq!(0, metrics.num_alive_tasks());
     rt.block_on(rt.spawn(async move {
-        assert_eq!(1, metrics.num_active_tasks());
+        assert_eq!(1, metrics.num_alive_tasks());
     }))
     .unwrap();
 
@@ -116,12 +116,12 @@ fn num_active_tasks() {
     // wake_join() is called before the task is released, so in multithreaded
     // code, this means we sometimes exit the block_on before the counter decrements.
     for _ in 0..100 {
-        if rt.metrics().num_active_tasks() == 0 {
+        if rt.metrics().num_alive_tasks() == 0 {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
-    assert_eq!(0, rt.metrics().num_active_tasks());
+    assert_eq!(0, rt.metrics().num_alive_tasks());
 }
 
 #[test]
