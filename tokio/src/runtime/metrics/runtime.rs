@@ -83,7 +83,7 @@ impl RuntimeMetrics {
 
         /// Returns the current number of alive tasks in the runtime.
         ///
-        /// This counter increses when a task is spawned and decreases when a
+        /// This counter increases when a task is spawned and decreases when a
         /// task exits.
         ///
         /// # Examples
