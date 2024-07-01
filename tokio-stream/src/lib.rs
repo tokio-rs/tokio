@@ -81,7 +81,20 @@ pub mod wrappers;
 
 mod stream_ext;
 pub use stream_ext::{collect::FromStream, StreamExt};
+/// Adapters for [`Stream`]s created by methods in [`StreamExt`].
+pub mod adapters {
+    pub use crate::stream_ext::{
+        AllFuture, AnyFuture, Chain, Filter, FilterMap, FoldFuture, Fuse, Map, MapWhile, Merge,
+        Next, Peekable, Skip, SkipWhile, Take, TakeWhile, Then, TryNext,
+    };
+    cfg_time! {
+        pub use crate::stream_ext::{ChunksTimeout, timeout::Elapsed, Timeout, TimeoutRepeating};
+    }
+}
+
 cfg_time! {
+    #[deprecated = "Import those symbols from adapters instead"]
+    #[doc(hidden)]
     pub use stream_ext::timeout::{Elapsed, Timeout};
 }
 
