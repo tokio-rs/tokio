@@ -713,13 +713,13 @@ impl<T> Receiver<T> {
     }
 
     /// Returns the number of [`Sender`] handles.
-    pub fn strong_count(&self) -> usize {
-        self.chan.strong_count()
+    pub fn sender_strong_count(&self) -> usize {
+        self.chan.sender_strong_count()
     }
 
     /// Returns the number of [`WeakSender`] handles.
-    pub fn weak_count(&self) -> usize {
-        self.chan.weak_count()
+    pub fn sender_weak_count(&self) -> usize {
+        self.chan.sender_weak_count()
     }
 }
 

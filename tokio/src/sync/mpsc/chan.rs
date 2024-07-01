@@ -470,11 +470,11 @@ impl<T, S: Semaphore> Rx<T, S> {
         &self.inner.semaphore
     }
 
-    pub(super) fn strong_count(&self) -> usize {
+    pub(super) fn sender_strong_count(&self) -> usize {
         self.inner.tx_count.load(Acquire)
     }
 
-    pub(super) fn weak_count(&self) -> usize {
+    pub(super) fn sender_weak_count(&self) -> usize {
         self.inner.tx_weak_count.load(Relaxed)
     }
 }

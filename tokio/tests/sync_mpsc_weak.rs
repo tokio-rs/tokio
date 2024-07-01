@@ -538,7 +538,7 @@ async fn sender_strong_count_when_cloned() {
 
     assert_eq!(tx.strong_count(), 2);
     assert_eq!(tx2.strong_count(), 2);
-    assert_eq!(rx.strong_count(), 2);
+    assert_eq!(rx.sender_strong_count(), 2);
 }
 
 #[tokio::test]
@@ -560,7 +560,7 @@ async fn sender_strong_count_when_dropped() {
     drop(tx2);
 
     assert_eq!(tx.strong_count(), 1);
-    assert_eq!(rx.strong_count(), 1);
+    assert_eq!(rx.sender_strong_count(), 1);
 }
 
 #[tokio::test]
@@ -572,7 +572,7 @@ async fn sender_weak_count_when_dropped() {
     drop(weak);
 
     assert_eq!(tx.weak_count(), 0);
-    assert_eq!(rx.weak_count(), 0);
+    assert_eq!(rx.sender_weak_count(), 0);
 }
 
 #[tokio::test]
@@ -588,24 +588,24 @@ async fn sender_strong_and_weak_conut() {
     assert_eq!(tx2.strong_count(), 2);
     assert_eq!(weak.strong_count(), 2);
     assert_eq!(weak2.strong_count(), 2);
-    assert_eq!(rx.strong_count(), 2);
+    assert_eq!(rx.sender_strong_count(), 2);
 
     assert_eq!(tx.weak_count(), 2);
     assert_eq!(tx2.weak_count(), 2);
     assert_eq!(weak.weak_count(), 2);
     assert_eq!(weak2.weak_count(), 2);
-    assert_eq!(rx.weak_count(), 2);
+    assert_eq!(rx.sender_weak_count(), 2);
 
     drop(tx2);
     drop(weak2);
 
     assert_eq!(tx.strong_count(), 1);
     assert_eq!(weak.strong_count(), 1);
-    assert_eq!(rx.strong_count(), 1);
+    assert_eq!(rx.sender_strong_count(), 1);
 
     assert_eq!(tx.weak_count(), 1);
     assert_eq!(weak.weak_count(), 1);
-    assert_eq!(rx.weak_count(), 1);
+    assert_eq!(rx.sender_weak_count(), 1);
 }
 
 #[tokio::test]
@@ -616,7 +616,7 @@ async fn unbounded_sender_strong_count_when_cloned() {
 
     assert_eq!(tx.strong_count(), 2);
     assert_eq!(tx2.strong_count(), 2);
-    assert_eq!(rx.strong_count(), 2);
+    assert_eq!(rx.sender_strong_count(), 2);
 }
 
 #[tokio::test]
@@ -627,7 +627,7 @@ async fn unbounded_sender_weak_count_when_downgraded() {
 
     assert_eq!(tx.weak_count(), 1);
     assert_eq!(weak.weak_count(), 1);
-    assert_eq!(rx.weak_count(), 1);
+    assert_eq!(rx.sender_weak_count(), 1);
 }
 
 #[tokio::test]
@@ -639,7 +639,7 @@ async fn unbounded_sender_strong_count_when_dropped() {
     drop(tx2);
 
     assert_eq!(tx.strong_count(), 1);
-    assert_eq!(rx.strong_count(), 1);
+    assert_eq!(rx.sender_strong_count(), 1);
 }
 
 #[tokio::test]
@@ -651,7 +651,7 @@ async fn unbounded_sender_weak_count_when_dropped() {
     drop(weak);
 
     assert_eq!(tx.weak_count(), 0);
-    assert_eq!(rx.weak_count(), 0);
+    assert_eq!(rx.sender_weak_count(), 0);
 }
 
 #[tokio::test]
@@ -667,22 +667,22 @@ async fn unbounded_sender_strong_and_weak_conut() {
     assert_eq!(tx2.strong_count(), 2);
     assert_eq!(weak.strong_count(), 2);
     assert_eq!(weak2.strong_count(), 2);
-    assert_eq!(rx.strong_count(), 2);
+    assert_eq!(rx.sender_strong_count(), 2);
 
     assert_eq!(tx.weak_count(), 2);
     assert_eq!(tx2.weak_count(), 2);
     assert_eq!(weak.weak_count(), 2);
     assert_eq!(weak2.weak_count(), 2);
-    assert_eq!(rx.weak_count(), 2);
+    assert_eq!(rx.sender_weak_count(), 2);
 
     drop(tx2);
     drop(weak2);
 
     assert_eq!(tx.strong_count(), 1);
     assert_eq!(weak.strong_count(), 1);
-    assert_eq!(rx.strong_count(), 1);
+    assert_eq!(rx.sender_strong_count(), 1);
 
     assert_eq!(tx.weak_count(), 1);
     assert_eq!(weak.weak_count(), 1);
-    assert_eq!(rx.weak_count(), 1);
+    assert_eq!(rx.sender_weak_count(), 1);
 }
