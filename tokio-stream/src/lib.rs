@@ -93,6 +93,7 @@ pub mod adapters {
 }
 
 cfg_time! {
+    #[deprecated = "Import those symbols from adapters instead"]
     #[doc(hidden)]
     pub use stream_ext::timeout::{Elapsed, Timeout};
 }
