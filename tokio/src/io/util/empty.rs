@@ -1,8 +1,8 @@
 use crate::io::util::poll_proceed_and_make_progress;
-use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
+use crate::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 
 use std::fmt;
-use std::io;
+use std::io::{self, SeekFrom};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -130,6 +130,20 @@ impl AsyncWrite for Empty {
         ready!(poll_proceed_and_make_progress(cx));
         let num_bytes = bufs.iter().map(|b| b.len()).sum();
         Poll::Ready(Ok(num_bytes))
+    }
+}
+
+impl AsyncSeek for Empty {
+    #[inline]
+    fn start_seek(self: Pin<&mut Self>, _position: SeekFrom) -> io::Result<()> {
+        Ok(())
+    }
+
+    #[inline]
+    fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
+        Poll::Ready(Ok(0))
     }
 }
 
