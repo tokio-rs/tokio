@@ -27,8 +27,8 @@ impl Handle {
             self.blocking_spawner.num_idle_threads()
         }
 
-        pub(crate) fn active_tasks_count(&self) -> usize {
-            self.shared.owned.active_tasks_count()
+        pub(crate) fn alive_tasks_count(&self) -> usize {
+            self.shared.owned.alive_tasks_count()
         }
 
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {

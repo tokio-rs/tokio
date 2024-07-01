@@ -75,15 +75,16 @@ impl RuntimeMetrics {
             self.handle.inner.num_blocking_threads()
         }
 
-        #[deprecated = "Renamed to num_active_tasks"]
-        /// Renamed to [`RuntimeMetrics::num_active_tasks`]
+        #[deprecated = "Renamed to num_alive_tasks"]
+        /// Renamed to [`RuntimeMetrics::num_alive_tasks`]
         pub fn active_tasks_count(&self) -> usize {
-            self.num_active_tasks()
+            self.num_alive_tasks()
         }
 
-        /// Returns the current number of active tasks in the runtime.
+        /// Returns the current number of alive tasks in the runtime.
         ///
-        /// This value increases and decreases over time as tasks are spawned and as they are completed or cancelled.
+        /// This counter increases when a task is spawned and decreases when a
+        /// task exits.
         ///
         /// # Examples
         ///
@@ -94,12 +95,12 @@ impl RuntimeMetrics {
         /// async fn main() {
         ///    let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.num_active_tasks();
-        ///     println!("Runtime has {} active tasks", n);
+        ///     let n = metrics.num_alive_tasks();
+        ///     println!("Runtime has {} alive tasks", n);
         /// }
         /// ```
-        pub fn num_active_tasks(&self) -> usize {
-            self.handle.inner.active_tasks_count()
+        pub fn num_alive_tasks(&self) -> usize {
+            self.handle.inner.alive_tasks_count()
         }
 
         /// Returns the number of idle threads, which have spawned by the runtime
