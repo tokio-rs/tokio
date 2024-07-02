@@ -1,6 +1,6 @@
 use crate::future::Future;
 use crate::runtime::task::core::{Core, Trailer};
-use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
+use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State, TaskBox};
 
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
@@ -162,10 +162,9 @@ impl RawTask {
         T: Future,
         S: Schedule,
     {
-        let ptr = Box::into_raw(Cell::<_, S>::new(task, scheduler, State::new(), id));
-        let ptr = unsafe { NonNull::new_unchecked(ptr.cast()) };
+        let ptr = TaskBox::into_raw(Cell::<_, S>::new(task, scheduler, State::new(), id));
 
-        RawTask { ptr }
+        RawTask { ptr: ptr.cast() }
     }
 
     pub(super) unsafe fn from_raw(ptr: NonNull<Header>) -> RawTask {
