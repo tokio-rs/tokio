@@ -11,7 +11,7 @@ use crate::{
 };
 
 use pin_project_lite::pin_project;
-use std::future::Future;
+use std::future::{Future, IntoFuture};
 use std::pin::Pin;
 use std::task::{self, Poll};
 
@@ -83,9 +83,9 @@ use std::task::{self, Poll};
 /// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
 /// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
 #[track_caller]
-pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F>
+pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F::IntoFuture>
 where
-    F: Future,
+    F: IntoFuture,
 {
     let location = trace::caller_location();
 
@@ -94,7 +94,7 @@ where
         Some(deadline) => Sleep::new_timeout(deadline, location),
         None => Sleep::far_future(location),
     };
-    Timeout::new_with_delay(future, delay)
+    Timeout::new_with_delay(future.into_future(), delay)
 }
 
 /// Requires a `Future` to complete before the specified instant in time.
@@ -142,14 +142,14 @@ where
 /// }
 /// # }
 /// ```
-pub fn timeout_at<F>(deadline: Instant, future: F) -> Timeout<F>
+pub fn timeout_at<F>(deadline: Instant, future: F) -> Timeout<F::IntoFuture>
 where
-    F: Future,
+    F: IntoFuture,
 {
     let delay = sleep_until(deadline);
 
     Timeout {
-        value: future,
+        value: future.into_future(),
         delay,
     }
 }
