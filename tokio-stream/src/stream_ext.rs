@@ -35,7 +35,7 @@ mod merge;
 pub use merge::Merge;
 
 mod next;
-pub use next::Next;
+use next::Next;
 
 mod skip;
 pub use skip::Skip;
