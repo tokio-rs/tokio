@@ -2,10 +2,10 @@ use core::future::Future;
 use futures_core::Stream;
 
 mod all;
-pub use all::AllFuture;
+use all::AllFuture;
 
 mod any;
-pub use any::AnyFuture;
+use any::AnyFuture;
 
 mod chain;
 pub use chain::Chain;
@@ -20,7 +20,7 @@ mod filter_map;
 pub use filter_map::FilterMap;
 
 mod fold;
-pub use fold::FoldFuture;
+use fold::FoldFuture;
 
 mod fuse;
 pub use fuse::Fuse;
@@ -53,7 +53,7 @@ mod then;
 pub use then::Then;
 
 mod try_next;
-pub use try_next::TryNext;
+use try_next::TryNext;
 
 mod peekable;
 pub use peekable::Peekable;
