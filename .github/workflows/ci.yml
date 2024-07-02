@@ -26,7 +26,7 @@ env:
   # - tokio-util/Cargo.toml
   # - tokio-test/Cargo.toml
   # - tokio-stream/Cargo.toml
-  rust_min: '1.63'
+  rust_min: '1.70'
 
 defaults:
   run:
@@ -177,7 +177,7 @@ jobs:
         run: |
           set -euxo pipefail
           RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run --workspace --exclude tokio-macros --exclude tests-build --all-features --tests
-  
+
   test-integration-tests-per-feature:
     needs: basics
     name: Run integration tests for each feature
@@ -1051,11 +1051,11 @@ jobs:
       - name: Make sure dictionary words are sorted and unique
         run: |
           # `sed` removes the first line (number of words) and
-          # the last line (new line). 
-          # 
+          # the last line (new line).
+          #
           # `sort` makes sure everything in between is sorted
           # and contains no duplicates.
-          # 
+          #
           # Since `sort` is sensitive to locale, we set it
           # using LC_ALL to en_US.UTF8 to be consistent in different
           # environments.
