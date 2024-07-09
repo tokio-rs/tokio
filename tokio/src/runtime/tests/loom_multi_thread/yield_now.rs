@@ -3,7 +3,6 @@ use crate::runtime::tests::loom_oneshot as oneshot;
 use crate::runtime::{self, Runtime};
 
 #[test]
-#[ignore]
 fn yield_calls_park_before_scheduling_again() {
     // Don't need to check all permutations
     let mut loom = loom::model::Builder::default();
