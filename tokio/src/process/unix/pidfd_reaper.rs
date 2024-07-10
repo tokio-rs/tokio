@@ -245,7 +245,12 @@ mod test {
         assert!(status.success());
         let stdout = String::from_utf8_lossy(&stdout);
 
-        let mut kernel_version_iter = stdout.split_once('-').unwrap().0.split('.');
+        let mut kernel_version_iter = match stdout.split_once('-') {
+            Some((version, _)) => version,
+            _ => &stdout,
+        }
+        .split('.');
+
         let major: u32 = kernel_version_iter.next().unwrap().parse().unwrap();
         let minor: u32 = kernel_version_iter.next().unwrap().parse().unwrap();
 
