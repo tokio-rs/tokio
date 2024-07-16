@@ -190,11 +190,13 @@ impl Driver {
         assert!(!handle.is_shutdown());
 
         // Finds out the min expiration time to park.
-        let expiration_time = (0..rt_handle.time().inner.get_shard_size())
-            .filter_map(|id| {
-                let lock = rt_handle.time().inner.lock_sharded_wheel(id);
-                lock.next_expiration_time()
-            })
+        let locks = (0..rt_handle.time().inner.get_shard_size())
+            .map(|id| rt_handle.time().inner.lock_sharded_wheel(id))
+            .collect::<Vec<_>>();
+
+        let expiration_time = locks
+            .iter()
+            .filter_map(|lock| lock.next_expiration_time())
             .min();
 
         rt_handle
@@ -202,6 +204,9 @@ impl Driver {
             .inner
             .next_wake
             .store(next_wake_time(expiration_time));
+
+        // Safety: After updating the `next_wake`, we drop all the locks.
+        drop(locks);
 
         match expiration_time {
             Some(when) => {
