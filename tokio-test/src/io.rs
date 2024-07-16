@@ -476,8 +476,16 @@ impl Drop for Mock {
         }
 
         self.inner.actions.iter().for_each(|a| match a {
-            Action::Read(data) => assert!(data.is_empty(), "There is still data left to read: {:?}", ShowBytes(data, 10)),
-            Action::Write(data) => assert!(data.is_empty(), "There is still data left to write: {:?}", ShowBytes(data, 10)),
+            Action::Read(data) => assert!(
+                data.is_empty(),
+                "There is still data left to read: {:?}",
+                ShowBytes(data, 10)
+            ),
+            Action::Write(data) => assert!(
+                data.is_empty(),
+                "There is still data left to write: {:?}",
+                ShowBytes(data, 10)
+            ),
             _ => (),
         });
     }
@@ -510,7 +518,7 @@ impl fmt::Debug for Inner {
     }
 }
 
-struct ShowBytes<'a>(&'a[u8], usize);
+struct ShowBytes<'a>(&'a [u8], usize);
 
 impl<'a> fmt::Debug for ShowBytes<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
