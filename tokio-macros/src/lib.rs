@@ -410,7 +410,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ### Set number of worker threads
 ///
 /// ```no_run
-/// #[tokio::test(flavor ="multi_thread", worker_threads = 2)]
+/// #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
