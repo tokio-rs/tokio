@@ -1,3 +1,15 @@
+# 1.38.1 (July 16th, 2024)
+
+This release fixes the bug identified as ([#6682]), which caused timers not
+to fire when they should.
+
+### Fixed
+
+- time: update `wake_up` while holding all the locks of sharded time wheels ([#6683])
+
+[#6682]: https://github.com/tokio-rs/tokio/pull/6682
+[#6683]: https://github.com/tokio-rs/tokio/pull/6683
+
 # 1.38.0 (May 30th, 2024)
 
 This release marks the beginning of stabilization for runtime metrics. It
