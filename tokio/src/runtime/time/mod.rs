@@ -204,10 +204,10 @@ impl Driver {
             .inner
             .next_wake
             .store(next_wake_time(expiration_time));
-        
+
         // Safety: After updating the `next_wake`, we drop all the locks.
         drop(locks);
-        
+
         match expiration_time {
             Some(when) => {
                 let now = handle.time_source.now(rt_handle.clock());
