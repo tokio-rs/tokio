@@ -6,7 +6,7 @@ use crate::runtime::blocking::schedule::BlockingSchedule;
 use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{Builder, Callback, Handle};
+use crate::runtime::{Builder, Callback, Handle, MAX_FUTURE_SIZE};
 use crate::util::metric_atomics::MetricAtomicUsize;
 
 use std::collections::{HashMap, VecDeque};
@@ -296,7 +296,7 @@ impl Spawner {
         R: Send + 'static,
     {
         let (join_handle, spawn_result) =
-            if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+            if cfg!(debug_assertions) && std::mem::size_of::<F>() > MAX_FUTURE_SIZE {
                 self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, None, rt)
             } else {
                 self.spawn_blocking_inner(func, Mandatory::NonMandatory, None, rt)
@@ -323,7 +323,7 @@ impl Spawner {
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            let (join_handle, spawn_result) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > 2048 {
+            let (join_handle, spawn_result) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > MAX_FUTURE_SIZE {
                 self.spawn_blocking_inner(
                     Box::new(func),
                     Mandatory::Mandatory,
