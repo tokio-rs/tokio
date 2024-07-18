@@ -385,6 +385,10 @@ cfg_rt! {
     mod runtime;
     pub use runtime::{Runtime, RuntimeFlavor};
 
+    /// Boundary value to prevent stack overflow caused by a large-sized
+    /// Future being placed in the stack.
+    pub(crate) const BOX_FUTURE_THRESHOLD: usize = 2048;
+
     mod thread_id;
     pub(crate) use thread_id::ThreadId;
 
