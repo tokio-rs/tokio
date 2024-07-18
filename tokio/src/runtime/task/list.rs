@@ -166,7 +166,7 @@ impl<S: 'static> OwnedTasks<S> {
         self.list.shard_size()
     }
 
-    pub(crate) fn alive_tasks_count(&self) -> usize {
+    pub(crate) fn num_alive_tasks(&self) -> usize {
         self.list.len()
     }
 

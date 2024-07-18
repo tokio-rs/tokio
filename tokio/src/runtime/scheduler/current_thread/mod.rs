@@ -501,8 +501,8 @@ impl Handle {
         self.shared.woken.swap(false, AcqRel)
     }
 
-    pub(crate) fn alive_tasks_count(&self) -> usize {
-        self.shared.owned.alive_tasks_count()
+    pub(crate) fn num_alive_tasks(&self) -> usize {
+        self.shared.owned.num_alive_tasks()
     }
 }
 
