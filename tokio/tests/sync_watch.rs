@@ -355,7 +355,7 @@ async fn multiple_sender() {
 }
 
 #[tokio::test]
-async fn reciever_is_notified_when_last_sender_is_dropped() {
+async fn receiver_is_notified_when_last_sender_is_dropped() {
     let (tx1, mut rx) = watch::channel(0);
     let tx2 = tx1.clone();
 
