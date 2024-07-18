@@ -500,6 +500,10 @@ impl Handle {
     pub(crate) fn reset_woken(&self) -> bool {
         self.shared.woken.swap(false, AcqRel)
     }
+
+    pub(crate) fn num_alive_tasks(&self) -> usize {
+        self.shared.owned.num_alive_tasks()
+    }
 }
 
 cfg_unstable_metrics! {
@@ -531,10 +535,6 @@ cfg_unstable_metrics! {
 
         pub(crate) fn blocking_queue_depth(&self) -> usize {
             self.blocking_spawner.queue_depth()
-        }
-
-        pub(crate) fn alive_tasks_count(&self) -> usize {
-            self.shared.owned.alive_tasks_count()
         }
 
         cfg_64bit_metrics! {
