@@ -174,8 +174,8 @@ cfg_rt! {
             }
         }
 
-        pub(crate) fn num_active_tasks(&self) -> usize {
-            match_flavor!(self, Handle(handle) => handle.num_active_tasks())
+        pub(crate) fn num_alive_tasks(&self) -> usize {
+            match_flavor!(self, Handle(handle) => handle.alive_tasks_count())
         }
     }
 

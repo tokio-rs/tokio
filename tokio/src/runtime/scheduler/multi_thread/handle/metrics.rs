@@ -9,8 +9,8 @@ impl Handle {
         self.shared.worker_metrics.len()
     }
 
-    pub(crate) fn num_active_tasks(&self) -> usize {
-        self.shared.owned.num_active_tasks()
+    pub(crate) fn alive_tasks_count(&self) -> usize {
+        self.shared.owned.alive_tasks_count()
     }
 
     cfg_unstable_metrics! {

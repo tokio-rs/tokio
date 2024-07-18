@@ -47,11 +47,10 @@ impl RuntimeMetrics {
         self.handle.inner.num_workers()
     }
 
-    /// Returns the current number of active tasks in the runtime.
+    /// Returns the current number of alive tasks in the runtime.
     ///
-    /// This value increases and decreases over time as tasks are spawned and as they are completed or cancelled.
-    ///
-    /// To see the total number of spawned tasks, see `spawned_tasks_count`.
+    /// This counter increases when a task is spawned and decreases when a
+    /// task exits.
     ///
     /// # Examples
     ///
@@ -62,12 +61,12 @@ impl RuntimeMetrics {
     /// async fn main() {
     ///    let metrics = Handle::current().metrics();
     ///
-    ///     let n = metrics.num_active_tasks();
-    ///     println!("Runtime has {} active tasks", n);
+    ///     let n = metrics.num_alive_tasks();
+    ///     println!("Runtime has {} alive tasks", n);
     /// }
     /// ```
-    pub fn num_active_tasks(&self) -> usize {
-        self.handle.inner.num_active_tasks()
+    pub fn num_alive_tasks(&self) -> usize {
+        self.handle.inner.num_alive_tasks()
     }
 
     cfg_unstable_metrics! {
@@ -101,29 +100,7 @@ impl RuntimeMetrics {
         #[deprecated = "Renamed to num_alive_tasks"]
         /// Renamed to [`RuntimeMetrics::num_alive_tasks`]
         pub fn active_tasks_count(&self) -> usize {
-            self.num_active_tasks()
-        }
-
-        /// Returns the current number of alive tasks in the runtime.
-        ///
-        /// This counter increases when a task is spawned and decreases when a
-        /// task exits.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::Handle;
-        ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///    let metrics = Handle::current().metrics();
-        ///
-        ///     let n = metrics.num_alive_tasks();
-        ///     println!("Runtime has {} alive tasks", n);
-        /// }
-        /// ```
-        pub fn num_alive_tasks(&self) -> usize {
-            self.handle.inner.alive_tasks_count()
+            self.num_alive_tasks()
         }
 
         /// Returns the number of idle threads, which have spawned by the runtime

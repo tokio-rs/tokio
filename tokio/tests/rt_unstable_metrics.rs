@@ -17,6 +17,15 @@ use tokio::task::consume_budget;
 use tokio::time::{self, Duration};
 
 #[test]
+fn num_workers() {
+    let rt = current_thread();
+    assert_eq!(1, rt.metrics().num_workers());
+
+    let rt = threaded();
+    assert_eq!(2, rt.metrics().num_workers());
+}
+
+#[test]
 fn num_blocking_threads() {
     let rt = current_thread();
     assert_eq!(0, rt.metrics().num_blocking_threads());
