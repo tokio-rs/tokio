@@ -387,7 +387,7 @@ cfg_rt! {
 
     /// Boundary value to prevent stack overflow caused by a large-sized
     /// Future being placed in the stack.
-    pub(crate) const MAX_FUTURE_SIZE: usize = 2048;
+    pub(crate) const BOX_FUTURE_THRESHOLD: usize = 2048;
 
     mod thread_id;
     pub(crate) use thread_id::ThreadId;
