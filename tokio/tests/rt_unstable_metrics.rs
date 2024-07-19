@@ -10,6 +10,7 @@
 use std::future::Future;
 use std::sync::{Arc, Barrier, Mutex};
 use std::task::Poll;
+use std::thread;
 use tokio::macros::support::poll_fn;
 
 use tokio::runtime::Runtime;
@@ -148,6 +149,28 @@ fn remote_schedule_count() {
     rt.block_on(task).unwrap();
 
     assert_eq!(1, rt.metrics().remote_schedule_count());
+}
+
+#[test]
+fn worker_thread_id() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+    rt.block_on(async {
+        time::sleep(Duration::from_millis(1)).await;
+    });
+    drop(rt);
+    assert_eq!(Some(thread::current().id()), metrics.worker_thread_id(0));
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+    rt.block_on(async {
+        time::sleep(Duration::from_millis(1)).await;
+    });
+    drop(rt);
+    assert!(metrics.worker_thread_id(0).is_some());
+    assert!(metrics.worker_thread_id(1).is_some());
+    assert_ne!(metrics.worker_thread_id(0), metrics.worker_thread_id(1));
+    assert_ne!(Some(thread::current().id()), metrics.worker_thread_id(0));
 }
 
 #[test]

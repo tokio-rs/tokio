@@ -1,5 +1,7 @@
 //! This file contains mocks of the types in src/runtime/metrics
 
+use std::thread::ThreadId;
+
 pub(crate) struct SchedulerMetrics {}
 
 pub(crate) struct WorkerMetrics {}
@@ -30,6 +32,7 @@ impl WorkerMetrics {
     }
 
     pub(crate) fn set_queue_depth(&self, _len: usize) {}
+    pub(crate) fn set_thread_id(&self, _thread_id: ThreadId) {}
 }
 
 impl MetricsBatch {

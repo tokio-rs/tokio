@@ -72,6 +72,7 @@ use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
 use std::task::Waker;
+use std::thread;
 use std::time::Duration;
 
 cfg_unstable_metrics! {
@@ -481,6 +482,8 @@ fn run(worker: Arc<Worker>) {
         Some(core) => core,
         None => return,
     };
+
+    worker.handle.shared.worker_metrics[worker.index].set_thread_id(thread::current().id());
 
     let handle = scheduler::Handle::MultiThread(worker.handle.clone());
 
