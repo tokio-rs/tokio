@@ -11,12 +11,12 @@ use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::{fmt, thread};
 use std::future::Future;
 use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
 use std::time::Duration;
+use std::{fmt, thread};
 
 /// Executes tasks on the current thread
 pub(crate) struct CurrentThread {
