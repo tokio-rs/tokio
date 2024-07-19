@@ -368,6 +368,9 @@ impl Context {
             });
 
             core = c;
+
+            core.metrics.unparked();
+            core.submit_metrics(handle);
         }
 
         if let Some(f) = &handle.shared.config.after_unpark {

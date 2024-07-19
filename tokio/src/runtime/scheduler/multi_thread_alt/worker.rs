@@ -658,6 +658,9 @@ impl Worker {
         let n = cmp::max(core.run_queue.remaining_slots() / 2, 1);
         let maybe_task = self.next_remote_task_batch_synced(cx, &mut synced, &mut core, n);
 
+        core.stats.unparked();
+        self.flush_metrics(cx, &mut core);
+
         Ok((maybe_task, core))
     }
 

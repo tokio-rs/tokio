@@ -171,6 +171,26 @@ fn worker_park_count() {
 }
 
 #[test]
+fn worker_park_unpark_count() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+    rt.block_on(async {
+        time::sleep(Duration::from_millis(1)).await;
+    });
+    drop(rt);
+    assert!(2 <= metrics.worker_park_unpark_count(0));
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+    rt.block_on(async {
+        time::sleep(Duration::from_millis(1)).await;
+    });
+    drop(rt);
+    assert!(2 <= metrics.worker_park_unpark_count(0));
+    assert!(2 <= metrics.worker_park_unpark_count(1));
+}
+
+#[test]
 fn worker_noop_count() {
     // There isn't really a great way to generate no-op parks as they happen as
     // false-positive events under concurrency.
