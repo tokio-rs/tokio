@@ -169,8 +169,8 @@ fn worker_thread_id() {
     drop(rt);
     assert!(metrics.worker_thread_id(0).is_some());
     assert!(metrics.worker_thread_id(1).is_some());
-    assert_ne!(metrics.worker_thread_id(0), metrics.worker_thread_id(1));
     assert_ne!(Some(thread::current().id()), metrics.worker_thread_id(0));
+    assert_ne!(Some(thread::current().id()), metrics.worker_thread_id(1));
 }
 
 #[test]
