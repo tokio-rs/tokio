@@ -217,6 +217,7 @@ releases are:
 
  * `1.32.x` - LTS release until September 2024. (MSRV 1.63)
  * `1.36.x` - LTS release until March 2025. (MSRV 1.63)
+ * `1.38.x` - LTS release until July 2025. (MSRV 1.63)
 
 Each LTS release will continue to receive backported fixes for at least a year.
 If you wish to use a fixed minor release in your project, we recommend that you
