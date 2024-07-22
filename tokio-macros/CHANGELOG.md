@@ -1,3 +1,11 @@
+# 2.4.0 (July 22nd, 2024)
+
+- msrv: increase MSRV to 1.70 ([#6645])
+- macros: allow `unhandled_panic` behavior for `#[tokio::main]` and `#[tokio::test]` ([#6593])
+
+[#6593]: https://github.com/tokio-rs/tokio/pull/6593
+[#6645]: https://github.com/tokio-rs/tokio/pull/6645
+
 # 2.3.0 (May 30th, 2024)
 
 - macros: make `#[tokio::test]` append `#[test]` at the end of the attribute list ([#6497])
