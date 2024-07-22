@@ -264,8 +264,12 @@ impl BlockingPool {
 
             // Loom requires that execution be deterministic, so sort by thread ID before joining.
             // (HashMaps use a randomly-seeded hash function, so the order is nondeterministic)
-            let mut workers: Vec<(usize, thread::JoinHandle<()>)> = workers.into_iter().collect();
-            workers.sort_by_key(|(id, _)| *id);
+            #[cfg(loom)]
+            let workers: Vec<(usize, thread::JoinHandle<()>)> = {
+                let mut workers: Vec<_> = workers.into_iter().collect();
+                workers.sort_by_key(|(id, _)| *id);
+                workers
+            };
 
             for (_id, handle) in workers {
                 let _ = handle.join();
