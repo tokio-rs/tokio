@@ -22,8 +22,10 @@ pin_project! {
 }
 
 /// Wraps a future into a `MaybeDone`.
-pub fn maybe_done<Fut: Future>(future: Fut) -> MaybeDone<Fut> {
-    MaybeDone::Future { future }
+pub fn maybe_done<F: IntoFuture>(future: Fut) -> MaybeDone<F::IntoFuture> {
+    MaybeDone::Future {
+        future: future.into_future(),
+    }
 }
 
 impl<Fut: Future> MaybeDone<Fut> {
