@@ -308,7 +308,7 @@ impl<T: 'static> JoinSet<T> {
 
     /// Tries to join one of the tasks in the set that has completed and return its output.
     ///
-    /// Returns `None` if the set is empty.
+    /// Returns `None` if there are no completed tasks, or if the set is empty.
     pub fn try_join_next(&mut self) -> Option<Result<T, JoinError>> {
         // Loop over all notified `JoinHandle`s to find one that's ready, or until none are left.
         loop {
@@ -331,7 +331,7 @@ impl<T: 'static> JoinSet<T> {
     /// Tries to join one of the tasks in the set that has completed and return its output,
     /// along with the [task ID] of the completed task.
     ///
-    /// Returns `None` if the set is empty.
+    /// Returns `None` if there are no completed tasks, or if the set is empty.
     ///
     /// When this method returns an error, then the id of the task that failed can be accessed
     /// using the [`JoinError::id`] method.

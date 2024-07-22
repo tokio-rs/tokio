@@ -10,6 +10,9 @@ use crate::util::TryLock;
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 
+#[cfg(loom)]
+use crate::runtime::park::CURRENT_THREAD_PARK_COUNT;
+
 pub(crate) struct Parker {
     inner: Arc<Inner>,
 }
@@ -73,6 +76,13 @@ impl Parker {
 
         if let Some(mut driver) = self.inner.shared.driver.try_lock() {
             driver.park_timeout(handle, duration);
+        } else {
+            // https://github.com/tokio-rs/tokio/issues/6536
+            // Hacky, but it's just for loom tests. The counter gets incremented during
+            // `park_timeout`, but we still have to increment the counter if we can't acquire the
+            // lock.
+            #[cfg(loom)]
+            CURRENT_THREAD_PARK_COUNT.with(|count| count.fetch_add(1, SeqCst));
         }
     }
 

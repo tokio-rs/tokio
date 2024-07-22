@@ -1,6 +1,6 @@
 #![allow(unreachable_pub)]
 use crate::{
-    runtime::Handle,
+    runtime::{Handle, BOX_FUTURE_THRESHOLD},
     task::{JoinHandle, LocalSet},
 };
 use std::{future::Future, io};
@@ -88,7 +88,13 @@ impl<'a> Builder<'a> {
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        Ok(super::spawn::spawn_inner(future, self.name))
+        Ok(
+            if cfg!(debug_assertions) && std::mem::size_of::<Fut>() > BOX_FUTURE_THRESHOLD {
+                super::spawn::spawn_inner(Box::pin(future), self.name)
+            } else {
+                super::spawn::spawn_inner(future, self.name)
+            },
+        )
     }
 
     /// Spawn a task with this builder's settings on the provided [runtime
@@ -104,7 +110,13 @@ impl<'a> Builder<'a> {
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        Ok(handle.spawn_named(future, self.name))
+        Ok(
+            if cfg!(debug_assertions) && std::mem::size_of::<Fut>() > BOX_FUTURE_THRESHOLD {
+                handle.spawn_named(Box::pin(future), self.name)
+            } else {
+                handle.spawn_named(future, self.name)
+            },
+        )
     }
 
     /// Spawns `!Send` a task on the current [`LocalSet`] with this builder's
@@ -127,7 +139,13 @@ impl<'a> Builder<'a> {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        Ok(super::local::spawn_local_inner(future, self.name))
+        Ok(
+            if cfg!(debug_assertions) && std::mem::size_of::<Fut>() > BOX_FUTURE_THRESHOLD {
+                super::local::spawn_local_inner(Box::pin(future), self.name)
+            } else {
+                super::local::spawn_local_inner(future, self.name)
+            },
+        )
     }
 
     /// Spawns `!Send` a task on the provided [`LocalSet`] with this builder's
@@ -188,12 +206,22 @@ impl<'a> Builder<'a> {
         Output: Send + 'static,
     {
         use crate::runtime::Mandatory;
-        let (join_handle, spawn_result) = handle.inner.blocking_spawner().spawn_blocking_inner(
-            function,
-            Mandatory::NonMandatory,
-            self.name,
-            handle,
-        );
+        let (join_handle, spawn_result) =
+            if cfg!(debug_assertions) && std::mem::size_of::<Function>() > BOX_FUTURE_THRESHOLD {
+                handle.inner.blocking_spawner().spawn_blocking_inner(
+                    Box::new(function),
+                    Mandatory::NonMandatory,
+                    self.name,
+                    handle,
+                )
+            } else {
+                handle.inner.blocking_spawner().spawn_blocking_inner(
+                    function,
+                    Mandatory::NonMandatory,
+                    self.name,
+                    handle,
+                )
+            };
 
         spawn_result?;
         Ok(join_handle)

@@ -179,15 +179,42 @@ feature! {
                 let evt = ready!(self.registration.poll_read_ready(cx))?;
 
                 let b = &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]);
+
+                // used only when the cfgs below apply
+                #[allow(unused_variables)]
                 let len = b.len();
 
                 match self.io.as_ref().unwrap().read(b) {
                     Ok(n) => {
-                        // if we read a partially full buffer, this is sufficient on unix to show
-                        // that the socket buffer has been drained.  Unfortunately this assumption
-                        // fails for level-triggered selectors (like on Windows or poll even for
-                        // UNIX): https://github.com/tokio-rs/tokio/issues/5866
-                        if n > 0 && (!cfg!(windows) && !cfg!(mio_unsupported_force_poll_poll) && n < len) {
+                        // When mio is using the epoll or kqueue selector, reading a partially full
+                        // buffer is sufficient to show that the socket buffer has been drained.
+                        //
+                        // This optimization does not work for level-triggered selectors such as
+                        // windows or when poll is used.
+                        //
+                        // Read more:
+                        // https://github.com/tokio-rs/tokio/issues/5866
+                        #[cfg(all(
+                            not(mio_unsupported_force_poll_poll),
+                            any(
+                                // epoll
+                                target_os = "android",
+                                target_os = "illumos",
+                                target_os = "linux",
+                                target_os = "redox",
+                                // kqueue
+                                target_os = "dragonfly",
+                                target_os = "freebsd",
+                                target_os = "ios",
+                                target_os = "macos",
+                                target_os = "netbsd",
+                                target_os = "openbsd",
+                                target_os = "tvos",
+                                target_os = "visionos",
+                                target_os = "watchos",
+                            )
+                        ))]
+                        if 0 < n && n < len {
                             self.registration.clear_readiness(evt);
                         }
 

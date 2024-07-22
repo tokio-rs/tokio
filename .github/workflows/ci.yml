@@ -26,7 +26,7 @@ env:
   # - tokio-util/Cargo.toml
   # - tokio-test/Cargo.toml
   # - tokio-stream/Cargo.toml
-  rust_min: '1.64'
+  rust_min: '1.70'
 
 defaults:
   run:
