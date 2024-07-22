@@ -335,6 +335,12 @@ where
                 if let Some(cx) = maybe_cx {
                     if self.take_core {
                         let core = cx.worker.core.take();
+
+                        if core.is_some() {
+                            cx.worker.handle.shared.worker_metrics[cx.worker.index]
+                                .set_thread_id(thread::current().id());
+                        }
+
                         let mut cx_core = cx.core.borrow_mut();
                         assert!(cx_core.is_none());
                         *cx_core = core;
