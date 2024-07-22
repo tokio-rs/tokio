@@ -1,3 +1,67 @@
+# 1.39.0 (July 22nd, 2024)
+
+This release bumps the MSRV to 1.70. ([#6645])
+
+### Added
+
+- io: implement `AsyncSeek` for `Empty` ([#6663])
+- metrics: stabilize `num_alive_tasks` ([#6619], [#6667])
+- process: add `Command::as_std_mut` ([#6608])
+- sync: add `watch::Sender::same_channel` ([#6637])
+- sync: add `{Receiver,UnboundedReceiver}::{sender_strong_count,sender_weak_count}` ([#6661])
+- sync: implement `Default` for `watch::Sender` ([#6626])
+- task: implement `Clone` for `AbortHandle` ([#6621])
+- task: stabilize `consume_budget` ([#6622])
+
+### Changed
+
+- io: improve panic message of `ReadBuf::put_slice()` ([#6629])
+- io: read during write in `copy_bidirectional` and `copy` ([#6532])
+- task: avoid stack overflow when passing large future to `block_on` ([#6692])
+- time: avoid traversing entries in the time wheel twice ([#6584])
+
+### Fixed
+
+- docs: fix docsrs builds with the fs feature enabled ([#6585])
+- io: only use short-read optimization on known-to-be-compatible platforms ([#6668])
+- time: fix overflow panic when using large durations with `Interval` ([#6612])
+
+### Added (unstable)
+
+- macros: allow `unhandled_panic` behavior for `#[tokio::main]` and `#[tokio::test]` ([#6593])
+- metrics: add `spawned_tasks_count` ([#6114])
+
+### Documented
+
+- io: update `tokio::io::stdout` documentation ([#6674])
+- macros: typo fix in `join.rs` and `try_join.rs` ([#6641])
+- runtime: fix typo in `unhandled_panic` ([#6660])
+- task: document behavior of `JoinSet::try_join_next` when all tasks are running ([#6671])
+
+[#6114]: https://github.com/tokio-rs/tokio/pull/6114
+[#6532]: https://github.com/tokio-rs/tokio/pull/6532
+[#6584]: https://github.com/tokio-rs/tokio/pull/6584
+[#6585]: https://github.com/tokio-rs/tokio/pull/6585
+[#6593]: https://github.com/tokio-rs/tokio/pull/6593
+[#6608]: https://github.com/tokio-rs/tokio/pull/6608
+[#6612]: https://github.com/tokio-rs/tokio/pull/6612
+[#6619]: https://github.com/tokio-rs/tokio/pull/6619
+[#6621]: https://github.com/tokio-rs/tokio/pull/6621
+[#6622]: https://github.com/tokio-rs/tokio/pull/6622
+[#6626]: https://github.com/tokio-rs/tokio/pull/6626
+[#6629]: https://github.com/tokio-rs/tokio/pull/6629
+[#6637]: https://github.com/tokio-rs/tokio/pull/6637
+[#6641]: https://github.com/tokio-rs/tokio/pull/6641
+[#6645]: https://github.com/tokio-rs/tokio/pull/6645
+[#6660]: https://github.com/tokio-rs/tokio/pull/6660
+[#6661]: https://github.com/tokio-rs/tokio/pull/6661
+[#6663]: https://github.com/tokio-rs/tokio/pull/6663
+[#6667]: https://github.com/tokio-rs/tokio/pull/6667
+[#6668]: https://github.com/tokio-rs/tokio/pull/6668
+[#6671]: https://github.com/tokio-rs/tokio/pull/6671
+[#6674]: https://github.com/tokio-rs/tokio/pull/6674
+[#6692]: https://github.com/tokio-rs/tokio/pull/6692
+
 # 1.38.1 (July 16th, 2024)
 
 This release fixes the bug identified as ([#6682]), which caused timers not
