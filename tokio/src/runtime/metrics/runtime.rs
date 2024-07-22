@@ -251,9 +251,11 @@ impl RuntimeMetrics {
             /// all pending work and is currently idle. When new work becomes available,
             /// the worker is unparked and the park/unpark count is again increased by one.
             ///
+            /// An odd count means that the worker is currently parked.
+            /// An even count means that the worker is currently active.
+            ///
             /// The counter is monotonically increasing. It is never decremented or
-            /// reset to zero. An odd count means that the worker is currently parked;
-            /// an even count means that the worker is active.
+            /// reset to zero.
             ///
             /// # Arguments
             ///

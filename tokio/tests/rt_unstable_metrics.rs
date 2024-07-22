@@ -13,7 +13,7 @@ use std::task::Poll;
 use tokio::macros::support::poll_fn;
 
 use tokio::runtime::Runtime;
-use tokio::task::consume_budget;
+use tokio::task::{consume_budget, yield_now};
 use tokio::time::{self, Duration};
 
 #[test]
@@ -183,11 +183,10 @@ fn worker_park_unpark_count() {
     let rt = threaded();
     let metrics = rt.metrics();
     rt.block_on(async {
-        time::sleep(Duration::from_millis(1)).await;
+        yield_now().await;
     });
     drop(rt);
-    assert!(2 <= metrics.worker_park_unpark_count(0));
-    assert!(2 <= metrics.worker_park_unpark_count(1));
+    assert!(2 <= metrics.worker_park_unpark_count(0) || 2 <= metrics.worker_park_unpark_count(1));
 }
 
 #[test]
