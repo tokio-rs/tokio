@@ -173,6 +173,10 @@ impl CurrentThread {
             // available or the future is complete.
             loop {
                 if let Some(core) = self.take_core(handle) {
+                    handle
+                        .shared
+                        .worker_metrics
+                        .set_thread_id(thread::current().id());
                     return core.block_on(future);
                 } else {
                     let notified = self.notify.notified();

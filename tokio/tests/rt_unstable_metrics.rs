@@ -152,21 +152,36 @@ fn remote_schedule_count() {
 }
 
 #[test]
-fn worker_thread_id() {
+fn worker_thread_id_current_thread() {
     let rt = current_thread();
     let metrics = rt.metrics();
-    rt.block_on(async {
-        time::sleep(Duration::from_millis(1)).await;
-    });
-    drop(rt);
+
+    // Check that runtime is on this thread.
+    rt.block_on(async {});
     assert_eq!(Some(thread::current().id()), metrics.worker_thread_id(0));
 
+    // Move runtime to another thread.
+    let thread_id = std::thread::scope(|scope| {
+        let join_handle = scope.spawn(|| {
+            rt.block_on(async {});
+        });
+        join_handle.thread().id()
+    });
+    assert_eq!(Some(thread_id), metrics.worker_thread_id(0));
+
+    // Move runtime back to this thread.
+    rt.block_on(async {});
+    assert_eq!(Some(thread::current().id()), metrics.worker_thread_id(0));
+}
+
+#[test]
+fn worker_thread_id_threaded() {
     let rt = threaded();
     let metrics = rt.metrics();
-    rt.block_on(async {
-        time::sleep(Duration::from_millis(1)).await;
-    });
+
+    rt.block_on(async {});
     drop(rt);
+
     assert!(metrics.worker_thread_id(0).is_some());
     assert!(metrics.worker_thread_id(1).is_some());
     assert_ne!(Some(thread::current().id()), metrics.worker_thread_id(0));
