@@ -13,7 +13,7 @@ use std::task::Poll;
 use tokio::macros::support::poll_fn;
 
 use tokio::runtime::Runtime;
-use tokio::task::{consume_budget, yield_now};
+use tokio::task::consume_budget;
 use tokio::time::{self, Duration};
 
 #[test]
@@ -174,19 +174,38 @@ fn worker_park_count() {
 fn worker_park_unpark_count() {
     let rt = current_thread();
     let metrics = rt.metrics();
-    rt.block_on(async {
-        time::sleep(Duration::from_millis(1)).await;
-    });
+    rt.block_on(rt.spawn(async {})).unwrap();
     drop(rt);
     assert!(2 <= metrics.worker_park_unpark_count(0));
 
     let rt = threaded();
     let metrics = rt.metrics();
-    rt.block_on(async {
-        yield_now().await;
-    });
+
+    // Wait for workers to be parked after runtime startup.
+    for _ in 0..100 {
+        if 1 <= metrics.worker_park_unpark_count(0) && 1 <= metrics.worker_park_unpark_count(1) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert_eq!(1, metrics.worker_park_unpark_count(0));
+    assert_eq!(1, metrics.worker_park_unpark_count(1));
+
+    // Spawn a task to unpark and then park a worker.
+    rt.block_on(rt.spawn(async {})).unwrap();
+    for _ in 0..100 {
+        if 3 <= metrics.worker_park_unpark_count(0) || 3 <= metrics.worker_park_unpark_count(1) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert!(3 <= metrics.worker_park_unpark_count(0) || 3 <= metrics.worker_park_unpark_count(1));
+
+    // Both threads unpark for runtime shutdown.
     drop(rt);
-    assert!(2 <= metrics.worker_park_unpark_count(0) || 2 <= metrics.worker_park_unpark_count(1));
+    assert_eq!(0, metrics.worker_park_unpark_count(0) % 2);
+    assert_eq!(0, metrics.worker_park_unpark_count(1) % 2);
+    assert!(4 <= metrics.worker_park_unpark_count(0) || 4 <= metrics.worker_park_unpark_count(1));
 }
 
 #[test]
