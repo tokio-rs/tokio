@@ -86,7 +86,7 @@ test-util = ["rt", "sync", "time"]
 time = []
 
 [dependencies]
-tokio-macros = { version = "~2.3.0", path = "../tokio-macros", optional = true }
+tokio-macros = { version = "~2.4.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.11"
 
