@@ -2,6 +2,7 @@ use crate::runtime::Handle;
 
 cfg_unstable_metrics! {
     use std::ops::Range;
+    use std::thread::ThreadId;
     cfg_64bit_metrics! {
         use std::sync::atomic::Ordering::Relaxed;
     }
@@ -125,6 +126,49 @@ impl RuntimeMetrics {
         /// ```
         pub fn num_idle_blocking_threads(&self) -> usize {
             self.handle.inner.num_idle_blocking_threads()
+        }
+
+        /// Returns the thread id of the given worker thread.
+        ///
+        /// The returned value is `None` if the worker thread has not yet finished
+        /// starting up.
+        ///
+        /// If additional information about the thread, such as its native id, are
+        /// required, those can be collected in [`on_thread_start`] and correlated
+        /// using the thread id.
+        ///
+        /// [`on_thread_start`]: crate::runtime::Builder::on_thread_start
+        ///
+        /// # Arguments
+        ///
+        /// `worker` is the index of the worker being queried. The given value must
+        /// be between 0 and `num_workers()`. The index uniquely identifies a single
+        /// worker and will continue to identify the worker throughout the lifetime
+        /// of the runtime instance.
+        ///
+        /// # Panics
+        ///
+        /// The method panics when `worker` represents an invalid worker, i.e. is
+        /// greater than or equal to `num_workers()`.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let metrics = Handle::current().metrics();
+        ///
+        ///     let id = metrics.worker_thread_id(0);
+        ///     println!("worker 0 has id {:?}", id);
+        /// }
+        /// ```
+        pub fn worker_thread_id(&self, worker: usize) -> Option<ThreadId> {
+            self.handle
+                .inner
+                .worker_metrics(worker)
+                .thread_id()
         }
 
         cfg_64bit_metrics! {

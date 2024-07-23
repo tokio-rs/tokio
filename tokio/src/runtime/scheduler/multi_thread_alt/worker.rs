@@ -70,9 +70,9 @@ use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::{Cell, RefCell};
-use std::cmp;
 use std::task::Waker;
 use std::time::Duration;
+use std::{cmp, thread};
 
 cfg_unstable_metrics! {
     mod metrics;
@@ -569,6 +569,7 @@ impl Worker {
             }
         };
 
+        cx.shared().worker_metrics[core.index].set_thread_id(thread::current().id());
         core.stats.start_processing_scheduled_tasks(&mut self.stats);
 
         if let Some(task) = maybe_task {

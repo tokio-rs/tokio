@@ -10,6 +10,7 @@
 use std::future::Future;
 use std::sync::{Arc, Barrier, Mutex};
 use std::task::Poll;
+use std::thread;
 use tokio::macros::support::poll_fn;
 
 use tokio::runtime::Runtime;
@@ -148,6 +149,68 @@ fn remote_schedule_count() {
     rt.block_on(task).unwrap();
 
     assert_eq!(1, rt.metrics().remote_schedule_count());
+}
+
+#[test]
+fn worker_thread_id_current_thread() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+
+    // Check that runtime is on this thread.
+    rt.block_on(async {});
+    assert_eq!(Some(thread::current().id()), metrics.worker_thread_id(0));
+
+    // Move runtime to another thread.
+    let thread_id = std::thread::scope(|scope| {
+        let join_handle = scope.spawn(|| {
+            rt.block_on(async {});
+        });
+        join_handle.thread().id()
+    });
+    assert_eq!(Some(thread_id), metrics.worker_thread_id(0));
+
+    // Move runtime back to this thread.
+    rt.block_on(async {});
+    assert_eq!(Some(thread::current().id()), metrics.worker_thread_id(0));
+}
+
+#[test]
+fn worker_thread_id_threaded() {
+    let rt = threaded();
+    let metrics = rt.metrics();
+
+    rt.block_on(rt.spawn(async move {
+        // Check that we are running on a worker thread and determine
+        // the index of our worker.
+        let thread_id = std::thread::current().id();
+        let this_worker = (0..2)
+            .position(|w| metrics.worker_thread_id(w) == Some(thread_id))
+            .expect("task not running on any worker thread");
+
+        // Force worker to another thread.
+        let moved_thread_id = tokio::task::block_in_place(|| {
+            assert_eq!(thread_id, std::thread::current().id());
+
+            // Wait for worker to move to another thread.
+            for _ in 0..100 {
+                let new_id = metrics.worker_thread_id(this_worker).unwrap();
+                if thread_id != new_id {
+                    return new_id;
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+
+            panic!("worker did not move to new thread");
+        });
+
+        // After blocking task worker either stays on new thread or
+        // is moved back to current thread.
+        assert!(
+            metrics.worker_thread_id(this_worker) == Some(moved_thread_id)
+                || metrics.worker_thread_id(this_worker) == Some(thread_id)
+        );
+    }))
+    .unwrap()
 }
 
 #[test]
