@@ -334,7 +334,6 @@ feature! {
         feature = "sync",
         feature = "rt",
         feature = "signal",
-        feature = "time",
     )]
 
     /// An intrusive linked list, but instead of keeping pointers to the head
