@@ -16,6 +16,9 @@ pub(crate) struct WorkerMetrics {
     ///  Number of times the worker parked.
     pub(crate) park_count: MetricAtomicU64,
 
+    ///  Number of times the worker parked and unparked.
+    pub(crate) park_unpark_count: MetricAtomicU64,
+
     /// Number of times the worker woke then parked again without doing work.
     pub(crate) noop_count: MetricAtomicU64,
 

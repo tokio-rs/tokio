@@ -100,6 +100,10 @@ impl Stats {
         self.batch.about_to_park();
     }
 
+    pub(crate) fn unparked(&mut self) {
+        self.batch.unparked();
+    }
+
     pub(crate) fn inc_local_schedule_count(&mut self) {
         self.batch.inc_local_schedule_count();
     }

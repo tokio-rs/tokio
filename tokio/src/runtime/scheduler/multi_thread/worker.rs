@@ -699,7 +699,12 @@ impl Context {
         if core.transition_to_parked(&self.worker) {
             while !core.is_shutdown && !core.is_traced {
                 core.stats.about_to_park();
+                core.stats
+                    .submit(&self.worker.handle.shared.worker_metrics[self.worker.index]);
+
                 core = self.park_timeout(core, None);
+
+                core.stats.unparked();
 
                 // Run regularly scheduled maintenance
                 core.maintenance(&self.worker);
