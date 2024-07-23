@@ -1,4 +1,4 @@
-# 1.39.0 (July 22nd, 2024)
+# 1.39.0 (July 23nd, 2024)
 
 - This release bumps the MSRV to 1.70. ([#6645])
 - This release upgrades to mio v1. ([#6635])
