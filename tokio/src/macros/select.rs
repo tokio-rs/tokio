@@ -495,7 +495,7 @@ doc! {macro_rules! select {
             // We can't use the `pin!` macro for this because `futures` is a
             // tuple and the standard library provides no way to pin-project to
             // the fields of a tuple.
-            let mut futures = ( $( $fut , )+ );
+            let mut futures = ( $( $crate::macros::support::IntoFuture::into_future($fut) , )+ );
 
             // This assignment makes sure that the `poll_fn` closure only has a
             // reference to the futures, instead of taking ownership of them.
