@@ -23,6 +23,7 @@
 - task: avoid stack overflow when passing large future to `block_on` ([#6692])
 - time: avoid traversing entries in the time wheel twice ([#6584])
 - time: support `IntoFuture` with `timeout` ([#6666])
+- macros: support `IntoFuture` with `join!` and `select!` ([#6710])
 
 ### Fixed
 
@@ -73,6 +74,7 @@
 [#6695]: https://github.com/tokio-rs/tokio/pull/6695
 [#6696]: https://github.com/tokio-rs/tokio/pull/6696
 [#6709]: https://github.com/tokio-rs/tokio/pull/6709
+[#6710]: https://github.com/tokio-rs/tokio/pull/6710
 
 # 1.38.1 (July 16th, 2024)
 
