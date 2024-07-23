@@ -37,6 +37,7 @@ fn single_thread() {
 }
 
 #[test]
+#[ignore] // https://github.com/tokio-rs/tokio/issues/5995
 fn many_oneshot_futures() {
     // used for notifying the main thread
     const NUM: usize = 1_000;
