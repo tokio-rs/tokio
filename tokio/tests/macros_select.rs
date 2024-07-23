@@ -701,7 +701,7 @@ async fn select_into_future() {
         type IntoFuture = std::future::Ready<()>;
 
         fn into_future(self) -> Self::IntoFuture {
-            std::future::Ready(())
+            std::future::ready(())
         }
     }
 
