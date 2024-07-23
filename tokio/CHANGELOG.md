@@ -1,4 +1,13 @@
+# 1.39.1 (July 23rd, 2024)
+
+This release reverts "time: avoid traversing entries in the time wheel twice"
+because it contains a bug. ([#6715])
+
+[#6715]: https://github.com/tokio-rs/tokio/pull/6715
+
 # 1.39.0 (July 23rd, 2024)
+
+Yanked. Please use 1.39.1 instead.
 
 - This release bumps the MSRV to 1.70. ([#6645])
 - This release upgrades to mio v1. ([#6635])
