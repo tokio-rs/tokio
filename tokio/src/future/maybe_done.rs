@@ -1,7 +1,7 @@
 //! Definition of the [`MaybeDone`] combinator.
 
 use pin_project_lite::pin_project;
-use std::future::Future;
+use std::future::{Future, IntoFuture};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -22,7 +22,7 @@ pin_project! {
 }
 
 /// Wraps a future into a `MaybeDone`.
-pub fn maybe_done<F: IntoFuture>(future: Fut) -> MaybeDone<F::IntoFuture> {
+pub fn maybe_done<F: IntoFuture>(future: F) -> MaybeDone<F::IntoFuture> {
     MaybeDone::Future {
         future: future.into_future(),
     }
