@@ -333,7 +333,11 @@ pub(crate) struct TimerShared {
     ///
     /// Only accessed under the entry lock.
     pointers: linked_list::Pointers<TimerShared>,
-
+    /// The expiration time for which this entry is currently registered.
+    /// It is used to calculate which slot this entry is stored in.
+    /// Generally owned by the driver, but is accessed by the entry when not
+    /// registered.
+    cached_when: AtomicU64,
     /// Current state. This records whether the timer entry is currently under
     /// the ownership of the driver, and if not, its current state (not
     /// complete, fired, error, etc).
@@ -348,6 +352,7 @@ unsafe impl Sync for TimerShared {}
 impl std::fmt::Debug for TimerShared {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TimerShared")
+            .field("cached_when", &self.cached_when.load(Ordering::Relaxed))
             .field("state", &self.state)
             .finish()
     }
@@ -365,10 +370,35 @@ impl TimerShared {
     pub(super) fn new(shard_id: u32) -> Self {
         Self {
             shard_id,
+            cached_when: AtomicU64::new(0),
             pointers: linked_list::Pointers::new(),
             state: StateCell::default(),
             _p: PhantomPinned,
         }
+    }
+
+    /// Gets the cached time-of-expiration value.
+    pub(super) fn cached_when(&self) -> u64 {
+        // Cached-when is only accessed under the driver lock, so we can use relaxed
+        self.cached_when.load(Ordering::Relaxed)
+    }
+    /// Gets the true time-of-expiration value, and copies it into the cached
+    /// time-of-expiration value.
+    ///
+    /// SAFETY: Must be called with the driver lock held, and when this entry is
+    /// not in any timer wheel lists.
+    pub(super) unsafe fn sync_when(&self) -> u64 {
+        let true_when = self.true_when();
+        self.set_cached_when(true_when);
+        true_when
+    }
+
+    /// Sets the cached time-of-expiration value.
+    ///
+    /// SAFETY: Must be called with the driver lock held, and when this entry is
+    /// not in any timer wheel lists.
+    pub(super) unsafe fn set_cached_when(&self, when: u64) {
+        self.cached_when.store(when, Ordering::Relaxed);
     }
 
     /// Returns the true time-of-expiration value, with relaxed memory ordering.
@@ -552,8 +582,16 @@ impl TimerEntry {
 }
 
 impl TimerHandle {
-    pub(super) unsafe fn true_when(&self) -> u64 {
-        unsafe { self.inner.as_ref().true_when() }
+    pub(super) unsafe fn cached_when(&self) -> u64 {
+        unsafe { self.inner.as_ref().cached_when() }
+    }
+
+    pub(super) unsafe fn set_cached_when(&self, t: u64) {
+        unsafe { self.inner.as_ref().set_cached_when(t) }
+    }
+
+    pub(super) unsafe fn sync_when(&self) -> u64 {
+        unsafe { self.inner.as_ref().sync_when() }
     }
 
     /// Forcibly sets the true and cached expiration times to the given tick.
@@ -566,9 +604,6 @@ impl TimerHandle {
 
     /// Attempts to mark this entry as firing. If the expiration time is after
     /// `not_after`, however, returns an Err with the current expiration time.
-    ///
-    /// If an `Err` is returned, the `cached_when` value will be updated to this
-    /// new expiration time.
     ///
     /// SAFETY: The caller must ensure that the handle remains valid, the driver
     /// lock is held, and that the timer is not in any wheel linked lists.

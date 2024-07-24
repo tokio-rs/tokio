@@ -142,16 +142,14 @@ impl Wheel {
         &mut self,
         item: TimerHandle,
     ) -> Result<u64, (TimerHandle, InsertError)> {
-        let when = item.true_when();
+        let when = item.sync_when();
 
         if when <= self.elapsed {
             return Err((item, InsertError::Elapsed));
         }
 
-        // Get the level at which the entry should be stored
-        let level = self.level_for(when);
-
-        unsafe { self.levels[level].add_entry(item) };
+        // Safety: The `cached_when` of this item has been updated by calling the `sync_when`.
+        let (level, _slot) = self.inner_insert(item, self.elapsed, when);
 
         debug_assert!({
             self.levels[level]
@@ -166,7 +164,7 @@ impl Wheel {
     /// Removes `item` from the timing wheel.
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
-            let when = item.as_ref().true_when();
+            let when = item.as_ref().cached_when();
             if when <= MAX_SAFE_MILLIS_DURATION {
                 debug_assert!(
                     self.elapsed <= when,
@@ -186,8 +184,25 @@ impl Wheel {
     /// Reinserts `item` to the timing wheel.
     /// Safety: This entry must not have expired.
     pub(super) unsafe fn reinsert_entry(&mut self, entry: TimerHandle, elapsed: u64, when: u64) {
+        entry.set_cached_when(when);
+        // Safety: The `cached_when` of this entry has been updated by calling the `set_cached_when`.
+        let (_level, _slot) = self.inner_insert(entry, elapsed, when);
+    }
+
+    /// Inserts the `entry` to the `Wheel`.
+    /// Returns the level and the slot which `entry` insert into.
+    ///
+    /// Safety: The `cached_when` of this `entry`` must have been updated to `when`.
+    unsafe fn inner_insert(
+        &mut self,
+        entry: TimerHandle,
+        elapsed: u64,
+        when: u64,
+    ) -> (usize, usize) {
+        // Get the level at which the entry should be stored
         let level = level_for(elapsed, when);
-        unsafe { self.levels[level].add_entry(entry) };
+        let slot = unsafe { self.levels[level].add_entry(entry) };
+        (level, slot)
     }
 
     /// Instant at which to poll.
