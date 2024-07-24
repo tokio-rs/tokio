@@ -1,5 +1,6 @@
 use crate::runtime::time::{TimerHandle, TimerShared};
 use crate::time::error::InsertError;
+use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
 
 mod level;
 pub(crate) use self::level::Expiration;
@@ -7,7 +8,59 @@ use self::level::Level;
 
 use std::{array, ptr::NonNull};
 
-use super::EntryList;
+use super::entry::MAX_SAFE_MILLIS_DURATION;
+use super::Handle;
+
+/// List used in `Handle::process_at_sharded_time`. It wraps a guarded linked list
+/// and gates the access to it on the lock of the `Wheel` with the specified `wheel_id`.
+/// It also empties the list on drop.
+pub(super) struct EntryWaitersList<'a> {
+    // GuardedLinkedList ensures that the concurrent drop of Entry in this slot is safe.
+    list: GuardedLinkedList<TimerShared, <TimerShared as linked_list::Link>::Target>,
+    is_empty: bool,
+    wheel_id: u32,
+    handle: &'a Handle,
+}
+
+impl<'a> Drop for EntryWaitersList<'a> {
+    fn drop(&mut self) {
+        // If the list is not empty, we unlink all waiters from it.
+        // We do not wake the waiters to avoid double panics.
+        if !self.is_empty {
+            let _lock = self.handle.inner.lock_sharded_wheel(self.wheel_id);
+            while self.list.pop_back().is_some() {}
+        }
+    }
+}
+
+impl<'a> EntryWaitersList<'a> {
+    fn new(
+        unguarded_list: LinkedList<TimerShared, <TimerShared as linked_list::Link>::Target>,
+        guard_handle: TimerHandle,
+        wheel_id: u32,
+        handle: &'a Handle,
+    ) -> Self {
+        let list = unguarded_list.into_guarded(guard_handle);
+        Self {
+            list,
+            is_empty: false,
+            wheel_id,
+            handle,
+        }
+    }
+
+    /// Removes the last element from the guarded list. Modifying this list
+    /// requires an exclusive access to the Wheel with the specified `wheel_id`.
+    pub(super) fn pop_back_locked(&mut self, _wheel: &mut Wheel) -> Option<TimerHandle> {
+        let result = self.list.pop_back();
+        if result.is_none() {
+            // Save information about emptiness to avoid waiting for lock
+            // in the destructor.
+            self.is_empty = true;
+        }
+        result
+    }
+}
 
 /// Timing wheel implementation.
 ///
@@ -36,15 +89,15 @@ pub(crate) struct Wheel {
     /// * ~ 4 hr slots / ~ 12 day range
     /// * ~ 12 day slots / ~ 2 yr range
     levels: Box<[Level; NUM_LEVELS]>,
-
-    /// Entries queued for firing
-    pending: EntryList,
 }
 
 /// Number of levels. Each level has 64 slots. By using 6 levels with 64 slots
 /// each, the timer is able to track time up to 2 years into the future with a
 /// precision of 1 millisecond.
 const NUM_LEVELS: usize = 6;
+
+/// The max level index.
+pub(super) const MAX_LEVEL_INDEX: usize = NUM_LEVELS - 1;
 
 /// The maximum duration of a `Sleep`.
 pub(super) const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
@@ -55,7 +108,6 @@ impl Wheel {
         Wheel {
             elapsed: 0,
             levels: Box::new(array::from_fn(Level::new)),
-            pending: EntryList::new(),
         }
     }
 
@@ -90,7 +142,7 @@ impl Wheel {
         &mut self,
         item: TimerHandle,
     ) -> Result<u64, (TimerHandle, InsertError)> {
-        let when = item.sync_when();
+        let when = item.true_when();
 
         if when <= self.elapsed {
             return Err((item, InsertError::Elapsed));
@@ -99,9 +151,7 @@ impl Wheel {
         // Get the level at which the entry should be stored
         let level = self.level_for(when);
 
-        unsafe {
-            self.levels[level].add_entry(item);
-        }
+        unsafe { self.levels[level].add_entry(item) };
 
         debug_assert!({
             self.levels[level]
@@ -116,10 +166,8 @@ impl Wheel {
     /// Removes `item` from the timing wheel.
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
-            let when = item.as_ref().cached_when();
-            if when == u64::MAX {
-                self.pending.remove(item);
-            } else {
+            let when = item.as_ref().true_when();
+            if when <= MAX_SAFE_MILLIS_DURATION {
                 debug_assert!(
                     self.elapsed <= when,
                     "elapsed={}; when={}",
@@ -128,9 +176,18 @@ impl Wheel {
                 );
 
                 let level = self.level_for(when);
+                // If the entry is not contained in the `slot` list,
+                // then it is contained by a guarded list.
                 self.levels[level].remove_entry(item);
             }
         }
+    }
+
+    /// Reinserts `item` to the timing wheel.
+    /// Safety: This entry must not have expired.
+    pub(super) unsafe fn reinsert_entry(&mut self, entry: TimerHandle, elapsed: u64, when: u64) {
+        let level = level_for(elapsed, when);
+        unsafe { self.levels[level].add_entry(entry) };
     }
 
     /// Instant at which to poll.
@@ -139,43 +196,22 @@ impl Wheel {
     }
 
     /// Advances the timer up to the instant represented by `now`.
-    pub(crate) fn poll(&mut self, now: u64) -> Option<TimerHandle> {
-        loop {
-            if let Some(handle) = self.pending.pop_back() {
-                return Some(handle);
-            }
-
-            match self.next_expiration() {
-                Some(ref expiration) if expiration.deadline <= now => {
-                    self.process_expiration(expiration);
-
-                    self.set_elapsed(expiration.deadline);
-                }
-                _ => {
-                    // in this case the poll did not indicate an expiration
-                    // _and_ we were not able to find a next expiration in
-                    // the current list of timers.  advance to the poll's
-                    // current time and do nothing else.
-                    self.set_elapsed(now);
-                    break;
-                }
+    pub(crate) fn poll(&mut self, now: u64) -> Option<Expiration> {
+        match self.next_expiration() {
+            Some(expiration) if expiration.deadline <= now => Some(expiration),
+            _ => {
+                // in this case the poll did not indicate an expiration
+                // _and_ we were not able to find a next expiration in
+                // the current list of timers.  advance to the poll's
+                // current time and do nothing else.
+                self.set_elapsed(now);
+                None
             }
         }
-
-        self.pending.pop_back()
     }
 
     /// Returns the instant at which the next timeout expires.
     fn next_expiration(&self) -> Option<Expiration> {
-        if !self.pending.is_empty() {
-            // Expire immediately as we have things pending firing
-            return Some(Expiration {
-                level: 0,
-                slot: 0,
-                deadline: self.elapsed,
-            });
-        }
-
         // Check all levels
         for (level_num, level) in self.levels.iter().enumerate() {
             if let Some(expiration) = level.next_expiration(self.elapsed) {
@@ -211,46 +247,7 @@ impl Wheel {
         res
     }
 
-    /// iteratively find entries that are between the wheel's current
-    /// time and the expiration time.  for each in that population either
-    /// queue it for notification (in the case of the last level) or tier
-    /// it down to the next level (in all other cases).
-    pub(crate) fn process_expiration(&mut self, expiration: &Expiration) {
-        // Note that we need to take _all_ of the entries off the list before
-        // processing any of them. This is important because it's possible that
-        // those entries might need to be reinserted into the same slot.
-        //
-        // This happens only on the highest level, when an entry is inserted
-        // more than MAX_DURATION into the future. When this happens, we wrap
-        // around, and process some entries a multiple of MAX_DURATION before
-        // they actually need to be dropped down a level. We then reinsert them
-        // back into the same position; we must make sure we don't then process
-        // those entries again or we'll end up in an infinite loop.
-        let mut entries = self.take_entries(expiration);
-
-        while let Some(item) = entries.pop_back() {
-            if expiration.level == 0 {
-                debug_assert_eq!(unsafe { item.cached_when() }, expiration.deadline);
-            }
-
-            // Try to expire the entry; this is cheap (doesn't synchronize) if
-            // the timer is not expired, and updates cached_when.
-            match unsafe { item.mark_pending(expiration.deadline) } {
-                Ok(()) => {
-                    // Item was expired
-                    self.pending.push_front(item);
-                }
-                Err(expiration_tick) => {
-                    let level = level_for(expiration.deadline, expiration_tick);
-                    unsafe {
-                        self.levels[level].add_entry(item);
-                    }
-                }
-            }
-        }
-    }
-
-    fn set_elapsed(&mut self, when: u64) {
+    pub(super) fn set_elapsed(&mut self, when: u64) {
         assert!(
             self.elapsed <= when,
             "elapsed={:?}; when={:?}",
@@ -263,9 +260,31 @@ impl Wheel {
         }
     }
 
-    /// Obtains the list of entries that need processing for the given expiration.
-    fn take_entries(&mut self, expiration: &Expiration) -> EntryList {
-        self.levels[expiration.level].take_slot(expiration.slot)
+    /// Obtains the guarded list of entries that need processing for the given expiration.
+    /// Safety: The `TimerShared` inside `guard_handle` must be pinned in the memory.
+    pub(super) unsafe fn get_waiters_list<'a>(
+        &mut self,
+        expiration: &Expiration,
+        guard_handle: TimerHandle,
+        wheel_id: u32,
+        handle: &'a Handle,
+    ) -> EntryWaitersList<'a> {
+        // Note that we need to take _all_ of the entries off the list before
+        // processing any of them. This is important because it's possible that
+        // those entries might need to be reinserted into the same slot.
+        //
+        // This happens only on the highest level, when an entry is inserted
+        // more than MAX_DURATION into the future. When this happens, we wrap
+        // around, and process some entries a multiple of MAX_DURATION before
+        // they actually need to be dropped down a level. We then reinsert them
+        // back into the same position; we must make sure we don't then process
+        // those entries again or we'll end up in an infinite loop.
+        let unguarded_list = self.levels[expiration.level].take_slot(expiration.slot);
+        EntryWaitersList::new(unguarded_list, guard_handle, wheel_id, handle)
+    }
+
+    pub(super) fn occupied_bit_maintain(&mut self, expiration: &Expiration) {
+        self.levels[expiration.level].occupied_bit_maintain(expiration.slot);
     }
 
     fn level_for(&self, when: u64) -> usize {
