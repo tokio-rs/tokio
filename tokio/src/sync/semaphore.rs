@@ -3,6 +3,7 @@ use super::{AcquireError, TryAcquireError};
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;
 use std::sync::Arc;
+#[cfg(feature = "time")]
 use std::time::Duration;
 
 /// Counting semaphore performing asynchronous permit acquisition.

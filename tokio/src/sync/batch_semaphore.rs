@@ -16,23 +16,25 @@
 //! use-case like tokio's read-write lock, writers will not be starved by
 //! readers.
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
-use crate::loom::sync::{Arc, Mutex, MutexGuard};
-#[cfg(feature = "time")]
-use crate::time::timeout;
+use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::{Mutex, MutexGuard};
 use crate::util::linked_list::{self, LinkedList};
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;
 use crate::util::WakeList;
-
 use std::future::Future;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::*;
 use std::task::{Context, Poll, Waker};
-use std::time::Duration;
 use std::{cmp, fmt};
+#[cfg(feature = "time")]
+use {
+    crate::loom::sync::{atomic::AtomicBool, Arc},
+    crate::time::timeout,
+    std::time::Duration,
+};
 
 /// An asynchronous counting semaphore which permits waiting on multiple permits at once.
 pub(crate) struct Semaphore {
