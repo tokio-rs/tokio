@@ -675,6 +675,7 @@ impl Semaphore {
     /// [`TryAcquireError::Closed`]: crate::sync::TryAcquireError::Closed
     /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
     /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
+    #[cfg(feature = "time")]
     pub async fn try_acquire_timeout(
         &self,
         dur: Duration,

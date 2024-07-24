@@ -18,6 +18,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
+#[cfg(feature = "time")]
 use crate::time::timeout;
 use crate::util::linked_list::{self, LinkedList};
 #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -295,6 +296,7 @@ impl Semaphore {
         }
     }
 
+    #[cfg(feature = "time")]
     pub(crate) async fn try_acquire_timeout(
         &self,
         num_permits: usize,
