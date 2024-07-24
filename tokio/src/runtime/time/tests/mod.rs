@@ -203,6 +203,7 @@ fn reset_future() {
 }
 
 #[test]
+#[cfg(not(loom))]
 fn reset_timer_and_drop() {
     model(|| {
         let rt = rt(false);
