@@ -906,6 +906,8 @@ jobs:
 
       - name: Test Quinn
         working-directory: quinn
+        env:
+          RUSTFLAGS: ""
         run: cargo test
 
   x86_64-fortanix-unknown-sgx:
