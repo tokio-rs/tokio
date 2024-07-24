@@ -3,6 +3,7 @@ use super::{AcquireError, TryAcquireError};
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Counting semaphore performing asynchronous permit acquisition.
 ///
@@ -641,6 +642,50 @@ impl Semaphore {
             sem: self,
             permits: n,
         })
+    }
+
+    /// Tries to acquire a permit from the semaphore for a specified duration.
+    ///
+    /// If the semaphore has been closed, this returns a [`TryAcquireError::Closed`]
+    /// and a [`TryAcquireError::NoPermits`] if there are no permits left within the
+    /// specified duration. Otherwise, this returns a [`SemaphorePermit`] representing
+    /// the acquired permits.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::{Semaphore, TryAcquireError};
+    /// use std::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let semaphore = Semaphore::new(2);
+    ///
+    ///     let permit_1 = semaphore.try_acquire_timeout(Duration::from_millis(1)).await.unwrap();
+    ///     assert_eq!(semaphore.available_permits(), 1);
+    ///
+    ///     let permit_2 = semaphore.try_acquire_timeout(Duration::from_millis(1)).await.unwrap();
+    ///     assert_eq!(semaphore.available_permits(), 0);
+    ///
+    ///     let permit_3 = semaphore.try_acquire_timeout(Duration::from_millis(1)).await;
+    ///     assert_eq!(permit_3.err(), Some(TryAcquireError::NoPermits));
+    /// }
+    /// ```
+    ///
+    /// [`TryAcquireError::Closed`]: crate::sync::TryAcquireError::Closed
+    /// [`TryAcquireError::NoPermits`]: crate::sync::TryAcquireError::NoPermits
+    /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
+    pub async fn try_acquire_timeout(
+        &self,
+        dur: Duration,
+    ) -> Result<SemaphorePermit<'_>, TryAcquireError> {
+        match self.ll_sem.try_acquire_timeout(1, dur).await {
+            Ok(()) => Ok(SemaphorePermit {
+                sem: self,
+                permits: 1,
+            }),
+            Err(e) => Err(e),
+        }
     }
 
     /// Tries to acquire a permit from the semaphore.

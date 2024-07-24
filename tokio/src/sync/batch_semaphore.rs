@@ -16,8 +16,9 @@
 //! use-case like tokio's read-write lock, writers will not be starved by
 //! readers.
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{Mutex, MutexGuard};
+use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
+use crate::loom::sync::{Arc, Mutex, MutexGuard};
+use crate::time::timeout;
 use crate::util::linked_list::{self, LinkedList};
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;
@@ -29,6 +30,7 @@ use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::*;
 use std::task::{Context, Poll, Waker};
+use std::time::Duration;
 use std::{cmp, fmt};
 
 /// An asynchronous counting semaphore which permits waiting on multiple permits at once.
@@ -290,6 +292,39 @@ impl Semaphore {
                 }
                 Err(actual) => curr = actual,
             }
+        }
+    }
+
+    pub(crate) async fn try_acquire_timeout(
+        &self,
+        num_permits: usize,
+        dur: Duration,
+    ) -> Result<(), TryAcquireError> {
+        let processed = Arc::new(AtomicBool::new(false));
+        let processed2 = Arc::clone(&processed);
+        let fut = async move {
+            match self.acquire(num_permits).await {
+                Ok(_) => {
+                    if processed2
+                        .compare_exchange_weak(false, true, AcqRel, Acquire)
+                        .is_err()
+                    {
+                        self.add_permits_locked(1, self.waiters.lock());
+                    }
+                    true
+                }
+                Err(_) => false,
+            }
+        };
+        match timeout(dur, fut).await {
+            Ok(ret) => match ret {
+                true => Ok(()),
+                false => Err(TryAcquireError::Closed),
+            },
+            Err(_) => match processed.compare_exchange_weak(false, true, AcqRel, Acquire) {
+                Ok(_) => Err(TryAcquireError::NoPermits),
+                Err(_) => Ok(()),
+            },
         }
     }
 
