@@ -27,6 +27,9 @@ rand = "0.8.3"
 [target.'cfg(windows)'.dev-dependencies.windows-sys]
 version = "0.52"
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)', 'cfg(tokio_taskdump)'] }
+
 [[example]]
 name = "chat"
 path = "chat.rs"
