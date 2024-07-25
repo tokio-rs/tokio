@@ -65,6 +65,7 @@ jobs:
       - loom-compile
       - check-readme
       - test-hyper
+      - test-quinn
       - x86_64-fortanix-unknown-sgx
       - check-redox
       - wasm32-unknown-unknown
@@ -858,6 +859,56 @@ jobs:
       - name: Test hyper
         run: cargo test --features full
         working-directory: hyper
+
+  test-quinn:
+    name: Test Quinn
+    needs: basics
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_stable }}
+
+      - name: Clone Quinn
+        run: git clone https://github.com/quinn-rs/quinn.git
+
+      - name: Checkout the latest release because HEAD maybe contains breakage.
+        run: |
+          set -x
+          tag=$(git describe --abbrev=0 --tags)
+          git checkout "${tag}"
+        working-directory: quinn
+
+      - name: Patch Quinn to use tokio from this repository
+        run: |
+          set -x
+          echo '[patch.crates-io]' >>Cargo.toml
+          echo 'tokio = { path = "../tokio" }' >>Cargo.toml
+          git diff
+        working-directory: quinn
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # The cargo workspaces and target directory configuration.
+          # These entries are separated by newlines and have the form
+          # `$workspace -> $target`. The `$target` part is treated as a directory
+          # relative to the `$workspace` and defaults to "target" if not explicitly given.
+          # default: ". -> target"
+          workspaces: "./quinn"
+
+      - name: Test Quinn
+        working-directory: quinn
+        env:
+          RUSTFLAGS: ""
+        run: cargo test
 
   x86_64-fortanix-unknown-sgx:
     name: build tokio for x86_64-fortanix-unknown-sgx
