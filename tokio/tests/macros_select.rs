@@ -709,3 +709,11 @@ async fn select_into_future() {
         () = NotAFuture => {},
     }
 }
+
+// regression test for https://github.com/tokio-rs/tokio/issues/6721
+#[tokio::test]
+async fn temporary_lifetime_extension() {
+    tokio::select! {
+        () = &mut std::future::ready(()) => {},
+    }
+}
