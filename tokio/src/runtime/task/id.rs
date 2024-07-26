@@ -1,6 +1,6 @@
 use crate::runtime::context;
 
-use std::fmt;
+use std::{fmt, num::NonZeroU64};
 
 /// An opaque ID that uniquely identifies a task relative to all other currently
 /// running tasks.
@@ -24,7 +24,7 @@ use std::fmt;
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
-pub struct Id(pub(crate) u64);
+pub struct Id(pub(crate) NonZeroU64);
 
 /// Returns the [`Id`] of the currently running task.
 ///
@@ -82,17 +82,23 @@ impl Id {
             crate::loom::lazy_static! {
                 static ref NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
             }
-            Self(NEXT_ID.fetch_add(1, Relaxed))
+            let id = NonZeroU64::new(NEXT_ID.fetch_add(1, Relaxed))
+                .unwrap_or_else(|| NonZeroU64::new(1).unwrap());
+
+            Self(id)
         }
 
         #[cfg(not(all(test, loom)))]
         {
             static NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
-            Self(NEXT_ID.fetch_add(1, Relaxed))
+            let id = NonZeroU64::new(NEXT_ID.fetch_add(1, Relaxed))
+                .unwrap_or_else(|| NonZeroU64::new(1).unwrap());
+
+            Self(id)
         }
     }
 
     pub(crate) fn as_u64(&self) -> u64 {
-        self.0
+        self.0.get()
     }
 }
