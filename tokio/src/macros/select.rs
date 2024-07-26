@@ -489,13 +489,22 @@ doc! {macro_rules! select {
         // Create a scope to separate polling from handling the output. This
         // adds borrow checker flexibility when using the macro.
         let mut output = {
+            // Store each future directly first (that is, without wrapping the future in a call to
+            // `IntoFuture::into_future`). This allows the `$fut` expression to make use of
+            // temporary lifetime extension.
+            //
+            // https://doc.rust-lang.org/1.58.1/reference/destructors.html#temporary-lifetime-extension
+            let futures_init = ($( $fut, )+);
+
             // Safety: Nothing must be moved out of `futures`. This is to
             // satisfy the requirement of `Pin::new_unchecked` called below.
             //
             // We can't use the `pin!` macro for this because `futures` is a
             // tuple and the standard library provides no way to pin-project to
             // the fields of a tuple.
-            let mut futures = ( $( $crate::macros::support::IntoFuture::into_future($fut) , )+ );
+            let mut futures = ($( $crate::macros::support::IntoFuture::into_future(
+                        $crate::count_field!( futures_init.$($skip)* )
+            ),)+);
 
             // This assignment makes sure that the `poll_fn` closure only has a
             // reference to the futures, instead of taking ownership of them.
@@ -851,6 +860,206 @@ macro_rules! count {
     };
     (_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
         64
+    };
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! count_field {
+    ($var:ident. ) => {
+        $var.0
+    };
+    ($var:ident. _) => {
+        $var.1
+    };
+    ($var:ident. _ _) => {
+        $var.2
+    };
+    ($var:ident. _ _ _) => {
+        $var.3
+    };
+    ($var:ident. _ _ _ _) => {
+        $var.4
+    };
+    ($var:ident. _ _ _ _ _) => {
+        $var.5
+    };
+    ($var:ident. _ _ _ _ _ _) => {
+        $var.6
+    };
+    ($var:ident. _ _ _ _ _ _ _) => {
+        $var.7
+    };
+    ($var:ident. _ _ _ _ _ _ _ _) => {
+        $var.8
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _) => {
+        $var.9
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _) => {
+        $var.10
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.11
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.12
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.13
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.14
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.15
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.16
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.17
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.18
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.19
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.20
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.21
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.22
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.23
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.24
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.25
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.26
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.27
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.28
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.29
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.30
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.31
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.32
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.33
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.34
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.35
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.36
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.37
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.38
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.39
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.40
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.41
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.42
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.43
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.44
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.45
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.46
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.47
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.48
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.49
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.50
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.51
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.52
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.53
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.54
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.55
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.56
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.57
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.58
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.59
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.60
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.61
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.62
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.63
+    };
+    ($var:ident. _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) => {
+        $var.64
     };
 }
 
