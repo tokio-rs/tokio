@@ -273,6 +273,7 @@ fn stress2() {
     }
 }
 
+#[allow(dead_code)]
 struct Runtime;
 
 impl Schedule for Runtime {
