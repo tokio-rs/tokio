@@ -136,7 +136,9 @@ async fn write_all_buf_vectored() {
     let mut wr = Wr {
         buf: BytesMut::with_capacity(64),
     };
-    let mut buf = Bytes::from_static(b"hello world");
+    let mut buf = Bytes::from_static(b"hello")
+        .chain(Bytes::from_static(b" "))
+        .chain(Bytes::from_static(b"world"));
 
     wr.write_all_buf(&mut buf).await.unwrap();
     assert_eq!(&wr.buf[..], b"hello world");
