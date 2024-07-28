@@ -1,3 +1,10 @@
+# 1.39.2 (July 27th, 2024)
+
+This release fixes a regression where the `select!` macro stopped accepting
+expressions that make use of temporary lifetime extension. ([#6722])
+
+[#6722]: https://github.com/tokio-rs/tokio/pull/6722
+
 # 1.39.1 (July 23rd, 2024)
 
 This release reverts "time: avoid traversing entries in the time wheel twice"
