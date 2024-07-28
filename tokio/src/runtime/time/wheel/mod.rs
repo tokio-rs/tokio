@@ -149,7 +149,7 @@ impl Wheel {
         }
 
         // Safety: The `cached_when` of this item has been updated by calling the `sync_when`.
-        let (level, _slot) = self.inner_insert(item, self.elapsed, when);
+        let level = self.inner_insert(item, self.elapsed, when);
 
         debug_assert!({
             self.levels[level]
@@ -186,23 +186,18 @@ impl Wheel {
     pub(super) unsafe fn reinsert_entry(&mut self, entry: TimerHandle, elapsed: u64, when: u64) {
         entry.set_cached_when(when);
         // Safety: The `cached_when` of this entry has been updated by calling the `set_cached_when`.
-        let (_level, _slot) = self.inner_insert(entry, elapsed, when);
+        let _level = self.inner_insert(entry, elapsed, when);
     }
 
     /// Inserts the `entry` to the `Wheel`.
-    /// Returns the level and the slot which `entry` insert into.
+    /// Returns the level where the entry is inserted.
     ///
     /// Safety: The `cached_when` of this `entry`` must have been updated to `when`.
-    unsafe fn inner_insert(
-        &mut self,
-        entry: TimerHandle,
-        elapsed: u64,
-        when: u64,
-    ) -> (usize, usize) {
-        // Get the level at which the entry should be stored
+    unsafe fn inner_insert(&mut self, entry: TimerHandle, elapsed: u64, when: u64) -> usize {
+        // Get the level at which the entry should be stored.
         let level = level_for(elapsed, when);
-        let slot = unsafe { self.levels[level].add_entry(entry) };
-        (level, slot)
+        unsafe { self.levels[level].add_entry(entry) };
+        level
     }
 
     /// Instant at which to poll.

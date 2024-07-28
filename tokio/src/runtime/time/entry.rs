@@ -413,6 +413,7 @@ impl TimerShared {
     /// in the timer wheel.
     pub(super) unsafe fn set_expiration(&self, t: u64) {
         self.state.set_expiration(t);
+        self.cached_when.store(t, Ordering::Relaxed);
     }
 
     /// Sets the true time-of-expiration only if it is after the current.
