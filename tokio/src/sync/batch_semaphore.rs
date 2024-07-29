@@ -147,6 +147,7 @@ impl Semaphore {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let resource_span = {
             let resource_span = tracing::trace_span!(
+                parent: None,
                 "runtime.resource",
                 concrete_type = "Semaphore",
                 kind = "Sync",
