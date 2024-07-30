@@ -1,4 +1,5 @@
 use crate::codec::{Decoder, Encoder};
+use crate::udp::{PollRecvFrom, PollSendTo};
 
 use futures_core::Stream;
 use tokio::{io::ReadBuf, net::UdpSocket};
@@ -6,12 +7,9 @@ use tokio::{io::ReadBuf, net::UdpSocket};
 use bytes::{BufMut, BytesMut};
 use futures_core::ready;
 use futures_sink::Sink;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{
-    borrow::Borrow,
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-};
 use std::{io, mem::MaybeUninit};
 
 /// A unified [`Stream`] and [`Sink`] interface to an underlying `UdpSocket`, using
@@ -54,7 +52,7 @@ impl<C, T> Unpin for UdpFramed<C, T> {}
 
 impl<C, T> Stream for UdpFramed<C, T>
 where
-    T: Borrow<UdpSocket>,
+    T: PollRecvFrom,
     C: Decoder,
 {
     type Item = Result<(C::Item, SocketAddr), C::Error>;
@@ -87,7 +85,7 @@ where
                 let buf = unsafe { &mut *(pin.rd.chunk_mut() as *mut _ as *mut [MaybeUninit<u8>]) };
                 let mut read = ReadBuf::uninit(buf);
                 let ptr = read.filled().as_ptr();
-                let res = ready!(pin.socket.borrow().poll_recv_from(cx, &mut read));
+                let res = ready!(pin.socket.poll_recv_from(cx, &mut read));
 
                 assert_eq!(ptr, read.filled().as_ptr());
                 let addr = res?;
@@ -107,7 +105,7 @@ where
 
 impl<I, C, T> Sink<(I, SocketAddr)> for UdpFramed<C, T>
 where
-    T: Borrow<UdpSocket>,
+    T: PollSendTo,
     C: Encoder<I>,
 {
     type Error = C::Error;
@@ -141,13 +139,13 @@ where
         }
 
         let Self {
-            ref socket,
+            ref mut socket,
             ref mut out_addr,
             ref mut wr,
             ..
         } = *self;
 
-        let n = ready!(socket.borrow().poll_send_to(cx, wr, *out_addr))?;
+        let n = ready!(socket.poll_send_to(cx, wr, *out_addr))?;
 
         let wrote_all = n == self.wr.len();
         self.wr.clear();
@@ -172,10 +170,7 @@ where
     }
 }
 
-impl<C, T> UdpFramed<C, T>
-where
-    T: Borrow<UdpSocket>,
-{
+impl<C, T> UdpFramed<C, T> {
     /// Create a new `UdpFramed` backed by the given socket and codec.
     ///
     /// See struct level documentation for more details.
