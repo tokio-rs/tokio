@@ -360,8 +360,10 @@ impl Handle {
                             }
                         }
                     }
-                    Err(state) if state == STATE_DEREGISTERED => {}
+                    // TODO: The following code is commented out for running the test. Just for test.
+                    // Err(state) if state == STATE_DEREGISTERED => {}
                     Err(state) => {
+                        assert_ne!(state, STATE_DEREGISTERED);
                         // Safety: This Entry has not expired.
                         unsafe { lock.reinsert_entry(entry, deadline, state) };
                     }
