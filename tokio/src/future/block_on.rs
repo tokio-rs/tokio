@@ -1,4 +1,6 @@
 use std::future::Future;
+use crate::runtime::context::BlockingRegionGuard;
+use std::error::Error;
 
 cfg_rt! {
     #[track_caller]
@@ -10,6 +12,16 @@ cfg_rt! {
             tasks."
         );
         e.block_on(f).unwrap()
+    }
+
+    pub(crate) fn try_blocking_on<F: Future>(f: F) -> Result<BlockingRegionGuard, Box<dyn Error>> {
+        match crate::runtime::context::try_enter_blocking_region(){
+            Some(x) => Ok(x),
+            None => Err("Cannot block the current thread from within a runtime. This \
+            happens because a function attempted to block the current \
+            thread while the thread is being used to drive asynchronous \
+            tasks.".into())
+        }
     }
 }
 
