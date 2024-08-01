@@ -14,7 +14,7 @@ cfg_rt! {
         e.block_on(f).unwrap()
     }
 
-    pub(crate) fn try_blocking_on<F: Future>(f: F) -> Result<F::Output, Box<dyn Error>> {
+    pub(crate) fn try_block_on<F: Future>(f: F) -> Result<F::Output, Box<dyn Error>> {
         match crate::runtime::context::try_enter_blocking_region(){
             Some(mut e) => Ok(e.block_on(f).unwrap()),
             None => Err("Cannot block the current thread from within a runtime. This \
