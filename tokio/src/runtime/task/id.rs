@@ -78,26 +78,16 @@ impl Id {
         use crate::loom::sync::atomic::StaticAtomicU64;
 
         #[cfg(all(test, loom))]
-        {
-            crate::loom::lazy_static! {
-                static ref NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
-            }
-            loop {
-                let id = NEXT_ID.fetch_add(1, Relaxed);
-                if let Some(id) = NonZeroU64::new(u64::from(id)) {
-                    return Self(id);
-                }
-            }
+        crate::loom::lazy_static! {
+            static ref NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
         }
-
         #[cfg(not(all(test, loom)))]
-        {
-            static NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
-            loop {
-                let id = NEXT_ID.fetch_add(1, Relaxed);
-                if let Some(id) = NonZeroU64::new(u64::from(id)) {
-                    return Self(id);
-                }
+        static NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
+
+        loop {
+            let id = NEXT_ID.fetch_add(1, Relaxed);
+            if let Some(id) = NonZeroU64::new(u64::from(id)) {
+                return Self(id);
             }
         }
     }
