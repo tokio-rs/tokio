@@ -2,7 +2,7 @@ use crate::future::Future;
 use crate::runtime::task::core::{Cell, Core, Header, Trailer};
 use crate::runtime::task::state::{Snapshot, State};
 use crate::runtime::task::waker::waker_ref;
-use crate::runtime::task::{Id, JoinError, Notified, RawTask, Schedule, Task};
+use crate::runtime::task::{Id, JoinError, Notified, RawTask, Schedule, Task, TaskBox};
 
 use std::any::Any;
 use std::mem;
@@ -269,7 +269,7 @@ where
         // are allowed to be dangling after their last use, even if the
         // reference has not yet gone out of scope.
         unsafe {
-            drop(Box::from_raw(self.cell.as_ptr()));
+            drop(TaskBox::from_raw(self.cell));
         }
     }
 
