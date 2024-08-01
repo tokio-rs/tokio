@@ -82,19 +82,23 @@ impl Id {
             crate::loom::lazy_static! {
                 static ref NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
             }
-            let id = NonZeroU64::new(NEXT_ID.fetch_add(1, Relaxed))
-                .unwrap_or_else(|| NonZeroU64::new(1).unwrap());
-
-            Self(id)
+            loop {
+                let id = NEXT_ID.fetch_add(1, Relaxed);
+                if let Some(id) = NonZeroU64::new(u64::from(id)) {
+                    return Self(id);
+                }
+            }
         }
 
         #[cfg(not(all(test, loom)))]
         {
             static NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
-            let id = NonZeroU64::new(NEXT_ID.fetch_add(1, Relaxed))
-                .unwrap_or_else(|| NonZeroU64::new(1).unwrap());
-
-            Self(id)
+            loop {
+                let id = NEXT_ID.fetch_add(1, Relaxed);
+                if let Some(id) = NonZeroU64::new(u64::from(id)) {
+                    return Self(id);
+                }
+            }
         }
     }
 
