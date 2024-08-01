@@ -4,6 +4,7 @@ use crate::runtime::task::state::{Snapshot, State};
 use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{Id, JoinError, Notified, RawTask, Schedule, Task};
 
+use crate::runtime::TaskMeta;
 use std::any::Any;
 use std::mem;
 use std::mem::ManuallyDrop;
@@ -313,9 +314,17 @@ where
 
         let snapshot = self.state().transition_to_complete();
 
-        // We catch panics here in case dropping the future or waking the
+        // We catch panics here in case dropping the future, invoking a hook or waking the
         // JoinHandle panics.
         let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            if let Some(f) = self.trailer().hooks.task_terminate_callback.as_ref() {
+                f(&TaskMeta {
+                    #[cfg(tokio_unstable)]
+                    id: self.core().task_id,
+                    _phantom: Default::default(),
+                })
+            }
+
             if !snapshot.is_join_interested() {
                 // The `JoinHandle` is not interested in the output of
                 // this task. It is our responsibility to drop the
