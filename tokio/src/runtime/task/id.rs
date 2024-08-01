@@ -87,7 +87,7 @@ impl Id {
 
         loop {
             let id = NEXT_ID.fetch_add(1, Relaxed);
-            if let Some(id) = NonZeroU64::new(u64::from(id)) {
+            if let Some(id) = NonZeroU64::new(id) {
                 return Self(id);
             }
         }
