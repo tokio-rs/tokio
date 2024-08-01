@@ -532,6 +532,6 @@ unsafe impl<S> sharded_list::ShardedListItem for Task<S> {
     unsafe fn get_shard_id(target: NonNull<Self::Target>) -> usize {
         // SAFETY: The caller guarantees that `target` points at a valid task.
         let task_id = unsafe { Header::get_id(target) };
-        task_id.0 as usize
+        task_id.0.get() as usize
     }
 }
