@@ -81,6 +81,7 @@ impl Id {
         crate::loom::lazy_static! {
             static ref NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
         }
+
         #[cfg(not(all(test, loom)))]
         static NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(1);
 
