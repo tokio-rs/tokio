@@ -4,6 +4,14 @@ use std::fmt;
 use std::ops;
 use std::time::Duration;
 
+cfg_wasm_unknown! {
+    pub(crate) type InstantInner = web_time::Instant;
+}
+
+cfg_not_wasm_unknown! {
+    pub(crate) type InstantInner = std::time::Instant;
+}
+
 /// A measurement of a monotonically nondecreasing clock.
 /// Opaque and useful only with `Duration`.
 ///
@@ -32,7 +40,7 @@ use std::time::Duration;
 /// take advantage of `time::pause()` and `time::advance()`.
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Instant {
-    std: std::time::Instant,
+    std: InstantInner,
 }
 
 impl Instant {
@@ -50,7 +58,7 @@ impl Instant {
     }
 
     /// Create a `tokio::time::Instant` from a `std::time::Instant`.
-    pub fn from_std(std: std::time::Instant) -> Instant {
+    pub fn from_std(std: InstantInner) -> Instant {
         Instant { std }
     }
 
@@ -63,7 +71,7 @@ impl Instant {
     }
 
     /// Convert the value into a `std::time::Instant`.
-    pub fn into_std(self) -> std::time::Instant {
+    pub fn into_std(self) -> InstantInner {
         self.std
     }
 
@@ -150,14 +158,14 @@ impl Instant {
     }
 }
 
-impl From<std::time::Instant> for Instant {
-    fn from(time: std::time::Instant) -> Instant {
+impl From<InstantInner> for Instant {
+    fn from(time: InstantInner) -> Instant {
         Instant::from_std(time)
     }
 }
 
-impl From<Instant> for std::time::Instant {
-    fn from(time: Instant) -> std::time::Instant {
+impl From<Instant> for InstantInner {
+    fn from(time: Instant) -> InstantInner {
         time.into_std()
     }
 }
@@ -188,7 +196,7 @@ impl ops::Sub<Duration> for Instant {
     type Output = Instant;
 
     fn sub(self, rhs: Duration) -> Instant {
-        Instant::from_std(std::time::Instant::sub(self.std, rhs))
+        Instant::from_std(InstantInner::sub(self.std, rhs))
     }
 }
 
@@ -206,10 +214,10 @@ impl fmt::Debug for Instant {
 
 #[cfg(not(feature = "test-util"))]
 mod variant {
-    use super::Instant;
+    use super::{Instant, InstantInner};
 
     pub(super) fn now() -> Instant {
-        Instant::from_std(std::time::Instant::now())
+        Instant::from_std(InstantInner::now())
     }
 }
 

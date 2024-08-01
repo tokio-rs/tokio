@@ -603,3 +603,21 @@ macro_rules! cfg_is_wasm_not_wasi {
         )*
     }
 }
+
+macro_rules! cfg_wasm_unknown {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_wasm_unknown {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+            $item
+        )*
+    }
+}
