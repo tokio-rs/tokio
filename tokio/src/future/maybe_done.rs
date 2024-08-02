@@ -101,6 +101,9 @@ mod miri_tests {
     #[test]
     fn maybe_done_miri() {
         let mut thing = "hello".to_owned();
+
+        // The async block is necessary to trigger the miri failure.
+        #[allow(clippy::redundant_async_block)]
         let fut = async move { ThingAdder { thing: &mut thing }.await };
 
         let mut fut = maybe_done(fut);
