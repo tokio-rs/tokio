@@ -1,9 +1,9 @@
 #![cfg_attr(loom, allow(unused_imports))]
 
 use crate::runtime::handle::Handle;
-#[cfg(all(not(loom), tokio_unstable))]
-use crate::runtime::TaskMeta;
-use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback};
+use crate::runtime::{
+    blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback, TaskMeta,
+};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use std::fmt;
