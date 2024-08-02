@@ -381,6 +381,7 @@ cfg_rt! {
 
     mod task_hooks;
     pub (crate) use task_hooks::{TaskHooks, TaskCallback};
+    #[cfg(all(not(loom), tokio_unstable))]
     pub use task_hooks::TaskMeta;
 
     mod handle;

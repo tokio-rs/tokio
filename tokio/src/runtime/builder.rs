@@ -1,9 +1,9 @@
 #![cfg_attr(loom, allow(unused_imports))]
 
 use crate::runtime::handle::Handle;
-use crate::runtime::{
-    blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback, TaskMeta,
-};
+use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime};
+#[cfg(all(not(loom), tokio_unstable))]
+use crate::runtime::{TaskCallback, TaskMeta};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use std::fmt;
@@ -724,7 +724,7 @@ impl Builder {
     /// })
     /// # }
     /// ```
-    #[cfg(not(loom))]
+    #[cfg(all(not(loom), tokio_unstable))]
     pub fn on_task_spawn<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
@@ -766,7 +766,7 @@ impl Builder {
     /// })
     /// # }
     /// ```
-    #[cfg(not(loom))]
+    #[cfg(all(not(loom), tokio_unstable))]
     pub fn on_task_terminate<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
