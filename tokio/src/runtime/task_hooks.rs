@@ -16,6 +16,7 @@ pub(crate) struct TaskHooks {
 
 /// Task metadata supplied to user-provided hooks for task events.
 #[allow(missing_debug_implementations)]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 pub struct TaskMeta<'a> {
     /// The opaque ID of the task.
     #[cfg(tokio_unstable)]
