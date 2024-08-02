@@ -1,7 +1,7 @@
 #![cfg_attr(loom, allow(unused_imports))]
 
 use crate::runtime::handle::Handle;
-#[cfg!(tokio_unstable)]
+#[cfg(tokio_unstable)]
 use crate::runtime::TaskMeta;
 use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
