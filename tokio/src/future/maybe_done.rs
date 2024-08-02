@@ -10,7 +10,7 @@ pin_project! {
     #[derive(Debug)]
     #[project = MaybeDoneProj]
     #[project_replace = MaybeDoneProjReplace]
-    //#[repr(C)] // https://github.com/rust-lang/miri/issues/3780
+    #[repr(C)] // https://github.com/rust-lang/miri/issues/3780
     pub enum MaybeDone<Fut: Future> {
         /// A not-yet-completed future.
         Future { #[pin] future: Fut },
