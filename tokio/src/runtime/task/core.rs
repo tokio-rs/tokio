@@ -196,6 +196,7 @@ generate_addr_of_methods! {
 }
 
 /// Either the future or the output.
+#[repr(C)] // https://github.com/rust-lang/miri/issues/3780
 pub(super) enum Stage<T: Future> {
     Running(T),
     Finished(super::Result<T::Output>),
