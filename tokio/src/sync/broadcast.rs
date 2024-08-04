@@ -997,31 +997,30 @@ impl<T> Receiver<T> {
         (next_send_pos - self.next) as usize
     }
 
-    
     /// Returns the number of active receivers.
-    /// 
+    ///
     /// # Note
     ///
     /// It is not guaranteed that a sent message will reach this number of
     /// receivers. Active receivers may never call [`recv`] again before
     /// dropping.
-    /// 
+    ///
     /// [`recv`]: crate::sync::broadcast::Receiver::recv
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use tokio::sync::broadcast;
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() {
     ///     let (tx, rx) = broadcast::channel(16);
-    /// 
+    ///
     ///     assert_eq!(1, rx.receiver_count());
-    /// 
+    ///
     ///     let mut _rx2 = rx.resubscribe();
     ///     assert_eq!(2, _rx2.receiver_count());
-    /// 
+    ///
     ///     tx.send(10).unwrap();
     /// }
     /// ```
