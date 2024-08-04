@@ -18,6 +18,7 @@
 //! [`AsyncRead`]: tokio::io::AsyncRead
 //! [`AsyncWrite`]: tokio::io::AsyncWrite
 
+use bstr::BStr;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::sync::mpsc;
 use tokio::time::{self, Duration, Instant, Sleep};
@@ -256,7 +257,7 @@ impl Inner {
                 Action::Write(ref mut expect) => {
                     let n = cmp::min(src.len(), expect.len());
 
-                    assert_eq!(&src[..n], &expect[..n]);
+                    assert_eq!(ShowBytes(src, n), ShowBytes(expect, n));
 
                     // Drop data that was matched
                     expect.drain(..n);
@@ -475,8 +476,16 @@ impl Drop for Mock {
         }
 
         self.inner.actions.iter().for_each(|a| match a {
-            Action::Read(data) => assert!(data.is_empty(), "There is still data left to read."),
-            Action::Write(data) => assert!(data.is_empty(), "There is still data left to write."),
+            Action::Read(data) => assert!(
+                data.is_empty(),
+                "There is still data left to read: {:?}",
+                ShowBytes(data, 10)
+            ),
+            Action::Write(data) => assert!(
+                data.is_empty(),
+                "There is still data left to write: {:?}",
+                ShowBytes(data, 10)
+            ),
             _ => (),
         });
     }
@@ -506,5 +515,26 @@ fn is_task_ctx() -> bool {
 impl fmt::Debug for Inner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Inner {{...}}")
+    }
+}
+
+struct ShowBytes<'a>(&'a [u8], usize);
+
+impl<'a> fmt::Debug for ShowBytes<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let n = self.0.len();
+        let limit = self.1;
+        if self.0.len() <= limit {
+            write!(f, "{:?}", BStr::new(self.0))
+        } else {
+            let bytes = BStr::new(&self.0[..limit]);
+            write!(f, "{bytes:?} plus {} more bytes", n - limit)
+        }
+    }
+}
+
+impl<'a> PartialEq for ShowBytes<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0[..self.1] == other.0[..other.1]
     }
 }
