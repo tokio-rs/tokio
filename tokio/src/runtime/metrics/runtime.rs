@@ -172,6 +172,9 @@ impl RuntimeMetrics {
         }
 
         cfg_64bit_metrics! {
+             /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the number of tasks spawned in this runtime since it was created.
             ///
             /// This count starts at zero when the runtime is created and increases by one each time a task is spawned.
@@ -195,7 +198,9 @@ impl RuntimeMetrics {
             pub fn spawned_tasks_count(&self) -> u64 {
                 self.handle.inner.spawned_tasks_count()
             }
-
+            /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the number of tasks scheduled from **outside** of the runtime.
             ///
             /// The remote schedule count starts at zero when the runtime is created and
@@ -227,7 +232,9 @@ impl RuntimeMetrics {
                     .remote_schedule_count
                     .load(Relaxed)
             }
-
+            /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the number of times that tasks have been forced to yield back to the scheduler
             /// after exhausting their task budgets.
             ///
@@ -242,7 +249,9 @@ impl RuntimeMetrics {
                     .budget_forced_yield_count
                     .load(Relaxed)
             }
-
+            /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the total number of times the given worker thread has parked.
             ///
             /// The worker park count starts at zero when the runtime is created and
@@ -285,7 +294,9 @@ impl RuntimeMetrics {
                     .park_count
                     .load(Relaxed)
             }
-
+            /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the total number of times the given worker thread has parked
             /// and unparked.
             ///
@@ -340,7 +351,9 @@ impl RuntimeMetrics {
                     .load(Relaxed)
             }
 
-
+            /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the number of times the given worker thread unparked but
             /// performed no work before parking again.
             ///
@@ -383,7 +396,9 @@ impl RuntimeMetrics {
                     .noop_count
                     .load(Relaxed)
             }
-
+            /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the number of tasks the given worker thread stole from
             /// another worker thread.
             ///
@@ -429,7 +444,9 @@ impl RuntimeMetrics {
                     .steal_count
                     .load(Relaxed)
             }
-
+            /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the number of times the given worker thread stole tasks from
             /// another worker thread.
             ///
@@ -475,7 +492,9 @@ impl RuntimeMetrics {
                     .steal_operations
                     .load(Relaxed)
             }
-
+            /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the number of tasks the given worker thread has polled.
             ///
             /// The worker poll count starts at zero when the runtime is created and
@@ -516,7 +535,9 @@ impl RuntimeMetrics {
                     .poll_count
                     .load(Relaxed)
             }
-
+             /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the amount of time the given worker thread has been busy.
             ///
             /// The worker busy duration starts at zero when the runtime is created and
@@ -562,6 +583,9 @@ impl RuntimeMetrics {
                     .load(Relaxed);
                 Duration::from_nanos(nanos)
             }
+             /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
 
             /// Returns the number of tasks scheduled from **within** the runtime on the
             /// given worker's local queue.
@@ -607,6 +631,9 @@ impl RuntimeMetrics {
                     .local_schedule_count
                     .load(Relaxed)
             }
+             /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
 
             /// Returns the number of times the given worker thread saturated its local
             /// queue.
@@ -845,6 +872,9 @@ impl RuntimeMetrics {
         }
 
         cfg_64bit_metrics! {
+            /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the number of times the given worker polled tasks with a poll
             /// duration within the given bucket's range.
             ///
@@ -909,7 +939,9 @@ impl RuntimeMetrics {
                     .map(|histogram| histogram.get(bucket))
                     .unwrap_or_default()
             }
-
+            /// This method requires both:
+            /// - The `tokio_unstable` configuration flag
+            /// - A target architecture with 64-bit atomics
             /// Returns the mean duration of task polls, in nanoseconds.
             ///
             /// This is an exponentially weighted moving average. Currently, this metric
@@ -978,6 +1010,9 @@ impl RuntimeMetrics {
 
         cfg_net! {
             cfg_64bit_metrics! {
+                /// This method requires both:
+                /// - The `tokio_unstable` configuration flag
+                /// - A target architecture with 64-bit atomics and net feature enabled
                 /// Returns the number of file descriptors that have been registered with the
                 /// runtime's I/O driver.
                 ///
@@ -1004,7 +1039,9 @@ impl RuntimeMetrics {
                         m.fd_registered_count.load(Relaxed)
                     })
                 }
-
+                /// This method requires both:
+                /// - The `tokio_unstable` configuration flag
+                /// - A target architecture with 64-bit atomics and net feature enabled
                 /// Returns the number of file descriptors that have been deregistered by the
                 /// runtime's I/O driver.
                 ///
@@ -1026,7 +1063,9 @@ impl RuntimeMetrics {
                         m.fd_deregistered_count.load(Relaxed)
                     })
                 }
-
+                /// This method requires both:
+                /// - The `tokio_unstable` configuration flag
+                /// - A target architecture with 64-bit atomics and net feature enabled
                 /// Returns the number of ready events processed by the runtime's
                 /// I/O driver.
                 ///
