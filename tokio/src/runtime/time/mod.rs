@@ -324,7 +324,6 @@ impl Handle {
         }
 
         while let Some(expiration) = lock.poll(now) {
-            lock.set_elapsed(expiration.deadline);
             // It is critical for `GuardedLinkedList` safety that the guard node is
             // pinned in memory and is not dropped until the guarded list is dropped.
             let guard = TimerShared::new(id);
@@ -351,6 +350,7 @@ impl Handle {
                             waker_list.push(waker);
 
                             if !waker_list.can_push() {
+                                lock.occupied_bit_maintain(&expiration);
                                 // Wake a batch of wakers. To avoid deadlock,
                                 // we must do this with the lock temporarily dropped.
                                 drop(lock);
@@ -367,6 +367,7 @@ impl Handle {
                     }
                 }
             }
+            lock.set_elapsed(expiration.deadline);
             lock.occupied_bit_maintain(&expiration);
         }
 
