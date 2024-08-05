@@ -2,6 +2,7 @@ use crate::io::util::fill_buf::{fill_buf, FillBuf};
 use crate::io::util::lines::{lines, Lines};
 use crate::io::util::read_line::{read_line, ReadLine};
 use crate::io::util::read_until::{read_until, ReadUntil};
+use crate::io::util::read_until_slice::{read_until_slice, ReadUntilSlice};
 use crate::io::util::split::{split, Split};
 use crate::io::AsyncBufRead;
 
@@ -99,6 +100,96 @@ cfg_io_util! {
         {
             read_until(self, byte, buf)
         }
+
+        /// Reads all bytes into `buf` until the delimiter or EOF is reached.
+        ///
+        /// Equivalent to:
+        ///
+        /// ```ignore
+        /// async fn read_until_slice<'a, 'b>(&'a mut self, delimiter: &'b [u8], buf: &'a mut Vec<u8>) -> io::Result<usize>;
+        /// ```
+        ///
+        /// This function will read bytes from the underlying stream until the
+        /// delimiter or EOF is found. Once found, all bytes up to, and including,
+        /// the delimiter (if found) will be appended to `buf`.
+        ///
+        /// If successful, this function will return the total number of bytes read.
+        ///
+        /// If this function returns `Ok(0)`, the stream has reached EOF.
+        ///
+        /// # Errors
+        ///
+        /// This function will ignore all instances of [`ErrorKind::Interrupted`] and
+        /// will otherwise return any errors returned by [`fill_buf`].
+        ///
+        /// If an I/O error is encountered then all bytes read so far will be
+        /// present in `buf` and its length will have been adjusted appropriately.
+        ///
+        /// [`fill_buf`]: AsyncBufRead::poll_fill_buf
+        /// [`ErrorKind::Interrupted`]: std::io::ErrorKind::Interrupted
+        ///
+        /// # Cancel safety
+        ///
+        /// This method is not cancellation safe. If the method is used as the
+        /// event in a [`tokio::select!`](crate::select) statement and some
+        /// other branch completes first, then it is not guaranted to find the
+        /// delimiter in the next call to `read_until_slice`.
+        ///
+        /// This function does not behave like [`read_until`] because the
+        /// delimiter can be split across multiple read calls and thus might
+        /// haven partially read in a previous call to `read_until_slice`.
+        ///
+        /// # Examples
+        ///
+        /// [`std::io::Cursor`][`Cursor`] is a type that implements `BufRead`. In
+        /// this example, we use [`Cursor`] to read all the bytes in a byte slice
+        /// in hyphen delimited segments:
+        ///
+        /// [`Cursor`]: std::io::Cursor
+        ///
+        /// ```
+        /// use tokio::io::AsyncBufReadExt;
+        ///
+        /// use std::io::Cursor;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let mut cursor = Cursor::new(b"lorem\r\nipsum");
+        ///     let mut buf = vec![];
+        ///
+        ///     // cursor is at 'l'
+        ///     let num_bytes = cursor.read_until_slice(b"\r\n", &mut buf)
+        ///         .await
+        ///         .expect("reading from cursor won't fail");
+        ///
+        ///     assert_eq!(num_bytes, 7);
+        ///     assert_eq!(buf, b"lorem\r\n");
+        ///     buf.clear();
+        ///
+        ///     // cursor is at 'i'
+        ///     let num_bytes = cursor.read_until_slice(b"\r\n", &mut buf)
+        ///         .await
+        ///         .expect("reading from cursor won't fail");
+        ///
+        ///     assert_eq!(num_bytes, 5);
+        ///     assert_eq!(buf, b"ipsum");
+        ///     buf.clear();
+        ///
+        ///     // cursor is at EOF
+        ///     let num_bytes = cursor.read_until_slice(b"\r\n", &mut buf)
+        ///         .await
+        ///         .expect("reading from cursor won't fail");
+        ///     assert_eq!(num_bytes, 0);
+        ///     assert_eq!(buf, b"");
+        /// }
+        /// ```
+        fn read_until_slice<'a, 'b>(&'a mut self, delimiter: &'b [u8], buf: &'a mut Vec<u8>) -> ReadUntilSlice<'a, 'b, Self>
+        where
+            Self: Unpin,
+        {
+            read_until_slice(self, delimiter, buf)
+        }
+
 
         /// Reads all bytes until a newline (the 0xA byte) is reached, and append
         /// them to the provided buffer.
