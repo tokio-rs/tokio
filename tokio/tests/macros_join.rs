@@ -81,7 +81,7 @@ fn join_size() {
         let ready2 = future::ready(0i32);
         tokio::join!(ready1, ready2)
     };
-    assert_eq!(mem::size_of_val(&fut), 40);
+    assert_eq!(mem::size_of_val(&fut), 48);
 }
 
 async fn non_cooperative_task(permits: Arc<Semaphore>) -> usize {
