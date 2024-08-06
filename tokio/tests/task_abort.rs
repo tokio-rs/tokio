@@ -238,9 +238,14 @@ fn test_join_error_display() {
         .await
         .unwrap_err();
 
-        assert_eq!(
-            join_err.to_string(),
-            "task 1 panicked with message \"Format-args payload: 1234\""
+        // We can't assert the full output because the task ID can change.
+        let join_err_str = join_err.to_string();
+
+        assert!(
+            join_err_str.starts_with("task ")
+                && join_err_str.ends_with(" panicked with message \"Format-args payload: 1234\""),
+            "Unexpected join_err_str {:?}",
+            join_err_str
         );
 
         // `&'static str` payload
@@ -248,9 +253,13 @@ fn test_join_error_display() {
             .await
             .unwrap_err();
 
-        assert_eq!(
-            join_err.to_string(),
-            "task 2 panicked with message \"Const payload\""
+        let join_err_str = join_err.to_string();
+
+        assert!(
+            join_err_str.starts_with("task ")
+                && join_err_str.ends_with(" panicked with message \"Const payload\""),
+            "Unexpected join_err_str {:?}",
+            join_err_str
         );
 
         // Non-string payload
@@ -258,7 +267,13 @@ fn test_join_error_display() {
             .await
             .unwrap_err();
 
-        assert_eq!(join_err.to_string(), "task 3 panicked");
+        let join_err_str = join_err.to_string();
+
+        assert!(
+            join_err_str.starts_with("task ") && join_err_str.ends_with(" panicked"),
+            "Unexpected join_err_str {:?}",
+            join_err_str
+        );
     });
 }
 
@@ -277,9 +292,14 @@ fn test_join_error_debug() {
         .await
         .unwrap_err();
 
-        assert_eq!(
-            format!("{:?}", join_err),
-            "JoinError::Panic(Id(1), \"Format-args payload: 1234\", ...)"
+        // We can't assert the full output because the task ID can change.
+        let join_err_str = format!("{:?}", join_err);
+
+        assert!(
+            join_err_str.starts_with("JoinError::Panic(Id(")
+                && join_err_str.ends_with("), \"Format-args payload: 1234\", ...)"),
+            "Unexpected join_err_str {:?}",
+            join_err_str
         );
 
         // `&'static str` payload
@@ -287,9 +307,13 @@ fn test_join_error_debug() {
             .await
             .unwrap_err();
 
-        assert_eq!(
-            format!("{:?}", join_err),
-            "JoinError::Panic(Id(2), \"Const payload\", ...)"
+        let join_err_str = format!("{:?}", join_err);
+
+        assert!(
+            join_err_str.starts_with("JoinError::Panic(Id(")
+                && join_err_str.ends_with("), \"Const payload\", ...)"),
+            "Unexpected join_err_str {:?}",
+            join_err_str
         );
 
         // Non-string payload
@@ -297,6 +321,12 @@ fn test_join_error_debug() {
             .await
             .unwrap_err();
 
-        assert_eq!(format!("{:?}", join_err), "JoinError::Panic(Id(3), ...)");
+        let join_err_str = format!("{:?}", join_err);
+
+        assert!(
+            join_err_str.starts_with("JoinError::Panic(Id(") && join_err_str.ends_with("), ...)"),
+            "Unexpected join_err_str {:?}",
+            join_err_str
+        );
     });
 }
