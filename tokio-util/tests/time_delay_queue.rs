@@ -880,6 +880,19 @@ async fn peek() {
     assert!(queue.peek().is_none());
 }
 
+#[tokio::test(start_paused = true)]
+async fn wake_after_remove_last() {
+    let mut queue = task::spawn(DelayQueue::new());
+    let key = queue.insert("foo", ms(1000));
+
+    assert_pending!(poll!(queue));
+
+    queue.remove(&key);
+
+    assert!(queue.is_woken());
+    assert!(assert_ready!(poll!(queue)).is_none());
+}
+
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
