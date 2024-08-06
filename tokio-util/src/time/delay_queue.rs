@@ -766,6 +766,12 @@ impl<T> DelayQueue<T> {
             }
         }
 
+        if self.slab.is_empty() {
+            if let Some(waker) = self.waker.take() {
+                waker.wake();
+            }
+        }
+
         Expired {
             key: Key::new(key.index),
             data: data.inner,
