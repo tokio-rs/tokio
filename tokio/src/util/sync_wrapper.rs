@@ -29,7 +29,7 @@ impl<T> SyncWrapper<T> {
 
 impl SyncWrapper<Box<dyn Any + Send>> {
     /// Attempt to downcast using [`Any::downcast_ref()`] to a type that is known to be `Sync`.
-    pub fn downcast_ref_sync<T: Any + Sync>(&self) -> Option<&T> {
+    pub(crate) fn downcast_ref_sync<T: Any + Sync>(&self) -> Option<&T> {
         // SAFETY: if the downcast fails, the inner value is not touched,
         // so no thread-safety violation can occur.
         self.value.downcast_ref()
