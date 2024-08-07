@@ -36,6 +36,16 @@ pub enum TrySendError<T> {
     Closed(T),
 }
 
+impl<T> TrySendError<T> {
+    /// Consume the `TrySendError`, returning the unsent value.
+    pub fn into_inner(self) -> T {
+        match self {
+            TrySendError::Full(val) => val,
+            TrySendError::Closed(val) => val,
+        }
+    }
+}
+
 impl<T> fmt::Debug for TrySendError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
@@ -121,6 +131,16 @@ cfg_time! {
         /// The receive half of the channel was explicitly closed or has been
         /// dropped.
         Closed(T),
+    }
+
+    impl<T> SendTimeoutError<T> {
+        /// Consume the `SendTimeoutError`, returning the unsent value.
+        pub fn into_inner(self) -> T {
+            match self {
+                SendTimeoutError::Timeout(val) => val,
+                SendTimeoutError::Closed(val) => val,
+            }
+        }
     }
 
     impl<T> fmt::Debug for SendTimeoutError<T> {
