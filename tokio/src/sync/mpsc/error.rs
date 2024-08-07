@@ -37,7 +37,7 @@ pub enum TrySendError<T> {
 }
 
 impl<T> TrySendError<T> {
-    /// Consume the `TrySendError`, returning the unsent value
+    /// Consume the `TrySendError`, returning the unsent value.
     pub fn into_inner(self) -> T {
         match self {
             TrySendError::Full(val) => val,
@@ -134,7 +134,7 @@ cfg_time! {
     }
 
     impl<T> SendTimeoutError<T> {
-        /// Consume the `SendTimeoutError`, returning the unsent value
+        /// Consume the `SendTimeoutError`, returning the unsent value.
         pub fn into_inner(self) -> T {
             match self {
                 SendTimeoutError::Timeout(val) => val,
