@@ -1,10 +1,23 @@
+struct RawWakerVTable {
+    void (*clone)(void *);
+
+    void (*wake)(void *);
+
+    void (*wake_by_ref)(void *);
+
+    void (*drop)(void *);
+} __attribute__((__packed__));
+
+struct Waker {
+    void *data;
+};
+
 struct Context {
-    void (*wake) (void*);
 
 };
 
 struct Task {
-    void* data;
-    void* (*poll) (void*);
+    void *data;
+
 };
 
