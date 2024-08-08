@@ -96,6 +96,7 @@ mod instant;
 pub use self::instant::Instant;
 
 mod interval;
+pub(crate) use instant::InstantInner;
 pub use interval::{interval, interval_at, Interval, MissedTickBehavior};
 
 mod sleep;
