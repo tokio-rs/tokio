@@ -804,6 +804,47 @@ impl<T> Sender<T> {
         Arc::ptr_eq(&self.shared, &other.shared)
     }
 
+    /// A future which completes when the number of [Receiver]s subscribed to this `Sender` reaches
+    /// zero.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use futures::FutureExt;
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx1) = broadcast::channel::<u32>(16);
+    ///     let mut rx2 = tx.subscribe();
+    ///
+    ///     tokio::spawn(async move {
+    ///         assert_eq!(rx1.recv().await.unwrap(), 10);
+    ///     });
+    ///
+    ///     let _ = tx.send(10);
+    ///     assert!(tx.closed().now_or_never().is_none());
+    ///
+    ///     let _ = tokio::spawn(async move {
+    ///         assert_eq!(rx2.recv().await.unwrap(), 10);
+    ///     }).await;
+    ///
+    ///     assert!(tx.closed().now_or_never().is_some());
+    /// }
+    /// ```
+    pub async fn closed(&self) {
+        std::future::poll_fn(|_| {
+            let tail = self.shared.tail.lock();
+
+            if tail.closed || tail.rx_cnt == 0 {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        })
+        .await;
+    }
+
     fn close_channel(&self) {
         let mut tail = self.shared.tail.lock();
         tail.closed = true;
