@@ -42,7 +42,7 @@ cfg_io_util! {
     pub use lines::Lines;
 
     mod mem;
-    pub use mem::{duplex, DuplexStream};
+    pub use mem::{duplex, simplex, DuplexStream, SimplexStream};
 
     mod read;
     mod read_buf;
