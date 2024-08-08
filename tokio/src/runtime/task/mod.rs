@@ -210,6 +210,7 @@ use crate::future::Future;
 use crate::util::linked_list;
 use crate::util::sharded_list;
 
+use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::{fmt, mem};
@@ -255,6 +256,12 @@ unsafe impl<S> Sync for UnownedTask<S> {}
 /// Task result sent back.
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
+/// Hooks for scheduling tasks which are needed in the task harness.
+#[derive(Clone)]
+pub(crate) struct TaskHarnessScheduleHooks {
+    pub(crate) task_terminate_callback: Option<TaskCallback>,
+}
+
 pub(crate) trait Schedule: Sync + Sized + 'static {
     /// The task has completed work and is ready to be released. The scheduler
     /// should release it immediately and return it. The task module will batch
@@ -265,6 +272,8 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
 
     /// Schedule the task
     fn schedule(&self, task: Notified<Self>);
+
+    fn hooks(&self) -> TaskHarnessScheduleHooks;
 
     /// Schedule the task to run in the near future, yielding the thread to
     /// other tasks.
