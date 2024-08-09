@@ -296,6 +296,7 @@ impl<T> JoinHandle<T> {
     /// # }
     /// ```
     /// [cancelled]: method@super::error::JoinError::is_cancelled
+    #[must_use = "abort handles do nothing unless `.abort` is called"]
     pub fn abort_handle(&self) -> super::AbortHandle {
         self.raw.ref_inc();
         super::AbortHandle::new(self.raw)
