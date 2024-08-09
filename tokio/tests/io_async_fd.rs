@@ -743,7 +743,7 @@ fn configure_timestamping_socket(udp_socket: &std::net::UdpSocket) -> std::io::R
             libc::SOL_SOCKET,
             libc::SO_TIMESTAMP,
             &options as *const _ as *const libc::c_void,
-            size_of_val(&options) as libc::socklen_t,
+            std::mem::size_of_val(&options) as libc::socklen_t,
         )
     };
 
@@ -773,7 +773,7 @@ async fn await_error_readiness_invalid_address() {
             libc::SOL_IP,
             libc::IP_RECVERR,
             &recv_err as *const _ as *const libc::c_void,
-            size_of_val(&recv_err) as libc::socklen_t,
+            std::mem::size_of_val(&recv_err) as libc::socklen_t,
         );
         if res == -1 {
             panic!("{:?}", std::io::Error::last_os_error());
@@ -804,7 +804,7 @@ async fn await_error_readiness_invalid_address() {
 
         // Prepare the destination address for the sendmsg call
         let dest_sockaddr: *const libc::sockaddr = &dest_addr as *const _ as *const libc::sockaddr;
-        let dest_addrlen: libc::socklen_t = size_of_val(&dest_addr) as libc::socklen_t;
+        let dest_addrlen: libc::socklen_t = std::mem::size_of_val(&dest_addr) as libc::socklen_t;
 
         let mut msg: libc::msghdr = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
         msg.msg_name = dest_sockaddr as *mut libc::c_void;

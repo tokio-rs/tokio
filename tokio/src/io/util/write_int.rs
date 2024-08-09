@@ -10,7 +10,7 @@ use std::task::{Context, Poll};
 
 macro_rules! writer {
     ($name:ident, $ty:ty, $writer:ident) => {
-        writer!($name, $ty, $writer, size_of::<$ty>());
+        writer!($name, $ty, $writer, std::mem::size_of::<$ty>());
     };
     ($name:ident, $ty:ty, $writer:ident, $bytes:expr) => {
         pin_project! {

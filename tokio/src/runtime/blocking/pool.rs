@@ -300,7 +300,7 @@ impl Spawner {
         R: Send + 'static,
     {
         let (join_handle, spawn_result) =
-            if cfg!(debug_assertions) && size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
                 self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, None, rt)
             } else {
                 self.spawn_blocking_inner(func, Mandatory::NonMandatory, None, rt)
@@ -327,7 +327,7 @@ impl Spawner {
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            let (join_handle, spawn_result) = if cfg!(debug_assertions) && size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            let (join_handle, spawn_result) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
                 self.spawn_blocking_inner(
                     Box::new(func),
                     Mandatory::Mandatory,
