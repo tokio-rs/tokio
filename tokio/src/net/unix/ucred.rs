@@ -126,7 +126,6 @@ pub(crate) mod impl_netbsd {
 
     use libc::{c_void, getsockopt, socklen_t, unpcbid, LOCAL_PEEREID, SOL_SOCKET};
     use std::io;
-    use std::mem::size_of;
     use std::os::unix::io::AsRawFd;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
@@ -205,7 +204,6 @@ pub(crate) mod impl_macos {
 
     use libc::{c_void, getpeereid, getsockopt, pid_t, LOCAL_PEEREPID, SOL_LOCAL};
     use std::io;
-    use std::mem::size_of;
     use std::mem::MaybeUninit;
     use std::os::unix::io::AsRawFd;
 

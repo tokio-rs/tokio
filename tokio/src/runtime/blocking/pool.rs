@@ -300,7 +300,7 @@ impl Spawner {
         R: Send + 'static,
     {
         let (join_handle, spawn_result) =
-            if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            if cfg!(debug_assertions) && size_of::<F>() > BOX_FUTURE_THRESHOLD {
                 self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, None, rt)
             } else {
                 self.spawn_blocking_inner(func, Mandatory::NonMandatory, None, rt)
@@ -327,7 +327,7 @@ impl Spawner {
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            let (join_handle, spawn_result) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            let (join_handle, spawn_result) = if cfg!(debug_assertions) && size_of::<F>() > BOX_FUTURE_THRESHOLD {
                 self.spawn_blocking_inner(
                     Box::new(func),
                     Mandatory::Mandatory,
@@ -461,7 +461,7 @@ impl Spawner {
         shutdown_tx: shutdown::Sender,
         rt: &Handle,
         id: usize,
-    ) -> std::io::Result<thread::JoinHandle<()>> {
+    ) -> io::Result<thread::JoinHandle<()>> {
         let mut builder = thread::Builder::new().name((self.inner.thread_name)());
 
         if let Some(stack_size) = self.inner.stack_size {
@@ -497,8 +497,8 @@ cfg_unstable_metrics! {
 
 // Tells whether the error when spawning a thread is temporary.
 #[inline]
-fn is_temporary_os_thread_error(error: &std::io::Error) -> bool {
-    matches!(error.kind(), std::io::ErrorKind::WouldBlock)
+fn is_temporary_os_thread_error(error: &io::Error) -> bool {
+    matches!(error.kind(), io::ErrorKind::WouldBlock)
 }
 
 impl Inner {
