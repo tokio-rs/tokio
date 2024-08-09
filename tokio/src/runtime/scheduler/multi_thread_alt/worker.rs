@@ -1592,12 +1592,3 @@ fn with_current<R>(f: impl FnOnce(Option<&Context>) -> R) -> R {
         _ => f(None),
     })
 }
-
-// `u32::abs_diff` is not available on Tokio's MSRV.
-fn abs_diff(a: u32, b: u32) -> u32 {
-    if a > b {
-        a - b
-    } else {
-        b - a
-    }
-}

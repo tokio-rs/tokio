@@ -70,24 +70,24 @@ impl<T: Future, S: Schedule> OffsetHelper<T, S> {
     // inside `get_trailer_offset` because trait bounds on generic parameters
     // of const fn are unstable on our MSRV.
     const TRAILER_OFFSET: usize = get_trailer_offset(
-        std::mem::size_of::<Header>(),
-        std::mem::size_of::<Core<T, S>>(),
-        std::mem::align_of::<Core<T, S>>(),
-        std::mem::align_of::<Trailer>(),
+        size_of::<Header>(),
+        size_of::<Core<T, S>>(),
+        align_of::<Core<T, S>>(),
+        align_of::<Trailer>(),
     );
 
     // The `scheduler` is the first field of `Core`, so it has the same
     // offset as `Core`.
     const SCHEDULER_OFFSET: usize = get_core_offset(
-        std::mem::size_of::<Header>(),
-        std::mem::align_of::<Core<T, S>>(),
+        size_of::<Header>(),
+        align_of::<Core<T, S>>(),
     );
 
     const ID_OFFSET: usize = get_id_offset(
-        std::mem::size_of::<Header>(),
-        std::mem::align_of::<Core<T, S>>(),
-        std::mem::size_of::<S>(),
-        std::mem::align_of::<Id>(),
+        size_of::<Header>(),
+        align_of::<Core<T, S>>(),
+        size_of::<S>(),
+        align_of::<Id>(),
     );
 }
 
