@@ -89,7 +89,7 @@ impl<'a> Builder<'a> {
         Fut::Output: Send + 'static,
     {
         Ok(
-            if cfg!(debug_assertions) && size_of::<Fut>() > BOX_FUTURE_THRESHOLD {
+            if cfg!(debug_assertions) && std::mem::size_of::<Fut>() > BOX_FUTURE_THRESHOLD {
                 super::spawn::spawn_inner(Box::pin(future), self.name)
             } else {
                 super::spawn::spawn_inner(future, self.name)
