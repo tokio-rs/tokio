@@ -1292,7 +1292,7 @@ impl Worker {
         let next = core.stats.tuned_global_queue_interval(&cx.shared().config);
 
         // Smooth out jitter
-        if self.global_queue_interval.abs_diff(next) > 2 {
+        if u32::abs_diff(self.global_queue_interval, next) > 2 {
             self.global_queue_interval = next;
         }
     }
