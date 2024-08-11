@@ -1014,7 +1014,7 @@ impl Core {
             .tuned_global_queue_interval(&worker.handle.shared.config);
 
         // Smooth out jitter
-        if abs_diff(self.global_queue_interval, next) > 2 {
+        if u32::abs_diff(self.global_queue_interval, next) > 2 {
             self.global_queue_interval = next;
         }
     }
@@ -1248,13 +1248,4 @@ fn with_current<R>(f: impl FnOnce(Option<&Context>) -> R) -> R {
         Some(MultiThread(ctx)) => f(Some(ctx)),
         _ => f(None),
     })
-}
-
-// `u32::abs_diff` is not available on Tokio's MSRV.
-fn abs_diff(a: u32, b: u32) -> u32 {
-    if a > b {
-        a - b
-    } else {
-        b - a
-    }
 }

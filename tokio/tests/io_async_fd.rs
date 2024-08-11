@@ -372,7 +372,7 @@ async fn multiple_waiters() {
             panic!("Tasks exited unexpectedly")
         },
         _ = barrier.wait() => {}
-    };
+    }
 
     b.write_all(b"0").unwrap();
 
