@@ -457,15 +457,14 @@ async fn anon_pipe_simple_send() -> io::Result<()> {
 }
 
 #[tokio::test]
-async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
+async fn anon_pipe_spawn_printf() -> std::io::Result<()> {
     use tokio::process::Command;
 
     const DATA: &str = "this is some data to write to the pipe";
 
     let (tx, mut rx) = pipe::pipe()?;
 
-    let status = Command::new("echo")
-        .arg("-n")
+    let status = Command::new("printf")
         .arg(DATA)
         .stdout(tx.into_blocking_fd()?)
         .status();
