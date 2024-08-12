@@ -38,7 +38,7 @@ banner build
 ptime -m cargo test --no-run --all --verbose --features full
 
 banner tests
-ptime -m cargo nextest run --features full
+ptime -m cargo nextest run --features full --no-fail-fast
 
 banner doctests
 ptime -m cargo test --doc --verbose --features full
