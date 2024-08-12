@@ -1,0 +1,8 @@
+# Repository-level Buildomat configuration.
+# See: https://github.com/oxidecomputer/buildomat#per-repository-configuration
+
+# Enable buildomat. This one should be self-explanatory.
+enable = true
+# Allow CI runs for PRs from users outside the `tokio-rs` organization. Our
+# buildomat jobs don't touch any secrets/keys, so this should be fine.
+org_only = false
