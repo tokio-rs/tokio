@@ -406,6 +406,16 @@ async fn epollhup() -> io::Result<()> {
     drop(listener);
 
     let err = connect.await.unwrap_err();
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionReset);
+
+    // On illumos (and presumably other Solaris descendents), `connect(3SOCKET)`
+    // returns `ECONNREFUSED` here rather than `ECONNRESET`.
+    //
+    // See: https://illumos.org/man/3SOCKET/connect
+    let expected_errno = if cfg!(target_os = "illumos") || cfg!(target_os = "solaris") {
+        io::ErrorKind::ConnectionRefused
+    } else {
+        io::ErrorKind::ConnectionReset
+    };
+    assert_eq!(err.kind(), expected_errno);
     Ok(())
 }
