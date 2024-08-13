@@ -39,13 +39,13 @@ macro_rules! doc {
         /// 2. Aggregate the `<async expression>`s from each branch, including the
         ///    disabled ones. If the branch is disabled, `<async expression>` is still
         ///    evaluated, but the resulting future is not polled.
-        /// 3. Concurrently await on the results for all remaining `<async expression>`s.
-        /// 4. Once an `<async expression>` returns a value, attempt to apply the value
-        ///    to the provided `<pattern>`, if the pattern matches, evaluate `<handler>`
-        ///    and return. If the pattern **does not** match, disable the current branch
-        ///    and for the remainder of the current call to `select!`. Continue from step 3.
-        /// 5. If **all** branches are disabled, evaluate the `else` expression. If no
-        ///    else branch is provided, panic.
+        /// 3. If **all** branches are disabled: go to step 6.
+        /// 4. Concurrently await on the results for all remaining `<async expression>`s.
+        /// 5. Once an `<async expression>` returns a value, attempt to apply the value to the
+        ///    provided `<pattern>`. If the pattern matches, evaluate the `<handler>` and return.
+        ///    If the pattern **does not** match, disable the current branch for the remainder of
+        ///    the current call to `select!`. Continue from step 3.
+        /// 6. Evaluate the `else` expression. If no else expression is provided, panic.
         ///
         /// # Runtime characteristics
         ///
