@@ -409,3 +409,16 @@ async fn epollhup() -> io::Result<()> {
     assert_eq!(err.kind(), io::ErrorKind::ConnectionReset);
     Ok(())
 }
+
+// test for https://github.com/tokio-rs/tokio/issues/6767
+#[tokio::test]
+#[cfg(target_os = "linux")]
+async fn abstract_socket_name() {
+    let socket_path = "\0aaa";
+    let listener = UnixListener::bind(socket_path).unwrap();
+
+    let accept = listener.accept();
+    let connect = UnixStream::connect(&socket_path);
+
+    try_join(accept, connect).await.unwrap();
+}
