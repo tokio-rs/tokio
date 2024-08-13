@@ -99,7 +99,7 @@ impl AtomicOptionNonZeroU64 {
 /// either be canceled (dropped) or their associated entries will reach level
 /// zero and be notified.
 ///
-/// [paper]: http://www.cs.columbia.edu/~nahum/w6998/papers/ton97-timing-wheels.pdf
+/// [paper]: https://ieeexplore.ieee.org/document/650142
 /// [sleep]: crate::time::Sleep
 /// [timeout]: crate::time::Timeout
 /// [interval]: crate::time::Interval
