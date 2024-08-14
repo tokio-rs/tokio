@@ -314,17 +314,9 @@ where
 
         let snapshot = self.state().transition_to_complete();
 
-        // We catch panics here in case dropping the future, invoking a hook or waking the
+        // We catch panics here in case dropping the future or waking the
         // JoinHandle panics.
         let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            if let Some(f) = self.trailer().hooks.task_terminate_callback.as_ref() {
-                f(&TaskMeta {
-                    #[cfg(tokio_unstable)]
-                    id: self.core().task_id,
-                    _phantom: Default::default(),
-                })
-            }
-
             if !snapshot.is_join_interested() {
                 // The `JoinHandle` is not interested in the output of
                 // this task. It is our responsibility to drop the
@@ -335,6 +327,20 @@ where
                 // in task/mod.rs, since the JOIN_WAKER bit is set and the call
                 // to transition_to_complete() above set the COMPLETE bit.
                 self.trailer().wake_join();
+            }
+        }));
+
+        // We catch panics here in case invoking a hook panics.
+        //
+        // We call this in a separate block so that it runs after the task appears to have
+        // completed and will still run if the destructor panics.
+        let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            if let Some(f) = self.trailer().hooks.task_terminate_callback.as_ref() {
+                f(&TaskMeta {
+                    #[cfg(tokio_unstable)]
+                    id: self.core().task_id,
+                    _phantom: Default::default(),
+                })
             }
         }));
 
