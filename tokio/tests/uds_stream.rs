@@ -406,16 +406,17 @@ async fn epollhup() -> io::Result<()> {
     drop(listener);
 
     let err = connect.await.unwrap_err();
-
-    // On illumos (and presumably other Solaris descendents), `connect(3SOCKET)`
-    // returns `ECONNREFUSED` here rather than `ECONNRESET`.
-    //
-    // See: https://illumos.org/man/3SOCKET/connect
-    let expected_errno = if cfg!(target_os = "illumos") || cfg!(target_os = "solaris") {
-        io::ErrorKind::ConnectionRefused
-    } else {
-        io::ErrorKind::ConnectionReset
-    };
-    assert_eq!(err.kind(), expected_errno);
+    let errno = err.kind();
+    assert!(
+        // As far as I can tell, whether we see ECONNREFUSED or ECONNRESET here
+        // seems relatively inconsistent, at least on non-Linux operating
+        // systems. The difference in meaning between these errnos is not
+        // particularly well-defined, so let's just accept either.
+        matches!(
+            errno,
+            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
+        ),
+        "unexpected error kind: {errno:?} (expected ConnectionRefused or ConnectionReset)"
+    );
     Ok(())
 }
