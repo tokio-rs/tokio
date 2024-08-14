@@ -1441,7 +1441,7 @@ impl Shared {
 
     fn push_remote_task_batch<I>(&self, iter: I)
     where
-        I: Iterator<Item=task::Notified<Arc<Handle>>>,
+        I: Iterator<Item = task::Notified<Arc<Handle>>>,
     {
         unsafe {
             self.inject.push_batch(self, iter);
@@ -1450,7 +1450,7 @@ impl Shared {
 
     fn push_remote_task_batch_synced<I>(&self, synced: &mut Synced, iter: I)
     where
-        I: Iterator<Item=task::Notified<Arc<Handle>>>,
+        I: Iterator<Item = task::Notified<Arc<Handle>>>,
     {
         unsafe {
             self.inject.push_batch(&mut synced.inject, iter);
@@ -1525,7 +1525,7 @@ impl Overflow<Arc<Handle>> for Shared {
 
     fn push_batch<I>(&self, iter: I)
     where
-        I: Iterator<Item=task::Notified<Arc<Handle>>>,
+        I: Iterator<Item = task::Notified<Arc<Handle>>>,
     {
         self.push_remote_task_batch(iter)
     }
