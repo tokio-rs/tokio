@@ -412,7 +412,7 @@ async fn epollhup() -> io::Result<()> {
 
 // test for https://github.com/tokio-rs/tokio/issues/6767
 #[tokio::test]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 async fn abstract_socket_name() {
     let socket_path = "\0aaa";
     let listener = UnixListener::bind(socket_path).unwrap();
