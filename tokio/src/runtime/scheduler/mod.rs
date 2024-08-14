@@ -155,11 +155,11 @@ cfg_rt! {
 
         pub(crate) fn hooks(&self) -> &TaskHooks {
             match self {
-                Handle::CurrentThread(h) => &h.scheduler_hooks,
+                Handle::CurrentThread(h) => &h.task_hooks,
                 #[cfg(feature = "rt-multi-thread")]
-                Handle::MultiThread(h) => &h.scheduler_hooks,
+                Handle::MultiThread(h) => &h.task_hooks,
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Handle::MultiThreadAlt(h) => &h.scheduler_hooks,
+                Handle::MultiThreadAlt(h) => &h.task_hooks,
             }
         }
 

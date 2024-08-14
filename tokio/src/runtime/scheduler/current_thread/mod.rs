@@ -47,7 +47,7 @@ pub(crate) struct Handle {
     pub(crate) seed_generator: RngSeedGenerator,
 
     /// User-supplied hooks to invoke for things
-    pub(crate) scheduler_hooks: TaskHooks,
+    pub(crate) task_hooks: TaskHooks,
 }
 
 /// Data required for executing the scheduler. The struct is passed around to
@@ -138,7 +138,7 @@ impl CurrentThread {
             .unwrap_or(DEFAULT_GLOBAL_QUEUE_INTERVAL);
 
         let handle = Arc::new(Handle {
-            scheduler_hooks: TaskHooks {
+            task_hooks: TaskHooks {
                 task_spawn_callback: config.before_spawn.clone(),
                 task_terminate_callback: config.after_termination.clone(),
             },
@@ -447,7 +447,7 @@ impl Handle {
     {
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
 
-        me.scheduler_hooks.spawn(&TaskMeta {
+        me.task_hooks.spawn(&TaskMeta {
             #[cfg(tokio_unstable)]
             id,
             _phantom: Default::default(),
@@ -619,7 +619,7 @@ impl Schedule for Arc<Handle> {
 
     fn hooks(&self) -> TaskHarnessScheduleHooks {
         TaskHarnessScheduleHooks {
-            task_terminate_callback: self.scheduler_hooks.task_terminate_callback.clone(),
+            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
         }
     }
 

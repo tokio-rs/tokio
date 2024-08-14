@@ -303,7 +303,7 @@ pub(super) fn create(
     let (inject, inject_synced) = inject::Shared::new();
 
     let handle = Arc::new(Handle {
-        scheduler_hooks: TaskHooks {
+        task_hooks: TaskHooks {
             task_spawn_callback: config.before_spawn.clone(),
             task_terminate_callback: config.after_termination.clone(),
         },
@@ -1441,7 +1441,7 @@ impl Shared {
 
     fn push_remote_task_batch<I>(&self, iter: I)
     where
-        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+        I: Iterator<Item=task::Notified<Arc<Handle>>>,
     {
         unsafe {
             self.inject.push_batch(self, iter);
@@ -1450,7 +1450,7 @@ impl Shared {
 
     fn push_remote_task_batch_synced<I>(&self, synced: &mut Synced, iter: I)
     where
-        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+        I: Iterator<Item=task::Notified<Arc<Handle>>>,
     {
         unsafe {
             self.inject.push_batch(&mut synced.inject, iter);
@@ -1525,7 +1525,7 @@ impl Overflow<Arc<Handle>> for Shared {
 
     fn push_batch<I>(&self, iter: I)
     where
-        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+        I: Iterator<Item=task::Notified<Arc<Handle>>>,
     {
         self.push_remote_task_batch(iter)
     }
@@ -1562,7 +1562,7 @@ impl task::Schedule for Arc<Handle> {
 
     fn hooks(&self) -> TaskHarnessScheduleHooks {
         TaskHarnessScheduleHooks {
-            task_terminate_callback: self.scheduler_hooks.task_terminate_callback.clone(),
+            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
         }
     }
 

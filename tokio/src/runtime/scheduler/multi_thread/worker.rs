@@ -284,7 +284,7 @@ pub(super) fn create(
 
     let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
-        scheduler_hooks: TaskHooks {
+        task_hooks: TaskHooks {
             task_spawn_callback: config.before_spawn.clone(),
             task_terminate_callback: config.after_termination.clone(),
         },
@@ -1043,7 +1043,7 @@ impl task::Schedule for Arc<Handle> {
 
     fn hooks(&self) -> TaskHarnessScheduleHooks {
         TaskHarnessScheduleHooks {
-            task_terminate_callback: self.scheduler_hooks.task_terminate_callback.clone(),
+            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
         }
     }
 

@@ -29,7 +29,7 @@ pub(crate) struct Handle {
     pub(crate) seed_generator: RngSeedGenerator,
 
     /// User-supplied hooks to invoke for things
-    pub(crate) scheduler_hooks: TaskHooks,
+    pub(crate) task_hooks: TaskHooks,
 }
 
 impl Handle {
@@ -54,7 +54,7 @@ impl Handle {
     {
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
 
-        me.scheduler_hooks.spawn(&TaskMeta {
+        me.task_hooks.spawn(&TaskMeta {
             #[cfg(tokio_unstable)]
             id,
             _phantom: Default::default(),
