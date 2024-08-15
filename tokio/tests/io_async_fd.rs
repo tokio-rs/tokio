@@ -142,10 +142,7 @@ fn drain(mut fd: &FileDescriptor, mut amt: usize) {
             Err(e) if e.kind() == ErrorKind::WouldBlock => {}
             Ok(0) => panic!("unexpected EOF"),
             Err(e) => panic!("unexpected error: {:?}", e),
-            Ok(x) => {
-                amt -= x;
-                continue;
-            }
+            Ok(x) => amt -= x,
         }
     }
 }
