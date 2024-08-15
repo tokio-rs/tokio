@@ -135,15 +135,14 @@ fn socketpair() -> (FileDescriptor, FileDescriptor) {
     fds
 }
 
-fn drain(mut fd: &FileDescriptor) {
+fn drain(mut fd: &FileDescriptor, mut amt: usize) {
     let mut buf = [0u8; 512];
-    #[allow(clippy::unused_io_amount)]
-    loop {
+    while amt > 0 {
         match fd.read(&mut buf[..]) {
-            Err(e) if e.kind() == ErrorKind::WouldBlock => break,
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {}
             Ok(0) => panic!("unexpected EOF"),
             Err(e) => panic!("unexpected error: {:?}", e),
-            Ok(_) => continue,
+            Ok(x) => amt -= x,
         }
     }
 }
@@ -219,10 +218,10 @@ async fn reset_writable() {
     let mut guard = afd_a.writable().await.unwrap();
 
     // Write until we get a WouldBlock. This also clears the ready state.
-    while guard
-        .try_io(|_| afd_a.get_ref().write(&[0; 512][..]))
-        .is_ok()
-    {}
+    let mut bytes = 0;
+    while let Ok(Ok(amt)) = guard.try_io(|_| afd_a.get_ref().write(&[0; 512][..])) {
+        bytes += amt;
+    }
 
     // Writable state should be cleared now.
     let writable = afd_a.writable();
@@ -234,7 +233,7 @@ async fn reset_writable() {
     }
 
     // Read from the other side; we should become writable now.
-    drain(&b);
+    drain(&b, bytes);
 
     let _ = writable.await.unwrap();
 }
@@ -386,7 +385,10 @@ async fn poll_fns() {
     let afd_b = Arc::new(AsyncFd::new(b).unwrap());
 
     // Fill up the write side of A
-    while afd_a.get_ref().write(&[0; 512]).is_ok() {}
+    let mut bytes = 0;
+    while let Ok(amt) = afd_a.get_ref().write(&[0; 512]) {
+        bytes += amt;
+    }
 
     let waker = TestWaker::new();
 
@@ -446,7 +448,7 @@ async fn poll_fns() {
     }
 
     // Make it writable now
-    drain(afd_b.get_ref());
+    drain(afd_b.get_ref(), bytes);
 
     // now we should be writable (ie - the waker for poll_write should still be registered after we wake the read side)
     let _ = write_fut.await;
