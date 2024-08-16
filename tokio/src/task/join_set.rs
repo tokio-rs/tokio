@@ -4,10 +4,10 @@
 //! of spawned tasks and allows asynchronously awaiting the output of those
 //! tasks as they complete. See the documentation for the [`JoinSet`] type for
 //! details.
-use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{fmt, panic};
 
 use crate::runtime::Handle;
 #[cfg(tokio_unstable)]
@@ -372,6 +372,26 @@ impl<T: 'static> JoinSet<T> {
     pub async fn shutdown(&mut self) {
         self.abort_all();
         while self.join_next().await.is_some() {}
+    }
+
+    /// Awaits the completion of all tasks on this `JoinSet`, returning a Vector of their results.
+    ///
+    /// If any task on this `JoinSet` errors or panics, this will panic and cancel all
+    /// tasks on this `JoinSet`.
+    ///
+    /// For specific error handling of individual tasks, you should call `join_next`
+    /// in a loop with your desired handling.
+    pub async fn join_all(mut self) -> Vec<T> {
+        let mut output = Vec::new();
+
+        while let Some(res) = self.join_next().await {
+            match res {
+                Ok(t) => output.push(t),
+                Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
+                Err(err) => panic!("{err}"),
+            }
+        }
+        output
     }
 
     /// Aborts all tasks on this `JoinSet`.
