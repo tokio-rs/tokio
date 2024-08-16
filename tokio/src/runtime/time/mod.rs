@@ -321,7 +321,7 @@ impl Handle {
     // Returns the next wakeup time of this shard.
     pub(self) fn process_at_sharded_time(&self, id: u32, mut now: u64) -> Option<u64> {
         let mut waker_list = WakeList::new();
-        let wheels_lock = self
+        let mut wheels_lock = self
             .inner
             .wheels
             .read()
@@ -348,9 +348,15 @@ impl Handle {
                 if !waker_list.can_push() {
                     // Wake a batch of wakers. To avoid deadlock, we must do this with the lock temporarily dropped.
                     drop(lock);
+                    drop(wheels_lock);
 
                     waker_list.wake_all();
 
+                    wheels_lock = self
+                        .inner
+                        .wheels
+                        .read()
+                        .expect("Timer wheel shards poisened");
                     lock = wheels_lock.lock_sharded_wheel(id);
                 }
             }
