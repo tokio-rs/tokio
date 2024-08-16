@@ -406,6 +406,17 @@ async fn epollhup() -> io::Result<()> {
     drop(listener);
 
     let err = connect.await.unwrap_err();
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionReset);
+    let errno = err.kind();
+    assert!(
+        // As far as I can tell, whether we see ECONNREFUSED or ECONNRESET here
+        // seems relatively inconsistent, at least on non-Linux operating
+        // systems. The difference in meaning between these errnos is not
+        // particularly well-defined, so let's just accept either.
+        matches!(
+            errno,
+            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
+        ),
+        "unexpected error kind: {errno:?} (expected ConnectionRefused or ConnectionReset)"
+    );
     Ok(())
 }
