@@ -1,3 +1,10 @@
+# 1.39.3 (August 17th, 2024)
+
+This release fixes a regression where the unix socket api stopped accepting
+the abstract socket namespace. ([#6772])
+
+[#6772]: https://github.com/tokio-rs/tokio/pull/6772
+
 # 1.39.2 (July 27th, 2024)
 
 This release fixes a regression where the `select!` macro stopped accepting
