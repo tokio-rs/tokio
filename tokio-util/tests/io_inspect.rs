@@ -165,7 +165,7 @@ async fn write_tee_vectored() {
     };
     let original = b"A very long string split up";
     let bufs: Vec<Vec<u8>> = original
-        .split(|b| b.is_ascii_whitespace())
+        .split(u8::is_ascii_whitespace)
         .map(Vec::from)
         .collect();
     assert!(bufs.len() > 1);

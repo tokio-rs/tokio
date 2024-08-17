@@ -42,9 +42,9 @@ async fn local_threadpool() {
 
     LocalSet::new()
         .run_until(async {
-            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            assert!(ON_RT_THREAD.with(Cell::get));
             task::spawn_local(async {
-                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                assert!(ON_RT_THREAD.with(Cell::get));
             })
             .await
             .unwrap();
@@ -63,7 +63,7 @@ async fn localset_future_threadpool() {
 
     let local = LocalSet::new();
     local.spawn_local(async move {
-        assert!(ON_LOCAL_THREAD.with(|cell| cell.get()));
+        assert!(ON_LOCAL_THREAD.with(Cell::get));
     });
     local.await;
 }
@@ -126,11 +126,11 @@ async fn local_threadpool_timer() {
 
     LocalSet::new()
         .run_until(async {
-            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            assert!(ON_RT_THREAD.with(Cell::get));
             let join = task::spawn_local(async move {
-                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                assert!(ON_RT_THREAD.with(Cell::get));
                 time::sleep(Duration::from_millis(10)).await;
-                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                assert!(ON_RT_THREAD.with(Cell::get));
             });
             join.await.unwrap();
         })
@@ -169,11 +169,11 @@ fn local_threadpool_blocking_in_place() {
         .build()
         .unwrap();
     LocalSet::new().block_on(&rt, async {
-        assert!(ON_RT_THREAD.with(|cell| cell.get()));
+        assert!(ON_RT_THREAD.with(Cell::get));
         let join = task::spawn_local(async move {
-            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            assert!(ON_RT_THREAD.with(Cell::get));
             task::block_in_place(|| {});
-            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            assert!(ON_RT_THREAD.with(Cell::get));
         });
         join.await.unwrap();
     });
@@ -190,18 +190,18 @@ async fn local_threadpool_blocking_run() {
 
     LocalSet::new()
         .run_until(async {
-            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            assert!(ON_RT_THREAD.with(Cell::get));
             let join = task::spawn_local(async move {
-                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                assert!(ON_RT_THREAD.with(Cell::get));
                 task::spawn_blocking(|| {
                     assert!(
-                        !ON_RT_THREAD.with(|cell| cell.get()),
+                        !ON_RT_THREAD.with(Cell::get),
                         "blocking must not run on the local task set's thread"
                     );
                 })
                 .await
                 .unwrap();
-                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                assert!(ON_RT_THREAD.with(Cell::get));
             });
             join.await.unwrap();
         })
@@ -220,11 +220,11 @@ async fn all_spawns_are_local() {
 
     LocalSet::new()
         .run_until(async {
-            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            assert!(ON_RT_THREAD.with(Cell::get));
             let handles = (0..128)
                 .map(|_| {
                     task::spawn_local(async {
-                        assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                        assert!(ON_RT_THREAD.with(Cell::get));
                     })
                 })
                 .collect::<Vec<_>>();
@@ -246,15 +246,15 @@ async fn nested_spawn_is_local() {
 
     LocalSet::new()
         .run_until(async {
-            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+            assert!(ON_RT_THREAD.with(Cell::get));
             task::spawn_local(async {
-                assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                assert!(ON_RT_THREAD.with(Cell::get));
                 task::spawn_local(async {
-                    assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                    assert!(ON_RT_THREAD.with(Cell::get));
                     task::spawn_local(async {
-                        assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                        assert!(ON_RT_THREAD.with(Cell::get));
                         task::spawn_local(async {
-                            assert!(ON_RT_THREAD.with(|cell| cell.get()));
+                            assert!(ON_RT_THREAD.with(Cell::get));
                         })
                         .await
                         .unwrap();
@@ -286,7 +286,7 @@ fn join_local_future_elsewhere() {
         let (tx, rx) = oneshot::channel();
         let join = task::spawn_local(async move {
             assert!(
-                ON_RT_THREAD.with(|cell| cell.get()),
+                ON_RT_THREAD.with(Cell::get),
                 "local task must run on local thread, no matter where it is awaited"
             );
             rx.await.unwrap();
@@ -295,7 +295,7 @@ fn join_local_future_elsewhere() {
         });
         let join2 = task::spawn(async move {
             assert!(
-                !ON_RT_THREAD.with(|cell| cell.get()),
+                !ON_RT_THREAD.with(Cell::get),
                 "spawned task should be on a worker"
             );
 

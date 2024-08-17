@@ -250,7 +250,7 @@ mod test {
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     fn get() -> Budget {
-        context::budget(|cell| cell.get()).unwrap_or(Budget::unconstrained())
+        context::budget(Cell::get).unwrap_or(Budget::unconstrained())
     }
 
     #[test]

@@ -711,7 +711,7 @@ impl LocalSet {
                 .queue
                 .lock()
                 .as_mut()
-                .and_then(|queue| queue.pop_front())
+                .and_then(VecDeque::pop_front)
                 .or_else(|| self.pop_local())
         } else {
             self.pop_local().or_else(|| {
