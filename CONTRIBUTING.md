@@ -560,7 +560,7 @@ _Adapted from the [Node.js contributing guide][node]_.
 
 The Tokio GitHub repository has a lot of issues and PRs to keep track of. This
 section explains the meaning of various labels, as well as our [GitHub
-project][project]. The section is primarily targeted at maintainers.  Most
+project][project]. The section is primarily targeted at maintainers. Most
 contributors aren't able to set these labels.
 
 ### Area

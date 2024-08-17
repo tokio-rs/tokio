@@ -389,7 +389,7 @@ where
                 },
                 false,
             ) => {
-                // We are on an executor, but _not_ on the thread pool.  That is
+                // We are on an executor, but _not_ on the thread pool. That is
                 // _only_ okay if we are in a thread pool runtime's block_on
                 // method:
                 if allow_block_in_place {

@@ -539,8 +539,8 @@ async fn reset_later_after_slot_starts() {
 
     // At this point the queue hasn't been polled, so `elapsed` on the wheel
     // for the queue is still at 0 and hence the 1ms resolution slots cover
-    // [0-64).  Resetting the time on the entry to 120 causes it to get put in
-    // the [64-128) slot.  As the queue knows that the first entry is within
+    // [0-64). Resetting the time on the entry to 120 causes it to get put in
+    // the [64-128) slot. As the queue knows that the first entry is within
     // that slot, but doesn't know when, it must wake immediately to advance
     // the wheel.
     queue.reset_at(&foo, now + ms(120));
@@ -601,8 +601,8 @@ async fn reset_earlier_after_slot_starts() {
 
     // At this point the queue hasn't been polled, so `elapsed` on the wheel
     // for the queue is still at 0 and hence the 1ms resolution slots cover
-    // [0-64).  Resetting the time on the entry to 120 causes it to get put in
-    // the [64-128) slot.  As the queue knows that the first entry is within
+    // [0-64). Resetting the time on the entry to 120 causes it to get put in
+    // the [64-128) slot. As the queue knows that the first entry is within
     // that slot, but doesn't know when, it must wake immediately to advance
     // the wheel.
     queue.reset_at(&foo, now + ms(120));

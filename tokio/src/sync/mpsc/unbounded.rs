@@ -409,7 +409,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided
     /// `Context` is scheduled to receive a wakeup when a message is sent on any
-    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// receiver, or when the channel is closed. Note that on multiple calls to
     /// `poll_recv` or `poll_recv_many`, only the `Waker` from the `Context`
     /// passed to the most recent call is scheduled to receive a wakeup.
     ///
@@ -433,7 +433,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided
     /// `Context` is scheduled to receive a wakeup when a message is sent on any
-    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// receiver, or when the channel is closed. Note that on multiple calls to
     /// `poll_recv` or `poll_recv_many`, only the `Waker` from the `Context`
     /// passed to the most recent call is scheduled to receive a wakeup.
     ///
@@ -635,7 +635,7 @@ impl<T> UnboundedSender<T> {
     ///
     /// ```
     /// let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<()>();
-    /// let  tx2 = tx.clone();
+    /// let tx2 = tx.clone();
     /// assert!(tx.same_channel(&tx2));
     ///
     /// let (tx3, rx3) = tokio::sync::mpsc::unbounded_channel::<()>();

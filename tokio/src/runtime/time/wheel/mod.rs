@@ -154,7 +154,7 @@ impl Wheel {
                 _ => {
                     // in this case the poll did not indicate an expiration
                     // _and_ we were not able to find a next expiration in
-                    // the current list of timers.  advance to the poll's
+                    // the current list of timers. Advance to the poll's
                     // current time and do nothing else.
                     self.set_elapsed(now);
                     break;
@@ -211,8 +211,8 @@ impl Wheel {
         res
     }
 
-    /// iteratively find entries that are between the wheel's current
-    /// time and the expiration time.  for each in that population either
+    /// Iteratively find entries that are between the wheel's current
+    /// time and the expiration time. For each in that population either
     /// queue it for notification (in the case of the last level) or tier
     /// it down to the next level (in all other cases).
     pub(crate) fn process_expiration(&mut self, expiration: &Expiration) {

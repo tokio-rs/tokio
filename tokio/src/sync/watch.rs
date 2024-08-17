@@ -46,7 +46,7 @@
 //!
 //! If the receiver intends to await notifications from [`changed`] in a loop,
 //! [`Receiver::borrow_and_update()`] should be preferred over
-//! [`Receiver::borrow()`].  This avoids a potential race where a new value is
+//! [`Receiver::borrow()`]. This avoids a potential race where a new value is
 //! sent between [`changed`] being ready and the value being read. (If
 //! [`Receiver::borrow()`] is used, the loop may run twice with the same value.)
 //!

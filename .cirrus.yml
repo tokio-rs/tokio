@@ -7,9 +7,9 @@ env:
   RUST_NIGHTLY: nightly-2024-05-05
   RUSTFLAGS: -D warnings
 
-# Test FreeBSD in a full VM on cirrus-ci.com.  Test the i686 target too, in the
-# same VM.  The binary will be built in 32-bit mode, but will execute on a
-# 64-bit kernel and in a 64-bit environment.  Our tests don't execute any of
+# Test FreeBSD in a full VM on cirrus-ci.com. Test the i686 target too, in the
+# same VM. The binary will be built in 32-bit mode, but will execute on a
+# 64-bit kernel and in a 64-bit environment. Our tests don't execute any of
 # the system's binaries, so the environment shouldn't matter.
 task:
   name: FreeBSD 64-bit

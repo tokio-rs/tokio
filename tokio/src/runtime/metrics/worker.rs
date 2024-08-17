@@ -15,10 +15,10 @@ use std::thread::ThreadId;
 #[derive(Debug, Default)]
 #[repr(align(128))]
 pub(crate) struct WorkerMetrics {
-    ///  Number of times the worker parked.
+    /// Number of times the worker parked.
     pub(crate) park_count: MetricAtomicU64,
 
-    ///  Number of times the worker parked and unparked.
+    /// Number of times the worker parked and unparked.
     pub(crate) park_unpark_count: MetricAtomicU64,
 
     /// Number of times the worker woke then parked again without doing work.

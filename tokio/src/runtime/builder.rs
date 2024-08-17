@@ -686,7 +686,7 @@ impl Builder {
     /// ```
     /// use tokio::runtime::Builder;
     ///
-    /// let rt  = Builder::new_multi_thread().build().unwrap();
+    /// let rt = Builder::new_multi_thread().build().unwrap();
     ///
     /// rt.block_on(async {
     ///     println!("Hello from the Tokio runtime");

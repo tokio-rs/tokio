@@ -67,7 +67,7 @@ use std::{task::Context, task::Poll};
 /// # Examples
 ///
 /// This example shows how to turn [`std::net::TcpStream`] asynchronous using
-/// `AsyncFd`.  It implements the read/write operations both as an `async fn`
+/// `AsyncFd`. It implements the read/write operations both as an `async fn`
 /// and using the IO traits [`AsyncRead`] and [`AsyncWrite`].
 ///
 /// ```no_run

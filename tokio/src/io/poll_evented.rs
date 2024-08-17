@@ -244,7 +244,7 @@ feature! {
                 match self.io.as_ref().unwrap().write(buf) {
                     Ok(n) => {
                         // if we write only part of our buffer, this is sufficient on unix to show
-                        // that the socket buffer is full.  Unfortunately this assumption
+                        // that the socket buffer is full. Unfortunately this assumption
                         // fails for level-triggered selectors (like on Windows or poll even for
                         // UNIX): https://github.com/tokio-rs/tokio/issues/5866
                         if n > 0 && (!cfg!(windows) && !cfg!(mio_unsupported_force_poll_poll) && n < buf.len()) {

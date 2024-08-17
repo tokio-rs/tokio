@@ -196,7 +196,7 @@ release. The MSRV history for past minor releases can be found below:
  * 1.27 to 1.29 - Rust 1.56
  * 1.17 to 1.26 - Rust 1.49
  * 1.15 to 1.16 - Rust 1.46
- * 1.0 to 1.14 - Rust 1.45
+ * 1.0 to 1.14  - Rust 1.45
 
 Note that although we try to avoid the situation where a dependency transitively
 increases the MSRV of Tokio, we do not guarantee that this does not happen.

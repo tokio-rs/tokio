@@ -139,7 +139,7 @@ use std::task::{Context, Poll, Waker};
 
 /// Sends a value to the associated [`Receiver`].
 ///
-/// A pair of both a [`Sender`] and a [`Receiver`]  are created by the
+/// A pair of both a [`Sender`] and a [`Receiver`] are created by the
 /// [`channel`](fn@channel) function.
 ///
 /// # Examples
@@ -227,7 +227,7 @@ pub struct Sender<T> {
 
 /// Receives a value from the associated [`Sender`].
 ///
-/// A pair of both a [`Sender`] and a [`Receiver`]  are created by the
+/// A pair of both a [`Sender`] and a [`Receiver`] are created by the
 /// [`channel`](fn@channel) function.
 ///
 /// This channel has no `recv` method because the receiver itself implements the
@@ -557,7 +557,7 @@ impl<T> Sender<T> {
     ///
     /// This method consumes `self` as only one value may ever be sent on a `oneshot`
     /// channel. It is not marked async because sending a message to an `oneshot`
-    /// channel never requires any form of waiting.  Because of this, the `send`
+    /// channel never requires any form of waiting. Because of this, the `send`
     /// method can be used in both synchronous and asynchronous code without
     /// problems.
     ///

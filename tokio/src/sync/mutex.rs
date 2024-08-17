@@ -405,7 +405,7 @@ impl<T: ?Sized> Mutex<T> {
     }
 
     /// Locks this mutex, causing the current task to yield until the lock has
-    /// been acquired.  When the lock has been acquired, function returns a
+    /// been acquired. When the lock has been acquired, function returns a
     /// [`MutexGuard`].
     ///
     /// If the mutex is available to be acquired immediately, then this call
@@ -489,7 +489,7 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mutex =  Arc::new(Mutex::new(1));
+    ///     let mutex = Arc::new(Mutex::new(1));
     ///     let lock = mutex.lock().await;
     ///
     ///     let mutex1 = Arc::clone(&mutex);
@@ -546,7 +546,7 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let mutex =  Arc::new(Mutex::new(1));
+    ///     let mutex = Arc::new(Mutex::new(1));
     ///     let lock = mutex.lock().await;
     ///
     ///     let mutex1 = Arc::clone(&mutex);
@@ -726,7 +726,7 @@ impl<T: ?Sized> Mutex<T> {
     /// is currently held somewhere else.
     ///
     /// This method is identical to [`Mutex::try_lock`], except that the
-    /// returned  guard references the `Mutex` with an [`Arc`] rather than by
+    /// returned guard references the `Mutex` with an [`Arc`] rather than by
     /// borrowing it. Therefore, the `Mutex` must be wrapped in an `Arc` to call
     /// this method, and the guard will live for the `'static` lifetime, as it
     /// keeps the `Mutex` alive by holding an `Arc`.

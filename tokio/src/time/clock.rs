@@ -169,7 +169,7 @@ cfg_test_util! {
     /// This function will make the current time jump forward by the given
     /// duration in one jump. This means that all `sleep` calls with a deadline
     /// before the new time will immediately complete "at the same time", and
-    /// the runtime is free to poll them in any order.  Additionally, this
+    /// the runtime is free to poll them in any order. Additionally, this
     /// method will not wait for the `sleep` calls it advanced past to complete.
     /// If you want to do that, you should instead call [`sleep`] and rely on
     /// the runtime's auto-advance feature.

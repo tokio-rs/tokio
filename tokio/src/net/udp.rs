@@ -226,7 +226,7 @@ impl UdpSocket {
     /// Turns a [`tokio::net::UdpSocket`] into a [`std::net::UdpSocket`].
     ///
     /// The returned [`std::net::UdpSocket`] will have nonblocking mode set as
-    /// `true`.  Use [`set_nonblocking`] to change the blocking mode if needed.
+    /// `true`. Use [`set_nonblocking`] to change the blocking mode if needed.
     ///
     /// # Examples
     ///

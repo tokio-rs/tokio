@@ -92,7 +92,7 @@ macro_rules! doc {
         /// When using `select!` in a loop to receive messages from multiple sources,
         /// you should make sure that the receive call is cancellation safe to avoid
         /// losing messages. This section goes through various common methods and
-        /// describes whether they are cancel safe.  The lists in this section are not
+        /// describes whether they are cancel safe. The lists in this section are not
         /// exhaustive.
         ///
         /// The following methods are cancellation safe:

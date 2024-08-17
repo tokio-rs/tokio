@@ -122,9 +122,9 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// by e.g. [`tokio::task::spawn_blocking`].
     ///
     /// Stated even more strongly: to make use of this bridge, you *must* move
-    /// it into a separate thread outside the runtime.  The synchronous I/O will use the
+    /// it into a separate thread outside the runtime. The synchronous I/O will use the
     /// underlying handle to block on the backing asynchronous source, via
-    /// [`tokio::runtime::Handle::block_on`].  As noted in the documentation for that
+    /// [`tokio::runtime::Handle::block_on`]. As noted in the documentation for that
     /// function, an attempt to `block_on` from an asynchronous execution context
     /// will panic.
     ///

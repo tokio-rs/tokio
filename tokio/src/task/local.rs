@@ -552,7 +552,7 @@ impl LocalSet {
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
-    /// let rt  = Runtime::new().unwrap();
+    /// let rt = Runtime::new().unwrap();
     /// let local = task::LocalSet::new();
     /// local.block_on(&rt, async {
     ///     let join = task::spawn_local(async {
@@ -569,7 +569,7 @@ impl LocalSet {
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
-    /// let rt  = Runtime::new().unwrap();
+    /// let rt = Runtime::new().unwrap();
     /// let local = task::LocalSet::new();
     /// local.block_on(&rt, async {
     ///     let join = task::spawn_local(async {

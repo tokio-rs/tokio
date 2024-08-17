@@ -836,7 +836,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let rwlock =  Arc::new(RwLock::new(1));
+    ///     let rwlock = Arc::new(RwLock::new(1));
     ///     let read_lock = rwlock.read().await;
     ///
     ///     let blocking_task = tokio::task::spawn_blocking({

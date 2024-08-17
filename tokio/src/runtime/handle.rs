@@ -255,7 +255,7 @@ impl Handle {
     /// use tokio::runtime::Runtime;
     ///
     /// // Create the runtime
-    /// let rt  = Runtime::new().unwrap();
+    /// let rt = Runtime::new().unwrap();
     ///
     /// // Get a handle from this runtime
     /// let handle = rt.handle();
