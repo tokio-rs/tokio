@@ -420,3 +420,16 @@ async fn epollhup() -> io::Result<()> {
     );
     Ok(())
 }
+
+// test for https://github.com/tokio-rs/tokio/issues/6767
+#[tokio::test]
+#[cfg(any(target_os = "linux", target_os = "android"))]
+async fn abstract_socket_name() {
+    let socket_path = "\0aaa";
+    let listener = UnixListener::bind(socket_path).unwrap();
+
+    let accept = listener.accept();
+    let connect = UnixStream::connect(&socket_path);
+
+    try_join(accept, connect).await.unwrap();
+}
