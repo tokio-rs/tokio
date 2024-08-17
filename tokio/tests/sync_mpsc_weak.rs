@@ -354,7 +354,7 @@ async fn actor_weak_unbounded_sender() {
             }
         }
 
-        async fn send_message_to_self(&mut self) {
+        fn send_message_to_self(&mut self) {
             let msg = ActorMessage::SelfMessage {};
 
             let sender = self.sender.clone();
@@ -372,7 +372,7 @@ async fn actor_weak_unbounded_sender() {
                 self.handle_message(msg);
 
                 if i == 0 {
-                    self.send_message_to_self().await;
+                    self.send_message_to_self();
                 }
 
                 i += 1;

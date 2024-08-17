@@ -49,7 +49,7 @@ async fn process(stream: TcpStream) -> Result<(), Box<dyn Error>> {
     while let Some(request) = transport.next().await {
         match request {
             Ok(request) => {
-                let response = respond(request).await?;
+                let response = respond(request)?;
                 transport.send(response).await?;
             }
             Err(e) => return Err(e.into()),
@@ -59,7 +59,7 @@ async fn process(stream: TcpStream) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn respond(req: Request<()>) -> Result<Response<String>, Box<dyn Error>> {
+fn respond(req: Request<()>) -> Result<Response<String>, Box<dyn Error>> {
     let mut response = Response::builder();
     let body = match req.uri().path() {
         "/plaintext" => {
