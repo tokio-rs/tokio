@@ -162,7 +162,7 @@ where
         if let Some(pidfd) = Pidfd::open(inner.id()) {
             match PollEvented::new_with_interest(pidfd, Interest::READABLE) {
                 Ok(pidfd) => Ok(Self {
-                    inner: Some(PidfdReaperInner { pidfd, inner }),
+                    inner: Some(PidfdReaperInner { inner, pidfd }),
                     orphan_queue,
                 }),
                 Err(io_error) => Err((Some(io_error), inner)),

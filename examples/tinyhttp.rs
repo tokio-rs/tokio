@@ -212,10 +212,10 @@ impl Decoder for Http {
             ret = ret.header(&data[k.0..k.1], value);
         }
 
-        let req = ret
+        let request = ret
             .body(())
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-        Ok(Some(req))
+        Ok(Some(request))
     }
 }
 

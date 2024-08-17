@@ -360,7 +360,7 @@ fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
 
-/// Helper struct to test the [tokio::time::Interval::poll_tick()] method.
+/// Helper struct to test the [`tokio::time::Interval::poll_tick()`] method.
 ///
 /// `poll_tick()` should register the waker in the context only if it returns
 /// `Poll::Pending`, not when returning `Poll::Ready`. This struct contains an

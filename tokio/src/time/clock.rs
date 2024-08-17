@@ -28,9 +28,9 @@ cfg_not_test_util! {
 }
 
 cfg_test_util! {
-    use crate::time::{Duration, Instant};
-    use crate::loom::sync::Mutex;
     use crate::loom::sync::atomic::Ordering;
+    use crate::loom::sync::Mutex;
+    use crate::time::{Duration, Instant};
     use std::sync::atomic::AtomicBool as StdAtomicBool;
 
     cfg_rt! {
@@ -38,13 +38,13 @@ cfg_test_util! {
         fn with_clock<R>(f: impl FnOnce(Option<&Clock>) -> Result<R, &'static str>) -> R {
             use crate::runtime::Handle;
 
-            let res = match Handle::try_current() {
+            let result = match Handle::try_current() {
                 Ok(handle) => f(Some(handle.inner.driver().clock())),
                 Err(ref e) if e.is_missing_context() => f(None),
                 Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
             };
 
-            match res {
+            match result {
                 Ok(ret) => ret,
                 Err(msg) => panic!("{}", msg),
             }
@@ -257,7 +257,7 @@ cfg_test_util! {
 
             let elapsed = match inner.unfrozen.as_ref() {
                 Some(v) => v.elapsed(),
-                None => return Err("time is already frozen")
+                None => return Err("time is already frozen"),
             };
             inner.base += elapsed;
             inner.unfrozen = None;
