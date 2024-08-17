@@ -134,8 +134,7 @@ fn useful_panic_message_when_dropping_rt_in_rt() {
 
     assert!(
         err.contains("Cannot drop a runtime"),
-        "Wrong panic message: {:?}",
-        err
+        "Wrong panic message: {err:?}"
     );
 }
 

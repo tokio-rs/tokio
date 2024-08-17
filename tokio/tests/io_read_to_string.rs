@@ -23,9 +23,9 @@ async fn to_string_does_not_truncate_on_utf8_error() {
     let mut s = "abc".to_string();
 
     match AsyncReadExt::read_to_string(&mut data.as_slice(), &mut s).await {
-        Ok(len) => panic!("Should fail: {} bytes.", len),
+        Ok(len) => panic!("Should fail: {len} bytes."),
         Err(err) if err.to_string() == "stream did not contain valid UTF-8" => {}
-        Err(err) => panic!("Fail: {}.", err),
+        Err(err) => panic!("Fail: {err}."),
     }
 
     assert_eq!(s, "abc");
@@ -40,9 +40,9 @@ async fn to_string_does_not_truncate_on_io_error() {
     let mut s = "abc".to_string();
 
     match AsyncReadExt::read_to_string(&mut mock, &mut s).await {
-        Ok(len) => panic!("Should fail: {} bytes.", len),
+        Ok(len) => panic!("Should fail: {len} bytes."),
         Err(err) if err.to_string() == "whoops" => {}
-        Err(err) => panic!("Fail: {}.", err),
+        Err(err) => panic!("Fail: {err}."),
     }
 
     assert_eq!(s, "abc");

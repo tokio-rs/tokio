@@ -141,7 +141,7 @@ fn drain(mut fd: &FileDescriptor, mut amt: usize) {
         match fd.read(&mut buf[..]) {
             Err(e) if e.kind() == ErrorKind::WouldBlock => {}
             Ok(0) => panic!("unexpected EOF"),
-            Err(e) => panic!("unexpected error: {:?}", e),
+            Err(e) => panic!("unexpected error: {e:?}"),
             Ok(x) => amt -= x,
         }
     }

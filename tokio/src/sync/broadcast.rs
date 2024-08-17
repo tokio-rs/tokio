@@ -254,7 +254,7 @@ pub mod error {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
                 RecvError::Closed => write!(f, "channel closed"),
-                RecvError::Lagged(amt) => write!(f, "channel lagged by {}", amt),
+                RecvError::Lagged(amt) => write!(f, "channel lagged by {amt}"),
             }
         }
     }
@@ -290,7 +290,7 @@ pub mod error {
             match self {
                 TryRecvError::Empty => write!(f, "channel empty"),
                 TryRecvError::Closed => write!(f, "channel closed"),
-                TryRecvError::Lagged(amt) => write!(f, "channel lagged by {}", amt),
+                TryRecvError::Lagged(amt) => write!(f, "channel lagged by {amt}"),
             }
         }
     }

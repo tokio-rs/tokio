@@ -37,7 +37,7 @@ fn create_medium<const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>) {
 fn send_data<T: Default, const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>, prefix: &str) {
     let rt = rt();
 
-    g.bench_function(format!("{}_{}", prefix, SIZE), |b| {
+    g.bench_function(format!("{prefix}_{SIZE}"), |b| {
         b.iter(|| {
             let (tx, mut rx) = mpsc::channel::<T>(SIZE);
 
