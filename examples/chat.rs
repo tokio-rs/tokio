@@ -139,7 +139,7 @@ impl Shared {
     /// Send a `LineCodec` encoded message to every peer, except
     /// for the sender.
     async fn broadcast(&mut self, sender: SocketAddr, message: &str) {
-        for peer in self.peers.iter_mut() {
+        for peer in &mut self.peers {
             if *peer.0 != sender {
                 let _ = peer.1.send(message.into());
             }

@@ -245,7 +245,7 @@ impl<T> SlabStorage<T> {
 
     pub(crate) fn compact(&mut self) {
         if !self.compact_called {
-            for (key, _) in self.inner.iter() {
+            for (key, _) in &self.inner {
                 self.key_map.insert(Key::new(key), KeyInternal::new(key));
             }
         }

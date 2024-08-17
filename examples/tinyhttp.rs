@@ -203,7 +203,7 @@ impl Decoder for Http {
         let s = unsafe { String::from_utf8_unchecked(Vec::from(s.as_ref())) };
         ret = ret.uri(s);
         ret = ret.version(http::Version::HTTP_11);
-        for header in headers.iter() {
+        for header in &headers {
             let Some((k, v)) = header else {
                 break;
             };
