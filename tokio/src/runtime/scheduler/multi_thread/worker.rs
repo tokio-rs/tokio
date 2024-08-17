@@ -402,9 +402,8 @@ where
         let cx = maybe_cx.expect("no .is_some() == false cases above should lead here");
 
         // Get the worker core. If none is set, then blocking is fine!
-        let mut core = match cx.core.borrow_mut().take() {
-            Some(core) => core,
-            None => return Ok(()),
+        let Some(mut core) = cx.core.borrow_mut().take() else {
+            return Ok(());
         };
 
         // If we heavily call `spawn_blocking`, there might be no available thread to
@@ -484,9 +483,8 @@ fn run(worker: Arc<Worker>) {
 
     // Acquire a core. If this fails, then another thread is running this
     // worker and there is nothing further to do.
-    let core = match worker.core.take() {
-        Some(core) => core,
-        None => return,
+    let Some(core) = worker.core.take() else {
+        return;
     };
 
     worker.handle.shared.worker_metrics[worker.index].set_thread_id(thread::current().id());
@@ -599,24 +597,18 @@ impl Context {
             loop {
                 // Check if we still have the core. If not, the core was stolen
                 // by another worker.
-                let mut core = match self.core.borrow_mut().take() {
-                    Some(core) => core,
-                    None => {
-                        // In this case, we cannot call `reset_lifo_enabled()`
-                        // because the core was stolen. The stealer will handle
-                        // that at the top of `Context::run`
-                        return Err(());
-                    }
+                let Some(mut core) = self.core.borrow_mut().take() else {
+                    // In this case, we cannot call `reset_lifo_enabled()`
+                    // because the core was stolen. The stealer will handle
+                    // that at the top of `Context::run`
+                    return Err(());
                 };
 
                 // Check for a task in the LIFO slot
-                let task = match core.lifo_slot.take() {
-                    Some(task) => task,
-                    None => {
-                        self.reset_lifo_enabled(&mut core);
-                        core.stats.end_poll();
-                        return Ok(core);
-                    }
+                let Some(task) = core.lifo_slot.take() else {
+                    self.reset_lifo_enabled(&mut core);
+                    core.stats.end_poll();
+                    return Ok(core);
                 };
 
                 if !coop::has_budget_remaining() {

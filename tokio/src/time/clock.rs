@@ -128,11 +128,9 @@ cfg_test_util! {
     /// [`advance`]: crate::time::advance
     #[track_caller]
     pub fn pause() {
-        with_clock(|maybe_clock| {
-            match maybe_clock {
-                Some(clock) => clock.pause(),
-                None => Err("time cannot be frozen from outside the Tokio runtime"),
-            }
+        with_clock(|maybe_clock| match maybe_clock {
+            Some(clock) => clock.pause(),
+            None => Err("time cannot be frozen from outside the Tokio runtime"),
         });
     }
 
@@ -148,9 +146,8 @@ cfg_test_util! {
     #[track_caller]
     pub fn resume() {
         with_clock(|maybe_clock| {
-            let clock = match maybe_clock {
-                Some(clock) => clock,
-                None => return Err("time cannot be frozen from outside the Tokio runtime"),
+            let Some(clock) = maybe_clock else {
+                return Err("time cannot be frozen from outside the Tokio runtime");
             };
 
             let mut inner = clock.inner.lock();
@@ -197,9 +194,8 @@ cfg_test_util! {
     /// [`sleep`]: fn@crate::time::sleep
     pub async fn advance(duration: Duration) {
         with_clock(|maybe_clock| {
-            let clock = match maybe_clock {
-                Some(clock) => clock,
-                None => return Err("time cannot be frozen from outside the Tokio runtime"),
+            let Some(clock) = maybe_clock else {
+                return Err("time cannot be frozen from outside the Tokio runtime");
             };
 
             clock.advance(duration)

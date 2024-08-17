@@ -37,16 +37,13 @@ async fn weak_sender() {
     for i in 0..12 {
         let recvd = rx.recv().await;
 
-        match recvd {
-            Some(msg) => {
-                if i == 10 {
-                    assert_eq!(msg, 20);
-                }
+        if let Some(msg) = recvd {
+            if i == 10 {
+                assert_eq!(msg, 20);
             }
-            None => {
-                assert_eq!(i, 11);
-                break;
-            }
+        } else {
+            assert_eq!(i, 11);
+            break;
         }
     }
 
@@ -298,16 +295,13 @@ async fn weak_unbounded_sender() {
     for i in 0..12 {
         let recvd = rx.recv().await;
 
-        match recvd {
-            Some(msg) => {
-                if i == 10 {
-                    assert_eq!(msg, 20);
-                }
+        if let Some(msg) = recvd {
+            if i == 10 {
+                assert_eq!(msg, 20);
             }
-            None => {
-                assert_eq!(i, 11);
-                break;
-            }
+        } else {
+            assert_eq!(i, 11);
+            break;
         }
     }
 

@@ -43,19 +43,16 @@ async fn correct_behavior_on_errors() {
     loop {
         let item = stream.next().await.unwrap();
         println!("{item:?}");
-        match item {
-            Ok(bytes) => {
-                let bytes = &*bytes;
-                for byte in bytes {
-                    assert_eq!(*byte, 0);
-                    zeros_received += 1;
-                }
+        if let Ok(bytes) = item {
+            let bytes = &*bytes;
+            for byte in bytes {
+                assert_eq!(*byte, 0);
+                zeros_received += 1;
             }
-            Err(_) => {
-                assert!(!had_error);
-                had_error = true;
-                break;
-            }
+        } else {
+            assert!(!had_error);
+            had_error = true;
+            break;
         }
     }
 

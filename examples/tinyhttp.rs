@@ -204,9 +204,8 @@ impl Decoder for Http {
         ret = ret.uri(s);
         ret = ret.version(http::Version::HTTP_11);
         for header in headers.iter() {
-            let (k, v) = match *header {
-                Some((ref k, ref v)) => (k, v),
-                None => break,
+            let Some((k, v)) = header else {
+                break;
             };
             let value = HeaderValue::from_bytes(data.slice(v.0..v.1).as_ref())
                 .map_err(|_| io::Error::new(io::ErrorKind::Other, "header decode error"))?;

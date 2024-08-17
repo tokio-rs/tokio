@@ -266,9 +266,8 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     handle.check_inner()?;
 
     let globals = globals();
-    let siginfo = match globals.storage().get(signal as EventId) {
-        Some(slot) => slot,
-        None => return Err(io::Error::new(io::ErrorKind::Other, "signal too large")),
+    let Some(siginfo) = globals.storage().get(signal as EventId) else {
+        return Err(io::Error::new(io::ErrorKind::Other, "signal too large"));
     };
     let mut registered = Ok(());
     siginfo.init.call_once(|| {

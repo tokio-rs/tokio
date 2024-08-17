@@ -155,22 +155,19 @@ where
                 }
             });
 
-            match expiration {
-                Some(ref expiration) => {
-                    if let Some(item) = self.poll_expiration(expiration, store) {
-                        return Some(item);
-                    }
+            if let Some(expiration) = &expiration {
+                if let Some(item) = self.poll_expiration(expiration, store) {
+                    return Some(item);
+                }
 
-                    self.set_elapsed(expiration.deadline);
-                }
-                None => {
-                    // in this case the poll did not indicate an expiration
-                    // _and_ we were not able to find a next expiration in
-                    // the current list of timers.  advance to the poll's
-                    // current time and do nothing else.
-                    self.set_elapsed(now);
-                    return None;
-                }
+                self.set_elapsed(expiration.deadline);
+            } else {
+                // in this case the poll did not indicate an expiration
+                // _and_ we were not able to find a next expiration in
+                // the current list of timers.  advance to the poll's
+                // current time and do nothing else.
+                self.set_elapsed(now);
+                return None;
             }
         }
     }

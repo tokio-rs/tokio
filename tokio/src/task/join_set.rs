@@ -418,15 +418,12 @@ impl<T: 'static> JoinSet<T> {
     pub fn poll_join_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<T, JoinError>>> {
         // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
         // the `notified` list if the waker is notified in the `poll` call below.
-        let mut entry = match self.inner.pop_notified(cx.waker()) {
-            Some(entry) => entry,
-            None => {
-                if self.is_empty() {
-                    return Poll::Ready(None);
-                } else {
-                    // The waker was set by `pop_notified`.
-                    return Poll::Pending;
-                }
+        let Some(mut entry) = self.inner.pop_notified(cx.waker()) else {
+            if self.is_empty() {
+                return Poll::Ready(None);
+            } else {
+                // The waker was set by `pop_notified`.
+                return Poll::Pending;
             }
         };
 

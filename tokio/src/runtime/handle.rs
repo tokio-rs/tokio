@@ -82,10 +82,8 @@ impl Handle {
     /// [`tokio::spawn`]: fn@crate::spawn
     pub fn enter(&self) -> EnterGuard<'_> {
         EnterGuard {
-            _guard: match context::try_set_current(&self.inner) {
-                Some(guard) => guard,
-                None => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
-            },
+            _guard: context::try_set_current(&self.inner)
+                .expect(crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
             _handle_lifetime: PhantomData,
         }
     }

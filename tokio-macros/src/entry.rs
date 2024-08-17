@@ -511,9 +511,8 @@ pub(crate) fn main(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
 // * `#[core::prelude::*::test]` or `#[::core::prelude::*::test]`
 // * `#[std::prelude::*::test]` or `#[::std::prelude::*::test]`
 fn is_test_attribute(attr: &Attribute) -> bool {
-    let path = match &attr.meta {
-        syn::Meta::Path(path) => path,
-        _ => return false,
+    let syn::Meta::Path(path) = &attr.meta else {
+        return false;
     };
     let candidates = [
         ["core", "prelude", "*", "test"],

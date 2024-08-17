@@ -429,9 +429,7 @@ fn coop_and_block_in_place() {
 
                     Pin::new(&mut fut).poll(cx)
                 } {
-                    if v.is_none() {
-                        panic!("did not yield");
-                    }
+                    assert!(v.is_some(), "did not yield");
                 }
 
                 Poll::Ready(())

@@ -104,13 +104,12 @@ fn set_nonblocking(fd: RawFd) {
 
     let flags = nix::fcntl::fcntl(fd, F_GETFL).expect("fcntl(F_GETFD)");
 
-    if flags < 0 {
-        panic!(
-            "bad return value from fcntl(F_GETFL): {} ({:?})",
-            flags,
-            nix::Error::last()
-        );
-    }
+    assert!(
+        flags >= 0,
+        "bad return value from fcntl(F_GETFL): {} ({:?})",
+        flags,
+        nix::Error::last()
+    );
 
     let flags = OFlag::from_bits_truncate(flags) | OFlag::O_NONBLOCK;
 

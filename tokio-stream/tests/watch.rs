@@ -16,9 +16,7 @@ async fn watch_stream_message_not_twice() {
         if payload == "goodbye" {
             counter += 1;
         }
-        if counter >= 2 {
-            panic!("too many goodbyes");
-        }
+        assert!(counter < 2, "too many goodbyes");
     });
 
     let task = tokio::spawn(async move { while stream.next().await.is_some() {} });

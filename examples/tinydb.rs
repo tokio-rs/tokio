@@ -190,13 +190,11 @@ impl Request {
                 })
             }
             Some("SET") => {
-                let key = match parts.next() {
-                    Some(key) => key,
-                    None => return Err("SET must be followed by a key".into()),
+                let Some(key) = parts.next() else {
+                    return Err("SET must be followed by a key".into());
                 };
-                let value = match parts.next() {
-                    Some(value) => value,
-                    None => return Err("SET needs a value".into()),
+                let Some(value) = parts.next() else {
+                    return Err("SET needs a value".into());
                 };
                 Ok(Request::Set {
                     key: key.to_string(),

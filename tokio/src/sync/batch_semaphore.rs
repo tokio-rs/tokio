@@ -311,18 +311,15 @@ impl Semaphore {
             let mut waiters = lock.take().unwrap_or_else(|| self.waiters.lock());
             'inner: while wakers.can_push() {
                 // Was the waiter assigned enough permits to wake it?
-                match waiters.queue.last() {
-                    Some(waiter) => {
-                        if !waiter.assign_permits(&mut rem) {
-                            break 'inner;
-                        }
-                    }
-                    None => {
-                        is_empty = true;
-                        // If we assigned permits to all the waiters in the queue, and there are
-                        // still permits left over, assign them back to the semaphore.
+                if let Some(waiter) = waiters.queue.last() {
+                    if !waiter.assign_permits(&mut rem) {
                         break 'inner;
                     }
+                } else {
+                    is_empty = true;
+                    // If we assigned permits to all the waiters in the queue, and there are
+                    // still permits left over, assign them back to the semaphore.
+                    break 'inner;
                 };
                 let mut waiter = waiters.queue.pop_back().unwrap();
                 if let Some(waker) =
