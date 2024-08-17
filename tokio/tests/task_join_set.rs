@@ -171,6 +171,7 @@ async fn join_all() {
     }
 }
 
+#[cfg(panic = "unwind")]
 #[tokio::test]
 async fn task_panics() {
     let mut set: JoinSet<()> = JoinSet::new();
