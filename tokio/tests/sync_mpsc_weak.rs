@@ -117,7 +117,7 @@ async fn actor_weak_sender() {
                     self.send_message_to_self().await;
                 }
 
-                i += 1
+                i += 1;
             }
 
             assert!(self.received_self_msg);
@@ -375,7 +375,7 @@ async fn actor_weak_unbounded_sender() {
                     self.send_message_to_self().await;
                 }
 
-                i += 1
+                i += 1;
             }
 
             assert!(self.received_self_msg);

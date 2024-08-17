@@ -265,7 +265,7 @@ async fn send_recv_many_bounded_capacity() {
         .map(|x: usize| format!("{x}"))
         .collect::<Vec<_>>();
     for x in expected.clone() {
-        tx.send(x).await.unwrap()
+        tx.send(x).await.unwrap();
     }
     tx.send("one more".to_string()).await.unwrap();
 
@@ -307,7 +307,7 @@ async fn send_recv_many_unbounded_capacity() {
         .map(|x: usize| format!("{x}"))
         .collect::<Vec<_>>();
     for x in expected.clone() {
-        tx.send(x).unwrap()
+        tx.send(x).unwrap();
     }
     tx.send("one more".to_string()).unwrap();
 
@@ -807,7 +807,7 @@ fn blocking_recv() {
         .block_on(async move {
             let _ = tx.send(10).await;
         });
-    sync_code.join().unwrap()
+    sync_code.join().unwrap();
 }
 
 #[tokio::test]
@@ -832,7 +832,7 @@ fn blocking_send() {
         .block_on(async move {
             assert_eq!(Some(10), rx.recv().await);
         });
-    sync_code.join().unwrap()
+    sync_code.join().unwrap();
 }
 
 #[tokio::test]
@@ -1092,14 +1092,14 @@ async fn test_rx_is_not_closed_when_there_are_permits_but_not_senders() {
 #[tokio::test]
 async fn test_rx_is_empty_when_no_messages_were_sent() {
     let (_tx, rx) = mpsc::channel::<()>(10);
-    assert!(rx.is_empty())
+    assert!(rx.is_empty());
 }
 
 #[tokio::test]
 async fn test_rx_is_not_empty_when_there_are_messages_in_the_buffer() {
     let (tx, rx) = mpsc::channel::<()>(10);
     assert!(tx.send(()).await.is_ok());
-    assert!(!rx.is_empty())
+    assert!(!rx.is_empty());
 }
 
 #[tokio::test]
@@ -1108,7 +1108,7 @@ async fn test_rx_is_not_empty_when_the_buffer_is_full() {
     for i in 0..10 {
         assert!(tx.send(i).await.is_ok());
     }
-    assert!(!rx.is_empty())
+    assert!(!rx.is_empty());
 }
 
 #[tokio::test]
@@ -1122,7 +1122,7 @@ async fn test_rx_is_not_empty_when_all_but_one_messages_are_consumed() {
         assert!(rx.recv().await.is_some());
     }
 
-    assert!(!rx.is_empty())
+    assert!(!rx.is_empty());
 }
 
 #[tokio::test]
@@ -1132,7 +1132,7 @@ async fn test_rx_is_empty_when_all_messages_are_consumed() {
         assert!(tx.send(i).await.is_ok());
     }
     while rx.try_recv().is_ok() {}
-    assert!(rx.is_empty())
+    assert!(rx.is_empty());
 }
 
 #[tokio::test]
@@ -1147,7 +1147,7 @@ async fn test_rx_is_empty_all_senders_are_dropped_and_messages_consumed() {
         assert!(rx.recv().await.is_some());
     }
 
-    assert!(rx.is_empty())
+    assert!(rx.is_empty());
 }
 
 #[tokio::test]
@@ -1289,14 +1289,14 @@ async fn test_rx_unbounded_is_closed_when_there_are_messages_and_close_is_called
 #[tokio::test]
 async fn test_rx_unbounded_is_empty_when_no_messages_were_sent() {
     let (_tx, rx) = mpsc::unbounded_channel::<()>();
-    assert!(rx.is_empty())
+    assert!(rx.is_empty());
 }
 
 #[tokio::test]
 async fn test_rx_unbounded_is_not_empty_when_there_are_messages_in_the_buffer() {
     let (tx, rx) = mpsc::unbounded_channel();
     assert!(tx.send(()).is_ok());
-    assert!(!rx.is_empty())
+    assert!(!rx.is_empty());
 }
 
 #[tokio::test]
@@ -1310,7 +1310,7 @@ async fn test_rx_unbounded_is_not_empty_when_all_but_one_messages_are_consumed()
         assert!(rx.recv().await.is_some());
     }
 
-    assert!(!rx.is_empty())
+    assert!(!rx.is_empty());
 }
 
 #[tokio::test]
@@ -1320,7 +1320,7 @@ async fn test_rx_unbounded_is_empty_when_all_messages_are_consumed() {
         assert!(tx.send(i).is_ok());
     }
     while rx.try_recv().is_ok() {}
-    assert!(rx.is_empty())
+    assert!(rx.is_empty());
 }
 
 #[tokio::test]
@@ -1335,7 +1335,7 @@ async fn test_rx_unbounded_is_empty_all_senders_are_dropped_and_messages_consume
         assert!(rx.recv().await.is_some());
     }
 
-    assert!(rx.is_empty())
+    assert!(rx.is_empty());
 }
 
 #[tokio::test]

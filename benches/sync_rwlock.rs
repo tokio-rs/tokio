@@ -19,8 +19,8 @@ fn read_uncontended(g: &mut BenchmarkGroup<WallTime>) {
                     let read = lock.read().await;
                     let _read = black_box(read);
                 }
-            })
-        })
+            });
+        });
     });
 }
 
@@ -49,8 +49,8 @@ fn read_concurrent_uncontended_multi(g: &mut BenchmarkGroup<WallTime>) {
                     task::spawn(task(lock.clone()))
                 };
                 j.unwrap();
-            })
-        })
+            });
+        });
     });
 }
 
@@ -77,8 +77,8 @@ fn read_concurrent_uncontended(g: &mut BenchmarkGroup<WallTime>) {
                     task(lock.clone()),
                     task(lock.clone())
                 };
-            })
-        })
+            });
+        });
     });
 }
 
@@ -108,8 +108,8 @@ fn read_concurrent_contended_multi(g: &mut BenchmarkGroup<WallTime>) {
                     task::spawn(task(lock.clone())),
                 };
                 j.unwrap();
-            })
-        })
+            });
+        });
     });
 }
 
@@ -137,8 +137,8 @@ fn read_concurrent_contended(g: &mut BenchmarkGroup<WallTime>) {
                     task(lock.clone()),
                     task(lock.clone()),
                 };
-            })
-        })
+            });
+        });
     });
 }
 

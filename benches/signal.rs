@@ -88,7 +88,7 @@ fn many_signals(c: &mut Criterion) {
                     rx.recv().await.expect("channel closed");
                 }
             });
-        })
+        });
     });
 }
 

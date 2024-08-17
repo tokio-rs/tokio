@@ -315,7 +315,7 @@ impl<'a> Drop for LocalDataEnterGuard<'a> {
         self.local_data_ref.ctx.set(self.ctx.take());
         self.local_data_ref
             .wake_on_schedule
-            .set(self.wake_on_schedule)
+            .set(self.wake_on_schedule);
     }
 }
 
@@ -1200,7 +1200,7 @@ mod tests {
         crate::runtime::Builder::new_current_thread()
             .build()
             .expect("rt")
-            .block_on(f)
+            .block_on(f);
     }
 
     // Tests that when a task on a `LocalSet` is woken by an io driver on the
@@ -1245,6 +1245,6 @@ mod tests {
                 task.is_some(),
                 "task should have been notified to the LocalSet's local queue"
             );
-        })
+        });
     }
 }

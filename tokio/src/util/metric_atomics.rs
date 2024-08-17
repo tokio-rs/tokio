@@ -26,7 +26,7 @@ impl MetricAtomicU64 {
 
     cfg_64bit_metrics! {
         pub(crate) fn store(&self, val: u64, ordering: Ordering) {
-            self.value.store(val, ordering)
+            self.value.store(val, ordering);
         }
 
         pub(crate) fn new(value: u64) -> Self {
@@ -68,7 +68,7 @@ impl MetricAtomicUsize {
     }
 
     pub(crate) fn store(&self, val: usize, ordering: Ordering) {
-        self.value.store(val, ordering)
+        self.value.store(val, ordering);
     }
 
     pub(crate) fn increment(&self) -> usize {

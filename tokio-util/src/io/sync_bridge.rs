@@ -20,7 +20,7 @@ impl<T: AsyncBufRead + Unpin> BufRead for SyncIoBridge<T> {
 
     fn consume(&mut self, amt: usize) {
         let src = &mut self.src;
-        AsyncBufReadExt::consume(src, amt)
+        AsyncBufReadExt::consume(src, amt);
     }
 
     fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>) -> std::io::Result<usize> {

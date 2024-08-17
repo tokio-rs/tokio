@@ -108,8 +108,8 @@ fn can_enter_current_thread_rt_from_within_block_in_place() {
                 .build()
                 .unwrap();
 
-            inner.block_on(async {})
-        })
+            inner.block_on(async {});
+        });
     });
 }
 
@@ -182,14 +182,14 @@ fn coop_disabled_in_block_in_place() {
                 futures::executor::block_on(async move {
                     use tokio_stream::StreamExt;
                     assert_eq!(rx.fold(0, |n, _| n + 1).await, 200);
-                })
-            })
+                });
+            });
         });
 
         tokio::time::timeout(Duration::from_secs(1), jh)
             .await
             .expect("timed out (probably hanging)")
-            .unwrap()
+            .unwrap();
     });
 }
 
@@ -212,8 +212,8 @@ fn coop_disabled_in_block_in_place_in_block_on() {
                 futures::executor::block_on(async move {
                     use tokio_stream::StreamExt;
                     assert_eq!(rx.fold(0, |n, _| n + 1).await, 200);
-                })
-            })
+                });
+            });
         });
 
         let _ = done.send(Ok(()));

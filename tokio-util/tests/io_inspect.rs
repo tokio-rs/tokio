@@ -22,7 +22,7 @@ impl AsyncRead for SmallReader {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
         if let Some(byte) = self.contents.pop() {
-            buf.put_slice(&[byte])
+            buf.put_slice(&[byte]);
         }
         Poll::Ready(Ok(()))
     }
@@ -172,7 +172,7 @@ async fn write_tee_vectored() {
     let expected: Vec<u8> = {
         let mut out = Vec::new();
         for item in &bufs {
-            out.extend_from_slice(item)
+            out.extend_from_slice(item);
         }
         out
     };
@@ -180,7 +180,7 @@ async fn write_tee_vectored() {
         let mut bufcount = 0;
         let tee = InspectWriter::new(&mut writeout, |bytes| {
             bufcount += 1;
-            altout.extend(bytes)
+            altout.extend(bytes);
         });
 
         assert!(tee.is_write_vectored());

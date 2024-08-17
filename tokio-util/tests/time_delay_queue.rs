@@ -35,7 +35,7 @@ async fn single_immediate_delay() {
     assert_ready_some!(poll!(queue));
 
     let entry = assert_ready!(poll!(queue));
-    assert!(entry.is_none())
+    assert!(entry.is_none());
 }
 
 #[tokio::test]
@@ -198,7 +198,7 @@ async fn reset_entry() {
     assert_eq!(*entry.get_ref(), "foo");
 
     let entry = assert_ready!(poll!(queue));
-    assert!(entry.is_none())
+    assert!(entry.is_none());
 }
 
 // Reproduces tokio-rs/tokio#849.
@@ -391,7 +391,7 @@ async fn multi_reset() {
     assert_eq!(*entry.get_ref(), "one");
 
     let entry = assert_ready!(poll!(queue));
-    assert!(entry.is_none())
+    assert!(entry.is_none());
 }
 
 #[tokio::test]

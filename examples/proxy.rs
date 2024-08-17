@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         println!("Failed to transfer; error={e}");
                     }
                 })
-                .await
+                .await;
         });
     }
 

@@ -316,7 +316,7 @@ async fn maybe_pending_seek() {
         }
 
         fn consume(mut self: Pin<&mut Self>, amt: usize) {
-            Pin::new(&mut self.inner).consume(amt)
+            Pin::new(&mut self.inner).consume(amt);
         }
     }
 

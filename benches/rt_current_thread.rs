@@ -23,7 +23,7 @@ fn rt_curr_spawn_many_local(c: &mut Criterion) {
                     handle.await.unwrap();
                 }
             });
-        })
+        });
     });
 }
 
@@ -43,7 +43,7 @@ fn rt_curr_spawn_many_remote_idle(c: &mut Criterion) {
                     handle.await.unwrap();
                 }
             });
-        })
+        });
     });
 }
 
@@ -57,7 +57,7 @@ fn rt_curr_spawn_many_remote_busy(c: &mut Criterion) {
             tokio::spawn(async { iter() });
         }
 
-        iter()
+        iter();
     });
 
     c.bench_function("spawn_many_remote_busy", |b| {
@@ -71,7 +71,7 @@ fn rt_curr_spawn_many_remote_busy(c: &mut Criterion) {
                     handle.await.unwrap();
                 }
             });
-        })
+        });
     });
 }
 

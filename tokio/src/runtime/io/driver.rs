@@ -226,7 +226,7 @@ impl Handle {
             // safety: `scheduled_io` is part of the `registrations` set.
             unsafe {
                 self.registrations
-                    .remove(&mut self.synced.lock(), &scheduled_io)
+                    .remove(&mut self.synced.lock(), &scheduled_io);
             };
 
             return Err(e);

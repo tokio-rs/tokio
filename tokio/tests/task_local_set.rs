@@ -303,7 +303,7 @@ fn join_local_future_elsewhere() {
 
             join.await.expect("task should complete successfully");
         });
-        join2.await.unwrap()
+        join2.await.unwrap();
     });
 }
 
@@ -323,7 +323,7 @@ async fn localset_in_thread_local() {
         LOCAL_SET.with(|local_set| {
             handle.block_on(local_set.run_until(async move {
                 let _ = rx.await;
-            }))
+            }));
         });
     });
 }
@@ -395,7 +395,7 @@ fn with_timeout(timeout: Duration, f: impl FnOnce() + Send + 'static) {
         Ok(()) => {}
     }
 
-    thread.join().expect("test thread should not panic!")
+    thread.join().expect("test thread should not panic!");
 }
 
 #[cfg_attr(
@@ -623,7 +623,7 @@ fn store_local_set_in_thread_local_with_runtime() {
                 .run_until(async move {
                     tokio::task::spawn_local(async {});
                 })
-                .await
+                .await;
         }
 
         fn method(&self) {

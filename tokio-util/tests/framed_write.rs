@@ -162,7 +162,7 @@ fn write_hits_backpressure() {
 
         // Ensure the mock is empty
         assert_eq!(0, framed.get_ref().calls.len());
-    })
+    });
 }
 
 // // ===== Mock ======

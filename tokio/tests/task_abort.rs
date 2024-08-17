@@ -158,7 +158,7 @@ fn test_abort_wakes_task_3964() {
         let handle = tokio::spawn(async move {
             // Make sure the Arc is moved into the task
             let _notify_dropped = notify_dropped;
-            tokio::time::sleep(Duration::new(100, 0)).await
+            tokio::time::sleep(Duration::new(100, 0)).await;
         });
 
         // wait for task to sleep.
@@ -186,7 +186,7 @@ fn test_abort_task_that_panics_on_drop_contained() {
         let handle = tokio::spawn(async move {
             // Make sure the Arc is moved into the task
             let _panic_dropped = PanicOnDrop;
-            tokio::time::sleep(Duration::new(100, 0)).await
+            tokio::time::sleep(Duration::new(100, 0)).await;
         });
 
         // wait for task to sleep.
@@ -210,7 +210,7 @@ fn test_abort_task_that_panics_on_drop_returned() {
         let handle = tokio::spawn(async move {
             // Make sure the Arc is moved into the task
             let _panic_dropped = PanicOnDrop;
-            tokio::time::sleep(Duration::new(100, 0)).await
+            tokio::time::sleep(Duration::new(100, 0)).await;
         });
 
         // wait for task to sleep.

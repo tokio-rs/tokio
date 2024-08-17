@@ -242,7 +242,7 @@ impl LocalPool {
                 // we assume the parent task was canceled, so cancel this task
                 // as well.
                 if let Err(join_handle) = sender.send(join_handle) {
-                    join_handle.abort()
+                    join_handle.abort();
                 }
             });
 

@@ -21,7 +21,7 @@ fn basic_scheduler_spawn(c: &mut Criterion) {
                 let h = tokio::spawn(work());
                 assert_eq!(h.await.unwrap(), 2);
             });
-        })
+        });
     });
 }
 
@@ -41,7 +41,7 @@ fn basic_scheduler_spawn10(c: &mut Criterion) {
                     assert_eq!(handle.await.unwrap(), 2);
                 }
             });
-        })
+        });
     });
 }
 
@@ -56,7 +56,7 @@ fn threaded_scheduler_spawn(c: &mut Criterion) {
                 let h = tokio::spawn(work());
                 assert_eq!(h.await.unwrap(), 2);
             });
-        })
+        });
     });
 }
 
@@ -76,7 +76,7 @@ fn threaded_scheduler_spawn10(c: &mut Criterion) {
                     assert_eq!(handle.await.unwrap(), 2);
                 }
             });
-        })
+        });
     });
 }
 

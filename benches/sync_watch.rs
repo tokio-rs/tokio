@@ -67,7 +67,7 @@ fn contention_resubscribe<const N_TASKS: usize>(g: &mut BenchmarkGroup<WallTime>
                     .unwrap();
                 }
             });
-        })
+        });
     });
 }
 

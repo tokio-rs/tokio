@@ -351,7 +351,7 @@ async fn multiple_waiters() {
                 biased;
                 guard = afd_a.readable() => {
                     tokio::task::yield_now().await;
-                    guard.unwrap().clear_ready()
+                    guard.unwrap().clear_ready();
                 },
                 _ = notify_barrier => unreachable!(),
             }

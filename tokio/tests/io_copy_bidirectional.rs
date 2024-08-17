@@ -24,7 +24,7 @@ async fn block_write(s: &mut TcpStream) -> usize {
     loop {
         tokio::select! {
             result = s.write(&BUF) => {
-                copied += result.expect("write error")
+                copied += result.expect("write error");
             },
             _ = tokio::time::sleep(Duration::from_millis(10)) => {
                 break;
@@ -66,7 +66,7 @@ async fn test_basic_transfer() {
         b.read_exact(&mut tmp).await.unwrap();
         assert_eq!(&tmp[..], b"test");
     })
-    .await
+    .await;
 }
 
 #[tokio::test]
@@ -85,7 +85,7 @@ async fn test_transfer_after_close() {
 
         assert_eq!(handle.await.unwrap().unwrap(), (0, 4));
     })
-    .await
+    .await;
 }
 
 #[tokio::test]
@@ -107,7 +107,7 @@ async fn blocking_one_side_does_not_block_other() {
 
         assert_eq!(handle.await.unwrap().unwrap(), (buf.len() as u64, 4));
     })
-    .await
+    .await;
 }
 
 #[tokio::test]
