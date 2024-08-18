@@ -11,6 +11,7 @@ use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 use tokio::test as maybe_tokio_test;
 
 use std::fmt;
+use std::panic;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
@@ -22,9 +23,28 @@ mod support {
 }
 
 #[allow(unused)]
-trait AssertSend: Send {}
-impl AssertSend for mpsc::Sender<i32> {}
-impl AssertSend for mpsc::Receiver<i32> {}
+trait AssertRefUnwindSafe: panic::RefUnwindSafe {}
+impl<T> AssertRefUnwindSafe for mpsc::OwnedPermit<T> {}
+impl<'a, T> AssertRefUnwindSafe for mpsc::Permit<'a, T> {}
+impl<'a, T> AssertRefUnwindSafe for mpsc::PermitIterator<'a, T> {}
+impl<T> AssertRefUnwindSafe for mpsc::Receiver<T> {}
+impl<T> AssertRefUnwindSafe for mpsc::Sender<T> {}
+impl<T> AssertRefUnwindSafe for mpsc::UnboundedReceiver<T> {}
+impl<T> AssertRefUnwindSafe for mpsc::UnboundedSender<T> {}
+impl<T> AssertRefUnwindSafe for mpsc::WeakSender<T> {}
+impl<T> AssertRefUnwindSafe for mpsc::WeakUnboundedSender<T> {}
+
+#[allow(unused)]
+trait AssertUnwindSafe: panic::UnwindSafe {}
+impl<T> AssertUnwindSafe for mpsc::OwnedPermit<T> {}
+impl<'a, T> AssertUnwindSafe for mpsc::Permit<'a, T> {}
+impl<'a, T> AssertUnwindSafe for mpsc::PermitIterator<'a, T> {}
+impl<T> AssertUnwindSafe for mpsc::Receiver<T> {}
+impl<T> AssertUnwindSafe for mpsc::Sender<T> {}
+impl<T> AssertUnwindSafe for mpsc::UnboundedReceiver<T> {}
+impl<T> AssertUnwindSafe for mpsc::UnboundedSender<T> {}
+impl<T> AssertUnwindSafe for mpsc::WeakSender<T> {}
+impl<T> AssertUnwindSafe for mpsc::WeakUnboundedSender<T> {}
 
 #[maybe_tokio_test]
 async fn send_recv_with_buffer() {

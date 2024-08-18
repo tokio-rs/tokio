@@ -1,6 +1,7 @@
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::ops::Deref;
+use std::panic;
 
 /// `AtomicU16` providing an additional `unsync_load` function.
 pub(crate) struct AtomicU16 {
@@ -9,6 +10,8 @@ pub(crate) struct AtomicU16 {
 
 unsafe impl Send for AtomicU16 {}
 unsafe impl Sync for AtomicU16 {}
+impl panic::RefUnwindSafe for AtomicU16 {}
+impl panic::UnwindSafe for AtomicU16 {}
 
 impl AtomicU16 {
     pub(crate) const fn new(val: u16) -> AtomicU16 {
