@@ -118,6 +118,9 @@ struct Inner {
     /// Sharded Timer wheels.
     wheels: RwLock<ShardedWheel>,
 
+    /// Number of entries in the sharded timer wheels.
+    wheels_len: u32,
+
     /// True if the driver is being shutdown.
     pub(super) is_shutdown: AtomicBool,
 
@@ -154,6 +157,7 @@ impl Driver {
             inner: Inner {
                 next_wake: AtomicOptionNonZeroU64::new(None),
                 wheels: RwLock::new(ShardedWheel(wheels.into_boxed_slice())),
+                wheels_len: shards,
                 is_shutdown: AtomicBool::new(false),
                 #[cfg(feature = "test-util")]
                 did_wake: AtomicBool::new(false),
@@ -200,10 +204,10 @@ impl Driver {
                 .inner
                 .wheels
                 .write()
-                .expect("Timer wheel shards poisened");
-            let expiration_time = (0..wheels_lock.get_shard_size())
+                .expect("Timer wheel shards poisoned");
+            let expiration_time = (0..rt_handle.time().inner.get_shard_size())
                 .filter_map(|id| {
-                    let wheel = wheels_lock.get_sharded_wheel(id);
+                    let wheel = wheels_lock.get_sharded_wheel_mut(id);
                     wheel.next_expiration_time()
                 })
                 .min();
@@ -325,7 +329,7 @@ impl Handle {
             .inner
             .wheels
             .read()
-            .expect("Timer wheel shards poisened");
+            .expect("Timer wheel shards poisoned");
         let mut lock = wheels_lock.lock_sharded_wheel(id);
 
         if now < lock.elapsed() {
@@ -356,7 +360,7 @@ impl Handle {
                         .inner
                         .wheels
                         .read()
-                        .expect("Timer wheel shards poisened");
+                        .expect("Timer wheel shards poisoned");
                     lock = wheels_lock.lock_sharded_wheel(id);
                 }
             }
@@ -384,7 +388,7 @@ impl Handle {
                 .inner
                 .wheels
                 .read()
-                .expect("Timer wheel shards poisened");
+                .expect("Timer wheel shards poisoned");
             let mut lock = wheels_lock.lock_sharded_wheel(entry.as_ref().shard_id());
 
             if entry.as_ref().might_be_registered() {
@@ -412,7 +416,7 @@ impl Handle {
                 .inner
                 .wheels
                 .read()
-                .expect("Timer wheel shards poisened");
+                .expect("Timer wheel shards poisoned");
 
             let mut lock = wheels_lock.lock_sharded_wheel(entry.as_ref().shard_id());
 
@@ -481,10 +485,7 @@ impl Inner {
 
     // Gets the number of shards.
     fn get_shard_size(&self) -> u32 {
-        self.wheels
-            .read()
-            .expect("Timer wheel shards poisened")
-            .get_shard_size()
+        self.wheels_len
     }
 }
 
@@ -508,15 +509,10 @@ impl ShardedWheel {
     }
 
     /// Gets a mutable reference to the sharded wheel with the given id.
-    pub(super) fn get_sharded_wheel(&mut self, shard_id: u32) -> &mut wheel::Wheel {
+    pub(super) fn get_sharded_wheel_mut(&mut self, shard_id: u32) -> &mut wheel::Wheel {
         let index = shard_id % (self.0.len() as u32);
         // Safety: This modulo operation ensures that the index is not out of bounds.
         unsafe { self.0.get_unchecked_mut(index as usize) }.get_mut()
-    }
-
-    /// Gets the number of shards.
-    fn get_shard_size(&self) -> u32 {
-        self.0.len() as u32
     }
 }
 
