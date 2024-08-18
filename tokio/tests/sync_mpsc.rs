@@ -23,11 +23,6 @@ mod support {
 }
 
 #[allow(unused)]
-trait AssertSend: Send {}
-impl AssertSend for mpsc::Sender<i32> {}
-impl AssertSend for mpsc::Receiver<i32> {}
-
-#[allow(unused)]
 trait AssertRefUnwindSafe: panic::RefUnwindSafe {}
 impl<T> AssertRefUnwindSafe for mpsc::OwnedPermit<T> {}
 impl<'a, T> AssertRefUnwindSafe for mpsc::Permit<'a, T> {}
