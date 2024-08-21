@@ -378,9 +378,9 @@ impl<T: 'static> JoinSet<T> {
     /// The results will be stored in the order they completed not the order they were spawned.
     ///
     /// This a convenience method that is equivalent to calling [`join_next`] in
-    /// a loop. If any tasks on the `JoinSet` fail with an `JoinError`, then this call
+    /// a loop. If any tasks on the `JoinSet` fail with an [`JoinError`], then this call
     /// to `join_all` will panic and all remaining tasks on the `JoinSet` are
-    /// [cancelled]. To handle errors in any other way, manually call `join_next`
+    /// cancelled. To handle errors in any other way, manually call [`join_next`]
     /// in a loop.
     ///
     /// # Examples
@@ -389,6 +389,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// ```
     /// use tokio::task::JoinSet;
+    /// use std::time::Duration;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -398,18 +399,19 @@ impl<T: 'static> JoinSet<T> {
     ///        set.spawn(async move {
     ///            tokio::time::sleep(Duration::from_secs(3 - i)).await;
     ///            i
-    //         });
+    ///        });
     ///     }   
     ///
-    ///     let res = set.join_all.await;  
-    ///     assert_eq!(vec, vec![2, 1, 0]);
+    ///     let output = set.join_all().await;  
+    ///     assert_eq!(output, vec![2, 1, 0]);
     /// }
     /// ```
     ///
-    /// Equivalent of `join_all` using `join_next` and loop.
+    /// Equivalent implementation of `join_all`, using [`join_next`] and loop.
     ///
     /// ```
     /// use tokio::task::JoinSet;
+    /// use std::panic;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -419,17 +421,19 @@ impl<T: 'static> JoinSet<T> {
     ///        set.spawn(async move {i});
     ///     }   
     ///     
-    ///     let res = Vec::new();
+    ///     let mut output = Vec::new();
     ///     while let Some(res) = set.join_next().await{
     ///         match res {
-    ///         Ok(t) => res.push(t),
-    ///         Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
-    ///         Err(err) => panic!("{err}"),
+    ///             Ok(t) => output.push(t),
+    ///             Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
+    ///             Err(err) => panic!("{err}"),
     ///         }
     ///     }
-    ///     assert_eq!(res.len(),3);
+    ///     assert_eq!(output.len(),3);
     /// }
     /// ```
+    /// [`join_next`]: fn@Self::join_next
+    /// [`JoinError::id`]: fn@crate::task::JoinError::id
     pub async fn join_all(mut self) -> Vec<T> {
         let mut output = Vec::with_capacity(self.len());
 
