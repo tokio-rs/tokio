@@ -374,15 +374,64 @@ impl<T: 'static> JoinSet<T> {
         while self.join_next().await.is_some() {}
     }
 
-    /// Awaits the completion of all tasks on this `JoinSet`, returning a Vector of their results.
+    /// Awaits the completion of all tasks in this `JoinSet`, returning a vector of their results.
+    /// The results will be stored in the order they completed not the order they were spawned.
     ///
-    /// If any task on this `JoinSet` errors or panics, this will panic and cancel all
-    /// tasks on this `JoinSet`.
+    /// This a convenience method that is equivalent to calling [`join_next`] in
+    /// a loop. If any tasks on the `JoinSet` fail with an `JoinError`, then this call
+    /// to `join_all` will panic and all remaining tasks on the `JoinSet` are
+    /// [cancelled]. To handle errors in any other way, manually call `join_next`
+    /// in a loop.
     ///
-    /// For specific error handling of individual tasks, you should call `join_next`
-    /// in a loop with your desired handling.
+    /// # Examples
+    ///
+    /// Spawn multiple tasks and `join_all` them.
+    ///
+    /// ```
+    /// use tokio::task::JoinSet;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut set = JoinSet::new();
+    ///
+    ///     for i in 0..3 {
+    ///        set.spawn(async move {
+    ///            tokio::time::sleep(Duration::from_secs(3 - i)).await;
+    ///            i
+    //         });
+    ///     }   
+    ///
+    ///     let res = set.join_all.await;  
+    ///     assert_eq!(vec, vec![2, 1, 0]);
+    /// }
+    /// ```
+    ///
+    /// Equivalent of `join_all` using `join_next` and loop.
+    ///
+    /// ```
+    /// use tokio::task::JoinSet;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut set = JoinSet::new();
+    ///
+    ///     for i in 0..3 {
+    ///        set.spawn(async move {i});
+    ///     }   
+    ///     
+    ///     let res = Vec::new();
+    ///     while let Some(res) = set.join_next().await{
+    ///         match res {
+    ///         Ok(t) => res.push(t),
+    ///         Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
+    ///         Err(err) => panic!("{err}"),
+    ///         }
+    ///     }
+    ///     assert_eq!(res.len(),3);
+    /// }
+    /// ```
     pub async fn join_all(mut self) -> Vec<T> {
-        let mut output = Vec::new();
+        let mut output = Vec::with_capacity(self.len());
 
         while let Some(res) = self.join_next().await {
             match res {
