@@ -205,11 +205,10 @@ impl Driver {
                 .wheels
                 .write()
                 .expect("Timer wheel shards poisoned");
-            let expiration_time = (0..rt_handle.time().inner.get_shard_size())
-                .filter_map(|id| {
-                    let wheel = wheels_lock.get_sharded_wheel_mut(id);
-                    wheel.next_expiration_time()
-                })
+            let expiration_time = wheels_lock
+                .0
+                .iter_mut()
+                .filter_map(|wheel| wheel.get_mut().next_expiration_time())
                 .min();
 
             rt_handle
@@ -367,6 +366,7 @@ impl Handle {
         }
         let next_wake_up = lock.poll_at();
         drop(lock);
+        drop(wheels_lock);
 
         waker_list.wake_all();
         next_wake_up
@@ -506,13 +506,6 @@ impl ShardedWheel {
         let index = shard_id % (self.0.len() as u32);
         // Safety: This modulo operation ensures that the index is not out of bounds.
         unsafe { self.0.get_unchecked(index as usize) }.lock()
-    }
-
-    /// Gets a mutable reference to the sharded wheel with the given id.
-    pub(super) fn get_sharded_wheel_mut(&mut self, shard_id: u32) -> &mut wheel::Wheel {
-        let index = shard_id % (self.0.len() as u32);
-        // Safety: This modulo operation ensures that the index is not out of bounds.
-        unsafe { self.0.get_unchecked_mut(index as usize) }.get_mut()
     }
 }
 
