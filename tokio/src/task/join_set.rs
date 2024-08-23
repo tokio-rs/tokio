@@ -377,7 +377,7 @@ impl<T: 'static> JoinSet<T> {
     /// Awaits the completion of all tasks in this `JoinSet`, returning a vector of their results.
     /// The results will be stored in the order they completed not the order they were spawned.
     ///
-    /// This a convenience method that is equivalent to calling [`join_next`] in
+    /// This is a convenience method that is equivalent to calling [`join_next`] in
     /// a loop. If any tasks on the `JoinSet` fail with an [`JoinError`], then this call
     /// to `join_all` will panic and all remaining tasks on the `JoinSet` are
     /// cancelled. To handle errors in any other way, manually call [`join_next`]
