@@ -334,15 +334,15 @@ where
         //
         // We call this in a separate block so that it runs after the task appears to have
         // completed and will still run if the destructor panics.
-        let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            if let Some(f) = self.trailer().hooks.task_terminate_callback.as_ref() {
+        if let Some(f) = self.trailer().hooks.task_terminate_callback.as_ref() {
+            let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 f(&TaskMeta {
                     #[cfg(tokio_unstable)]
                     id: self.core().task_id,
                     _phantom: Default::default(),
                 })
-            }
-        }));
+            }));
+        }
 
         // The task has completed execution and will no longer be scheduled.
         let num_release = self.release();
