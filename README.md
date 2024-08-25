@@ -52,7 +52,7 @@ an asynchronous application.
 
 A basic TCP echo server with Tokio.
 
-Make sure you activated the full features of the tokio crate on Cargo.toml:
+Make sure you activate the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
