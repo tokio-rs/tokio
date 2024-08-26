@@ -4,10 +4,10 @@
 //! of spawned tasks and allows asynchronously awaiting the output of those
 //! tasks as they complete. See the documentation for the [`JoinSet`] type for
 //! details.
-use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{fmt, panic};
 
 use crate::runtime::Handle;
 #[cfg(tokio_unstable)]
@@ -372,6 +372,79 @@ impl<T: 'static> JoinSet<T> {
     pub async fn shutdown(&mut self) {
         self.abort_all();
         while self.join_next().await.is_some() {}
+    }
+
+    /// Awaits the completion of all tasks in this `JoinSet`, returning a vector of their results.
+    ///
+    /// The results will be stored in the order they completed not the order they were spawned.
+    /// This is a convenience method that is equivalent to calling [`join_next`] in
+    /// a loop. If any tasks on the `JoinSet` fail with an [`JoinError`], then this call
+    /// to `join_all` will panic and all remaining tasks on the `JoinSet` are
+    /// cancelled. To handle errors in any other way, manually call [`join_next`]
+    /// in a loop.
+    ///
+    /// # Examples
+    ///
+    /// Spawn multiple tasks and `join_all` them.
+    ///
+    /// ```
+    /// use tokio::task::JoinSet;
+    /// use std::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut set = JoinSet::new();
+    ///
+    ///     for i in 0..3 {
+    ///        set.spawn(async move {
+    ///            tokio::time::sleep(Duration::from_secs(3 - i)).await;
+    ///            i
+    ///        });
+    ///     }   
+    ///
+    ///     let output = set.join_all().await;  
+    ///     assert_eq!(output, vec![2, 1, 0]);
+    /// }
+    /// ```
+    ///
+    /// Equivalent implementation of `join_all`, using [`join_next`] and loop.
+    ///
+    /// ```
+    /// use tokio::task::JoinSet;
+    /// use std::panic;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut set = JoinSet::new();
+    ///
+    ///     for i in 0..3 {
+    ///        set.spawn(async move {i});
+    ///     }   
+    ///     
+    ///     let mut output = Vec::new();
+    ///     while let Some(res) = set.join_next().await{
+    ///         match res {
+    ///             Ok(t) => output.push(t),
+    ///             Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
+    ///             Err(err) => panic!("{err}"),
+    ///         }
+    ///     }
+    ///     assert_eq!(output.len(),3);
+    /// }
+    /// ```
+    /// [`join_next`]: fn@Self::join_next
+    /// [`JoinError::id`]: fn@crate::task::JoinError::id
+    pub async fn join_all(mut self) -> Vec<T> {
+        let mut output = Vec::with_capacity(self.len());
+
+        while let Some(res) = self.join_next().await {
+            match res {
+                Ok(t) => output.push(t),
+                Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
+                Err(err) => panic!("{err}"),
+            }
+        }
+        output
     }
 
     /// Aborts all tasks on this `JoinSet`.
