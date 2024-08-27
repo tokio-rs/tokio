@@ -23,7 +23,10 @@ use crate::util::IdleNotifiedSet;
 ///
 /// All of the tasks must have the same return type `T`.
 ///
-/// When the `JoinSet` is dropped, all tasks in the `JoinSet` are immediately aborted.
+/// When the `JoinSet` is dropped, all non-blocking tasks in the `JoinSet` are
+/// immediately aborted. Tasks spawned with
+/// [`spawn_blocking`](Self::spawn_blocking) will abort when they reach an
+/// `await` point
 ///
 /// # Examples
 ///
@@ -205,6 +208,8 @@ impl<T: 'static> JoinSet<T> {
     /// it in this `JoinSet`, returning an [`AbortHandle`] that can be
     /// used to remotely cancel the task.
     ///
+    /// Note that the task can only abort once it reaches an `await` point.
+    ///
     /// # Examples
     ///
     /// Spawn multiple blocking tasks and wait for them.
@@ -250,6 +255,8 @@ impl<T: 'static> JoinSet<T> {
     /// Spawn the blocking code on the blocking threadpool of the
     /// provided runtime and store it in this `JoinSet`, returning an
     /// [`AbortHandle`] that can be used to remotely cancel the task.
+    ///
+    /// Note that the task can only abort once it reaches an `await` point.
     ///
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
@@ -367,6 +374,10 @@ impl<T: 'static> JoinSet<T> {
     /// This method ignores any panics in the tasks shutting down. When this call returns, the
     /// `JoinSet` will be empty.
     ///
+    /// Note that tasks can only abort once they reach an `await` point, this
+    /// might take a while for tasks containing blocking code even if they are
+    /// spawned with [`spawn_blocking`](Self::spawn_blocking).
+    ///
     /// [`abort_all`]: fn@Self::abort_all
     /// [`join_next`]: fn@Self::join_next
     pub async fn shutdown(&mut self) {
@@ -451,6 +462,10 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// This does not remove the tasks from the `JoinSet`. To wait for the tasks to complete
     /// cancellation, you should call `join_next` in a loop until the `JoinSet` is empty.
+    ///
+    /// Note that tasks can only abort once they reach an `await` point, this
+    /// might take a while for tasks containing blocking code even if they are
+    /// spawned with [`spawn_blocking`](Self::spawn_blocking).
     pub fn abort_all(&mut self) {
         self.inner.for_each(|jh| jh.abort());
     }
