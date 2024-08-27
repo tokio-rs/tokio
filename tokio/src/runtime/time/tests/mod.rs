@@ -202,6 +202,26 @@ fn reset_future() {
     })
 }
 
+#[test]
+#[cfg(not(loom))]
+fn reset_timer_and_drop() {
+    let rt = rt(false);
+    let handle = rt.handle();
+
+    let start = handle.inner.driver().clock().now();
+
+    for _ in 0..2 {
+        let entry = TimerEntry::new(handle.inner.clone(), start + Duration::from_millis(10));
+        pin!(entry);
+
+        let _ = entry
+            .as_mut()
+            .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+
+        entry.as_mut().reset(start + Duration::from_secs(1), true);
+    }
+}
+
 #[cfg(not(loom))]
 fn normal_or_miri<T>(normal: T, miri: T) -> T {
     if cfg!(miri) {
