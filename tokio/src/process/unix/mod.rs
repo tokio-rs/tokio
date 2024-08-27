@@ -132,18 +132,14 @@ impl Drop for ChildDropGuard {
 
 impl ChildDropGuard {
     pub(crate) fn new(child: StdChild) -> ChildDropGuard {
-        return ChildDropGuard {
+        ChildDropGuard {
             child: Some(child),
             kill_on_drop: true,
-        };
+        }
     }
 
     pub(crate) fn extract(mut self) -> StdChild {
         self.child.take().unwrap()
-    }
-
-    pub(crate) fn dont_kill_on_drop(&mut self) {
-        self.kill_on_drop = false;
     }
 
     pub(crate) fn take_stdin(&mut self) -> Option<std::process::ChildStdin> {
@@ -168,6 +164,12 @@ impl ChildDropGuard {
             .take()
     }
 
+    #[cfg(all(target_os = "linux", feature = "rt"))]
+    pub(crate) fn dont_kill_on_drop(&mut self) {
+        self.kill_on_drop = false;
+    }
+
+    #[cfg(all(target_os = "linux", feature = "rt"))]
     pub(crate) fn inner_mut(&mut self) -> &mut StdChild {
         self.child.as_mut().expect("child has gone away")
     }
