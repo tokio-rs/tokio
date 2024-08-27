@@ -4,6 +4,7 @@ use crate::runtime::scheduler::multi_thread::worker;
 use crate::runtime::{
     blocking, driver,
     task::{self, JoinHandle},
+    TaskHooks, TaskMeta,
 };
 use crate::util::RngSeedGenerator;
 
@@ -28,6 +29,9 @@ pub(crate) struct Handle {
 
     /// Current random number generator seed
     pub(crate) seed_generator: RngSeedGenerator,
+
+    /// User-supplied hooks to invoke for things
+    pub(crate) task_hooks: TaskHooks,
 }
 
 impl Handle {
@@ -50,6 +54,12 @@ impl Handle {
         T::Output: Send + 'static,
     {
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
+
+        me.task_hooks.spawn(&TaskMeta {
+            #[cfg(tokio_unstable)]
+            id,
+            _phantom: Default::default(),
+        });
 
         me.schedule_option_task_without_yield(notified);
 

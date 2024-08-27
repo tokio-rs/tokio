@@ -7,6 +7,8 @@ cfg_rt! {
 
     pub(crate) mod inject;
     pub(crate) use inject::Inject;
+
+    use crate::runtime::TaskHooks;
 }
 
 cfg_rt_multi_thread! {
@@ -148,6 +150,16 @@ cfg_rt! {
                 Handle::CurrentThread(handle) => handle,
                 #[cfg(feature = "rt-multi-thread")]
                 _ => panic!("not a CurrentThread handle"),
+            }
+        }
+
+        pub(crate) fn hooks(&self) -> &TaskHooks {
+            match self {
+                Handle::CurrentThread(h) => &h.task_hooks,
+                #[cfg(feature = "rt-multi-thread")]
+                Handle::MultiThread(h) => &h.task_hooks,
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Handle::MultiThreadAlt(h) => &h.task_hooks,
             }
         }
 
