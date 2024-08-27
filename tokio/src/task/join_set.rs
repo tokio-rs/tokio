@@ -23,10 +23,10 @@ use crate::util::IdleNotifiedSet;
 ///
 /// All of the tasks must have the same return type `T`.
 ///
-/// When the `JoinSet` is dropped, all non-blocking tasks in the `JoinSet` are
-/// immediately aborted. Tasks spawned with
-/// [`spawn_blocking`](Self::spawn_blocking) will abort when they reach an
-/// `await` point
+/// When the `JoinSet` is dropped, all *async* tasks in the `JoinSet` are
+/// immediately aborted. Tasks spawned with [`spawn_blocking`] or
+/// [`spawn_blocking_on`] can not be aborted as they are not *async*, see [task
+/// cancellation].
 ///
 /// # Examples
 ///
@@ -54,6 +54,9 @@ use crate::util::IdleNotifiedSet;
 ///     }
 /// }
 /// ```
+/// [`spawn_blocking`]: fn@Self::spawn_blocking
+/// [`spawn_blocking_on`]: fn@Self::spawn_blocking_on
+/// [task cancellation]: crate::task#cancellation
 #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub struct JoinSet<T> {
     inner: IdleNotifiedSet<JoinHandle<T>>,
@@ -208,7 +211,8 @@ impl<T: 'static> JoinSet<T> {
     /// it in this `JoinSet`, returning an [`AbortHandle`] that can be
     /// used to remotely cancel the task.
     ///
-    /// Note that the task can only abort once it reaches an `await` point.
+    /// Note that this task can not be aborted as its not *async*,
+    /// see [task cancellation].
     ///
     /// # Examples
     ///
@@ -242,6 +246,7 @@ impl<T: 'static> JoinSet<T> {
     /// This method panics if called outside of a Tokio runtime.
     ///
     /// [`AbortHandle`]: crate::task::AbortHandle
+    /// [task cancellation]: crate::task#cancellation
     #[track_caller]
     pub fn spawn_blocking<F>(&mut self, f: F) -> AbortHandle
     where
@@ -256,7 +261,8 @@ impl<T: 'static> JoinSet<T> {
     /// provided runtime and store it in this `JoinSet`, returning an
     /// [`AbortHandle`] that can be used to remotely cancel the task.
     ///
-    /// Note that the task can only abort once it reaches an `await` point.
+    /// Note that this task can not be aborted as its not *async*,
+    /// see [task cancellation].
     ///
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
@@ -374,12 +380,15 @@ impl<T: 'static> JoinSet<T> {
     /// This method ignores any panics in the tasks shutting down. When this call returns, the
     /// `JoinSet` will be empty.
     ///
-    /// Note that tasks can only abort once they reach an `await` point, this
-    /// might take a while for tasks containing blocking code even if they are
-    /// spawned with [`spawn_blocking`](Self::spawn_blocking).
+    /// Note that tasks spawned with [`spawn_blocking`] or [`spawn_blocking_on`]
+    /// can not be aborted as they are not *async*, see [task cancellation].
+    /// They may cause the call to shutdown to block.
     ///
     /// [`abort_all`]: fn@Self::abort_all
     /// [`join_next`]: fn@Self::join_next
+    /// [`spawn_blocking`]: fn@Self::spawn_blocking
+    /// [`spawn_blocking_on`]: fn@Self::spawn_blocking_on
+    /// [task cancellation]: crate::task#cancellation
     pub async fn shutdown(&mut self) {
         self.abort_all();
         while self.join_next().await.is_some() {}
@@ -463,9 +472,13 @@ impl<T: 'static> JoinSet<T> {
     /// This does not remove the tasks from the `JoinSet`. To wait for the tasks to complete
     /// cancellation, you should call `join_next` in a loop until the `JoinSet` is empty.
     ///
-    /// Note that tasks can only abort once they reach an `await` point, this
-    /// might take a while for tasks containing blocking code even if they are
-    /// spawned with [`spawn_blocking`](Self::spawn_blocking).
+    /// Note that tasks spawned with [`spawn_blocking`] or [`spawn_blocking_on`]
+    /// can not be aborted as they are not *async*, see [task cancellation].
+    /// They may cause the call to shutdown to block.
+    ///
+    /// [`spawn_blocking`]: fn@Self::spawn_blocking
+    /// [`spawn_blocking_on`]: fn@Self::spawn_blocking_on
+    /// [task cancellation]: crate::task#cancellation
     pub fn abort_all(&mut self) {
         self.inner.for_each(|jh| jh.abort());
     }
