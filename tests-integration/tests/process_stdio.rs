@@ -10,6 +10,7 @@ use futures::future::{self, FutureExt};
 use std::env;
 use std::io;
 use std::process::{ExitStatus, Stdio};
+use std::task::ready;
 
 fn cat() -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_test-cat"));
@@ -211,7 +212,7 @@ async fn vectored_writes() {
             if vectored == 0 {
                 return std::task::Poll::Ready(std::io::Result::Ok(()));
             }
-            let n = futures::ready!(Pin::new(&mut stdin).poll_write_vectored(cx, &slices))?;
+            let n = ready!(Pin::new(&mut stdin).poll_write_vectored(cx, &slices))?;
             writes_completed += 1;
             input.advance(n);
         })

@@ -71,11 +71,10 @@ use std::task::{ready, Context, Poll};
 /// and using the IO traits [`AsyncRead`] and [`AsyncWrite`].
 ///
 /// ```no_run
-/// use futures::ready;
 /// use std::io::{self, Read, Write};
 /// use std::net::TcpStream;
 /// use std::pin::Pin;
-/// use std::task::{Context, Poll};
+/// use std::task::{ready, Context, Poll};
 /// use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 /// use tokio::io::unix::AsyncFd;
 ///
