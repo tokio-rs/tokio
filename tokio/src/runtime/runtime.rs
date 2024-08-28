@@ -475,6 +475,17 @@ impl Runtime {
     pub fn metrics(&self) -> crate::runtime::RuntimeMetrics {
         self.handle.metrics()
     }
+
+    /// Gets a raw fd for the IO driver which can be polled.
+    ///
+    /// Do NOT use this for anything other than watching it with epoll/kqueue/poll.
+    ///
+    /// # Safety
+    /// Don't use this after the runtime goes away.
+    #[cfg(unix)]
+    pub unsafe fn get_raw_poll_fd(&self) -> Option<std::os::fd::RawFd> {
+        Some(self.handle.inner.driver().io.as_ref()?.get_raw_poll_fd())
+    }
 }
 
 #[allow(clippy::single_match)] // there are comments in the error branch, so we don't want if-let

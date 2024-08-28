@@ -13,6 +13,7 @@ use crate::runtime::io::{IoDriverMetrics, RegistrationSet, ScheduledIo};
 use mio::event::Source;
 use std::fmt;
 use std::io;
+use std::os::fd::AsRawFd;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -207,6 +208,11 @@ impl Handle {
     pub(crate) fn unpark(&self) {
         #[cfg(not(target_os = "wasi"))]
         self.waker.wake().expect("failed to wake I/O driver");
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn get_raw_poll_fd(&self) -> std::os::fd::RawFd {
+        self.registry.as_raw_fd()
     }
 
     /// Registers an I/O resource with the reactor for a given `mio::Ready` state.
