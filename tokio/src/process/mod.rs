@@ -250,8 +250,7 @@ use std::io;
 use std::path::Path;
 use std::pin::Pin;
 use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
-use std::task::Context;
-use std::task::Poll;
+use std::task::{ready, Context, Poll};
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;

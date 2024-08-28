@@ -3,7 +3,7 @@ use crate::io::{AsyncRead, ReadBuf};
 
 use std::io;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 cfg_io_util! {
     /// An async reader which yields one byte over and over and over and over and
