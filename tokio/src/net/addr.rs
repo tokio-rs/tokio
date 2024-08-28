@@ -257,7 +257,6 @@ pub(crate) mod sealed {
     use std::future::Future;
     use std::io;
     use std::net::SocketAddr;
-    use std::task::ready;
 
     #[doc(hidden)]
     pub trait ToSocketAddrsPriv {
@@ -275,7 +274,7 @@ pub(crate) mod sealed {
 
         use std::option;
         use std::pin::Pin;
-        use std::task::{Context, Poll};
+        use std::task::{ready,Context, Poll};
         use std::vec;
 
         #[doc(hidden)]
