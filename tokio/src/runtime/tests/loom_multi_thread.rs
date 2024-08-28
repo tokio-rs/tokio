@@ -11,7 +11,7 @@ mod yield_now;
 use crate::future::poll_fn;
 use crate::runtime::tests::loom_oneshot as oneshot;
 use crate::runtime::{self, Runtime};
-use crate::{spawn, task};
+use crate::{ready, spawn, task};
 use tokio_test::assert_ok;
 
 use loom::sync::atomic::{AtomicBool, AtomicUsize};
