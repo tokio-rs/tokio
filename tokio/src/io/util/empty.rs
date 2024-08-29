@@ -4,7 +4,7 @@ use crate::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use std::fmt;
 use std::io::{self, SeekFrom};
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 cfg_io_util! {
     /// `Empty` ignores any data written via [`AsyncWrite`], and will always be empty

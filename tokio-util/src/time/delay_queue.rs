@@ -6,7 +6,6 @@
 
 use crate::time::wheel::{self, Wheel};
 
-use futures_core::ready;
 use tokio::time::{sleep_until, Duration, Instant, Sleep};
 
 use core::ops::{Index, IndexMut};
@@ -19,7 +18,7 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
-use std::task::{self, Poll, Waker};
+use std::task::{self, ready, Poll, Waker};
 
 /// A queue of delayed elements.
 ///
@@ -74,9 +73,8 @@ use std::task::{self, Poll, Waker};
 /// ```rust,no_run
 /// use tokio_util::time::{DelayQueue, delay_queue};
 ///
-/// use futures::ready;
 /// use std::collections::HashMap;
-/// use std::task::{Context, Poll};
+/// use std::task::{ready, Context, Poll};
 /// use std::time::Duration;
 /// # type CacheKey = String;
 /// # type Value = String;

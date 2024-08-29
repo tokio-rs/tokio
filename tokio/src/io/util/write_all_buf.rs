@@ -6,7 +6,7 @@ use std::future::Future;
 use std::io::{self, IoSlice};
 use std::marker::PhantomPinned;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 pin_project! {
     /// A future to write some of the buffer to an `AsyncWrite`.

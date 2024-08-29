@@ -2,7 +2,7 @@ use crate::Stream;
 
 use pin_project_lite::pin_project;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 pin_project! {
     /// Stream returned by [`fuse()`][super::StreamExt::fuse].

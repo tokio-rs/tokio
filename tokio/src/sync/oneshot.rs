@@ -135,7 +135,7 @@ use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire};
 use std::task::Poll::{Pending, Ready};
-use std::task::{Context, Poll, Waker};
+use std::task::{ready, Context, Poll, Waker};
 
 /// Sends a value to the associated [`Receiver`].
 ///
