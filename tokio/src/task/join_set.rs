@@ -25,8 +25,8 @@ use crate::util::IdleNotifiedSet;
 ///
 /// When the `JoinSet` is dropped, all *async* tasks in the `JoinSet` are
 /// immediately aborted. Tasks spawned with [`spawn_blocking`] or
-/// [`spawn_blocking_on`] can not be aborted as they are not *async*, see [task
-/// cancellation].
+/// [`spawn_blocking_on`] can only be aborted before they start running. 
+/// This is because they are not *async*, see [task cancellation].
 ///
 /// # Examples
 ///
@@ -211,8 +211,8 @@ impl<T: 'static> JoinSet<T> {
     /// it in this `JoinSet`, returning an [`AbortHandle`] that can be
     /// used to remotely cancel the task.
     ///
-    /// Note that this task can not be aborted as its not *async*,
-    /// see [task cancellation].
+    /// Note that this task can only be aborted before it starts running.
+    /// This is because they are not *async*, see [task cancellation].
     ///
     /// # Examples
     ///
@@ -261,8 +261,8 @@ impl<T: 'static> JoinSet<T> {
     /// provided runtime and store it in this `JoinSet`, returning an
     /// [`AbortHandle`] that can be used to remotely cancel the task.
     ///
-    /// Note that this task can not be aborted as its not *async*,
-    /// see [task cancellation].
+    /// Note that this task can only be aborted before it starts running.
+    /// This is because they are not *async*, see [task cancellation].
     ///
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
@@ -381,8 +381,9 @@ impl<T: 'static> JoinSet<T> {
     /// `JoinSet` will be empty.
     ///
     /// Note that tasks spawned with [`spawn_blocking`] or [`spawn_blocking_on`]
-    /// can not be aborted as they are not *async*, see [task cancellation].
-    /// They may cause the call to shutdown to block.
+    /// can not be aborted after they start running. This is because they are not 
+    /// *async*, see [task cancellation]. These tasks may cause the call to shutdown to 
+    /// block.
     ///
     /// [`abort_all`]: fn@Self::abort_all
     /// [`join_next`]: fn@Self::join_next
@@ -473,8 +474,9 @@ impl<T: 'static> JoinSet<T> {
     /// cancellation, you should call `join_next` in a loop until the `JoinSet` is empty.
     ///
     /// Note that tasks spawned with [`spawn_blocking`] or [`spawn_blocking_on`]
-    /// can not be aborted as they are not *async*, see [task cancellation].
-    /// They may cause the call to shutdown to block.
+    /// can not be aborted after they start running. This is because they are not 
+    /// *async*, see [task cancellation]. These tasks may cause the call to shutdown to 
+    /// block.
     ///
     /// [`spawn_blocking`]: fn@Self::spawn_blocking
     /// [`spawn_blocking_on`]: fn@Self::spawn_blocking_on
