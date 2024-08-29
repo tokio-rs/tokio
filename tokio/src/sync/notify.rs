@@ -1041,7 +1041,7 @@ impl Notified<'_> {
                     #[cfg(tokio_taskdump)]
                     if let Some(waker) = waker {
                         let mut ctx = Context::from_waker(waker);
-                        ready!(crate::trace::trace_leaf(&mut ctx));
+                        std::task::ready!(crate::trace::trace_leaf(&mut ctx));
                     }
 
                     if waiter.notification.load(Acquire).is_some() {
@@ -1135,7 +1135,7 @@ impl Notified<'_> {
                     #[cfg(tokio_taskdump)]
                     if let Some(waker) = waker {
                         let mut ctx = Context::from_waker(waker);
-                        ready!(crate::trace::trace_leaf(&mut ctx));
+                        std::task::ready!(crate::trace::trace_leaf(&mut ctx));
                     }
                     return Poll::Ready(());
                 }

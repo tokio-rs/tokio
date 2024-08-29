@@ -36,10 +36,10 @@
 
 use std::collections::VecDeque;
 use std::pin::Pin;
-use std::task::Poll;
+use std::task::{ready, Poll};
 use std::time::Duration;
 
-use futures_core::{ready, Stream};
+use futures_core::Stream;
 use std::future::Future;
 use tokio::time::{sleep_until, Instant, Sleep};
 

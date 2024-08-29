@@ -5,7 +5,7 @@ use futures_core::Stream;
 use tokio_util::sync::ReusableBoxFuture;
 
 use std::fmt;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 use tokio::sync::watch::error::RecvError;
 
 /// A wrapper around [`tokio::sync::watch::Receiver`] that implements [`Stream`].

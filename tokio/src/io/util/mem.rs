@@ -7,7 +7,7 @@ use bytes::{Buf, BytesMut};
 use std::{
     pin::Pin,
     sync::Arc,
-    task::{self, Poll, Waker},
+    task::{self, ready, Poll, Waker},
 };
 
 /// A bidirectional pipe to read and write bytes in memory.

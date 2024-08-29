@@ -1,8 +1,7 @@
-use futures_core::ready;
 use pin_project_lite::pin_project;
 use std::io::{IoSlice, Result};
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
