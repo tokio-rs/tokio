@@ -157,7 +157,7 @@ cfg_rt! {
         /// Spawn a local task
         ///
         /// # Safety
-        /// This should only be called in LocalRuntime if the runtime has been verified to be owned
+        /// This should only be called in `LocalRuntime` if the runtime has been verified to be owned
         /// by the current thread.
         #[allow(irrefutable_let_patterns)]
         pub(crate) unsafe fn spawn_local<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>

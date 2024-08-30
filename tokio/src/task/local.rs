@@ -411,7 +411,7 @@ cfg_rt! {
                 let id = task::Id::next();
                 let task = crate::util::trace::task(future, "task", name, id.as_u64());
 
-                // safety: we have verified that this is a LocalRuntime owned by the current thread
+                // safety: we have verified that this is a `LocalRuntime` owned by the current thread
                 unsafe { handle.spawn_local(task, id) }
             } else {
                 match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {

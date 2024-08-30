@@ -1,4 +1,4 @@
-/// LocalRuntime-only config options
+/// `LocalRuntime`-only config options
 ///
 /// Currently, there are no such options, but in the future, things like `!Send + !Sync` hooks may
 /// be added.

@@ -49,7 +49,7 @@ pub(crate) struct Handle {
     /// User-supplied hooks to invoke for things
     pub(crate) task_hooks: TaskHooks,
 
-    /// If this is a LocalRuntime, flags the owning thread ID.
+    /// If this is a `LocalRuntime`, flags the owning thread ID.
     pub(crate) local_tid: Option<ThreadId>,
 }
 

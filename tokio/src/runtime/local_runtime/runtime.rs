@@ -111,7 +111,7 @@ impl LocalRuntime {
         &self.handle
     }
 
-    /// Spawns a future onto the LocalRuntime.
+    /// Spawns a future onto the `LocalRuntime`.
     ///
     /// See the documentation for the equivalent method on [Runtime] for more information
     ///
@@ -152,7 +152,7 @@ impl LocalRuntime {
         F: Future + 'static,
         F::Output: 'static,
     {
-        // safety: spawn_local can only be called from LocalRuntime, which this is
+        // safety: spawn_local can only be called from `LocalRuntime`, which this is
         unsafe {
             if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
                 self.handle.spawn_local_named(Box::pin(future), None)
