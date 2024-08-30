@@ -386,11 +386,16 @@ cfg_rt! {
     {
         use crate::runtime::{context, task};
 
+        let mut future = Some(future);
+
         let res = context::with_current(|handle| {
             Some(if handle.is_local() {
                 if !handle.can_spawn_local_on_local_runtime() {
                     return None;
                 }
+
+                let future = future.take().unwrap();
+
                 #[cfg(all(
                     tokio_unstable,
                     tokio_taskdump,
@@ -411,7 +416,7 @@ cfg_rt! {
             } else {
                 match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
                     None => panic!("`spawn_local` called from outside of a `task::LocalSet` or LocalRuntime"),
-                    Some(cx) => cx.spawn(future, meta)
+                    Some(cx) => cx.spawn(future.take().unwrap(), meta)
                 }
             })
         });
@@ -419,7 +424,10 @@ cfg_rt! {
         match res {
             Ok(None) => panic!("Local tasks can only be spawned on a LocalRuntime from the thread the runtime was created on"),
             Ok(Some(join_handle)) => join_handle,
-            Err(e) => panic!("{}", e),
+            Err(_) => match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
+                None => panic!("`spawn_local` called from outside of a `task::LocalSet` or LocalRuntime"),
+                Some(cx) => cx.spawn(future.unwrap(), name)
+            }
         }
     }
 }
