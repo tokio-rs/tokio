@@ -349,6 +349,7 @@ impl Handle {
     }
 
     #[track_caller]
+    #[allow(dead_code)]
     pub(crate) unsafe fn spawn_local_named<F>(
         &self,
         future: F,
