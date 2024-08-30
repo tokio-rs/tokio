@@ -1,11 +1,9 @@
 #![cfg_attr(loom, allow(unused_imports))]
 
 use crate::runtime::handle::Handle;
+use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback};
 #[cfg(tokio_unstable)]
-use crate::runtime::TaskMeta;
-use crate::runtime::{
-    blocking, driver, Callback, HistogramBuilder, LocalOptions, LocalRuntime, Runtime, TaskCallback,
-};
+use crate::runtime::{LocalOptions, LocalRuntime, TaskMeta};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use crate::runtime::blocking::BlockingPool;
@@ -821,6 +819,8 @@ impl Builder {
     /// });
     /// ```
     #[allow(unused_variables)]
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn build_local(&mut self, options: &mut LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
@@ -1231,6 +1231,7 @@ impl Builder {
         ))
     }
 
+    #[cfg(tokio_unstable)]
     fn build_current_thread_local_runtime(&mut self) -> io::Result<LocalRuntime> {
         use crate::runtime::local_runtime::LocalRuntimeScheduler;
 
