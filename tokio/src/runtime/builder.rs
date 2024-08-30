@@ -818,7 +818,7 @@ impl Builder {
     ///     println!("Hello from the Tokio runtime");
     /// });
     /// ```
-    #[allow(unused_variables)]
+    #[allow(unused_variables, unreachable_patterns)]
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn build_local(&mut self, options: &mut LocalOptions) -> io::Result<LocalRuntime> {
