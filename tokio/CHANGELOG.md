@@ -22,10 +22,6 @@
 - task: add `#[must_use]` to `JoinHandle::abort_handle` ([#6762])
 - time: eliminate timer wheel allocations ([#6779])
 
-### Fixed
-
-- task: fix typo in `TaskTracker` docs ([#6792])
-
 ### Documented
 
 - docs: clarify that `[build]` section doesn't go in Cargo.toml ([#6728])
@@ -50,7 +46,6 @@
 [#6783]: https://github.com/tokio-rs/tokio/pull/6783
 [#6784]: https://github.com/tokio-rs/tokio/pull/6784
 [#6790]: https://github.com/tokio-rs/tokio/pull/6790
-[#6792]: https://github.com/tokio-rs/tokio/pull/6792
 
 # 1.39.3 (August 17th, 2024)
 
