@@ -226,7 +226,7 @@ impl LocalRuntime {
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
         ))]
-        let future = super::task::trace::Trace::root(future);
+        let future = crate::runtime::task::trace::Trace::root(future);
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(
