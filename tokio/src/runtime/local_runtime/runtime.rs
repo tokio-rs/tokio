@@ -11,8 +11,8 @@ use std::time::Duration;
 
 /// A local Tokio runtime.
 ///
-/// This runtime is identical to a current_thread [runtime], save for not being `!Send + !Sync`,
-/// and supporting spawn_local.
+/// This runtime is identical to a `current_thread` [runtime], save for not being `!Send + !Sync`,
+/// and supporting `spawn_local`.
 ///
 /// For more general information on how to use runtimes, see the [module] docs.
 ///
@@ -34,7 +34,7 @@ pub struct LocalRuntime {
     _phantom: PhantomData<*mut u8>,
 }
 
-/// The runtime scheduler is always a current_thread scheduler right now.
+/// The runtime scheduler is always a `current_thread` scheduler right now.
 #[derive(Debug)]
 pub(crate) enum LocalRuntimeScheduler {
     /// Execute all tasks on the current-thread.
