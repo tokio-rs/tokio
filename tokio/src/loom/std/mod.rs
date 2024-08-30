@@ -8,6 +8,7 @@ mod barrier;
 mod mutex;
 #[cfg(all(feature = "parking_lot", not(miri)))]
 mod parking_lot;
+mod rwlock;
 mod unsafe_cell;
 
 pub(crate) mod cell {
@@ -64,10 +65,13 @@ pub(crate) mod sync {
 
     #[cfg(not(all(feature = "parking_lot", not(miri))))]
     #[allow(unused_imports)]
-    pub(crate) use std::sync::{Condvar, MutexGuard, RwLock, RwLockReadGuard, WaitTimeoutResult};
+    pub(crate) use std::sync::{Condvar, MutexGuard, RwLockReadGuard, WaitTimeoutResult};
 
     #[cfg(not(all(feature = "parking_lot", not(miri))))]
     pub(crate) use crate::loom::std::mutex::Mutex;
+
+    #[cfg(not(all(feature = "parking_lot", not(miri))))]
+    pub(crate) use crate::loom::std::rwlock::RwLock;
 
     pub(crate) mod atomic {
         pub(crate) use crate::loom::std::atomic_u16::AtomicU16;

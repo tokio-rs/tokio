@@ -575,7 +575,7 @@ impl<T> Receiver<T> {
     /// assert_eq!(*rx.borrow(), "hello");
     /// ```
     pub fn borrow(&self) -> Ref<'_, T> {
-        let inner = self.shared.value.read().unwrap();
+        let inner = self.shared.value.read();
 
         // After obtaining a read-lock no concurrent writes could occur
         // and the loaded version matches that of the borrowed reference.
@@ -622,7 +622,7 @@ impl<T> Receiver<T> {
     /// [`changed`]: Receiver::changed
     /// [`borrow`]: Receiver::borrow
     pub fn borrow_and_update(&mut self) -> Ref<'_, T> {
-        let inner = self.shared.value.read().unwrap();
+        let inner = self.shared.value.read();
 
         // After obtaining a read-lock no concurrent writes could occur
         // and the loaded version matches that of the borrowed reference.
@@ -813,7 +813,7 @@ impl<T> Receiver<T> {
         let mut closed = false;
         loop {
             {
-                let inner = self.shared.value.read().unwrap();
+                let inner = self.shared.value.read();
 
                 let new_version = self.shared.state.load().version();
                 let has_changed = self.version != new_version;
@@ -1087,7 +1087,7 @@ impl<T> Sender<T> {
     {
         {
             // Acquire the write lock and update the value.
-            let mut lock = self.shared.value.write().unwrap();
+            let mut lock = self.shared.value.write();
 
             // Update the value and catch possible panic inside func.
             let result = panic::catch_unwind(panic::AssertUnwindSafe(|| modify(&mut lock)));
@@ -1164,7 +1164,7 @@ impl<T> Sender<T> {
     /// assert_eq!(*tx.borrow(), "hello");
     /// ```
     pub fn borrow(&self) -> Ref<'_, T> {
-        let inner = self.shared.value.read().unwrap();
+        let inner = self.shared.value.read();
 
         // The sender/producer always sees the current version
         let has_changed = false;
