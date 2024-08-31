@@ -1,10 +1,9 @@
 use crate::sync::batch_semaphore::*;
 
-use futures::future::poll_fn;
 use loom::future::block_on;
 use loom::sync::atomic::AtomicUsize;
 use loom::thread;
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;

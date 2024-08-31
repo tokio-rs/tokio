@@ -1,5 +1,5 @@
-use futures::future::poll_fn;
 use std::{
+    future::poll_fn,
     io::IoSlice,
     pin::Pin,
     task::{Context, Poll},

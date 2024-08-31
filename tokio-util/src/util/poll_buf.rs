@@ -17,7 +17,7 @@ use std::task::{ready, Context, Poll};
 /// use tokio_stream as stream;
 /// use tokio::io::Result;
 /// use tokio_util::io::{StreamReader, poll_read_buf};
-/// use futures::future::poll_fn;
+/// use std::future::poll_fn;
 /// use std::pin::Pin;
 /// # #[tokio::main]
 /// # async fn main() -> std::io::Result<()> {
@@ -95,9 +95,9 @@ pub fn poll_read_buf<T: AsyncRead + ?Sized, B: BufMut>(
 /// use tokio::fs::File;
 ///
 /// use bytes::Buf;
+/// use std::future::poll_fn;
 /// use std::io::Cursor;
 /// use std::pin::Pin;
-/// use futures::future::poll_fn;
 ///
 /// #[tokio::main]
 /// async fn main() -> io::Result<()> {
