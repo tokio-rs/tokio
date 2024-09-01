@@ -5,13 +5,12 @@ use futures_core::Stream;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use bytes::BytesMut;
-use futures_core::ready;
 use futures_sink::Sink;
 use pin_project_lite::pin_project;
 use std::borrow::{Borrow, BorrowMut};
 use std::io;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 pin_project! {
     #[derive(Debug)]

@@ -1,11 +1,10 @@
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use bytes::{Buf, BufMut};
-use futures_core::ready;
 use std::io::{self, IoSlice};
 use std::mem::MaybeUninit;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 /// Try to read data from an `AsyncRead` into an implementer of the [`BufMut`] trait.
 ///

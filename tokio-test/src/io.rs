@@ -23,13 +23,13 @@ use tokio::sync::mpsc;
 use tokio::time::{self, Duration, Instant, Sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use futures_core::{ready, Stream};
+use futures_core::Stream;
 use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{self, Poll, Waker};
+use std::task::{self, ready, Poll, Waker};
 use std::{cmp, io};
 
 /// An I/O object that follows a predefined script.

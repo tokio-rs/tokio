@@ -7,7 +7,7 @@ use crate::runtime::scheduler;
 use mio::event::Source;
 use std::io;
 use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 cfg_io_driver! {
     /// Associates an I/O resource with the reactor instance that drives it.

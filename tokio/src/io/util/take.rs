@@ -3,7 +3,7 @@ use crate::io::{AsyncBufRead, AsyncRead, ReadBuf};
 use pin_project_lite::pin_project;
 use std::convert::TryFrom;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 use std::{cmp, io};
 
 pin_project! {

@@ -5,7 +5,7 @@ use crate::util::trace;
 use std::future::Future;
 use std::panic::Location;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 /// Creates new [`Interval`] that yields with interval of `period`. The first
 /// tick completes immediately. The default [`MissedTickBehavior`] is

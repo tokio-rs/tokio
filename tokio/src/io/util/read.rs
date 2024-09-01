@@ -6,7 +6,7 @@ use std::io;
 use std::marker::PhantomPinned;
 use std::marker::Unpin;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 /// Tries to read some bytes directly into the given `buf` in asynchronous
 /// manner, returning a future type.

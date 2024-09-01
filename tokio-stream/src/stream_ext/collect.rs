@@ -4,7 +4,7 @@ use core::future::Future;
 use core::marker::PhantomPinned;
 use core::mem;
 use core::pin::Pin;
-use core::task::{Context, Poll};
+use core::task::{ready, Context, Poll};
 use pin_project_lite::pin_project;
 
 // Do not export this struct until `FromStream` can be unsealed.

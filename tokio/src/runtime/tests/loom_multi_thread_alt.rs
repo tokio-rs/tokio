@@ -23,7 +23,7 @@ use pin_project_lite::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 mod atomic_take {
     use loom::sync::atomic::AtomicBool;

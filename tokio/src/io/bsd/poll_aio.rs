@@ -11,7 +11,7 @@ use std::io;
 use std::ops::{Deref, DerefMut};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 /// Like [`mio::event::Source`], but for POSIX AIO only.
 ///
