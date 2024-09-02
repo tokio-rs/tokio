@@ -130,8 +130,8 @@ impl<T: Unpin> SyncIoBridge<T> {
     ///
     /// In general, blocking call on current thread are not appropriate,as
     /// it may prevent the executor from driving other futures forward.
-    /// When using SyncIoBridge, think about whether there is a better approach
-    /// and understand the scenarios and proper methods for using SyncIoBridge.
+    /// When using `SyncIoBridge`, think about whether there is a better approach
+    /// and understand the scenarios and proper methods for using `SyncIoBridge`.
     ///
     /// # Wrapping `!Unpin` types
     ///
@@ -143,9 +143,9 @@ impl<T: Unpin> SyncIoBridge<T> {
     ///
     /// # Examples
     ///
-    /// If you wish to hash some data with blake3, then you should do this.
-    /// This example uses BufReader as the data stream, reads all data asynchronously
-    /// with [`AsyncReadExt`]'s read_to_end, and then calculates the hash:
+    /// If you wish to hash some data with `blake3`, then you should do this.
+    /// This example uses `BufReader` as the data stream, reads all data asynchronously
+    /// with [`AsyncReadExt::read_to_end`] , and then calculates the hash:
     ///
     /// ```rust
     /// use std::io::Result;
@@ -165,7 +165,7 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// }
     /// ```
     ///
-    /// or uses [`AsyncReadExt`]'s read to asynchronously read some bytes
+    /// or uses [`AsyncReadExt::read`] to asynchronously read some bytes
     /// into a fixed-size buffer each time, looping until all data is read:
     ///
     /// ```no_run
@@ -179,7 +179,7 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// ```
     ///
     /// This example demonstrates how [`SyncIoBridge`] converts an asynchronous data stream
-    /// into synchronous reading, using [`tokio::runtime::Handle::block_on`] internally to block and read the data.
+    /// into synchronous reading, using `block_on` internally to block and read the data.
     /// you should do not this:
     ///
     /// ```no_run
@@ -192,15 +192,15 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// ```
     ///
     /// In the three examples above, the first two involve asynchronously reading data within the current runtime context.
-    /// The third example uses [`SyncIoBridge`] in spawn_blocking to convert to synchronous I/O,
-    /// essentially using handle::block_on. spawn_blocking creates a new operating system thread for the task.
+    /// The third example uses [`SyncIoBridge`] in `spawn_blocking` to convert to synchronous I/O,
+    /// essentially using `block_on`. `spawn_blocking` creates a new operating system thread for the task.
     /// If you read very few bytes of I/O data each time and the operation is very quick,
     /// asynchronous reading is a better approach, as it avoids the overhead associated with `spawn_blocking` and `SyncIoBridge`.
     ///
     /// Other similar examples
     ///
     /// How to compress a stream of data correctly.
-    /// (use async-compression and don't pass a SyncIoBridge to a non-async compression library):
+    /// (use async-compression and don't pass a `SyncIoBridge` to a non-async compression library):
     ///
     /// ```rust
     /// use std::io::Result;
@@ -226,7 +226,7 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// ```
     ///
     /// How to parse data using serde-json correctly.
-    /// (read data into a `Vec<u8>` and use from_slice instead of attempting to use from_reader with SyncIoBridge):
+    /// (read data into a `Vec<u8>` and use `from_slice` instead of attempting to use `from_reader` with `SyncIoBridge`):
     ///
     /// ```rust
     /// use serde::{Deserialize, Serialize};
@@ -260,9 +260,9 @@ impl<T: Unpin> SyncIoBridge<T> {
     ///
     /// When doing things with files, you probably want to use [`std::fs`] inside [`tokio::task::spawn_blocking`]
     /// instead of combining [`tokio::fs::File`] with [`SyncIoBridge`].
-    /// Since spawn_blocking only synchronously executes a task and does not schedule multiple tasks,
-    /// and handle::block_on cannot drive I/O or timers, it must wait for other threads in the runtime to handle I/O.
-    /// Therefore, using tokio::fs::File for file handling within spawn_blocking is inefficient:
+    /// Since `spawn_blocking` only synchronously executes a task and does not schedule multiple tasks,
+    /// and `block_on` cannot drive I/O or timers, it must wait for other threads in the runtime to handle I/O.
+    /// Therefore, using tokio::fs::File for file handling within `spawn_blocking` is inefficient:
     ///
     /// ```rust
     /// use tokio::task;
