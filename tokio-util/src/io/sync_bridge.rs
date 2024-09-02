@@ -153,15 +153,15 @@ impl<T: Unpin> SyncIoBridge<T> {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
-    /// 	let data = b"example";
-    /// 	// the input data stream example
-    /// 	let mut reader = BufReader::new(&data[..]);
+    ///     let data = b"example";
+    ///     // the input data stream example
+    ///     let mut reader = BufReader::new(&data[..]);
     ///
-    /// 	let mut hash_data = Vec::new();
-    /// 	reader.read_to_end(&mut hash_data).await?;
-    /// 	let hash = blake3::hash(&hash_data);
-    /// 	println!(" hash :{}", hash.to_string());
-    /// 	Ok(())
+    ///     let mut hash_data = Vec::new();
+    ///     reader.read_to_end(&mut hash_data).await?;
+    ///     let hash = blake3::hash(&hash_data);
+    ///     println!(" hash :{}", hash.to_string());
+    ///     Ok(())
     /// }
     /// ```
     ///
@@ -184,10 +184,10 @@ impl<T: Unpin> SyncIoBridge<T> {
     ///
     /// ```no_run
     /// task::spawn_blocking(move || {
-    /// 	let hasher = blake3::Hasher::new();
-    /// 	let reader = SyncIoBridge::new(reader);
-    /// 	std::io::copy(&mut reader, &mut hasher);
-    /// 	let hash = hasher.finalize();
+    ///     let hasher = blake3::Hasher::new();
+    ///     let reader = SyncIoBridge::new(reader);
+    ///     std::io::copy(&mut reader, &mut hasher);
+    ///     let hash = hasher.finalize();
     /// })
     /// ```
     ///
@@ -209,19 +209,19 @@ impl<T: Unpin> SyncIoBridge<T> {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
-    /// 	let data = b"example";
-    /// 	// the input data stream example
-    /// 	let mut reader = BufReader::new(&data[..]);
-    /// 	// the output data stream
-    /// 	let writer = BufWriter::new(Vec::new());
+    ///     let data = b"example";
+    ///     // the input data stream example
+    ///     let mut reader = BufReader::new(&data[..]);
+    ///     // the output data stream
+    ///     let writer = BufWriter::new(Vec::new());
     ///
-    /// 	let mut encoder = ZlibEncoder::new(writer);
-    /// 	tokio::io::copy(&mut reader, &mut encoder).await?;
-    /// 	encoder.shutdown().await?;
+    ///     let mut encoder = ZlibEncoder::new(writer);
+    ///     tokio::io::copy(&mut reader, &mut encoder).await?;
+    ///     encoder.shutdown().await?;
     ///
-    /// 	// encode data
-    /// 	let _encoded_data = encoder.get_ref().buffer();
-    /// 	Ok(())
+    ///     // encode data
+    ///     let _encoded_data = encoder.get_ref().buffer();
+    ///     Ok(())
     /// }
     /// ```
     ///
@@ -235,26 +235,26 @@ impl<T: Unpin> SyncIoBridge<T> {
     ///
     /// #[derive(Serialize, Deserialize,Debug)]
     /// struct User {
-    /// 	name: String,
-    /// 	age: u8,
+    ///     name: String,
+    ///     age: u8,
     /// }
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
-    /// 	let data = b"
-    /// 		{
-    /// 			\"name\": \"Tom\",
-    /// 			\"age\": 23
-    /// 		}";
-    /// 	// the input data stream example
-    /// 	let mut reader = BufReader::new(&data[..]);
+    ///     let data = b"
+    ///         {
+    ///             \"name\": \"Tom\",
+    ///             \"age\": 23
+    ///         }";
+    ///     // the input data stream example
+    ///     let mut reader = BufReader::new(&data[..]);
     ///
-    /// 	let mut json_data = Vec::new();
-    /// 	reader.read_to_end(&mut json_data).await?;
+    ///     let mut json_data = Vec::new();
+    ///     reader.read_to_end(&mut json_data).await?;
     ///
-    /// 	let u: User = serde_json::from_slice(&json_data).unwrap();
-    /// 	println!("{:#?}", u);
-    /// 	Ok(())
+    ///     let u: User = serde_json::from_slice(&json_data).unwrap();
+    ///     println!("{:#?}", u);
+    ///     Ok(())
     /// }
     /// ```
     ///
@@ -271,25 +271,25 @@ impl<T: Unpin> SyncIoBridge<T> {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    /// 	let path = "example.txt";
+    ///     let path = "example.txt";
     ///
-    /// 	// write file
-    /// 	task::spawn_blocking(move || {
-    /// 		let mut file = fs::File::create(path)?;
-    /// 		file.write_all(b"Hello, world!")?;
-    /// 		Ok::<(), io::Error>(())
-    /// 	}).await??;
+    ///     // write file
+    ///     task::spawn_blocking(move || {
+    ///         let mut file = fs::File::create(path)?;
+    ///         file.write_all(b"Hello, world!")?;
+    ///         Ok::<(), io::Error>(())
+    ///     }).await??;
     ///
-    /// 	// read file
-    /// 	let content = task::spawn_blocking(move || {
-    /// 		let mut file = fs::File::open(path)?;
-    /// 		let mut contents = String::new();
-    /// 		file.read_to_string(&mut contents)?;
-    /// 		Ok::<_, io::Error>(contents)
-    /// 	}).await??;
+    ///     // read file
+    ///     let content = task::spawn_blocking(move || {
+    ///         let mut file = fs::File::open(path)?;
+    ///         let mut contents = String::new();
+    ///         file.read_to_string(&mut contents)?;
+    ///         Ok::<_, io::Error>(contents)
+    ///     }).await??;
     ///
-    /// 	println!("file content: {}", content);
-    /// 	Ok(())
+    ///     println!("file content: {}", content);
+    ///     Ok(())
     /// }
     /// ```
     ///
