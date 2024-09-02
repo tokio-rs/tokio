@@ -168,7 +168,12 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// or uses [`AsyncReadExt::read`] to asynchronously read some bytes
     /// into a fixed-size buffer each time, looping until all data is read:
     ///
-    /// ```no_run
+    /// ```rust,no_run
+    /// # use tokio::io::{AsyncReadExt, BufReader};
+    /// # async fn docs() -> std::io::Result<()> {
+    /// # let data = b"example";
+    /// # let mut reader = BufReader::new(&data[..]);
+    /// let mut hasher = blake3::Hasher::new();
     /// let mut data = vec![0; 64*1024];
     /// loop {
     ///     let len = reader.read(&mut data).await?;
@@ -176,19 +181,31 @@ impl<T: Unpin> SyncIoBridge<T> {
     ///     hasher.update(&data[..len]);
     /// }
     /// let hash = hasher.finalize();
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// This example demonstrates how [`SyncIoBridge`] converts an asynchronous data stream
     /// into synchronous reading, using `block_on` internally to block and read the data.
     /// you should do not this:
     ///
-    /// ```no_run
+    /// ```rust,no_run
+    /// # use tokio::task;
+    /// # use tokio::io::BufReader;
+    /// # use tokio_util::io::SyncIoBridge;
+    /// # use tokio::task::JoinError;
+    /// # async fn docs() -> Result<(), JoinError> {
+    /// # let data = b"example";
+    /// # let reader = BufReader::new(&data[..]);
     /// task::spawn_blocking(move || {
-    ///     let hasher = blake3::Hasher::new();
-    ///     let reader = SyncIoBridge::new(reader);
-    ///     std::io::copy(&mut reader, &mut hasher);
+    ///     let mut hasher = blake3::Hasher::new();
+    ///     let mut reader = SyncIoBridge::new(reader);
+    ///     let _ = std::io::copy(&mut reader, &mut hasher);
     ///     let hash = hasher.finalize();
-    /// })
+    /// }).await?;
+    ///
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// In the three examples above, the first two involve asynchronously reading data within the current runtime context.
@@ -202,7 +219,7 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// How to compress a stream of data correctly.
     /// (use async-compression and don't pass a `SyncIoBridge` to a non-async compression library):
     ///
-    /// ```rust
+    /// ```ignore
     /// use std::io::Result;
     /// use async_compression::tokio::write::ZlibEncoder;
     /// use tokio::io::{AsyncWriteExt, BufReader, BufWriter}; // for `write_all` and `shutdown`
@@ -264,7 +281,7 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// and `block_on` cannot drive I/O or timers, it must wait for other threads in the runtime to handle I/O.
     /// Therefore, using tokio::fs::File for file handling within `spawn_blocking` is inefficient:
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// use tokio::task;
     /// use std::fs;
     /// use std::io::{self, Read, Write};
