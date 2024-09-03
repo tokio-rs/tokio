@@ -265,6 +265,7 @@ impl<T: 'static> JoinSet<T> {
     /// This is because they are not *async*, see [task cancellation].
     ///
     /// [`AbortHandle`]: crate::task::AbortHandle
+    /// [task cancellation]: crate::task#cancellation
     #[track_caller]
     pub fn spawn_blocking_on<F>(&mut self, f: F, handle: &Handle) -> AbortHandle
     where
