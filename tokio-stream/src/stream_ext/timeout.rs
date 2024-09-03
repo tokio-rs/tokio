@@ -4,7 +4,7 @@ use tokio::time::{Instant, Sleep};
 
 use core::future::Future;
 use core::pin::Pin;
-use core::task::{Context, Poll};
+use core::task::{ready, Context, Poll};
 use pin_project_lite::pin_project;
 use std::fmt;
 use std::time::Duration;

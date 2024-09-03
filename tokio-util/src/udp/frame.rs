@@ -4,10 +4,9 @@ use futures_core::Stream;
 use tokio::{io::ReadBuf, net::UdpSocket};
 
 use bytes::{BufMut, BytesMut};
-use futures_core::ready;
 use futures_sink::Sink;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 use std::{
     borrow::Borrow,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},

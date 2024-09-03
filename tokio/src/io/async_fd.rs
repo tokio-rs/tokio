@@ -7,7 +7,7 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::{task::Context, task::Poll};
+use std::task::{ready, Context, Poll};
 
 /// Associates an IO object backed by a Unix file descriptor with the tokio
 /// reactor, allowing for readiness to be polled. The file descriptor must be of
@@ -71,11 +71,10 @@ use std::{task::Context, task::Poll};
 /// and using the IO traits [`AsyncRead`] and [`AsyncWrite`].
 ///
 /// ```no_run
-/// use futures::ready;
 /// use std::io::{self, Read, Write};
 /// use std::net::TcpStream;
 /// use std::pin::Pin;
-/// use std::task::{Context, Poll};
+/// use std::task::{ready, Context, Poll};
 /// use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 /// use tokio::io::unix::AsyncFd;
 ///
