@@ -21,11 +21,13 @@ use std::task::{ready, Context, Poll};
 /// the [`AsyncFd`] is dropped.
 ///
 /// The [`AsyncFd`] takes ownership of an arbitrary object to represent the IO
-/// object. It is intended that this object will handle closing the file
+/// object. It is intended that the inner object will handle closing the file
 /// descriptor when it is dropped, avoiding resource leaks and ensuring that the
 /// [`AsyncFd`] can clean up the registration before closing the file descriptor.
 /// The [`AsyncFd::into_inner`] function can be used to extract the inner object
-/// to retake control from the tokio IO reactor.
+/// to retake control from the tokio IO reactor. The [`OwnedFd`] type is often
+/// used as the inner object, as it is the simplest type that closes the fd on
+/// drop.
 ///
 /// The inner object is required to implement [`AsRawFd`]. This file descriptor
 /// must not change while [`AsyncFd`] owns the inner object, i.e. the
@@ -175,6 +177,7 @@ use std::task::{ready, Context, Poll};
 /// [`TcpStream::poll_read_ready`]: struct@crate::net::TcpStream
 /// [`AsyncRead`]: trait@crate::io::AsyncRead
 /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
+/// [`OwnedFd`]: struct@std::os::fd::OwnedFd
 pub struct AsyncFd<T: AsRawFd> {
     registration: Registration,
     // The inner value is always present. the Option is required for `drop` and `into_inner`.
