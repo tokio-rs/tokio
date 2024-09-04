@@ -101,7 +101,7 @@ use tokio::io::{
 /// ## Example 3: Parsing `JSON`
 ///
 /// When parsing serialization formats such as `JSON`, avoid using `SyncIoBridge` with functions that
-/// deserialize data from a type implementing `std::io::Read`, such as `serde_json::from_reader`.
+/// `deserialize` data from a type implementing `std::io::Read`, such as `serde_json::from_reader`.
 ///
 /// ```rust,no_run
 /// use tokio::io::AsyncReadExt;
