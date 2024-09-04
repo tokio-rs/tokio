@@ -10,9 +10,6 @@ mod loom;
 mod pin;
 
 #[macro_use]
-mod ready;
-
-#[macro_use]
 mod thread_local;
 
 #[macro_use]

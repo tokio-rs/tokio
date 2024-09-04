@@ -406,6 +406,30 @@ async fn epollhup() -> io::Result<()> {
     drop(listener);
 
     let err = connect.await.unwrap_err();
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionReset);
+    let errno = err.kind();
+    assert!(
+        // As far as I can tell, whether we see ECONNREFUSED or ECONNRESET here
+        // seems relatively inconsistent, at least on non-Linux operating
+        // systems. The difference in meaning between these errnos is not
+        // particularly well-defined, so let's just accept either.
+        matches!(
+            errno,
+            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
+        ),
+        "unexpected error kind: {errno:?} (expected ConnectionRefused or ConnectionReset)"
+    );
     Ok(())
+}
+
+// test for https://github.com/tokio-rs/tokio/issues/6767
+#[tokio::test]
+#[cfg(any(target_os = "linux", target_os = "android"))]
+async fn abstract_socket_name() {
+    let socket_path = "\0aaa";
+    let listener = UnixListener::bind(socket_path).unwrap();
+
+    let accept = listener.accept();
+    let connect = UnixStream::connect(&socket_path);
+
+    try_join(accept, connect).await.unwrap();
 }

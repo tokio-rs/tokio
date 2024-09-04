@@ -30,6 +30,7 @@ mock! {
         pub fn open(pb: PathBuf) -> io::Result<Self>;
         pub fn set_len(&self, size: u64) -> io::Result<()>;
         pub fn set_permissions(&self, _perm: Permissions) -> io::Result<()>;
+        pub fn set_max_buf_size(&self, max_buf_size: usize);
         pub fn sync_all(&self) -> io::Result<()>;
         pub fn sync_data(&self) -> io::Result<()>;
         pub fn try_clone(&self) -> io::Result<Self>;

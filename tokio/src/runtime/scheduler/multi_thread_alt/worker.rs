@@ -58,23 +58,23 @@
 
 use crate::loom::sync::{Arc, Condvar, Mutex, MutexGuard};
 use crate::runtime;
-use crate::runtime::context;
 use crate::runtime::driver::Driver;
 use crate::runtime::scheduler::multi_thread_alt::{
     idle, queue, stats, Counters, Handle, Idle, Overflow, Stats, TraceStatus,
 };
 use crate::runtime::scheduler::{self, inject, Lock};
-use crate::runtime::task::OwnedTasks;
+use crate::runtime::task::{OwnedTasks, TaskHarnessScheduleHooks};
 use crate::runtime::{blocking, coop, driver, task, Config, SchedulerMetrics, WorkerMetrics};
+use crate::runtime::{context, TaskHooks};
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::{Cell, RefCell};
-use std::cmp;
 use std::task::Waker;
 use std::time::Duration;
+use std::{cmp, thread};
 
-cfg_metrics! {
+cfg_unstable_metrics! {
     mod metrics;
 }
 
@@ -303,6 +303,10 @@ pub(super) fn create(
     let (inject, inject_synced) = inject::Shared::new();
 
     let handle = Arc::new(Handle {
+        task_hooks: TaskHooks {
+            task_spawn_callback: config.before_spawn.clone(),
+            task_terminate_callback: config.after_termination.clone(),
+        },
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
             inject,
@@ -569,6 +573,7 @@ impl Worker {
             }
         };
 
+        cx.shared().worker_metrics[core.index].set_thread_id(thread::current().id());
         core.stats.start_processing_scheduled_tasks(&mut self.stats);
 
         if let Some(task) = maybe_task {
@@ -658,13 +663,15 @@ impl Worker {
         let n = cmp::max(core.run_queue.remaining_slots() / 2, 1);
         let maybe_task = self.next_remote_task_batch_synced(cx, &mut synced, &mut core, n);
 
+        core.stats.unparked();
+        self.flush_metrics(cx, &mut core);
+
         Ok((maybe_task, core))
     }
 
     /// Ensure core's state is set correctly for the worker to start using.
     fn reset_acquired_core(&mut self, cx: &Context, synced: &mut Synced, core: &mut Core) {
         self.global_queue_interval = core.stats.tuned_global_queue_interval(&cx.shared().config);
-        debug_assert!(self.global_queue_interval > 1);
 
         // Reset `lifo_enabled` here in case the core was previously stolen from
         // a task that had the LIFO slot disabled.
@@ -1288,10 +1295,8 @@ impl Worker {
     fn tune_global_queue_interval(&mut self, cx: &Context, core: &mut Core) {
         let next = core.stats.tuned_global_queue_interval(&cx.shared().config);
 
-        debug_assert!(next > 1);
-
         // Smooth out jitter
-        if abs_diff(self.global_queue_interval, next) > 2 {
+        if u32::abs_diff(self.global_queue_interval, next) > 2 {
             self.global_queue_interval = next;
         }
     }
@@ -1313,6 +1318,11 @@ impl Context {
 
     fn shared(&self) -> &Shared {
         &self.handle.shared
+    }
+
+    #[cfg_attr(not(feature = "time"), allow(dead_code))]
+    pub(crate) fn get_worker_index(&self) -> usize {
+        self.index
     }
 }
 
@@ -1550,6 +1560,12 @@ impl task::Schedule for Arc<Handle> {
         self.shared.schedule_task(task, false);
     }
 
+    fn hooks(&self) -> TaskHarnessScheduleHooks {
+        TaskHarnessScheduleHooks {
+            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
+        }
+    }
+
     fn yield_now(&self, task: Notified) {
         self.shared.schedule_task(task, true);
     }
@@ -1585,13 +1601,4 @@ fn with_current<R>(f: impl FnOnce(Option<&Context>) -> R) -> R {
         Some(MultiThreadAlt(ctx)) => f(Some(ctx)),
         _ => f(None),
     })
-}
-
-// `u32::abs_diff` is not available on Tokio's MSRV.
-fn abs_diff(a: u32, b: u32) -> u32 {
-    if a > b {
-        a - b
-    } else {
-        b - a
-    }
 }

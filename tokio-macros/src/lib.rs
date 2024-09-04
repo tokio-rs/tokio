@@ -1,3 +1,4 @@
+#![allow(unknown_lints, unexpected_cfgs)]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,
@@ -201,8 +202,55 @@ use proc_macro::TokenStream;
 ///         })
 /// }
 /// ```
+///
+/// ### Configure unhandled panic behavior
+///
+/// Available options are `shutdown_runtime` and `ignore`. For more details, see
+/// [`Builder::unhandled_panic`].
+///
+/// This option is only compatible with the `current_thread` runtime.
+///
+/// ```no_run
+/// # #![allow(unknown_lints, unexpected_cfgs)]
+/// #[cfg(tokio_unstable)]
+/// #[tokio::main(flavor = "current_thread", unhandled_panic = "shutdown_runtime")]
+/// async fn main() {
+///     let _ = tokio::spawn(async {
+///         panic!("This panic will shutdown the runtime.");
+///     }).await;
+/// }
+/// # #[cfg(not(tokio_unstable))]
+/// # fn main() { }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```no_run
+/// # #![allow(unknown_lints, unexpected_cfgs)]
+/// #[cfg(tokio_unstable)]
+/// fn main() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             let _ = tokio::spawn(async {
+///                 panic!("This panic will shutdown the runtime.");
+///             }).await;
+///         })
+/// }
+/// # #[cfg(not(tokio_unstable))]
+/// # fn main() { }
+/// ```
+///
+/// **Note**: This option depends on Tokio's [unstable API][unstable]. See [the
+/// documentation on unstable features][unstable] for details on how to enable
+/// Tokio's unstable features.
+///
+/// [`Builder::unhandled_panic`]: ../tokio/runtime/struct.Builder.html#method.unhandled_panic
+/// [unstable]: ../tokio/index.html#unstable-features
 #[proc_macro_attribute]
-#[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args.into(), item.into(), true).into()
 }
@@ -267,7 +315,6 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 #[proc_macro_attribute]
-#[cfg(not(test))] // Work around for rust-lang/rust#62127
 pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args.into(), item.into(), false).into()
 }
@@ -365,7 +412,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ### Set number of worker threads
 ///
 /// ```no_run
-/// #[tokio::test(flavor ="multi_thread", worker_threads = 2)]
+/// #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 /// async fn my_test() {
 ///     assert!(true);
 /// }
@@ -424,6 +471,55 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///     println!("Hello world");
 /// }
 /// ```
+///
+/// ### Configure unhandled panic behavior
+///
+/// Available options are `shutdown_runtime` and `ignore`. For more details, see
+/// [`Builder::unhandled_panic`].
+///
+/// This option is only compatible with the `current_thread` runtime.
+///
+/// ```no_run
+/// # #![allow(unknown_lints, unexpected_cfgs)]
+/// #[cfg(tokio_unstable)]
+/// #[tokio::test(flavor = "current_thread", unhandled_panic = "shutdown_runtime")]
+/// async fn my_test() {
+///     let _ = tokio::spawn(async {
+///         panic!("This panic will shutdown the runtime.");
+///     }).await;
+/// }
+/// # #[cfg(not(tokio_unstable))]
+/// # fn main() { }
+/// ```
+///
+/// Equivalent code not using `#[tokio::test]`
+///
+/// ```no_run
+/// # #![allow(unknown_lints, unexpected_cfgs)]
+/// #[cfg(tokio_unstable)]
+/// #[test]
+/// fn my_test() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             let _ = tokio::spawn(async {
+///                 panic!("This panic will shutdown the runtime.");
+///             }).await;
+///         })
+/// }
+/// # #[cfg(not(tokio_unstable))]
+/// # fn main() { }
+/// ```
+///
+/// **Note**: This option depends on Tokio's [unstable API][unstable]. See [the
+/// documentation on unstable features][unstable] for details on how to enable
+/// Tokio's unstable features.
+///
+/// [`Builder::unhandled_panic`]: ../tokio/runtime/struct.Builder.html#method.unhandled_panic
+/// [unstable]: ../tokio/index.html#unstable-features
 #[proc_macro_attribute]
 pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::test(args.into(), item.into(), true).into()

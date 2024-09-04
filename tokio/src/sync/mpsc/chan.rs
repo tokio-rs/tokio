@@ -9,10 +9,11 @@ use crate::sync::notify::Notify;
 use crate::util::cacheline::CachePadded;
 
 use std::fmt;
+use std::panic;
 use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::task::Poll::{Pending, Ready};
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 /// Channel sender.
 pub(crate) struct Tx<T, S> {
@@ -66,6 +67,9 @@ pub(super) struct Chan<T, S> {
     /// When this drops to zero, the send half of the channel is closed.
     tx_count: AtomicUsize,
 
+    /// Tracks the number of outstanding weak sender handles.
+    tx_weak_count: AtomicUsize,
+
     /// Only accessed by `Rx` handle.
     rx_fields: UnsafeCell<RxFields<T>>,
 }
@@ -105,6 +109,8 @@ impl<T> fmt::Debug for RxFields<T> {
 
 unsafe impl<T: Send, S: Send> Send for Chan<T, S> {}
 unsafe impl<T: Send, S: Sync> Sync for Chan<T, S> {}
+impl<T, S> panic::RefUnwindSafe for Chan<T, S> {}
+impl<T, S> panic::UnwindSafe for Chan<T, S> {}
 
 pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
     let (tx, rx) = list::channel();
@@ -115,6 +121,7 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
         semaphore,
         rx_waker: CachePadded::new(AtomicWaker::new()),
         tx_count: AtomicUsize::new(1),
+        tx_weak_count: AtomicUsize::new(0),
         rx_fields: UnsafeCell::new(RxFields {
             list: rx,
             rx_closed: false,
@@ -131,7 +138,17 @@ impl<T, S> Tx<T, S> {
         Tx { inner: chan }
     }
 
+    pub(super) fn strong_count(&self) -> usize {
+        self.inner.tx_count.load(Acquire)
+    }
+
+    pub(super) fn weak_count(&self) -> usize {
+        self.inner.tx_weak_count.load(Relaxed)
+    }
+
     pub(super) fn downgrade(&self) -> Arc<Chan<T, S>> {
+        self.inner.increment_weak_count();
+
         self.inner.clone()
     }
 
@@ -239,6 +256,33 @@ impl<T, S: Semaphore> Rx<T, S> {
 
         self.inner.semaphore.close();
         self.inner.notify_rx_closed.notify_waiters();
+    }
+
+    pub(crate) fn is_closed(&self) -> bool {
+        // There two internal states that can represent a closed channel
+        //
+        //  1. When `close` is called.
+        //  In this case, the inner semaphore will be closed.
+        //
+        //  2. When all senders are dropped.
+        //  In this case, the semaphore remains unclosed, and the `index` in the list won't
+        //  reach the tail position. It is necessary to check the list if the last block is
+        //  `closed`.
+        self.inner.semaphore.is_closed() || self.inner.tx_count.load(Acquire) == 0
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.rx_fields.with(|rx_fields_ptr| {
+            let rx_fields = unsafe { &*rx_fields_ptr };
+            rx_fields.list.is_empty(&self.inner.tx)
+        })
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.inner.rx_fields.with(|rx_fields_ptr| {
+            let rx_fields = unsafe { &*rx_fields_ptr };
+            rx_fields.list.len(&self.inner.tx)
+        })
     }
 
     /// Receive the next value
@@ -424,6 +468,18 @@ impl<T, S: Semaphore> Rx<T, S> {
             }
         })
     }
+
+    pub(super) fn semaphore(&self) -> &S {
+        &self.inner.semaphore
+    }
+
+    pub(super) fn sender_strong_count(&self) -> usize {
+        self.inner.tx_count.load(Acquire)
+    }
+
+    pub(super) fn sender_weak_count(&self) -> usize {
+        self.inner.tx_weak_count.load(Relaxed)
+    }
 }
 
 impl<T, S: Semaphore> Drop for Rx<T, S> {
@@ -451,6 +507,22 @@ impl<T, S> Chan<T, S> {
 
         // Notify the rx task
         self.rx_waker.wake();
+    }
+
+    pub(super) fn decrement_weak_count(&self) {
+        self.tx_weak_count.fetch_sub(1, Relaxed);
+    }
+
+    pub(super) fn increment_weak_count(&self) {
+        self.tx_weak_count.fetch_add(1, Relaxed);
+    }
+
+    pub(super) fn strong_count(&self) -> usize {
+        self.tx_count.load(Acquire)
+    }
+
+    pub(super) fn weak_count(&self) -> usize {
+        self.tx_weak_count.load(Relaxed)
     }
 }
 

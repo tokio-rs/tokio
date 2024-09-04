@@ -7,6 +7,9 @@ pub(crate) struct MetricsBatch {
     /// Number of times the worker parked.
     park_count: u64,
 
+    /// Number of times the worker parked and unparked.
+    park_unpark_count: u64,
+
     /// Number of times the worker woke w/o doing work.
     noop_count: u64,
 
@@ -54,6 +57,7 @@ impl MetricsBatch {
 
         MetricsBatch {
             park_count: 0,
+            park_unpark_count: 0,
             noop_count: 0,
             steal_count: 0,
             steal_operations: 0,
@@ -76,6 +80,9 @@ impl MetricsBatch {
     pub(crate) fn submit(&mut self, worker: &WorkerMetrics, mean_poll_time: u64) {
         worker.mean_poll_time.store(mean_poll_time, Relaxed);
         worker.park_count.store(self.park_count, Relaxed);
+        worker
+            .park_unpark_count
+            .store(self.park_unpark_count, Relaxed);
         worker.noop_count.store(self.noop_count, Relaxed);
         worker.steal_count.store(self.steal_count, Relaxed);
         worker
@@ -101,12 +108,18 @@ impl MetricsBatch {
     /// The worker is about to park.
     pub(crate) fn about_to_park(&mut self) {
         self.park_count += 1;
+        self.park_unpark_count += 1;
 
         if self.poll_count_on_last_park == self.poll_count {
             self.noop_count += 1;
         } else {
             self.poll_count_on_last_park = self.poll_count;
         }
+    }
+
+    /// The worker was unparked.
+    pub(crate) fn unparked(&mut self) {
+        self.park_unpark_count += 1;
     }
 
     /// Start processing a batch of tasks

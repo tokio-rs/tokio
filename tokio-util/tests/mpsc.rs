@@ -1,7 +1,10 @@
 use futures::future::poll_fn;
+use futures::sink::SinkExt;
 use tokio::sync::mpsc::channel;
 use tokio_test::task::spawn;
-use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok};
+use tokio_test::{
+    assert_ok, assert_pending, assert_ready, assert_ready_eq, assert_ready_err, assert_ready_ok,
+};
 use tokio_util::sync::PollSender;
 
 #[tokio::test]
@@ -259,4 +262,88 @@ fn start_send_panics_when_acquiring() {
     let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
     assert_pending!(reserve.poll());
     send.send_item(2).unwrap();
+}
+
+#[test]
+fn sink_send_then_flush() {
+    let (send, mut recv) = channel(1);
+    let mut send = PollSender::new(send);
+
+    let mut recv_task = spawn(recv.recv());
+    assert_pending!(recv_task.poll());
+
+    let mut ready = spawn(poll_fn(|cx| send.poll_ready_unpin(cx)));
+    assert_ready_ok!(ready.poll());
+    assert_ok!(send.start_send_unpin(()));
+
+    let mut ready = spawn(poll_fn(|cx| send.poll_ready_unpin(cx)));
+    assert_pending!(ready.poll());
+
+    let mut flush = spawn(poll_fn(|cx| send.poll_flush_unpin(cx)));
+    assert_ready_ok!(flush.poll());
+
+    // Flushing does not mean that the sender becomes ready.
+    let mut ready = spawn(poll_fn(|cx| send.poll_ready_unpin(cx)));
+    assert_pending!(ready.poll());
+
+    assert_ready_eq!(recv_task.poll(), Some(()));
+    assert!(ready.is_woken());
+    assert_ready_ok!(ready.poll());
+}
+
+#[test]
+fn sink_send_then_close() {
+    let (send, mut recv) = channel(1);
+    let mut send = PollSender::new(send);
+
+    let mut recv_task = spawn(recv.recv());
+    assert_pending!(recv_task.poll());
+
+    let mut ready = spawn(poll_fn(|cx| send.poll_ready_unpin(cx)));
+    assert_ready_ok!(ready.poll());
+    assert_ok!(send.start_send_unpin(1));
+
+    let mut ready = spawn(poll_fn(|cx| send.poll_ready_unpin(cx)));
+    assert_pending!(ready.poll());
+
+    assert!(recv_task.is_woken());
+    assert_ready_eq!(recv_task.poll(), Some(1));
+
+    assert!(ready.is_woken());
+    assert_ready_ok!(ready.poll());
+
+    drop(recv_task);
+    let mut recv_task = spawn(recv.recv());
+    assert_pending!(recv_task.poll());
+    assert_ok!(send.start_send_unpin(2));
+
+    let mut close = spawn(poll_fn(|cx| send.poll_close_unpin(cx)));
+    assert_ready_ok!(close.poll());
+
+    assert!(recv_task.is_woken());
+    assert_ready_eq!(recv_task.poll(), Some(2));
+
+    drop(recv_task);
+    let mut recv_task = spawn(recv.recv());
+    assert_ready_eq!(recv_task.poll(), None);
+}
+
+#[test]
+fn sink_send_ref() {
+    let data = "data".to_owned();
+    let (send, mut recv) = channel(1);
+    let mut send = PollSender::new(send);
+
+    let mut recv_task = spawn(recv.recv());
+    assert_pending!(recv_task.poll());
+
+    let mut ready = spawn(poll_fn(|cx| send.poll_ready_unpin(cx)));
+    assert_ready_ok!(ready.poll());
+
+    assert_ok!(send.start_send_unpin(data.as_str()));
+
+    let mut flush = spawn(poll_fn(|cx| send.poll_flush_unpin(cx)));
+    assert_ready_ok!(flush.poll());
+
+    assert_ready_eq!(recv_task.poll(), Some("data"));
 }

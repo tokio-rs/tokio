@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "sync"), allow(dead_code, unreachable_pub))]
 
-//! A single-producer, multi-consumer channel that only retains the *last* sent
+//! A multi-producer, multi-consumer channel that only retains the *last* sent
 //! value.
 //!
 //! This channel is useful for watching for changes to a value from multiple
@@ -114,7 +114,7 @@
 use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::atomic::Ordering::Relaxed;
+use crate::loom::sync::atomic::Ordering::{AcqRel, Relaxed};
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 use std::mem;
@@ -144,6 +144,22 @@ pub struct Receiver<T> {
 #[derive(Debug)]
 pub struct Sender<T> {
     shared: Arc<Shared<T>>,
+}
+
+impl<T> Clone for Sender<T> {
+    fn clone(&self) -> Self {
+        self.shared.ref_count_tx.fetch_add(1, Relaxed);
+
+        Self {
+            shared: self.shared.clone(),
+        }
+    }
+}
+
+impl<T: Default> Default for Sender<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
 }
 
 /// Returns a reference to the inner value.
@@ -237,6 +253,9 @@ struct Shared<T> {
 
     /// Tracks the number of `Receiver` instances.
     ref_count_rx: AtomicUsize,
+
+    /// Tracks the number of `Sender` instances.
+    ref_count_tx: AtomicUsize,
 
     /// Notifies waiting receivers that the value changed.
     notify_rx: big_notify::BigNotify,
@@ -485,6 +504,7 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
         value: RwLock::new(init),
         state: AtomicState::new(),
         ref_count_rx: AtomicUsize::new(1),
+        ref_count_tx: AtomicUsize::new(1),
         notify_rx: big_notify::BigNotify::new(),
         notify_tx: Notify::new(),
     });
@@ -1171,12 +1191,18 @@ impl<T> Sender<T> {
     /// Completes when all receivers have dropped.
     ///
     /// This allows the producer to get notified when interest in the produced
-    /// values is canceled and immediately stop doing work.
+    /// values is canceled and immediately stop doing work. Once a channel is
+    /// closed, the only way to reopen it is to call [`Sender::subscribe`] to
+    /// get a new receiver.
+    ///
+    /// If the channel becomes closed for a brief amount of time (e.g., the last
+    /// receiver is dropped and then `subscribe` is called), then this call to
+    /// `closed` might return, but it is also possible that it does not "notice"
+    /// that the channel was closed for a brief amount of time.
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. Once the channel is closed, it stays closed
-    /// forever and all future calls to `closed` will return immediately.
+    /// This method is cancel safe.
     ///
     /// # Examples
     ///
@@ -1298,12 +1324,30 @@ impl<T> Sender<T> {
     pub fn receiver_count(&self) -> usize {
         self.shared.ref_count_rx.load(Relaxed)
     }
+
+    /// Returns `true` if senders belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let (tx, rx) = tokio::sync::watch::channel(true);
+    /// let tx2 = tx.clone();
+    /// assert!(tx.same_channel(&tx2));
+    ///
+    /// let (tx3, rx3) = tokio::sync::watch::channel(true);
+    /// assert!(!tx3.same_channel(&tx2));
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.shared, &other.shared)
+    }
 }
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        self.shared.state.set_closed();
-        self.shared.notify_rx.notify_waiters();
+        if self.shared.ref_count_tx.fetch_sub(1, AcqRel) == 1 {
+            self.shared.state.set_closed();
+            self.shared.notify_rx.notify_waiters();
+        }
     }
 }
 

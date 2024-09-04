@@ -155,6 +155,31 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
             resource_span: this.resource_span,
         })
     }
+
+    /// Returns a reference to the original `Arc<RwLock>`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::{
+    ///     RwLock,
+    ///     OwnedRwLockWriteGuard,
+    ///     OwnedRwLockMappedWriteGuard,
+    /// };
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(1));
+    ///
+    /// let guard = lock.clone().write_owned().await;
+    /// let guard = OwnedRwLockWriteGuard::map(guard, |x| x);
+    /// assert!(Arc::ptr_eq(&lock, OwnedRwLockMappedWriteGuard::rwlock(&guard)));
+    /// # }
+    /// ```
+    pub fn rwlock(this: &Self) -> &Arc<RwLock<T>> {
+        &this.lock
+    }
 }
 
 impl<T: ?Sized, U: ?Sized> ops::Deref for OwnedRwLockMappedWriteGuard<T, U> {

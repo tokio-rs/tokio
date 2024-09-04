@@ -3,7 +3,7 @@ use crate::runtime::coop;
 
 use std::cell::Cell;
 
-#[cfg(any(feature = "rt", feature = "macros"))]
+#[cfg(any(feature = "rt", feature = "macros", feature = "time"))]
 use crate::util::rand::FastRand;
 
 cfg_rt! {
@@ -57,7 +57,7 @@ struct Context {
     #[cfg(feature = "rt")]
     runtime: Cell<EnterRuntime>,
 
-    #[cfg(any(feature = "rt", feature = "macros"))]
+    #[cfg(any(feature = "rt", feature = "macros", feature = "time"))]
     rng: Cell<Option<FastRand>>,
 
     /// Tracks the amount of "work" a task may still do before yielding back to
@@ -100,7 +100,7 @@ tokio_thread_local! {
             #[cfg(feature = "rt")]
             runtime: Cell::new(EnterRuntime::NotEntered),
 
-            #[cfg(any(feature = "rt", feature = "macros"))]
+            #[cfg(any(feature = "rt", feature = "macros", feature = "time"))]
             rng: Cell::new(None),
 
             budget: Cell::new(coop::Budget::unconstrained()),
@@ -121,7 +121,11 @@ tokio_thread_local! {
     }
 }
 
-#[cfg(any(feature = "macros", all(feature = "sync", feature = "rt")))]
+#[cfg(any(
+    feature = "time",
+    feature = "macros",
+    all(feature = "sync", feature = "rt")
+))]
 pub(crate) fn thread_rng_n(n: u32) -> u32 {
     CONTEXT.with(|ctx| {
         let mut rng = ctx.rng.get().unwrap_or_else(FastRand::new);

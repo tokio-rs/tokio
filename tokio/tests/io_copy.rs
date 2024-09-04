@@ -2,12 +2,11 @@
 #![cfg(feature = "full")]
 
 use bytes::BytesMut;
-use futures::ready;
 use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 use tokio_test::assert_ok;
 
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 #[tokio::test]
 async fn copy() {

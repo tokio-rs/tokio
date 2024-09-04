@@ -2,9 +2,7 @@
 
 #[cfg(tokio_unstable)]
 mod join_map;
-#[cfg(not(target_os = "wasi"))]
 mod spawn_pinned;
-#[cfg(not(target_os = "wasi"))]
 pub use spawn_pinned::LocalPoolHandle;
 
 #[cfg(tokio_unstable)]
@@ -13,3 +11,6 @@ pub use join_map::{JoinMap, JoinMapKeys};
 
 pub mod task_tracker;
 pub use task_tracker::TaskTracker;
+
+mod abort_on_drop;
+pub use abort_on_drop::AbortOnDropHandle;

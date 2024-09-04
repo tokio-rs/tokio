@@ -1,6 +1,6 @@
 #[cfg(tokio_unstable)]
 use crate::runtime;
-use crate::runtime::{context, scheduler, RuntimeFlavor};
+use crate::runtime::{context, scheduler, RuntimeFlavor, RuntimeMetrics};
 
 /// Handle to the runtime.
 ///
@@ -16,6 +16,7 @@ pub struct Handle {
 }
 
 use crate::runtime::task::JoinHandle;
+use crate::runtime::BOX_FUTURE_THRESHOLD;
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 
 use std::future::Future;
@@ -188,7 +189,11 @@ impl Handle {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        self.spawn_named(future, None)
+        if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            self.spawn_named(Box::pin(future), None)
+        } else {
+            self.spawn_named(future, None)
+        }
     }
 
     /// Runs the provided function on an executor dedicated to blocking
@@ -291,6 +296,15 @@ impl Handle {
     /// [`tokio::time`]: crate::time
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+        if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            self.block_on_inner(Box::pin(future))
+        } else {
+            self.block_on_inner(future)
+        }
+    }
+
+    #[track_caller]
+    fn block_on_inner<F: Future>(&self, future: F) -> F::Output {
         #[cfg(all(
             tokio_unstable,
             tokio_taskdump,
@@ -355,9 +369,9 @@ impl Handle {
     pub fn runtime_flavor(&self) -> RuntimeFlavor {
         match self.inner {
             scheduler::Handle::CurrentThread(_) => RuntimeFlavor::CurrentThread,
-            #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(feature = "rt-multi-thread")]
             scheduler::Handle::MultiThread(_) => RuntimeFlavor::MultiThread,
-            #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
             scheduler::Handle::MultiThreadAlt(_) => RuntimeFlavor::MultiThreadAlt,
         }
     }
@@ -385,25 +399,19 @@ impl Handle {
         pub fn id(&self) -> runtime::Id {
             let owned_id = match &self.inner {
                 scheduler::Handle::CurrentThread(handle) => handle.owned_id(),
-                #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(feature = "rt-multi-thread")]
                 scheduler::Handle::MultiThread(handle) => handle.owned_id(),
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread", not(target_os = "wasi")))]
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 scheduler::Handle::MultiThreadAlt(handle) => handle.owned_id(),
             };
             owned_id.into()
         }
     }
-}
 
-cfg_metrics! {
-    use crate::runtime::RuntimeMetrics;
-
-    impl Handle {
-        /// Returns a view that lets you get information about how the runtime
-        /// is performing.
-        pub fn metrics(&self) -> RuntimeMetrics {
-            RuntimeMetrics::new(self.clone())
-        }
+    /// Returns a view that lets you get information about how the runtime
+    /// is performing.
+    pub fn metrics(&self) -> RuntimeMetrics {
+        RuntimeMetrics::new(self.clone())
     }
 }
 

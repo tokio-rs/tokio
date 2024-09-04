@@ -24,6 +24,11 @@ pub(crate) mod sync {
         pub(crate) fn try_lock(&self) -> Option<MutexGuard<'_, T>> {
             self.0.try_lock().ok()
         }
+
+        #[inline]
+        pub(crate) fn get_mut(&mut self) -> &mut T {
+            self.0.get_mut().unwrap()
+        }
     }
     pub(crate) use loom::sync::*;
 

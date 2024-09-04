@@ -35,7 +35,7 @@ tokio_thread_local! {
 // Bit of a hack, but it is only for loom
 #[cfg(loom)]
 tokio_thread_local! {
-    static CURRENT_THREAD_PARK_COUNT: AtomicUsize = AtomicUsize::new(0);
+    pub(crate) static CURRENT_THREAD_PARK_COUNT: AtomicUsize = AtomicUsize::new(0);
 }
 
 // ==== impl ParkThread ====

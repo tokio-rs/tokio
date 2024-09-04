@@ -6,7 +6,7 @@ use pin_project_lite::pin_project;
 use std::future::Future;
 use std::panic::Location;
 use std::pin::Pin;
-use std::task::{self, Poll};
+use std::task::{self, ready, Poll};
 
 /// Waits until `deadline` is reached.
 ///
@@ -254,12 +254,11 @@ impl Sleep {
         location: Option<&'static Location<'static>>,
     ) -> Sleep {
         use crate::runtime::scheduler;
-
         let handle = scheduler::Handle::current();
-        let entry = TimerEntry::new(&handle, deadline);
-
+        let entry = TimerEntry::new(handle, deadline);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
+            let handle = scheduler::Handle::current();
             let clock = handle.driver().clock();
             let handle = &handle.driver().time();
             let time_source = handle.time_source();
@@ -268,6 +267,7 @@ impl Sleep {
 
             let location = location.expect("should have location if tracing");
             let resource_span = tracing::trace_span!(
+                parent: None,
                 "runtime.resource",
                 concrete_type = "Sleep",
                 kind = "timer",

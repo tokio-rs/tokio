@@ -250,8 +250,7 @@ use std::io;
 use std::path::Path;
 use std::pin::Pin;
 use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
-use std::task::Context;
-use std::task::Poll;
+use std::task::{ready, Context, Poll};
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
@@ -323,6 +322,12 @@ impl Command {
     /// library is expected.
     pub fn as_std(&self) -> &StdCommand {
         &self.std
+    }
+
+    /// Cheaply convert to a `&mut std::process::Command` for places where the type from the
+    /// standard library is expected.
+    pub fn as_std_mut(&mut self) -> &mut StdCommand {
+        &mut self.std
     }
 
     /// Adds an argument to pass to the program.
@@ -544,11 +549,9 @@ impl Command {
 
     /// Sets configuration for the child process's standard input (stdin) handle.
     ///
-    /// Defaults to [`inherit`] when used with `spawn` or `status`, and
-    /// defaults to [`piped`] when used with `output`.
+    /// Defaults to [`inherit`].
     ///
     /// [`inherit`]: std::process::Stdio::inherit
-    /// [`piped`]: std::process::Stdio::piped
     ///
     /// # Examples
     ///
@@ -672,6 +675,8 @@ impl Command {
     #[cfg(unix)]
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn uid(&mut self, id: u32) -> &mut Command {
+        #[cfg(target_os = "nto")]
+        let id = id as i32;
         self.std.uid(id);
         self
     }
@@ -681,6 +686,8 @@ impl Command {
     #[cfg(unix)]
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn gid(&mut self, id: u32) -> &mut Command {
+        #[cfg(target_os = "nto")]
+        let id = id as i32;
         self.std.gid(id);
         self
     }
@@ -743,29 +750,34 @@ impl Command {
     ///
     /// Process groups determine which processes receive signals.
     ///
-    /// **Note**: This is an [unstable API][unstable] but will be stabilised once
-    /// tokio's `MSRV` is sufficiently new. See [the documentation on
-    /// unstable features][unstable] for details about using unstable features.
+    /// # Examples
     ///
-    /// If you want similar behavior without using this unstable feature you can
-    /// create a [`std::process::Command`] and convert that into a
-    /// [`tokio::process::Command`] using the `From` trait.
+    /// Pressing Ctrl-C in a terminal will send `SIGINT` to all processes
+    /// in the current foreground process group. By spawning the `sleep`
+    /// subprocess in a new process group, it will not receive `SIGINT`
+    /// from the terminal.
     ///
-    /// [unstable]: crate#unstable-features
-    /// [`tokio::process::Command`]: crate::process::Command
+    /// The parent process could install a [signal handler] and manage the
+    /// process on its own terms.
+    ///
+    /// A process group ID of 0 will use the process ID as the PGID.
     ///
     /// ```no_run
     /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     ///
-    /// let output = Command::new("ls")
-    ///         .process_group(0)
-    ///         .output().await.unwrap();
+    /// let output = Command::new("sleep")
+    ///     .arg("10")
+    ///     .process_group(0)
+    ///     .output()
+    ///     .await
+    ///     .unwrap();
     /// # }
     /// ```
+    ///
+    /// [signal handler]: crate::signal
     #[cfg(unix)]
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(all(unix, tokio_unstable))))]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn process_group(&mut self, pgroup: i32) -> &mut Command {
         self.std.process_group(pgroup);
         self

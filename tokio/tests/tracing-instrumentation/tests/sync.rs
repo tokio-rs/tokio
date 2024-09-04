@@ -60,7 +60,7 @@ async fn test_mutex_creates_span() {
         .new_span(mutex_span.clone().with_explicit_parent(None))
         .enter(mutex_span.clone())
         .event(locked_event)
-        .new_span(batch_semaphore_span.clone())
+        .new_span(batch_semaphore_span.clone().with_explicit_parent(None))
         .enter(batch_semaphore_span.clone())
         .event(batch_semaphore_permits_event)
         .exit(batch_semaphore_span.clone())

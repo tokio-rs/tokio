@@ -28,7 +28,7 @@ cfg_io_util! {
     pub use copy::copy;
 
     mod copy_bidirectional;
-    pub use copy_bidirectional::copy_bidirectional;
+    pub use copy_bidirectional::{copy_bidirectional, copy_bidirectional_with_sizes};
 
     mod copy_buf;
     pub use copy_buf::copy_buf;
@@ -42,7 +42,7 @@ cfg_io_util! {
     pub use lines::Lines;
 
     mod mem;
-    pub use mem::{duplex, DuplexStream};
+    pub use mem::{duplex, simplex, DuplexStream, SimplexStream};
 
     mod read;
     mod read_buf;
@@ -88,7 +88,7 @@ cfg_io_util! {
 
     cfg_coop! {
         fn poll_proceed_and_make_progress(cx: &mut std::task::Context<'_>) -> std::task::Poll<()> {
-            let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+            let coop = std::task::ready!(crate::runtime::coop::poll_proceed(cx));
             coop.made_progress();
             std::task::Poll::Ready(())
         }

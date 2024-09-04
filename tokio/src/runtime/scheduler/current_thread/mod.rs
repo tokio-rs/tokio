@@ -3,20 +3,24 @@ use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
-use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
-use crate::runtime::{blocking, context, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics};
+use crate::runtime::task::{
+    self, JoinHandle, OwnedTasks, Schedule, Task, TaskHarnessScheduleHooks,
+};
+use crate::runtime::{
+    blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
+};
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::fmt;
 use std::future::Future;
 use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
 use std::time::Duration;
+use std::{fmt, thread};
 
 /// Executes tasks on the current thread
 pub(crate) struct CurrentThread {
@@ -41,6 +45,9 @@ pub(crate) struct Handle {
 
     /// Current random number generator seed
     pub(crate) seed_generator: RngSeedGenerator,
+
+    /// User-supplied hooks to invoke for things
+    pub(crate) task_hooks: TaskHooks,
 }
 
 /// Data required for executing the scheduler. The struct is passed around to
@@ -123,6 +130,7 @@ impl CurrentThread {
         config: Config,
     ) -> (CurrentThread, Arc<Handle>) {
         let worker_metrics = WorkerMetrics::from_config(&config);
+        worker_metrics.set_thread_id(thread::current().id());
 
         // Get the configured global queue interval, or use the default.
         let global_queue_interval = config
@@ -130,6 +138,10 @@ impl CurrentThread {
             .unwrap_or(DEFAULT_GLOBAL_QUEUE_INTERVAL);
 
         let handle = Arc::new(Handle {
+            task_hooks: TaskHooks {
+                task_spawn_callback: config.before_spawn.clone(),
+                task_terminate_callback: config.after_termination.clone(),
+            },
             shared: Shared {
                 inject: Inject::new(),
                 owned: OwnedTasks::new(1),
@@ -172,6 +184,10 @@ impl CurrentThread {
             // available or the future is complete.
             loop {
                 if let Some(core) = self.take_core(handle) {
+                    handle
+                        .shared
+                        .worker_metrics
+                        .set_thread_id(thread::current().id());
                     return core.block_on(future);
                 } else {
                     let notified = self.notify.notified();
@@ -368,6 +384,9 @@ impl Context {
             });
 
             core = c;
+
+            core.metrics.unparked();
+            core.submit_metrics(handle);
         }
 
         if let Some(f) = &handle.shared.config.after_unpark {
@@ -427,6 +446,12 @@ impl Handle {
         F::Output: Send + 'static,
     {
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
+
+        me.task_hooks.spawn(&TaskMeta {
+            #[cfg(tokio_unstable)]
+            id,
+            _phantom: Default::default(),
+        });
 
         if let Some(notified) = notified {
             me.schedule(notified);
@@ -500,9 +525,13 @@ impl Handle {
     pub(crate) fn reset_woken(&self) -> bool {
         self.shared.woken.swap(false, AcqRel)
     }
+
+    pub(crate) fn num_alive_tasks(&self) -> usize {
+        self.shared.owned.num_alive_tasks()
+    }
 }
 
-cfg_metrics! {
+cfg_unstable_metrics! {
     impl Handle {
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
             &self.shared.scheduler_metrics
@@ -533,8 +562,10 @@ cfg_metrics! {
             self.blocking_spawner.queue_depth()
         }
 
-        pub(crate) fn active_tasks_count(&self) -> usize {
-            self.shared.owned.active_tasks_count()
+        cfg_64bit_metrics! {
+            pub(crate) fn spawned_tasks_count(&self) -> u64 {
+                self.shared.owned.spawned_tasks_count()
+            }
         }
     }
 }
@@ -584,6 +615,12 @@ impl Schedule for Arc<Handle> {
                 self.driver.unpark();
             }
         });
+    }
+
+    fn hooks(&self) -> TaskHarnessScheduleHooks {
+        TaskHarnessScheduleHooks {
+            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
+        }
     }
 
     cfg_unstable! {

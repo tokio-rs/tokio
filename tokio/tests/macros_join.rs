@@ -81,7 +81,7 @@ fn join_size() {
         let ready2 = future::ready(0i32);
         tokio::join!(ready1, ready2)
     };
-    assert_eq!(mem::size_of_val(&fut), 40);
+    assert_eq!(mem::size_of_val(&fut), 48);
 }
 
 async fn non_cooperative_task(permits: Arc<Semaphore>) -> usize {
@@ -158,4 +158,19 @@ async fn a_different_future_is_polled_first_every_time_poll_fn_is_polled() {
 #[allow(clippy::unit_cmp)]
 async fn empty_join() {
     assert_eq!(tokio::join!(), ());
+}
+
+#[tokio::test]
+async fn join_into_future() {
+    struct NotAFuture;
+    impl std::future::IntoFuture for NotAFuture {
+        type Output = ();
+        type IntoFuture = std::future::Ready<()>;
+
+        fn into_future(self) -> Self::IntoFuture {
+            std::future::ready(())
+        }
+    }
+
+    tokio::join!(NotAFuture);
 }

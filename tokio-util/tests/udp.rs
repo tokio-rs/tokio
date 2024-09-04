@@ -18,7 +18,8 @@ use std::sync::Arc;
         target_os = "macos",
         target_os = "ios",
         target_os = "tvos",
-        target_os = "watchos"
+        target_os = "watchos",
+        target_os = "visionos"
     ),
     allow(unused_assignments)
 )]
@@ -53,7 +54,8 @@ async fn send_framed_byte_codec() -> std::io::Result<()> {
         target_os = "macos",
         target_os = "ios",
         target_os = "tvos",
-        target_os = "watchos"
+        target_os = "watchos",
+        target_os = "visionos"
     )))]
     // test sending & receiving an empty message
     {

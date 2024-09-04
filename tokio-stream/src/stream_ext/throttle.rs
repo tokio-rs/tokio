@@ -5,7 +5,7 @@ use tokio::time::{Duration, Instant, Sleep};
 
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{self, Poll};
+use std::task::{self, ready, Poll};
 
 use pin_project_lite::pin_project;
 

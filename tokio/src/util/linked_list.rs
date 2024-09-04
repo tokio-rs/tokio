@@ -78,26 +78,19 @@ pub(crate) struct Pointers<T> {
 /// Additionally, we never access the `prev` or `next` fields directly, as any
 /// such access would implicitly involve the creation of a reference to the
 /// field, which we want to avoid since the fields are not `!Unpin`, and would
-/// hence be given the `noalias` attribute if we were to do such an access.
-/// As an alternative to accessing the fields directly, the `Pointers` type
+/// hence be given the `noalias` attribute if we were to do such an access. As
+/// an alternative to accessing the fields directly, the `Pointers` type
 /// provides getters and setters for the two fields, and those are implemented
-/// using raw pointer casts and offsets, which is valid since the struct is
-/// #[repr(C)].
+/// using `ptr`-specific methods which avoids the creation of intermediate
+/// references.
 ///
 /// See this link for more information:
 /// <https://github.com/rust-lang/rust/pull/82834>
-#[repr(C)]
 struct PointersInner<T> {
     /// The previous node in the list. null if there is no previous node.
-    ///
-    /// This field is accessed through pointer manipulation, so it is not dead code.
-    #[allow(dead_code)]
     prev: Option<NonNull<T>>,
 
     /// The next node in the list. null if there is no previous node.
-    ///
-    /// This field is accessed through pointer manipulation, so it is not dead code.
-    #[allow(dead_code)]
     next: Option<NonNull<T>>,
 
     /// This type is !Unpin due to the heuristic from:
@@ -141,6 +134,26 @@ impl<L: Link> LinkedList<L, L::Target> {
             if self.tail.is_none() {
                 self.tail = Some(ptr);
             }
+        }
+    }
+
+    /// Removes the first element from a list and returns it, or None if it is
+    /// empty.
+    pub(crate) fn pop_front(&mut self) -> Option<L::Handle> {
+        unsafe {
+            let head = self.head?;
+            self.head = L::pointers(head).as_ref().get_next();
+
+            if let Some(new_head) = L::pointers(head).as_ref().get_next() {
+                L::pointers(new_head).as_mut().set_prev(None);
+            } else {
+                self.tail = None;
+            }
+
+            L::pointers(head).as_mut().set_prev(None);
+            L::pointers(head).as_mut().set_next(None);
+
+            Some(L::from_raw(head))
         }
     }
 
@@ -338,7 +351,7 @@ feature! {
         _marker: PhantomData<*const L>,
     }
 
-    impl<U, L: Link<Handle = NonNull<U>>> LinkedList<L, L::Target> {
+    impl<L: Link> LinkedList<L, L::Target> {
         /// Turns a linked list into the guarded version by linking the guard node
         /// with the head and tail nodes. Like with other nodes, you should guarantee
         /// that the guard node is pinned in memory.
@@ -418,38 +431,24 @@ impl<T> Pointers<T> {
     }
 
     pub(crate) fn get_prev(&self) -> Option<NonNull<T>> {
-        // SAFETY: prev is the first field in PointersInner, which is #[repr(C)].
-        unsafe {
-            let inner = self.inner.get();
-            let prev = inner as *const Option<NonNull<T>>;
-            ptr::read(prev)
-        }
+        // SAFETY: Field is accessed immutably through a reference.
+        unsafe { ptr::addr_of!((*self.inner.get()).prev).read() }
     }
     pub(crate) fn get_next(&self) -> Option<NonNull<T>> {
-        // SAFETY: next is the second field in PointersInner, which is #[repr(C)].
-        unsafe {
-            let inner = self.inner.get();
-            let prev = inner as *const Option<NonNull<T>>;
-            let next = prev.add(1);
-            ptr::read(next)
-        }
+        // SAFETY: Field is accessed immutably through a reference.
+        unsafe { ptr::addr_of!((*self.inner.get()).next).read() }
     }
 
     fn set_prev(&mut self, value: Option<NonNull<T>>) {
-        // SAFETY: prev is the first field in PointersInner, which is #[repr(C)].
+        // SAFETY: Field is accessed mutably through a mutable reference.
         unsafe {
-            let inner = self.inner.get();
-            let prev = inner as *mut Option<NonNull<T>>;
-            ptr::write(prev, value);
+            ptr::addr_of_mut!((*self.inner.get()).prev).write(value);
         }
     }
     fn set_next(&mut self, value: Option<NonNull<T>>) {
-        // SAFETY: next is the second field in PointersInner, which is #[repr(C)].
+        // SAFETY: Field is accessed mutably through a mutable reference.
         unsafe {
-            let inner = self.inner.get();
-            let prev = inner as *mut Option<NonNull<T>>;
-            let next = prev.add(1);
-            ptr::write(next, value);
+            ptr::addr_of_mut!((*self.inner.get()).next).write(value);
         }
     }
 }

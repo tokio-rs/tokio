@@ -6,13 +6,12 @@ use std::future::Future;
 use std::io;
 use std::io::ErrorKind::UnexpectedEof;
 use std::marker::PhantomPinned;
-use std::mem::size_of;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 macro_rules! reader {
     ($name:ident, $ty:ty, $reader:ident) => {
-        reader!($name, $ty, $reader, size_of::<$ty>());
+        reader!($name, $ty, $reader, std::mem::size_of::<$ty>());
     };
     ($name:ident, $ty:ty, $reader:ident, $bytes:expr) => {
         pin_project! {

@@ -1,11 +1,10 @@
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use bytes::{Buf, BufMut};
-use futures_core::ready;
 use std::io::{self, IoSlice};
 use std::mem::MaybeUninit;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 /// Try to read data from an `AsyncRead` into an implementer of the [`BufMut`] trait.
 ///
@@ -46,7 +45,7 @@ use std::task::{Context, Poll};
 /// # }
 /// ```
 #[cfg_attr(not(feature = "io"), allow(unreachable_pub))]
-pub fn poll_read_buf<T: AsyncRead, B: BufMut>(
+pub fn poll_read_buf<T: AsyncRead + ?Sized, B: BufMut>(
     io: Pin<&mut T>,
     cx: &mut Context<'_>,
     buf: &mut B,
@@ -120,7 +119,7 @@ pub fn poll_read_buf<T: AsyncRead, B: BufMut>(
 /// [`File`]: tokio::fs::File
 /// [vectored writes]: tokio::io::AsyncWrite::poll_write_vectored
 #[cfg_attr(not(feature = "io"), allow(unreachable_pub))]
-pub fn poll_write_buf<T: AsyncWrite, B: Buf>(
+pub fn poll_write_buf<T: AsyncWrite + ?Sized, B: Buf>(
     io: Pin<&mut T>,
     cx: &mut Context<'_>,
     buf: &mut B,

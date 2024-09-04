@@ -8,15 +8,24 @@ impl Handle {
     }
 
     pub(crate) fn num_blocking_threads(&self) -> usize {
-        self.blocking_spawner.num_threads()
+        // workers are currently spawned using spawn_blocking
+        self.blocking_spawner
+            .num_threads()
+            .saturating_sub(self.num_workers())
     }
 
     pub(crate) fn num_idle_blocking_threads(&self) -> usize {
         self.blocking_spawner.num_idle_threads()
     }
 
-    pub(crate) fn active_tasks_count(&self) -> usize {
-        self.shared.owned.active_tasks_count()
+    pub(crate) fn num_alive_tasks(&self) -> usize {
+        self.shared.owned.num_alive_tasks()
+    }
+
+    cfg_64bit_metrics! {
+        pub(crate) fn spawned_tasks_count(&self) -> u64 {
+            self.shared.owned.spawned_tasks_count()
+        }
     }
 
     pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {

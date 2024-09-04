@@ -1,4 +1,6 @@
-use crate::runtime::task::{self, unowned, Id, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::task::{
+    self, unowned, Id, JoinHandle, OwnedTasks, Schedule, Task, TaskHarnessScheduleHooks,
+};
 use crate::runtime::tests::NoopSchedule;
 
 use std::collections::VecDeque;
@@ -119,6 +121,29 @@ fn drop_abort_handle2() {
     handle.assert_dropped();
 }
 
+#[test]
+fn drop_abort_handle_clone() {
+    let (ad, handle) = AssertDrop::new();
+    let (notified, join) = unowned(
+        async {
+            drop(ad);
+            unreachable!()
+        },
+        NoopSchedule,
+        Id::next(),
+    );
+    let abort = join.abort_handle();
+    let abort_clone = abort.clone();
+    drop(join);
+    handle.assert_not_dropped();
+    drop(notified);
+    handle.assert_not_dropped();
+    drop(abort);
+    handle.assert_not_dropped();
+    drop(abort_clone);
+    handle.assert_dropped();
+}
+
 // Shutting down through Notified works
 #[test]
 fn create_shutdown1() {
@@ -198,6 +223,100 @@ fn shutdown_immediately() {
 
         rt.shutdown();
     })
+}
+
+// Test for https://github.com/tokio-rs/tokio/issues/6729
+#[test]
+fn spawn_niche_in_task() {
+    use crate::future::poll_fn;
+    use std::task::{Context, Poll, Waker};
+
+    with(|rt| {
+        let state = Arc::new(Mutex::new(State::new()));
+
+        let mut subscriber = Subscriber::new(Arc::clone(&state), 1);
+        rt.spawn(async move {
+            subscriber.wait().await;
+            subscriber.wait().await;
+        });
+
+        rt.spawn(async move {
+            state.lock().unwrap().set_version(2);
+            state.lock().unwrap().set_version(0);
+        });
+
+        rt.tick_max(10);
+        assert!(rt.is_empty());
+        rt.shutdown();
+    });
+
+    pub(crate) struct Subscriber {
+        state: Arc<Mutex<State>>,
+        observed_version: u64,
+        waker_key: Option<usize>,
+    }
+
+    impl Subscriber {
+        pub(crate) fn new(state: Arc<Mutex<State>>, version: u64) -> Self {
+            Self {
+                state,
+                observed_version: version,
+                waker_key: None,
+            }
+        }
+
+        pub(crate) async fn wait(&mut self) {
+            poll_fn(|cx| {
+                self.state
+                    .lock()
+                    .unwrap()
+                    .poll_update(&mut self.observed_version, &mut self.waker_key, cx)
+                    .map(|_| ())
+            })
+            .await;
+        }
+    }
+
+    struct State {
+        version: u64,
+        wakers: Vec<Waker>,
+    }
+
+    impl State {
+        pub(crate) fn new() -> Self {
+            Self {
+                version: 1,
+                wakers: Vec::new(),
+            }
+        }
+
+        pub(crate) fn poll_update(
+            &mut self,
+            observed_version: &mut u64,
+            waker_key: &mut Option<usize>,
+            cx: &Context<'_>,
+        ) -> Poll<Option<()>> {
+            if self.version == 0 {
+                *waker_key = None;
+                Poll::Ready(None)
+            } else if *observed_version < self.version {
+                *waker_key = None;
+                *observed_version = self.version;
+                Poll::Ready(Some(()))
+            } else {
+                self.wakers.push(cx.waker().clone());
+                *waker_key = Some(self.wakers.len());
+                Poll::Pending
+            }
+        }
+
+        pub(crate) fn set_version(&mut self, version: u64) {
+            self.version = version;
+            for waker in self.wakers.drain(..) {
+                waker.wake();
+            }
+        }
+    }
 }
 
 #[test]
@@ -326,5 +445,11 @@ impl Schedule for Runtime {
 
     fn schedule(&self, task: task::Notified<Self>) {
         self.0.core.try_lock().unwrap().queue.push_back(task);
+    }
+
+    fn hooks(&self) -> TaskHarnessScheduleHooks {
+        TaskHarnessScheduleHooks {
+            task_terminate_callback: None,
+        }
     }
 }

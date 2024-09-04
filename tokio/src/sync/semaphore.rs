@@ -76,6 +76,59 @@ use std::sync::Arc;
 /// }
 /// ```
 ///
+/// ## Limit the number of outgoing requests being sent at the same time
+///
+/// In some scenarios, it might be required to limit the number of outgoing
+/// requests being sent in parallel. This could be due to limits of a consumed
+/// API or the network resources of the system the application is running on.
+///
+/// This example uses an `Arc<Semaphore>` with 10 permits. Each task spawned is
+/// given a reference to the semaphore by cloning the `Arc<Semaphore>`. Before
+/// a task sends a request, it must acquire a permit from the semaphore by
+/// calling [`Semaphore::acquire`]. This ensures that at most 10 requests are
+/// sent in parallel at any given time. After a task has sent a request, it
+/// drops the permit to allow other tasks to send requests.
+///
+/// ```
+/// use std::sync::Arc;
+/// use tokio::sync::Semaphore;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     // Define maximum number of parallel requests.
+///     let semaphore = Arc::new(Semaphore::new(10));
+///     // Spawn many tasks that will send requests.
+///     let mut jhs = Vec::new();
+///     for task_id in 0..100 {
+///         let semaphore = semaphore.clone();
+///         let jh = tokio::spawn(async move {
+///             // Acquire permit before sending request.
+///             let _permit = semaphore.acquire().await.unwrap();
+///             // Send the request.
+///             let response = send_request(task_id).await;
+///             // Drop the permit after the request has been sent.
+///             drop(_permit);
+///             // Handle response.
+///             // ...
+///
+///             response
+///         });
+///         jhs.push(jh);
+///     }
+///     // Collect responses from tasks.
+///     let mut responses = Vec::new();
+///     for jh in jhs {
+///         let response = jh.await.unwrap();
+///         responses.push(response);
+///     }
+///     // Process responses.
+///     // ...
+/// }
+/// # async fn send_request(task_id: usize) {
+/// #     // Send request.
+/// # }
+/// ```
+///
 /// ## Limit the number of incoming requests being handled at the same time
 ///
 /// Similar to limiting the number of simultaneously opened files, network handles
@@ -915,6 +968,24 @@ impl<'a> SemaphorePermit<'a> {
     /// Forgets the permit **without** releasing it back to the semaphore.
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(10));
+    /// {
+    ///     let permit = sem.try_acquire_many(5).unwrap();
+    ///     assert_eq!(sem.available_permits(), 5);
+    ///     permit.forget();
+    /// }
+    ///
+    /// // Since we forgot the permit, available permits won't go back to its initial value
+    /// // even after the permit is dropped.
+    /// assert_eq!(sem.available_permits(), 5);
+    /// ```
     pub fn forget(mut self) {
         self.permits = 0;
     }
@@ -928,6 +999,29 @@ impl<'a> SemaphorePermit<'a> {
     ///
     /// This function panics if permits from different [`Semaphore`] instances
     /// are merged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(10));
+    /// let mut permit = sem.try_acquire().unwrap();
+    ///
+    /// for _ in 0..9 {
+    ///     let _permit = sem.try_acquire().unwrap();
+    ///     // Merge individual permits into a single one.
+    ///     permit.merge(_permit)
+    /// }
+    ///
+    /// assert_eq!(sem.available_permits(), 0);
+    ///
+    /// // Release all permits in a single batch.
+    /// drop(permit);
+    ///
+    /// assert_eq!(sem.available_permits(), 10);
+    /// ```
     #[track_caller]
     pub fn merge(&mut self, mut other: Self) {
         assert!(
@@ -937,12 +1031,68 @@ impl<'a> SemaphorePermit<'a> {
         self.permits += other.permits;
         other.permits = 0;
     }
+
+    /// Splits `n` permits from `self` and returns a new [`SemaphorePermit`] instance that holds `n` permits.
+    ///
+    /// If there are insufficient permits and it's not possible to reduce by `n`, returns `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(3));
+    ///
+    /// let mut p1 = sem.try_acquire_many(3).unwrap();
+    /// let p2 = p1.split(1).unwrap();
+    ///
+    /// assert_eq!(p1.num_permits(), 2);
+    /// assert_eq!(p2.num_permits(), 1);
+    /// ```
+    pub fn split(&mut self, n: usize) -> Option<Self> {
+        let n = u32::try_from(n).ok()?;
+
+        if n > self.permits {
+            return None;
+        }
+
+        self.permits -= n;
+
+        Some(Self {
+            sem: self.sem,
+            permits: n,
+        })
+    }
+
+    /// Returns the number of permits held by `self`.
+    pub fn num_permits(&self) -> usize {
+        self.permits as usize
+    }
 }
 
 impl OwnedSemaphorePermit {
     /// Forgets the permit **without** releasing it back to the semaphore.
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(10));
+    /// {
+    ///     let permit = sem.clone().try_acquire_many_owned(5).unwrap();
+    ///     assert_eq!(sem.available_permits(), 5);
+    ///     permit.forget();
+    /// }
+    ///
+    /// // Since we forgot the permit, available permits won't go back to its initial value
+    /// // even after the permit is dropped.
+    /// assert_eq!(sem.available_permits(), 5);
+    /// ```
     pub fn forget(mut self) {
         self.permits = 0;
     }
@@ -956,6 +1106,29 @@ impl OwnedSemaphorePermit {
     ///
     /// This function panics if permits from different [`Semaphore`] instances
     /// are merged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(10));
+    /// let mut permit = sem.clone().try_acquire_owned().unwrap();
+    ///
+    /// for _ in 0..9 {
+    ///     let _permit = sem.clone().try_acquire_owned().unwrap();
+    ///     // Merge individual permits into a single one.
+    ///     permit.merge(_permit)
+    /// }
+    ///
+    /// assert_eq!(sem.available_permits(), 0);
+    ///
+    /// // Release all permits in a single batch.
+    /// drop(permit);
+    ///
+    /// assert_eq!(sem.available_permits(), 10);
+    /// ```
     #[track_caller]
     pub fn merge(&mut self, mut other: Self) {
         assert!(
@@ -966,9 +1139,51 @@ impl OwnedSemaphorePermit {
         other.permits = 0;
     }
 
+    /// Splits `n` permits from `self` and returns a new [`OwnedSemaphorePermit`] instance that holds `n` permits.
+    ///
+    /// If there are insufficient permits and it's not possible to reduce by `n`, returns `None`.
+    ///
+    /// # Note
+    ///
+    /// It will clone the owned `Arc<Semaphore>` to construct the new instance.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// let sem = Arc::new(Semaphore::new(3));
+    ///
+    /// let mut p1 = sem.try_acquire_many_owned(3).unwrap();
+    /// let p2 = p1.split(1).unwrap();
+    ///
+    /// assert_eq!(p1.num_permits(), 2);
+    /// assert_eq!(p2.num_permits(), 1);
+    /// ```
+    pub fn split(&mut self, n: usize) -> Option<Self> {
+        let n = u32::try_from(n).ok()?;
+
+        if n > self.permits {
+            return None;
+        }
+
+        self.permits -= n;
+
+        Some(Self {
+            sem: self.sem.clone(),
+            permits: n,
+        })
+    }
+
     /// Returns the [`Semaphore`] from which this permit was acquired.
     pub fn semaphore(&self) -> &Arc<Semaphore> {
         &self.sem
+    }
+
+    /// Returns the number of permits held by `self`.
+    pub fn num_permits(&self) -> usize {
+        self.permits as usize
     }
 }
 

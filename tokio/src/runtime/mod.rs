@@ -379,30 +379,38 @@ cfg_rt! {
         pub use dump::Dump;
     }
 
+    mod task_hooks;
+    pub(crate) use task_hooks::{TaskHooks, TaskCallback};
+    #[cfg(tokio_unstable)]
+    pub use task_hooks::TaskMeta;
+    #[cfg(not(tokio_unstable))]
+    pub(crate) use task_hooks::TaskMeta;
+
     mod handle;
     pub use handle::{EnterGuard, Handle, TryCurrentError};
 
     mod runtime;
     pub use runtime::{Runtime, RuntimeFlavor};
 
+    /// Boundary value to prevent stack overflow caused by a large-sized
+    /// Future being placed in the stack.
+    pub(crate) const BOX_FUTURE_THRESHOLD: usize = 2048;
+
     mod thread_id;
     pub(crate) use thread_id::ThreadId;
 
-    cfg_metrics! {
-        mod metrics;
-        pub use metrics::{RuntimeMetrics, HistogramScale};
+    pub(crate) mod metrics;
+    pub use metrics::RuntimeMetrics;
 
-        pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics, HistogramBuilder};
+    cfg_unstable_metrics! {
+        pub use metrics::HistogramScale;
 
         cfg_net! {
-        pub(crate) use metrics::IoDriverMetrics;
+            pub(crate) use metrics::IoDriverMetrics;
         }
     }
 
-    cfg_not_metrics! {
-        pub(crate) mod metrics;
-        pub(crate) use metrics::{SchedulerMetrics, WorkerMetrics, MetricsBatch, HistogramBuilder};
-    }
+    pub(crate) use metrics::{MetricsBatch, SchedulerMetrics, WorkerMetrics, HistogramBuilder};
 
     /// After thread starts / before thread stops
     type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;

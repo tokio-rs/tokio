@@ -5,7 +5,7 @@ use crate::util::trace;
 use std::future::Future;
 use std::panic::Location;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 /// Creates new [`Interval`] that yields with interval of `period`. The first
 /// tick completes immediately. The default [`MissedTickBehavior`] is
@@ -480,7 +480,9 @@ impl Interval {
             self.missed_tick_behavior
                 .next_timeout(timeout, now, self.period)
         } else {
-            timeout + self.period
+            timeout
+                .checked_add(self.period)
+                .unwrap_or_else(Instant::far_future)
         };
 
         // When we arrive here, the internal delay returned `Poll::Ready`.

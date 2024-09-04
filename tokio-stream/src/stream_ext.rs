@@ -8,66 +8,66 @@ mod any;
 use any::AnyFuture;
 
 mod chain;
-use chain::Chain;
+pub use chain::Chain;
 
 pub(crate) mod collect;
 use collect::{Collect, FromStream};
 
 mod filter;
-use filter::Filter;
+pub use filter::Filter;
 
 mod filter_map;
-use filter_map::FilterMap;
+pub use filter_map::FilterMap;
 
 mod fold;
 use fold::FoldFuture;
 
 mod fuse;
-use fuse::Fuse;
+pub use fuse::Fuse;
 
 mod map;
-use map::Map;
+pub use map::Map;
 
 mod map_while;
-use map_while::MapWhile;
+pub use map_while::MapWhile;
 
 mod merge;
-use merge::Merge;
+pub use merge::Merge;
 
 mod next;
 use next::Next;
 
 mod skip;
-use skip::Skip;
+pub use skip::Skip;
 
 mod skip_while;
-use skip_while::SkipWhile;
+pub use skip_while::SkipWhile;
 
 mod take;
-use take::Take;
+pub use take::Take;
 
 mod take_while;
-use take_while::TakeWhile;
+pub use take_while::TakeWhile;
 
 mod then;
-use then::Then;
+pub use then::Then;
 
 mod try_next;
 use try_next::TryNext;
 
 mod peekable;
-use peekable::Peekable;
+pub use peekable::Peekable;
 
 cfg_time! {
     pub(crate) mod timeout;
     pub(crate) mod timeout_repeating;
-    use timeout::Timeout;
-    use timeout_repeating::TimeoutRepeating;
+    pub use timeout::Timeout;
+    pub use timeout_repeating::TimeoutRepeating;
     use tokio::time::{Duration, Interval};
     mod throttle;
     use throttle::{throttle, Throttle};
     mod chunks_timeout;
-    use chunks_timeout::ChunksTimeout;
+    pub use chunks_timeout::ChunksTimeout;
 }
 
 /// An extension trait for the [`Stream`] trait that provides a variety of

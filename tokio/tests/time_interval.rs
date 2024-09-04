@@ -6,7 +6,7 @@ use std::task::{Context, Poll};
 
 use futures::{Stream, StreamExt};
 use tokio::time::{self, Duration, Instant, Interval, MissedTickBehavior};
-use tokio_test::{assert_pending, assert_ready_eq, task};
+use tokio_test::{assert_pending, assert_ready, assert_ready_eq, task};
 
 // Takes the `Interval` task, `start` variable, and optional time deltas
 // For each time delta, it polls the `Interval` and asserts that the result is
@@ -468,4 +468,10 @@ async fn stream_with_interval_poll_tick_no_waking() {
     // `Poll::Pending` and neither does [tokio::time::Interval] reschedule the
     // task when returning `Poll::Ready`.
     assert_eq!(items, vec![]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn interval_doesnt_panic_max_duration_when_polling() {
+    let mut timer = task::spawn(time::interval(Duration::MAX));
+    assert_ready!(timer.enter(|cx, mut timer| timer.poll_tick(cx)));
 }

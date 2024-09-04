@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(unix, feature = "full"))]
 
-use std::os::unix::io::{AsRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -13,11 +13,12 @@ use std::{
     task::{Context, Waker},
 };
 
-use nix::unistd::{close, read, write};
+use nix::unistd::{read, write};
 
 use futures::poll;
 
 use tokio::io::unix::{AsyncFd, AsyncFdReadyGuard};
+use tokio::io::Interest;
 use tokio_test::{assert_err, assert_pending};
 
 struct TestWaker {
@@ -57,18 +58,18 @@ impl TestWaker {
 
 #[derive(Debug)]
 struct FileDescriptor {
-    fd: RawFd,
+    fd: std::os::fd::OwnedFd,
 }
 
 impl AsRawFd for FileDescriptor {
     fn as_raw_fd(&self) -> RawFd {
-        self.fd
+        self.fd.as_raw_fd()
     }
 }
 
 impl Read for &FileDescriptor {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        read(self.fd, buf).map_err(io::Error::from)
+        read(self.fd.as_raw_fd(), buf).map_err(io::Error::from)
     }
 }
 
@@ -80,7 +81,7 @@ impl Read for FileDescriptor {
 
 impl Write for &FileDescriptor {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        write(self.fd, buf).map_err(io::Error::from)
+        write(&self.fd, buf).map_err(io::Error::from)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -95,12 +96,6 @@ impl Write for FileDescriptor {
 
     fn flush(&mut self) -> io::Result<()> {
         (self as &Self).flush()
-    }
-}
-
-impl Drop for FileDescriptor {
-    fn drop(&mut self) {
-        let _ = close(self.fd);
     }
 }
 
@@ -132,30 +127,22 @@ fn socketpair() -> (FileDescriptor, FileDescriptor) {
         SockFlag::empty(),
     )
     .expect("socketpair");
-    let fds = (
-        FileDescriptor {
-            fd: fd_a.into_raw_fd(),
-        },
-        FileDescriptor {
-            fd: fd_b.into_raw_fd(),
-        },
-    );
+    let fds = (FileDescriptor { fd: fd_a }, FileDescriptor { fd: fd_b });
 
-    set_nonblocking(fds.0.fd);
-    set_nonblocking(fds.1.fd);
+    set_nonblocking(fds.0.fd.as_raw_fd());
+    set_nonblocking(fds.1.fd.as_raw_fd());
 
     fds
 }
 
-fn drain(mut fd: &FileDescriptor) {
+fn drain(mut fd: &FileDescriptor, mut amt: usize) {
     let mut buf = [0u8; 512];
-
-    loop {
+    while amt > 0 {
         match fd.read(&mut buf[..]) {
-            Err(e) if e.kind() == ErrorKind::WouldBlock => break,
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {}
             Ok(0) => panic!("unexpected EOF"),
             Err(e) => panic!("unexpected error: {:?}", e),
-            Ok(_) => continue,
+            Ok(x) => amt -= x,
         }
     }
 }
@@ -231,10 +218,10 @@ async fn reset_writable() {
     let mut guard = afd_a.writable().await.unwrap();
 
     // Write until we get a WouldBlock. This also clears the ready state.
-    while guard
-        .try_io(|_| afd_a.get_ref().write(&[0; 512][..]))
-        .is_ok()
-    {}
+    let mut bytes = 0;
+    while let Ok(Ok(amt)) = guard.try_io(|_| afd_a.get_ref().write(&[0; 512][..])) {
+        bytes += amt;
+    }
 
     // Writable state should be cleared now.
     let writable = afd_a.writable();
@@ -246,7 +233,7 @@ async fn reset_writable() {
     }
 
     // Read from the other side; we should become writable now.
-    drain(&b);
+    drain(&b, bytes);
 
     let _ = writable.await.unwrap();
 }
@@ -384,7 +371,7 @@ async fn multiple_waiters() {
             panic!("Tasks exited unexpectedly")
         },
         _ = barrier.wait() => {}
-    };
+    }
 
     b.write_all(b"0").unwrap();
 
@@ -398,7 +385,10 @@ async fn poll_fns() {
     let afd_b = Arc::new(AsyncFd::new(b).unwrap());
 
     // Fill up the write side of A
-    while afd_a.get_ref().write(&[0; 512]).is_ok() {}
+    let mut bytes = 0;
+    while let Ok(amt) = afd_a.get_ref().write(&[0; 512]) {
+        bytes += amt;
+    }
 
     let waker = TestWaker::new();
 
@@ -458,7 +448,7 @@ async fn poll_fns() {
     }
 
     // Make it writable now
-    drain(afd_b.get_ref());
+    drain(afd_b.get_ref(), bytes);
 
     // now we should be writable (ie - the waker for poll_write should still be registered after we wake the read side)
     let _ = write_fut.await;
@@ -833,4 +823,33 @@ async fn await_error_readiness_invalid_address() {
 
     let guard = fd.ready(Interest::ERROR).await.unwrap();
     assert_eq!(guard.ready(), Ready::ERROR);
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct InvalidSource;
+
+impl AsRawFd for InvalidSource {
+    fn as_raw_fd(&self) -> RawFd {
+        -1
+    }
+}
+
+#[tokio::test]
+async fn try_new() {
+    let original = Arc::new(InvalidSource);
+
+    let error = AsyncFd::try_new(original.clone()).unwrap_err();
+    let (returned, _cause) = error.into_parts();
+
+    assert!(Arc::ptr_eq(&original, &returned));
+}
+
+#[tokio::test]
+async fn try_with_interest() {
+    let original = Arc::new(InvalidSource);
+
+    let error = AsyncFd::try_with_interest(original.clone(), Interest::READABLE).unwrap_err();
+    let (returned, _cause) = error.into_parts();
+
+    assert!(Arc::ptr_eq(&original, &returned));
 }

@@ -463,6 +463,153 @@ impl<T> Receiver<T> {
         self.chan.close();
     }
 
+    /// Checks if a channel is closed.
+    ///
+    /// This method returns `true` if the channel has been closed. The channel is closed
+    /// when all [`Sender`] have been dropped, or when [`Receiver::close`] is called.
+    ///
+    /// [`Sender`]: crate::sync::mpsc::Sender
+    /// [`Receiver::close`]: crate::sync::mpsc::Receiver::close
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (_tx, mut rx) = mpsc::channel::<()>(10);
+    ///     assert!(!rx.is_closed());
+    ///
+    ///     rx.close();
+    ///
+    ///     assert!(rx.is_closed());
+    /// }
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        self.chan.is_closed()
+    }
+
+    /// Checks if a channel is empty.
+    ///
+    /// This method returns `true` if the channel has no messages.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel(10);
+    ///     assert!(rx.is_empty());
+    ///
+    ///     tx.send(0).await.unwrap();
+    ///     assert!(!rx.is_empty());
+    /// }
+    ///
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.chan.is_empty()
+    }
+
+    /// Returns the number of messages in the channel.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel(10);
+    ///     assert_eq!(0, rx.len());
+    ///
+    ///     tx.send(0).await.unwrap();
+    ///     assert_eq!(1, rx.len());
+    /// }
+    /// ```
+    pub fn len(&self) -> usize {
+        self.chan.len()
+    }
+
+    /// Returns the current capacity of the channel.
+    ///
+    /// The capacity goes down when the sender sends a value by calling [`Sender::send`] or by reserving
+    /// capacity with [`Sender::reserve`]. The capacity goes up when values are received.
+    /// This is distinct from [`max_capacity`], which always returns buffer capacity initially
+    /// specified when calling [`channel`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel::<()>(5);
+    ///
+    ///     assert_eq!(rx.capacity(), 5);
+    ///
+    ///     // Making a reservation drops the capacity by one.
+    ///     let permit = tx.reserve().await.unwrap();
+    ///     assert_eq!(rx.capacity(), 4);
+    ///     assert_eq!(rx.len(), 0);
+    ///
+    ///     // Sending and receiving a value increases the capacity by one.
+    ///     permit.send(());
+    ///     assert_eq!(rx.len(), 1);
+    ///     rx.recv().await.unwrap();
+    ///     assert_eq!(rx.capacity(), 5);
+    ///
+    ///     // Directly sending a message drops the capacity by one.
+    ///     tx.send(()).await.unwrap();
+    ///     assert_eq!(rx.capacity(), 4);
+    ///     assert_eq!(rx.len(), 1);
+    ///
+    ///     // Receiving the message increases the capacity by one.
+    ///     rx.recv().await.unwrap();
+    ///     assert_eq!(rx.capacity(), 5);
+    ///     assert_eq!(rx.len(), 0);
+    /// }
+    /// ```
+    /// [`capacity`]: Receiver::capacity
+    /// [`max_capacity`]: Receiver::max_capacity
+    pub fn capacity(&self) -> usize {
+        self.chan.semaphore().semaphore.available_permits()
+    }
+
+    /// Returns the maximum buffer capacity of the channel.
+    ///
+    /// The maximum capacity is the buffer capacity initially specified when calling
+    /// [`channel`]. This is distinct from [`capacity`], which returns the *current*
+    /// available buffer capacity: as messages are sent and received, the value
+    /// returned by [`capacity`] will go up or down, whereas the value
+    /// returned by [`max_capacity`] will remain constant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel::<()>(5);
+    ///
+    ///     // both max capacity and capacity are the same at first
+    ///     assert_eq!(rx.max_capacity(), 5);
+    ///     assert_eq!(rx.capacity(), 5);
+    ///
+    ///     // Making a reservation doesn't change the max capacity.
+    ///     let permit = tx.reserve().await.unwrap();
+    ///     assert_eq!(rx.max_capacity(), 5);
+    ///     // but drops the capacity by one
+    ///     assert_eq!(rx.capacity(), 4);
+    /// }
+    /// ```
+    /// [`capacity`]: Receiver::capacity
+    /// [`max_capacity`]: Receiver::max_capacity
+    pub fn max_capacity(&self) -> usize {
+        self.chan.semaphore().bound
+    }
+
     /// Polls to receive the next message on this channel.
     ///
     /// This method returns:
@@ -563,6 +710,16 @@ impl<T> Receiver<T> {
         limit: usize,
     ) -> Poll<usize> {
         self.chan.recv_many(cx, buffer, limit)
+    }
+
+    /// Returns the number of [`Sender`] handles.
+    pub fn sender_strong_count(&self) -> usize {
+        self.chan.sender_strong_count()
+    }
+
+    /// Returns the number of [`WeakSender`] handles.
+    pub fn sender_weak_count(&self) -> usize {
+        self.chan.sender_weak_count()
     }
 }
 
@@ -992,7 +1149,7 @@ impl<T> Sender<T> {
     ///
     ///     // The iterator should now be exhausted
     ///     assert!(permit.next().is_none());
-    ///     
+    ///
     ///     // The value sent on the permit is received
     ///     assert_eq!(rx.recv().await.unwrap(), 456);
     ///     assert_eq!(rx.recv().await.unwrap(), 457);
@@ -1207,7 +1364,7 @@ impl<T> Sender<T> {
     ///     // The value sent on the permit is received
     ///     assert_eq!(rx.recv().await.unwrap(), 456);
     ///     assert_eq!(rx.recv().await.unwrap(), 457);
-    ///     
+    ///
     ///     // Trying to call try_reserve_many with 0 will return an empty iterator
     ///     let mut permit = tx.try_reserve_many(0).unwrap();
     ///     assert!(permit.next().is_none());
@@ -1380,7 +1537,7 @@ impl<T> Sender<T> {
     /// [`channel`]. This is distinct from [`capacity`], which returns the *current*
     /// available buffer capacity: as messages are sent and received, the
     /// value returned by [`capacity`] will go up or down, whereas the value
-    /// returned by `max_capacity` will remain constant.
+    /// returned by [`max_capacity`] will remain constant.
     ///
     /// # Examples
     ///
@@ -1409,6 +1566,16 @@ impl<T> Sender<T> {
     pub fn max_capacity(&self) -> usize {
         self.chan.semaphore().bound
     }
+
+    /// Returns the number of [`Sender`] handles.
+    pub fn strong_count(&self) -> usize {
+        self.chan.strong_count()
+    }
+
+    /// Returns the number of [`WeakSender`] handles.
+    pub fn weak_count(&self) -> usize {
+        self.chan.weak_count()
+    }
 }
 
 impl<T> Clone for Sender<T> {
@@ -1429,9 +1596,17 @@ impl<T> fmt::Debug for Sender<T> {
 
 impl<T> Clone for WeakSender<T> {
     fn clone(&self) -> Self {
+        self.chan.increment_weak_count();
+
         WeakSender {
             chan: self.chan.clone(),
         }
+    }
+}
+
+impl<T> Drop for WeakSender<T> {
+    fn drop(&mut self) {
+        self.chan.decrement_weak_count();
     }
 }
 
@@ -1441,6 +1616,16 @@ impl<T> WeakSender<T> {
     /// previously dropped, otherwise `None` is returned.
     pub fn upgrade(&self) -> Option<Sender<T>> {
         chan::Tx::upgrade(self.chan.clone()).map(Sender::new)
+    }
+
+    /// Returns the number of [`Sender`] handles.
+    pub fn strong_count(&self) -> usize {
+        self.chan.strong_count()
+    }
+
+    /// Returns the number of [`WeakSender`] handles.
+    pub fn weak_count(&self) -> usize {
+        self.chan.weak_count()
     }
 }
 

@@ -1,5 +1,7 @@
 //! This file contains mocks of the types in src/runtime/metrics
 
+use std::thread::ThreadId;
+
 pub(crate) struct SchedulerMetrics {}
 
 pub(crate) struct WorkerMetrics {}
@@ -30,6 +32,7 @@ impl WorkerMetrics {
     }
 
     pub(crate) fn set_queue_depth(&self, _len: usize) {}
+    pub(crate) fn set_thread_id(&self, _thread_id: ThreadId) {}
 }
 
 impl MetricsBatch {
@@ -39,6 +42,7 @@ impl MetricsBatch {
 
     pub(crate) fn submit(&mut self, _to: &WorkerMetrics, _mean_poll_time: u64) {}
     pub(crate) fn about_to_park(&mut self) {}
+    pub(crate) fn unparked(&mut self) {}
     pub(crate) fn inc_local_schedule_count(&mut self) {}
     pub(crate) fn start_processing_scheduled_tasks(&mut self) {}
     pub(crate) fn end_processing_scheduled_tasks(&mut self) {}

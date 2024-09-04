@@ -6,13 +6,14 @@ mod support {
 }
 
 use support::mpsc;
+use tokio_stream::adapters::Chain;
 
 #[tokio::test]
 async fn basic_usage() {
     let one = stream::iter(vec![1, 2, 3]);
     let two = stream::iter(vec![4, 5, 6]);
 
-    let mut stream = one.chain(two);
+    let mut stream = visibility_test(one, two);
 
     assert_eq!(stream.size_hint(), (6, Some(6)));
     assert_eq!(stream.next().await, Some(1));
@@ -37,6 +38,14 @@ async fn basic_usage() {
 
     assert_eq!(stream.size_hint(), (0, Some(0)));
     assert_eq!(stream.next().await, None);
+}
+
+fn visibility_test<I, S1, S2>(s1: S1, s2: S2) -> Chain<S1, S2>
+where
+    S1: Stream<Item = I>,
+    S2: Stream<Item = I>,
+{
+    s1.chain(s2)
 }
 
 #[tokio::test]

@@ -326,7 +326,7 @@ impl<S, B> StreamReader<S, B> {
     }
 }
 
-impl<S: Sink<T, Error = E>, E, T> Sink<T> for StreamReader<S, E> {
+impl<S: Sink<T, Error = E>, B, E, T> Sink<T> for StreamReader<S, B> {
     type Error = E;
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.project().inner.poll_ready(cx)

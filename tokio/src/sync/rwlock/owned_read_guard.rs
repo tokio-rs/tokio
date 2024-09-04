@@ -138,6 +138,32 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
             resource_span: this.resource_span,
         })
     }
+
+    /// Returns a reference to the original `Arc<RwLock>`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::{RwLock, OwnedRwLockReadGuard};
+    ///
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// struct Foo(u32);
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(Foo(1)));
+    ///
+    /// let guard = lock.clone().read_owned().await;
+    /// assert!(Arc::ptr_eq(&lock, OwnedRwLockReadGuard::rwlock(&guard)));
+    ///
+    /// let guard = OwnedRwLockReadGuard::map(guard, |f| &f.0);
+    /// assert!(Arc::ptr_eq(&lock, OwnedRwLockReadGuard::rwlock(&guard)));
+    /// # }
+    /// ```
+    pub fn rwlock(this: &Self) -> &Arc<RwLock<T>> {
+        &this.lock
+    }
 }
 
 impl<T: ?Sized, U: ?Sized> ops::Deref for OwnedRwLockReadGuard<T, U> {

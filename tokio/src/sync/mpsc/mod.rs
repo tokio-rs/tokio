@@ -78,6 +78,22 @@
 //! within a Tokio runtime, however it is still not tied to one specific Tokio
 //! runtime, and the sender may be moved from one Tokio runtime to another.
 //!
+//! # Allocation behavior
+//!
+//! <div class="warning">The implementation details described in this section may change in future
+//! Tokio releases.</div>
+//!
+//! The mpsc channel stores elements in blocks. Blocks are organized in a linked list. Sending
+//! pushes new elements onto the block at the front of the list, and receiving pops them off the
+//! one at the back. A block can hold 32 messages on a 64-bit target and 16 messages on a 32-bit
+//! target. This number is independent of channel and message size. Each block also stores 4
+//! pointer-sized values for bookkeeping (so on a 64-bit machine, each message has 1 byte of
+//! overhead).
+//!
+//! When all values in a block have been received, it becomes empty. It will then be freed, unless
+//! the channel's first block (where newly-sent elements are being stored) has no next block. In
+//! that case, the empty block is reused as the next block.
+//!
 //! [`Sender`]: crate::sync::mpsc::Sender
 //! [`Receiver`]: crate::sync::mpsc::Receiver
 //! [bounded-send]: crate::sync::mpsc::Sender::send()

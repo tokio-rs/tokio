@@ -1,4 +1,4 @@
-use std::task::Poll;
+use std::task::{ready, Poll};
 
 /// Consumes a unit of budget and returns the execution back to the Tokio
 /// runtime *if* the task's coop budget was exhausted.
@@ -7,10 +7,6 @@ use std::task::Poll;
 /// This function can be used in order to insert optional yield points into long
 /// computations that do not use Tokio resources like sockets or semaphores,
 /// without redundantly yielding to the runtime each time.
-///
-/// **Note**: This is an [unstable API][unstable]. The public API of this type
-/// may break in 1.x releases. See [the documentation on unstable
-/// features][unstable] for details.
 ///
 /// # Examples
 ///
@@ -27,8 +23,7 @@ use std::task::Poll;
 ///     sum
 /// }
 /// ```
-/// [unstable]: crate#unstable-features
-#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub async fn consume_budget() {
     let mut status = Poll::Pending;
 

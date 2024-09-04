@@ -16,7 +16,7 @@
 ///
 /// # Notes
 ///
-/// The supplied futures are stored inline and does not require allocating a
+/// The supplied futures are stored inline and do not require allocating a
 /// `Vec`.
 ///
 /// ### Runtime characteristics

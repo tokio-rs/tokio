@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::pin;
+use tokio::sync::oneshot;
 use tokio_util::sync::{CancellationToken, WaitForCancellationFuture};
 
 use core::future::Future;
@@ -444,4 +445,51 @@ fn derives_send_sync() {
 
     assert_send::<WaitForCancellationFuture<'static>>();
     assert_sync::<WaitForCancellationFuture<'static>>();
+}
+
+#[test]
+fn run_until_cancelled_test() {
+    let (waker, _) = new_count_waker();
+
+    {
+        let token = CancellationToken::new();
+
+        let fut = token.run_until_cancelled(std::future::pending::<()>());
+        pin!(fut);
+
+        assert_eq!(
+            Poll::Pending,
+            fut.as_mut().poll(&mut Context::from_waker(&waker))
+        );
+
+        token.cancel();
+
+        assert_eq!(
+            Poll::Ready(None),
+            fut.as_mut().poll(&mut Context::from_waker(&waker))
+        );
+    }
+
+    {
+        let (tx, rx) = oneshot::channel::<()>();
+
+        let token = CancellationToken::new();
+        let fut = token.run_until_cancelled(async move {
+            rx.await.unwrap();
+            42
+        });
+        pin!(fut);
+
+        assert_eq!(
+            Poll::Pending,
+            fut.as_mut().poll(&mut Context::from_waker(&waker))
+        );
+
+        tx.send(()).unwrap();
+
+        assert_eq!(
+            Poll::Ready(Some(42)),
+            fut.as_mut().poll(&mut Context::from_waker(&waker))
+        );
+    }
 }

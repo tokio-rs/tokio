@@ -346,7 +346,7 @@ impl ScheduledIo {
             match slot {
                 Some(existing) => {
                     if !existing.will_wake(cx.waker()) {
-                        *existing = cx.waker().clone();
+                        existing.clone_from(cx.waker());
                     }
                 }
                 None => {

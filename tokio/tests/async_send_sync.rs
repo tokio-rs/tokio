@@ -14,16 +14,19 @@ use tokio::time::{Duration, Instant};
 // The names of these structs behaves better when sorted.
 // Send: Yes, Sync: Yes
 #[derive(Clone)]
+#[allow(unused)]
 struct YY {}
 
 // Send: Yes, Sync: No
 #[derive(Clone)]
+#[allow(unused)]
 struct YN {
     _value: Cell<u8>,
 }
 
 // Send: No, Sync: No
 #[derive(Clone)]
+#[allow(unused)]
 struct NN {
     _value: Rc<u8>,
 }
@@ -52,18 +55,21 @@ fn require_unpin<T: Unpin>(_t: &T) {}
 #[allow(dead_code)]
 struct Invalid;
 
+#[allow(unused)]
 trait AmbiguousIfSend<A> {
     fn some_item(&self) {}
 }
 impl<T: ?Sized> AmbiguousIfSend<()> for T {}
 impl<T: ?Sized + Send> AmbiguousIfSend<Invalid> for T {}
 
+#[allow(unused)]
 trait AmbiguousIfSync<A> {
     fn some_item(&self) {}
 }
 impl<T: ?Sized> AmbiguousIfSync<()> for T {}
 impl<T: ?Sized + Sync> AmbiguousIfSync<Invalid> for T {}
 
+#[allow(unused)]
 trait AmbiguousIfUnpin<A> {
     fn some_item(&self) {}
 }
@@ -407,6 +413,12 @@ assert_value!(tokio::sync::mpsc::UnboundedReceiver<YY>: Send & Sync & Unpin);
 assert_value!(tokio::sync::mpsc::UnboundedSender<NN>: !Send & !Sync & Unpin);
 assert_value!(tokio::sync::mpsc::UnboundedSender<YN>: Send & Sync & Unpin);
 assert_value!(tokio::sync::mpsc::UnboundedSender<YY>: Send & Sync & Unpin);
+assert_value!(tokio::sync::mpsc::WeakSender<NN>: !Send & !Sync & Unpin);
+assert_value!(tokio::sync::mpsc::WeakSender<YN>: Send & Sync & Unpin);
+assert_value!(tokio::sync::mpsc::WeakSender<YY>: Send & Sync & Unpin);
+assert_value!(tokio::sync::mpsc::WeakUnboundedSender<NN>: !Send & !Sync & Unpin);
+assert_value!(tokio::sync::mpsc::WeakUnboundedSender<YN>: Send & Sync & Unpin);
+assert_value!(tokio::sync::mpsc::WeakUnboundedSender<YY>: Send & Sync & Unpin);
 assert_value!(tokio::sync::mpsc::error::SendError<NN>: !Send & !Sync & Unpin);
 assert_value!(tokio::sync::mpsc::error::SendError<YN>: Send & !Sync & Unpin);
 assert_value!(tokio::sync::mpsc::error::SendError<YY>: Send & Sync & Unpin);
@@ -712,6 +724,7 @@ mod unix_asyncfd {
     use super::*;
     use tokio::io::unix::*;
 
+    #[allow(unused)]
     struct ImplsFd<T> {
         _t: T,
     }
