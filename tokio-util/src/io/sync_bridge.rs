@@ -18,9 +18,9 @@ use tokio::io::{
 /// 
 /// ### Why It Matters:
 /// `SyncIoBridge` allows you to use synchronous I/O operations in an asynchronous context by blocking the current thread. However, this can be inefficient because:
-/// - Blocking: The use of `SyncIoBridge` may block a valuable async runtime thread, which could otherwise be used to handle more tasks concurrently. 
-/// - Thread Pool Saturation: If many threads are blocked using `SyncIoBridge`, it can exhaust the async runtime's thread pool, leading to increased latency and reduced throughput.
-/// - Lack of Parallelism: By blocking on synchronous operations, you may miss out on the benefits of running tasks concurrently, especially in I/O-bound operations where async tasks could be interleaved.
+///  Blocking: The use of `SyncIoBridge` may block a valuable async runtime thread, which could otherwise be used to handle more tasks concurrently. 
+///  Thread Pool Saturation: If many threads are blocked using `SyncIoBridge`, it can exhaust the async runtime's thread pool, leading to increased latency and reduced throughput.
+///  Lack of Parallelism: By blocking on synchronous operations, you may miss out on the benefits of running tasks concurrently, especially in I/O-bound operations where async tasks could be interleaved.
 ///
 /// Instead, consider reading the data into memory and then hashing it, or processing the data in chunks.
 ///
