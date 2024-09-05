@@ -379,6 +379,7 @@ impl Drop for NotifyWaitersList<'_> {
 /// This future is fused, so once it has completed, any future calls to poll
 /// will immediately return `Poll::Ready`.
 #[derive(Debug)]
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Notified<'a> {
     /// The `Notify` being received on.
     notify: &'a Notify,
