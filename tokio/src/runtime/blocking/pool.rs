@@ -299,12 +299,11 @@ impl Spawner {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        let (join_handle, spawn_result) =
-            if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
-                self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, None, rt)
-            } else {
-                self.spawn_blocking_inner(func, Mandatory::NonMandatory, None, rt)
-            };
+        let (join_handle, spawn_result) = if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, None, rt)
+        } else {
+            self.spawn_blocking_inner(func, Mandatory::NonMandatory, None, rt)
+        };
 
         match spawn_result {
             Ok(()) => join_handle,
@@ -327,7 +326,7 @@ impl Spawner {
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            let (join_handle, spawn_result) = if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            let (join_handle, spawn_result) = if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
                 self.spawn_blocking_inner(
                     Box::new(func),
                     Mandatory::Mandatory,
