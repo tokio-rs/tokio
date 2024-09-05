@@ -62,23 +62,7 @@ macro_rules! doc {
 
 #[cfg(doc)]
 doc! {macro_rules! join {
-    (@ {
-        ( $($count:tt)* )
-        ( $($total:tt)* )
-        $( ( $($skip:tt)* ) $e:expr, )*
-    }) => {
-        unimplemented!()
-    };
-
-    (@ { ( $($s:tt)* ) ( $($n:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
-        unimplemented!()
-    };
-
-    ( $($e:expr),+ $(,)?) => {
-        unimplemented!()
-    };
-
-    () => { async {}.await }
+    ($($future:expr),*) => { unimplemented!() }
 }}
 
 #[cfg(not(doc))]
