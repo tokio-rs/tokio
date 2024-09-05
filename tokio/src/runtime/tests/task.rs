@@ -228,7 +228,7 @@ fn shutdown_immediately() {
 // Test for https://github.com/tokio-rs/tokio/issues/6729
 #[test]
 fn spawn_niche_in_task() {
-    use crate::future::poll_fn;
+    use std::future::poll_fn;
     use std::task::{Context, Poll, Waker};
 
     with(|rt| {

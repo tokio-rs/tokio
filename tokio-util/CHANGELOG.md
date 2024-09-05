@@ -1,3 +1,27 @@
+# 0.7.12 (September 5th, 2024)
+
+This release bumps the MSRV to 1.70. ([#6645])
+
+### Added
+- sync: Add `run_until_cancelled` to `tokio_util::sync::CancellationToken` ([#6618])
+- task: add `AbortOnDropHandle` type ([#6786])
+
+### Changed
+- deps: no default features for hashbrown ([#6541])
+- time: wake `DelayQueue` when removing last item ([#6752])
+- deps: enable the full feature when compiled for the playground ([#6818])
+
+### Documented
+- task: fix typo in `TaskTracker` docs ([#6792])
+
+[#6645]: https://github.com/tokio-rs/tokio/pull/6645
+[#6541]: https://github.com/tokio-rs/tokio/pull/6541
+[#6618]: https://github.com/tokio-rs/tokio/pull/6618
+[#6752]: https://github.com/tokio-rs/tokio/pull/6752
+[#6786]: https://github.com/tokio-rs/tokio/pull/6786
+[#6792]: https://github.com/tokio-rs/tokio/pull/6792
+[#6818]: https://github.com/tokio-rs/tokio/pull/6818
+
 # 0.7.11 (May 4th, 2024)
 
 This release updates the MSRV to 1.63. ([#6126])

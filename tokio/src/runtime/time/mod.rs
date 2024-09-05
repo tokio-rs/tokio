@@ -20,7 +20,7 @@ pub(crate) use source::TimeSource;
 mod wheel;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
-use crate::loom::sync::Mutex;
+use crate::loom::sync::{Mutex, RwLock};
 use crate::runtime::driver::{self, IoHandle, IoStack};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
@@ -28,7 +28,6 @@ use crate::util::WakeList;
 
 use crate::loom::sync::atomic::AtomicU64;
 use std::fmt;
-use std::sync::RwLock;
 use std::{num::NonZeroU64, ptr::NonNull};
 
 struct AtomicOptionNonZeroU64(AtomicU64);
@@ -199,12 +198,7 @@ impl Driver {
 
         // Finds out the min expiration time to park.
         let expiration_time = {
-            let mut wheels_lock = rt_handle
-                .time()
-                .inner
-                .wheels
-                .write()
-                .expect("Timer wheel shards poisoned");
+            let mut wheels_lock = rt_handle.time().inner.wheels.write();
             let expiration_time = wheels_lock
                 .0
                 .iter_mut()
@@ -324,11 +318,7 @@ impl Handle {
     // Returns the next wakeup time of this shard.
     pub(self) fn process_at_sharded_time(&self, id: u32, mut now: u64) -> Option<u64> {
         let mut waker_list = WakeList::new();
-        let mut wheels_lock = self
-            .inner
-            .wheels
-            .read()
-            .expect("Timer wheel shards poisoned");
+        let mut wheels_lock = self.inner.wheels.read();
         let mut lock = wheels_lock.lock_sharded_wheel(id);
 
         if now < lock.elapsed() {
@@ -355,11 +345,7 @@ impl Handle {
 
                     waker_list.wake_all();
 
-                    wheels_lock = self
-                        .inner
-                        .wheels
-                        .read()
-                        .expect("Timer wheel shards poisoned");
+                    wheels_lock = self.inner.wheels.read();
                     lock = wheels_lock.lock_sharded_wheel(id);
                 }
             }
@@ -384,11 +370,7 @@ impl Handle {
     /// `add_entry` must not be called concurrently.
     pub(self) unsafe fn clear_entry(&self, entry: NonNull<TimerShared>) {
         unsafe {
-            let wheels_lock = self
-                .inner
-                .wheels
-                .read()
-                .expect("Timer wheel shards poisoned");
+            let wheels_lock = self.inner.wheels.read();
             let mut lock = wheels_lock.lock_sharded_wheel(entry.as_ref().shard_id());
 
             if entry.as_ref().might_be_registered() {
@@ -412,11 +394,7 @@ impl Handle {
         entry: NonNull<TimerShared>,
     ) {
         let waker = unsafe {
-            let wheels_lock = self
-                .inner
-                .wheels
-                .read()
-                .expect("Timer wheel shards poisoned");
+            let wheels_lock = self.inner.wheels.read();
 
             let mut lock = wheels_lock.lock_sharded_wheel(entry.as_ref().shard_id());
 

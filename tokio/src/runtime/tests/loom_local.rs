@@ -23,7 +23,7 @@ fn wake_during_shutdown() {
         ls.spawn_local(async move {
             let mut send = Some(send);
 
-            let () = futures::future::poll_fn(|cx| {
+            let () = std::future::poll_fn(|cx| {
                 if let Some(send) = send.take() {
                     send.send(cx.waker().clone());
                 }
