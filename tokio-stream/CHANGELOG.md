@@ -2,9 +2,9 @@
 
 This release bumps the MSRV of tokio-stream to 1.70.
 
-- stream: add `next_many` and `poll_next_many` to `StreamMap` (#6409)
-- stream: make stream adapters public (#6658)
-- readme: add readme for tokio-stream (#6456)
+- stream: add `next_many` and `poll_next_many` to `StreamMap` ([#6409])
+- stream: make stream adapters public ([#6658])
+- readme: add readme for tokio-stream ([#6456])
 
 [#6409]: https://github.com/tokio-rs/tokio/pull/6409
 [#6658]: https://github.com/tokio-rs/tokio/pull/6658
