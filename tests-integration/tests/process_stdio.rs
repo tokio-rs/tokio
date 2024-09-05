@@ -206,7 +206,7 @@ async fn vectored_writes() {
         let mut input = Bytes::from_static(b"hello\n").chain(Bytes::from_static(b"world!\n"));
         let mut writes_completed = 0;
 
-        futures::future::poll_fn(|cx| loop {
+        std::future::poll_fn(|cx| loop {
             let mut slices = [IoSlice::new(&[]); 2];
             let vectored = input.chunks_vectored(&mut slices);
             if vectored == 0 {

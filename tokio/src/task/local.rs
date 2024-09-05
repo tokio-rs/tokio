@@ -1238,7 +1238,7 @@ mod tests {
             }));
 
             // poll the run until future once
-            crate::future::poll_fn(|cx| {
+            std::future::poll_fn(|cx| {
                 let _ = run_until.as_mut().poll(cx);
                 Poll::Ready(())
             })

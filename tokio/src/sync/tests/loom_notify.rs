@@ -108,8 +108,7 @@ fn notify_multi() {
 
 #[test]
 fn notify_drop() {
-    use crate::future::poll_fn;
-    use std::future::Future;
+    use std::future::{poll_fn, Future};
     use std::task::Poll;
 
     loom::model(|| {

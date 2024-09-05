@@ -67,7 +67,7 @@ where
     /// # }
     /// ```
     pub async fn next_line(&mut self) -> io::Result<Option<String>> {
-        use crate::future::poll_fn;
+        use std::future::poll_fn;
 
         poll_fn(|cx| Pin::new(&mut *self).poll_next_line(cx)).await
     }

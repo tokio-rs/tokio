@@ -9,7 +9,7 @@ type SemRet = Option<OwnedSemaphorePermit>;
 fn semaphore_poll(
     sem: &mut PollSemaphore,
 ) -> tokio_test::task::Spawn<impl Future<Output = SemRet> + '_> {
-    let fut = futures::future::poll_fn(move |cx| sem.poll_acquire(cx));
+    let fut = std::future::poll_fn(move |cx| sem.poll_acquire(cx));
     tokio_test::task::spawn(fut)
 }
 
@@ -17,7 +17,7 @@ fn semaphore_poll_many(
     sem: &mut PollSemaphore,
     permits: u32,
 ) -> tokio_test::task::Spawn<impl Future<Output = SemRet> + '_> {
-    let fut = futures::future::poll_fn(move |cx| sem.poll_acquire_many(cx, permits));
+    let fut = std::future::poll_fn(move |cx| sem.poll_acquire_many(cx, permits));
     tokio_test::task::spawn(fut)
 }
 
