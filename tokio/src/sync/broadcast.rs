@@ -599,7 +599,7 @@ impl<T> Sender<T> {
         tail.pos = tail.pos.wrapping_add(1);
 
         // Get the slot
-        let mut slot = self.shared.buffer[idx].write().unwrap();
+        let mut slot = self.shared.buffer[idx].write();
 
         // Track the position
         slot.pos = pos;
@@ -695,7 +695,7 @@ impl<T> Sender<T> {
         while low < high {
             let mid = low + (high - low) / 2;
             let idx = base_idx.wrapping_add(mid) & self.shared.mask;
-            if self.shared.buffer[idx].read().unwrap().rem.load(SeqCst) == 0 {
+            if self.shared.buffer[idx].read().rem.load(SeqCst) == 0 {
                 low = mid + 1;
             } else {
                 high = mid;
@@ -737,7 +737,7 @@ impl<T> Sender<T> {
         let tail = self.shared.tail.lock();
 
         let idx = (tail.pos.wrapping_sub(1) & self.shared.mask as u64) as usize;
-        self.shared.buffer[idx].read().unwrap().rem.load(SeqCst) == 0
+        self.shared.buffer[idx].read().rem.load(SeqCst) == 0
     }
 
     /// Returns the number of active receivers.
@@ -1057,7 +1057,7 @@ impl<T> Receiver<T> {
         let idx = (self.next & self.shared.mask as u64) as usize;
 
         // The slot holding the next value to read
-        let mut slot = self.shared.buffer[idx].read().unwrap();
+        let mut slot = self.shared.buffer[idx].read();
 
         if slot.pos != self.next {
             // Release the `slot` lock before attempting to acquire the `tail`
@@ -1074,7 +1074,7 @@ impl<T> Receiver<T> {
             let mut tail = self.shared.tail.lock();
 
             // Acquire slot lock again
-            slot = self.shared.buffer[idx].read().unwrap();
+            slot = self.shared.buffer[idx].read();
 
             // Make sure the position did not change. This could happen in the
             // unlikely event that the buffer is wrapped between dropping the
