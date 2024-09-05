@@ -936,7 +936,7 @@ cfg_windows! {
 
 impl Inner {
     async fn complete_inflight(&mut self) {
-        use crate::future::poll_fn;
+        use std::future::poll_fn;
 
         poll_fn(|cx| self.poll_complete_inflight(cx)).await;
     }

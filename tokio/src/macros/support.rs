@@ -1,6 +1,7 @@
 cfg_macros! {
-    pub use crate::future::poll_fn;
     pub use crate::future::maybe_done::maybe_done;
+
+    pub use std::future::poll_fn;
 
     #[doc(hidden)]
     pub fn thread_rng_n(n: u32) -> u32 {

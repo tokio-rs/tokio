@@ -1,9 +1,9 @@
 use crate::sync::mpsc;
 
-use futures::future::poll_fn;
 use loom::future::block_on;
 use loom::sync::Arc;
 use loom::thread;
+use std::future::poll_fn;
 use tokio_test::assert_ok;
 
 #[test]

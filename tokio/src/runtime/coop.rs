@@ -255,7 +255,7 @@ mod test {
 
     #[test]
     fn budgeting() {
-        use futures::future::poll_fn;
+        use std::future::poll_fn;
         use tokio_test::*;
 
         assert!(get().0.is_none());
