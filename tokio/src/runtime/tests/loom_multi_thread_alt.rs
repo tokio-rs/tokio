@@ -10,7 +10,6 @@ mod yield_now;
 /// Use `LOOM_MAX_PREEMPTIONS=1` to do a "quick" run as a smoke test.
 ///
 /// In order to speed up the C
-use crate::future::poll_fn;
 use crate::runtime::tests::loom_oneshot as oneshot;
 use crate::runtime::{self, Runtime};
 use crate::{spawn, task};
@@ -20,7 +19,7 @@ use loom::sync::atomic::{AtomicBool, AtomicUsize};
 use loom::sync::Arc;
 
 use pin_project_lite::pin_project;
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::task::{ready, Context, Poll};

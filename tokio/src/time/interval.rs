@@ -1,8 +1,7 @@
-use crate::future::poll_fn;
 use crate::time::{sleep_until, Duration, Instant, Sleep};
 use crate::util::trace;
 
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::panic::Location;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
