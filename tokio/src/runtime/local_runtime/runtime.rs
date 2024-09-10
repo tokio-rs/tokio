@@ -145,7 +145,7 @@ impl LocalRuntime {
         }
     }
 
-    /// Spawns a task which isn't `!Send + Sync` on the runtime.
+    /// Spawns a task which isn't `Send + Sync` on the runtime.
     #[track_caller]
     pub fn spawn_local<F>(&self, future: F) -> JoinHandle<F::Output>
     where
