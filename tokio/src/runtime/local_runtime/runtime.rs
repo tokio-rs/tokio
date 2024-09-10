@@ -111,11 +111,12 @@ impl LocalRuntime {
         &self.handle
     }
 
-    /// Spawns a future onto the `LocalRuntime`.
+    /// Spawns a task which isn't `Send + Sync` on the runtime.
     ///
-    /// See the documentation for the equivalent method on [Runtime] for more information
+    /// This is analogous to the [spawn] method on the standard [Runtime].
     ///
-    /// [Runtime]: crate::runtime::Runtime::spawn
+    /// [spawn]: crate::runtime::Runtime::spawn
+    /// [Runtime]: crate::runtime::Runtime
     ///
     /// # Examples
     ///
@@ -127,25 +128,11 @@ impl LocalRuntime {
     /// let rt = LocalRuntime::new().unwrap();
     ///
     /// // Spawn a future onto the runtime
-    /// rt.spawn(async {
+    /// rt.spawn_local(async {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
     /// ```
-    #[track_caller]
-    pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
-    where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
-            self.handle.spawn_named(Box::pin(future), None)
-        } else {
-            self.handle.spawn_named(future, None)
-        }
-    }
-
-    /// Spawns a task which isn't `Send + Sync` on the runtime.
     #[track_caller]
     pub fn spawn_local<F>(&self, future: F) -> JoinHandle<F::Output>
     where
