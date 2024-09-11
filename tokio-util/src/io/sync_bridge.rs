@@ -72,7 +72,7 @@ use tokio::io::{
 ///
 ///
 /// When the data doesn't fit into memory, the hashing library will usually
-/// provide a hasher that you can repeatedly call `update` on to hash the data
+/// provide a `hasher` that you can repeatedly call `update` on to hash the data
 /// one chunk at the time. For example:
 ///
 /// ```rust
@@ -201,7 +201,7 @@ use tokio::io::{
 /// }
 /// ```
 /// Explanation: This example shows how to asynchronously read data into memory
-/// and then parse it as JSON. By avoiding `SyncIoBridge`, the asynchronous runtime
+/// and then parse it as `JSON`. By avoiding `SyncIoBridge`, the asynchronous runtime
 /// remains unblocked, leading to better performance when working with asynchronous
 /// I/O streams.
 ///
