@@ -425,7 +425,7 @@ impl TcpSocket {
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
     /// let socket = TcpSocket::new_v4()?;
     ///
-    /// println!("{:?}", socket.nodelay()?);
+    /// socket.set_nodelay(true)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -445,9 +445,9 @@ impl TcpSocket {
     /// use tokio::net::TcpSocket;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpSocket::new_v4()?;
+    /// let socket = TcpSocket::new_v4()?;
     ///
-    /// stream.set_nodelay(true)?;
+    /// println!("{:?}", socket.nodelay()?);
     /// # Ok(())
     /// # }
     /// ```
