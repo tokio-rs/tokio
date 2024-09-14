@@ -743,7 +743,7 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
-        changed_impl(&self.shared, &mut self.version).await
+        crate::runtime::coop::budget_constraint(changed_impl(&self.shared, &mut self.version)).await
     }
 
     /// Waits for a value that satisfies the provided condition.
