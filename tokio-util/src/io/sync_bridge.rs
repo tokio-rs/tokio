@@ -162,7 +162,7 @@ use tokio::io::{
 ///
 /// `SyncIoBridge` is not ideal when parsing data formats such as `JSON`, as it
 /// blocks async operations. A more efficient approach is to read data asynchronously
-/// into memory and then `deserialize` it, avoding unnecessary synchronization overhead.
+/// into memory and then `deserialize` it, avoiding unnecessary synchronization overhead.
 ///
 /// ```rust,no_run
 /// use tokio::io::AsyncRead;
