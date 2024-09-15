@@ -159,7 +159,7 @@ use tokio::io::{
 ///
 /// ## Example 3: Parsing `JSON`
 ///
-/// 
+///
 /// `SyncIoBridge` is not ideal when parsing data formats such as `JSON`, as it
 /// blocks async operations. A more efficient approach is to read data asynchronously
 /// into memory and then `deserialize` it, avoding unnecessary synchronization overhead.
