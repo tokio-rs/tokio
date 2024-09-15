@@ -119,10 +119,10 @@ use tokio::io::{
 ///
 /// ## Example 2: Compressing Data
 ///
-/// When compressing data, avoid using `SyncIoBridge` with non-async compression
-/// libraries, as it may lead to inefficient and blocking code. Instead, use an
-/// async compression library such as the [`async-compression`](https://docs.rs/async-compression/latest/async_compression/)
-/// crate, which is designed to work with asynchronous data streams.
+/// When compressing data, the use of `SyncIoBridge` is unnecessary as it introduces
+/// blocking and inefficient code. Instead, you can utilize an async compression library
+/// such as the [`async-compression`](https://docs.rs/async-compression/latest/async_compression/)
+/// crate, which is built to handle asynchronous data streams efficiently.
 ///
 /// ```ignore
 /// use async_compression::tokio::write::GzipEncoder;
@@ -159,9 +159,10 @@ use tokio::io::{
 ///
 /// ## Example 3: Parsing `JSON`
 ///
-/// When parsing serialization formats such as `JSON`, avoid using `SyncIoBridge`
-/// with functions that `deserialize` data from a type implementing `std::io::Read`,
-/// such as `serde_json::from_reader`.
+/// 
+/// `SyncIoBridge` is not ideal when parsing data formats such as `JSON`, as it
+/// blocks async operations. A more efficient approach is to read data asynchronously
+/// into memory and then `deserialize` it, avoding unnecessary synchronization overhead.
 ///
 /// ```rust,no_run
 /// use tokio::io::AsyncRead;
