@@ -368,3 +368,52 @@ async fn receiver_is_notified_when_last_sender_is_dropped() {
 
     assert!(t.is_woken());
 }
+
+#[tokio::test]
+async fn receiver_changed_is_cooperative() {
+    let (tx, mut rx) = watch::channel(());
+
+    drop(tx);
+
+    tokio::select! {
+        biased;
+        _ = async {
+            loop {
+                let _ = rx.changed().await;
+            }
+        } => {},
+        _ = tokio::task::yield_now() => {},
+    }
+}
+
+#[tokio::test]
+async fn receiver_wait_for_is_cooperative() {
+    let (tx, mut rx) = watch::channel(0);
+
+    drop(tx);
+
+    tokio::select! {
+        biased;
+        _ = async {
+            loop {
+                let _ = rx.wait_for(|val| *val == 1).await;
+            }
+        } => {},
+        _ = tokio::task::yield_now() => {},
+    }
+}
+
+#[tokio::test]
+async fn sender_closed_is_cooperative() {
+    let (tx, rx) = watch::channel(());
+
+    drop(rx);
+    tokio::select! {
+        _ = async {
+            loop {
+                let _ = tx.closed().await;
+            }
+        } => {},
+        _ = tokio::task::yield_now() => {},
+    }
+}

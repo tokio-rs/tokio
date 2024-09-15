@@ -245,19 +245,21 @@ cfg_coop! {
     }
 
     pin_project! {
-        /// A future type that calls `poll_proceed` before polling the inner future to check if the
-        /// inner future has exceeded its budget. If the inner future resolves, this will
+        /// Future wrapper to ensure cooperative scheduling.
+        ///
+        /// When being polled `poll_proceed` is called before the inner future is polled to check
+        /// if the inner future has exceeded its budget. If the inner future resolves, this will
         /// automatically call `RestoreOnPending::made_progress` before resolving this future with
         /// the result of the inner one. If polling the inner future is pending, polling this future
         /// type will also return a `Poll::Pending`.
         #[must_use = "futures do nothing unless polled"]
-        pub(crate) struct BudgetConstraintFuture<F: Future> {
+        pub(crate) struct Coop<F: Future> {
             #[pin]
             pub(crate) fut: F,
         }
     }
 
-    impl<F: Future> Future for BudgetConstraintFuture<F> {
+    impl<F: Future> Future for Coop<F> {
         type Output = F::Output;
 
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -276,8 +278,8 @@ cfg_coop! {
     /// If the future exceeds its budget while being polled, control is yielded back to the
     /// runtime.
     #[inline]
-    pub(crate) async fn budget_constraint<F: Future>(fut: F) -> F::Output {
-        BudgetConstraintFuture { fut }.await
+    pub(crate) fn cooperative<F: Future>(fut: F) -> Coop<F> {
+        Coop { fut }
     }
 }
 
