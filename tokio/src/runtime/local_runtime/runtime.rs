@@ -90,7 +90,7 @@ impl LocalRuntime {
     /// The returned handle can be used to spawn tasks that run on this runtime, and can
     /// be cloned to allow moving the `Handle` to other threads.
     ///
-    /// Local tasks cannot be spawned on this handle.
+    /// As the handle can be sent to other threads, it can only be used to spawn tasks that are `Send`.
     ///
     /// Calling [`Handle::block_on`] on a handle to a `LocalRuntime` is error-prone.
     /// Refer to the documentation of [`Handle::block_on`] for more.
