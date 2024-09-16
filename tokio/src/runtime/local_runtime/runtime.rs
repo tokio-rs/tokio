@@ -111,9 +111,9 @@ impl LocalRuntime {
         &self.handle
     }
 
-    /// Spawns a task which isn't `Send + Sync` on the runtime.
+    /// Spawns a task on the runtime.
     ///
-    /// This is analogous to the [spawn] method on the standard [Runtime].
+    /// This is analogous to the [`spawn`] method on the standard [`Runtime`], but works even if the task is not threads safe.
     ///
     /// [spawn]: crate::runtime::Runtime::spawn
     /// [Runtime]: crate::runtime::Runtime
