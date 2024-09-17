@@ -63,7 +63,7 @@ cfg_net! {
     ///     // previous one.
     ///     //
     ///     // On Windows, this allows rebinding sockets which are actively in use,
-    ///     // which allows “socket hijacking”, so we explicitly don't set it here.
+    ///     // which allows "socket hijacking", so we explicitly don't set it here.
     ///     // https://docs.microsoft.com/en-us/windows/win32/winsock/using-so-reuseaddr-and-so-exclusiveaddruse
     ///     socket.set_reuseaddr(true)?;
     ///     socket.bind(addr)?;
