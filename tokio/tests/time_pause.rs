@@ -47,6 +47,7 @@ async fn pause_time_in_spawn_threads() {
     assert_err!(t.await);
 }
 
+#[cfg(not(miri))] // Too slow on miri.
 #[test]
 fn paused_time_is_deterministic() {
     let run_1 = paused_time_stress_run();

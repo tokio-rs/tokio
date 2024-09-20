@@ -7,7 +7,7 @@
 // It is expected that `EVFILT_WRITE` would be returned with either the
 // `EV_EOF` or `EV_ERROR` flag set. If either flag is set a write would be
 // attempted, but that does not seem to occur.
-#![cfg(all(unix, not(target_os = "freebsd")))]
+#![cfg(all(unix, not(target_os = "freebsd"), not(miri)))]
 
 use std::process::Stdio;
 use std::time::Duration;

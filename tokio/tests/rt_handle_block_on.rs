@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(feature = "full", not(miri)))]
+
 
 // All io tests that deal with shutdown is currently ignored because there are known bugs in with
 // shutting down the io driver while concurrently registering new resources. See
@@ -143,6 +144,7 @@ rt_test! {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn fs_shutdown_before_started() {
         let rt = rt();
         let _enter = rt.enter();
@@ -175,6 +177,7 @@ rt_test! {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn spawn_blocking_after_shutdown_fails() {
         use tokio::task::spawn_blocking;
         let rt = rt();

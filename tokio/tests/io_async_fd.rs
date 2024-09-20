@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(unix, feature = "full"))]
+#![cfg(all(unix, feature = "full", not(miri)))]
 
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{
@@ -655,6 +655,7 @@ fn send_oob_data<S: AsRawFd>(stream: &S, data: &[u8]) -> io::Result<usize> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)]
 async fn clear_ready_matching_clears_ready() {
     use tokio::io::{Interest, Ready};
 
@@ -678,6 +679,7 @@ async fn clear_ready_matching_clears_ready() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)]
 async fn clear_ready_matching_clears_ready_mut() {
     use tokio::io::{Interest, Ready};
 
@@ -702,6 +704,7 @@ async fn clear_ready_matching_clears_ready_mut() {
 
 #[tokio::test]
 #[cfg(target_os = "linux")]
+#[cfg_attr(miri, ignore)]
 async fn await_error_readiness_timestamping() {
     use std::net::{Ipv4Addr, SocketAddr};
 
@@ -758,6 +761,7 @@ fn configure_timestamping_socket(udp_socket: &std::net::UdpSocket) -> std::io::R
 
 #[tokio::test]
 #[cfg(target_os = "linux")]
+#[cfg_attr(miri, ignore)]
 async fn await_error_readiness_invalid_address() {
     use std::net::{Ipv4Addr, SocketAddr};
     use tokio::io::{Interest, Ready};
