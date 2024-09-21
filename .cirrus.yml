@@ -3,7 +3,7 @@ auto_cancellation: $CIRRUS_BRANCH != 'master' && $CIRRUS_BRANCH !=~ 'tokio-.*'
 freebsd_instance:
   image_family: freebsd-14-1
 env:
-  RUST_STABLE: beta
+  RUST_STABLE: nightly-2024-09-21
   RUST_NIGHTLY: nightly-2024-05-05
   RUSTFLAGS: -D warnings
 
@@ -20,7 +20,7 @@ task:
     - . $HOME/.cargo/env
     - |
       echo "~~~~ rustc --version ~~~~"
-      rustc --version
+      rustc --version --verbose
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --all-features
@@ -52,7 +52,7 @@ task:
     - rustup target add i686-unknown-freebsd
     - |
       echo "~~~~ rustc --version ~~~~"
-      rustc --version
+      rustc --version --verbose
   test_script:
     - . $HOME/.cargo/env
     - cargo test --all --all-features --target i686-unknown-freebsd
