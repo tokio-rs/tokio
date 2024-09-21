@@ -528,16 +528,16 @@ impl Handle {
     pub(crate) fn num_alive_tasks(&self) -> usize {
         self.shared.owned.num_alive_tasks()
     }
+
+    pub(crate) fn injection_queue_depth(&self) -> usize {
+        self.shared.inject.len()
+    }
 }
 
 cfg_unstable_metrics! {
     impl Handle {
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
             &self.shared.scheduler_metrics
-        }
-
-        pub(crate) fn injection_queue_depth(&self) -> usize {
-            self.shared.inject.len()
         }
 
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
