@@ -831,7 +831,7 @@ jobs:
       - name: Checkout the latest release because HEAD maybe contains breakage.
         run: |
           set -x
-          tag=$(git describe --abbrev=0 --tags)
+          tag=bb51c81b74cbbeaa922d52d4472b25eaf3c62eff
           git checkout "${tag}"
         working-directory: hyper
 
