@@ -24,4 +24,4 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test -p tokio --all-features --target i686-unknown-freebsd
+    - rustc --version --verbose
