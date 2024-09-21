@@ -8,7 +8,7 @@
 ))]
 
 use std::future::Future;
-use std::sync::{Arc, Barrier, Mutex};
+use std::sync::{Arc, Mutex};
 use std::task::Poll;
 use std::thread;
 use tokio::macros::support::poll_fn;
