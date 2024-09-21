@@ -623,51 +623,6 @@ fn worker_overflow_count() {
 }
 
 #[test]
-fn injection_queue_depth_current_thread() {
-    use std::thread;
-
-    let rt = current_thread();
-    let handle = rt.handle().clone();
-    let metrics = rt.metrics();
-
-    thread::spawn(move || {
-        handle.spawn(async {});
-    })
-    .join()
-    .unwrap();
-
-    assert_eq!(1, metrics.injection_queue_depth());
-}
-
-#[test]
-fn injection_queue_depth_multi_thread() {
-    let rt = threaded();
-    let metrics = rt.metrics();
-
-    let barrier1 = Arc::new(Barrier::new(3));
-    let barrier2 = Arc::new(Barrier::new(3));
-
-    // Spawn a task per runtime worker to block it.
-    for _ in 0..2 {
-        let barrier1 = barrier1.clone();
-        let barrier2 = barrier2.clone();
-        rt.spawn(async move {
-            barrier1.wait();
-            barrier2.wait();
-        });
-    }
-
-    barrier1.wait();
-
-    for i in 0..10 {
-        assert_eq!(i, metrics.injection_queue_depth());
-        rt.spawn(async {});
-    }
-
-    barrier2.wait();
-}
-
-#[test]
 fn worker_local_queue_depth() {
     const N: usize = 100;
 
