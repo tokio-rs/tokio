@@ -12,6 +12,37 @@ env:
 # 64-bit kernel and in a 64-bit environment.  Our tests don't execute any of
 # the system's binaries, so the environment shouldn't matter.
 task:
+  name: FreeBSD 64-bit
+  setup_script:
+    - pkg install -y bash
+    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
+    - . $HOME/.cargo/env
+    - |
+      echo "~~~~ rustc --version ~~~~"
+      rustc --version
+  test_script:
+    - . $HOME/.cargo/env
+    - cargo test --all --all-features
+
+task:
+  name: FreeBSD docs
+  env:
+    RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
+    RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
+  setup_script:
+    - pkg install -y bash
+    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - sh rustup.sh -y --profile minimal --default-toolchain $RUST_NIGHTLY
+    - . $HOME/.cargo/env
+    - |
+      echo "~~~~ rustc --version ~~~~"
+      rustc --version
+  test_script:
+    - . $HOME/.cargo/env
+    - cargo doc --lib --no-deps --all-features --document-private-items
+
+task:
   name: FreeBSD 32-bit
   setup_script:
     - pkg install -y bash
@@ -24,4 +55,4 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test -p tokio --all-features --target i686-unknown-freebsd
+    - cargo test --all --all-features --target i686-unknown-freebsd
