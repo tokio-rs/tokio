@@ -12,7 +12,52 @@ env:
 # 64-bit kernel and in a 64-bit environment.  Our tests don't execute any of
 # the system's binaries, so the environment shouldn't matter.
 task:
-  name: FreeBSD 32-bit 2024-08-22
+  name: FreeBSD 32-bit 2024-08-18
+  setup_script:
+    - pkg install -y bash
+    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2024-08-18
+    - . $HOME/.cargo/env
+    - rustup target add i686-unknown-freebsd
+    - |
+      echo "~~~~ rustc --version ~~~~"
+      rustc --version --verbose
+  test_script:
+    - . $HOME/.cargo/env
+    - cargo test -p tests-build --all-features --target i686-unknown-freebsd
+
+task:
+  name: FreeBSD 32-bit 2024-08-19
+  setup_script:
+    - pkg install -y bash
+    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2024-08-19
+    - . $HOME/.cargo/env
+    - rustup target add i686-unknown-freebsd
+    - |
+      echo "~~~~ rustc --version ~~~~"
+      rustc --version --verbose
+  test_script:
+    - . $HOME/.cargo/env
+    - cargo test -p tests-build --all-features --target i686-unknown-freebsd
+
+task:
+  name: FreeBSD 32-bit 2024-08-20
+  setup_script:
+    - pkg install -y bash
+    - curl https://sh.rustup.rs -sSf --output rustup.sh
+    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2024-08-20
+    - . $HOME/.cargo/env
+    - rustup target add i686-unknown-freebsd
+    - |
+      echo "~~~~ rustc --version ~~~~"
+      rustc --version --verbose
+  test_script:
+    - . $HOME/.cargo/env
+    - cargo test -p tests-build --all-features --target i686-unknown-freebsd
+
+task:
+  name: FreeBSD 32-bit 2024-08-21
   setup_script:
     - pkg install -y bash
     - curl https://sh.rustup.rs -sSf --output rustup.sh
@@ -27,56 +72,11 @@ task:
     - cargo test -p tests-build --all-features --target i686-unknown-freebsd
 
 task:
-  name: FreeBSD 32-bit 2024-08-26
+  name: FreeBSD 32-bit 2024-08-22
   setup_script:
     - pkg install -y bash
     - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2024-08-26
-    - . $HOME/.cargo/env
-    - rustup target add i686-unknown-freebsd
-    - |
-      echo "~~~~ rustc --version ~~~~"
-      rustc --version --verbose
-  test_script:
-    - . $HOME/.cargo/env
-    - cargo test -p tests-build --all-features --target i686-unknown-freebsd
-
-task:
-  name: FreeBSD 32-bit 2024-08-30
-  setup_script:
-    - pkg install -y bash
-    - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2024-08-30
-    - . $HOME/.cargo/env
-    - rustup target add i686-unknown-freebsd
-    - |
-      echo "~~~~ rustc --version ~~~~"
-      rustc --version --verbose
-  test_script:
-    - . $HOME/.cargo/env
-    - cargo test -p tests-build --all-features --target i686-unknown-freebsd
-
-task:
-  name: FreeBSD 32-bit 2024-09-03
-  setup_script:
-    - pkg install -y bash
-    - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2024-09-03
-    - . $HOME/.cargo/env
-    - rustup target add i686-unknown-freebsd
-    - |
-      echo "~~~~ rustc --version ~~~~"
-      rustc --version --verbose
-  test_script:
-    - . $HOME/.cargo/env
-    - cargo test -p tests-build --all-features --target i686-unknown-freebsd
-
-task:
-  name: FreeBSD 32-bit 2024-09-04
-  setup_script:
-    - pkg install -y bash
-    - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2024-09-04
+    - sh rustup.sh -y --profile minimal --default-toolchain nightly-2024-08-22
     - . $HOME/.cargo/env
     - rustup target add i686-unknown-freebsd
     - |
