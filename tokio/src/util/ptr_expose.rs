@@ -48,7 +48,8 @@ impl<T> PtrExposeDomain<T> {
     pub(crate) fn from_exposed_addr(&self, addr: usize) -> *const T {
         #[cfg(miri)]
         {
-            *self.map
+            *self
+                .map
                 .lock()
                 .get(&addr)
                 .expect("Provided address is not exposed.")
