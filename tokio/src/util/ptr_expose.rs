@@ -6,7 +6,7 @@
 
 use std::marker::PhantomData;
 #[cfg(miri)]
-use {std::collections::HashMap, crate::loom::sync::Mutex};
+use {crate::loom::sync::Mutex, std::collections::HashMap};
 
 pub(crate) struct PtrExposeDomain<T> {
     #[cfg(miri)]
@@ -43,7 +43,10 @@ impl<T> PtrExposeDomain<T> {
     pub(crate) fn from_exposed_addr(&self, addr: usize) -> *const T {
         #[cfg(miri)]
         {
-            self.map.lock().get(&addr).expect("Provided address is not exposed.")
+            self.map
+                .lock()
+                .get(&addr)
+                .expect("Provided address is not exposed.")
         }
 
         #[cfg(not(miri))]
@@ -58,7 +61,10 @@ impl<T> PtrExposeDomain<T> {
         {
             // SAFETY: Equivalent to `pointer::addr` which is safe.
             let addr: usize = unsafe { std::mem::transmute(_ptr) };
-            self.map.lock().remove(addr).expect("Provided address is not exposed.");
+            self.map
+                .lock()
+                .remove(addr)
+                .expect("Provided address is not exposed.");
         }
     }
 }
