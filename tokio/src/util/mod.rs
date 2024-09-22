@@ -69,6 +69,9 @@ cfg_rt! {
 
     mod rc_cell;
     pub(crate) use rc_cell::RcCell;
+
+    mod ptr_expose;
+    pub(crate) use ptr_expose::PtrExposeDomain;
 }
 
 cfg_rt_multi_thread! {
