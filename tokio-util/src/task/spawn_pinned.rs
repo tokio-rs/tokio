@@ -14,7 +14,7 @@ use tokio::task::{spawn_local, JoinHandle, LocalSet};
 /// Internally the local pool uses a [`tokio::task::LocalSet`] for each worker thread
 /// in the pool. Consequently you can also use [`tokio::task::spawn_local`] (which will
 /// execute on the same thread) inside the Future you supply to the various spawn methods
-/// of `LocalPoolHandle`,
+/// of `LocalPoolHandle`.
 ///
 /// [`tokio::task::LocalSet`]: tokio::task::LocalSet
 /// [`tokio::task::spawn_local`]: tokio::task::spawn_local
@@ -194,7 +194,7 @@ enum WorkerChoice {
 }
 
 struct LocalPool {
-    workers: Vec<LocalWorkerHandle>,
+    workers: Box<[LocalWorkerHandle]>,
 }
 
 impl LocalPool {
