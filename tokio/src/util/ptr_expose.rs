@@ -2,7 +2,7 @@
 //!
 //! During normal execution, this module is equivalent to pointer casts. However, when running
 //! under miri, pointer casts are replaced with lookups in a hash map. This makes Tokio compatible
-//! with strict provenance when running under miri (which comes with a perf cost).
+//! with strict provenance when running under miri (which comes with a performance cost).
 
 use std::marker::PhantomData;
 #[cfg(miri)]
@@ -27,6 +27,7 @@ impl<T> PtrExposeDomain<T> {
     pub(crate) fn expose_provenance(&self, ptr: *const T) -> usize {
         #[cfg(miri)]
         {
+            // FIXME: Use `pointer:addr` when it is stable.
             // SAFETY: Equivalent to `pointer::addr` which is safe.
             let addr: usize = unsafe { std::mem::transmute(ptr) };
             self.map.lock().insert(addr, ptr);

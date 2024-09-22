@@ -69,9 +69,6 @@ cfg_rt! {
 
     mod rc_cell;
     pub(crate) use rc_cell::RcCell;
-
-    mod ptr_expose;
-    pub(crate) use ptr_expose::PtrExposeDomain;
 }
 
 cfg_rt_multi_thread! {
@@ -89,3 +86,7 @@ pub(crate) mod memchr;
 pub(crate) mod markers;
 
 pub(crate) mod cacheline;
+
+cfg_io_driver_impl! {
+    pub(crate) mod ptr_expose;
+}
