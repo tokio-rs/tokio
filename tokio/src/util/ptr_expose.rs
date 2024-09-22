@@ -48,11 +48,11 @@ impl<T> PtrExposeDomain<T> {
     pub(crate) fn from_exposed_addr(&self, addr: usize) -> *const T {
         #[cfg(miri)]
         {
-            *self
-                .map
-                .lock()
-                .get(&addr)
-                .expect("Provided address is not exposed.")
+            let maybe_ptr = self.map.lock().get(&addr).copied();
+
+            // SAFETY: Intentionally trigger a miri failure if the provenance we want is not
+            // exposed.
+            unsafe { maybe_ptr.unwrap_unchecked() }
         }
 
         #[cfg(not(miri))]
@@ -67,10 +67,11 @@ impl<T> PtrExposeDomain<T> {
         {
             // SAFETY: Equivalent to `pointer::addr` which is safe.
             let addr: usize = unsafe { std::mem::transmute(_ptr) };
-            self.map
-                .lock()
-                .remove(&addr)
-                .expect("Provided address is not exposed.");
+            let maybe_ptr = self.map.lock().remove(&addr);
+
+            // SAFETY: Intentionally trigger a miri failure if the provenance we want is not
+            // exposed.
+            unsafe { maybe_ptr.unwrap_unchecked() };
         }
     }
 }
