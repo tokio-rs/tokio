@@ -40,6 +40,7 @@ impl<T> PtrExposeDomain<T> {
     }
 
     #[inline]
+    #[allow(clippy::wrong_self_convention)] // mirrors std name
     pub(crate) fn from_exposed_addr(&self, addr: usize) -> *const T {
         #[cfg(miri)]
         {
