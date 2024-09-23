@@ -2,6 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi"), target_has_atomic = "64"))]
 
+use std::sync::{Arc, Barrier};
 use tokio::runtime::Runtime;
 
 #[test]
@@ -43,6 +44,51 @@ fn num_alive_tasks() {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
     assert_eq!(0, rt.metrics().num_alive_tasks());
+}
+
+#[test]
+fn injection_queue_depth_current_thread() {
+    use std::thread;
+
+    let rt = current_thread();
+    let handle = rt.handle().clone();
+    let metrics = rt.metrics();
+
+    thread::spawn(move || {
+        handle.spawn(async {});
+    })
+    .join()
+    .unwrap();
+
+    assert_eq!(1, metrics.injection_queue_depth());
+}
+
+#[test]
+fn injection_queue_depth_multi_thread() {
+    let rt = threaded();
+    let metrics = rt.metrics();
+
+    let barrier1 = Arc::new(Barrier::new(3));
+    let barrier2 = Arc::new(Barrier::new(3));
+
+    // Spawn a task per runtime worker to block it.
+    for _ in 0..2 {
+        let barrier1 = barrier1.clone();
+        let barrier2 = barrier2.clone();
+        rt.spawn(async move {
+            barrier1.wait();
+            barrier2.wait();
+        });
+    }
+
+    barrier1.wait();
+
+    for i in 0..10 {
+        assert_eq!(i, metrics.injection_queue_depth());
+        rt.spawn(async {});
+    }
+
+    barrier2.wait();
 }
 
 fn current_thread() -> Runtime {
