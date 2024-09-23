@@ -83,12 +83,21 @@ fn injection_queue_depth_multi_thread() {
 
     barrier1.wait();
 
+    let mut fail: Option<String> = None;
     for i in 0..10 {
-        assert_eq!(i, metrics.injection_queue_depth());
+        let depth = metrics.injection_queue_depth();
+        if i != depth {
+            fail = Some(format!("{i} is not equal to {depth}"));
+            break;
+        }
         rt.spawn(async {});
     }
 
     barrier2.wait();
+
+    if let Some(fail) = fail {
+        panic!("{fail}");
+    }
 }
 
 fn current_thread() -> Runtime {
