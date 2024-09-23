@@ -809,6 +809,13 @@ impl<T> Receiver<T> {
     /// ```
     pub async fn wait_for(
         &mut self,
+        f: impl FnMut(&T) -> bool,
+    ) -> Result<Ref<'_, T>, error::RecvError> {
+        cooperative(self.wait_for_inner(f)).await
+    }
+
+    async fn wait_for_inner(
+        &mut self,
         mut f: impl FnMut(&T) -> bool,
     ) -> Result<Ref<'_, T>, error::RecvError> {
         let mut closed = false;
@@ -845,9 +852,7 @@ impl<T> Receiver<T> {
             }
 
             // Wait for the value to change.
-            closed = cooperative(changed_impl(&self.shared, &mut self.version))
-                .await
-                .is_err();
+            closed = changed_impl(&self.shared, &mut self.version).await.is_err();
         }
     }
 

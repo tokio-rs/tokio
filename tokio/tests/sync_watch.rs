@@ -379,7 +379,23 @@ async fn receiver_changed_is_cooperative() {
         biased;
         _ = async {
             loop {
-                let _ = rx.changed().await;
+                assert!(rx.changed().await.is_err());
+            }
+        } => {},
+        _ = tokio::task::yield_now() => {},
+    }
+}
+
+#[tokio::test]
+async fn receiver_changed_is_cooperative_ok() {
+    let (tx, mut rx) = watch::channel(());
+
+    tokio::select! {
+        biased;
+        _ = async {
+            loop {
+                assert!(tx.send(()).is_ok());
+                assert!(rx.changed().await.is_ok());
             }
         } => {},
         _ = tokio::task::yield_now() => {},
@@ -396,7 +412,23 @@ async fn receiver_wait_for_is_cooperative() {
         biased;
         _ = async {
             loop {
-                let _ = rx.wait_for(|val| *val == 1).await;
+                assert!(rx.wait_for(|val| *val == 1).await.is_err());
+            }
+        } => {},
+        _ = tokio::task::yield_now() => {},
+    }
+}
+
+#[tokio::test]
+async fn receiver_wait_for_is_cooperative_ok() {
+    let (tx, mut rx) = watch::channel(0);
+
+    tokio::select! {
+        biased;
+        _ = async {
+            loop {
+                assert!(tx.send(1).is_ok());
+                assert!(rx.wait_for(|val| *val == 1).await.is_ok());
             }
         } => {},
         _ = tokio::task::yield_now() => {},
@@ -408,10 +440,11 @@ async fn sender_closed_is_cooperative() {
     let (tx, rx) = watch::channel(());
 
     drop(rx);
+
     tokio::select! {
         _ = async {
             loop {
-                let _ = tx.closed().await;
+                tx.closed().await;
             }
         } => {},
         _ = tokio::task::yield_now() => {},
