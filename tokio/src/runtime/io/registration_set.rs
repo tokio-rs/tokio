@@ -115,6 +115,7 @@ impl RegistrationSet {
     // This function is marked as unsafe, because the caller must make sure that
     // `io` is part of the registration set.
     pub(super) unsafe fn remove(&self, synced: &mut Synced, io: &ScheduledIo) {
+        super::EXPOSE_IO.unexpose_provenance(io);
         let _ = synced.registrations.remove(io.into());
     }
 }
