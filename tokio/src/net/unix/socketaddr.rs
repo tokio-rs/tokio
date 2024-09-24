@@ -32,13 +32,12 @@ impl fmt::Debug for SocketAddr {
 
 impl From<std::os::unix::net::SocketAddr> for SocketAddr {
     fn from(value: std::os::unix::net::SocketAddr) -> Self {
-	SocketAddr(value)
+        SocketAddr(value)
     }
 }
 
 impl From<SocketAddr> for std::os::unix::net::SocketAddr {
     fn from(value: SocketAddr) -> Self {
-	value.0
+        value.0
     }
 }
-
