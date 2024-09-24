@@ -29,3 +29,16 @@ impl fmt::Debug for SocketAddr {
         self.0.fmt(fmt)
     }
 }
+
+impl From<std::os::unix::net::SocketAddr> for SocketAddr {
+    fn from(value: std::os::unix::net::SocketAddr) -> Self {
+	SocketAddr(value)
+    }
+}
+
+impl From<SocketAddr> for std::os::unix::net::SocketAddr {
+    fn from(value: SocketAddr) -> Self {
+	value.0
+    }
+}
+
