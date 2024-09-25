@@ -3,10 +3,9 @@ use std::path::Path;
 
 /// An address associated with a Tokio Unix socket.
 ///
-/// This type is a think wrapper around
-/// [`std::os::unix::net::SocketAddr`];
-/// you can use [`From`] to wrap and unwrap
-/// instances of [`std::os::unix::net::SocketAddr`] as this type.
+/// This type is a thin wrapper around [`std::os::unix::net::SocketAddr`]. You
+/// can convert to and from the standard library `SocketAddr` type using the
+/// [`From`] trait.
 pub struct SocketAddr(pub(super) std::os::unix::net::SocketAddr);
 
 impl SocketAddr {
