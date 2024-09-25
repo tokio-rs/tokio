@@ -5,7 +5,7 @@ use std::path::Path;
 ///
 /// This type is a think wrapper around
 /// [`std::os::unix::net::SocketAddr`];
-/// you can use [`From`](std::convert::From) to wrap and unwrap
+/// you can use [`From`] to wrap and unwrap
 /// instances of [`std::os::unix::net::SocketAddr`] as this type.
 pub struct SocketAddr(pub(super) std::os::unix::net::SocketAddr);
 
