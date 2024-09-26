@@ -11,7 +11,7 @@ use std::task::{ready, Context, Poll};
 /// A wrapper around [`tokio::sync::broadcast::Receiver`] that implements [`Stream`].
 ///
 /// [`tokio::sync::broadcast::Receiver`]: struct@tokio::sync::broadcast::Receiver
-/// [`Stream`]: trait@crate::Stream
+/// [`Stream`]: trait@futures_core::Stream
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub struct BroadcastStream<T> {
     inner: ReusableBoxFuture<'static, (Result<T, RecvError>, Receiver<T>)>,
@@ -53,15 +53,14 @@ impl<T: 'static + Clone + Send> BroadcastStream<T> {
 
 impl<T: 'static + Clone + Send> Stream for BroadcastStream<T> {
     type Item = Result<T, BroadcastStreamRecvError>;
+
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let (result, rx) = ready!(self.inner.poll(cx));
         self.inner.set(make_future(rx));
         match result {
             Ok(item) => Poll::Ready(Some(Ok(item))),
             Err(RecvError::Closed) => Poll::Ready(None),
-            Err(RecvError::Lagged(n)) => {
-                Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n))))
-            }
+            Err(RecvError::Lagged(n)) => Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n)))),
         }
     }
 }
