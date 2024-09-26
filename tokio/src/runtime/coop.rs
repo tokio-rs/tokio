@@ -135,8 +135,11 @@ cfg_rt! {
 }
 
 cfg_coop! {
+    use pin_project_lite::pin_project;
     use std::cell::Cell;
-    use std::task::{Context, Poll};
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::task::{ready, Context, Poll};
 
     #[must_use]
     pub(crate) struct RestoreOnPending(Cell<Budget>);
@@ -239,6 +242,44 @@ cfg_coop! {
         fn is_unconstrained(self) -> bool {
             self.0.is_none()
         }
+    }
+
+    pin_project! {
+        /// Future wrapper to ensure cooperative scheduling.
+        ///
+        /// When being polled `poll_proceed` is called before the inner future is polled to check
+        /// if the inner future has exceeded its budget. If the inner future resolves, this will
+        /// automatically call `RestoreOnPending::made_progress` before resolving this future with
+        /// the result of the inner one. If polling the inner future is pending, polling this future
+        /// type will also return a `Poll::Pending`.
+        #[must_use = "futures do nothing unless polled"]
+        pub(crate) struct Coop<F: Future> {
+            #[pin]
+            pub(crate) fut: F,
+        }
+    }
+
+    impl<F: Future> Future for Coop<F> {
+        type Output = F::Output;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let coop = ready!(poll_proceed(cx));
+            let me = self.project();
+            if let Poll::Ready(ret) = me.fut.poll(cx) {
+                coop.made_progress();
+                Poll::Ready(ret)
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+
+    /// Run a future with a budget constraint for cooperative scheduling.
+    /// If the future exceeds its budget while being polled, control is yielded back to the
+    /// runtime.
+    #[inline]
+    pub(crate) fn cooperative<F: Future>(fut: F) -> Coop<F> {
+        Coop { fut }
     }
 }
 
