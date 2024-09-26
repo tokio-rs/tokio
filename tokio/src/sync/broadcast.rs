@@ -119,6 +119,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard};
+use crate::runtime::coop::cooperative;
 use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
 use crate::util::WakeList;
 
@@ -1262,8 +1263,7 @@ impl<T: Clone> Receiver<T> {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Result<T, RecvError> {
-        let fut = Recv::new(self);
-        fut.await
+        cooperative(Recv::new(self)).await
     }
 
     /// Attempts to return a pending value on this receiver without awaiting.
