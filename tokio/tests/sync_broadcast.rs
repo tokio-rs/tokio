@@ -640,3 +640,20 @@ fn send_in_waker_drop() {
     // Shouldn't deadlock.
     let _ = tx.send(());
 }
+
+#[test]
+fn broadcast_sender_closed() {
+    let (tx, rx) = broadcast::channel::<()>(1);
+    let rx2 = tx.subscribe();
+
+    let mut task = task::spawn(tx.closed());
+    assert_pending!(task.poll());
+
+    drop(rx);
+    assert!(!task.is_woken());
+    assert_pending!(task.poll());
+
+    drop(rx2);
+    assert!(task.is_woken());
+    assert_ready!(task.poll());
+}
