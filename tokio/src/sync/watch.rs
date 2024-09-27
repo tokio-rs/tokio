@@ -111,6 +111,7 @@
 //! [`Sender::closed`]: crate::sync::watch::Sender::closed
 //! [`Sender::subscribe()`]: crate::sync::watch::Sender::subscribe
 
+use crate::runtime::coop::cooperative;
 use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
@@ -743,7 +744,7 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
-        changed_impl(&self.shared, &mut self.version).await
+        cooperative(changed_impl(&self.shared, &mut self.version)).await
     }
 
     /// Waits for a value that satisfies the provided condition.
@@ -807,6 +808,13 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn wait_for(
+        &mut self,
+        f: impl FnMut(&T) -> bool,
+    ) -> Result<Ref<'_, T>, error::RecvError> {
+        cooperative(self.wait_for_inner(f)).await
+    }
+
+    async fn wait_for_inner(
         &mut self,
         mut f: impl FnMut(&T) -> bool,
     ) -> Result<Ref<'_, T>, error::RecvError> {
@@ -1224,19 +1232,22 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub async fn closed(&self) {
-        crate::trace::async_trace_leaf().await;
+        cooperative(async {
+            crate::trace::async_trace_leaf().await;
 
-        while self.receiver_count() > 0 {
-            let notified = self.shared.notify_tx.notified();
+            while self.receiver_count() > 0 {
+                let notified = self.shared.notify_tx.notified();
 
-            if self.receiver_count() == 0 {
-                return;
+                if self.receiver_count() == 0 {
+                    return;
+                }
+
+                notified.await;
+                // The channel could have been reopened in the meantime by calling
+                // `subscribe`, so we loop again.
             }
-
-            notified.await;
-            // The channel could have been reopened in the meantime by calling
-            // `subscribe`, so we loop again.
-        }
+        })
+        .await;
     }
 
     /// Creates a new [`Receiver`] connected to this `Sender`.
