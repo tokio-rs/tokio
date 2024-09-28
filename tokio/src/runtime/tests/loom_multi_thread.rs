@@ -345,6 +345,32 @@ mod group_d {
             done_rx.recv();
         });
     }
+
+    #[test]
+    fn pool_deadlock_on_blocked_task() {
+        loom::model(|| {
+            let pool = mk_pool(2);
+
+            let (tx1, rx1) = oneshot::channel();
+            let (tx2, rx2) = oneshot::channel();
+
+            let (blocking_tx, blocking_rx) = oneshot::channel();
+
+            pool.spawn(async move {
+                tx1.send(());
+                blocking_rx.recv();
+            });
+
+            pool.spawn(async move {
+                tx2.send(());
+            });
+
+            rx1.recv();
+            rx2.recv();
+
+            blocking_tx.send(());
+        });
+    }
 }
 
 fn mk_pool(num_threads: usize) -> Runtime {
