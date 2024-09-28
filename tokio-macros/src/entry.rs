@@ -438,8 +438,9 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     };
 
     let body_ident = quote! { body };
+    // This explicit `return` is intentional. See tokio-rs/tokio#4636
     let last_block = quote_spanned! {last_stmt_end_span=>
-        #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
+        #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
         {
             return #rt
                 .enable_all()
