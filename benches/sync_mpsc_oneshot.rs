@@ -42,8 +42,8 @@ fn request_reply(b: &mut Criterion, rt: Runtime) {
                     task_tx.send(o_tx).await.unwrap();
                     let _ = o_rx.await;
                 }
-            })
-        })
+            });
+        });
     });
 }
 

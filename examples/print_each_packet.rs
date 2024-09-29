@@ -75,7 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // to our event loop. After the socket's created we inform that we're ready
     // to go and start accepting connections.
     let listener = TcpListener::bind(&addr).await?;
-    println!("Listening on: {}", addr);
+    println!("Listening on: {addr}");
 
     loop {
         // Asynchronously wait for an inbound socket.
@@ -96,8 +96,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // The stream will return None once the client disconnects.
             while let Some(message) = framed.next().await {
                 match message {
-                    Ok(bytes) => println!("bytes: {:?}", bytes),
-                    Err(err) => println!("Socket closed with error: {:?}", err),
+                    Ok(bytes) => println!("bytes: {bytes:?}"),
+                    Err(err) => println!("Socket closed with error: {err:?}"),
                 }
             }
             println!("Socket received FIN packet and closed connection");

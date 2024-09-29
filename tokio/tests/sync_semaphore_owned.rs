@@ -111,7 +111,7 @@ fn merge_unrelated_permits() {
     let sem2 = Arc::new(Semaphore::new(3));
     let mut p1 = sem1.try_acquire_owned().unwrap();
     let p2 = sem2.try_acquire_owned().unwrap();
-    p1.merge(p2)
+    p1.merge(p2);
 }
 
 #[test]

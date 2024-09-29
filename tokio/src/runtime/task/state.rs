@@ -475,9 +475,8 @@ impl State {
 
         loop {
             let (output, next) = f(curr);
-            let next = match next {
-                Some(next) => next,
-                None => return output,
+            let Some(next) = next else {
+                return output;
             };
 
             let res = self.val.compare_exchange(curr.0, next.0, AcqRel, Acquire);
@@ -496,9 +495,8 @@ impl State {
         let mut curr = self.load();
 
         loop {
-            let next = match f(curr) {
-                Some(next) => next,
-                None => return Err(curr),
+            let Some(next) = f(curr) else {
+                return Err(curr);
             };
 
             let res = self.val.compare_exchange(curr.0, next.0, AcqRel, Acquire);

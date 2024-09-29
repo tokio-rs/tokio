@@ -11,7 +11,7 @@ pub(crate) fn declare_output_enum(input: TokenStream) -> TokenStream {
     };
 
     let variants = (0..branches)
-        .map(|num| Ident::new(&format!("_{}", num), Span::call_site()))
+        .map(|num| Ident::new(&format!("_{num}"), Span::call_site()))
         .collect::<Vec<_>>();
 
     // Use a bitfield to track which futures completed

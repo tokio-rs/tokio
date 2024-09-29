@@ -98,7 +98,7 @@ fn rx_mark_changed() {
 
         rx4.mark_changed();
         assert!(rx4.has_changed().unwrap());
-        assert_eq!(*rx4.borrow_and_update(), "two")
+        assert_eq!(*rx4.borrow_and_update(), "two");
     }
 
     assert_eq!(*rx.borrow(), "two");
@@ -323,7 +323,7 @@ fn send_modify_panic() {
         tx.send_modify(|old| {
             *old = "panicked";
             panic!();
-        })
+        });
     }));
     assert!(result.is_err());
 

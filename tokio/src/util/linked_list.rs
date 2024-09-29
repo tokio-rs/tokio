@@ -520,7 +520,7 @@ pub(crate) mod tests {
         list: &mut LinkedList<&'a Entry, <&'_ Entry as Link>::Target>,
         entries: &[Pin<&'a Entry>],
     ) {
-        for entry in entries.iter() {
+        for entry in entries {
             list.push_front(*entry);
         }
     }

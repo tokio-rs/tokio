@@ -26,7 +26,7 @@ fn drop_cell() {
     {
         let once_cell = OnceCell::new();
         let prev = once_cell.set(fooer);
-        assert!(prev.is_ok())
+        assert!(prev.is_ok());
     }
     assert!(NUM_DROPS.load(Ordering::Acquire) == 1);
 }

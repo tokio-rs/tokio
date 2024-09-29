@@ -34,7 +34,7 @@ fn multi_loop() {
             })
             .collect();
         // Wait for them to declare they're ready
-        for &_ in threads.iter() {
+        for _ in &threads {
             receiver.recv().unwrap();
         }
         // Send a signal

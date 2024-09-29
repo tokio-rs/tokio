@@ -157,7 +157,7 @@ where
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        futures_io::AsyncBufRead::consume(self.project().inner, amt)
+        futures_io::AsyncBufRead::consume(self.project().inner, amt);
     }
 }
 
@@ -173,7 +173,7 @@ where
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        tokio::io::AsyncBufRead::consume(self.project().inner, amt)
+        tokio::io::AsyncBufRead::consume(self.project().inner, amt);
     }
 }
 

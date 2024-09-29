@@ -827,7 +827,7 @@ impl UnixStream {
     /// Turns a [`tokio::net::UnixStream`] into a [`std::os::unix::net::UnixStream`].
     ///
     /// The returned [`std::os::unix::net::UnixStream`] will have nonblocking
-    /// mode set as `true`.  Use [`set_nonblocking`] to change the blocking
+    /// mode set as `true`. Use [`set_nonblocking`] to change the blocking
     /// mode if needed.
     ///
     /// # Examples

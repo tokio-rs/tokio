@@ -35,7 +35,7 @@ async fn single_immediate_delay() {
     assert_ready_some!(poll!(queue));
 
     let entry = assert_ready!(poll!(queue));
-    assert!(entry.is_none())
+    assert!(entry.is_none());
 }
 
 #[tokio::test]
@@ -110,7 +110,7 @@ async fn multi_delay_at_start() {
 
     let start = Instant::now();
     for elapsed in 0..1200 {
-        println!("elapsed: {:?}", elapsed);
+        println!("elapsed: {elapsed:?}");
         let elapsed = elapsed + 1;
         tokio::time::sleep_until(start + ms(elapsed)).await;
 
@@ -198,7 +198,7 @@ async fn reset_entry() {
     assert_eq!(*entry.get_ref(), "foo");
 
     let entry = assert_ready!(poll!(queue));
-    assert!(entry.is_none())
+    assert!(entry.is_none());
 }
 
 // Reproduces tokio-rs/tokio#849.
@@ -327,7 +327,7 @@ async fn remove_at_timer_wheel_threshold() {
             let entry = queue.remove(&key1).into_inner();
             assert_eq!(entry, "foo");
         }
-        other => panic!("other: {:?}", other),
+        other => panic!("other: {other:?}"),
     }
 }
 
@@ -391,7 +391,7 @@ async fn multi_reset() {
     assert_eq!(*entry.get_ref(), "one");
 
     let entry = assert_ready!(poll!(queue));
-    assert!(entry.is_none())
+    assert!(entry.is_none());
 }
 
 #[tokio::test]
@@ -539,8 +539,8 @@ async fn reset_later_after_slot_starts() {
 
     // At this point the queue hasn't been polled, so `elapsed` on the wheel
     // for the queue is still at 0 and hence the 1ms resolution slots cover
-    // [0-64).  Resetting the time on the entry to 120 causes it to get put in
-    // the [64-128) slot.  As the queue knows that the first entry is within
+    // [0-64). Resetting the time on the entry to 120 causes it to get put in
+    // the [64-128) slot. As the queue knows that the first entry is within
     // that slot, but doesn't know when, it must wake immediately to advance
     // the wheel.
     queue.reset_at(&foo, now + ms(120));
@@ -601,8 +601,8 @@ async fn reset_earlier_after_slot_starts() {
 
     // At this point the queue hasn't been polled, so `elapsed` on the wheel
     // for the queue is still at 0 and hence the 1ms resolution slots cover
-    // [0-64).  Resetting the time on the entry to 120 causes it to get put in
-    // the [64-128) slot.  As the queue knows that the first entry is within
+    // [0-64). Resetting the time on the entry to 120 causes it to get put in
+    // the [64-128) slot. As the queue knows that the first entry is within
     // that slot, but doesn't know when, it must wake immediately to advance
     // the wheel.
     queue.reset_at(&foo, now + ms(120));

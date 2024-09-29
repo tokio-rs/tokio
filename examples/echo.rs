@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // connections. This TCP listener is bound to the address we determined
     // above and must be associated with an event loop.
     let listener = TcpListener::bind(&addr).await?;
-    println!("Listening on: {}", addr);
+    println!("Listening on: {addr}");
 
     loop {
         // Asynchronously wait for an inbound socket.

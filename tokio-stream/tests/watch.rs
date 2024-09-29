@@ -12,13 +12,11 @@ async fn watch_stream_message_not_twice() {
 
     let mut counter = 0;
     let mut stream = WatchStream::new(rx).map(move |payload| {
-        println!("{}", payload);
+        println!("{payload}");
         if payload == "goodbye" {
             counter += 1;
         }
-        if counter >= 2 {
-            panic!("too many goodbyes");
-        }
+        assert!(counter < 2, "too many goodbyes");
     });
 
     let task = tokio::spawn(async move { while stream.next().await.is_some() {} });

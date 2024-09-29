@@ -11,9 +11,8 @@ impl ThreadId {
 
         let mut last = NEXT_ID.load(Relaxed);
         loop {
-            let id = match last.checked_add(1) {
-                Some(id) => id,
-                None => exhausted(),
+            let Some(id) = last.checked_add(1) else {
+                exhausted();
             };
 
             match NEXT_ID.compare_exchange_weak(last, id, Relaxed, Relaxed) {

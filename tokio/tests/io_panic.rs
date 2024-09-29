@@ -19,7 +19,7 @@ impl AsyncRead for RW {
         _cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        buf.put_slice(&[b'z']);
+        buf.put_slice(b"z");
         Poll::Ready(Ok(()))
     }
 }

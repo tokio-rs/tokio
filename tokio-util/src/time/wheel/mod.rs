@@ -155,22 +155,19 @@ where
                 }
             });
 
-            match expiration {
-                Some(ref expiration) => {
-                    if let Some(item) = self.poll_expiration(expiration, store) {
-                        return Some(item);
-                    }
+            if let Some(expiration) = &expiration {
+                if let Some(item) = self.poll_expiration(expiration, store) {
+                    return Some(item);
+                }
 
-                    self.set_elapsed(expiration.deadline);
-                }
-                None => {
-                    // in this case the poll did not indicate an expiration
-                    // _and_ we were not able to find a next expiration in
-                    // the current list of timers.  advance to the poll's
-                    // current time and do nothing else.
-                    self.set_elapsed(now);
-                    return None;
-                }
+                self.set_elapsed(expiration.deadline);
+            } else {
+                // in this case the poll did not indicate an expiration
+                // _and_ we were not able to find a next expiration in
+                // the current list of timers. Advance to the poll's
+                // current time and do nothing else.
+                self.set_elapsed(now);
+                return None;
             }
         }
     }
@@ -206,8 +203,8 @@ where
         res
     }
 
-    /// iteratively find entries that are between the wheel's current
-    /// time and the expiration time.  for each in that population either
+    /// Iteratively find entries that are between the wheel's current
+    /// time and the expiration time. For each in that population either
     /// return it for notification (in the case of the last level) or tier
     /// it down to the next level (in all other cases).
     pub(crate) fn poll_expiration(
@@ -280,13 +277,7 @@ mod test {
     #[test]
     fn test_level_for() {
         for pos in 0..64 {
-            assert_eq!(
-                0,
-                level_for(0, pos),
-                "level_for({}) -- binary = {:b}",
-                pos,
-                pos
-            );
+            assert_eq!(0, level_for(0, pos), "level_for({pos}) -- binary = {pos:b}");
         }
 
         for level in 1..5 {
@@ -295,9 +286,7 @@ mod test {
                 assert_eq!(
                     level,
                     level_for(0, a as u64),
-                    "level_for({}) -- binary = {:b}",
-                    a,
-                    a
+                    "level_for({a}) -- binary = {a:b}"
                 );
 
                 if pos > level {
@@ -305,9 +294,7 @@ mod test {
                     assert_eq!(
                         level,
                         level_for(0, a as u64),
-                        "level_for({}) -- binary = {:b}",
-                        a,
-                        a
+                        "level_for({a}) -- binary = {a:b}"
                     );
                 }
 
@@ -316,9 +303,7 @@ mod test {
                     assert_eq!(
                         level,
                         level_for(0, a as u64),
-                        "level_for({}) -- binary = {:b}",
-                        a,
-                        a
+                        "level_for({a}) -- binary = {a:b}"
                     );
                 }
             }

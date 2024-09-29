@@ -123,7 +123,7 @@ fn unbounded_mpsc_channel() {
 
         let value = Handle::current().block_on(rx.recv()).unwrap();
         assert_eq!(value, 42);
-    })
+    });
 }
 
 #[cfg(not(target_os = "wasi"))] // Wasi doesn't support file operations or bind

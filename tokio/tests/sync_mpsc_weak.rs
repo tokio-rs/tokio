@@ -37,16 +37,13 @@ async fn weak_sender() {
     for i in 0..12 {
         let recvd = rx.recv().await;
 
-        match recvd {
-            Some(msg) => {
-                if i == 10 {
-                    assert_eq!(msg, 20);
-                }
+        if let Some(msg) = recvd {
+            if i == 10 {
+                assert_eq!(msg, 20);
             }
-            None => {
-                assert_eq!(i, 11);
-                break;
-            }
+        } else {
+            assert_eq!(i, 11);
+            break;
         }
     }
 
@@ -120,7 +117,7 @@ async fn actor_weak_sender() {
                     self.send_message_to_self().await;
                 }
 
-                i += 1
+                i += 1;
             }
 
             assert!(self.received_self_msg);
@@ -298,16 +295,13 @@ async fn weak_unbounded_sender() {
     for i in 0..12 {
         let recvd = rx.recv().await;
 
-        match recvd {
-            Some(msg) => {
-                if i == 10 {
-                    assert_eq!(msg, 20);
-                }
+        if let Some(msg) = recvd {
+            if i == 10 {
+                assert_eq!(msg, 20);
             }
-            None => {
-                assert_eq!(i, 11);
-                break;
-            }
+        } else {
+            assert_eq!(i, 11);
+            break;
         }
     }
 
@@ -360,7 +354,7 @@ async fn actor_weak_unbounded_sender() {
             }
         }
 
-        async fn send_message_to_self(&mut self) {
+        fn send_message_to_self(&mut self) {
             let msg = ActorMessage::SelfMessage {};
 
             let sender = self.sender.clone();
@@ -378,10 +372,10 @@ async fn actor_weak_unbounded_sender() {
                 self.handle_message(msg);
 
                 if i == 0 {
-                    self.send_message_to_self().await;
+                    self.send_message_to_self();
                 }
 
-                i += 1
+                i += 1;
             }
 
             assert!(self.received_self_msg);

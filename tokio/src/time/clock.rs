@@ -28,9 +28,9 @@ cfg_not_test_util! {
 }
 
 cfg_test_util! {
-    use crate::time::{Duration, Instant};
-    use crate::loom::sync::Mutex;
     use crate::loom::sync::atomic::Ordering;
+    use crate::loom::sync::Mutex;
+    use crate::time::{Duration, Instant};
     use std::sync::atomic::AtomicBool as StdAtomicBool;
 
     cfg_rt! {
@@ -38,13 +38,13 @@ cfg_test_util! {
         fn with_clock<R>(f: impl FnOnce(Option<&Clock>) -> Result<R, &'static str>) -> R {
             use crate::runtime::Handle;
 
-            let res = match Handle::try_current() {
+            let result = match Handle::try_current() {
                 Ok(handle) => f(Some(handle.inner.driver().clock())),
                 Err(ref e) if e.is_missing_context() => f(None),
                 Err(_) => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
             };
 
-            match res {
+            match result {
                 Ok(ret) => ret,
                 Err(msg) => panic!("{}", msg),
             }
@@ -128,11 +128,9 @@ cfg_test_util! {
     /// [`advance`]: crate::time::advance
     #[track_caller]
     pub fn pause() {
-        with_clock(|maybe_clock| {
-            match maybe_clock {
-                Some(clock) => clock.pause(),
-                None => Err("time cannot be frozen from outside the Tokio runtime"),
-            }
+        with_clock(|maybe_clock| match maybe_clock {
+            Some(clock) => clock.pause(),
+            None => Err("time cannot be frozen from outside the Tokio runtime"),
         });
     }
 
@@ -148,9 +146,8 @@ cfg_test_util! {
     #[track_caller]
     pub fn resume() {
         with_clock(|maybe_clock| {
-            let clock = match maybe_clock {
-                Some(clock) => clock,
-                None => return Err("time cannot be frozen from outside the Tokio runtime"),
+            let Some(clock) = maybe_clock else {
+                return Err("time cannot be frozen from outside the Tokio runtime");
             };
 
             let mut inner = clock.inner.lock();
@@ -172,7 +169,7 @@ cfg_test_util! {
     /// This function will make the current time jump forward by the given
     /// duration in one jump. This means that all `sleep` calls with a deadline
     /// before the new time will immediately complete "at the same time", and
-    /// the runtime is free to poll them in any order.  Additionally, this
+    /// the runtime is free to poll them in any order. Additionally, this
     /// method will not wait for the `sleep` calls it advanced past to complete.
     /// If you want to do that, you should instead call [`sleep`] and rely on
     /// the runtime's auto-advance feature.
@@ -197,9 +194,8 @@ cfg_test_util! {
     /// [`sleep`]: fn@crate::time::sleep
     pub async fn advance(duration: Duration) {
         with_clock(|maybe_clock| {
-            let clock = match maybe_clock {
-                Some(clock) => clock,
-                None => return Err("time cannot be frozen from outside the Tokio runtime"),
+            let Some(clock) = maybe_clock else {
+                return Err("time cannot be frozen from outside the Tokio runtime");
             };
 
             clock.advance(duration)
@@ -261,7 +257,7 @@ cfg_test_util! {
 
             let elapsed = match inner.unfrozen.as_ref() {
                 Some(v) => v.elapsed(),
-                None => return Err("time is already frozen")
+                None => return Err("time is already frozen"),
             };
             inner.base += elapsed;
             inner.unfrozen = None;

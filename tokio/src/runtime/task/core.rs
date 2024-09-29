@@ -319,9 +319,8 @@ impl<T: Future, S: Schedule> Core<T, S> {
         let res = {
             self.stage.stage.with_mut(|ptr| {
                 // Safety: The caller ensures mutual exclusion to the field.
-                let future = match unsafe { &mut *ptr } {
-                    Stage::Running(future) => future,
-                    _ => unreachable!("unexpected stage"),
+                let Stage::Running(future) = (unsafe { &mut *ptr }) else {
+                    unreachable!("unexpected stage");
                 };
 
                 // Safety: The caller ensures the future is pinned.

@@ -104,13 +104,12 @@ fn set_nonblocking(fd: RawFd) {
 
     let flags = nix::fcntl::fcntl(fd, F_GETFL).expect("fcntl(F_GETFD)");
 
-    if flags < 0 {
-        panic!(
-            "bad return value from fcntl(F_GETFL): {} ({:?})",
-            flags,
-            nix::Error::last()
-        );
-    }
+    assert!(
+        flags >= 0,
+        "bad return value from fcntl(F_GETFL): {} ({:?})",
+        flags,
+        nix::Error::last()
+    );
 
     let flags = OFlag::from_bits_truncate(flags) | OFlag::O_NONBLOCK;
 
@@ -141,7 +140,7 @@ fn drain(mut fd: &FileDescriptor, mut amt: usize) {
         match fd.read(&mut buf[..]) {
             Err(e) if e.kind() == ErrorKind::WouldBlock => {}
             Ok(0) => panic!("unexpected EOF"),
-            Err(e) => panic!("unexpected error: {:?}", e),
+            Err(e) => panic!("unexpected error: {e:?}"),
             Ok(x) => amt -= x,
         }
     }
@@ -352,7 +351,7 @@ async fn multiple_waiters() {
                 biased;
                 guard = afd_a.readable() => {
                     tokio::task::yield_now().await;
-                    guard.unwrap().clear_ready()
+                    guard.unwrap().clear_ready();
                 },
                 _ = notify_barrier => unreachable!(),
             }

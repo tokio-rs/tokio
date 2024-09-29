@@ -111,7 +111,7 @@ pub struct Receiver<T> {
 /// Creates a bounded mpsc channel for communicating between asynchronous tasks
 /// with backpressure.
 ///
-/// The channel will buffer up to the provided number of messages.  Once the
+/// The channel will buffer up to the provided number of messages. Once the
 /// buffer is full, attempts to send new messages will wait until a message is
 /// received from the channel. The provided buffer capacity must be at least 1.
 ///
@@ -189,7 +189,7 @@ impl<T> Receiver<T> {
     ///
     /// If there are no messages in the channel's buffer, but the channel has
     /// not yet been closed, this method will sleep until a message is sent or
-    /// the channel is closed.  Note that if [`close`] is called, but there are
+    /// the channel is closed. Note that if [`close`] is called, but there are
     /// still outstanding [`Permits`] from before it was closed, the channel is
     /// not considered closed by `recv` until the permits are released.
     ///
@@ -622,7 +622,7 @@ impl<T> Receiver<T> {
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided
     /// `Context` is scheduled to receive a wakeup when a message is sent on any
-    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// receiver, or when the channel is closed. Note that on multiple calls to
     /// `poll_recv` or `poll_recv_many`, only the `Waker` from the `Context`
     /// passed to the most recent call is scheduled to receive a wakeup.
     ///
@@ -646,7 +646,7 @@ impl<T> Receiver<T> {
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided
     /// `Context` is scheduled to receive a wakeup when a message is sent on any
-    /// receiver, or when the channel is closed.  Note that on multiple calls to
+    /// receiver, or when the channel is closed. Note that on multiple calls to
     /// `poll_recv` or `poll_recv_many`, only the `Waker` from the `Context`
     /// passed to the most recent call is scheduled to receive a wakeup.
     ///
@@ -768,7 +768,7 @@ impl<T> Sender<T> {
     /// capacity, then use the returned [`Permit`] to send the message.
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve`
-    /// complete in the order they were requested.  Cancelling a call to
+    /// complete in the order they were requested. Cancelling a call to
     /// `send` makes you lose your place in the queue.
     ///
     /// # Examples
@@ -1068,7 +1068,7 @@ impl<T> Sender<T> {
     /// # Cancel safety
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve`
-    /// complete in the order they were requested.  Cancelling a call to
+    /// complete in the order they were requested. Cancelling a call to
     /// `reserve` makes you lose your place in the queue.
     ///
     /// # Examples
@@ -1187,7 +1187,7 @@ impl<T> Sender<T> {
     /// # Cancel safety
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve`
-    /// complete in the order they were requested.  Cancelling a call to
+    /// complete in the order they were requested. Cancelling a call to
     /// `reserve_owned` makes you lose your place in the queue.
     ///
     /// # Examples
@@ -1406,7 +1406,7 @@ impl<T> Sender<T> {
     /// This moves the sender _by value_, and returns an owned permit that can
     /// be used to send a message into the channel. Unlike [`Sender::try_reserve`],
     /// this method may be used in cases where the permit must be valid for the
-    /// `'static` lifetime.  `Sender`s may be cloned cheaply (`Sender::clone` is
+    /// `'static` lifetime. `Sender`s may be cloned cheaply (`Sender::clone` is
     /// essentially a reference count increment, comparable to [`Arc::clone`]),
     /// so when multiple [`OwnedPermit`]s are needed or the `Sender` cannot be
     /// moved, it can be cloned prior to calling `try_reserve_owned`.
@@ -1473,7 +1473,7 @@ impl<T> Sender<T> {
     ///
     /// ```
     /// let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
-    /// let  tx2 = tx.clone();
+    /// let tx2 = tx.clone();
     /// assert!(tx.same_channel(&tx2));
     ///
     /// let (tx3, rx3) = tokio::sync::mpsc::channel::<()>(1);
