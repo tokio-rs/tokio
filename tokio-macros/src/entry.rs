@@ -385,7 +385,11 @@ fn parse_knobs(mut input: syn::ItemFn, is_test: bool, config: FinalConfig) -> To
     let brace_token = input.block.brace_token;
     let body_ident = quote! { body };
     let block_expr = quote_spanned! {last_stmt_end_span=>
-        #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
+        #[allow(
+            clippy::expect_used,
+            clippy::diverging_sub_expression,
+            clippy::needless_return,
+        )]
         {
             return #rt
                 .enable_all()
