@@ -5,6 +5,7 @@ cfg_trace! {
             task::{Context, Poll},
         };
         use pin_project_lite::pin_project;
+        use std::mem;
         use std::future::Future;
         pub(crate) use tracing::instrument::Instrumented;
 
@@ -12,7 +13,7 @@ cfg_trace! {
         #[track_caller]
         pub(crate) fn task<F>(task: F, kind: &'static str, name: Option<&str>, id: u64) -> Instrumented<F> {
             #[track_caller]
-            fn get_span(kind: &'static str, name: Option<&str>, id: u64) -> tracing::Span {
+            fn get_span(kind: &'static str, name: Option<&str>, id: u64, task_size: usize) -> tracing::Span {
                 let location = std::panic::Location::caller();
                 tracing::trace_span!(
                     target: "tokio::task",
@@ -21,13 +22,14 @@ cfg_trace! {
                     %kind,
                     task.name = %name.unwrap_or_default(),
                     task.id = id,
+                    size.bytes = task_size,
                     loc.file = location.file(),
                     loc.line = location.line(),
                     loc.col = location.column(),
                 )
             }
             use tracing::instrument::Instrument;
-            let span = get_span(kind, name, id);
+            let span = get_span(kind, name, id, mem::size_of::<F>());
             task.instrument(span)
         }
 

@@ -375,6 +375,7 @@ impl Spawner {
                 task.name = %name.unwrap_or_default(),
                 task.id = id.as_u64(),
                 "fn" = %std::any::type_name::<F>(),
+                size.bytes = std::mem::size_of::<F>(),
                 loc.file = location.file(),
                 loc.line = location.line(),
                 loc.col = location.column(),
