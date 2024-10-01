@@ -18,10 +18,11 @@ pub struct Handle {
 use crate::runtime::task::JoinHandle;
 use crate::runtime::BOX_FUTURE_THRESHOLD;
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
+use crate::util::trace::SpawnMeta;
 
 use std::future::Future;
 use std::marker::PhantomData;
-use std::{error, fmt};
+use std::{error, fmt, mem};
 
 /// Runtime context guard.
 ///
@@ -189,10 +190,11 @@ impl Handle {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
-            self.spawn_named(Box::pin(future), None)
+        let fut_size = mem::size_of::<F>();
+        if fut_size > BOX_FUTURE_THRESHOLD {
+            self.spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
-            self.spawn_named(future, None)
+            self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
         }
     }
 
@@ -296,15 +298,16 @@ impl Handle {
     /// [`tokio::time`]: crate::time
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
-        if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
-            self.block_on_inner(Box::pin(future))
+        let fut_size = mem::size_of::<F>();
+        if fut_size > BOX_FUTURE_THRESHOLD {
+            self.block_on_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
-            self.block_on_inner(future)
+            self.block_on_inner(future, SpawnMeta::new_unnamed(fut_size))
         }
     }
 
     #[track_caller]
-    fn block_on_inner<F: Future>(&self, future: F) -> F::Output {
+    fn block_on_inner<F: Future>(&self, future: F, _meta: SpawnMeta<'_>) -> F::Output {
         #[cfg(all(
             tokio_unstable,
             tokio_taskdump,
@@ -316,7 +319,7 @@ impl Handle {
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future =
-            crate::util::trace::task(future, "block_on", None, super::task::Id::next().as_u64());
+            crate::util::trace::task(future, "block_on", _meta, super::task::Id::next().as_u64());
 
         // Enter the runtime context. This sets the current driver handles and
         // prevents blocking an existing runtime.
@@ -326,7 +329,7 @@ impl Handle {
     }
 
     #[track_caller]
-    pub(crate) fn spawn_named<F>(&self, future: F, _name: Option<&str>) -> JoinHandle<F::Output>
+    pub(crate) fn spawn_named<F>(&self, future: F, _meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -341,7 +344,7 @@ impl Handle {
         ))]
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task", _name, id.as_u64());
+        let future = crate::util::trace::task(future, "task", _meta, id.as_u64());
         self.inner.spawn(future, id)
     }
 

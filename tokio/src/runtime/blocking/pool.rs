@@ -8,6 +8,7 @@ use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle, BOX_FUTURE_THRESHOLD};
 use crate::util::metric_atomics::MetricAtomicUsize;
+use crate::util::trace::SpawnMeta;
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -299,10 +300,11 @@ impl Spawner {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        let (join_handle, spawn_result) = if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
-            self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, None, rt)
+        let fn_size = std::mem::size_of::<F>();
+        let (join_handle, spawn_result) = if fn_size > BOX_FUTURE_THRESHOLD {
+            self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, SpawnMeta::new_unnamed(fn_size), rt)
         } else {
-            self.spawn_blocking_inner(func, Mandatory::NonMandatory, None, rt)
+            self.spawn_blocking_inner(func, Mandatory::NonMandatory, SpawnMeta::new_unnamed(fn_size), rt)
         };
 
         match spawn_result {
@@ -326,18 +328,19 @@ impl Spawner {
             F: FnOnce() -> R + Send + 'static,
             R: Send + 'static,
         {
-            let (join_handle, spawn_result) = if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            let fn_size = std::mem::size_of::<F>();
+            let (join_handle, spawn_result) = if fn_size > BOX_FUTURE_THRESHOLD {
                 self.spawn_blocking_inner(
                     Box::new(func),
                     Mandatory::Mandatory,
-                    None,
+                    SpawnMeta::new_unnamed(fn_size),
                     rt,
                 )
             } else {
                 self.spawn_blocking_inner(
                     func,
                     Mandatory::Mandatory,
-                    None,
+                    SpawnMeta::new_unnamed(fn_size),
                     rt,
                 )
             };
@@ -355,7 +358,7 @@ impl Spawner {
         &self,
         func: F,
         is_mandatory: Mandatory,
-        name: Option<&str>,
+        spawn_meta: SpawnMeta<'_>,
         rt: &Handle,
     ) -> (JoinHandle<R>, Result<(), SpawnError>)
     where
@@ -372,9 +375,10 @@ impl Spawner {
                 target: "tokio::task::blocking",
                 "runtime.spawn",
                 kind = %"blocking",
-                task.name = %name.unwrap_or_default(),
+                task.name = %spawn_meta.name.unwrap_or_default(),
                 task.id = id.as_u64(),
                 "fn" = %std::any::type_name::<F>(),
+                original_size.bytes = spawn_meta.original_size,
                 size.bytes = std::mem::size_of::<F>(),
                 loc.file = location.file(),
                 loc.line = location.line(),
@@ -384,7 +388,7 @@ impl Spawner {
         };
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let _ = name;
+        let _ = spawn_meta;
 
         let (task, handle) = task::unowned(fut, BlockingSchedule::new(rt), id);
 
