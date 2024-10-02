@@ -123,8 +123,8 @@ impl LocalRuntime {
     ///
     /// This is analogous to the [`spawn`] method on the standard [`Runtime`], but works even if the task is not threads safe.
     ///
-    /// [spawn]: crate::runtime::Runtime::spawn
-    /// [Runtime]: crate::runtime::Runtime
+    /// [`spawn`]: crate::runtime::Runtime::spawn
+    /// [`Runtime`]: crate::runtime::Runtime
     ///
     /// # Examples
     ///
