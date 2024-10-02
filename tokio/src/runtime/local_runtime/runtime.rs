@@ -16,10 +16,10 @@ use std::time::Duration;
 ///
 /// This runtime cannot be moved between threads or driven from different threads.
 ///
-/// This runtime is incompatible with LocalSet. You should not attempt to drive a `LocalSet` within a
+/// This runtime is incompatible with `LocalSet`. You should not attempt to drive a `LocalSet` within a
 /// `LocalRuntime`.
 ///
-/// Currently, this runtime supports one flavor, which is internally identical to current_thread,
+/// Currently, this runtime supports one flavor, which is internally identical to `current_thread`,
 /// save for the aforementioned differences related to `spawn_local`.
 ///
 /// For more general information on how to use runtimes, see the [module] docs.
