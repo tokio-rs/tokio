@@ -1,43 +1,43 @@
-use std::marker::PhantomData;
+cfg_rt! {
+    use std::marker::PhantomData;
 
-pub(crate) struct SpawnMeta<'a> {
-    /// The name of the task
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(crate) name: Option<&'a str>,
-    /// The original size of the future or function being spawned
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(crate) original_size: usize,
-    _pd: PhantomData<&'a ()>,
-}
+    pub(crate) struct SpawnMeta<'a> {
+        /// The name of the task
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        pub(crate) name: Option<&'a str>,
+        /// The original size of the future or function being spawned
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        pub(crate) original_size: usize,
+        _pd: PhantomData<&'a ()>,
+    }
 
-impl<'a> SpawnMeta<'a> {
-    /// Create new spawn meta with a name and original size (before possible auto-boxing)
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(crate) fn new(name: Option<&'a str>, original_size: usize) -> Self {
-        Self {
-            name,
-            original_size,
-            _pd: PhantomData,
+    impl<'a> SpawnMeta<'a> {
+        /// Create new spawn meta with a name and original size (before possible auto-boxing)
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        pub(crate) fn new(name: Option<&'a str>, original_size: usize) -> Self {
+            Self {
+                name,
+                original_size,
+                _pd: PhantomData,
+            }
+        }
+
+        /// Create a new unnamed spawn meta with the original size (before possible auto-boxing)
+        pub(crate) fn new_unnamed(original_size: usize) -> Self {
+            #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+            let _original_size = original_size;
+
+            Self {
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                name: None,
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                original_size,
+                _pd: PhantomData,
+            }
         }
     }
 
-    /// Create a new unnamed spawn meta with the original size (before possible auto-boxing)
-    pub(crate) fn new_unnamed(original_size: usize) -> Self {
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let _original_size = original_size;
-
-        Self {
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            name: None,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            original_size,
-            _pd: PhantomData,
-        }
-    }
-}
-
-cfg_trace! {
-    cfg_rt! {
+    cfg_trace! {
         use core::{
             pin::Pin,
             task::{Context, Poll},
@@ -124,7 +124,16 @@ cfg_trace! {
             }
         }
     }
+
+    cfg_not_trace! {
+        #[inline]
+        pub(crate) fn task<F>(task: F, _kind: &'static str, _meta: SpawnMeta<'_>, _id: u64) -> F {
+            // nop
+            task
+        }
+    }
 }
+
 cfg_time! {
     #[track_caller]
     pub(crate) fn caller_location() -> Option<&'static std::panic::Location<'static>> {
@@ -132,15 +141,5 @@ cfg_time! {
         return Some(std::panic::Location::caller());
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         None
-    }
-}
-
-cfg_not_trace! {
-    cfg_rt! {
-        #[inline]
-        pub(crate) fn task<F>(task: F, _kind: &'static str, _meta: SpawnMeta<'_>, _id: u64) -> F {
-            // nop
-            task
-        }
     }
 }
