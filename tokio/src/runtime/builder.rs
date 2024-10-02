@@ -821,7 +821,7 @@ impl Builder {
     #[allow(unused_variables, unreachable_patterns)]
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
-    pub fn build_local(&mut self, options: &mut LocalOptions) -> io::Result<LocalRuntime> {
+    pub fn build_local(&mut self, options: &LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
             _ => panic!("Only current_thread is supported when building a local runtime"),
