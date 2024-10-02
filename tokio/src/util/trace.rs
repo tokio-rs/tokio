@@ -45,6 +45,7 @@ cfg_rt! {
         use pin_project_lite::pin_project;
         use std::mem;
         use std::future::Future;
+        use tracing::instrument::Instrument;
         pub(crate) use tracing::instrument::Instrumented;
 
         #[inline]
@@ -53,6 +54,11 @@ cfg_rt! {
             #[track_caller]
             fn get_span(kind: &'static str, spawn_meta: SpawnMeta<'_>, id: u64, task_size: usize) -> tracing::Span {
                 let location = std::panic::Location::caller();
+                let original_size = if spawn_meta.original_size != task_size {
+                    Some(spawn_meta.original_size)
+                } else {
+                    None
+                };
                 tracing::trace_span!(
                     target: "tokio::task",
                     parent: None,
@@ -60,7 +66,7 @@ cfg_rt! {
                     %kind,
                     task.name = %spawn_meta.name.unwrap_or_default(),
                     task.id = id,
-                    original_size.bytes = spawn_meta.original_size,
+                    original_size.bytes = original_size,
                     size.bytes = task_size,
                     loc.file = location.file(),
                     loc.line = location.line(),
@@ -70,6 +76,35 @@ cfg_rt! {
             use tracing::instrument::Instrument;
             let span = get_span(kind, meta, id, mem::size_of::<F>());
             task.instrument(span)
+        }
+
+        #[inline]
+        #[track_caller]
+        pub(crate) fn blocking_task<Fn, Fut>(task: Fut, spawn_meta: SpawnMeta<'_>, id: u64) -> Instrumented<Fut> {
+            let location = std::panic::Location::caller();
+
+            let fn_size = mem::size_of::<Fn>();
+            let original_size = if spawn_meta.original_size != fn_size {
+                Some(spawn_meta.original_size)
+            } else {
+                None
+            };
+
+            let span = tracing::trace_span!(
+                target: "tokio::task::blocking",
+                "runtime.spawn",
+                kind = %"blocking",
+                task.name = %spawn_meta.name.unwrap_or_default(),
+                task.id = id,
+                "fn" = %std::any::type_name::<Fn>(),
+                original_size.bytes = original_size,
+                size.bytes = fn_size,
+                loc.file = location.file(),
+                loc.line = location.line(),
+                loc.col = location.column(),
+            );
+            task.instrument(span)
+
         }
 
         pub(crate) fn async_op<P,F>(inner: P, resource_span: tracing::Span, source: &str, poll_op_name: &'static str, inherits_child_attrs: bool) -> InstrumentedAsyncOp<F>
@@ -128,6 +163,13 @@ cfg_rt! {
     cfg_not_trace! {
         #[inline]
         pub(crate) fn task<F>(task: F, _kind: &'static str, _meta: SpawnMeta<'_>, _id: u64) -> F {
+            // nop
+            task
+        }
+
+        #[inline]
+        pub(crate) fn blocking_task<Fn, Fut>(task: Fut, _spawn_meta: SpawnMeta<'_>, _id: u64) -> Fut {
+            let _ = PhantomData::<&Fn>;
             // nop
             task
         }

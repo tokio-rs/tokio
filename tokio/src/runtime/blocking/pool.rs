@@ -8,7 +8,7 @@ use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{Builder, Callback, Handle, BOX_FUTURE_THRESHOLD};
 use crate::util::metric_atomics::MetricAtomicUsize;
-use crate::util::trace::SpawnMeta;
+use crate::util::trace::{blocking_task, SpawnMeta};
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -375,30 +375,9 @@ impl Spawner {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        let fut = BlockingTask::new(func);
         let id = task::Id::next();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let fut = {
-            use tracing::Instrument;
-            let location = std::panic::Location::caller();
-            let span = tracing::trace_span!(
-                target: "tokio::task::blocking",
-                "runtime.spawn",
-                kind = %"blocking",
-                task.name = %spawn_meta.name.unwrap_or_default(),
-                task.id = id.as_u64(),
-                "fn" = %std::any::type_name::<F>(),
-                original_size.bytes = spawn_meta.original_size,
-                size.bytes = std::mem::size_of::<F>(),
-                loc.file = location.file(),
-                loc.line = location.line(),
-                loc.col = location.column(),
-            );
-            fut.instrument(span)
-        };
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let _ = spawn_meta;
+        let fut =
+            blocking_task::<F, BlockingTask<F>>(BlockingTask::new(func), spawn_meta, id.as_u64());
 
         let (task, handle) = task::unowned(fut, BlockingSchedule::new(rt), id);
 
