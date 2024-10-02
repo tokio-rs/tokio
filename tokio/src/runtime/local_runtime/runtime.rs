@@ -11,8 +11,11 @@ use std::time::Duration;
 
 /// A local Tokio runtime.
 ///
-/// This runtime is identical to a `current_thread` [runtime], save for not being `!Send + !Sync`,
-/// and supporting `spawn_local`.
+/// This runtime is capable of driving tasks which are not `Send + Sync` without the use of a
+/// `LocalSet`, and thus supports `spawn_local` without the need for a LocalSet context.
+///
+/// This runtime is incompatible with LocalSet. You should not attempt to drive a LocalSet within a
+/// LocalRuntime.
 ///
 /// For more general information on how to use runtimes, see the [module] docs.
 ///
