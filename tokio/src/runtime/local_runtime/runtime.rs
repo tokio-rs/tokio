@@ -121,7 +121,7 @@ impl LocalRuntime {
 
     /// Spawns a task on the runtime.
     ///
-    /// This is analogous to the [`spawn`] method on the standard [`Runtime`], but works even if the task is not threads safe.
+    /// This is analogous to the [`spawn`] method on the standard [`Runtime`], but works even if the task is not thread-safe.
     ///
     /// [`spawn`]: crate::runtime::Runtime::spawn
     /// [`Runtime`]: crate::runtime::Runtime
