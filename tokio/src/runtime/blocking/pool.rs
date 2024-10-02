@@ -302,9 +302,19 @@ impl Spawner {
     {
         let fn_size = std::mem::size_of::<F>();
         let (join_handle, spawn_result) = if fn_size > BOX_FUTURE_THRESHOLD {
-            self.spawn_blocking_inner(Box::new(func), Mandatory::NonMandatory, SpawnMeta::new_unnamed(fn_size), rt)
+            self.spawn_blocking_inner(
+                Box::new(func),
+                Mandatory::NonMandatory,
+                SpawnMeta::new_unnamed(fn_size),
+                rt,
+            )
         } else {
-            self.spawn_blocking_inner(func, Mandatory::NonMandatory, SpawnMeta::new_unnamed(fn_size), rt)
+            self.spawn_blocking_inner(
+                func,
+                Mandatory::NonMandatory,
+                SpawnMeta::new_unnamed(fn_size),
+                rt,
+            )
         };
 
         match spawn_result {

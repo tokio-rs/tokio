@@ -1,7 +1,8 @@
 #![allow(unreachable_pub)]
 use crate::{
     runtime::{Handle, BOX_FUTURE_THRESHOLD},
-    task::{JoinHandle, LocalSet}, util::trace::SpawnMeta,
+    task::{JoinHandle, LocalSet},
+    util::trace::SpawnMeta,
 };
 use std::{future::Future, io, mem};
 
@@ -137,7 +138,6 @@ impl<'a> Builder<'a> {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-
         let fut_size = mem::size_of::<Fut>();
         Ok(if fut_size > BOX_FUTURE_THRESHOLD {
             super::local::spawn_local_inner(Box::pin(future), SpawnMeta::new(self.name, fut_size))
@@ -169,7 +169,6 @@ impl<'a> Builder<'a> {
         } else {
             local_set.spawn_named(future, SpawnMeta::new(self.name, fut_size))
         })
-            
     }
 
     /// Spawns blocking code on the blocking threadpool.
@@ -211,8 +210,7 @@ impl<'a> Builder<'a> {
     {
         use crate::runtime::Mandatory;
         let fn_size = mem::size_of::<Function>();
-        let (join_handle, spawn_result) = if fn_size > BOX_FUTURE_THRESHOLD
-        {
+        let (join_handle, spawn_result) = if fn_size > BOX_FUTURE_THRESHOLD {
             handle.inner.blocking_spawner().spawn_blocking_inner(
                 Box::new(function),
                 Mandatory::NonMandatory,

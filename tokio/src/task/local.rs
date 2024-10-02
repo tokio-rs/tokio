@@ -11,9 +11,10 @@ use crate::util::RcCell;
 
 use std::cell::Cell;
 use std::collections::VecDeque;
-use std::{fmt, mem};
+use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::mem;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Poll;

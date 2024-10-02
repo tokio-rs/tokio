@@ -245,9 +245,11 @@ impl Runtime {
     {
         let fut_size = mem::size_of::<F>();
         if fut_size > BOX_FUTURE_THRESHOLD {
-            self.handle.spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+            self.handle
+                .spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
-            self.handle.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
+            self.handle
+                .spawn_named(future, SpawnMeta::new_unnamed(fut_size))
         }
     }
 
