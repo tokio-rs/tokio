@@ -149,7 +149,13 @@ impl LocalRuntime {
         }
     }
 
-    /// Runs the provided function on an executor dedicated to blocking operations.
+    /// Runs the provided function on a thread from a dedicated blocking thread pool.
+    ///
+    /// This function _will_ be run on another thread.
+    ///
+    /// See the documentation in the non-local runtime for more information.
+    ///
+    /// [Runtime]: crate::runtime::Runtime::spawn_blocking
     ///
     /// # Examples
     ///
