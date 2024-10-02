@@ -467,7 +467,7 @@ impl Handle {
     /// Spawn a task which isn't safe to send across thread boundaries onto the runtime.
     ///
     /// # Safety
-    /// This should only be used when this is a LocalRuntime or in another case where the runtime
+    /// This should only be used when this is a `LocalRuntime` or in another case where the runtime
     /// provably cannot be driven from or moved to different threads from the one on which the task
     /// is spawned.
     pub(crate) unsafe fn spawn_local<F>(
