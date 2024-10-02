@@ -103,11 +103,9 @@ async fn task_spawn_sizes_recorded() {
     let task_span = expect::span()
         .named("runtime.spawn")
         .with_target("tokio::task")
-        .with_field(
-            expect::field("size.bytes")
-                .with_value(&size)
-                .and(expect::field("original_size.bytes").with_value(&size)),
-        );
+        // TODO(hds): check that original_size.bytes is NOT recorded when this can be done in
+        // tracing-mock without listing every other field.
+        .with_field(expect::field("size.bytes").with_value(&size));
 
     let (subscriber, handle) = subscriber::mock().new_span(task_span).run_with_handle();
 
@@ -129,12 +127,12 @@ async fn task_big_spawn_sizes_recorded() {
     let future = {
         async fn big<const N: usize>() {
             let mut a = [0_u8; N];
-            for idx in 0..N {
-                a[idx] = (idx % 256) as u8;
+            for (idx, item) in a.iter_mut().enumerate() {
+                *item = (idx % 256) as u8;
             }
             tokio::time::sleep(Duration::from_millis(10)).await;
-            for idx in 0..N {
-                assert_eq!(a[idx], (idx % 256) as u8);
+            for (idx, item) in a.iter_mut().enumerate() {
+                assert_eq!(*item, (idx % 256) as u8);
             }
         }
 
