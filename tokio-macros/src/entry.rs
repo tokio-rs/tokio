@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream, TokenTree};
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseStream, Parser};
 use syn::{braced, Attribute, Ident, Path, Signature, Visibility};
 
@@ -390,43 +390,30 @@ fn build_config(
 }
 
 fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenStream {
-    input.sig.asyncness = None;
-
-    // If type mismatch occurs, the current rustc points to the last statement.
-    let (last_stmt_start_span, last_stmt_end_span) = {
-        let mut last_stmt = input.stmts.last().cloned().unwrap_or_default().into_iter();
-
-        // `Span` on stable Rust has a limitation that only points to the first
-        // token, not the whole tokens. We can work around this limitation by
-        // using the first/last span of the tokens like
-        // `syn::Error::new_spanned` does.
-        let start = last_stmt.next().map_or_else(Span::call_site, |t| t.span());
-        let end = last_stmt.last().map_or(start, |t| t.span());
-        (start, end)
-    };
+    let asyncness = input.sig.asyncness.take().unwrap_or_default();
 
     let crate_path = config
         .crate_name
         .map(ToTokens::into_token_stream)
-        .unwrap_or_else(|| Ident::new("tokio", last_stmt_start_span).into_token_stream());
+        .unwrap_or_else(|| Ident::new("tokio", Span::call_site()).into_token_stream());
 
     let mut rt = match config.flavor {
-        RuntimeFlavor::CurrentThread => quote_spanned! {last_stmt_start_span=>
+        RuntimeFlavor::CurrentThread => quote! {
             #crate_path::runtime::Builder::new_current_thread()
         },
-        RuntimeFlavor::Threaded => quote_spanned! {last_stmt_start_span=>
+        RuntimeFlavor::Threaded => quote! {
             #crate_path::runtime::Builder::new_multi_thread()
         },
     };
     if let Some(v) = config.worker_threads {
-        rt = quote_spanned! {last_stmt_start_span=> #rt.worker_threads(#v) };
+        rt = quote! { #rt.worker_threads(#v) };
     }
     if let Some(v) = config.start_paused {
-        rt = quote_spanned! {last_stmt_start_span=> #rt.start_paused(#v) };
+        rt = quote! { #rt.start_paused(#v) };
     }
     if let Some(v) = config.unhandled_panic {
         let unhandled_panic = v.into_tokens(&crate_path);
-        rt = quote_spanned! {last_stmt_start_span=> #rt.unhandled_panic(#unhandled_panic) };
+        rt = quote! { #rt.unhandled_panic(#unhandled_panic) };
     }
 
     let generated_attrs = if is_test {
@@ -439,7 +426,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
 
     let body_ident = quote! { body };
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
-    let last_block = quote_spanned! {last_stmt_end_span=>
+    let last_block = quote! {
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
         {
             return #rt
@@ -451,6 +438,20 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     };
 
     let body = input.body();
+
+    // We emit a second function for the body to keep diagnostics as close to a user written
+    // async function as possible.
+    let body_function = &Signature {
+        asyncness: Some(asyncness),
+        inputs: Default::default(),
+        ident: {
+            let mut ident = input.sig.ident.clone();
+            ident.set_span(Span::call_site());
+            ident
+        },
+        ..input.sig.clone()
+    };
+    let name = &body_function.ident;
 
     // For test functions pin the body to the stack and use `Pin<&mut dyn
     // Future>` to reduce the amount of `Runtime::block_on` (and related
@@ -470,13 +471,15 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
             syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
         };
         quote! {
-            let body = async #body;
+            #body_function #body
+            let body = #name();
             #crate_path::pin!(body);
             let body: ::core::pin::Pin<&mut dyn ::core::future::Future<Output = #output_type>> = body;
         }
     } else {
         quote! {
-            let body = async #body;
+            #body_function #body
+            let body = #name();
         }
     };
 

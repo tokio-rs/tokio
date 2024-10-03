@@ -6,54 +6,33 @@ error[E0308]: mismatched types
   |
   = note: expected unit type `()`
                   found enum `Result<(), _>`
-help: a return type might be missing here
-  |
-4 | async fn missing_semicolon_or_return_type() -> _ {
-  |                                             ++++
-help: consider using `Result::expect` to unwrap the `Result<(), _>` value, panicking if the value is a `Result::Err`
-  |
-5 |     Ok(()).expect("REASON")
-  |           +++++++++++++++++
 
 error[E0308]: mismatched types
-  --> tests/fail/macros_type_mismatch.rs:10:5
+  --> tests/fail/macros_type_mismatch.rs:10:12
    |
 10 |     return Ok(());
-   |     ^^^^^^^^^^^^^^ expected `()`, found `Result<(), _>`
+   |            ^^^^^^ expected `()`, found `Result<(), _>`
    |
    = note: expected unit type `()`
                    found enum `Result<(), _>`
-help: a return type might be missing here
-   |
-9  | async fn missing_return_type() -> _ {
-   |                                ++++
-help: consider using `Result::expect` to unwrap the `Result<(), _>` value, panicking if the value is a `Result::Err`
-   |
-10 |     return Ok(());.expect("REASON")
-   |                   +++++++++++++++++
 
 error[E0308]: mismatched types
-  --> tests/fail/macros_type_mismatch.rs:23:5
+  --> tests/fail/macros_type_mismatch.rs:14:46
    |
-14 | async fn extra_semicolon() -> Result<(), ()> {
-   |                               -------------- expected `Result<(), ()>` because of return type
-...
-23 |     Ok(());
-   |     ^^^^^^^ expected `Result<(), ()>`, found `()`
+14 |   async fn extra_semicolon() -> Result<(), ()> {
+   |  ______________________________________________^
+15 | |     Ok(());
+   | |           - help: remove this semicolon to return this value
+16 | | }
+   | |_^ expected `Result<(), ()>`, found `()`
    |
    = note:   expected enum `Result<(), ()>`
            found unit type `()`
-help: try adding an expression at the end of the block
-   |
-23 ~     Ok(());;
-24 +     Ok(())
-   |
 
 error[E0308]: mismatched types
-  --> tests/fail/macros_type_mismatch.rs:32:5
+  --> tests/fail/macros_type_mismatch.rs:23:12
    |
-30 | async fn issue_4635() {
+22 | async fn issue_4635() {
    |                      - help: try adding a return type: `-> i32`
-31 |     return 1;
-32 |     ;
-   |     ^ expected `()`, found integer
+23 |     return 1;
+   |            ^ expected `()`, found integer
