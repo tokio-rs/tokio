@@ -295,6 +295,9 @@ impl LocalRuntime {
     /// Shuts down the runtime, waiting for at most `duration` for all spawned
     /// work to stop.
     ///
+    /// Note that `spawn_blocking` tasks, and only `spawn_blocking` tasks, can get left behind if
+    /// the timeout expires.
+    ///
     /// See the [struct level documentation](LocalRuntime#shutdown) for more details.
     ///
     /// # Examples
@@ -333,7 +336,7 @@ impl LocalRuntime {
     ///
     /// Note however, that because we do not wait for any blocking tasks to complete, this
     /// may result in a resource leak (in that any blocking tasks are still running until they
-    /// return.
+    /// return. No other tasks will leak.
     ///
     /// See the [struct level documentation](LocalRuntime#shutdown) for more details.
     ///
