@@ -252,9 +252,15 @@ impl LocalRuntime {
     /// available on creation such as [`Sleep`] or [`TcpStream`]. It will
     /// also allow you to call methods such as [`tokio::spawn`].
     ///
+    /// If this is a handle to a [`LocalRuntime`], and this function is being invoked from the same
+    /// thread that the runtime was created on, you will also be able to call
+    /// [`tokio::task::spawn_local`].
+    ///
     /// [`Sleep`]: struct@crate::time::Sleep
     /// [`TcpStream`]: struct@crate::net::TcpStream
     /// [`tokio::spawn`]: fn@crate::spawn
+    /// [`LocalRuntime`]: struct@crate::runtime::LocalRuntime
+    /// [`tokio::task::spawn_local`]: fn@crate::task::spawn_local
     ///
     /// # Example
     ///
