@@ -1,6 +1,6 @@
 #![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", tokio_unstable))]
+#![cfg(feature = "full")]
 
 #[cfg(not(target_os = "wasi"))]
 use std::error::Error;
