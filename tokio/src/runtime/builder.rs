@@ -807,6 +807,12 @@ impl Builder {
     ///
     /// The returned `LocalRuntime` instance is ready to spawn tasks.
     ///
+    /// # Panics
+    /// This will panic if `current_thread` is not the selected runtime flavor.
+    /// All other runtime flavors are unsupported by [`LocalRuntime`].
+    ///
+    /// [`LocalRuntime`]: [crate::runtime::LocalRuntime]
+    ///
     /// # Examples
     ///
     /// ```
