@@ -149,7 +149,7 @@ impl LocalRuntime {
     {
         // safety: spawn_local can only be called from `LocalRuntime`, which this is
         unsafe {
-            if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
                 self.handle.spawn_local_named(Box::pin(future), None)
             } else {
                 self.handle.spawn_local_named(future, None)
@@ -211,7 +211,7 @@ impl LocalRuntime {
     /// ```
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
-        if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+        if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
             self.block_on_inner(Box::pin(future))
         } else {
             self.block_on_inner(future)
