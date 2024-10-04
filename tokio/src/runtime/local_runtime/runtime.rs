@@ -192,7 +192,7 @@ impl LocalRuntime {
     /// Runs a future to completion on the Tokio runtime. This is the
     /// runtime's entry point.
     ///
-    /// See the documentation for the equivalent method on [Runtime] for more information.
+    /// See the documentation for [the equivalent method on Runtime] for more information.
     ///
     /// [Runtime]: crate::runtime::Runtime::block_on
     ///
