@@ -90,7 +90,7 @@ impl LocalRuntime {
     pub fn new() -> std::io::Result<LocalRuntime> {
         Builder::new_current_thread()
             .enable_all()
-            .build_local(&mut Default::default())
+            .build_local(&Default::default())
     }
 
     /// Returns a handle to the runtime's spawner.
