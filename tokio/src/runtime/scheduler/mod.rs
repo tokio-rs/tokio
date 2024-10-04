@@ -7,6 +7,8 @@ cfg_rt! {
 
     pub(crate) mod inject;
     pub(crate) use inject::Inject;
+
+    use crate::runtime::TaskHooks;
 }
 
 cfg_rt_multi_thread! {
@@ -151,6 +153,16 @@ cfg_rt! {
             }
         }
 
+        pub(crate) fn hooks(&self) -> &TaskHooks {
+            match self {
+                Handle::CurrentThread(h) => &h.task_hooks,
+                #[cfg(feature = "rt-multi-thread")]
+                Handle::MultiThread(h) => &h.task_hooks,
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Handle::MultiThreadAlt(h) => &h.task_hooks,
+            }
+        }
+
         cfg_rt_multi_thread! {
             cfg_unstable! {
                 pub(crate) fn expect_multi_thread_alt(&self) -> &Arc<multi_thread_alt::Handle> {
@@ -176,6 +188,10 @@ cfg_rt! {
 
         pub(crate) fn num_alive_tasks(&self) -> usize {
             match_flavor!(self, Handle(handle) => handle.num_alive_tasks())
+        }
+
+        pub(crate) fn injection_queue_depth(&self) -> usize {
+            match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
         }
     }
 
@@ -203,10 +219,6 @@ cfg_rt! {
 
             pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
                 match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
-            }
-
-            pub(crate) fn injection_queue_depth(&self) -> usize {
-                match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
             }
 
             pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {

@@ -241,7 +241,7 @@ impl Runtime {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+        if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
             self.handle.spawn_named(Box::pin(future), None)
         } else {
             self.handle.spawn_named(future, None)
@@ -329,7 +329,7 @@ impl Runtime {
     /// [handle]: fn@Handle::block_on
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
-        if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+        if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
             self.block_on_inner(Box::pin(future))
         } else {
             self.block_on_inner(future)

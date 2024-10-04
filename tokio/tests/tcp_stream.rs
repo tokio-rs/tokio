@@ -7,11 +7,10 @@ use tokio::try_join;
 use tokio_test::task;
 use tokio_test::{assert_ok, assert_pending, assert_ready_ok};
 
+use std::future::poll_fn;
 use std::io;
 use std::task::Poll;
 use std::time::Duration;
-
-use futures::future::poll_fn;
 
 #[tokio::test]
 async fn set_linger() {

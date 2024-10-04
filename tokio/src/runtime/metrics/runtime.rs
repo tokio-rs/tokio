@@ -70,6 +70,32 @@ impl RuntimeMetrics {
         self.handle.inner.num_alive_tasks()
     }
 
+    /// Returns the number of tasks currently scheduled in the runtime's
+    /// injection queue.
+    ///
+    /// Tasks that are spawned or notified from a non-runtime thread are
+    /// scheduled using the runtime's injection queue. This metric returns the
+    /// **current** number of tasks pending in the injection queue. As such, the
+    /// returned value may increase or decrease as new tasks are scheduled and
+    /// processed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let metrics = Handle::current().metrics();
+    ///
+    ///     let n = metrics.injection_queue_depth();
+    ///     println!("{} tasks currently pending in the runtime's injection queue", n);
+    /// }
+    /// ```
+    pub fn injection_queue_depth(&self) -> usize {
+        self.handle.inner.injection_queue_depth()
+    }
+
     cfg_unstable_metrics! {
 
         /// Returns the number of additional threads spawned by the runtime.
@@ -653,32 +679,6 @@ impl RuntimeMetrics {
                     .overflow_count
                     .load(Relaxed)
             }
-        }
-
-        /// Returns the number of tasks currently scheduled in the runtime's
-        /// injection queue.
-        ///
-        /// Tasks that are spawned or notified from a non-runtime thread are
-        /// scheduled using the runtime's injection queue. This metric returns the
-        /// **current** number of tasks pending in the injection queue. As such, the
-        /// returned value may increase or decrease as new tasks are scheduled and
-        /// processed.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::Handle;
-        ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
-        ///
-        ///     let n = metrics.injection_queue_depth();
-        ///     println!("{} tasks currently pending in the runtime's injection queue", n);
-        /// }
-        /// ```
-        pub fn injection_queue_depth(&self) -> usize {
-            self.handle.inner.injection_queue_depth()
         }
 
         /// Returns the number of tasks currently scheduled in the given worker's

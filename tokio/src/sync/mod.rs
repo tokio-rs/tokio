@@ -431,6 +431,20 @@
 //!   number of permits, which tasks may request in order to enter a critical
 //!   section. Semaphores are useful for implementing limiting or bounding of
 //!   any kind.
+//!
+//! # Runtime compatibility
+//!
+//! All synchronization primitives provided in this module are runtime agnostic.
+//! You can freely move them between different instances of the Tokio runtime
+//! or even use them from non-Tokio runtimes.
+//!
+//! When used in a Tokio runtime, the synchronization primitives participate in
+//! [cooperative scheduling](crate::task#cooperative-scheduling) to avoid
+//! starvation. This feature does not apply when used from non-Tokio runtimes.
+//!
+//! As an exception, methods ending in `_timeout` are not runtime agnostic
+//! because they require access to the Tokio timer. See the documentation of
+//! each `*_timeout` method for more information on its use.
 
 cfg_sync! {
     /// Named future types.

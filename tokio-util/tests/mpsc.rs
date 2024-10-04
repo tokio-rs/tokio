@@ -1,5 +1,5 @@
-use futures::future::poll_fn;
 use futures::sink::SinkExt;
+use std::future::poll_fn;
 use tokio::sync::mpsc::channel;
 use tokio_test::task::spawn;
 use tokio_test::{

@@ -8,10 +8,10 @@
 //! split has no associated overhead and enforces all invariants at the type
 //! level.
 
-use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite, Interest, ReadBuf, Ready};
 use crate::net::TcpStream;
 
+use std::future::poll_fn;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
@@ -69,7 +69,7 @@ impl ReadHalf<'_> {
     /// use tokio::io::{self, ReadBuf};
     /// use tokio::net::TcpStream;
     ///
-    /// use futures::future::poll_fn;
+    /// use std::future::poll_fn;
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {

@@ -8,8 +8,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::Context;
-use std::task::Poll;
+use std::task::{ready, Context, Poll};
 
 #[cfg(test)]
 use super::mocks::spawn_blocking;
@@ -77,7 +76,7 @@ impl ReadDir {
     ///
     /// This method is cancellation safe.
     pub async fn next_entry(&mut self) -> io::Result<Option<DirEntry>> {
-        use crate::future::poll_fn;
+        use std::future::poll_fn;
         poll_fn(|cx| self.poll_next_entry(cx)).await
     }
 

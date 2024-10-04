@@ -12,7 +12,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr as StdSocketAddr};
 use std::path::Path;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 cfg_net_unix! {
     /// A Unix socket which can accept connections from other Unix sockets.
@@ -81,7 +81,7 @@ impl UnixListener {
         let addr = {
             let os_str_bytes = path.as_ref().as_os_str().as_bytes();
             if os_str_bytes.starts_with(b"\0") {
-                StdSocketAddr::from_abstract_name(os_str_bytes)?
+                StdSocketAddr::from_abstract_name(&os_str_bytes[1..])?
             } else {
                 StdSocketAddr::from_pathname(path)?
             }

@@ -1,10 +1,9 @@
 //! Compatibility between the `tokio::io` and `futures-io` versions of the
 //! `AsyncRead` and `AsyncWrite` traits.
-use futures_core::ready;
 use pin_project_lite::pin_project;
 use std::io;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 pin_project! {
     /// A compatibility layer that allows conversion between the

@@ -14,8 +14,7 @@ use std::io::{self, Seek, SeekFrom};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::Context;
-use std::task::Poll;
+use std::task::{ready, Context, Poll};
 
 #[cfg(test)]
 use super::mocks::JoinHandle;
@@ -937,7 +936,7 @@ cfg_windows! {
 
 impl Inner {
     async fn complete_inflight(&mut self) {
-        use crate::future::poll_fn;
+        use std::future::poll_fn;
 
         poll_fn(|cx| self.poll_complete_inflight(cx)).await;
     }

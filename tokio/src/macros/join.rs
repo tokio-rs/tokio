@@ -1,60 +1,72 @@
-/// Waits on multiple concurrent branches, returning when **all** branches
-/// complete.
-///
-/// The `join!` macro must be used inside of async functions, closures, and
-/// blocks.
-///
-/// The `join!` macro takes a list of async expressions and evaluates them
-/// concurrently on the same task. Each async expression evaluates to a future
-/// and the futures from each expression are multiplexed on the current task.
-///
-/// When working with async expressions returning `Result`, `join!` will wait
-/// for **all** branches complete regardless if any complete with `Err`. Use
-/// [`try_join!`] to return early when `Err` is encountered.
-///
-/// [`try_join!`]: crate::try_join
-///
-/// # Notes
-///
-/// The supplied futures are stored inline and do not require allocating a
-/// `Vec`.
-///
-/// ### Runtime characteristics
-///
-/// By running all async expressions on the current task, the expressions are
-/// able to run **concurrently** but not in **parallel**. This means all
-/// expressions are run on the same thread and if one branch blocks the thread,
-/// all other expressions will be unable to continue. If parallelism is
-/// required, spawn each async expression using [`tokio::spawn`] and pass the
-/// join handle to `join!`.
-///
-/// [`tokio::spawn`]: crate::spawn
-///
-/// # Examples
-///
-/// Basic join with two branches
-///
-/// ```
-/// async fn do_stuff_async() {
-///     // async work
-/// }
-///
-/// async fn more_async_work() {
-///     // more here
-/// }
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let (first, second) = tokio::join!(
-///         do_stuff_async(),
-///         more_async_work());
-///
-///     // do something with the values
-/// }
-/// ```
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-macro_rules! join {
+macro_rules! doc {
+    ($join:item) => {
+        /// Waits on multiple concurrent branches, returning when **all** branches
+        /// complete.
+        ///
+        /// The `join!` macro must be used inside of async functions, closures, and
+        /// blocks.
+        ///
+        /// The `join!` macro takes a list of async expressions and evaluates them
+        /// concurrently on the same task. Each async expression evaluates to a future
+        /// and the futures from each expression are multiplexed on the current task.
+        ///
+        /// When working with async expressions returning `Result`, `join!` will wait
+        /// for **all** branches complete regardless if any complete with `Err`. Use
+        /// [`try_join!`] to return early when `Err` is encountered.
+        ///
+        /// [`try_join!`]: crate::try_join
+        ///
+        /// # Notes
+        ///
+        /// The supplied futures are stored inline and do not require allocating a
+        /// `Vec`.
+        ///
+        /// ### Runtime characteristics
+        ///
+        /// By running all async expressions on the current task, the expressions are
+        /// able to run **concurrently** but not in **parallel**. This means all
+        /// expressions are run on the same thread and if one branch blocks the thread,
+        /// all other expressions will be unable to continue. If parallelism is
+        /// required, spawn each async expression using [`tokio::spawn`] and pass the
+        /// join handle to `join!`.
+        ///
+        /// [`tokio::spawn`]: crate::spawn
+        ///
+        /// # Examples
+        ///
+        /// Basic join with two branches
+        ///
+        /// ```
+        /// async fn do_stuff_async() {
+        ///     // async work
+        /// }
+        ///
+        /// async fn more_async_work() {
+        ///     // more here
+        /// }
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let (first, second) = tokio::join!(
+        ///         do_stuff_async(),
+        ///         more_async_work());
+        ///
+        ///     // do something with the values
+        /// }
+        /// ```
+        #[macro_export]
+        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        $join
+    };
+}
+
+#[cfg(doc)]
+doc! {macro_rules! join {
+    ($($future:expr),*) => { unimplemented!() }
+}}
+
+#[cfg(not(doc))]
+doc! {macro_rules! join {
     (@ {
         // One `_` for each branch in the `join!` macro. This is not used once
         // normalization is complete.
@@ -163,4 +175,4 @@ macro_rules! join {
     };
 
     () => { async {}.await }
-}
+}}

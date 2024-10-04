@@ -156,6 +156,46 @@ fn runtime_gone() {
         .is_cancelled());
 }
 
+#[tokio::test]
+async fn join_all() {
+    let mut set: JoinSet<i32> = JoinSet::new();
+
+    for _ in 0..5 {
+        set.spawn(async { 1 });
+    }
+    let res: Vec<i32> = set.join_all().await;
+
+    assert_eq!(res.len(), 5);
+    for itm in res.into_iter() {
+        assert_eq!(itm, 1)
+    }
+}
+
+#[cfg(panic = "unwind")]
+#[tokio::test(start_paused = true)]
+async fn task_panics() {
+    let mut set: JoinSet<()> = JoinSet::new();
+
+    let (tx, mut rx) = oneshot::channel();
+    assert_eq!(set.len(), 0);
+
+    set.spawn(async move {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        tx.send(()).unwrap();
+    });
+    assert_eq!(set.len(), 1);
+
+    set.spawn(async {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        panic!();
+    });
+    assert_eq!(set.len(), 2);
+
+    let panic = tokio::spawn(set.join_all()).await.unwrap_err();
+    assert!(rx.try_recv().is_err());
+    assert!(panic.is_panic());
+}
+
 #[tokio::test(start_paused = true)]
 async fn abort_all() {
     let mut set: JoinSet<()> = JoinSet::new();

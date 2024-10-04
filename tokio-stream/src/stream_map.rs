@@ -1,9 +1,10 @@
-use crate::{poll_fn, Stream};
+use crate::Stream;
 
 use std::borrow::Borrow;
+use std::future::poll_fn;
 use std::hash::Hash;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 /// Combine many streams into one, indexing each source stream with a unique
 /// key.

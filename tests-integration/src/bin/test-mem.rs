@@ -1,4 +1,4 @@
-use futures::future::poll_fn;
+use std::future::poll_fn;
 
 fn main() {
     let rt = tokio::runtime::Builder::new_multi_thread()

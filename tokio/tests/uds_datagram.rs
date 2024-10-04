@@ -2,11 +2,11 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
 
-use futures::future::poll_fn;
 use tokio::io::ReadBuf;
 use tokio::net::UnixDatagram;
 use tokio::try_join;
 
+use std::future::poll_fn;
 use std::io;
 use std::sync::Arc;
 

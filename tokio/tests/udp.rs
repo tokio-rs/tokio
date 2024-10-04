@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support bind or UDP
 
-use futures::future::poll_fn;
+use std::future::poll_fn;
 use std::io;
 use std::sync::Arc;
 use tokio::{io::ReadBuf, net::UdpSocket};
