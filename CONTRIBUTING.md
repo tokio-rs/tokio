@@ -200,7 +200,7 @@ run loom tests that test unstable features.
 
 You can run miri tests with
 ```
-MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-tag-raw-pointers" \
+MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields" \
     cargo +nightly miri test --features full --lib
 ```
 
