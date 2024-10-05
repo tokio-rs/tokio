@@ -430,13 +430,22 @@
 //! Enabling any other feature (including `full`) will cause a compilation
 //! failure.
 //!
+//! Note that not all API's are guaranteed to work correctly.
+//! We document some specific issues below.
+//! All failures should be easy to detect, such as panics or runtime errors, silent failure is considered a bug.
+//!
 //! The `time` module will only work on `WASM` platforms that have support for
 //! timers (e.g. wasm32-wasi). The timing functions will panic if used on a `WASM`
 //! platform that does not support timers.
 //!
-//! Note also that if the runtime becomes indefinitely idle, it will panic
-//! immediately instead of blocking forever. On platforms that don't support
+//! Note also that if the runtime becomes indefinitely idle, that will lead to errors
+//! instead of blocking forever. On platforms that don't support
 //! time, this means that the runtime can never be idle in any way.
+//!
+//! In particular running:
+//! * most applications (e.g. eframe) in a tokio runtime on the browser main thread will fail.
+//! * a current-thread runtime in a web-worker is doable.
+//! * a [`task::LocalSet`] on the browser main thread inside of a future - created e.g. by wasm_bindgen_futures - is doable.
 //!
 //! ### Unstable `WASM` support
 //!
