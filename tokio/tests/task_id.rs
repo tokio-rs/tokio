@@ -273,7 +273,7 @@ async fn task_id_block_in_place_block_on_spawn() {
     .unwrap();
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(panic = "unwind")]
 #[test]
 fn task_id_outside_task_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
@@ -286,7 +286,7 @@ fn task_id_outside_task_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(panic = "unwind")]
 #[test]
 fn task_id_inside_block_on_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
