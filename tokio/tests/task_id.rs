@@ -273,8 +273,8 @@ async fn task_id_block_in_place_block_on_spawn() {
     .unwrap();
 }
 
-#[cfg(panic = "unwind")]
 #[test]
+#[cfg_attr(not(panic = "unwind"), ignore)]
 fn task_id_outside_task_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = task::id();
@@ -286,8 +286,8 @@ fn task_id_outside_task_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(panic = "unwind")]
 #[test]
+#[cfg_attr(not(panic = "unwind"), ignore)]
 fn task_id_inside_block_on_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = Runtime::new().unwrap();
