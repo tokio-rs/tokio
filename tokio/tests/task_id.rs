@@ -2,21 +2,17 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-#[cfg(not(target_os = "wasi"))]
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-#[cfg(not(target_os = "wasi"))]
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use tokio::task::{self, Id, LocalSet};
 
-#[cfg(not(target_os = "wasi"))]
 mod support {
     pub mod panic;
 }
-#[cfg(not(target_os = "wasi"))]
 use support::panic::test_panic;
 
 #[tokio::test(flavor = "current_thread")]
@@ -256,6 +252,8 @@ async fn task_id_nested_spawn_local() {
 #[cfg(not(target_os = "wasi"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn task_id_block_in_place_block_on_spawn() {
+    use tokio::runtime::Builder;
+
     task::spawn(async {
         let parent_id = task::id();
 
