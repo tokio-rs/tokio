@@ -8,8 +8,7 @@
 //!
 //! This type must be used from within the context of the `Runtime`.
 
-use futures_core::Future;
-use std::time::Duration;
+use core::{future::Future, time::Duration};
 use tokio::time::Timeout;
 
 mod wheel;
