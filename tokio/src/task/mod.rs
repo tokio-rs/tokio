@@ -359,9 +359,7 @@ cfg_rt! {
     #[cfg(tokio_unstable)]
     pub mod join_set;
 
-    cfg_unstable! {
-        pub use crate::runtime::task::{Id, id, try_id};
-    }
+    pub use crate::runtime::task::{Id, id, try_id};
 
     cfg_trace! {
         mod builder;
