@@ -1,7 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(miri)))]
 
-
 use tokio::io::AsyncReadExt;
 
 #[tokio::test]

@@ -1,7 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(miri)))]
 
-
 // All io tests that deal with shutdown is currently ignored because there are known bugs in with
 // shutting down the io driver while concurrently registering new resources. See
 // https://github.com/tokio-rs/tokio/pull/3569#pullrequestreview-612703467 for more details.

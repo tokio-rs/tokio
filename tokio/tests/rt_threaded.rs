@@ -1,6 +1,6 @@
 #![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
-// Too slow on miri. 
+// Too slow on miri.
 #![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -324,7 +324,7 @@ fn start_stop_callbacks_called() {
 
 #[test]
 // too slow on miri
-#[cfg_attr(miri, ignore)] 
+#[cfg_attr(miri, ignore)]
 fn blocking() {
     // used for notifying the main thread
     const NUM: usize = 1_000;
