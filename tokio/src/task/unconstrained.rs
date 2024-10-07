@@ -34,6 +34,31 @@ where
     }
 }
 
+impl<F: Future> Unconstrained<F>
+where
+    F: Future,
+{
+    /// Gets a reference to the wrapped future.
+    pub fn get_ref(&self) -> &F {
+        &self.inner
+    }
+
+    /// Gets a mutable reference to the wrapped future.
+    pub fn get_mut(&mut self) -> &mut F {
+        &mut self.inner
+    }
+
+    /// Gets a pinned mutable reference to the wrapped future.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut F> {
+        self.project().inner
+    }
+
+    /// Consumes `Unconstrained`, returning the wrapped future.
+    pub fn into_inner(self) -> F {
+        self.inner
+    }
+}
+
 /// Turn off cooperative scheduling for a future. The future will never be forced to yield by
 /// Tokio. Using this exposes your service to starvation if the unconstrained future never yields
 /// otherwise.
