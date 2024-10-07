@@ -372,6 +372,9 @@ cfg_rt! {
 
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
+
+        mod local_runtime;
+        pub use local_runtime::{LocalRuntime, LocalOptions};
     }
 
     cfg_taskdump! {
