@@ -6,6 +6,7 @@ use crate::runtime;
 use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task, TaskHarnessScheduleHooks};
 use crate::runtime::{context, ThreadId, BOX_FUTURE_THRESHOLD};
 use crate::sync::AtomicWaker;
+use crate::util::trace::SpawnMeta;
 use crate::util::RcCell;
 
 use std::cell::Cell;
@@ -13,6 +14,7 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::mem;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Poll;
@@ -367,22 +369,23 @@ cfg_rt! {
         F: Future + 'static,
         F::Output: 'static,
     {
-        if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
-            spawn_local_inner(Box::pin(future), None)
+        let fut_size = std::mem::size_of::<F>();
+        if fut_size > BOX_FUTURE_THRESHOLD {
+            spawn_local_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
-            spawn_local_inner(future, None)
+            spawn_local_inner(future, SpawnMeta::new_unnamed(fut_size))
         }
     }
 
 
     #[track_caller]
-    pub(super) fn spawn_local_inner<F>(future: F, name: Option<&str>) -> JoinHandle<F::Output>
+    pub(super) fn spawn_local_inner<F>(future: F, meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
     where F: Future + 'static,
           F::Output: 'static
     {
         match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
             None => panic!("`spawn_local` called from outside of a `task::LocalSet`"),
-            Some(cx) => cx.spawn(future, name)
+            Some(cx) => cx.spawn(future, meta)
        }
     }
 }
@@ -521,7 +524,12 @@ impl LocalSet {
         F: Future + 'static,
         F::Output: 'static,
     {
-        self.spawn_named(future, None)
+        let fut_size = mem::size_of::<F>();
+        if fut_size > BOX_FUTURE_THRESHOLD {
+            self.spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+        } else {
+            self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
+        }
     }
 
     /// Runs a future to completion on the provided runtime, driving any local
@@ -643,26 +651,22 @@ impl LocalSet {
     pub(in crate::task) fn spawn_named<F>(
         &self,
         future: F,
-        name: Option<&str>,
+        meta: SpawnMeta<'_>,
     ) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,
     {
-        if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
-            self.spawn_named_inner(Box::pin(future), name)
-        } else {
-            self.spawn_named_inner(future, name)
-        }
+        self.spawn_named_inner(future, meta)
     }
 
     #[track_caller]
-    fn spawn_named_inner<F>(&self, future: F, name: Option<&str>) -> JoinHandle<F::Output>
+    fn spawn_named_inner<F>(&self, future: F, meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,
     {
-        let handle = self.context.spawn(future, name);
+        let handle = self.context.spawn(future, meta);
 
         // Because a task was spawned from *outside* the `LocalSet`, wake the
         // `LocalSet` future to execute the new task, if it hasn't been woken.
@@ -949,13 +953,13 @@ impl Drop for LocalSet {
 
 impl Context {
     #[track_caller]
-    fn spawn<F>(&self, future: F, name: Option<&str>) -> JoinHandle<F::Output>
+    fn spawn<F>(&self, future: F, meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,
     {
         let id = crate::runtime::task::Id::next();
-        let future = crate::util::trace::task(future, "local", name, id.as_u64());
+        let future = crate::util::trace::task(future, "local", meta, id.as_u64());
 
         // Safety: called from the thread that owns the `LocalSet`
         let (handle, notified) = {
