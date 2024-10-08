@@ -10,7 +10,6 @@ use std::task::{Context, Poll};
 use std::{fmt, panic};
 
 use crate::runtime::Handle;
-#[cfg(tokio_unstable)]
 use crate::task::Id;
 use crate::task::{unconstrained, AbortHandle, JoinError, JoinHandle, LocalSet};
 use crate::util::IdleNotifiedSet;
@@ -300,8 +299,6 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// [task ID]: crate::task::Id
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub async fn join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         std::future::poll_fn(|cx| self.poll_join_next_with_id(cx)).await
     }
@@ -338,8 +335,6 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// [task ID]: crate::task::Id
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn try_join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         // Loop over all notified `JoinHandle`s to find one that's ready, or until none are left.
         loop {
@@ -544,8 +539,6 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// [coop budget]: crate::task#cooperative-scheduling
     /// [task ID]: crate::task::Id
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn poll_join_next_with_id(
         &mut self,
         cx: &mut Context<'_>,
