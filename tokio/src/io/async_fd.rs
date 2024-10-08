@@ -702,6 +702,13 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// concurrently with other methods on this struct. This method only
     /// provides shared access to the inner IO resource when handling the
     /// [`AsyncFdReadyGuard`].
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn readable<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
         self.ready(Interest::READABLE).await
@@ -713,6 +720,13 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// This method takes `&mut self`, so it is possible to access the inner IO
     /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn readable_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
         self.ready_mut(Interest::READABLE).await
@@ -726,6 +740,13 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// concurrently with other methods on this struct. This method only
     /// provides shared access to the inner IO resource when handling the
     /// [`AsyncFdReadyGuard`].
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn writable<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
         self.ready(Interest::WRITABLE).await
@@ -737,6 +758,13 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// This method takes `&mut self`, so it is possible to access the inner IO
     /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn writable_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
         self.ready_mut(Interest::WRITABLE).await
