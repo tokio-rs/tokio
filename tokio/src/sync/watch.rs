@@ -58,6 +58,15 @@
 //!
 //! # Examples
 //!
+//! The following example borrows values as they arrive in channel:
+//!
+//! ```
+//! while recv.changed().await.is_ok() {
+//!     let value = recv.borrow();
+//!     // use value
+//! }
+//! // reaching this line means all senders are dropped
+//!````
 //! The following example prints `hello! world! `.
 //!
 //! ```
