@@ -29,7 +29,7 @@
 //! [`AsyncFd`]: crate::io::unix::AsyncFd
 
 mod addr;
-cfg_not_wasi! {
+cfg_not_wasip1! {
     #[cfg(feature = "net")]
     pub(crate) use addr::to_socket_addrs;
 }
