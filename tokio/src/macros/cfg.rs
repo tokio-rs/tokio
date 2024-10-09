@@ -647,6 +647,15 @@ macro_rules! cfg_not_wasi {
     }
 }
 
+macro_rules! cfg_not_wasip1 {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(not(target_os = "wasi"), target_env = "p2"))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_is_wasm_not_wasi {
     ($($item:item)*) => {
         $(
