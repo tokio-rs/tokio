@@ -96,7 +96,7 @@ mio = { version = "1.0.1", optional = true, default-features = false }
 parking_lot = { version = "0.12.0", optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-socket2 = { version = "0.5.5", optional = true, features = [ "all" ] }
+socket2 = { version = "0.5.5", optional = true, features = ["all"] }
 
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
@@ -123,8 +123,8 @@ optional = true
 [target.'cfg(windows)'.dev-dependencies.windows-sys]
 version = "0.52"
 features = [
-    "Win32_Foundation",
-    "Win32_Security_Authorization",
+  "Win32_Foundation",
+  "Win32_Security_Authorization",
 ]
 
 [dev-dependencies]
@@ -137,6 +137,7 @@ async-stream = "0.3"
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 socket2 = "0.5.5"
 tempfile = "3.1.0"
+proptest = "1"
 
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dev-dependencies]
 rand = "0.8.0"
@@ -165,8 +166,7 @@ features = ["full", "test-util"]
 # The following are types that are allowed to be exposed in Tokio's public API.
 # The standard library is allowed by default.
 allowed_external_types = [
-   "bytes::buf::buf_impl::Buf",
-   "bytes::buf::buf_mut::BufMut",
-
-   "tokio_macros::*",
+  "bytes::buf::buf_impl::Buf",
+  "bytes::buf::buf_mut::BufMut",
+  "tokio_macros::*",
 ]
