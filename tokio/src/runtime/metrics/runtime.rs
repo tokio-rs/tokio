@@ -760,7 +760,7 @@ impl RuntimeMetrics {
         /// task poll times.
         ///
         /// This value is configured by calling
-        /// [`metrics_poll_count_histogram_buckets()`] when building the runtime.
+        /// [`metrics_poll_count_histogram_configuration()`] when building the runtime.
         ///
         /// # Examples
         ///
@@ -781,8 +781,8 @@ impl RuntimeMetrics {
         /// }
         /// ```
         ///
-        /// [`metrics_poll_count_histogram_buckets()`]:
-        ///     crate::runtime::Builder::metrics_poll_count_histogram_buckets
+        /// [`metrics_poll_count_histogram_configuration()`]:
+        ///     crate::runtime::Builder::metrics_poll_count_histogram_configuration
         pub fn poll_count_histogram_num_buckets(&self) -> usize {
             self.handle
                 .inner
@@ -796,7 +796,7 @@ impl RuntimeMetrics {
         /// Returns the range of task poll times tracked by the given bucket.
         ///
         /// This value is configured by calling
-        /// [`metrics_poll_count_histogram_resolution()`] when building the runtime.
+        /// [`metrics_poll_count_histogram_configuration()`] when building the runtime.
         ///
         /// # Panics
         ///
@@ -825,8 +825,8 @@ impl RuntimeMetrics {
         /// }
         /// ```
         ///
-        /// [`metrics_poll_count_histogram_resolution()`]:
-        ///     crate::runtime::Builder::metrics_poll_count_histogram_resolution
+        /// [`metrics_poll_count_histogram_configuration()`]:
+        ///     crate::runtime::Builder::metrics_poll_count_histogram_configuration
         #[track_caller]
         pub fn poll_count_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
             self.handle

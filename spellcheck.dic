@@ -1,4 +1,4 @@
-287
+292
 &
 +
 <
@@ -12,13 +12,16 @@
 0xA
 0xD
 100ms
+100ns
 10ms
+12.5%
 ~12
 ±1m
 ±1ms
 1ms
 1s
 250ms
+25%
 2x
 ~4
 443
@@ -117,7 +120,9 @@ goroutines
 Growable
 gzip
 hashmaps
+H2
 HashMaps
+HdrHistogram
 hashsets
 ie
 Illumos
