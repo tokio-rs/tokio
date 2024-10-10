@@ -143,7 +143,6 @@ rt_test! {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore)]
     fn fs_shutdown_before_started() {
         let rt = rt();
         let _enter = rt.enter();
@@ -176,7 +175,6 @@ rt_test! {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore)]
     fn spawn_blocking_after_shutdown_fails() {
         use tokio::task::spawn_blocking;
         let rt = rt();
