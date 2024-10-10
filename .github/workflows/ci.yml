@@ -17,6 +17,8 @@ env:
   # Change to specific Rust release to pin
   rust_stable: stable
   rust_nightly: nightly-2024-05-05
+  # Pin a specific miri version
+  rust_miri_nightly: nightly-2024-09-19
   rust_clippy: '1.77'
   # When updating this, also update:
   # - README.md
@@ -413,16 +415,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust ${{ env.rust_nightly }}
+      - name: Install Rust ${{ env.rust_miri_nightly }}
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_miri_nightly }}
           components: miri
       - uses: Swatinem/rust-cache@v2
       - name: miri
         run: |
-          rustup toolchain install nightly-2024-09-19 --component miri --profile minimal --no-self-update
-          rustup override set nightly
           cargo miri test --features full --lib --tests --no-fail-fast
         working-directory: tokio
         env:
