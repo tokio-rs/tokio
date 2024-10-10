@@ -122,6 +122,34 @@ impl<T: Future> Spawn<T> {
         let fut = self.future.as_mut();
         self.task.enter(|cx| fut.poll(cx))
     }
+
+    /// Run a future to completion on the current thread.
+    ///
+    /// This function will block the caller until the given future has completed.
+    ///
+    /// Note: This does not create a Tokio runtime, and therefore does not support
+    /// Tokio-specific asynchronous APIs, such as [tokio::time::sleep].
+    pub fn block_on(&mut self) -> T::Output {
+        loop {
+            match self.poll() {
+                Poll::Ready(val) => return val,
+                Poll::Pending => {
+                    let mut guard = self.task.waker.state.lock().unwrap();
+                    let state = *guard;
+
+                    if state == WAKE {
+                        continue;
+                    }
+
+                    assert_eq!(state, IDLE);
+                    *guard = SLEEP;
+                    let guard = self.task.waker.condvar.wait(guard).unwrap();
+                    assert_eq!(*guard, WAKE);
+                    drop(guard);
+                }
+            };
+        }
+    }
 }
 
 impl<T: Stream> Spawn<T> {
