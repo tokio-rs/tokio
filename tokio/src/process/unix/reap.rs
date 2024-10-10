@@ -21,6 +21,8 @@ where
     inner: Option<W>,
     orphan_queue: Q,
     signal: S,
+    #[cfg(feature = "time")]
+    interval: Option<crate::time::Interval>,
 }
 
 impl<W, Q, S> Deref for Reaper<W, Q, S>
@@ -45,6 +47,12 @@ where
             inner: Some(inner),
             orphan_queue,
             signal,
+            #[cfg(feature = "time")]
+            interval: crate::runtime::scheduler::Handle::current()
+                .driver()
+                .time
+                .as_ref()
+                .map(|_| crate::time::interval(std::time::Duration::from_secs(1))),
         }
     }
 
@@ -85,6 +93,26 @@ where
             // futures model allows for spurious wake ups this extra wakeup
             // should not cause significant issues with parent futures.
             let registered_interest = self.signal.poll_recv(cx).is_pending();
+
+            // Signals may coalesce. SIGCHLD is a standard signal.
+            // According to man signal(7):
+            // > Standard signals do not queue. If multiple instances of a standard signal
+            // > are generated while that signal is blocked, then only one instance of
+            // > the signal is marked as pending (and the signal will be delivered
+            // > just once when it is unblocked).
+            // This means the SIGCHLD we are waiting for may be overwritten by
+            // another signal like SIGHUP or whatever,
+            // and in this case no one is going to wake us up to poll for maybe a long period.
+            // Hence, besides polling on signal, here we do a polling at an interval of one second
+            // as well. This makes sure we will not oversleep longer than one second.
+            // The result of `poll_tick` does not matter: the only thing necessary
+            // is to give it `cx` to let it wake us up.
+            // This "timed wait" approach is also used by tini, which is used by Docker as `init`.
+            #[cfg(feature = "time")]
+            let _ = self
+                .interval
+                .as_mut()
+                .map(|interval| interval.poll_tick(cx));
 
             if let Some(status) = self.inner_mut().try_wait()? {
                 return Poll::Ready(Ok(status));
