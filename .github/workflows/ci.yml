@@ -420,10 +420,14 @@ jobs:
         with:
           toolchain: ${{ env.rust_miri_nightly }}
           components: miri
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
       - name: miri
         run: |
-          cargo miri test --features full --lib --tests --no-fail-fast
+          cargo miri nextest run --features full --lib --tests --no-fail-fast
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
