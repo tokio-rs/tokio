@@ -1336,6 +1336,29 @@ impl<T> Sender<T> {
         self.shared.ref_count_rx.load(Relaxed)
     }
 
+    /// Returns the number of senders that currently exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx1, rx) = watch::channel("hello");
+    ///
+    ///     assert_eq!(1, tx1.sender_count());
+    ///
+    ///     let tx2 = tx1.clone();
+    ///
+    ///     assert_eq!(2, tx1.sender_count());
+    ///     assert_eq!(2, tx2.sender_count());
+    /// }
+    /// ```
+    pub fn sender_count(&self) -> usize {
+        self.shared.ref_count_tx.load(Relaxed)
+    }
+
     /// Returns `true` if senders belong to the same channel.
     ///
     /// # Examples
