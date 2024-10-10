@@ -421,6 +421,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: miri
         run: |
+          rustup toolchain install nightly nightly-2024-09-19 --component miri --profile minimal --no-self-update
+          rustup override set nightly
           cargo miri test --features full --lib --tests --no-fail-fast
         working-directory: tokio
         env:
