@@ -407,7 +407,7 @@ cfg_rt! {
     pub use metrics::RuntimeMetrics;
 
     cfg_unstable_metrics! {
-        pub use metrics::HistogramScale;
+        pub use metrics::{HistogramScale, HistogramConfiguration, LogHistogram, LogHistogramBuilder, InvalidHistogramConfiguration} ;
 
         cfg_net! {
             pub(crate) use metrics::IoDriverMetrics;
