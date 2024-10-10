@@ -92,6 +92,7 @@ async fn single_short_delay() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Too slow on miri.
 async fn multi_delay_at_start() {
     time::pause();
 

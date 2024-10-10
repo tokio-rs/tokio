@@ -680,6 +680,7 @@ async fn try_reserve_many_on_closed_channel() {
 }
 
 #[maybe_tokio_test]
+#[cfg_attr(miri, ignore)] // Too slow on miri.
 async fn try_reserve_many_full() {
     // Reserve n capacity and send k messages
     for n in 1..100 {

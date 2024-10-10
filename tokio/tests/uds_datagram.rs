@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(unix)]
+#![cfg(not(miri))]
 
 use tokio::io::ReadBuf;
 use tokio::net::UnixDatagram;

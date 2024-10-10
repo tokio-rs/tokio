@@ -1,6 +1,7 @@
 #![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
+#![cfg(not(miri))] // Possible bug on Miri.
 
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;

@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))]
+#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))]
 #![cfg(panic = "unwind")]
 
 use std::error::Error;

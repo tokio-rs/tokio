@@ -5,6 +5,7 @@ use tempfile::tempdir;
 use tokio::fs;
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)]
 async fn copy() {
     let dir = tempdir().unwrap();
 
@@ -21,6 +22,7 @@ async fn copy() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)]
 async fn copy_permissions() {
     let dir = tempdir().unwrap();
     let from_path = dir.path().join("foo.txt");

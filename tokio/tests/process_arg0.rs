@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", unix))]
+#![cfg(all(feature = "full", unix, not(miri)))]
 
 use tokio::process::Command;
 

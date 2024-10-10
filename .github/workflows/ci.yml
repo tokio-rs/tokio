@@ -17,6 +17,8 @@ env:
   # Change to specific Rust release to pin
   rust_stable: stable
   rust_nightly: nightly-2024-05-05
+  # Pin a specific miri version
+  rust_miri_nightly: nightly-2024-09-19
   rust_clippy: '1.77'
   # When updating this, also update:
   # - README.md
@@ -413,17 +415,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust ${{ env.rust_nightly }}
+      - name: Install Rust ${{ env.rust_miri_nightly }}
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_miri_nightly }}
           components: miri
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
       - name: miri
-        # Many of tests in tokio/tests and doctests use #[tokio::test] or
-        # #[tokio::main] that calls epoll_create1 that Miri does not support.
         run: |
-          cargo miri test --features full --lib --no-fail-fast
+          cargo miri nextest run --features full --lib --tests --no-fail-fast
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields

@@ -79,6 +79,7 @@ async fn read_to_end_uninit() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // too slow with miri
 async fn read_to_end_doesnt_grow_with_capacity() {
     let arr: Vec<u8> = (0..100).collect();
 

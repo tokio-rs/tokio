@@ -1,5 +1,6 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
+#![cfg(not(miri))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
 use tokio::net::unix::pipe;
