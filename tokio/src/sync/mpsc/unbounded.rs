@@ -165,7 +165,7 @@ impl<T> UnboundedReceiver<T> {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<T> {
-        use crate::future::poll_fn;
+        use std::future::poll_fn;
 
         poll_fn(|cx| self.poll_recv(cx)).await
     }
@@ -239,7 +239,7 @@ impl<T> UnboundedReceiver<T> {
     /// }
     /// ```
     pub async fn recv_many(&mut self, buffer: &mut Vec<T>, limit: usize) -> usize {
-        use crate::future::poll_fn;
+        use std::future::poll_fn;
         poll_fn(|cx| self.chan.recv_many(cx, buffer, limit)).await
     }
 

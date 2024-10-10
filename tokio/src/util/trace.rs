@@ -1,34 +1,110 @@
-cfg_trace! {
-    cfg_rt! {
+cfg_rt! {
+    use std::marker::PhantomData;
+
+    pub(crate) struct SpawnMeta<'a> {
+        /// The name of the task
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        pub(crate) name: Option<&'a str>,
+        /// The original size of the future or function being spawned
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        pub(crate) original_size: usize,
+        _pd: PhantomData<&'a ()>,
+    }
+
+    impl<'a> SpawnMeta<'a> {
+        /// Create new spawn meta with a name and original size (before possible auto-boxing)
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        pub(crate) fn new(name: Option<&'a str>, original_size: usize) -> Self {
+            Self {
+                name,
+                original_size,
+                _pd: PhantomData,
+            }
+        }
+
+        /// Create a new unnamed spawn meta with the original size (before possible auto-boxing)
+        pub(crate) fn new_unnamed(original_size: usize) -> Self {
+            #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+            let _original_size = original_size;
+
+            Self {
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                name: None,
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                original_size,
+                _pd: PhantomData,
+            }
+        }
+    }
+
+    cfg_trace! {
         use core::{
             pin::Pin,
             task::{Context, Poll},
         };
         use pin_project_lite::pin_project;
+        use std::mem;
         use std::future::Future;
+        use tracing::instrument::Instrument;
         pub(crate) use tracing::instrument::Instrumented;
 
         #[inline]
         #[track_caller]
-        pub(crate) fn task<F>(task: F, kind: &'static str, name: Option<&str>, id: u64) -> Instrumented<F> {
+        pub(crate) fn task<F>(task: F, kind: &'static str, meta: SpawnMeta<'_>, id: u64) -> Instrumented<F> {
             #[track_caller]
-            fn get_span(kind: &'static str, name: Option<&str>, id: u64) -> tracing::Span {
+            fn get_span(kind: &'static str, spawn_meta: SpawnMeta<'_>, id: u64, task_size: usize) -> tracing::Span {
                 let location = std::panic::Location::caller();
+                let original_size = if spawn_meta.original_size != task_size {
+                    Some(spawn_meta.original_size)
+                } else {
+                    None
+                };
                 tracing::trace_span!(
                     target: "tokio::task",
                     parent: None,
                     "runtime.spawn",
                     %kind,
-                    task.name = %name.unwrap_or_default(),
+                    task.name = %spawn_meta.name.unwrap_or_default(),
                     task.id = id,
+                    original_size.bytes = original_size,
+                    size.bytes = task_size,
                     loc.file = location.file(),
                     loc.line = location.line(),
                     loc.col = location.column(),
                 )
             }
             use tracing::instrument::Instrument;
-            let span = get_span(kind, name, id);
+            let span = get_span(kind, meta, id, mem::size_of::<F>());
             task.instrument(span)
+        }
+
+        #[inline]
+        #[track_caller]
+        pub(crate) fn blocking_task<Fn, Fut>(task: Fut, spawn_meta: SpawnMeta<'_>, id: u64) -> Instrumented<Fut> {
+            let location = std::panic::Location::caller();
+
+            let fn_size = mem::size_of::<Fn>();
+            let original_size = if spawn_meta.original_size != fn_size {
+                Some(spawn_meta.original_size)
+            } else {
+                None
+            };
+
+            let span = tracing::trace_span!(
+                target: "tokio::task::blocking",
+                "runtime.spawn",
+                kind = %"blocking",
+                task.name = %spawn_meta.name.unwrap_or_default(),
+                task.id = id,
+                "fn" = %std::any::type_name::<Fn>(),
+                original_size.bytes = original_size,
+                size.bytes = fn_size,
+                loc.file = location.file(),
+                loc.line = location.line(),
+                loc.col = location.column(),
+            );
+            task.instrument(span)
+
         }
 
         pub(crate) fn async_op<P,F>(inner: P, resource_span: tracing::Span, source: &str, poll_op_name: &'static str, inherits_child_attrs: bool) -> InstrumentedAsyncOp<F>
@@ -83,7 +159,23 @@ cfg_trace! {
             }
         }
     }
+
+    cfg_not_trace! {
+        #[inline]
+        pub(crate) fn task<F>(task: F, _kind: &'static str, _meta: SpawnMeta<'_>, _id: u64) -> F {
+            // nop
+            task
+        }
+
+        #[inline]
+        pub(crate) fn blocking_task<Fn, Fut>(task: Fut, _spawn_meta: SpawnMeta<'_>, _id: u64) -> Fut {
+            let _ = PhantomData::<&Fn>;
+            // nop
+            task
+        }
+    }
 }
+
 cfg_time! {
     #[track_caller]
     pub(crate) fn caller_location() -> Option<&'static std::panic::Location<'static>> {
@@ -91,15 +183,5 @@ cfg_time! {
         return Some(std::panic::Location::caller());
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         None
-    }
-}
-
-cfg_not_trace! {
-    cfg_rt! {
-        #[inline]
-        pub(crate) fn task<F>(task: F, _: &'static str, _name: Option<&str>, _: u64) -> F {
-            // nop
-            task
-        }
     }
 }

@@ -189,6 +189,10 @@ cfg_rt! {
         pub(crate) fn num_alive_tasks(&self) -> usize {
             match_flavor!(self, Handle(handle) => handle.num_alive_tasks())
         }
+
+        pub(crate) fn injection_queue_depth(&self) -> usize {
+            match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
+        }
     }
 
     cfg_unstable_metrics! {
@@ -215,10 +219,6 @@ cfg_rt! {
 
             pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
                 match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
-            }
-
-            pub(crate) fn injection_queue_depth(&self) -> usize {
-                match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
             }
 
             pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {

@@ -11,7 +11,7 @@ use tokio::test as maybe_tokio_test;
 use tokio::sync::oneshot;
 use tokio_test::{assert_ok, assert_pending, assert_ready};
 
-use futures::future::poll_fn;
+use std::future::poll_fn;
 use std::task::Poll::Ready;
 
 #[maybe_tokio_test]

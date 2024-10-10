@@ -113,8 +113,7 @@ rt_test! {
     use tokio_test::assert_err;
     use tokio_test::assert_ok;
 
-    use futures::future::poll_fn;
-    use std::future::Future;
+    use std::future::{poll_fn, Future};
     use std::pin::Pin;
 
     #[cfg(not(target_os="wasi"))]
@@ -697,7 +696,7 @@ rt_test! {
                 loop {
                     // Don't use Tokio's `yield_now()` to avoid special defer
                     // logic.
-                    futures::future::poll_fn::<(), _>(|cx| {
+                    std::future::poll_fn::<(), _>(|cx| {
                         cx.waker().wake_by_ref();
                         std::task::Poll::Pending
                     }).await;

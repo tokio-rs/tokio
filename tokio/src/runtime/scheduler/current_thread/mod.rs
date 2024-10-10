@@ -1,4 +1,3 @@
-use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
@@ -15,7 +14,7 @@ use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
@@ -529,16 +528,16 @@ impl Handle {
     pub(crate) fn num_alive_tasks(&self) -> usize {
         self.shared.owned.num_alive_tasks()
     }
+
+    pub(crate) fn injection_queue_depth(&self) -> usize {
+        self.shared.inject.len()
+    }
 }
 
 cfg_unstable_metrics! {
     impl Handle {
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
             &self.shared.scheduler_metrics
-        }
-
-        pub(crate) fn injection_queue_depth(&self) -> usize {
-            self.shared.inject.len()
         }
 
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {

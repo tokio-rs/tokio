@@ -13,6 +13,10 @@ impl Handle {
         self.shared.owned.num_alive_tasks()
     }
 
+    pub(crate) fn injection_queue_depth(&self) -> usize {
+        self.shared.injection_queue_depth()
+    }
+
     cfg_unstable_metrics! {
         cfg_64bit_metrics! {
             pub(crate) fn spawned_tasks_count(&self) -> u64 {
@@ -37,10 +41,6 @@ impl Handle {
 
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
             &self.shared.worker_metrics[worker]
-        }
-
-        pub(crate) fn injection_queue_depth(&self) -> usize {
-            self.shared.injection_queue_depth()
         }
 
         pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
