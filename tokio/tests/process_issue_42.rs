@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(unix)]
+#![cfg(not(miri))]
 
 use futures::future::join_all;
 use std::process::Stdio;

@@ -1,4 +1,5 @@
 #[test]
+#[cfg_attr(miri, ignore)]
 fn compile_fail_full() {
     let t = trybuild::TestCases::new();
 

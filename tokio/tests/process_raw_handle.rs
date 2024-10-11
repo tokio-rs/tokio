@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(windows)]
+#![cfg(not(miri))]
 
 use tokio::process::Command;
 use windows_sys::Win32::System::Threading::GetProcessId;
