@@ -11,21 +11,22 @@
 mod runtime;
 pub use runtime::RuntimeMetrics;
 
-cfg_unstable_metrics! {
-    mod batch;
-    pub(crate) use batch::MetricsBatch;
+mod worker;
+pub(crate) use worker::WorkerMetrics;
 
-    mod histogram;
-    pub(crate) use histogram::{Histogram, HistogramBatch, HistogramBuilder};
+mod batch;
+pub(crate) use batch::MetricsBatch;
+
+mod histogram;
+pub(crate) use histogram::{Histogram, HistogramBatch, HistogramBuilder};
+
+cfg_unstable_metrics! {
     #[allow(unreachable_pub)] // rust-lang/rust#57411
     pub use histogram::HistogramScale;
 
 
     mod scheduler;
     pub(crate) use scheduler::SchedulerMetrics;
-
-    mod worker;
-    pub(crate) use worker::WorkerMetrics;
 
     cfg_net! {
         mod io;
@@ -36,5 +37,5 @@ cfg_unstable_metrics! {
 cfg_not_unstable_metrics! {
     mod mock;
 
-    pub(crate) use mock::{SchedulerMetrics, WorkerMetrics, MetricsBatch, HistogramBuilder};
+    pub(crate) use mock::{SchedulerMetrics};
 }

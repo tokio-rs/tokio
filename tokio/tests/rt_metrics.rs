@@ -3,6 +3,7 @@
 #![cfg(all(feature = "full", not(target_os = "wasi"), target_has_atomic = "64"))]
 
 use std::sync::{Arc, Barrier};
+use std::time::Duration;
 use tokio::runtime::Runtime;
 
 #[test]
@@ -113,4 +114,47 @@ fn threaded() -> Runtime {
         .enable_all()
         .build()
         .unwrap()
+}
+
+#[test]
+fn worker_total_busy_duration() {
+    const N: usize = 5;
+
+    let zero = Duration::from_millis(0);
+
+    let rt = current_thread();
+    let metrics = rt.metrics();
+
+    rt.block_on(async {
+        for _ in 0..N {
+            tokio::spawn(async {
+                tokio::task::yield_now().await;
+            })
+                .await
+                .unwrap();
+        }
+    });
+
+    drop(rt);
+
+    assert!(zero < metrics.worker_total_busy_duration(0));
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+
+    rt.block_on(async {
+        for _ in 0..N {
+            tokio::spawn(async {
+                tokio::task::yield_now().await;
+            })
+                .await
+                .unwrap();
+        }
+    });
+
+    drop(rt);
+
+    for i in 0..metrics.num_workers() {
+        assert!(zero < metrics.worker_total_busy_duration(i));
+    }
 }

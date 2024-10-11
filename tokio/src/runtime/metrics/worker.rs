@@ -70,6 +70,7 @@ impl WorkerMetrics {
         WorkerMetrics::default()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn queue_depth(&self) -> usize {
         self.queue_depth.load(Relaxed)
     }
@@ -78,6 +79,7 @@ impl WorkerMetrics {
         self.queue_depth.store(len, Relaxed);
     }
 
+    #[allow(dead_code)]
     pub(crate) fn thread_id(&self) -> Option<ThreadId> {
         *self.thread_id.lock().unwrap()
     }

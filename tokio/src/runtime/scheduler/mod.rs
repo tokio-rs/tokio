@@ -11,6 +11,8 @@ cfg_rt! {
     use crate::runtime::TaskHooks;
 }
 
+use crate::runtime::{driver, WorkerMetrics};
+
 cfg_rt_multi_thread! {
     mod block_in_place;
     pub(crate) use block_in_place::block_in_place;
@@ -26,8 +28,6 @@ cfg_rt_multi_thread! {
         pub(crate) use multi_thread_alt::MultiThread as MultiThreadAlt;
     }
 }
-
-use crate::runtime::driver;
 
 #[derive(Debug, Clone)]
 pub(crate) enum Handle {
@@ -193,10 +193,14 @@ cfg_rt! {
         pub(crate) fn injection_queue_depth(&self) -> usize {
             match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
         }
+
+        pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
+            match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
+        }
     }
 
     cfg_unstable_metrics! {
-        use crate::runtime::{SchedulerMetrics, WorkerMetrics};
+        use crate::runtime::{SchedulerMetrics};
 
         impl Handle {
             cfg_64bit_metrics! {
@@ -215,10 +219,6 @@ cfg_rt! {
 
             pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
                 match_flavor!(self, Handle(handle) => handle.scheduler_metrics())
-            }
-
-            pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
-                match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
             }
 
             pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {

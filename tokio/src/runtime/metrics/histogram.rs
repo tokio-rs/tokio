@@ -35,31 +35,34 @@ pub(crate) struct HistogramBatch {
     resolution: u64,
 }
 
-cfg_unstable! {
-    /// Whether the histogram used to aggregate a metric uses a linear or
-    /// logarithmic scale.
-    #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-    #[non_exhaustive]
-    pub enum HistogramScale {
-        /// Linear bucket scale
-        Linear,
+/// Whether the histogram used to aggregate a metric uses a linear or
+/// logarithmic scale.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[non_exhaustive]
+#[allow(unreachable_pub)]
+pub enum HistogramScale {
+    /// Linear bucket scale
+    Linear,
 
-        /// Logarithmic bucket scale
-        Log,
-    }
+    /// Logarithmic bucket scale
+    #[allow(dead_code)]
+    Log,
 }
 
 impl Histogram {
+    #[allow(dead_code)]
     pub(crate) fn num_buckets(&self) -> usize {
         self.buckets.len()
     }
 
     cfg_64bit_metrics! {
+        #[allow(dead_code)]
         pub(crate) fn get(&self, bucket: usize) -> u64 {
             self.buckets[bucket].load(Relaxed)
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn bucket_range(&self, bucket: usize) -> Range<u64> {
         match self.scale {
             HistogramScale::Log => Range {
