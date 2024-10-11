@@ -10,7 +10,6 @@ cfg_rt! {
 
     use crate::runtime::TaskHooks;
 
-    #[cfg(target_has_atomic = "64")]
     use crate::runtime::{WorkerMetrics};
 }
 
@@ -197,7 +196,7 @@ cfg_rt! {
             match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
         }
 
-        #[cfg(target_has_atomic = "64")]
+        #[allow(dead_code)]
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
             match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
         }
