@@ -274,8 +274,7 @@ impl<T: ?Sized> RwLock<T> {
     {
         assert!(
             max_reads <= MAX_READS,
-            "a RwLock may not be created with more than {} readers",
-            MAX_READS
+            "a RwLock may not be created with more than {MAX_READS} readers",
         );
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -837,7 +836,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let rwlock =  Arc::new(RwLock::new(1));
+    ///     let rwlock = Arc::new(RwLock::new(1));
     ///     let read_lock = rwlock.read().await;
     ///
     ///     let blocking_task = tokio::task::spawn_blocking({
@@ -1095,7 +1094,7 @@ impl<T> From<T> for RwLock<T> {
     }
 }
 
-impl<T: ?Sized> Default for RwLock<T>
+impl<T> Default for RwLock<T>
 where
     T: Default,
 {

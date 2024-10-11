@@ -144,13 +144,12 @@ cfg_rt! {
 
     pub(crate) fn thread_id() -> Result<ThreadId, AccessError> {
         CONTEXT.try_with(|ctx| {
-            match ctx.thread_id.get() {
-                Some(id) => id,
-                None => {
-                    let id = ThreadId::next();
-                    ctx.thread_id.set(Some(id));
-                    id
-                }
+            if let Some(id) = ctx.thread_id.get() {
+                id
+            } else {
+                let id = ThreadId::next();
+                ctx.thread_id.set(Some(id));
+                id
             }
         })
     }

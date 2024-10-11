@@ -343,7 +343,7 @@ fn blocking() {
                 tokio::task::block_in_place(move || {
                     block.wait();
                     block.wait();
-                })
+                });
             });
         }
         block.wait();
@@ -431,14 +431,12 @@ fn coop_and_block_in_place() {
 
                     Pin::new(&mut fut).poll(cx)
                 } {
-                    if v.is_none() {
-                        panic!("did not yield");
-                    }
+                    assert!(v.is_some(), "did not yield");
                 }
 
                 Poll::Ready(())
             })
-            .await
+            .await;
         })
         .await
         .unwrap();
@@ -467,7 +465,7 @@ fn yield_after_block_in_place() {
             tokio::task::yield_now().await;
         })
         .await
-        .unwrap()
+        .unwrap();
     });
 }
 
@@ -639,10 +637,10 @@ fn test_nested_block_in_place_with_block_on_between() {
                     h.block_on(async {
                         tokio::task::block_in_place(|| {});
                     });
-                })
+                });
             })
             .await
-            .unwrap()
+            .unwrap();
         });
     }
 }

@@ -7,6 +7,6 @@ fn pin() {
     block_on(async {
         let future = my_async_fn();
         tokio::pin!(future);
-        (&mut future).await
+        (&mut future).await;
     });
 }

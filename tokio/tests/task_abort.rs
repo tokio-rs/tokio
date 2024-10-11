@@ -158,7 +158,7 @@ fn test_abort_wakes_task_3964() {
         let handle = tokio::spawn(async move {
             // Make sure the Arc is moved into the task
             let _notify_dropped = notify_dropped;
-            tokio::time::sleep(Duration::new(100, 0)).await
+            tokio::time::sleep(Duration::new(100, 0)).await;
         });
 
         // wait for task to sleep.
@@ -186,7 +186,7 @@ fn test_abort_task_that_panics_on_drop_contained() {
         let handle = tokio::spawn(async move {
             // Make sure the Arc is moved into the task
             let _panic_dropped = PanicOnDrop;
-            tokio::time::sleep(Duration::new(100, 0)).await
+            tokio::time::sleep(Duration::new(100, 0)).await;
         });
 
         // wait for task to sleep.
@@ -210,7 +210,7 @@ fn test_abort_task_that_panics_on_drop_returned() {
         let handle = tokio::spawn(async move {
             // Make sure the Arc is moved into the task
             let _panic_dropped = PanicOnDrop;
-            tokio::time::sleep(Duration::new(100, 0)).await
+            tokio::time::sleep(Duration::new(100, 0)).await;
         });
 
         // wait for task to sleep.
@@ -233,7 +233,7 @@ fn test_join_error_display() {
         // `String` payload
         let join_err = tokio::spawn(async move {
             let value = 1234;
-            panic!("Format-args payload: {}", value)
+            panic!("Format-args payload: {value}")
         })
         .await
         .unwrap_err();
@@ -244,8 +244,7 @@ fn test_join_error_display() {
         assert!(
             join_err_str.starts_with("task ")
                 && join_err_str.ends_with(" panicked with message \"Format-args payload: 1234\""),
-            "Unexpected join_err_str {:?}",
-            join_err_str
+            "Unexpected join_err_str {join_err_str:?}"
         );
 
         // `&'static str` payload
@@ -258,8 +257,7 @@ fn test_join_error_display() {
         assert!(
             join_err_str.starts_with("task ")
                 && join_err_str.ends_with(" panicked with message \"Const payload\""),
-            "Unexpected join_err_str {:?}",
-            join_err_str
+            "Unexpected join_err_str {join_err_str:?}"
         );
 
         // Non-string payload
@@ -271,8 +269,7 @@ fn test_join_error_display() {
 
         assert!(
             join_err_str.starts_with("task ") && join_err_str.ends_with(" panicked"),
-            "Unexpected join_err_str {:?}",
-            join_err_str
+            "Unexpected join_err_str {join_err_str:?}"
         );
     });
 }
@@ -287,19 +284,18 @@ fn test_join_error_debug() {
         // `String` payload
         let join_err = tokio::spawn(async move {
             let value = 1234;
-            panic!("Format-args payload: {}", value)
+            panic!("Format-args payload: {value}")
         })
         .await
         .unwrap_err();
 
         // We can't assert the full output because the task ID can change.
-        let join_err_str = format!("{:?}", join_err);
+        let join_err_str = format!("{join_err:?}");
 
         assert!(
             join_err_str.starts_with("JoinError::Panic(Id(")
                 && join_err_str.ends_with("), \"Format-args payload: 1234\", ...)"),
-            "Unexpected join_err_str {:?}",
-            join_err_str
+            "Unexpected join_err_str {join_err_str:?}"
         );
 
         // `&'static str` payload
@@ -307,13 +303,12 @@ fn test_join_error_debug() {
             .await
             .unwrap_err();
 
-        let join_err_str = format!("{:?}", join_err);
+        let join_err_str = format!("{join_err:?}");
 
         assert!(
             join_err_str.starts_with("JoinError::Panic(Id(")
                 && join_err_str.ends_with("), \"Const payload\", ...)"),
-            "Unexpected join_err_str {:?}",
-            join_err_str
+            "Unexpected join_err_str {join_err_str:?}"
         );
 
         // Non-string payload
@@ -321,12 +316,11 @@ fn test_join_error_debug() {
             .await
             .unwrap_err();
 
-        let join_err_str = format!("{:?}", join_err);
+        let join_err_str = format!("{join_err:?}");
 
         assert!(
             join_err_str.starts_with("JoinError::Panic(Id(") && join_err_str.ends_with("), ...)"),
-            "Unexpected join_err_str {:?}",
-            join_err_str
+            "Unexpected join_err_str {join_err_str:?}"
         );
     });
 }

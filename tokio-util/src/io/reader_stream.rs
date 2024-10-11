@@ -90,9 +90,8 @@ impl<R: AsyncRead> Stream for ReaderStream<R> {
 
         let mut this = self.as_mut().project();
 
-        let reader = match this.reader.as_pin_mut() {
-            Some(r) => r,
-            None => return Poll::Ready(None),
+        let Some(reader) = this.reader.as_pin_mut() else {
+            return Poll::Ready(None);
         };
 
         if this.buf.capacity() == 0 {

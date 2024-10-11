@@ -25,7 +25,7 @@ async fn feed_cat(mut cat: Child, n: usize) -> io::Result<ExitStatus> {
     // Produce n lines on the child's stdout.
     let write = async {
         for i in 0..n {
-            let bytes = format!("line {}\n", i).into_bytes();
+            let bytes = format!("line {i}\n").into_bytes();
             stdin.write_all(&bytes).await.unwrap();
         }
 
@@ -52,7 +52,7 @@ async fn feed_cat(mut cat: Child, n: usize) -> io::Result<ExitStatus> {
                 (false, 0) => panic!("broken pipe"),
                 (true, n) if n != 0 => panic!("extraneous data"),
                 _ => {
-                    let expected = format!("line {}", num_lines);
+                    let expected = format!("line {num_lines}");
                     assert_eq!(expected, data);
                 }
             };

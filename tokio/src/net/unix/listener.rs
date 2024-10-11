@@ -198,7 +198,7 @@ impl UnixListener {
     /// Polls to accept a new incoming connection to this listener.
     ///
     /// If there is no connection to accept, `Poll::Pending` is returned and the
-    /// current task will be notified by a waker.  Note that on multiple calls
+    /// current task will be notified by a waker. Note that on multiple calls
     /// to `poll_accept`, only the `Waker` from the `Context` passed to the most
     /// recent call is scheduled to receive a wakeup.
     pub fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<io::Result<(UnixStream, SocketAddr)>> {

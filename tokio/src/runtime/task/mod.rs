@@ -125,7 +125,7 @@
 //!
 //! ## Non-Send futures
 //!
-//! If a future is not Send, then it is bound to a `LocalOwnedTasks`.  The future
+//! If a future is not Send, then it is bound to a `LocalOwnedTasks`. The future
 //! will only ever be polled or dropped given a `LocalNotified` or inside a call
 //! to `LocalOwnedTasks::shutdown_all`. In either case, it is guaranteed that the
 //! future is on the right thread.

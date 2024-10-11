@@ -59,8 +59,7 @@ async fn open_options_mode() {
     // TESTING HACK: use Debug output to check the stored data
     assert!(
         mode.contains("mode: 420 ") || mode.contains("mode: 0o000644 "),
-        "mode is: {}",
-        mode
+        "mode is: {mode}"
     );
 }
 

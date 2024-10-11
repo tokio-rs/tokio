@@ -170,7 +170,7 @@ fn read_err() {
                 .unwrap()
                 .unwrap_err()
                 .kind()
-        )
+        );
     });
 }
 
@@ -190,7 +190,7 @@ fn read_partial_then_err() {
                 .unwrap()
                 .unwrap_err()
                 .kind()
-        )
+        );
     });
 }
 
@@ -212,7 +212,7 @@ fn read_partial_would_block_then_err() {
                 .unwrap()
                 .unwrap_err()
                 .kind()
-        )
+        );
     });
 }
 

@@ -358,24 +358,21 @@ impl<T> OnceCell<T> {
             // will allow us to set the value of the OnceCell, and prevents
             // other tasks from initializing the OnceCell while we are holding
             // it.
-            match self.semaphore.acquire().await {
-                Ok(permit) => {
-                    debug_assert!(!self.initialized());
+            if let Ok(permit) = self.semaphore.acquire().await {
+                debug_assert!(!self.initialized());
 
-                    // If `f()` panics or `select!` is called, this
-                    // `get_or_init` call is aborted and the semaphore permit is
-                    // dropped.
-                    let value = f().await;
+                // If `f()` panics or `select!` is called, this
+                // `get_or_init` call is aborted and the semaphore permit is
+                // dropped.
+                let value = f().await;
 
-                    self.set_value(value, permit)
-                }
-                Err(_) => {
-                    debug_assert!(self.initialized());
+                self.set_value(value, permit)
+            } else {
+                debug_assert!(self.initialized());
 
-                    // SAFETY: The semaphore has been closed. This only happens
-                    // when the OnceCell is fully initialized.
-                    unsafe { self.get_unchecked() }
-                }
+                // SAFETY: The semaphore has been closed. This only happens
+                // when the OnceCell is fully initialized.
+                unsafe { self.get_unchecked() }
             }
         }
     }
@@ -408,27 +405,24 @@ impl<T> OnceCell<T> {
             // will allow us to set the value of the OnceCell, and prevents
             // other tasks from initializing the OnceCell while we are holding
             // it.
-            match self.semaphore.acquire().await {
-                Ok(permit) => {
-                    debug_assert!(!self.initialized());
+            if let Ok(permit) = self.semaphore.acquire().await {
+                debug_assert!(!self.initialized());
 
-                    // If `f()` panics or `select!` is called, this
-                    // `get_or_try_init` call is aborted and the semaphore
-                    // permit is dropped.
-                    let value = f().await;
+                // If `f()` panics or `select!` is called, this
+                // `get_or_try_init` call is aborted and the semaphore
+                // permit is dropped.
+                let value = f().await;
 
-                    match value {
-                        Ok(value) => Ok(self.set_value(value, permit)),
-                        Err(e) => Err(e),
-                    }
+                match value {
+                    Ok(value) => Ok(self.set_value(value, permit)),
+                    Err(e) => Err(e),
                 }
-                Err(_) => {
-                    debug_assert!(self.initialized());
+            } else {
+                debug_assert!(self.initialized());
 
-                    // SAFETY: The semaphore has been closed. This only happens
-                    // when the OnceCell is fully initialized.
-                    unsafe { Ok(self.get_unchecked()) }
-                }
+                // SAFETY: The semaphore has been closed. This only happens
+                // when the OnceCell is fully initialized.
+                unsafe { Ok(self.get_unchecked()) }
             }
         }
     }
@@ -445,7 +439,7 @@ impl<T> OnceCell<T> {
         }
     }
 
-    /// Takes ownership of the current value, leaving the cell empty.  Returns
+    /// Takes ownership of the current value, leaving the cell empty. Returns
     /// `None` if the cell is empty.
     pub fn take(&mut self) -> Option<T> {
         std::mem::take(self).into_inner()

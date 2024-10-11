@@ -15,7 +15,7 @@ impl<T> PollSendError<T> {
     /// Consumes the stored value, if any.
     ///
     /// If this error was encountered when calling `start_send`/`send_item`, this will be the item
-    /// that the caller attempted to send.  Otherwise, it will be `None`.
+    /// that the caller attempted to send. Otherwise, it will be `None`.
     pub fn into_inner(self) -> Option<T> {
         self.0
     }
@@ -47,7 +47,7 @@ pub struct PollSender<T> {
     acquire: PollSenderFuture<T>,
 }
 
-// Creates a future for acquiring a permit from the underlying channel.  This is used to ensure
+// Creates a future for acquiring a permit from the underlying channel. This is used to ensure
 // there's capacity for a send to complete.
 //
 // By reusing the same async fn for both `Some` and `None`, we make sure every future passed to
@@ -133,7 +133,7 @@ impl<T: Send> PollSender<T> {
     ///
     /// # Errors
     ///
-    /// If the channel is closed, an error will be returned.  This is a permanent state.
+    /// If the channel is closed, an error will be returned. This is a permanent state.
     pub fn poll_reserve(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), PollSendError<T>>> {
         loop {
             let (result, next_state) = match self.take_state() {
@@ -173,7 +173,7 @@ impl<T: Send> PollSender<T> {
     ///
     /// # Errors
     ///
-    /// If the channel is closed, an error will be returned.  This is a permanent state.
+    /// If the channel is closed, an error will be returned. This is a permanent state.
     ///
     /// # Panics
     ///
@@ -221,8 +221,8 @@ impl<T: Send> PollSender<T> {
     /// remain open until all senders have dropped, or until the [`Receiver`] closes the channel.
     ///
     /// If a slot was previously reserved by calling `poll_reserve`, then a final call can be made
-    /// to `send_item` in order to consume the reserved slot.  After that, no further sends will be
-    /// possible.  If you do not intend to send another item, you can release the reserved slot back
+    /// to `send_item` in order to consume the reserved slot. After that, no further sends will be
+    /// possible. If you do not intend to send another item, you can release the reserved slot back
     /// to the underlying sender by calling [`abort_send`].
     ///
     /// [`abort_send`]: crate::sync::PollSender::abort_send
@@ -232,7 +232,7 @@ impl<T: Send> PollSender<T> {
         self.sender = None;
 
         // If we're already idle, closed, or we haven't yet reserved a slot, we can quickly
-        // transition to the closed state.  Otherwise, leave the existing permit in place for the
+        // transition to the closed state. Otherwise, leave the existing permit in place for the
         // caller if they want to complete the send.
         match self.state {
             State::Idle(_) => self.state = State::Closed,
@@ -246,12 +246,12 @@ impl<T: Send> PollSender<T> {
 
     /// Aborts the current in-progress send, if any.
     ///
-    /// Returns `true` if a send was aborted.  If the sender was closed prior to calling
+    /// Returns `true` if a send was aborted. If the sender was closed prior to calling
     /// `abort_send`, then the sender will remain in the closed state, otherwise the sender will be
     /// ready to attempt another send.
     pub fn abort_send(&mut self) -> bool {
         // We may have been closed in the meantime, after a call to `poll_reserve` already
-        // succeeded.  We'll check if `self.sender` is `None` to see if we should transition to the
+        // succeeded. We'll check if `self.sender` is `None` to see if we should transition to the
         // closed state when we actually abort a send, rather than resetting ourselves back to idle.
 
         let (result, next_state) = match self.take_state() {
@@ -268,7 +268,7 @@ impl<T: Send> PollSender<T> {
                 };
                 (true, state)
             }
-            // We got the permit.  If we haven't closed yet, get the sender back.
+            // We got the permit. If we haven't closed yet, get the sender back.
             State::ReadyToSend(permit) => {
                 let state = if self.sender.is_some() {
                     State::Idle(permit.release())

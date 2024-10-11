@@ -31,13 +31,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
     let server = TcpListener::bind(&addr).await?;
-    println!("Listening on: {}", addr);
+    println!("Listening on: {addr}");
 
     loop {
         let (stream, _) = server.accept().await?;
         tokio::spawn(async move {
             if let Err(e) = process(stream).await {
-                println!("failed to process connection; error = {}", e);
+                println!("failed to process connection; error = {e}");
             }
         });
     }
@@ -49,7 +49,7 @@ async fn process(stream: TcpStream) -> Result<(), Box<dyn Error>> {
     while let Some(request) = transport.next().await {
         match request {
             Ok(request) => {
-                let response = respond(request).await?;
+                let response = respond(request)?;
                 transport.send(response).await?;
             }
             Err(e) => return Err(e.into()),
@@ -59,7 +59,7 @@ async fn process(stream: TcpStream) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn respond(req: Request<()>) -> Result<Response<String>, Box<dyn Error>> {
+fn respond(req: Request<()>) -> Result<Response<String>, Box<dyn Error>> {
     let mut response = Response::builder();
     let body = match req.uri().path() {
         "/plaintext" => {
@@ -159,7 +159,7 @@ impl Decoder for Http {
             let mut parsed_headers = [httparse::EMPTY_HEADER; 16];
             let mut r = httparse::Request::new(&mut parsed_headers);
             let status = r.parse(src).map_err(|e| {
-                let msg = format!("failed to parse http request: {:?}", e);
+                let msg = format!("failed to parse http request: {e:?}");
                 io::Error::new(io::ErrorKind::Other, msg)
             })?;
 
@@ -203,20 +203,19 @@ impl Decoder for Http {
         let s = unsafe { String::from_utf8_unchecked(Vec::from(s.as_ref())) };
         ret = ret.uri(s);
         ret = ret.version(http::Version::HTTP_11);
-        for header in headers.iter() {
-            let (k, v) = match *header {
-                Some((ref k, ref v)) => (k, v),
-                None => break,
+        for header in &headers {
+            let Some((k, v)) = header else {
+                break;
             };
             let value = HeaderValue::from_bytes(data.slice(v.0..v.1).as_ref())
                 .map_err(|_| io::Error::new(io::ErrorKind::Other, "header decode error"))?;
             ret = ret.header(&data[k.0..k.1], value);
         }
 
-        let req = ret
+        let request = ret
             .body(())
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-        Ok(Some(req))
+        Ok(Some(request))
     }
 }
 

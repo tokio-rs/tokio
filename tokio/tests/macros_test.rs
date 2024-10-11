@@ -32,12 +32,12 @@ fn trait_method() {
     impl A for () {
         #[tokio::main]
         async fn f(self) {
-            self.g()
+            self.g();
         }
 
         fn g(self) {}
     }
-    ().f()
+    ().f();
 }
 
 // https://github.com/tokio-rs/tokio/issues/4175

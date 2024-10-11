@@ -575,7 +575,7 @@ rt_test! {
             assert_ok!(inner.await)
         });
 
-        assert_eq!(out, "hello")
+        assert_eq!(out, "hello");
     }
 
     #[cfg(not(target_os="wasi"))] // Wasi does not support threads
@@ -591,7 +591,7 @@ rt_test! {
             assert_ok!(inner.await)
         });
 
-        assert_eq!(out, "hello")
+        assert_eq!(out, "hello");
     }
 
     #[cfg(not(target_os="wasi"))] // Wasi does not support threads
@@ -898,7 +898,7 @@ rt_test! {
                 Poll::Pending
             }
         })
-        .await
+        .await;
     }
 
     #[test]
@@ -943,7 +943,7 @@ rt_test! {
             tokio::spawn(async move {
                 assert_ok!(run_tx.send(()));
 
-                Never { drop_tx }.await
+                Never { drop_tx }.await;
             });
 
             assert_ok!(run_rx.await);
@@ -962,7 +962,7 @@ rt_test! {
 
         impl<F: FnMut()> Drop for OnDrop<F> {
             fn drop(&mut self) {
-                (self.0)()
+                (self.0)();
             }
         }
 

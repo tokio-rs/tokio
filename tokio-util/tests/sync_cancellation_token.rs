@@ -234,7 +234,7 @@ fn cancel_child_token_without_parent() {
 
 #[test]
 fn create_child_token_after_parent_was_cancelled() {
-    for drop_child_first in [true, false].iter().cloned() {
+    for drop_child_first in [true, false].iter().copied() {
         let (waker, wake_counter) = new_count_waker();
         let token = CancellationToken::new();
         token.cancel();

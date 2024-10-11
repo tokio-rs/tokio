@@ -40,7 +40,7 @@ fn notify_waiters<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
                     break;
                 }
             }
-        })
+        });
     });
 }
 
@@ -71,7 +71,7 @@ fn notify_one<const N_WAITERS: usize>(g: &mut BenchmarkGroup<WallTime>) {
                     break;
                 }
             }
-        })
+        });
     });
 }
 
