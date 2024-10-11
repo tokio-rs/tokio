@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support bind or UDP
+#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi does not support bind or UDP
 
 use std::future::poll_fn;
 use std::io;
