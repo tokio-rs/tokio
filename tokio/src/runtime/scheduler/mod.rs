@@ -9,9 +9,10 @@ cfg_rt! {
     pub(crate) use inject::Inject;
 
     use crate::runtime::TaskHooks;
-}
 
-use crate::runtime::{driver, WorkerMetrics};
+    #[cfg(target_has_atomic = "64")]
+    use crate::runtime::{WorkerMetrics};
+}
 
 cfg_rt_multi_thread! {
     mod block_in_place;
@@ -28,6 +29,8 @@ cfg_rt_multi_thread! {
         pub(crate) use multi_thread_alt::MultiThread as MultiThreadAlt;
     }
 }
+
+use crate::runtime::driver;
 
 #[derive(Debug, Clone)]
 pub(crate) enum Handle {
@@ -194,6 +197,7 @@ cfg_rt! {
             match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
         }
 
+        #[cfg(target_has_atomic = "64")]
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
             match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
         }

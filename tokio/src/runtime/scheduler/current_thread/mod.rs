@@ -533,6 +533,7 @@ impl Handle {
         self.shared.inject.len()
     }
 
+    #[cfg(target_has_atomic = "64")]
     pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
         assert_eq!(0, worker);
         &self.shared.worker_metrics

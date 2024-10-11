@@ -1,5 +1,7 @@
 use crate::runtime::Handle;
+#[cfg(target_has_atomic = "64")]
 use std::sync::atomic::Ordering::Relaxed;
+#[cfg(target_has_atomic = "64")]
 use std::time::Duration;
 
 cfg_unstable_metrics! {
@@ -130,6 +132,7 @@ impl RuntimeMetrics {
     ///     println!("worker 0 was busy for a total of {:?}", n);
     /// }
     /// ```
+    #[cfg(target_has_atomic = "64")]
     pub fn worker_total_busy_duration(&self, worker: usize) -> Duration {
         let nanos = self
             .handle

@@ -1,4 +1,5 @@
 use super::Handle;
+#[cfg(target_has_atomic = "64")]
 use crate::runtime::WorkerMetrics;
 
 cfg_unstable_metrics! {
@@ -18,6 +19,7 @@ impl Handle {
         self.shared.injection_queue_depth()
     }
 
+    #[cfg(target_has_atomic = "64")]
     pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
         &self.shared.worker_metrics[worker]
     }
