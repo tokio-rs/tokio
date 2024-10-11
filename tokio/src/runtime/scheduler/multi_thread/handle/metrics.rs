@@ -1,5 +1,5 @@
-use crate::runtime::WorkerMetrics;
 use super::Handle;
+use crate::runtime::WorkerMetrics;
 
 cfg_unstable_metrics! {
     use crate::runtime::{SchedulerMetrics};

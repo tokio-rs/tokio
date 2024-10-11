@@ -1,6 +1,6 @@
+use crate::runtime::Handle;
 use std::sync::atomic::Ordering::Relaxed;
 use std::time::Duration;
-use crate::runtime::Handle;
 
 cfg_unstable_metrics! {
     use std::ops::Range;

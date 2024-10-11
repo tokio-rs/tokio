@@ -130,8 +130,8 @@ fn worker_total_busy_duration() {
             tokio::spawn(async {
                 tokio::task::yield_now().await;
             })
-                .await
-                .unwrap();
+            .await
+            .unwrap();
         }
     });
 
@@ -147,8 +147,8 @@ fn worker_total_busy_duration() {
             tokio::spawn(async {
                 tokio::task::yield_now().await;
             })
-                .await
-                .unwrap();
+            .await
+            .unwrap();
         }
     });
 
