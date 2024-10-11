@@ -337,7 +337,6 @@ where
         if let Some(f) = self.trailer().hooks.task_terminate_callback.as_ref() {
             let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 f(&TaskMeta {
-                    #[cfg(tokio_unstable)]
                     id: self.core().task_id,
                     _phantom: Default::default(),
                 })
