@@ -2,7 +2,7 @@ use super::Handle;
 use crate::runtime::WorkerMetrics;
 
 cfg_unstable_metrics! {
-    use crate::runtime::{SchedulerMetrics};
+    use crate::runtime::SchedulerMetrics;
 }
 
 impl Handle {

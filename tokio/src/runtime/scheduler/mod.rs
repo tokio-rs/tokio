@@ -10,7 +10,7 @@ cfg_rt! {
 
     use crate::runtime::TaskHooks;
 
-    use crate::runtime::{WorkerMetrics};
+    use crate::runtime::WorkerMetrics;
 }
 
 cfg_rt_multi_thread! {
@@ -203,7 +203,7 @@ cfg_rt! {
     }
 
     cfg_unstable_metrics! {
-        use crate::runtime::{SchedulerMetrics};
+        use crate::runtime::SchedulerMetrics;
 
         impl Handle {
             cfg_64bit_metrics! {

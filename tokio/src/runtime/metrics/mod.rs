@@ -37,5 +37,5 @@ cfg_unstable_metrics! {
 cfg_not_unstable_metrics! {
     mod mock;
 
-    pub(crate) use mock::{SchedulerMetrics};
+    pub(crate) use mock::SchedulerMetrics;
 }

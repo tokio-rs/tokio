@@ -9,7 +9,6 @@ cfg_64bit_metrics! {
 cfg_unstable_metrics! {
     use std::ops::Range;
     use std::thread::ThreadId;
-    // use std::time::Duration;
 }
 
 /// Handle to the runtime's metrics.
@@ -137,13 +136,13 @@ impl RuntimeMetrics {
         /// }
         /// ```
         pub fn worker_total_busy_duration(&self, worker: usize) -> Duration {
-        let nanos = self
-            .handle
-            .inner
-            .worker_metrics(worker)
-            .busy_duration_total
-            .load(Relaxed);
-        Duration::from_nanos(nanos)
+            let nanos = self
+                .handle
+                .inner
+                .worker_metrics(worker)
+                .busy_duration_total
+                .load(Relaxed);
+            Duration::from_nanos(nanos)
         }
     }
 
