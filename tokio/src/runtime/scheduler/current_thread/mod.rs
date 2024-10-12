@@ -482,7 +482,6 @@ impl Handle {
         let (handle, notified) = me.shared.owned.bind_local(future, me.clone(), id);
 
         me.task_hooks.spawn(&TaskMeta {
-            #[cfg(tokio_unstable)]
             id,
             _phantom: Default::default(),
         });
