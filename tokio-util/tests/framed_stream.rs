@@ -1,7 +1,7 @@
 use futures_core::stream::Stream;
-use tokio_test_macros::tokio_test;
 use std::{io, pin::Pin};
 use tokio_test::{assert_ready, io::Builder, task};
+use tokio_test_macros::tokio_test;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 macro_rules! pin {

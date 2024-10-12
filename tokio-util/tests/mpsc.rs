@@ -1,11 +1,11 @@
 use futures::sink::SinkExt;
-use tokio_test_macros::tokio_test;
 use std::future::poll_fn;
 use tokio::sync::mpsc::channel;
 use tokio_test::task::spawn;
 use tokio_test::{
     assert_ok, assert_pending, assert_ready, assert_ready_eq, assert_ready_err, assert_ready_ok,
 };
+use tokio_test_macros::tokio_test;
 use tokio_util::sync::PollSender;
 
 #[tokio_test(miri)]

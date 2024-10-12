@@ -2,9 +2,9 @@
 
 use bytes::Bytes;
 use futures_util::SinkExt;
-use tokio_test_macros::tokio_test;
 use std::io::{self, Error, ErrorKind};
 use tokio::io::AsyncWriteExt;
+use tokio_test_macros::tokio_test;
 use tokio_util::codec::{Encoder, FramedWrite};
 use tokio_util::io::{CopyToBytes, SinkWriter};
 use tokio_util::sync::PollSender;
