@@ -36,7 +36,6 @@ fn test_spawn_block_on() {
                 if poll_once {
                     return Poll::Ready(());
                 }
-                assert!(!poll_once);
                 poll_once = true;
                 cx.waker().wake_by_ref();
                 Poll::Pending
@@ -66,7 +65,7 @@ fn test_spawn_block_on() {
         task::spawn(async { std::future::pending::<()>().await }).block_on();
     });
 
-    thread::sleep(Duration::from_secs(2));
+    thread::sleep(Duration::from_secs(3));
     assert!(job.is_finished());
     assert!(!job2.is_finished());
 }

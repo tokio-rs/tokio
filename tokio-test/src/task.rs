@@ -141,11 +141,16 @@ impl<T: Future> Spawn<T> {
                         continue;
                     }
 
-                    assert_eq!(state, IDLE);
+                    debug_assert_eq!(state, IDLE);
                     *guard = SLEEP;
-                    let guard = self.task.waker.condvar.wait(guard).unwrap();
-                    assert_eq!(*guard, WAKE);
-                    drop(guard);
+
+                    'spurious_wakeups: loop {
+                        guard = self.task.waker.condvar.wait(guard).unwrap();
+                        debug_assert_ne!(*guard, IDLE);
+                        if *guard == WAKE {
+                            break 'spurious_wakeups;
+                        }
+                    }
                 }
             };
         }
@@ -249,6 +254,10 @@ impl ThreadWaker {
 
 impl Wake for ThreadWaker {
     fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
+    }
+
+    fn wake_by_ref(self: &Arc<Self>) {
         // First, try transitioning from IDLE -> NOTIFY, this does not require a lock.
         let mut state = self.state.lock().unwrap();
         let prev = *state;
@@ -264,7 +273,7 @@ impl Wake for ThreadWaker {
         }
 
         // The other half is sleeping, so we wake it up.
-        assert_eq!(prev, SLEEP);
+        debug_assert_eq!(prev, SLEEP);
         self.condvar.notify_one();
     }
 }
