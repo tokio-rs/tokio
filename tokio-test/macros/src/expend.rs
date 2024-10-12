@@ -2,7 +2,7 @@ use quote2::{proc_macro2::TokenStream, quote, utils::quote_rep, Quote, ToTokens}
 use syn::{
     parse::{Parse, ParseStream, Parser},
     punctuated::Punctuated,
-    Attribute, Lit, Meta, MetaNameValue, Signature, Token, Visibility,
+    Attribute, Meta, MetaNameValue, Signature, Token, Visibility,
 };
 
 type AttributeArgs = Punctuated<Meta, Token![,]>;
@@ -34,10 +34,10 @@ pub fn tokio_test(args: TokenStream, item_fn: ItemFn) -> TokenStream {
     let has_miri_cfg = metadata.iter().any(|meta| meta.path().is_ident("miri"));
     let id_multi_thread = metadata.iter().any(|meta| match meta {
         Meta::NameValue(meta) if meta.path.is_ident("flavor") => {
-            match parse_string(&meta.lit, "flavor").as_str() {
+            match meta.value.to_token_stream().to_string().as_str() {
                 "multi_thread" => true,
                 "current_thread" => false,
-                _ => panic!("unknown `flavor`, expected: multi_thread | current_thread"),
+                val => panic!("unknown `flavor = {val}`, expected: multi_thread | current_thread"),
             }
         }
         _ => false,
@@ -48,10 +48,10 @@ pub fn tokio_test(args: TokenStream, item_fn: ItemFn) -> TokenStream {
                 return;
             }
         }
-        if let Meta::NameValue(MetaNameValue { path, lit, .. }) = &meta {
+        if let Meta::NameValue(MetaNameValue { path, value, .. }) = &meta {
             for key in ["worker_threads", "start_paused"] {
                 if path.is_ident(key) {
-                    quote!(t, { .#path(#lit) });
+                    quote!(t, { .#path(#value) });
                     return;
                 }
             }
@@ -118,12 +118,4 @@ pub fn tokio_test(args: TokenStream, item_fn: ItemFn) -> TokenStream {
         }
     });
     out
-}
-
-fn parse_string(int: &Lit, field: &str) -> String {
-    match int {
-        Lit::Str(s) => s.value(),
-        Lit::Verbatim(s) => s.to_string(),
-        _ => panic!("Failed to parse value of `{}` as string.", field),
-    }
 }
