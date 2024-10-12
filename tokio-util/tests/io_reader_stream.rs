@@ -4,6 +4,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, ReadBuf};
 use tokio_stream::StreamExt;
+use tokio_test_macros::tokio_test;
 
 /// produces at most `remaining` zeros, that returns error.
 /// each time it reads at most 31 byte.
@@ -34,7 +35,7 @@ impl AsyncRead for Reader {
     }
 }
 
-#[tokio::test]
+#[tokio_test] // Too slow on miri
 async fn correct_behavior_on_errors() {
     let reader = Reader { remaining: 8000 };
     let mut stream = tokio_util::io::ReaderStream::new(reader);

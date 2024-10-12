@@ -2,13 +2,14 @@
 
 use bytes::Bytes;
 use futures_util::SinkExt;
+use tokio_test_macros::tokio_test;
 use std::io::{self, Error, ErrorKind};
 use tokio::io::AsyncWriteExt;
 use tokio_util::codec::{Encoder, FramedWrite};
 use tokio_util::io::{CopyToBytes, SinkWriter};
 use tokio_util::sync::PollSender;
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn test_copied_sink_writer() -> Result<(), Error> {
     // Construct a channel pair to send data across and wrap a pollable sink.
     // Note that the sink must mimic a writable object, e.g. have `std::io::Error`
@@ -51,7 +52,7 @@ impl<'a> Encoder<&'a [u8]> for SliceEncoder {
     }
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn test_direct_sink_writer() -> Result<(), Error> {
     // We define a framed writer which accepts byte slices
     // and 'reverse' this construction immediately.

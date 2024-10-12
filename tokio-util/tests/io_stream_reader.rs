@@ -3,9 +3,10 @@
 use bytes::Bytes;
 use tokio::io::AsyncReadExt;
 use tokio_stream::iter;
+use tokio_test_macros::tokio_test;
 use tokio_util::io::StreamReader;
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn test_stream_reader() -> std::io::Result<()> {
     let stream = iter(vec![
         std::io::Result::Ok(Bytes::from_static(&[])),

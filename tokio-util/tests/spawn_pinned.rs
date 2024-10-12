@@ -6,10 +6,11 @@
 use std::rc::Rc;
 use std::sync::Arc;
 use tokio::sync::Barrier;
+use tokio_test_macros::tokio_test;
 use tokio_util::task;
 
 /// Simple test of running a !Send future via spawn_pinned
-#[tokio::test]
+#[tokio_test(miri)]
 async fn can_spawn_not_send_future() {
     let pool = task::LocalPoolHandle::new(1);
 
@@ -53,7 +54,7 @@ fn cannot_create_zero_sized_pool() {
 }
 
 /// We should be able to spawn multiple futures onto the pool at the same time.
-#[tokio::test]
+#[tokio_test(miri)]
 async fn can_spawn_multiple_futures() {
     let pool = task::LocalPoolHandle::new(2);
 
@@ -72,7 +73,7 @@ async fn can_spawn_multiple_futures() {
 
 /// A panic in the spawned task causes the join handle to return an error.
 /// But, you can continue to spawn tasks.
-#[tokio::test]
+#[tokio_test(miri)]
 #[cfg(panic = "unwind")]
 async fn task_panic_propagates() {
     let pool = task::LocalPoolHandle::new(1);
@@ -97,7 +98,7 @@ async fn task_panic_propagates() {
 
 /// A panic during task creation causes the join handle to return an error.
 /// But, you can continue to spawn tasks.
-#[tokio::test]
+#[tokio_test(miri)]
 #[cfg(panic = "unwind")]
 async fn callback_panic_does_not_kill_worker() {
     let pool = task::LocalPoolHandle::new(1);
@@ -124,7 +125,7 @@ async fn callback_panic_does_not_kill_worker() {
 
 /// Canceling the task via the returned join handle cancels the spawned task
 /// (which has a different, internal join handle).
-#[tokio::test]
+#[tokio_test(miri)]
 async fn task_cancellation_propagates() {
     let pool = task::LocalPoolHandle::new(1);
     let notify_dropped = Arc::new(());
@@ -161,7 +162,7 @@ async fn task_cancellation_propagates() {
 /// Tasks should be given to the least burdened worker. When spawning two tasks
 /// on a pool with two empty workers the tasks should be spawned on separate
 /// workers.
-#[tokio::test]
+#[tokio_test(miri)]
 async fn tasks_are_balanced() {
     let pool = task::LocalPoolHandle::new(2);
 
@@ -198,7 +199,7 @@ async fn tasks_are_balanced() {
     assert_ne!(thread_id1, thread_id2);
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn spawn_by_idx() {
     let pool = task::LocalPoolHandle::new(3);
     let barrier = Arc::new(Barrier::new(4));

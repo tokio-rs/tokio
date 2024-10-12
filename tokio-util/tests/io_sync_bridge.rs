@@ -4,6 +4,7 @@
 use std::error::Error;
 use std::io::{Cursor, Read, Result as IoResult, Write};
 use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio_test_macros::tokio_test;
 use tokio_util::io::SyncIoBridge;
 
 async fn test_reader_len(
@@ -21,7 +22,7 @@ async fn test_reader_len(
     Ok(())
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn test_async_read_to_sync() -> Result<(), Box<dyn Error>> {
     test_reader_len(tokio::io::empty(), 0).await?;
     let buf = b"hello world";
@@ -29,7 +30,7 @@ async fn test_async_read_to_sync() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn test_async_write_to_sync() -> Result<(), Box<dyn Error>> {
     let mut dest = Vec::new();
     let src = b"hello world";
@@ -43,7 +44,7 @@ async fn test_async_write_to_sync() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn test_into_inner() -> Result<(), Box<dyn Error>> {
     let mut buf = Vec::new();
     SyncIoBridge::new(tokio::io::empty())
@@ -55,7 +56,7 @@ async fn test_into_inner() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn test_shutdown() -> Result<(), Box<dyn Error>> {
     let (s1, mut s2) = tokio::io::duplex(1024);
     let (_rh, wh) = tokio::io::split(s1);

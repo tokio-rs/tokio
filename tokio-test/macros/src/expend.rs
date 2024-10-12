@@ -56,10 +56,7 @@ pub fn tokio_test(args: TokenStream, item_fn: ItemFn) -> TokenStream {
                 }
             }
         }
-        panic!(
-            "unknown config `{}`",
-            meta.path().to_token_stream().to_string()
-        )
+        panic!("unknown config `{}`", meta.path().to_token_stream())
     });
     let runtime_type = quote(|t| {
         if id_multi_thread {

@@ -5,6 +5,7 @@
 use futures::StreamExt;
 use tokio::time::{self, sleep, sleep_until, Duration, Instant};
 use tokio_test::{assert_pending, assert_ready, task};
+use tokio_test_macros::tokio_test;
 use tokio_util::time::DelayQueue;
 
 macro_rules! poll {
@@ -22,7 +23,7 @@ macro_rules! assert_ready_some {
     }};
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn single_immediate_delay() {
     time::pause();
 
@@ -38,7 +39,7 @@ async fn single_immediate_delay() {
     assert!(entry.is_none())
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn multi_immediate_delays() {
     time::pause();
 
@@ -67,7 +68,7 @@ async fn multi_immediate_delays() {
     assert_eq!("3", res[2]);
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn single_short_delay() {
     time::pause();
 
@@ -91,7 +92,7 @@ async fn single_short_delay() {
     assert!(entry.is_none());
 }
 
-#[tokio::test]
+#[tokio_test]
 #[cfg_attr(miri, ignore)] // Too slow on miri.
 async fn multi_delay_at_start() {
     time::pause();
@@ -134,7 +135,7 @@ async fn multi_delay_at_start() {
     println!("finished multi_delay_start");
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn insert_in_past_fires_immediately() {
     println!("running insert_in_past_fires_immediately");
     time::pause();
@@ -150,7 +151,7 @@ async fn insert_in_past_fires_immediately() {
     println!("finished insert_in_past_fires_immediately");
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn remove_entry() {
     time::pause();
 
@@ -169,7 +170,7 @@ async fn remove_entry() {
     assert!(entry.is_none());
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn reset_entry() {
     time::pause();
 
@@ -203,7 +204,7 @@ async fn reset_entry() {
 }
 
 // Reproduces tokio-rs/tokio#849.
-#[tokio::test]
+#[tokio_test]
 async fn reset_much_later() {
     time::pause();
 
@@ -225,7 +226,7 @@ async fn reset_much_later() {
 }
 
 // Reproduces tokio-rs/tokio#849.
-#[tokio::test]
+#[tokio_test]
 async fn reset_twice() {
     time::pause();
 
@@ -256,7 +257,7 @@ async fn reset_twice() {
 /// deadline in the future. Validate that this leaves the entry and queue in an
 /// internally consistent state by running an additional reset on the entry
 /// before polling it to completion.
-#[tokio::test]
+#[tokio_test]
 async fn repeatedly_reset_entry_inserted_as_expired() {
     time::pause();
 
@@ -284,7 +285,7 @@ async fn repeatedly_reset_entry_inserted_as_expired() {
     assert!(entry.is_none());
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn remove_expired_item() {
     time::pause();
 
@@ -304,7 +305,7 @@ async fn remove_expired_item() {
 /// 0th slot of the internal timer wheel — that is, entries whose expiration
 /// (a) falls at the beginning of one of the wheel's hierarchical levels and (b)
 /// is equal to the wheel's current elapsed time.
-#[tokio::test]
+#[tokio_test]
 async fn remove_at_timer_wheel_threshold() {
     time::pause();
 
@@ -332,7 +333,7 @@ async fn remove_at_timer_wheel_threshold() {
     }
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn expires_before_last_insert() {
     time::pause();
 
@@ -358,7 +359,7 @@ async fn expires_before_last_insert() {
     assert_eq!(entry, "bar");
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn multi_reset() {
     time::pause();
 
@@ -395,7 +396,7 @@ async fn multi_reset() {
     assert!(entry.is_none())
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn expire_first_key_when_reset_to_expire_earlier() {
     time::pause();
 
@@ -418,7 +419,7 @@ async fn expire_first_key_when_reset_to_expire_earlier() {
     assert_eq!(entry, "one");
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn expire_second_key_when_reset_to_expire_earlier() {
     time::pause();
 
@@ -441,7 +442,7 @@ async fn expire_second_key_when_reset_to_expire_earlier() {
     assert_eq!(entry, "two");
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn reset_first_expiring_item_to_expire_later() {
     time::pause();
 
@@ -463,7 +464,7 @@ async fn reset_first_expiring_item_to_expire_later() {
     assert_eq!(entry, "two");
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn insert_before_first_after_poll() {
     time::pause();
 
@@ -489,7 +490,7 @@ async fn insert_before_first_after_poll() {
     assert_eq!(entry, "two");
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn insert_after_ready_poll() {
     time::pause();
 
@@ -522,7 +523,7 @@ async fn insert_after_ready_poll() {
     assert_eq!("3", res[2]);
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn reset_later_after_slot_starts() {
     time::pause();
 
@@ -559,7 +560,7 @@ async fn reset_later_after_slot_starts() {
     assert_eq!(entry, "foo");
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn reset_inserted_expired() {
     time::pause();
 
@@ -584,7 +585,7 @@ async fn reset_inserted_expired() {
     assert_eq!(queue.len(), 0);
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn reset_earlier_after_slot_starts() {
     time::pause();
 
@@ -621,7 +622,7 @@ async fn reset_earlier_after_slot_starts() {
     assert_eq!(entry, "foo");
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn insert_in_past_after_poll_fires_immediately() {
     time::pause();
 
@@ -644,7 +645,7 @@ async fn insert_in_past_after_poll_fires_immediately() {
     assert_eq!(entry, "bar");
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn delay_queue_poll_expired_when_empty() {
     let mut delay_queue = task::spawn(DelayQueue::new());
     let key = delay_queue.insert(0, std::time::Duration::from_secs(10));
@@ -654,7 +655,7 @@ async fn delay_queue_poll_expired_when_empty() {
     assert!(assert_ready!(poll!(delay_queue)).is_none());
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio_test(start_paused = true)]
 async fn compact_expire_empty() {
     let mut queue = task::spawn(DelayQueue::new());
 
@@ -677,7 +678,7 @@ async fn compact_expire_empty() {
     assert_eq!(queue.capacity(), 0);
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio_test(start_paused = true)]
 async fn compact_remove_empty() {
     let mut queue = task::spawn(DelayQueue::new());
 
@@ -695,7 +696,7 @@ async fn compact_remove_empty() {
     assert_eq!(queue.capacity(), 0);
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio_test(start_paused = true)]
 // Trigger a re-mapping of keys in the slab due to a `compact` call and
 // test removal of re-mapped keys
 async fn compact_remove_remapped_keys() {
@@ -736,7 +737,7 @@ async fn compact_remove_remapped_keys() {
     assert_eq!(queue.capacity(), 1);
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio_test(start_paused = true)]
 async fn compact_change_deadline() {
     let mut queue = task::spawn(DelayQueue::new());
 
@@ -788,7 +789,7 @@ async fn compact_change_deadline() {
     assert!(entry.is_none());
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio_test(start_paused = true)]
 async fn item_expiry_greater_than_wheel() {
     // This function tests that a delay queue that has existed for at least 2^36 milliseconds won't panic when a new item is inserted.
     let mut queue = DelayQueue::new();
@@ -805,7 +806,7 @@ async fn item_expiry_greater_than_wheel() {
 }
 
 #[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
-#[tokio::test(start_paused = true)]
+#[tokio_test(start_paused = true)]
 #[cfg(panic = "unwind")]
 async fn remove_after_compact() {
     let now = Instant::now();
@@ -823,7 +824,7 @@ async fn remove_after_compact() {
 }
 
 #[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
-#[tokio::test(start_paused = true)]
+#[tokio_test(start_paused = true)]
 #[cfg(panic = "unwind")]
 async fn remove_after_compact_poll() {
     let now = Instant::now();
@@ -843,7 +844,7 @@ async fn remove_after_compact_poll() {
     assert!(panic.is_err());
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio_test(start_paused = true)]
 async fn peek() {
     let mut queue = task::spawn(DelayQueue::new());
 
@@ -881,7 +882,7 @@ async fn peek() {
     assert!(queue.peek().is_none());
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio_test(start_paused = true)]
 async fn wake_after_remove_last() {
     let mut queue = task::spawn(DelayQueue::new());
     let key = queue.insert("foo", ms(1000));

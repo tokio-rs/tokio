@@ -5,6 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
+use tokio_test_macros::tokio_test;
 use tokio_util::io::{InspectReader, InspectWriter};
 
 /// An AsyncRead implementation that works byte-by-byte, to catch out callers
@@ -28,7 +29,7 @@ impl AsyncRead for SmallReader {
     }
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn read_tee() {
     let contents = b"This could be really long, you know".to_vec();
     let reader = SmallReader {
@@ -110,7 +111,7 @@ impl AsyncWrite for SmallWriter {
     }
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn write_tee() {
     let mut altout: Vec<u8> = Vec::new();
     let mut writeout = SmallWriter {
@@ -157,7 +158,7 @@ async fn write_all_vectored<W: AsyncWrite + Unpin>(
     Ok(res)
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn write_tee_vectored() {
     let mut altout: Vec<u8> = Vec::new();
     let mut writeout = SmallWriter {

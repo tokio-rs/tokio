@@ -4,6 +4,7 @@
 
 use tokio::net::UdpSocket;
 use tokio_stream::StreamExt;
+use tokio_test_macros::tokio_test;
 use tokio_util::codec::{Decoder, Encoder, LinesCodec};
 use tokio_util::udp::UdpFramed;
 
@@ -24,7 +25,7 @@ use std::sync::Arc;
     ),
     allow(unused_assignments)
 )]
-#[tokio::test]
+#[tokio_test(miri)]
 async fn send_framed_byte_codec() -> std::io::Result<()> {
     let mut a_soc = UdpSocket::bind("127.0.0.1:0").await?;
     let mut b_soc = UdpSocket::bind("127.0.0.1:0").await?;
@@ -99,7 +100,7 @@ impl Encoder<&[u8]> for ByteCodec {
     }
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn send_framed_lines_codec() -> std::io::Result<()> {
     let a_soc = UdpSocket::bind("127.0.0.1:0").await?;
     let b_soc = UdpSocket::bind("127.0.0.1:0").await?;
@@ -120,7 +121,7 @@ async fn send_framed_lines_codec() -> std::io::Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn framed_half() -> std::io::Result<()> {
     let a_soc = Arc::new(UdpSocket::bind("127.0.0.1:0").await?);
     let b_soc = a_soc.clone();

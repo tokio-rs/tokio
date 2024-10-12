@@ -2,6 +2,7 @@
 
 use tokio_stream::StreamExt;
 use tokio_test::assert_ok;
+use tokio_test_macros::tokio_test;
 use tokio_util::codec::{Decoder, Encoder, Framed, FramedParts};
 
 use bytes::{Buf, BufMut, BytesMut};
@@ -97,7 +98,7 @@ impl tokio::io::AsyncRead for DontReadIntoThis {
     }
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn can_read_from_existing_buf() {
     let mut parts = FramedParts::new(DontReadIntoThis, U32Codec::default());
     parts.read_buf = BytesMut::from(&[0, 0, 0, 42][..]);
@@ -109,7 +110,7 @@ async fn can_read_from_existing_buf() {
     assert_eq!(framed.codec().read_bytes, 4);
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn can_read_from_existing_buf_after_codec_changed() {
     let mut parts = FramedParts::new(DontReadIntoThis, U32Codec::default());
     parts.read_buf = BytesMut::from(&[0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 84][..]);

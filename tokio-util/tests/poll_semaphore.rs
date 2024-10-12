@@ -2,6 +2,7 @@ use std::future::Future;
 use std::sync::Arc;
 use std::task::Poll;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio_test_macros::tokio_test;
 use tokio_util::sync::PollSemaphore;
 
 type SemRet = Option<OwnedSemaphorePermit>;
@@ -21,7 +22,7 @@ fn semaphore_poll_many(
     tokio_test::task::spawn(fut)
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn it_works() {
     let sem = Arc::new(Semaphore::new(1));
     let mut poll_sem = PollSemaphore::new(sem.clone());
@@ -43,7 +44,7 @@ async fn it_works() {
     assert!(semaphore_poll(&mut poll_sem).await.is_none());
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn can_acquire_many_permits() {
     let sem = Arc::new(Semaphore::new(4));
     let mut poll_sem = PollSemaphore::new(sem.clone());
@@ -68,7 +69,7 @@ async fn can_acquire_many_permits() {
     assert_eq!(sem.available_permits(), 0);
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn can_poll_different_amounts_of_permits() {
     let sem = Arc::new(Semaphore::new(4));
     let mut poll_sem = PollSemaphore::new(sem.clone());

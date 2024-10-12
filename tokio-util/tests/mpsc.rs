@@ -1,4 +1,5 @@
 use futures::sink::SinkExt;
+use tokio_test_macros::tokio_test;
 use std::future::poll_fn;
 use tokio::sync::mpsc::channel;
 use tokio_test::task::spawn;
@@ -7,7 +8,7 @@ use tokio_test::{
 };
 use tokio_util::sync::PollSender;
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn simple() {
     let (send, mut recv) = channel(3);
     let mut send = PollSender::new(send);
@@ -30,7 +31,7 @@ async fn simple() {
     send.send_item(42).unwrap();
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn simple_ref() {
     let v = [1, 2, 3i32];
 
@@ -53,7 +54,7 @@ async fn simple_ref() {
     send.send_item(&42).unwrap();
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn repeated_poll_reserve() {
     let (send, mut recv) = channel::<i32>(1);
     let mut send = PollSender::new(send);
@@ -66,7 +67,7 @@ async fn repeated_poll_reserve() {
     assert_eq!(recv.recv().await.unwrap(), 1);
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn abort_send() {
     let (send, mut recv) = channel(3);
     let mut send = PollSender::new(send);
@@ -95,7 +96,7 @@ async fn abort_send() {
     assert_eq!(recv.recv().await.unwrap(), 5);
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn close_sender_last() {
     let (send, mut recv) = channel::<i32>(3);
     let mut send = PollSender::new(send);
@@ -109,7 +110,7 @@ async fn close_sender_last() {
     assert!(assert_ready!(recv_task.poll()).is_none());
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn close_sender_not_last() {
     let (send, mut recv) = channel::<i32>(3);
     let mut send = PollSender::new(send);
@@ -129,7 +130,7 @@ async fn close_sender_not_last() {
     assert!(assert_ready!(recv_task.poll()).is_none());
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn close_sender_before_reserve() {
     let (send, mut recv) = channel::<i32>(3);
     let mut send = PollSender::new(send);
@@ -146,7 +147,7 @@ async fn close_sender_before_reserve() {
     assert_ready_err!(reserve.poll());
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn close_sender_after_pending_reserve() {
     let (send, mut recv) = channel::<i32>(1);
     let mut send = PollSender::new(send);
@@ -171,7 +172,7 @@ async fn close_sender_after_pending_reserve() {
     assert_ready_err!(reserve.poll());
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn close_sender_after_successful_reserve() {
     let (send, mut recv) = channel::<i32>(3);
     let mut send = PollSender::new(send);
@@ -192,7 +193,7 @@ async fn close_sender_after_successful_reserve() {
     assert_ready_ok!(reserve.poll());
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn abort_send_after_pending_reserve() {
     let (send, mut recv) = channel::<i32>(1);
     let mut send = PollSender::new(send);
@@ -214,7 +215,7 @@ async fn abort_send_after_pending_reserve() {
     assert_eq!(send.get_ref().unwrap().capacity(), 0);
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn abort_send_after_successful_reserve() {
     let (send, mut recv) = channel::<i32>(1);
     let mut send = PollSender::new(send);
@@ -231,7 +232,7 @@ async fn abort_send_after_successful_reserve() {
     assert_eq!(send.get_ref().unwrap().capacity(), 1);
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn closed_when_receiver_drops() {
     let (send, _) = channel::<i32>(1);
     let mut send = PollSender::new(send);

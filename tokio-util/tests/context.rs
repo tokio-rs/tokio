@@ -7,6 +7,7 @@ use tokio::time::*;
 use tokio_util::context::RuntimeExt;
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn tokio_context_with_another_runtime() {
     let rt1 = Builder::new_multi_thread()
         .worker_threads(1)

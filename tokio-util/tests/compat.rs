@@ -6,9 +6,10 @@ use futures_io::SeekFrom;
 use futures_util::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tempfile::NamedTempFile;
 use tokio::fs::OpenOptions;
+use tokio_test_macros::tokio_test;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 
-#[tokio::test]
+#[tokio_test]
 async fn compat_file_seek() -> futures_util::io::Result<()> {
     let temp_file = NamedTempFile::new()?;
     let mut file = OpenOptions::new()

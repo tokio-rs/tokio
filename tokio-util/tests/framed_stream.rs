@@ -1,4 +1,5 @@
 use futures_core::stream::Stream;
+use tokio_test_macros::tokio_test;
 use std::{io, pin::Pin};
 use tokio_test::{assert_ready, io::Builder, task};
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -16,7 +17,7 @@ macro_rules! assert_read {
     }};
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn return_none_after_error() {
     let mut io = FramedRead::new(
         Builder::new()

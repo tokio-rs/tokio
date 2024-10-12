@@ -89,6 +89,7 @@ fn local_pool_handle_new_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn local_pool_handle_spawn_pinned_by_idx_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -104,7 +105,9 @@ fn local_pool_handle_spawn_pinned_by_idx_panic_caller() -> Result<(), Box<dyn Er
 
     Ok(())
 }
+
 #[test]
+#[cfg_attr(miri, ignore)]
 fn delay_queue_insert_at_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -126,6 +129,7 @@ fn delay_queue_insert_at_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn delay_queue_insert_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -143,6 +147,7 @@ fn delay_queue_insert_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn delay_queue_remove_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -162,6 +167,7 @@ fn delay_queue_remove_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn delay_queue_reset_at_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -183,6 +189,7 @@ fn delay_queue_reset_at_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn delay_queue_reset_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();
@@ -201,6 +208,7 @@ fn delay_queue_reset_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn delay_queue_reserve_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = basic();

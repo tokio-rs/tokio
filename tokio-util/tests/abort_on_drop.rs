@@ -1,7 +1,8 @@
 use tokio::sync::oneshot;
+use tokio_test_macros::tokio_test;
 use tokio_util::task::AbortOnDropHandle;
 
-#[tokio::test]
+#[tokio_test]
 async fn aborts_task_on_drop() {
     let (mut tx, rx) = oneshot::channel::<bool>();
     let handle = tokio::spawn(async move {
@@ -13,7 +14,7 @@ async fn aborts_task_on_drop() {
     assert!(tx.is_closed());
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn aborts_task_directly() {
     let (mut tx, rx) = oneshot::channel::<bool>();
     let handle = tokio::spawn(async move {

@@ -66,7 +66,7 @@ async fn test_with_sleep() {
     assert!(matches!(map.join_next().await, None));
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn test_abort_on_drop() {
     let mut map = JoinMap::new();
 
@@ -91,7 +91,7 @@ async fn test_abort_on_drop() {
     }
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn alternating() {
     let mut map = JoinMap::new();
 
@@ -110,7 +110,7 @@ async fn alternating() {
     }
 }
 
-#[tokio::test]
+#[tokio_test(miri)]
 async fn test_keys() {
     use std::collections::HashSet;
 
