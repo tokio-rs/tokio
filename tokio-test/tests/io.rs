@@ -5,7 +5,12 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time::{Duration, Instant};
 use tokio_test::io::Builder;
 
-#[tokio::test]
+mod tokio {
+    pub use ::tokio::*;
+    pub use ::tokio_test_macros::tokio_test as test;
+}
+
+#[tokio::test(miri)]
 async fn read() {
     let mut mock = Builder::new().read(b"hello ").read(b"world!").build();
 
@@ -18,7 +23,7 @@ async fn read() {
     assert_eq!(&buf[..n], b"world!");
 }
 
-#[tokio::test]
+#[tokio::test(miri)]
 async fn read_error() {
     let error = io::Error::new(io::ErrorKind::Other, "cruel");
     let mut mock = Builder::new()
@@ -43,7 +48,7 @@ async fn read_error() {
     assert_eq!(&buf[..n], b"world!");
 }
 
-#[tokio::test]
+#[tokio::test(miri)]
 async fn write() {
     let mut mock = Builder::new().write(b"hello ").write(b"world!").build();
 
@@ -51,7 +56,7 @@ async fn write() {
     mock.write_all(b"world!").await.expect("write 2");
 }
 
-#[tokio::test]
+#[tokio::test(miri)]
 async fn write_with_handle() {
     let (mut mock, mut handle) = Builder::new().build_with_handle();
     handle.write(b"hello ");
@@ -61,7 +66,7 @@ async fn write_with_handle() {
     mock.write_all(b"world!").await.expect("write 2");
 }
 
-#[tokio::test]
+#[tokio::test(miri)]
 async fn read_with_handle() {
     let (mut mock, mut handle) = Builder::new().build_with_handle();
     handle.read(b"hello ");
@@ -74,7 +79,7 @@ async fn read_with_handle() {
     assert_eq!(&buf[..], b"world!");
 }
 
-#[tokio::test]
+#[tokio::test(miri)]
 async fn write_error() {
     let error = io::Error::new(io::ErrorKind::Other, "cruel");
     let mut mock = Builder::new()
@@ -82,6 +87,7 @@ async fn write_error() {
         .write_error(error)
         .write(b"world!")
         .build();
+
     mock.write_all(b"hello ").await.expect("write 1");
 
     match mock.write_all(b"whoa").await {
@@ -95,14 +101,14 @@ async fn write_error() {
     mock.write_all(b"world!").await.expect("write 2");
 }
 
-#[tokio::test]
+#[tokio::test(miri)]
 #[should_panic]
 async fn mock_panics_read_data_left() {
     use tokio_test::io::Builder;
     Builder::new().read(b"read").build();
 }
 
-#[tokio::test]
+#[tokio::test(miri)]
 #[should_panic]
 async fn mock_panics_write_data_left() {
     use tokio_test::io::Builder;

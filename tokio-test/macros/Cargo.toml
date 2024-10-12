@@ -1,0 +1,11 @@
+[package]
+name = "tokio-test-macros"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "*", features = ["full"] }
+quote2 = "0.9"

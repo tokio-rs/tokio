@@ -2,7 +2,12 @@ use futures_util::StreamExt;
 use std::time::Duration;
 use tokio_test::stream_mock::StreamMockBuilder;
 
-#[tokio::test]
+mod tokio {
+    pub use ::tokio::*;
+    pub use ::tokio_test_macros::tokio_test as test;
+}
+
+#[tokio::test(miri)]
 async fn test_stream_mock_empty() {
     let mut stream_mock = StreamMockBuilder::<u32>::new().build();
 
@@ -10,7 +15,7 @@ async fn test_stream_mock_empty() {
     assert_eq!(stream_mock.next().await, None);
 }
 
-#[tokio::test]
+#[tokio::test(miri)]
 async fn test_stream_mock_items() {
     let mut stream_mock = StreamMockBuilder::new().next(1).next(2).build();
 
@@ -35,14 +40,14 @@ async fn test_stream_mock_wait() {
     assert_eq!(stream_mock.next().await, None);
 }
 
-#[tokio::test]
+#[tokio::test(miri)]
 #[should_panic(expected = "StreamMock was dropped before all actions were consumed")]
 async fn test_stream_mock_drop_without_consuming_all() {
     let stream_mock = StreamMockBuilder::new().next(1).next(2).build();
     drop(stream_mock);
 }
 
-#[tokio::test]
+#[tokio::test(miri)]
 #[should_panic(expected = "test panic was not masked")]
 async fn test_stream_mock_drop_during_panic_doesnt_mask_panic() {
     let _stream_mock = StreamMockBuilder::new().next(1).next(2).build();

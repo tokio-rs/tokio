@@ -27,6 +27,7 @@ futures-core = "0.3.0"
 [dev-dependencies]
 tokio = { version = "1.2.0", path = "../tokio", features = ["full"] }
 futures-util = "0.3.0"
+tokio-test-macros = { path = "./macros" }
 
 [package.metadata.docs.rs]
 all-features = true

@@ -28,6 +28,7 @@ fn test_spawn_stream_size_hint() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_spawn_block_on() {
     let job = thread::spawn(move || {
         task::spawn(async {
