@@ -409,7 +409,7 @@ cfg_rt! {
                 ))]
                 let future = task::trace::Trace::root(future);
                 let id = task::Id::next();
-                let task = crate::util::trace::task(future, "task", name, id.as_u64());
+                let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
                 // safety: we have verified that this is a `LocalRuntime` owned by the current thread
                 unsafe { handle.spawn_local(task, id) }
@@ -426,7 +426,7 @@ cfg_rt! {
             Ok(Some(join_handle)) => join_handle,
             Err(_) => match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
                 None => panic!("`spawn_local` called from outside of a `task::LocalSet` or LocalRuntime"),
-                Some(cx) => cx.spawn(future.unwrap(), name)
+                Some(cx) => cx.spawn(future.unwrap(), meta)
             }
         }
     }

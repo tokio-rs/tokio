@@ -1,6 +1,7 @@
 cfg_rt! {
     use std::marker::PhantomData;
 
+    #[derive(Copy, Clone)]
     pub(crate) struct SpawnMeta<'a> {
         /// The name of the task
         #[cfg(all(tokio_unstable, feature = "tracing"))]

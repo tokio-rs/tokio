@@ -5,8 +5,10 @@ use crate::runtime::scheduler::CurrentThread;
 use crate::runtime::{context, Builder, EnterGuard, Handle, BOX_FUTURE_THRESHOLD};
 use crate::task::JoinHandle;
 
+use crate::util::trace::SpawnMeta;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::mem;
 use std::time::Duration;
 
 /// A local Tokio runtime.
@@ -147,12 +149,15 @@ impl LocalRuntime {
         F: Future + 'static,
         F::Output: 'static,
     {
+        let fut_size = std::mem::size_of::<F>();
+        let meta = SpawnMeta::new_unnamed(fut_size);
+
         // safety: spawn_local can only be called from `LocalRuntime`, which this is
         unsafe {
             if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
-                self.handle.spawn_local_named(Box::pin(future), None)
+                self.handle.spawn_local_named(Box::pin(future), meta)
             } else {
-                self.handle.spawn_local_named(future, None)
+                self.handle.spawn_local_named(future, meta)
             }
         }
     }
@@ -211,15 +216,18 @@ impl LocalRuntime {
     /// ```
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+        let fut_size = mem::size_of::<F>();
+        let meta = SpawnMeta::new_unnamed(fut_size);
+
         if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
-            self.block_on_inner(Box::pin(future))
+            self.block_on_inner(Box::pin(future), meta)
         } else {
-            self.block_on_inner(future)
+            self.block_on_inner(future, meta)
         }
     }
 
     #[track_caller]
-    fn block_on_inner<F: Future>(&self, future: F) -> F::Output {
+    fn block_on_inner<F: Future>(&self, future: F, _meta: SpawnMeta<'_>) -> F::Output {
         #[cfg(all(
             tokio_unstable,
             tokio_taskdump,
@@ -233,7 +241,7 @@ impl LocalRuntime {
         let future = crate::util::trace::task(
             future,
             "block_on",
-            None,
+            _meta,
             crate::runtime::task::Id::next().as_u64(),
         );
 

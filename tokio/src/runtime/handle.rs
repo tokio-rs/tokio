@@ -353,7 +353,7 @@ impl Handle {
     pub(crate) unsafe fn spawn_local_named<F>(
         &self,
         future: F,
-        _name: Option<&str>,
+        _meta: SpawnMeta<'_>,
     ) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -369,7 +369,7 @@ impl Handle {
         ))]
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task", _name, id.as_u64());
+        let future = crate::util::trace::task(future, "task", _meta, id.as_u64());
         self.inner.spawn_local(future, id)
     }
 
