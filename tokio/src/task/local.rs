@@ -322,7 +322,7 @@ impl<'a> Drop for LocalDataEnterGuard<'a> {
 }
 
 cfg_rt! {
-    /// Spawns a `!Send` future on the current [`LocalSet`].
+    /// Spawns a `!Send` future on the current [`LocalSet`] or [`LocalRuntime`].
     ///
     /// The spawned future will run on the same thread that called `spawn_local`.
     ///
@@ -362,6 +362,7 @@ cfg_rt! {
     /// ```
     ///
     /// [`LocalSet`]: struct@crate::task::LocalSet
+    /// [`LocalRuntime`]: struct@crate::runtime::LocalRuntime
     /// [`tokio::spawn`]: fn@crate::task::spawn
     #[track_caller]
     pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
@@ -383,10 +384,51 @@ cfg_rt! {
     where F: Future + 'static,
           F::Output: 'static
     {
-        match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
-            None => panic!("`spawn_local` called from outside of a `task::LocalSet`"),
-            Some(cx) => cx.spawn(future, meta)
-       }
+        use crate::runtime::{context, task};
+
+        let mut future = Some(future);
+
+        let res = context::with_current(|handle| {
+            Some(if handle.is_local() {
+                if !handle.can_spawn_local_on_local_runtime() {
+                    return None;
+                }
+
+                let future = future.take().unwrap();
+
+                #[cfg(all(
+                    tokio_unstable,
+                    tokio_taskdump,
+                    feature = "rt",
+                    target_os = "linux",
+                    any(
+                        target_arch = "aarch64",
+                        target_arch = "x86",
+                        target_arch = "x86_64"
+                    )
+                ))]
+                let future = task::trace::Trace::root(future);
+                let id = task::Id::next();
+                let task = crate::util::trace::task(future, "task", meta, id.as_u64());
+
+                // safety: we have verified that this is a `LocalRuntime` owned by the current thread
+                unsafe { handle.spawn_local(task, id) }
+            } else {
+                match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
+                    None => panic!("`spawn_local` called from outside of a `task::LocalSet` or LocalRuntime"),
+                    Some(cx) => cx.spawn(future.take().unwrap(), meta)
+                }
+            })
+        });
+
+        match res {
+            Ok(None) => panic!("Local tasks can only be spawned on a LocalRuntime from the thread the runtime was created on"),
+            Ok(Some(join_handle)) => join_handle,
+            Err(_) => match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
+                None => panic!("`spawn_local` called from outside of a `task::LocalSet` or LocalRuntime"),
+                Some(cx) => cx.spawn(future.unwrap(), meta)
+            }
+        }
     }
 }
 
