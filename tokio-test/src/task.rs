@@ -28,7 +28,8 @@
 use std::future::Future;
 use std::ops;
 use std::pin::Pin;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
 
 use tokio_stream::Stream;
@@ -54,20 +55,15 @@ pub struct Spawn<T> {
     future: Pin<Box<T>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct MockTask {
-    waker: Arc<ThreadWaker>,
+    waker_state: Arc<WakerState>,
 }
 
-#[derive(Debug)]
-struct ThreadWaker {
-    state: Mutex<usize>,
-    condvar: Condvar,
+#[derive(Debug, Default)]
+struct WakerState {
+    is_woken: AtomicBool,
 }
-
-const IDLE: usize = 0;
-const WAKE: usize = 1;
-const SLEEP: usize = 2;
 
 impl<T> Spawn<T> {
     /// Consumes `self` returning the inner value
@@ -122,39 +118,6 @@ impl<T: Future> Spawn<T> {
         let fut = self.future.as_mut();
         self.task.enter(|cx| fut.poll(cx))
     }
-
-    /// Run a future to completion on the current thread.
-    ///
-    /// This function will block the caller until the given future has completed.
-    ///
-    /// Note: This does not create a Tokio runtime, and therefore does not support
-    /// Tokio-specific asynchronous APIs, such as [tokio::time::sleep].
-    pub fn block_on(&mut self) -> T::Output {
-        loop {
-            match self.poll() {
-                Poll::Ready(val) => return val,
-                Poll::Pending => {
-                    let mut guard = self.task.waker.state.lock().unwrap();
-                    let state = *guard;
-
-                    if state == WAKE {
-                        continue;
-                    }
-
-                    debug_assert_eq!(state, IDLE);
-                    *guard = SLEEP;
-
-                    'spurious_wakeups: loop {
-                        guard = self.task.waker.condvar.wait(guard).unwrap();
-                        debug_assert_ne!(*guard, IDLE);
-                        if *guard == WAKE {
-                            break 'spurious_wakeups;
-                        }
-                    }
-                }
-            };
-        }
-    }
 }
 
 impl<T: Stream> Spawn<T> {
@@ -189,9 +152,7 @@ impl<T: Stream> Stream for Spawn<T> {
 impl MockTask {
     /// Creates new mock task
     fn new() -> Self {
-        MockTask {
-            waker: Arc::new(ThreadWaker::new()),
-        }
+        MockTask::default()
     }
 
     /// Runs a closure from the context of the task.
@@ -202,8 +163,8 @@ impl MockTask {
     where
         F: FnOnce(&mut Context<'_>) -> R,
     {
-        self.waker.clear();
-        let waker = Waker::from(self.waker.clone());
+        self.waker_state.is_woken.store(false, Ordering::Relaxed);
+        let waker = Waker::from(self.waker_state.clone());
         let mut cx = Context::from_waker(&waker);
         f(&mut cx)
     }
@@ -211,69 +172,23 @@ impl MockTask {
     /// Returns `true` if the inner future has received a wake notification
     /// since the last call to `enter`.
     fn is_woken(&self) -> bool {
-        self.waker.is_woken()
+        self.waker_state.is_woken.load(Ordering::Relaxed)
     }
 
     /// Returns the number of references to the task waker
     ///
     /// The task itself holds a reference. The return value will never be zero.
     fn waker_ref_count(&self) -> usize {
-        Arc::strong_count(&self.waker)
+        Arc::strong_count(&self.waker_state)
     }
 }
 
-impl Default for MockTask {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ThreadWaker {
-    fn new() -> Self {
-        ThreadWaker {
-            state: Mutex::new(IDLE),
-            condvar: Condvar::new(),
-        }
-    }
-
-    /// Clears any previously received wakes, avoiding potential spurious
-    /// wake notifications. This should only be called immediately before running the
-    /// task.
-    fn clear(&self) {
-        *self.state.lock().unwrap() = IDLE;
-    }
-
-    fn is_woken(&self) -> bool {
-        match *self.state.lock().unwrap() {
-            IDLE => false,
-            WAKE => true,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Wake for ThreadWaker {
+impl Wake for WakerState {
     fn wake(self: Arc<Self>) {
         self.wake_by_ref();
     }
 
     fn wake_by_ref(self: &Arc<Self>) {
-        // First, try transitioning from IDLE -> NOTIFY, this does not require a lock.
-        let mut state = self.state.lock().unwrap();
-        let prev = *state;
-
-        if prev == WAKE {
-            return;
-        }
-
-        *state = WAKE;
-
-        if prev == IDLE {
-            return;
-        }
-
-        // The other half is sleeping, so we wake it up.
-        debug_assert_eq!(prev, SLEEP);
-        self.condvar.notify_one();
+        self.is_woken.store(true, Ordering::Release);
     }
 }
