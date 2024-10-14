@@ -23,4 +23,3 @@ fn test_spawn_stream_size_hint() {
     let spawn = task::spawn(SizedStream);
     assert_eq!(spawn.size_hint(), (100, Some(200)));
 }
-
