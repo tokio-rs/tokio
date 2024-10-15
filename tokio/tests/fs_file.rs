@@ -203,6 +203,7 @@ async fn set_max_buf_size_write() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)]
 #[cfg(unix)]
 async fn file_debug_fmt() {
     let tempfile = tempfile();

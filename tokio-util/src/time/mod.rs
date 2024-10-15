@@ -8,7 +8,7 @@
 //!
 //! This type must be used from within the context of the `Runtime`.
 
-use futures_core::Future;
+use std::future::Future;
 use std::time::Duration;
 use tokio::time::Timeout;
 

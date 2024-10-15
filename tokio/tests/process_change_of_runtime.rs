@@ -3,7 +3,7 @@
 // This tests test the behavior of `process::Command::spawn` when it is used
 // outside runtime, and when `process::Child::wait ` is used in a different
 // runtime from which `process::Command::spawn` is used.
-#![cfg(all(unix, not(target_os = "freebsd")))]
+#![cfg(all(unix, not(target_os = "freebsd"), not(miri)))]
 
 use std::process::Stdio;
 use tokio::{process::Command, runtime::Runtime};

@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
+#![cfg(not(miri))] // Too slow on Miri.
 
 use std::future::Future;
 use std::task::Context;

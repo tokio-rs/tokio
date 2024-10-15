@@ -9,6 +9,7 @@ use std::net::TcpStream;
 use std::thread;
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)]
 async fn echo_server() {
     const N: usize = 1024;
 

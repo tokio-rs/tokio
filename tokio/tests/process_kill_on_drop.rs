@@ -1,4 +1,4 @@
-#![cfg(all(unix, feature = "process"))]
+#![cfg(all(unix, feature = "process", not(miri)))]
 #![warn(rust_2018_idioms)]
 
 use std::io::ErrorKind;
