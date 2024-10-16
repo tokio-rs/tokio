@@ -1115,7 +1115,13 @@ jobs:
           # using LC_ALL to en_US.UTF8 to be consistent in different
           # environments.
 
-          sed '1d; $d' spellcheck.dic | LC_ALL=en_US.UTF8 sort -uc
+          (
+            sed '1d; $d' spellcheck.dic | LC_ALL=en_US.UTF8 sort -uc
+          ) || {
+            echo "Dictionary is not in sorted order. Correct order is:"
+            LC_ALL=en_US.UTF8 sort -u <(sed '1d; $d' spellcheck.dic)
+            false
+          }
       - name: Run cargo-spellcheck
         run: cargo spellcheck --code 1
 
