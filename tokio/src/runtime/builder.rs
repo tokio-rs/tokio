@@ -1222,7 +1222,6 @@ impl Builder {
         ///     .unwrap();
         /// ```
         ///
-        ///
         /// [`LogHistogram`]: crate::runtime::LogHistogram
         /// [default configuration]: crate::runtime::LogHistogramBuilder
         pub fn metrics_poll_count_histogram_configuration(&mut self, configuration: HistogramConfiguration) -> &mut Self {

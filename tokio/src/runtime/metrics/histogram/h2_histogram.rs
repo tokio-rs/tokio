@@ -121,7 +121,8 @@ impl LogHistogram {
 /// the range from 0 to [`LogHistogramBuilder::min_value`] and the final bucket covers
 /// [`LogHistogramBuilder::max_value`] to infinity. The precision is bounded to the specified
 /// [`LogHistogramBuilder::max_error`]. Specifically, the precision is the next smallest value
-/// of `2^-p` such that it is smaller than the requested precision.
+/// of `2^-p` such that it is smaller than the requested max error. You can also select `p` directly
+/// with [`LogHistogramBuilder::precision_exact`].
 ///
 /// Depending on the selected parameters, the number of buckets required is variable. To ensure
 /// that the histogram size is acceptable, callers may call [`LogHistogramBuilder::max_buckets`].
