@@ -15,8 +15,10 @@ pub(crate) struct Histogram {
     /// The histogram buckets
     buckets: Box<[MetricAtomicU64]>,
 
-    /// Bucket scale, linear or log
-    configuration: HistogramType,
+    /// The type of the histogram
+    ///
+    /// This handles `fn(bucket) -> Range` and `fn(value) -> bucket`
+    histogram_type: HistogramType,
 }
 
 #[derive(Debug, Clone)]
@@ -98,6 +100,7 @@ cfg_unstable! {
 pub(crate) enum HistogramType {
     /// Linear histogram with fixed width buckets
     Linear(LinearHistogram),
+
     /// Old log histogram where each bucket doubles in size
     LogLegacy(LegacyLogHistogram),
 
@@ -196,7 +199,7 @@ impl Histogram {
     }
 
     pub(crate) fn bucket_range(&self, bucket: usize) -> Range<u64> {
-        self.configuration.bucket_range(bucket)
+        self.histogram_type.bucket_range(bucket)
     }
 }
 
@@ -206,7 +209,7 @@ impl HistogramBatch {
 
         HistogramBatch {
             buckets,
-            configuration: histogram.configuration,
+            configuration: histogram.histogram_type,
         }
     }
 
@@ -215,7 +218,7 @@ impl HistogramBatch {
     }
 
     pub(crate) fn submit(&self, histogram: &Histogram) {
-        debug_assert_eq!(self.configuration, histogram.configuration);
+        debug_assert_eq!(self.configuration, histogram.histogram_type);
         debug_assert_eq!(self.buckets.len(), histogram.buckets.len());
 
         for i in 0..self.buckets.len() {
@@ -240,33 +243,22 @@ impl HistogramBuilder {
     }
 
     pub(crate) fn legacy_mut(&mut self, f: impl Fn(&mut LegacyBuilder)) {
-        if let Some(legacy) = &mut self.legacy {
-            f(legacy)
-        } else {
-            let mut legacy = LegacyBuilder::default();
-            f(&mut legacy);
-            self.legacy = Some(legacy)
-        }
+        let legacy = self.legacy.get_or_insert_with(|| LegacyBuilder::default());
+        f(legacy);
     }
 
     pub(crate) fn build(&self) -> Histogram {
-        let configuration = match &self.legacy {
+        let histogram_type = match &self.legacy {
             Some(legacy) => {
-                let mut resolution = legacy.resolution;
-
-                assert!(resolution > 0);
-
-                if matches!(legacy.scale, HistogramScale::Log) {
-                    resolution = resolution.next_power_of_two();
-                }
+                assert!(legacy.resolution > 0);
                 match legacy.scale {
                     HistogramScale::Linear => HistogramType::Linear(LinearHistogram {
                         num_buckets: legacy.num_buckets,
-                        bucket_width: resolution,
+                        bucket_width: legacy.resolution,
                     }),
                     HistogramScale::Log => HistogramType::LogLegacy(LegacyLogHistogram {
                         num_buckets: legacy.num_buckets,
-                        first_bucket_width: resolution,
+                        first_bucket_width: legacy.resolution.next_power_of_two(),
                     }),
                 }
             }
@@ -279,7 +271,7 @@ impl HistogramBuilder {
                 .map(|_| MetricAtomicU64::new(0))
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
-            configuration,
+            histogram_type: histogram_type,
         }
     }
 }

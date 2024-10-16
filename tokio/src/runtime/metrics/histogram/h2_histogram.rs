@@ -120,7 +120,7 @@ impl LogHistogram {
 /// The log-scaled histogram implements an H2 histogram where the first bucket covers
 /// the range from 0 to [`LogHistogramBuilder::min_value`] and the final bucket covers
 /// [`LogHistogramBuilder::max_value`] to infinity. The precision is bounded to the specified
-/// [`LogHistogramBuilder::precision`]. Specifically, the precision is the next smallest value
+/// [`LogHistogramBuilder::max_error`]. Specifically, the precision is the next smallest value
 /// of `2^-p` such that it is smaller than the requested precision.
 ///
 /// Depending on the selected parameters, the number of buckets required is variable. To ensure
@@ -162,7 +162,7 @@ impl LogHistogramBuilder {
     /// # Panics
     /// - `precision` < 0
     /// - `precision` > 1
-    pub fn precision(mut self, max_error: f64) -> Self {
+    pub fn max_error(mut self, max_error: f64) -> Self {
         if max_error < 0.0 {
             panic!("precision must be >= 0");
         };
@@ -460,7 +460,7 @@ mod test {
     #[test]
     fn max_buckets_enforcement() {
         let error = LogHistogram::builder()
-            .precision(0.001)
+            .max_error(0.001)
             .max_buckets(5)
             .expect_err("this produces way more than 5 buckets");
         let num_buckets = match error {
