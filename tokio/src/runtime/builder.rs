@@ -1169,7 +1169,7 @@ impl Builder {
         /// better granularity with low memory usage, use [`LogHistogram`] instead.
         ///
         /// # Examples
-        /// Configure a `LogHistogram` with default configuration:
+        /// Configure a [`LogHistogram`] with [default configuration]:
         /// ```
         /// use tokio::runtime;
         /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
@@ -1183,7 +1183,7 @@ impl Builder {
         ///     .unwrap();
         /// ```
         ///
-        /// Configure a linear histogram
+        /// Configure a linear histogram with 100 buckets, each 10μs wide
         /// ```
         /// use tokio::runtime;
         /// use std::time::Duration;
@@ -1198,7 +1198,33 @@ impl Builder {
         ///     .unwrap();
         /// ```
         ///
+        /// Configure a [`LogHistogram`] with the following settings:
+        /// - Measure times from 100ns to 120s
+        /// - Max error of 0.1
+        /// - No more than 1024 buckets
+        /// ```
+        /// use std::time::Duration;
+        /// use tokio::runtime;
+        /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_count_histogram()
+        ///     .metrics_poll_count_histogram_configuration(
+        ///         HistogramConfiguration::log(LogHistogram::builder()
+        ///             .max_value(Duration::from_secs(120))
+        ///             .min_value(Duration::from_nanos(100))
+        ///             .max_error(0.1)
+        ///             .max_buckets(1024)
+        ///             .expect("configuration uses 488 buckets")
+        ///         )
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        ///
+        ///
         /// [`LogHistogram`]: crate::runtime::LogHistogram
+        /// [default configuration]: crate::runtime::LogHistogramBuilder
         pub fn metrics_poll_count_histogram_configuration(&mut self, configuration: HistogramConfiguration) -> &mut Self {
             self.metrics_poll_count_histogram.histogram_type = configuration.inner;
             self

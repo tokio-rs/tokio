@@ -400,7 +400,7 @@ fn log_histogram() {
             LogHistogram::builder()
                 .max_value(Duration::from_secs(60))
                 .min_value(Duration::from_nanos(100))
-                .precision(0.25),
+                .max_error(0.25),
         ))
         .build()
         .unwrap();
