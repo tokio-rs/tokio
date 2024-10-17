@@ -171,6 +171,6 @@ cfg_rt_multi_thread! {
     }
 }
 
-fn duration_as_u64(dur: Duration) -> u64 {
+pub(crate) fn duration_as_u64(dur: Duration) -> u64 {
     u64::try_from(dur.as_nanos()).unwrap_or(u64::MAX)
 }
