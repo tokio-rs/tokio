@@ -419,6 +419,16 @@ impl<T> Receiver<T> {
         crate::future::block_on(self.recv())
     }
 
+    /// Variant of [`Self::recv_many`] for blocking contexts.
+    ///
+    /// The same conditions as in [`Self::blocking_recv`] apply.
+    #[track_caller]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(alias = "recv_many_blocking"))]
+    pub fn blocking_recv_many(&mut self, buffer: &mut Vec<T>, limit: usize) -> usize {
+        crate::future::block_on(self.recv_many(buffer, limit))
+    }
+
     /// Closes the receiving half of a channel without dropping it.
     ///
     /// This prevents any further messages from being sent on the channel while
