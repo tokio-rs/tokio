@@ -2,7 +2,8 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi"), target_has_atomic = "64"))]
 
-use std::sync::{Arc, Barrier};
+use std::sync::mpsc;
+use std::time::Duration;
 use tokio::runtime::Runtime;
 
 #[test]
@@ -68,36 +69,47 @@ fn injection_queue_depth_multi_thread() {
     let rt = threaded();
     let metrics = rt.metrics();
 
-    let barrier1 = Arc::new(Barrier::new(3));
-    let barrier2 = Arc::new(Barrier::new(3));
+    'next_try: for _ in 0..10 {
+        let (tx, rx) = mpsc::channel();
 
-    // Spawn a task per runtime worker to block it.
-    for _ in 0..2 {
-        let barrier1 = barrier1.clone();
-        let barrier2 = barrier2.clone();
-        rt.spawn(async move {
-            barrier1.wait();
-            barrier2.wait();
-        });
-    }
+        // Dropping _blocking_tasks will cause the blocking tasks to finish.
+        let _blocking_tasks: Vec<_> = (0..2)
+            .map(|_| {
+                let tx = tx.clone();
+                let (task, barrier) = mpsc::channel::<()>();
 
-    barrier1.wait();
+                // Spawn a task per runtime worker to block it.
+                rt.spawn(async move {
+                    tx.send(()).unwrap();
+                    barrier.recv().ok();
+                });
 
-    let mut fail: Option<String> = None;
-    for i in 0..10 {
-        let depth = metrics.injection_queue_depth();
-        if i != depth {
-            fail = Some(format!("{i} is not equal to {depth}"));
-            break;
+                task
+            })
+            .collect();
+
+        // Make sure both tasks are blocking the runtime so that we can
+        // deterministically fill up the injection queue with pending tasks.
+        //
+        // If this times out, we deadlocked the runtime (which can happen and is
+        // expected behaviour) and retry the test until we manage to either not
+        // deadlock the runtime or exhaust all tries, the latter causing the
+        // test to fail.
+        for _ in 0..2 {
+            if rx.recv_timeout(Duration::from_secs(1)).is_err() {
+                continue 'next_try;
+            }
         }
-        rt.spawn(async {});
+
+        for i in 0..10 {
+            assert_eq!(i, metrics.injection_queue_depth());
+            rt.spawn(async {});
+        }
+
+        return;
     }
 
-    barrier2.wait();
-
-    if let Some(fail) = fail {
-        panic!("{fail}");
-    }
+    panic!("runtime deadlocked each try");
 }
 
 fn current_thread() -> Runtime {
