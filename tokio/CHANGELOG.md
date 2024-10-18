@@ -2,7 +2,7 @@
 
 ### Added
 
-- metrics: stabilize `injection_queue_depth` ([#6854])
+- metrics: stabilize `global_queue_depth` ([#6854], [#6918])
 - net: add conversions for unix `SocketAddr` ([#6868])
 - sync: add `watch::Sender::sender_count` ([#6836])
 - sync: add `mpsc::Receiver::blocking_recv_many` ([#6867])
@@ -54,6 +54,7 @@
 [#6881]: https://github.com/tokio-rs/tokio/pull/6881
 [#6890]: https://github.com/tokio-rs/tokio/pull/6890
 [#6891]: https://github.com/tokio-rs/tokio/pull/6891
+[#6918]: https://github.com/tokio-rs/tokio/pull/6918
 
 # 1.40.0 (August 30th, 2024)
 
