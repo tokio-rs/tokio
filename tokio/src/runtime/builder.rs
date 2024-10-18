@@ -728,7 +728,7 @@ impl Builder {
     /// # }
     /// ```
     #[cfg(all(not(loom), tokio_unstable))]
-    #[cfg_attr(docsrs, doc(cfg(all(not(loom), tokio_unstable))))]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_task_spawn<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
