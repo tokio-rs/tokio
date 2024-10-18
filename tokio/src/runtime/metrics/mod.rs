@@ -18,7 +18,7 @@ cfg_unstable_metrics! {
     mod histogram;
     pub(crate) use histogram::{Histogram, HistogramBatch, HistogramBuilder};
     #[allow(unreachable_pub)] // rust-lang/rust#57411
-    pub use histogram::HistogramScale;
+    pub use histogram::{HistogramScale, HistogramConfiguration, LogHistogram, LogHistogramBuilder, InvalidHistogramConfiguration};
 
 
     mod scheduler;

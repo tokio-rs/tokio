@@ -1,38 +1,53 @@
+mod h2_histogram;
+
+pub use h2_histogram::{InvalidHistogramConfiguration, LogHistogram, LogHistogramBuilder};
+
 use crate::util::metric_atomics::MetricAtomicU64;
 use std::sync::atomic::Ordering::Relaxed;
 
+use crate::runtime::metrics::batch::duration_as_u64;
 use std::cmp;
 use std::ops::Range;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub(crate) struct Histogram {
     /// The histogram buckets
     buckets: Box<[MetricAtomicU64]>,
 
-    /// Bucket scale, linear or log
-    scale: HistogramScale,
-
-    /// Minimum resolution
-    resolution: u64,
+    /// The type of the histogram
+    ///
+    /// This handles `fn(bucket) -> Range` and `fn(value) -> bucket`
+    histogram_type: HistogramType,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct HistogramBuilder {
-    /// Histogram scale
-    pub(crate) scale: HistogramScale,
+    pub(crate) histogram_type: HistogramType,
+    pub(crate) legacy: Option<LegacyBuilder>,
+}
 
-    /// Must be a power of 2
+#[derive(Debug, Clone)]
+pub(crate) struct LegacyBuilder {
     pub(crate) resolution: u64,
-
-    /// Number of buckets
+    pub(crate) scale: HistogramScale,
     pub(crate) num_buckets: usize,
+}
+
+impl Default for LegacyBuilder {
+    fn default() -> Self {
+        Self {
+            resolution: 100_000,
+            num_buckets: 10,
+            scale: HistogramScale::Linear,
+        }
+    }
 }
 
 #[derive(Debug)]
 pub(crate) struct HistogramBatch {
     buckets: Box<[u64]>,
-    scale: HistogramScale,
-    resolution: u64,
+    configuration: HistogramType,
 }
 
 cfg_unstable! {
@@ -47,6 +62,129 @@ cfg_unstable! {
         /// Logarithmic bucket scale
         Log,
     }
+
+    /// Configuration for the poll count histogram
+    #[derive(Debug, Clone)]
+    pub struct HistogramConfiguration {
+        pub(crate) inner: HistogramType
+    }
+
+    impl HistogramConfiguration {
+        /// Create a linear bucketed histogram
+        ///
+        /// # Arguments
+        ///
+        /// * `bucket_width`: The width of each bucket
+        /// * `num_buckets`: The number of buckets
+        pub fn linear(bucket_width: Duration, num_buckets: usize) -> Self {
+            Self {
+                inner: HistogramType::Linear(LinearHistogram {
+                    num_buckets,
+                    bucket_width: duration_as_u64(bucket_width),
+                }),
+            }
+        }
+
+        /// Creates a log-scaled bucketed histogram
+        ///
+        /// See [`LogHistogramBuilder`] for information about configuration & defaults
+        pub fn log(configuration: impl Into<LogHistogram>) -> Self {
+            Self {
+                inner: HistogramType::H2(configuration.into()),
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum HistogramType {
+    /// Linear histogram with fixed width buckets
+    Linear(LinearHistogram),
+
+    /// Old log histogram where each bucket doubles in size
+    LogLegacy(LegacyLogHistogram),
+
+    /// Log histogram implementation based on H2 Histograms
+    H2(LogHistogram),
+}
+
+impl HistogramType {
+    pub(crate) fn num_buckets(&self) -> usize {
+        match self {
+            HistogramType::Linear(linear) => linear.num_buckets,
+            HistogramType::LogLegacy(log) => log.num_buckets,
+            HistogramType::H2(h2) => h2.num_buckets,
+        }
+    }
+    fn value_to_bucket(&self, value: u64) -> usize {
+        match self {
+            HistogramType::Linear(LinearHistogram {
+                num_buckets,
+                bucket_width,
+            }) => {
+                let max = num_buckets - 1;
+                cmp::min(value / *bucket_width, max as u64) as usize
+            }
+            HistogramType::LogLegacy(LegacyLogHistogram {
+                num_buckets,
+                first_bucket_width,
+            }) => {
+                let max = num_buckets - 1;
+                if value < *first_bucket_width {
+                    0
+                } else {
+                    let significant_digits = 64 - value.leading_zeros();
+                    let bucket_digits = 64 - (first_bucket_width - 1).leading_zeros();
+                    cmp::min(significant_digits as usize - bucket_digits as usize, max)
+                }
+            }
+            HistogramType::H2(log_histogram) => log_histogram.value_to_bucket(value),
+        }
+    }
+
+    fn bucket_range(&self, bucket: usize) -> Range<u64> {
+        match self {
+            HistogramType::Linear(LinearHistogram {
+                num_buckets,
+                bucket_width,
+            }) => Range {
+                start: bucket_width * bucket as u64,
+                end: if bucket == num_buckets - 1 {
+                    u64::MAX
+                } else {
+                    bucket_width * (bucket as u64 + 1)
+                },
+            },
+            HistogramType::LogLegacy(LegacyLogHistogram {
+                num_buckets,
+                first_bucket_width,
+            }) => Range {
+                start: if bucket == 0 {
+                    0
+                } else {
+                    first_bucket_width << (bucket - 1)
+                },
+                end: if bucket == num_buckets - 1 {
+                    u64::MAX
+                } else {
+                    first_bucket_width << bucket
+                },
+            },
+            HistogramType::H2(log) => log.bucket_range(bucket),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub(crate) struct LinearHistogram {
+    num_buckets: usize,
+    bucket_width: u64,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub(crate) struct LegacyLogHistogram {
+    num_buckets: usize,
+    first_bucket_width: u64,
 }
 
 impl Histogram {
@@ -61,28 +199,7 @@ impl Histogram {
     }
 
     pub(crate) fn bucket_range(&self, bucket: usize) -> Range<u64> {
-        match self.scale {
-            HistogramScale::Log => Range {
-                start: if bucket == 0 {
-                    0
-                } else {
-                    self.resolution << (bucket - 1)
-                },
-                end: if bucket == self.buckets.len() - 1 {
-                    u64::MAX
-                } else {
-                    self.resolution << bucket
-                },
-            },
-            HistogramScale::Linear => Range {
-                start: self.resolution * bucket as u64,
-                end: if bucket == self.buckets.len() - 1 {
-                    u64::MAX
-                } else {
-                    self.resolution * (bucket as u64 + 1)
-                },
-            },
-        }
+        self.histogram_type.bucket_range(bucket)
     }
 }
 
@@ -92,8 +209,7 @@ impl HistogramBatch {
 
         HistogramBatch {
             buckets,
-            scale: histogram.scale,
-            resolution: histogram.resolution,
+            configuration: histogram.histogram_type,
         }
     }
 
@@ -102,8 +218,7 @@ impl HistogramBatch {
     }
 
     pub(crate) fn submit(&self, histogram: &Histogram) {
-        debug_assert_eq!(self.scale, histogram.scale);
-        debug_assert_eq!(self.resolution, histogram.resolution);
+        debug_assert_eq!(self.configuration, histogram.histogram_type);
         debug_assert_eq!(self.buckets.len(), histogram.buckets.len());
 
         for i in 0..self.buckets.len() {
@@ -112,52 +227,51 @@ impl HistogramBatch {
     }
 
     fn value_to_bucket(&self, value: u64) -> usize {
-        match self.scale {
-            HistogramScale::Linear => {
-                let max = self.buckets.len() - 1;
-                cmp::min(value / self.resolution, max as u64) as usize
-            }
-            HistogramScale::Log => {
-                let max = self.buckets.len() - 1;
-
-                if value < self.resolution {
-                    0
-                } else {
-                    let significant_digits = 64 - value.leading_zeros();
-                    let bucket_digits = 64 - (self.resolution - 1).leading_zeros();
-                    cmp::min(significant_digits as usize - bucket_digits as usize, max)
-                }
-            }
-        }
+        self.configuration.value_to_bucket(value)
     }
 }
 
 impl HistogramBuilder {
     pub(crate) fn new() -> HistogramBuilder {
         HistogramBuilder {
-            scale: HistogramScale::Linear,
-            // Resolution is in nanoseconds.
-            resolution: 100_000,
-            num_buckets: 10,
+            histogram_type: HistogramType::Linear(LinearHistogram {
+                num_buckets: 10,
+                bucket_width: 100_000,
+            }),
+            legacy: None,
         }
     }
 
+    pub(crate) fn legacy_mut(&mut self, f: impl Fn(&mut LegacyBuilder)) {
+        let legacy = self.legacy.get_or_insert_with(|| LegacyBuilder::default());
+        f(legacy);
+    }
+
     pub(crate) fn build(&self) -> Histogram {
-        let mut resolution = self.resolution;
-
-        assert!(resolution > 0);
-
-        if matches!(self.scale, HistogramScale::Log) {
-            resolution = resolution.next_power_of_two();
-        }
+        let histogram_type = match &self.legacy {
+            Some(legacy) => {
+                assert!(legacy.resolution > 0);
+                match legacy.scale {
+                    HistogramScale::Linear => HistogramType::Linear(LinearHistogram {
+                        num_buckets: legacy.num_buckets,
+                        bucket_width: legacy.resolution,
+                    }),
+                    HistogramScale::Log => HistogramType::LogLegacy(LegacyLogHistogram {
+                        num_buckets: legacy.num_buckets,
+                        first_bucket_width: legacy.resolution.next_power_of_two(),
+                    }),
+                }
+            }
+            None => self.histogram_type,
+        };
+        let num_buckets = self.histogram_type.num_buckets();
 
         Histogram {
-            buckets: (0..self.num_buckets)
+            buckets: (0..num_buckets)
                 .map(|_| MetricAtomicU64::new(0))
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
-            resolution,
-            scale: self.scale,
+            histogram_type: histogram_type,
         }
     }
 }
@@ -178,12 +292,25 @@ mod test {
         }};
     }
 
+    fn linear(resolution: u64, num_buckets: usize) -> Histogram {
+        HistogramBuilder {
+            histogram_type: HistogramType::Linear(LinearHistogram {
+                bucket_width: resolution,
+                num_buckets,
+            }),
+            legacy: None,
+        }
+        .build()
+    }
+
     #[test]
     fn log_scale_resolution_1() {
         let h = HistogramBuilder {
-            scale: HistogramScale::Log,
-            resolution: 1,
-            num_buckets: 10,
+            histogram_type: HistogramType::LogLegacy(LegacyLogHistogram {
+                first_bucket_width: 1,
+                num_buckets: 10,
+            }),
+            legacy: None,
         }
         .build();
 
@@ -233,9 +360,11 @@ mod test {
     #[test]
     fn log_scale_resolution_2() {
         let h = HistogramBuilder {
-            scale: HistogramScale::Log,
-            resolution: 2,
-            num_buckets: 10,
+            histogram_type: HistogramType::LogLegacy(LegacyLogHistogram {
+                num_buckets: 10,
+                first_bucket_width: 2,
+            }),
+            legacy: None,
         }
         .build();
 
@@ -319,12 +448,7 @@ mod test {
 
     #[test]
     fn linear_scale_resolution_1() {
-        let h = HistogramBuilder {
-            scale: HistogramScale::Linear,
-            resolution: 1,
-            num_buckets: 10,
-        }
-        .build();
+        let h = linear(1, 10);
 
         assert_eq!(h.bucket_range(0), 0..1);
         assert_eq!(h.bucket_range(1), 1..2);
@@ -380,12 +504,7 @@ mod test {
 
     #[test]
     fn linear_scale_resolution_100() {
-        let h = HistogramBuilder {
-            scale: HistogramScale::Linear,
-            resolution: 100,
-            num_buckets: 10,
-        }
-        .build();
+        let h = linear(100, 10);
 
         assert_eq!(h.bucket_range(0), 0..100);
         assert_eq!(h.bucket_range(1), 100..200);
@@ -459,12 +578,7 @@ mod test {
 
     #[test]
     fn inc_by_more_than_one() {
-        let h = HistogramBuilder {
-            scale: HistogramScale::Linear,
-            resolution: 100,
-            num_buckets: 10,
-        }
-        .build();
+        let h = linear(100, 10);
 
         let mut b = HistogramBatch::from_histogram(&h);
 
