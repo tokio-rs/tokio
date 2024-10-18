@@ -47,7 +47,7 @@ fn num_alive_tasks() {
 }
 
 #[test]
-fn injection_queue_depth_current_thread() {
+fn global_queue_depth_current_thread() {
     use std::thread;
 
     let rt = current_thread();
@@ -60,11 +60,11 @@ fn injection_queue_depth_current_thread() {
     .join()
     .unwrap();
 
-    assert_eq!(1, metrics.injection_queue_depth());
+    assert_eq!(1, metrics.global_queue_depth());
 }
 
 #[test]
-fn injection_queue_depth_multi_thread() {
+fn global_queue_depth_multi_thread() {
     let rt = threaded();
     let metrics = rt.metrics();
 
@@ -85,7 +85,7 @@ fn injection_queue_depth_multi_thread() {
 
     let mut fail: Option<String> = None;
     for i in 0..10 {
-        let depth = metrics.injection_queue_depth();
+        let depth = metrics.global_queue_depth();
         if i != depth {
             fail = Some(format!("{i} is not equal to {depth}"));
             break;
