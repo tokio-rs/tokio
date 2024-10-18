@@ -56,6 +56,7 @@ struct FinalConfig {
     start_paused: Option<bool>,
     crate_name: Option<Path>,
     unhandled_panic: Option<UnhandledPanic>,
+    thread_name: Option<String>,
 }
 
 /// Config used in case of the attribute not being able to build a valid config
@@ -65,6 +66,7 @@ const DEFAULT_ERROR_CONFIG: FinalConfig = FinalConfig {
     start_paused: None,
     crate_name: None,
     unhandled_panic: None,
+    thread_name: None,
 };
 
 struct Configuration {
@@ -76,6 +78,7 @@ struct Configuration {
     is_test: bool,
     crate_name: Option<Path>,
     unhandled_panic: Option<(UnhandledPanic, Span)>,
+    thread_name: Option<String>,
 }
 
 impl Configuration {
@@ -92,6 +95,7 @@ impl Configuration {
             is_test,
             crate_name: None,
             unhandled_panic: None,
+            thread_name: None,
         }
     }
 
@@ -165,6 +169,16 @@ impl Configuration {
         Ok(())
     }
 
+    fn set_thread_name(&mut self, thread_name: syn::Lit, span: Span) -> Result<(), syn::Error> {
+        if self.thread_name.is_some() {
+            return Err(syn::Error::new(span, "`thread_name` set multiple times."));
+        }
+
+        let thread_name = parse_string(thread_name, span, "thread_name")?;
+        self.thread_name = Some(thread_name);
+        Ok(())
+    }
+
     fn macro_name(&self) -> &'static str {
         if self.is_test {
             "tokio::test"
@@ -229,6 +243,7 @@ impl Configuration {
             worker_threads,
             start_paused,
             unhandled_panic,
+            thread_name: self.thread_name.clone(),
         })
     }
 }
@@ -340,9 +355,12 @@ fn build_config(
                         config
                             .set_unhandled_panic(lit.clone(), syn::spanned::Spanned::span(lit))?;
                     }
+                    "thread_name" => {
+                        config.set_thread_name(lit.clone(), syn::spanned::Spanned::span(lit))?;
+                    }
                     name => {
                         let msg = format!(
-                            "Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`",
+                            "Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`, `thread_name`",
                             name,
                         );
                         return Err(syn::Error::new_spanned(namevalue, msg));
@@ -372,7 +390,7 @@ fn build_config(
                         format!("The `{}` attribute requires an argument.", name)
                     }
                     name => {
-                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`.", name)
+                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`, `thread_name`.", name)
                     }
                 };
                 return Err(syn::Error::new_spanned(path, msg));
@@ -427,6 +445,9 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     if let Some(v) = config.unhandled_panic {
         let unhandled_panic = v.into_tokens(&crate_path);
         rt = quote_spanned! {last_stmt_start_span=> #rt.unhandled_panic(#unhandled_panic) };
+    }
+    if let Some(v) = config.thread_name {
+        rt = quote_spanned! {last_stmt_start_span=> #rt.thread_name(#v) };
     }
 
     let generated_attrs = if is_test {

@@ -150,6 +150,30 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 ///
+/// ### Configure name of spawned threads
+///
+/// ```rust
+/// #[tokio::main(thread_name = "foo")]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new_multi_thread()
+///         .thread_name("foo")
+///         .enable_all()
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
 /// ### Configure the runtime to start with time paused
 ///
 /// ```rust
