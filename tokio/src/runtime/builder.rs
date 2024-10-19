@@ -1,13 +1,16 @@
 #![cfg_attr(loom, allow(unused_imports))]
 
 use crate::runtime::handle::Handle;
-#[cfg(tokio_unstable)]
-use crate::runtime::TaskMeta;
 use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback};
+#[cfg(tokio_unstable)]
+use crate::runtime::{LocalOptions, LocalRuntime, TaskMeta};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
+use crate::runtime::blocking::BlockingPool;
+use crate::runtime::scheduler::CurrentThread;
 use std::fmt;
 use std::io;
+use std::thread::ThreadId;
 use std::time::Duration;
 
 /// Builds Tokio Runtime with custom configuration values.
@@ -800,6 +803,37 @@ impl Builder {
         }
     }
 
+    /// Creates the configured `LocalRuntime`.
+    ///
+    /// The returned `LocalRuntime` instance is ready to spawn tasks.
+    ///
+    /// # Panics
+    /// This will panic if `current_thread` is not the selected runtime flavor.
+    /// All other runtime flavors are unsupported by [`LocalRuntime`].
+    ///
+    /// [`LocalRuntime`]: [crate::runtime::LocalRuntime]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Builder;
+    ///
+    /// let rt  = Builder::new_current_thread().build_local(&mut Default::default()).unwrap();
+    ///
+    /// rt.block_on(async {
+    ///     println!("Hello from the Tokio runtime");
+    /// });
+    /// ```
+    #[allow(unused_variables, unreachable_patterns)]
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn build_local(&mut self, options: &LocalOptions) -> io::Result<LocalRuntime> {
+        match &self.kind {
+            Kind::CurrentThread => self.build_current_thread_local_runtime(),
+            _ => panic!("Only current_thread is supported when building a local runtime"),
+        }
+    }
+
     fn get_cfg(&self, workers: usize) -> driver::Cfg {
         driver::Cfg {
             enable_pause_time: match self.kind {
@@ -1191,8 +1225,40 @@ impl Builder {
     }
 
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::scheduler::{self, CurrentThread};
-        use crate::runtime::{runtime::Scheduler, Config};
+        use crate::runtime::runtime::Scheduler;
+
+        let (scheduler, handle, blocking_pool) =
+            self.build_current_thread_runtime_components(None)?;
+
+        Ok(Runtime::from_parts(
+            Scheduler::CurrentThread(scheduler),
+            handle,
+            blocking_pool,
+        ))
+    }
+
+    #[cfg(tokio_unstable)]
+    fn build_current_thread_local_runtime(&mut self) -> io::Result<LocalRuntime> {
+        use crate::runtime::local_runtime::LocalRuntimeScheduler;
+
+        let tid = std::thread::current().id();
+
+        let (scheduler, handle, blocking_pool) =
+            self.build_current_thread_runtime_components(Some(tid))?;
+
+        Ok(LocalRuntime::from_parts(
+            LocalRuntimeScheduler::CurrentThread(scheduler),
+            handle,
+            blocking_pool,
+        ))
+    }
+
+    fn build_current_thread_runtime_components(
+        &mut self,
+        local_tid: Option<ThreadId>,
+    ) -> io::Result<(CurrentThread, Handle, BlockingPool)> {
+        use crate::runtime::scheduler;
+        use crate::runtime::Config;
 
         let (driver, driver_handle) = driver::Driver::new(self.get_cfg(1))?;
 
@@ -1227,17 +1293,14 @@ impl Builder {
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
             },
+            local_tid,
         );
 
         let handle = Handle {
             inner: scheduler::Handle::CurrentThread(handle),
         };
 
-        Ok(Runtime::from_parts(
-            Scheduler::CurrentThread(scheduler),
-            handle,
-            blocking_pool,
-        ))
+        Ok((scheduler, handle, blocking_pool))
     }
 
     fn metrics_poll_count_histogram_builder(&self) -> Option<HistogramBuilder> {

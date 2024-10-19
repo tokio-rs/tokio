@@ -2,6 +2,7 @@
 #![allow(clippy::needless_range_loop)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
+#![cfg(not(miri))]
 
 // Tests to run on both current-thread & multi-thread runtime variants.
 

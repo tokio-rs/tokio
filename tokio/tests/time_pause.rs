@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
+#![cfg(not(miri))] // Too slow on miri.
 
 use rand::SeedableRng;
 use rand::{rngs::StdRng, Rng};

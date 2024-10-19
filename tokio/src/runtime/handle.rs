@@ -250,8 +250,8 @@ impl Handle {
     /// # Panics
     ///
     /// This function panics if the provided future panics, if called within an
-    /// asynchronous execution context, or if a timer future is executed on a
-    /// runtime that has been shut down.
+    /// asynchronous execution context, or if a timer future is executed on a runtime that has been
+    /// shut down.
     ///
     /// # Examples
     ///
@@ -346,6 +346,31 @@ impl Handle {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", _meta, id.as_u64());
         self.inner.spawn(future, id)
+    }
+
+    #[track_caller]
+    #[allow(dead_code)]
+    pub(crate) unsafe fn spawn_local_named<F>(
+        &self,
+        future: F,
+        _meta: SpawnMeta<'_>,
+    ) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        let id = crate::runtime::task::Id::next();
+        #[cfg(all(
+            tokio_unstable,
+            tokio_taskdump,
+            feature = "rt",
+            target_os = "linux",
+            any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+        ))]
+        let future = super::task::trace::Trace::root(future);
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let future = crate::util::trace::task(future, "task", _meta, id.as_u64());
+        self.inner.spawn_local(future, id)
     }
 
     /// Returns the flavor of the current `Runtime`.
