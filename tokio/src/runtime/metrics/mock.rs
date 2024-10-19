@@ -14,8 +14,11 @@ pub(crate) struct SchedulerMetrics {}
 /// without relying on the full metrics collection logic. In the real implementation,
 /// additional fields provide more detailed tracking of worker activity.
 ///
-/// This mock can be further enriched when stabailzing other worker metrics, such as
+/// This mock can be further enriched when stabilizing other worker metrics, such as
 /// `worker_thread_id`, `worker_park_count` and so on
+///
+/// When more worker metrics are stabilized, we can remove this mock and switch back
+/// to `batch::MetricsBatch`
 pub(crate) struct MetricsBatch {
     /// The total busy duration in nanoseconds.
     busy_duration_total: u64,

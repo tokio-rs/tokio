@@ -239,7 +239,6 @@ cfg_rt! {
             match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
         }
 
-        #[allow(dead_code)]
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
             match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
         }
