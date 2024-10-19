@@ -18,7 +18,7 @@ impl Handle {
         self.shared.injection_queue_depth()
     }
 
-    #[allow(dead_code)]
+    // #[allow(dead_code)]
     pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
         &self.shared.worker_metrics[worker]
     }

@@ -533,7 +533,7 @@ impl Handle {
         self.shared.inject.len()
     }
 
-    #[allow(dead_code)]
+    // #[allow(dead_code)]
     pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
         assert_eq!(0, worker);
         &self.shared.worker_metrics

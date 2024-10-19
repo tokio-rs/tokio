@@ -1,9 +1,12 @@
-use crate::runtime::metrics::Histogram;
 use crate::runtime::Config;
 use crate::util::metric_atomics::{MetricAtomicU64, MetricAtomicUsize};
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Mutex;
 use std::thread::ThreadId;
+
+cfg_unstable_metrics! {
+    use crate::runtime::metrics::Histogram;
+}
 
 /// Retrieve runtime worker metrics.
 ///
@@ -15,33 +18,51 @@ use std::thread::ThreadId;
 #[derive(Debug, Default)]
 #[repr(align(128))]
 pub(crate) struct WorkerMetrics {
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     ///  Number of times the worker parked.
     pub(crate) park_count: MetricAtomicU64,
 
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     ///  Number of times the worker parked and unparked.
     pub(crate) park_unpark_count: MetricAtomicU64,
 
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of times the worker woke then parked again without doing work.
     pub(crate) noop_count: MetricAtomicU64,
 
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of tasks the worker stole.
     pub(crate) steal_count: MetricAtomicU64,
 
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of times the worker stole
     pub(crate) steal_operations: MetricAtomicU64,
 
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of tasks the worker polled.
     pub(crate) poll_count: MetricAtomicU64,
 
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// EWMA task poll time, in nanoseconds.
     pub(crate) mean_poll_time: MetricAtomicU64,
 
     /// Amount of time the worker spent doing work vs. parking.
     pub(crate) busy_duration_total: MetricAtomicU64,
 
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of tasks scheduled for execution on the worker's local queue.
     pub(crate) local_schedule_count: MetricAtomicU64,
 
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of tasks moved from the local queue to the global queue to free space.
     pub(crate) overflow_count: MetricAtomicU64,
 
@@ -49,6 +70,8 @@ pub(crate) struct WorkerMetrics {
     /// current-thread scheduler.
     pub(crate) queue_depth: MetricAtomicUsize,
 
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// If `Some`, tracks the number of polls by duration range.
     pub(super) poll_count_histogram: Option<Histogram>,
 
@@ -57,13 +80,21 @@ pub(crate) struct WorkerMetrics {
 }
 
 impl WorkerMetrics {
-    pub(crate) fn from_config(config: &Config) -> WorkerMetrics {
-        let mut worker_metrics = WorkerMetrics::new();
-        worker_metrics.poll_count_histogram = config
-            .metrics_poll_count_histogram
-            .as_ref()
-            .map(|histogram_builder| histogram_builder.build());
-        worker_metrics
+    cfg_unstable_metrics! {
+        pub(crate) fn from_config(config: &Config) -> WorkerMetrics {
+            let mut worker_metrics = WorkerMetrics::new();
+            worker_metrics.poll_count_histogram = config
+                .metrics_poll_count_histogram
+                .as_ref()
+                .map(|histogram_builder| histogram_builder.build());
+            worker_metrics
+        }
+    }
+
+    cfg_not_unstable_metrics! {
+        pub(crate) fn from_config(_: &Config) -> WorkerMetrics {
+            WorkerMetrics::new()
+        }
     }
 
     pub(crate) fn new() -> WorkerMetrics {
