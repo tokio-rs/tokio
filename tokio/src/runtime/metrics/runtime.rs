@@ -71,11 +71,11 @@ impl RuntimeMetrics {
     }
 
     /// Returns the number of tasks currently scheduled in the runtime's
-    /// injection queue.
+    /// global queue.
     ///
     /// Tasks that are spawned or notified from a non-runtime thread are
-    /// scheduled using the runtime's injection queue. This metric returns the
-    /// **current** number of tasks pending in the injection queue. As such, the
+    /// scheduled using the runtime's global queue. This metric returns the
+    /// **current** number of tasks pending in the global queue. As such, the
     /// returned value may increase or decrease as new tasks are scheduled and
     /// processed.
     ///
@@ -88,11 +88,11 @@ impl RuntimeMetrics {
     /// async fn main() {
     ///     let metrics = Handle::current().metrics();
     ///
-    ///     let n = metrics.injection_queue_depth();
-    ///     println!("{} tasks currently pending in the runtime's injection queue", n);
+    ///     let n = metrics.global_queue_depth();
+    ///     println!("{} tasks currently pending in the runtime's global queue", n);
     /// }
     /// ```
-    pub fn injection_queue_depth(&self) -> usize {
+    pub fn global_queue_depth(&self) -> usize {
         self.handle.inner.injection_queue_depth()
     }
 
@@ -681,6 +681,13 @@ impl RuntimeMetrics {
             }
         }
 
+        /// Renamed to [`RuntimeMetrics::global_queue_depth`]
+        #[deprecated = "Renamed to global_queue_depth"]
+        #[doc(hidden)]
+        pub fn injection_queue_depth(&self) -> usize {
+            self.handle.inner.injection_queue_depth()
+        }
+
         /// Returns the number of tasks currently scheduled in the given worker's
         /// local queue.
         ///
@@ -760,7 +767,7 @@ impl RuntimeMetrics {
         /// task poll times.
         ///
         /// This value is configured by calling
-        /// [`metrics_poll_count_histogram_buckets()`] when building the runtime.
+        /// [`metrics_poll_count_histogram_configuration()`] when building the runtime.
         ///
         /// # Examples
         ///
@@ -781,8 +788,8 @@ impl RuntimeMetrics {
         /// }
         /// ```
         ///
-        /// [`metrics_poll_count_histogram_buckets()`]:
-        ///     crate::runtime::Builder::metrics_poll_count_histogram_buckets
+        /// [`metrics_poll_count_histogram_configuration()`]:
+        ///     crate::runtime::Builder::metrics_poll_count_histogram_configuration
         pub fn poll_count_histogram_num_buckets(&self) -> usize {
             self.handle
                 .inner
@@ -796,7 +803,7 @@ impl RuntimeMetrics {
         /// Returns the range of task poll times tracked by the given bucket.
         ///
         /// This value is configured by calling
-        /// [`metrics_poll_count_histogram_resolution()`] when building the runtime.
+        /// [`metrics_poll_count_histogram_configuration()`] when building the runtime.
         ///
         /// # Panics
         ///
@@ -825,8 +832,8 @@ impl RuntimeMetrics {
         /// }
         /// ```
         ///
-        /// [`metrics_poll_count_histogram_resolution()`]:
-        ///     crate::runtime::Builder::metrics_poll_count_histogram_resolution
+        /// [`metrics_poll_count_histogram_configuration()`]:
+        ///     crate::runtime::Builder::metrics_poll_count_histogram_configuration
         #[track_caller]
         pub fn poll_count_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
             self.handle
