@@ -357,7 +357,7 @@ fn worker_poll_count_and_time() {
     // Does not populate the histogram
     assert!(!metrics.poll_time_histogram_enabled());
     for i in 0..10 {
-        assert_eq!(0, metrics.poll_count_histogram_bucket_count(0, i));
+        assert_eq!(0, metrics.poll_time_histogram_bucket_count(0, i));
     }
 
     let rt = threaded();
@@ -385,7 +385,7 @@ fn worker_poll_count_and_time() {
     assert!(!metrics.poll_time_histogram_enabled());
     for n in 0..metrics.num_workers() {
         for i in 0..10 {
-            assert_eq!(0, metrics.poll_count_histogram_bucket_count(n, i));
+            assert_eq!(0, metrics.poll_time_histogram_bucket_count(n, i));
         }
     }
 }
@@ -427,7 +427,7 @@ fn log_histogram() {
     );
     let n = (0..metrics.num_workers())
         .flat_map(|i| (0..num_buckets).map(move |j| (i, j)))
-        .map(|(worker, bucket)| metrics.poll_count_histogram_bucket_count(worker, bucket))
+        .map(|(worker, bucket)| metrics.poll_time_histogram_bucket_count(worker, bucket))
         .sum();
     assert_eq!(N, n);
 }
@@ -489,7 +489,7 @@ fn worker_poll_count_histogram() {
 
         let n = (0..num_workers)
             .flat_map(|i| (0..num_buckets).map(move |j| (i, j)))
-            .map(|(worker, bucket)| metrics.poll_count_histogram_bucket_count(worker, bucket))
+            .map(|(worker, bucket)| metrics.poll_time_histogram_bucket_count(worker, bucket))
             .sum();
         assert_eq!(N, n);
     }

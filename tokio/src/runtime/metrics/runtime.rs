@@ -813,7 +813,6 @@ impl RuntimeMetrics {
         #[deprecated(note = "renamed to `poll_time_histogram_num_buckets`.")]
         pub fn poll_count_histogram_num_buckets(&self) -> usize {
             self.poll_time_histogram_num_buckets()
-
         }
 
         /// Returns the range of task poll times tracked by the given bucket.
@@ -923,7 +922,7 @@ impl RuntimeMetrics {
             ///
             ///             for worker in 0..metrics.num_workers() {
             ///                 for i in 0..buckets {
-            ///                     let count = metrics.poll_count_histogram_bucket_count(worker, i);
+            ///                     let count = metrics.poll_time_histogram_bucket_count(worker, i);
             ///                     println!("Poll count {}", count);
             ///                 }
             ///             }
@@ -933,8 +932,7 @@ impl RuntimeMetrics {
             ///
             /// [`poll_time_histogram_bucket_range()`]: crate::runtime::RuntimeMetrics::poll_time_histogram_bucket_range
             #[track_caller]
-            #[doc(hidden)]
-            pub fn poll_count_histogram_bucket_count(&self, worker: usize, bucket: usize) -> u64 {
+            pub fn poll_time_histogram_bucket_count(&self, worker: usize, bucket: usize) -> u64 {
                 self.handle
                     .inner
                     .worker_metrics(worker)
@@ -942,6 +940,12 @@ impl RuntimeMetrics {
                     .as_ref()
                     .map(|histogram| histogram.get(bucket))
                     .unwrap_or_default()
+            }
+
+            #[doc(hidden)]
+            #[deprecated(note = "use `poll_time_histogram_bucket_count` instead")]
+            pub fn poll_count_histogram_bucket_count(&self, worker: usize, bucket: usize) -> u64 {
+                self.poll_time_histogram_bucket_count(worker, bucket)
             }
 
             /// Returns the mean duration of task polls, in nanoseconds.

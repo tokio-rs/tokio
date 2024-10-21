@@ -1137,6 +1137,7 @@ impl Builder {
         ///
         /// [`enable_metrics_poll_time_histogram()`]: Builder::enable_metrics_poll_time_histogram
         #[deprecated(note = "`poll_count_histogram` related methods have been renamed `poll_time_histogram` to better reflect their functionality.")]
+        #[doc(hidden)]
         pub fn enable_metrics_poll_count_histogram(&mut self) -> &mut Self {
             self.enable_metrics_poll_time_histogram()
         }
