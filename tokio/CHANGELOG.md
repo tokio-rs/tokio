@@ -55,8 +55,8 @@
 [#6881]: https://github.com/tokio-rs/tokio/pull/6881
 [#6890]: https://github.com/tokio-rs/tokio/pull/6890
 [#6891]: https://github.com/tokio-rs/tokio/pull/6891
-[#6918]: https://github.com/tokio-rs/tokio/pull/6918
 [#6897]: https://github.com/tokio-rs/tokio/pull/6897
+[#6918]: https://github.com/tokio-rs/tokio/pull/6918
 
 # 1.40.0 (August 30th, 2024)
 
