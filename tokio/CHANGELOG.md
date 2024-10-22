@@ -11,6 +11,7 @@
 ### Added (unstable)
 
 - metrics: add H2 Histogram option to improve histogram granularity ([#6897])
+- metrics: rename some histogram apis ([#6924])
 - runtime: add `LocalRuntime` ([#6808])
 
 ### Changed
@@ -57,6 +58,7 @@
 [#6891]: https://github.com/tokio-rs/tokio/pull/6891
 [#6897]: https://github.com/tokio-rs/tokio/pull/6897
 [#6918]: https://github.com/tokio-rs/tokio/pull/6918
+[#6924]: https://github.com/tokio-rs/tokio/pull/6924
 
 # 1.40.0 (August 30th, 2024)
 
