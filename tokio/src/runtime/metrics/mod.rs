@@ -38,6 +38,9 @@ cfg_not_unstable_metrics! {
     mod worker;
     pub(crate) use worker::WorkerMetrics;
 
+    mod batch;
+    pub(crate) use batch::MetricsBatch;
+
     mod mock;
-    pub(crate) use mock::{SchedulerMetrics, MetricsBatch, HistogramBuilder};
+    pub(crate) use mock::{SchedulerMetrics, HistogramBuilder};
 }

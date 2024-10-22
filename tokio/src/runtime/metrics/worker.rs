@@ -19,37 +19,30 @@ cfg_unstable_metrics! {
 #[repr(align(128))]
 pub(crate) struct WorkerMetrics {
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     ///  Number of times the worker parked.
     pub(crate) park_count: MetricAtomicU64,
 
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     ///  Number of times the worker parked and unparked.
     pub(crate) park_unpark_count: MetricAtomicU64,
 
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of times the worker woke then parked again without doing work.
     pub(crate) noop_count: MetricAtomicU64,
 
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of tasks the worker stole.
     pub(crate) steal_count: MetricAtomicU64,
 
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of times the worker stole
     pub(crate) steal_operations: MetricAtomicU64,
 
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of tasks the worker polled.
     pub(crate) poll_count: MetricAtomicU64,
 
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// EWMA task poll time, in nanoseconds.
     pub(crate) mean_poll_time: MetricAtomicU64,
 
@@ -57,12 +50,10 @@ pub(crate) struct WorkerMetrics {
     pub(crate) busy_duration_total: MetricAtomicU64,
 
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of tasks scheduled for execution on the worker's local queue.
     pub(crate) local_schedule_count: MetricAtomicU64,
 
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// Number of tasks moved from the local queue to the global queue to free space.
     pub(crate) overflow_count: MetricAtomicU64,
 
@@ -71,7 +62,6 @@ pub(crate) struct WorkerMetrics {
     pub(crate) queue_depth: MetricAtomicUsize,
 
     #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     /// If `Some`, tracks the number of polls by duration range.
     pub(super) poll_count_histogram: Option<Histogram>,
 
@@ -80,17 +70,6 @@ pub(crate) struct WorkerMetrics {
 }
 
 impl WorkerMetrics {
-    cfg_unstable_metrics! {
-        pub(crate) fn from_config(config: &Config) -> WorkerMetrics {
-            let mut worker_metrics = WorkerMetrics::new();
-            worker_metrics.poll_count_histogram = config
-                .metrics_poll_count_histogram
-                .as_ref()
-                .map(|histogram_builder| histogram_builder.build());
-            worker_metrics
-        }
-    }
-
     cfg_not_unstable_metrics! {
         pub(crate) fn from_config(_: &Config) -> WorkerMetrics {
             WorkerMetrics::new()
@@ -101,23 +80,30 @@ impl WorkerMetrics {
         WorkerMetrics::default()
     }
 
-    cfg_unstable_metrics! {
-        pub(crate) fn queue_depth(&self) -> usize {
-            self.queue_depth.load(Relaxed)
-        }
-    }
-
     pub(crate) fn set_queue_depth(&self, len: usize) {
         self.queue_depth.store(len, Relaxed);
     }
 
+    pub(crate) fn set_thread_id(&self, thread_id: ThreadId) {
+        *self.thread_id.lock().unwrap() = Some(thread_id);
+    }
+
     cfg_unstable_metrics! {
+        pub(crate) fn from_config(config: &Config) -> WorkerMetrics {
+            let mut worker_metrics = WorkerMetrics::new();
+            worker_metrics.poll_count_histogram = config
+                .metrics_poll_count_histogram
+                .as_ref()
+                .map(|histogram_builder| histogram_builder.build());
+            worker_metrics
+        }
+
+        pub(crate) fn queue_depth(&self) -> usize {
+            self.queue_depth.load(Relaxed)
+        }
+
         pub(crate) fn thread_id(&self) -> Option<ThreadId> {
             *self.thread_id.lock().unwrap()
         }
-    }
-
-    pub(crate) fn set_thread_id(&self, thread_id: ThreadId) {
-        *self.thread_id.lock().unwrap() = Some(thread_id);
     }
 }
