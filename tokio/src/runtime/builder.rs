@@ -706,6 +706,12 @@ impl Builder {
     ///
     /// This *does not* support [`LocalSet`](crate::task::LocalSet) at this time.
     ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type  
+    /// may break in 1.x releases. See [the documentation on unstable  
+    /// features][unstable] for details.  
+    ///  
+    /// [unstable]: crate#unstable-features  
+    ///
     /// # Examples
     ///
     /// ```
@@ -728,6 +734,7 @@ impl Builder {
     /// # }
     /// ```
     #[cfg(all(not(loom), tokio_unstable))]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_task_spawn<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
@@ -747,6 +754,12 @@ impl Builder {
     /// function more than once replaces the last callback defined, rather than adding to it.
     ///
     /// This *does not* support [`LocalSet`](crate::task::LocalSet) at this time.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type  
+    /// may break in 1.x releases. See [the documentation on unstable  
+    /// features][unstable] for details.  
+    ///  
+    /// [unstable]: crate#unstable-features  
     ///
     /// # Examples
     ///
@@ -770,6 +783,7 @@ impl Builder {
     /// # }
     /// ```
     #[cfg(all(not(loom), tokio_unstable))]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_task_terminate<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
