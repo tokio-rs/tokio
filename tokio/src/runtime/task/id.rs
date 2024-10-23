@@ -37,7 +37,7 @@ pub fn id() -> Id {
 /// Returns the [`Id`] of the currently running task, or `None` if called outside
 /// of a task.
 ///
-/// This function is similar to  [`task::id()`](crate::runtime::task::id()), except
+/// This function is similar to [`task::id()`](crate::runtime::task::id()), except
 /// that it returns `None` rather than panicking if called outside of a task
 /// context.
 ///

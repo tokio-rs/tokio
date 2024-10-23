@@ -273,7 +273,7 @@ impl<T: Clone + 'static> LocalKey<T> {
     /// This function will panic if the task local doesn't have a value set.
     #[track_caller]
     pub fn get(&'static self) -> T {
-        self.with(|v| v.clone())
+        self.with(Clone::clone)
     }
 }
 

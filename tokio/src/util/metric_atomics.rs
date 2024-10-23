@@ -26,7 +26,7 @@ impl MetricAtomicU64 {
 
     cfg_64bit_metrics! {
         pub(crate) fn store(&self, val: u64, ordering: Ordering) {
-            self.value.store(val, ordering)
+            self.value.store(val, ordering);
         }
 
         pub(crate) fn new(value: u64) -> Self {
@@ -41,7 +41,7 @@ impl MetricAtomicU64 {
     cfg_no_64bit_metrics! {
         pub(crate) fn store(&self, _val: u64, _ordering: Ordering) { }
         // on platforms without 64-bit atomics, fetch-add returns unit
-        pub(crate) fn add(&self, _value: u64, _ordering: Ordering) {  }
+        pub(crate) fn add(&self, _value: u64, _ordering: Ordering) { }
         pub(crate) fn new(_value: u64) -> Self { Self { } }
     }
 }
@@ -68,7 +68,7 @@ impl MetricAtomicUsize {
     }
 
     pub(crate) fn store(&self, val: usize, ordering: Ordering) {
-        self.value.store(val, ordering)
+        self.value.store(val, ordering);
     }
 
     pub(crate) fn increment(&self) -> usize {

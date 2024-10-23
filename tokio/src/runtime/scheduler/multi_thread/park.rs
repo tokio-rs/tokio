@@ -151,7 +151,7 @@ impl Inner {
 
                 return;
             }
-            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
+            Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
 
         loop {
@@ -188,7 +188,7 @@ impl Inner {
 
                 return;
             }
-            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
+            Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
 
         driver.park(handle);
@@ -196,7 +196,7 @@ impl Inner {
         match self.state.swap(EMPTY, SeqCst) {
             NOTIFIED => {}      // got a notification, hurray!
             PARKED_DRIVER => {} // no notification, alas
-            n => panic!("inconsistent park_timeout state: {}", n),
+            n => panic!("inconsistent park_timeout state: {n}"),
         }
     }
 
@@ -211,7 +211,7 @@ impl Inner {
             NOTIFIED => {} // already unparked
             PARKED_CONDVAR => self.unpark_condvar(),
             PARKED_DRIVER => driver.unpark(),
-            actual => panic!("inconsistent state in unpark; actual = {}", actual),
+            actual => panic!("inconsistent state in unpark; actual = {actual}"),
         }
     }
 

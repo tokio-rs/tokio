@@ -126,9 +126,8 @@ impl ReadDir {
 
     fn next_chunk(buf: &mut VecDeque<io::Result<DirEntry>>, std: &mut std::fs::ReadDir) -> bool {
         for _ in 0..CHUNK_SIZE {
-            let ret = match std.next() {
-                Some(ret) => ret,
-                None => return false,
+            let Some(ret) = std.next() else {
+                return false;
             };
 
             let success = ret.is_ok();

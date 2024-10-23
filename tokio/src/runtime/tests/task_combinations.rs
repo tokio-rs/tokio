@@ -114,7 +114,7 @@ fn test_combinations() {
                     for ji in ji.iter().copied() {
                         for jh in jh.iter().copied() {
                             for abort in abort.iter().copied() {
-                                // abort via join handle --- abort  handles
+                                // abort via join handle --- abort handles
                                 // may be dropped at any point
                                 for ah in ah.iter().copied() {
                                     test_combination(

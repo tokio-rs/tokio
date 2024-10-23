@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Run both futures simultaneously of `a` and `b` sending messages back and forth.
     match tokio::try_join!(a, b) {
-        Err(e) => println!("an error occurred; error = {:?}", e),
+        Err(e) => println!("an error occurred; error = {e:?}"),
         _ => println!("done!"),
     }
 

@@ -125,6 +125,6 @@ where
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        self.project().reader.consume(amt)
+        self.project().reader.consume(amt);
     }
 }

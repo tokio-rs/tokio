@@ -39,7 +39,7 @@ impl<L, T> ShardedList<L, T> {
         let shard_mask = sharded_size - 1;
         let mut lists = Vec::with_capacity(sharded_size);
         for _ in 0..sharded_size {
-            lists.push(Mutex::new(LinkedList::<L, T>::new()))
+            lists.push(Mutex::new(LinkedList::<L, T>::new()));
         }
         Self {
             lists: lists.into_boxed_slice(),

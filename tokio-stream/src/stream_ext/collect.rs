@@ -68,11 +68,8 @@ where
         loop {
             let me = self.as_mut().project();
 
-            let item = match ready!(me.stream.poll_next(cx)) {
-                Some(item) => item,
-                None => {
-                    return Ready(U::finalize(sealed::Internal, me.collection));
-                }
+            let Some(item) = ready!(me.stream.poll_next(cx)) else {
+                return Ready(U::finalize(sealed::Internal, me.collection));
             };
 
             if !U::extend(sealed::Internal, me.collection, item) {

@@ -1,7 +1,7 @@
 //! `TcpStream` owned split support.
 //!
 //! A `TcpStream` can be split into an `OwnedReadHalf` and a `OwnedWriteHalf`
-//! with the `TcpStream::into_split` method.  `OwnedReadHalf` implements
+//! with the `TcpStream::into_split` method. `OwnedReadHalf` implements
 //! `AsyncRead` while `OwnedWriteHalf` implements `AsyncWrite`.
 //!
 //! Compared to the generic split of `AsyncRead + AsyncWrite`, this specialized
@@ -39,7 +39,7 @@ pub struct OwnedReadHalf {
 /// Owned write half of a [`TcpStream`], created by [`into_split`].
 ///
 /// Note that in the [`AsyncWrite`] implementation of this type, [`poll_shutdown`] will
-/// shut down the TCP stream in the write direction.  Dropping the write half
+/// shut down the TCP stream in the write direction. Dropping the write half
 /// will also shut down the write half of the TCP stream.
 ///
 /// Writing to an `OwnedWriteHalf` is usually done using the convenience methods found

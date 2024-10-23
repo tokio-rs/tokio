@@ -126,9 +126,9 @@ where
     fn consume(self: Pin<&mut Self>, amt: usize) {
         let me = self.project();
         if !*me.done_first {
-            me.first.consume(amt)
+            me.first.consume(amt);
         } else {
-            me.second.consume(amt)
+            me.second.consume(amt);
         }
     }
 }

@@ -161,8 +161,7 @@ impl<T: Unpin> Drop for StreamMock<T> {
 
         assert!(
             undropped_count == 0,
-            "StreamMock was dropped before all actions were consumed, {} actions were not consumed",
-            undropped_count
+            "StreamMock was dropped before all actions were consumed, {undropped_count} actions were not consumed"
         );
     }
 }

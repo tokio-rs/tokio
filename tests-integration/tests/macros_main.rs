@@ -24,5 +24,5 @@ fn main_with_spawn() {
 #[test]
 fn shell() {
     assert_eq!(1, basic_main());
-    assert_eq!(bool::default(), generic_fun::<bool>())
+    assert_eq!(bool::default(), generic_fun::<bool>());
 }

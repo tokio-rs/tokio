@@ -20,7 +20,7 @@ impl<T: AsyncBufRead + Unpin> BufRead for SyncIoBridge<T> {
 
     fn consume(&mut self, amt: usize) {
         let src = &mut self.src;
-        AsyncBufReadExt::consume(src, amt)
+        AsyncBufReadExt::consume(src, amt);
     }
 
     fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>) -> std::io::Result<usize> {
@@ -122,9 +122,9 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// by e.g. [`tokio::task::spawn_blocking`].
     ///
     /// Stated even more strongly: to make use of this bridge, you *must* move
-    /// it into a separate thread outside the runtime.  The synchronous I/O will use the
+    /// it into a separate thread outside the runtime. The synchronous I/O will use the
     /// underlying handle to block on the backing asynchronous source, via
-    /// [`tokio::runtime::Handle::block_on`].  As noted in the documentation for that
+    /// [`tokio::runtime::Handle::block_on`]. As noted in the documentation for that
     /// function, an attempt to `block_on` from an asynchronous execution context
     /// will panic.
     ///

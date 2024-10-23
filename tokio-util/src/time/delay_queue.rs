@@ -243,7 +243,7 @@ impl<T> SlabStorage<T> {
 
     pub(crate) fn compact(&mut self) {
         if !self.compact_called {
-            for (key, _) in self.inner.iter() {
+            for (key, _) in &self.inner {
                 self.key_map.insert(Key::new(key), KeyInternal::new(key));
             }
         }
@@ -665,7 +665,7 @@ impl<T> DelayQueue<T> {
                 // The delay is already expired, store it in the expired queue
                 self.expired.push(key, &mut self.slab);
             }
-            Err((_, err)) => panic!("invalid deadline; err={:?}", err),
+            Err((_, err)) => panic!("invalid deadline; err={err:?}"),
         }
     }
 

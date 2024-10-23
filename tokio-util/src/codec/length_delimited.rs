@@ -271,7 +271,7 @@
 //! second half of the head is needed.
 //!
 //! `length_field_offset` indicates how many bytes to skip before starting
-//! to read the length field.  `length_adjustment` is the number of bytes to
+//! to read the length field. `length_adjustment` is the number of bytes to
 //! skip starting at the end of the length field. In this case, it is the
 //! second half of the head.
 //!

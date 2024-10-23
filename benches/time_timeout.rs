@@ -43,7 +43,7 @@ fn do_timeout_test(c: &mut Criterion, workers: usize, name: &str) {
                 black_box(spawn_timeout_job(iters as usize, workers)).await;
             });
             start.elapsed()
-        })
+        });
     });
 }
 
@@ -80,7 +80,7 @@ fn do_sleep_test(c: &mut Criterion, workers: usize, name: &str) {
                 black_box(spawn_sleep_job(iters as usize, workers)).await;
             });
             start.elapsed()
-        })
+        });
     });
 }
 

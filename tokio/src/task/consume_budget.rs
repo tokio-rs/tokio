@@ -37,5 +37,5 @@ pub async fn consume_budget() {
         });
         status
     })
-    .await
+    .await;
 }

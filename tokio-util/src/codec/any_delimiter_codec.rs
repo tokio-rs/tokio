@@ -249,7 +249,7 @@ impl fmt::Display for AnyDelimiterCodecError {
             AnyDelimiterCodecError::MaxChunkLengthExceeded => {
                 write!(f, "max chunk length exceeded")
             }
-            AnyDelimiterCodecError::Io(e) => write!(f, "{}", e),
+            AnyDelimiterCodecError::Io(e) => write!(f, "{e}"),
         }
     }
 }

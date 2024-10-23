@@ -157,7 +157,7 @@ impl Runtime {
     /// initialized.
     ///
     /// Most applications will not need to call this function directly. Instead,
-    /// they will use the  [`#[tokio::main]` attribute][main]. When a more complex
+    /// they will use the [`#[tokio::main]` attribute][main]. When a more complex
     /// configuration is necessary, the [runtime builder] may be used.
     ///
     /// See [module level][mod] documentation for more details.
@@ -324,7 +324,7 @@ impl Runtime {
     /// use tokio::runtime::Runtime;
     ///
     /// // Create the runtime
-    /// let rt  = Runtime::new().unwrap();
+    /// let rt = Runtime::new().unwrap();
     ///
     /// // Execute the future, blocking the current thread until completion
     /// rt.block_on(async {

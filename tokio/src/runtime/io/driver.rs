@@ -154,7 +154,7 @@ impl Driver {
                 // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
                 // just return from the park, as there would be nothing, which wakes us up.
             }
-            Err(e) => panic!("unexpected error when polling the I/O driver: {:?}", e),
+            Err(e) => panic!("unexpected error when polling the I/O driver: {e:?}"),
         }
 
         // Process all the events that came in, dispatching appropriately
@@ -225,7 +225,7 @@ impl Handle {
             // safety: `scheduled_io` is part of the `registrations` set.
             unsafe {
                 self.registrations
-                    .remove(&mut self.synced.lock(), &scheduled_io)
+                    .remove(&mut self.synced.lock(), &scheduled_io);
             };
 
             return Err(e);

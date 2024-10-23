@@ -1,4 +1,5 @@
-//! Mock version of std::fs::File;
+//! Mock version of [`std::fs::File`].
+
 use mockall::mock;
 
 use crate::sync::oneshot;
@@ -19,7 +20,7 @@ mock! {
         pub fn create(pb: PathBuf) -> io::Result<Self>;
         // These inner_ methods exist because std::fs::File has two
         // implementations for each of these methods: one on "&mut self" and
-        // one on "&&self".  Defining both of those in terms of an inner_ method
+        // one on "&&self". Defining both of those in terms of an inner_ method
         // allows us to specify the expectation the same way, regardless of
         // which method is used.
         pub fn inner_flush(&self) -> io::Result<()>;
@@ -129,7 +130,7 @@ impl<T> Future for JoinHandle<T> {
 
         match Pin::new(&mut self.rx).poll(cx) {
             Poll::Ready(Ok(v)) => Poll::Ready(Ok(v)),
-            Poll::Ready(Err(e)) => panic!("error = {:?}", e),
+            Poll::Ready(Err(e)) => panic!("error = {e:?}"),
             Poll::Pending => Poll::Pending,
         }
     }

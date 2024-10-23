@@ -331,7 +331,7 @@ impl<S: 'static> LocalOwnedTasks<S> {
         F: FnOnce(&mut OwnedTasksInner<S>) -> T,
     {
         // safety: This type is not Sync, so concurrent calls of this method
-        // can't happen.  Furthermore, all uses of this method in this file make
+        // can't happen. Furthermore, all uses of this method in this file make
         // sure that they don't call `with_inner` recursively.
         self.inner.with_mut(|ptr| unsafe { f(&mut *ptr) })
     }

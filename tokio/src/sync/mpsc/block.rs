@@ -97,9 +97,8 @@ impl<T> Block<T> {
             // Allocate the block on the heap.
             // SAFETY: The size of the Block<T> is non-zero, since it is at least the size of the header.
             let block = std::alloc::alloc(Layout::new::<Block<T>>()) as *mut Block<T>;
-            let block = match NonNull::new(block) {
-                Some(block) => block,
-                None => std::alloc::handle_alloc_error(Layout::new::<Block<T>>()),
+            let Some(block) = NonNull::new(block) else {
+                std::alloc::handle_alloc_error(Layout::new::<Block<T>>());
             };
 
             // Write the header to the block.
@@ -371,13 +370,10 @@ impl<T> Block<T> {
                 .unwrap_or_else(|x| x),
         );
 
-        let next = match next {
-            Some(next) => next,
-            None => {
-                // The compare-and-swap succeeded and the newly allocated block
-                // is successfully pushed.
-                return new_block;
-            }
+        let Some(next) = next else {
+            // The compare-and-swap succeeded and the newly allocated block
+            // is successfully pushed.
+            return new_block;
         };
 
         // There already is a next block in the linked list. The newly allocated

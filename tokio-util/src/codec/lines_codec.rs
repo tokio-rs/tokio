@@ -218,7 +218,7 @@ impl fmt::Display for LinesCodecError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LinesCodecError::MaxLineLengthExceeded => write!(f, "max line length exceeded"),
-            LinesCodecError::Io(e) => write!(f, "{}", e),
+            LinesCodecError::Io(e) => write!(f, "{e}"),
         }
     }
 }

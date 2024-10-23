@@ -746,22 +746,19 @@ impl CoreGuard<'_> {
 
                     let entry = core.next_task(handle);
 
-                    let task = match entry {
-                        Some(entry) => entry,
-                        None => {
-                            core.metrics.end_processing_scheduled_tasks();
+                    let Some(task) = entry else {
+                        core.metrics.end_processing_scheduled_tasks();
 
-                            core = if !context.defer.is_empty() {
-                                context.park_yield(core, handle)
-                            } else {
-                                context.park(core, handle)
-                            };
+                        core = if context.defer.is_empty() {
+                            context.park(core, handle)
+                        } else {
+                            context.park_yield(core, handle)
+                        };
 
-                            core.metrics.start_processing_scheduled_tasks();
+                        core.metrics.start_processing_scheduled_tasks();
 
-                            // Try polling the `block_on` future next
-                            continue 'outer;
-                        }
+                        // Try polling the `block_on` future next
+                        continue 'outer;
                     };
 
                     let task = context.handle.shared.owned.assert_owner(task);
