@@ -13,18 +13,12 @@ permissions:
   contents: read
 
 jobs:
-  security-audit:
+  cargo-deny:
     permissions:
-      checks: write  # for rustsec/audit-check to create check
-      contents: read  # for actions/checkout to fetch code
-      issues: write  # for rustsec/audit-check to create issues
+      checks: write
+      contents: read
+      issues: write
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'ci skip')"
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Audit Check
-        # https://github.com/rustsec/audit-check/issues/2
-        uses: rustsec/audit-check@master
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/checkout@v4
+    - uses: EmbarkStudios/cargo-deny-action@v2
