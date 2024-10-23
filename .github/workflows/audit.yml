@@ -20,5 +20,5 @@ jobs:
       issues: write
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: EmbarkStudios/cargo-deny-action@v1
+    - uses: actions/checkout@v4
+    - uses: EmbarkStudios/cargo-deny-action@v2
