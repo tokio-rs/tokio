@@ -119,11 +119,10 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard};
-use crate::runtime::coop::{cooperative, Coop};
+use crate::runtime::coop::cooperative;
 use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
 use crate::util::WakeList;
 
-use pin_project_lite::pin_project;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomPinned;
@@ -390,27 +389,43 @@ struct RecvGuard<'a, T> {
     slot: RwLockReadGuard<'a, Slot<T>>,
 }
 
-pin_project! {
-    /// Future for the [`Receiver::recv`] method.
-    pub struct Recv<'a, T>
+pub(crate) mod future {
+    use std::{
+        future::Future,
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use pin_project_lite::pin_project;
+
+    use crate::runtime::coop::Coop;
+
+    use super::{error::RecvError, RecvInner};
+
+    pin_project! {
+        /// Future for the [`Receiver::recv`][super::Receiver::recv] method.
+        pub struct Recv<'a, T>
+        where
+            T: Clone,
+        {
+            #[pin]
+            pub(super) inner: Coop<RecvInner<'a, T>>,
+        }
+    }
+
+    impl<'a, T> Future for Recv<'a, T>
     where
         T: Clone,
     {
-        #[pin]
-        inner: Coop<RecvInner<'a, T>>,
+        type Output = Result<T, RecvError>;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            self.project().inner.poll(cx)
+        }
     }
 }
 
-impl<'a, T> Future for Recv<'a, T>
-where
-    T: Clone,
-{
-    type Output = Result<T, RecvError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.project().inner.poll(cx)
-    }
-}
+use self::future::Recv;
 
 /// Receive a value future.
 struct RecvInner<'a, T> {
