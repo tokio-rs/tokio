@@ -1215,6 +1215,12 @@ impl<T: Clone> Receiver<T> {
     }
     /// Receives the next value for this receiver.
     ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn recv(&self) -> Result<T, RecvError>;
+    /// ```
+    ///
     /// Each [`Receiver`] handle will receive a clone of all values sent
     /// **after** it has subscribed.
     ///
