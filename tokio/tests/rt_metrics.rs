@@ -66,10 +66,10 @@ fn global_queue_depth_current_thread() {
 
 #[test]
 fn global_queue_depth_multi_thread() {
-    let rt = threaded();
-    let metrics = rt.metrics();
-
     for _ in 0..10 {
+        let rt = threaded();
+        let metrics = rt.metrics();
+
         if let Ok(_blocking_tasks) = try_block_threaded(&rt) {
             for i in 0..10 {
                 assert_eq!(i, metrics.global_queue_depth());
@@ -93,7 +93,7 @@ fn try_block_threaded(rt: &Runtime) -> Result<Vec<mpsc::Sender<()>>, mpsc::RecvT
 
             // Spawn a task per runtime worker to block it.
             rt.spawn(async move {
-                tx.send(()).unwrap();
+                tx.send(()).ok();
                 barrier.recv().ok();
             });
 
