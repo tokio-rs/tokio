@@ -46,6 +46,7 @@ cfg_net! {
         pub use tcp::socket::TcpSocket;
 
         mod udp;
+        #[doc(inline)]
         pub use udp::UdpSocket;
     }
 }
