@@ -1035,7 +1035,7 @@ jobs:
         rust:
           # `check-external-types` requires a specific Rust nightly version. See
           # the README for details: https://github.com/awslabs/cargo-check-external-types
-          - nightly-2023-10-21
+          - nightly-2024-06-30
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ matrix.rust }}
@@ -1046,7 +1046,10 @@ jobs:
       - name: Install cargo-check-external-types
         uses: taiki-e/cache-cargo-install-action@v1
         with:
-          tool: cargo-check-external-types@0.1.10
+          tool: cargo-check-external-types
+          # TODO: install from crates.io once https://github.com/awslabs/cargo-check-external-types/pull/183 merged and released.
+          git: https://github.com/taiki-e/cargo-check-external-types.git
+          rev: 83a8d29
       - name: check-external-types
         run: cargo check-external-types --all-features
         working-directory: tokio
