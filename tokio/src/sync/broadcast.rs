@@ -876,6 +876,11 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     assert!(tail.rx_cnt != MAX_RECEIVERS, "max receivers");
 
     tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
+    if tail.closed {
+        // Potentially need to re-open the channel, if a new receiver has been added between calls
+        // to poll()
+        tail.closed = false;
+    }
 
     let next = tail.pos;
 
