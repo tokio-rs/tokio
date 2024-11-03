@@ -269,7 +269,7 @@ To list the available fuzzing harnesses you can run;
 $ cd tokio
 $ cargo fuzz list
 fuzz_linked_list
-````
+```
 
 Running a fuzz test is as simple as;
 
