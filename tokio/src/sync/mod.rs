@@ -9,6 +9,13 @@
 //!
 //! [tasks]: crate::task
 //!
+//! **Note**: All functionality provided in this module is runtime agnostic. It is safe
+//! and correct to use these primitives without also using Tokio. Some types may provide additional
+//! functionality when used with Tokio runtime (e.g. cooperation with [Task Dumps]), but all
+//! documented functionality is runtime-agnostic.
+//!
+//! [Task Dumps]: crate::runtime::Handle::dump
+//!
 //! # Message passing
 //!
 //! The most common form of synchronization in a Tokio program is message
