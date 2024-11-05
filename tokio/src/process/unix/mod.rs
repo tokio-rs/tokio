@@ -116,6 +116,14 @@ impl fmt::Debug for Child {
 }
 
 pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<SpawnedChild> {
+    // block SIGCHLD to avoid race condition with spawn and signal handler registration
+    unsafe {
+        let mut mask: libc::sigset_t = std::mem::zeroed();
+        libc::sigemptyset(&mut mask);
+        libc::sigaddset(&mut mask, libc::SIGCHLD);
+        libc::sigprocmask(libc::SIG_BLOCK, &mask, std::ptr::null_mut());
+    }
+
     let mut child = cmd.spawn()?;
     let stdin = child.stdin.take().map(stdio).transpose()?;
     let stdout = child.stdout.take().map(stdio).transpose()?;
@@ -136,6 +144,14 @@ pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<Spawned
     }
 
     let signal = signal(SignalKind::child())?;
+
+    // unblock SIGCHLD after process is spawned and signal handler is registered
+    unsafe {
+        let mut mask: libc::sigset_t = std::mem::zeroed();
+        libc::sigemptyset(&mut mask);
+        libc::sigaddset(&mut mask, libc::SIGCHLD);
+        libc::sigprocmask(libc::SIG_UNBLOCK, &mask, std::ptr::null_mut());
+    }
 
     Ok(SpawnedChild {
         child: Child::SignalReaper(Reaper::new(child, GlobalOrphanQueue, signal)),
