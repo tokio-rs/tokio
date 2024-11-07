@@ -13,7 +13,7 @@ use std::task::Poll;
 use std::thread;
 use tokio::macros::support::poll_fn;
 
-use tokio::runtime::{HistogramConfiguration, LogHistogram, Runtime};
+use tokio::runtime::{HistogramConfiguration, HistogramScale, LogHistogram, Runtime};
 use tokio::task::consume_budget;
 use tokio::time::{self, Duration};
 
@@ -422,6 +422,21 @@ fn log_histogram() {
         .map(|(worker, bucket)| metrics.poll_time_histogram_bucket_count(worker, bucket))
         .sum();
     assert_eq!(N, n);
+}
+
+#[test]
+#[allow(deprecated)]
+fn legacy_log_histogram() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .enable_metrics_poll_time_histogram()
+        .metrics_poll_count_histogram_scale(HistogramScale::Log)
+        .metrics_poll_count_histogram_resolution(Duration::from_micros(50))
+        .metrics_poll_count_histogram_buckets(20)
+        .build()
+        .unwrap();
+    let num_buckets = rt.metrics().poll_time_histogram_num_buckets();
+    assert_eq!(num_buckets, 20);
 }
 
 #[test]
