@@ -634,15 +634,15 @@ pub mod stream {}
 // local re-exports of platform specific things, allowing for decent
 // documentation to be shimmed in on docs.rs
 
-#[cfg(docsrs)]
+#[cfg(all(docsrs, unix))]
 pub mod doc;
 
 #[cfg(any(feature = "net", feature = "fs"))]
-#[cfg(docsrs)]
+#[cfg(all(docsrs, unix))]
 #[allow(unused)]
 pub(crate) use self::doc::os;
 
-#[cfg(not(docsrs))]
+#[cfg(not(all(docsrs, unix)))]
 #[allow(unused)]
 pub(crate) use std::os;
 
