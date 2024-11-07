@@ -1,3 +1,15 @@
+# 1.41.1 (Nov 7th, 2024)
+
+### Fixed
+
+- metrics: fix bug with wrong number of buckets for the histogram ([#6957])
+- net: display `net` requirement for `net::UdpSocket` in docs ([#6938])
+- net: fix typo in `TcpStream` internal comment ([#6944])
+
+[#6957]: https://github.com/tokio-rs/tokio/pull/6957
+[#6938]: https://github.com/tokio-rs/tokio/pull/6938
+[#6944]: https://github.com/tokio-rs/tokio/pull/6944
+
 # 1.41.0 (Oct 22th, 2024)
 
 ### Added
