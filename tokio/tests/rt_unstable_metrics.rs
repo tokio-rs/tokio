@@ -425,6 +425,29 @@ fn log_histogram() {
 }
 
 #[test]
+fn minimal_log_histogram() {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .enable_metrics_poll_time_histogram()
+        .metrics_poll_time_histogram_configuration(HistogramConfiguration::log(
+            LogHistogram::builder()
+                .max_value(Duration::from_millis(4))
+                .min_value(Duration::from_micros(20))
+                .precision_exact(0),
+        ))
+        .build()
+        .unwrap();
+    let metrics = rt.metrics();
+    let num_buckets = rt.metrics().poll_time_histogram_num_buckets();
+    for b in 0..num_buckets {
+        let range = metrics.poll_time_histogram_bucket_range(b);
+        let size = range.end - range.start;
+        println!("bucket {b}: {range:?} (size: {size:?})");
+    }
+    assert_eq!(num_buckets, 10);
+}
+
+#[test]
 #[allow(deprecated)]
 fn legacy_log_histogram() {
     let rt = tokio::runtime::Builder::new_multi_thread()
