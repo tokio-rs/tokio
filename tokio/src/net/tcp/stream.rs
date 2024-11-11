@@ -1,6 +1,6 @@
 cfg_not_wasi! {
-    use crate::future::poll_fn;
     use crate::net::{to_socket_addrs, ToSocketAddrs};
+    use std::future::poll_fn;
     use std::time::Duration;
 }
 
@@ -12,7 +12,7 @@ use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -340,7 +340,7 @@ impl TcpStream {
     /// use tokio::io::{self, ReadBuf};
     /// use tokio::net::TcpStream;
     ///
-    /// use futures::future::poll_fn;
+    /// use std::future::poll_fn;
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
@@ -1278,7 +1278,7 @@ impl TcpStream {
 
     // == Poll IO functions that takes `&self` ==
     //
-    // To read or write without mutable access to the `UnixStream`, combine the
+    // To read or write without mutable access to the `TcpStream`, combine the
     // `poll_read_ready` or `poll_write_ready` methods with the `try_read` or
     // `try_write` methods.
 

@@ -33,7 +33,7 @@ async fn issue_4435() {
     let mut read_buf = ReadBuf::new(&mut buf);
     read_buf.put_slice(b"AB");
 
-    futures::future::poll_fn(|cx| rd.as_mut().poll_read(cx, &mut read_buf))
+    std::future::poll_fn(|cx| rd.as_mut().poll_read(cx, &mut read_buf))
         .await
         .unwrap();
     assert_eq!(&buf, &b"ABhell\0\0"[..]);

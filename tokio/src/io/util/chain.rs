@@ -4,7 +4,7 @@ use pin_project_lite::pin_project;
 use std::fmt;
 use std::io;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 pin_project! {
     /// Stream for the [`chain`](super::AsyncReadExt::chain) method.

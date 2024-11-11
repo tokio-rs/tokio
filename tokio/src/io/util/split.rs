@@ -5,7 +5,7 @@ use pin_project_lite::pin_project;
 use std::io;
 use std::mem;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 pin_project! {
     /// Splitter for the [`split`](crate::io::AsyncBufReadExt::split) method.
@@ -59,7 +59,7 @@ where
     /// # }
     /// ```
     pub async fn next_segment(&mut self) -> io::Result<Option<Vec<u8>>> {
-        use crate::future::poll_fn;
+        use std::future::poll_fn;
 
         poll_fn(|cx| Pin::new(&mut *self).poll_next_segment(cx)).await
     }

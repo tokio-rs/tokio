@@ -6,7 +6,7 @@ use pin_project_lite::pin_project;
 use std::future::Future;
 use std::panic::Location;
 use std::pin::Pin;
-use std::task::{self, Poll};
+use std::task::{self, ready, Poll};
 
 /// Waits until `deadline` is reached.
 ///

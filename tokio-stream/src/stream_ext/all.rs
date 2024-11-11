@@ -3,7 +3,7 @@ use crate::Stream;
 use core::future::Future;
 use core::marker::PhantomPinned;
 use core::pin::Pin;
-use core::task::{Context, Poll};
+use core::task::{ready, Context, Poll};
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -42,7 +42,7 @@ where
 
         // Take a maximum of 32 items from the stream before yielding.
         for _ in 0..32 {
-            match futures_core::ready!(stream.as_mut().poll_next(cx)) {
+            match ready!(stream.as_mut().poll_next(cx)) {
                 Some(v) => {
                     if !(me.f)(v) {
                         return Poll::Ready(false);

@@ -7,6 +7,8 @@ cfg_rt! {
 
     pub(crate) mod inject;
     pub(crate) use inject::Inject;
+
+    use crate::runtime::TaskHooks;
 }
 
 cfg_rt_multi_thread! {
@@ -111,6 +113,31 @@ cfg_rt! {
             match_flavor!(self, Handle(h) => &h.blocking_spawner)
         }
 
+        pub(crate) fn is_local(&self) -> bool {
+            match self {
+                Handle::CurrentThread(h) => h.local_tid.is_some(),
+
+                #[cfg(feature = "rt-multi-thread")]
+                Handle::MultiThread(_) => false,
+
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Handle::MultiThreadAlt(_) => false,
+            }
+        }
+
+        /// Returns true if this is a local runtime and the runtime is owned by the current thread.
+        pub(crate) fn can_spawn_local_on_local_runtime(&self) -> bool {
+            match self {
+                Handle::CurrentThread(h) => h.local_tid.map(|x| std::thread::current().id() == x).unwrap_or(false),
+
+                #[cfg(feature = "rt-multi-thread")]
+                Handle::MultiThread(_) => false,
+
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Handle::MultiThreadAlt(_) => false,
+            }
+        }
+
         pub(crate) fn spawn<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
@@ -124,6 +151,24 @@ cfg_rt! {
 
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 Handle::MultiThreadAlt(h) => multi_thread_alt::Handle::spawn(h, future, id),
+            }
+        }
+
+        /// Spawn a local task
+        ///
+        /// # Safety
+        /// This should only be called in `LocalRuntime` if the runtime has been verified to be owned
+        /// by the current thread.
+        #[allow(irrefutable_let_patterns)]
+        pub(crate) unsafe fn spawn_local<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
+        where
+            F: Future + 'static,
+            F::Output: 'static,
+        {
+            if let Handle::CurrentThread(h) = self {
+                current_thread::Handle::spawn_local(h, future, id)
+            } else {
+                panic!("Only current_thread and LocalSet have spawn_local internals implemented")
             }
         }
 
@@ -148,6 +193,16 @@ cfg_rt! {
                 Handle::CurrentThread(handle) => handle,
                 #[cfg(feature = "rt-multi-thread")]
                 _ => panic!("not a CurrentThread handle"),
+            }
+        }
+
+        pub(crate) fn hooks(&self) -> &TaskHooks {
+            match self {
+                Handle::CurrentThread(h) => &h.task_hooks,
+                #[cfg(feature = "rt-multi-thread")]
+                Handle::MultiThread(h) => &h.task_hooks,
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Handle::MultiThreadAlt(h) => &h.task_hooks,
             }
         }
 
@@ -177,6 +232,10 @@ cfg_rt! {
         pub(crate) fn num_alive_tasks(&self) -> usize {
             match_flavor!(self, Handle(handle) => handle.num_alive_tasks())
         }
+
+        pub(crate) fn injection_queue_depth(&self) -> usize {
+            match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
+        }
     }
 
     cfg_unstable_metrics! {
@@ -203,10 +262,6 @@ cfg_rt! {
 
             pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
                 match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
-            }
-
-            pub(crate) fn injection_queue_depth(&self) -> usize {
-                match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
             }
 
             pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {

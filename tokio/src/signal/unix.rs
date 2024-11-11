@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
 
-pub(crate) type OsStorage = Vec<SignalInfo>;
+pub(crate) type OsStorage = Box<[SignalInfo]>;
 
 impl Init for OsStorage {
     fn init() -> Self {

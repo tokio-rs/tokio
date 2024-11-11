@@ -7,7 +7,7 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::{task::Context, task::Poll};
+use std::task::{ready, Context, Poll};
 
 /// Associates an IO object backed by a Unix file descriptor with the tokio
 /// reactor, allowing for readiness to be polled. The file descriptor must be of
@@ -21,11 +21,13 @@ use std::{task::Context, task::Poll};
 /// the [`AsyncFd`] is dropped.
 ///
 /// The [`AsyncFd`] takes ownership of an arbitrary object to represent the IO
-/// object. It is intended that this object will handle closing the file
+/// object. It is intended that the inner object will handle closing the file
 /// descriptor when it is dropped, avoiding resource leaks and ensuring that the
 /// [`AsyncFd`] can clean up the registration before closing the file descriptor.
 /// The [`AsyncFd::into_inner`] function can be used to extract the inner object
-/// to retake control from the tokio IO reactor.
+/// to retake control from the tokio IO reactor. The [`OwnedFd`] type is often
+/// used as the inner object, as it is the simplest type that closes the fd on
+/// drop.
 ///
 /// The inner object is required to implement [`AsRawFd`]. This file descriptor
 /// must not change while [`AsyncFd`] owns the inner object, i.e. the
@@ -71,11 +73,10 @@ use std::{task::Context, task::Poll};
 /// and using the IO traits [`AsyncRead`] and [`AsyncWrite`].
 ///
 /// ```no_run
-/// use futures::ready;
 /// use std::io::{self, Read, Write};
 /// use std::net::TcpStream;
 /// use std::pin::Pin;
-/// use std::task::{Context, Poll};
+/// use std::task::{ready, Context, Poll};
 /// use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 /// use tokio::io::unix::AsyncFd;
 ///
@@ -176,6 +177,7 @@ use std::{task::Context, task::Poll};
 /// [`TcpStream::poll_read_ready`]: struct@crate::net::TcpStream
 /// [`AsyncRead`]: trait@crate::io::AsyncRead
 /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
+/// [`OwnedFd`]: struct@std::os::fd::OwnedFd
 pub struct AsyncFd<T: AsRawFd> {
     registration: Registration,
     // The inner value is always present. the Option is required for `drop` and `into_inner`.
@@ -700,6 +702,13 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// concurrently with other methods on this struct. This method only
     /// provides shared access to the inner IO resource when handling the
     /// [`AsyncFdReadyGuard`].
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn readable<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
         self.ready(Interest::READABLE).await
@@ -711,6 +720,13 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// This method takes `&mut self`, so it is possible to access the inner IO
     /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn readable_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
         self.ready_mut(Interest::READABLE).await
@@ -724,6 +740,13 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// concurrently with other methods on this struct. This method only
     /// provides shared access to the inner IO resource when handling the
     /// [`AsyncFdReadyGuard`].
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn writable<'a>(&'a self) -> io::Result<AsyncFdReadyGuard<'a, T>> {
         self.ready(Interest::WRITABLE).await
@@ -735,6 +758,13 @@ impl<T: AsRawFd> AsyncFd<T> {
     ///
     /// This method takes `&mut self`, so it is possible to access the inner IO
     /// resource mutably when handling the [`AsyncFdReadyMutGuard`].
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. Once a readiness event occurs, the method
+    /// will continue to return immediately until the readiness event is
+    /// consumed by an attempt to read or write that fails with `WouldBlock` or
+    /// `Poll::Pending`.
     #[allow(clippy::needless_lifetimes)] // The lifetime improves rustdoc rendering.
     pub async fn writable_mut<'a>(&'a mut self) -> io::Result<AsyncFdReadyMutGuard<'a, T>> {
         self.ready_mut(Interest::WRITABLE).await

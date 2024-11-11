@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support bind
+#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support bind
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, oneshot};
@@ -96,8 +96,7 @@ async fn no_extra_poll() {
 
 #[tokio::test]
 async fn accept_many() {
-    use futures::future::poll_fn;
-    use std::future::Future;
+    use std::future::{poll_fn, Future};
     use std::sync::atomic::AtomicBool;
 
     const N: usize = 50;

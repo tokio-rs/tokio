@@ -4,7 +4,7 @@ name = "tokio-util"
 # - Remove path dependencies
 # - Update CHANGELOG.md.
 # - Create "tokio-util-0.7.x" git tag.
-version = "0.7.11"
+version = "0.7.12"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -42,7 +42,7 @@ futures-io = { version = "0.3.0", optional = true }
 futures-util = { version = "0.3.0", optional = true }
 pin-project-lite = "0.2.11"
 slab = { version = "0.4.4", optional = true } # Backs `DelayQueue`
-tracing = { version = "0.1.25", default-features = false, features = ["std"], optional = true }
+tracing = { version = "0.1.29", default-features = false, features = ["std"], optional = true }
 
 [target.'cfg(tokio_unstable)'.dependencies]
 hashbrown = { version = "0.14.0", default-features = false, optional = true }
@@ -65,3 +65,6 @@ rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable"]
 # it's necessary to _also_ pass `--cfg tokio_unstable` to rustc, or else
 # dependencies will not be enabled, and the docs build will fail.
 rustc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable"]
+
+[package.metadata.playground]
+features = ["full"]

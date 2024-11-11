@@ -15,14 +15,7 @@ use std::{fmt, num::NonZeroU64};
 ///   task via the [`task::try_id()`](crate::task::try_id()) and
 ///   [`task::id()`](crate::task::id()) functions and from outside the task via
 ///   the [`JoinHandle::id()`](crate::task::JoinHandle::id()) function.
-///
-/// **Note**: This is an [unstable API][unstable]. The public API of this type
-/// may break in 1.x releases. See [the documentation on unstable
-/// features][unstable] for details.
-///
-/// [unstable]: crate#unstable-features
-#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "rt"))))]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub struct Id(pub(crate) NonZeroU64);
 
@@ -35,13 +28,7 @@ pub struct Id(pub(crate) NonZeroU64);
 /// within a call to `block_on`. For a version of this function that doesn't
 /// panic, see [`task::try_id()`](crate::runtime::task::try_id()).
 ///
-/// **Note**: This is an [unstable API][unstable]. The public API of this type
-/// may break in 1.x releases. See [the documentation on unstable
-/// features][unstable] for details.
-///
 /// [task ID]: crate::task::Id
-/// [unstable]: crate#unstable-features
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 #[track_caller]
 pub fn id() -> Id {
     context::current_task_id().expect("Can't get a task id when not inside a task")
@@ -54,13 +41,7 @@ pub fn id() -> Id {
 /// that it returns `None` rather than panicking if called outside of a task
 /// context.
 ///
-/// **Note**: This is an [unstable API][unstable]. The public API of this type
-/// may break in 1.x releases. See [the documentation on unstable
-/// features][unstable] for details.
-///
 /// [task ID]: crate::task::Id
-/// [unstable]: crate#unstable-features
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 #[track_caller]
 pub fn try_id() -> Option<Id> {
     context::current_task_id()

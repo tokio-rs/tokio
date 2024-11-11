@@ -1,4 +1,4 @@
-285
+292
 &
 +
 <
@@ -12,12 +12,17 @@
 0xA
 0xD
 100ms
+100ns
 10ms
+10μs
 ~12
+120s
+12.5%
 ±1m
 ±1ms
 1ms
 1s
+25%
 250ms
 2x
 ~4
@@ -99,6 +104,7 @@ errored
 EWMA
 expirations
 fcntl
+fd
 fd's
 FIFOs
 filename
@@ -115,9 +121,11 @@ GID
 goroutines
 Growable
 gzip
+H2
 hashmaps
 HashMaps
 hashsets
+HdrHistogram
 ie
 Illumos
 impl
@@ -151,6 +159,7 @@ metadata
 mio
 Mio
 mio's
+miri
 misconfigured
 mock's
 mpmc

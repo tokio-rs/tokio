@@ -70,13 +70,17 @@
 //!
 //! # Multiple runtimes
 //!
-//! The mpsc channel does not care about which runtime you use it in, and can be
-//! used to send messages from one runtime to another. It can also be used in
-//! non-Tokio runtimes.
+//! The `mpsc` channel is runtime agnostic. You can freely move it between
+//! different instances of the Tokio runtime or even use it from non-Tokio
+//! runtimes.
 //!
-//! There is one exception to the above: the [`send_timeout`] must be used from
-//! within a Tokio runtime, however it is still not tied to one specific Tokio
-//! runtime, and the sender may be moved from one Tokio runtime to another.
+//! When used in a Tokio runtime, it participates in
+//! [cooperative scheduling](crate::task#cooperative-scheduling) to avoid
+//! starvation. This feature does not apply when used from non-Tokio runtimes.
+//!
+//! As an exception, methods ending in `_timeout` are not runtime agnostic
+//! because they require access to the Tokio timer. See the documentation of
+//! each `*_timeout` method for more information on its use.
 //!
 //! # Allocation behavior
 //!

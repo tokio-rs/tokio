@@ -6,12 +6,12 @@ use futures_core::Stream;
 use tokio_util::sync::ReusableBoxFuture;
 
 use std::fmt;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 /// A wrapper around [`tokio::sync::broadcast::Receiver`] that implements [`Stream`].
 ///
 /// [`tokio::sync::broadcast::Receiver`]: struct@tokio::sync::broadcast::Receiver
-/// [`Stream`]: trait@crate::Stream
+/// [`Stream`]: trait@futures_core::Stream
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub struct BroadcastStream<T> {
     inner: ReusableBoxFuture<'static, (Result<T, RecvError>, Receiver<T>)>,

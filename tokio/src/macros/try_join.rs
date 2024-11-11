@@ -1,106 +1,118 @@
-/// Waits on multiple concurrent branches, returning when **all** branches
-/// complete with `Ok(_)` or on the first `Err(_)`.
-///
-/// The `try_join!` macro must be used inside of async functions, closures, and
-/// blocks.
-///
-/// Similar to [`join!`], the `try_join!` macro takes a list of async
-/// expressions and evaluates them concurrently on the same task. Each async
-/// expression evaluates to a future and the futures from each expression are
-/// multiplexed on the current task. The `try_join!` macro returns when **all**
-/// branches return with `Ok` or when the **first** branch returns with `Err`.
-///
-/// [`join!`]: macro@join
-///
-/// # Notes
-///
-/// The supplied futures are stored inline and do not require allocating a
-/// `Vec`.
-///
-/// ### Runtime characteristics
-///
-/// By running all async expressions on the current task, the expressions are
-/// able to run **concurrently** but not in **parallel**. This means all
-/// expressions are run on the same thread and if one branch blocks the thread,
-/// all other expressions will be unable to continue. If parallelism is
-/// required, spawn each async expression using [`tokio::spawn`] and pass the
-/// join handle to `try_join!`.
-///
-/// [`tokio::spawn`]: crate::spawn
-///
-/// # Examples
-///
-/// Basic `try_join` with two branches.
-///
-/// ```
-/// async fn do_stuff_async() -> Result<(), &'static str> {
-///     // async work
-/// # Ok(())
-/// }
-///
-/// async fn more_async_work() -> Result<(), &'static str> {
-///     // more here
-/// # Ok(())
-/// }
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let res = tokio::try_join!(
-///         do_stuff_async(),
-///         more_async_work());
-///
-///     match res {
-///          Ok((first, second)) => {
-///              // do something with the values
-///          }
-///          Err(err) => {
-///             println!("processing failed; error = {}", err);
-///          }
-///     }
-/// }
-/// ```
-///
-/// Using `try_join!` with spawned tasks.
-///
-/// ```
-/// use tokio::task::JoinHandle;
-///
-/// async fn do_stuff_async() -> Result<(), &'static str> {
-///     // async work
-/// # Err("failed")
-/// }
-///
-/// async fn more_async_work() -> Result<(), &'static str> {
-///     // more here
-/// # Ok(())
-/// }
-///
-/// async fn flatten<T>(handle: JoinHandle<Result<T, &'static str>>) -> Result<T, &'static str> {
-///     match handle.await {
-///         Ok(Ok(result)) => Ok(result),
-///         Ok(Err(err)) => Err(err),
-///         Err(err) => Err("handling failed"),
-///     }
-/// }
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let handle1 = tokio::spawn(do_stuff_async());
-///     let handle2 = tokio::spawn(more_async_work());
-///     match tokio::try_join!(flatten(handle1), flatten(handle2)) {
-///         Ok(val) => {
-///             // do something with the values
-///         }
-///         Err(err) => {
-///             println!("Failed with {}.", err);
-///             # assert_eq!(err, "failed");
-///         }
-///     }
-/// }
-/// ```
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-macro_rules! try_join {
+macro_rules! doc {
+    ($try_join:item) => {
+        /// Waits on multiple concurrent branches, returning when **all** branches
+        /// complete with `Ok(_)` or on the first `Err(_)`.
+        ///
+        /// The `try_join!` macro must be used inside of async functions, closures, and
+        /// blocks.
+        ///
+        /// Similar to [`join!`], the `try_join!` macro takes a list of async
+        /// expressions and evaluates them concurrently on the same task. Each async
+        /// expression evaluates to a future and the futures from each expression are
+        /// multiplexed on the current task. The `try_join!` macro returns when **all**
+        /// branches return with `Ok` or when the **first** branch returns with `Err`.
+        ///
+        /// [`join!`]: macro@join
+        ///
+        /// # Notes
+        ///
+        /// The supplied futures are stored inline and do not require allocating a
+        /// `Vec`.
+        ///
+        /// ### Runtime characteristics
+        ///
+        /// By running all async expressions on the current task, the expressions are
+        /// able to run **concurrently** but not in **parallel**. This means all
+        /// expressions are run on the same thread and if one branch blocks the thread,
+        /// all other expressions will be unable to continue. If parallelism is
+        /// required, spawn each async expression using [`tokio::spawn`] and pass the
+        /// join handle to `try_join!`.
+        ///
+        /// [`tokio::spawn`]: crate::spawn
+        ///
+        /// # Examples
+        ///
+        /// Basic `try_join` with two branches.
+        ///
+        /// ```
+        /// async fn do_stuff_async() -> Result<(), &'static str> {
+        ///     // async work
+        /// # Ok(())
+        /// }
+        ///
+        /// async fn more_async_work() -> Result<(), &'static str> {
+        ///     // more here
+        /// # Ok(())
+        /// }
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let res = tokio::try_join!(
+        ///         do_stuff_async(),
+        ///         more_async_work());
+        ///
+        ///     match res {
+        ///          Ok((first, second)) => {
+        ///              // do something with the values
+        ///          }
+        ///          Err(err) => {
+        ///             println!("processing failed; error = {}", err);
+        ///          }
+        ///     }
+        /// }
+        /// ```
+        ///
+        /// Using `try_join!` with spawned tasks.
+        ///
+        /// ```
+        /// use tokio::task::JoinHandle;
+        ///
+        /// async fn do_stuff_async() -> Result<(), &'static str> {
+        ///     // async work
+        /// # Err("failed")
+        /// }
+        ///
+        /// async fn more_async_work() -> Result<(), &'static str> {
+        ///     // more here
+        /// # Ok(())
+        /// }
+        ///
+        /// async fn flatten<T>(handle: JoinHandle<Result<T, &'static str>>) -> Result<T, &'static str> {
+        ///     match handle.await {
+        ///         Ok(Ok(result)) => Ok(result),
+        ///         Ok(Err(err)) => Err(err),
+        ///         Err(err) => Err("handling failed"),
+        ///     }
+        /// }
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let handle1 = tokio::spawn(do_stuff_async());
+        ///     let handle2 = tokio::spawn(more_async_work());
+        ///     match tokio::try_join!(flatten(handle1), flatten(handle2)) {
+        ///         Ok(val) => {
+        ///             // do something with the values
+        ///         }
+        ///         Err(err) => {
+        ///             println!("Failed with {}.", err);
+        ///             # assert_eq!(err, "failed");
+        ///         }
+        ///     }
+        /// }
+        /// ```
+        #[macro_export]
+        #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+        $try_join
+    };
+}
+
+#[cfg(doc)]
+doc! {macro_rules! try_join {
+    ($($future:expr),*) => { unimplemented!() }
+}}
+
+#[cfg(not(doc))]
+doc! {macro_rules! try_join {
     (@ {
         // One `_` for each branch in the `try_join!` macro. This is not used once
         // normalization is complete.
@@ -215,4 +227,4 @@ macro_rules! try_join {
     };
 
     () => { async { Ok(()) }.await }
-}
+}}

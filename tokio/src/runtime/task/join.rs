@@ -5,7 +5,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
-use std::task::{Context, Poll, Waker};
+use std::task::{ready, Context, Poll, Waker};
 
 cfg_rt! {
     /// An owned permission to join on a task (await its termination).
@@ -305,14 +305,7 @@ impl<T> JoinHandle<T> {
     /// Returns a [task ID] that uniquely identifies this task relative to other
     /// currently spawned tasks.
     ///
-    /// **Note**: This is an [unstable API][unstable]. The public API of this type
-    /// may break in 1.x releases. See [the documentation on unstable
-    /// features][unstable] for details.
-    ///
     /// [task ID]: crate::task::Id
-    /// [unstable]: crate#unstable-features
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn id(&self) -> super::Id {
         // Safety: The header pointer is valid.
         unsafe { Header::get_id(self.raw.header_ptr()) }

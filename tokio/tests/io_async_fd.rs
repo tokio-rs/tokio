@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(unix, feature = "full"))]
+#![cfg(all(unix, feature = "full", not(miri)))]
 
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{
@@ -400,12 +400,12 @@ async fn poll_fns() {
 
     let read_fut = tokio::spawn(async move {
         // Move waker onto this task first
-        assert_pending!(poll!(futures::future::poll_fn(|cx| afd_a_2
+        assert_pending!(poll!(std::future::poll_fn(|cx| afd_a_2
             .as_ref()
             .poll_read_ready(cx))));
         barrier_clone.wait().await;
 
-        let _ = futures::future::poll_fn(|cx| afd_a_2.as_ref().poll_read_ready(cx)).await;
+        let _ = std::future::poll_fn(|cx| afd_a_2.as_ref().poll_read_ready(cx)).await;
     });
 
     let afd_a_2 = afd_a.clone();
@@ -414,12 +414,12 @@ async fn poll_fns() {
 
     let mut write_fut = tokio::spawn(async move {
         // Move waker onto this task first
-        assert_pending!(poll!(futures::future::poll_fn(|cx| afd_a_2
+        assert_pending!(poll!(std::future::poll_fn(|cx| afd_a_2
             .as_ref()
             .poll_write_ready(cx))));
         barrier_clone.wait().await;
 
-        let _ = futures::future::poll_fn(|cx| afd_a_2.as_ref().poll_write_ready(cx)).await;
+        let _ = std::future::poll_fn(|cx| afd_a_2.as_ref().poll_write_ready(cx)).await;
     });
 
     r_barrier.wait().await;
@@ -530,11 +530,11 @@ fn driver_shutdown_wakes_pending_race() {
 }
 
 async fn poll_readable<T: AsRawFd>(fd: &AsyncFd<T>) -> std::io::Result<AsyncFdReadyGuard<'_, T>> {
-    futures::future::poll_fn(|cx| fd.poll_read_ready(cx)).await
+    std::future::poll_fn(|cx| fd.poll_read_ready(cx)).await
 }
 
 async fn poll_writable<T: AsRawFd>(fd: &AsyncFd<T>) -> std::io::Result<AsyncFdReadyGuard<'_, T>> {
-    futures::future::poll_fn(|cx| fd.poll_write_ready(cx)).await
+    std::future::poll_fn(|cx| fd.poll_write_ready(cx)).await
 }
 
 #[test]
@@ -655,6 +655,7 @@ fn send_oob_data<S: AsRawFd>(stream: &S, data: &[u8]) -> io::Result<usize> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)]
 async fn clear_ready_matching_clears_ready() {
     use tokio::io::{Interest, Ready};
 
@@ -678,6 +679,7 @@ async fn clear_ready_matching_clears_ready() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)]
 async fn clear_ready_matching_clears_ready_mut() {
     use tokio::io::{Interest, Ready};
 
@@ -702,6 +704,7 @@ async fn clear_ready_matching_clears_ready_mut() {
 
 #[tokio::test]
 #[cfg(target_os = "linux")]
+#[cfg_attr(miri, ignore)]
 async fn await_error_readiness_timestamping() {
     use std::net::{Ipv4Addr, SocketAddr};
 
@@ -758,6 +761,7 @@ fn configure_timestamping_socket(udp_socket: &std::net::UdpSocket) -> std::io::R
 
 #[tokio::test]
 #[cfg(target_os = "linux")]
+#[cfg_attr(miri, ignore)]
 async fn await_error_readiness_invalid_address() {
     use std::net::{Ipv4Addr, SocketAddr};
     use tokio::io::{Interest, Ready};

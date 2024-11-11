@@ -84,7 +84,7 @@ impl RxFuture {
     }
 
     async fn recv(&mut self) -> Option<()> {
-        use crate::future::poll_fn;
+        use std::future::poll_fn;
         poll_fn(|cx| self.poll_recv(cx)).await
     }
 

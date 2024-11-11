@@ -1,4 +1,6 @@
-use crate::runtime::task::{self, unowned, Id, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::task::{
+    self, unowned, Id, JoinHandle, OwnedTasks, Schedule, Task, TaskHarnessScheduleHooks,
+};
 use crate::runtime::tests::NoopSchedule;
 
 use std::collections::VecDeque;
@@ -226,7 +228,7 @@ fn shutdown_immediately() {
 // Test for https://github.com/tokio-rs/tokio/issues/6729
 #[test]
 fn spawn_niche_in_task() {
-    use crate::future::poll_fn;
+    use std::future::poll_fn;
     use std::task::{Context, Poll, Waker};
 
     with(|rt| {
@@ -443,5 +445,11 @@ impl Schedule for Runtime {
 
     fn schedule(&self, task: task::Notified<Self>) {
         self.0.core.try_lock().unwrap().queue.push_back(task);
+    }
+
+    fn hooks(&self) -> TaskHarnessScheduleHooks {
+        TaskHarnessScheduleHooks {
+            task_terminate_callback: None,
+        }
     }
 }

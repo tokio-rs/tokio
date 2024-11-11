@@ -9,7 +9,7 @@ pub trait Encoder<Item> {
     /// The type of encoding errors.
     ///
     /// [`FramedWrite`] requires `Encoder`s errors to implement `From<io::Error>`
-    /// in the interest letting it return `Error`s directly.
+    /// in the interest of letting it return `Error`s directly.
     ///
     /// [`FramedWrite`]: crate::codec::FramedWrite
     type Error: From<io::Error>;

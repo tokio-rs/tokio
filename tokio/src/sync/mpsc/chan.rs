@@ -9,10 +9,11 @@ use crate::sync::notify::Notify;
 use crate::util::cacheline::CachePadded;
 
 use std::fmt;
+use std::panic;
 use std::process;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::task::Poll::{Pending, Ready};
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 /// Channel sender.
 pub(crate) struct Tx<T, S> {
@@ -108,6 +109,8 @@ impl<T> fmt::Debug for RxFields<T> {
 
 unsafe impl<T: Send, S: Send> Send for Chan<T, S> {}
 unsafe impl<T: Send, S: Sync> Sync for Chan<T, S> {}
+impl<T, S> panic::RefUnwindSafe for Chan<T, S> {}
+impl<T, S> panic::UnwindSafe for Chan<T, S> {}
 
 pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
     let (tx, rx) = list::channel();

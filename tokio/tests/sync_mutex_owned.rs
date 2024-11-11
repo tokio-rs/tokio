@@ -59,6 +59,7 @@ fn readiness() {
 /// is aborted prematurely.
 #[tokio::test]
 #[cfg(feature = "full")]
+#[cfg_attr(miri, ignore)]
 async fn aborted_future_1() {
     use std::time::Duration;
     use tokio::time::{interval, timeout};

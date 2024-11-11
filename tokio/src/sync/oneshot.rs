@@ -135,7 +135,7 @@ use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::sync::atomic::Ordering::{self, AcqRel, Acquire};
 use std::task::Poll::{Pending, Ready};
-use std::task::{Context, Poll, Waker};
+use std::task::{ready, Context, Poll, Waker};
 
 /// Sends a value to the associated [`Receiver`].
 ///
@@ -698,7 +698,7 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub async fn closed(&mut self) {
-        use crate::future::poll_fn;
+        use std::future::poll_fn;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let resource_span = self.resource_span.clone();
@@ -775,7 +775,7 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::oneshot;
     ///
-    /// use futures::future::poll_fn;
+    /// use std::future::poll_fn;
     ///
     /// #[tokio::main]
     /// async fn main() {

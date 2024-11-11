@@ -19,7 +19,7 @@ use std::{
     pin::Pin,
     process::ExitStatus,
     sync::atomic::{AtomicBool, Ordering::Relaxed},
-    task::{Context, Poll},
+    task::{ready, Context, Poll},
 };
 
 #[derive(Debug)]

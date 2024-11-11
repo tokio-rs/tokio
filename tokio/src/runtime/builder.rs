@@ -1,9 +1,16 @@
+#![cfg_attr(loom, allow(unused_imports))]
+
 use crate::runtime::handle::Handle;
-use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime};
+use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback};
+#[cfg(tokio_unstable)]
+use crate::runtime::{metrics::HistogramConfiguration, LocalOptions, LocalRuntime, TaskMeta};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
+use crate::runtime::blocking::BlockingPool;
+use crate::runtime::scheduler::CurrentThread;
 use std::fmt;
 use std::io;
+use std::thread::ThreadId;
 use std::time::Duration;
 
 /// Builds Tokio Runtime with custom configuration values.
@@ -77,6 +84,12 @@ pub struct Builder {
 
     /// To run after each thread is unparked.
     pub(super) after_unpark: Option<Callback>,
+
+    /// To run before each task is spawned.
+    pub(super) before_spawn: Option<TaskCallback>,
+
+    /// To run after each task is terminated.
+    pub(super) after_termination: Option<TaskCallback>,
 
     /// Customizable keep alive timeout for `BlockingPool`
     pub(super) keep_alive: Option<Duration>,
@@ -289,6 +302,9 @@ impl Builder {
             before_stop: None,
             before_park: None,
             after_unpark: None,
+
+            before_spawn: None,
+            after_termination: None,
 
             keep_alive: None,
 
@@ -677,6 +693,105 @@ impl Builder {
         self
     }
 
+    /// Executes function `f` just before a task is spawned.
+    ///
+    /// `f` is called within the Tokio context, so functions like
+    /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback being
+    /// invoked immediately.
+    ///
+    /// This can be used for bookkeeping or monitoring purposes.
+    ///
+    /// Note: There can only be one spawn callback for a runtime; calling this function more
+    /// than once replaces the last callback defined, rather than adding to it.
+    ///
+    /// This *does not* support [`LocalSet`](crate::task::LocalSet) at this time.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type  
+    /// may break in 1.x releases. See [the documentation on unstable  
+    /// features][unstable] for details.  
+    ///  
+    /// [unstable]: crate#unstable-features  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    /// # pub fn main() {
+    /// let runtime = runtime::Builder::new_current_thread()
+    ///     .on_task_spawn(|_| {
+    ///         println!("spawning task");
+    ///     })
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// runtime.block_on(async {
+    ///     tokio::task::spawn(std::future::ready(()));
+    ///
+    ///     for _ in 0..64 {
+    ///         tokio::task::yield_now().await;
+    ///     }
+    /// })
+    /// # }
+    /// ```
+    #[cfg(all(not(loom), tokio_unstable))]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn on_task_spawn<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
+    {
+        self.before_spawn = Some(std::sync::Arc::new(f));
+        self
+    }
+
+    /// Executes function `f` just after a task is terminated.
+    ///
+    /// `f` is called within the Tokio context, so functions like
+    /// [`tokio::spawn`](crate::spawn) can be called.
+    ///
+    /// This can be used for bookkeeping or monitoring purposes.
+    ///
+    /// Note: There can only be one task termination callback for a runtime; calling this
+    /// function more than once replaces the last callback defined, rather than adding to it.
+    ///
+    /// This *does not* support [`LocalSet`](crate::task::LocalSet) at this time.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type  
+    /// may break in 1.x releases. See [the documentation on unstable  
+    /// features][unstable] for details.  
+    ///  
+    /// [unstable]: crate#unstable-features  
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    /// # pub fn main() {
+    /// let runtime = runtime::Builder::new_current_thread()
+    ///     .on_task_terminate(|_| {
+    ///         println!("killing task");
+    ///     })
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// runtime.block_on(async {
+    ///     tokio::task::spawn(std::future::ready(()));
+    ///
+    ///     for _ in 0..64 {
+    ///         tokio::task::yield_now().await;
+    ///     }
+    /// })
+    /// # }
+    /// ```
+    #[cfg(all(not(loom), tokio_unstable))]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn on_task_terminate<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
+    {
+        self.after_termination = Some(std::sync::Arc::new(f));
+        self
+    }
+
     /// Creates the configured `Runtime`.
     ///
     /// The returned `Runtime` instance is ready to spawn tasks.
@@ -699,6 +814,37 @@ impl Builder {
             Kind::MultiThread => self.build_threaded_runtime(),
             #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
             Kind::MultiThreadAlt => self.build_alt_threaded_runtime(),
+        }
+    }
+
+    /// Creates the configured `LocalRuntime`.
+    ///
+    /// The returned `LocalRuntime` instance is ready to spawn tasks.
+    ///
+    /// # Panics
+    /// This will panic if `current_thread` is not the selected runtime flavor.
+    /// All other runtime flavors are unsupported by [`LocalRuntime`].
+    ///
+    /// [`LocalRuntime`]: [crate::runtime::LocalRuntime]
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Builder;
+    ///
+    /// let rt  = Builder::new_current_thread().build_local(&mut Default::default()).unwrap();
+    ///
+    /// rt.block_on(async {
+    ///     println!("Hello from the Tokio runtime");
+    /// });
+    /// ```
+    #[allow(unused_variables, unreachable_patterns)]
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn build_local(&mut self, options: &LocalOptions) -> io::Result<LocalRuntime> {
+        match &self.kind {
+            Kind::CurrentThread => self.build_current_thread_local_runtime(),
+            _ => panic!("Only current_thread is supported when building a local runtime"),
         }
     }
 
@@ -967,8 +1113,13 @@ impl Builder {
         ///
         /// The histogram uses fixed bucket sizes. In other words, the histogram
         /// buckets are not dynamic based on input values. Use the
-        /// `metrics_poll_count_histogram_` builder methods to configure the
+        /// `metrics_poll_time_histogram` builder methods to configure the
         /// histogram details.
+        ///
+        /// By default, a linear histogram with 10 buckets each 100 microseconds wide will be used.
+        /// This has an extremely low memory footprint, but may not provide enough granularity. For
+        /// better granularity with low memory usage, use [`metrics_poll_time_histogram_configuration()`]
+        /// to select [`LogHistogram`] instead.
         ///
         /// # Examples
         ///
@@ -976,22 +1127,33 @@ impl Builder {
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_metrics_poll_count_histogram()
+        ///     .enable_metrics_poll_time_histogram()
         ///     .build()
         ///     .unwrap();
         /// # // Test default values here
         /// # fn us(n: u64) -> std::time::Duration { std::time::Duration::from_micros(n) }
         /// # let m = rt.handle().metrics();
-        /// # assert_eq!(m.poll_count_histogram_num_buckets(), 10);
-        /// # assert_eq!(m.poll_count_histogram_bucket_range(0), us(0)..us(100));
-        /// # assert_eq!(m.poll_count_histogram_bucket_range(1), us(100)..us(200));
+        /// # assert_eq!(m.poll_time_histogram_num_buckets(), 10);
+        /// # assert_eq!(m.poll_time_histogram_bucket_range(0), us(0)..us(100));
+        /// # assert_eq!(m.poll_time_histogram_bucket_range(1), us(100)..us(200));
         /// ```
         ///
         /// [`Handle::metrics()`]: crate::runtime::Handle::metrics
         /// [`Instant::now()`]: std::time::Instant::now
-        pub fn enable_metrics_poll_count_histogram(&mut self) -> &mut Self {
+        /// [`LogHistogram`]: crate::runtime::LogHistogram
+        /// [`metrics_poll_time_histogram_configuration()`]: Builder::metrics_poll_time_histogram_configuration
+        pub fn enable_metrics_poll_time_histogram(&mut self) -> &mut Self {
             self.metrics_poll_count_histogram_enable = true;
             self
+        }
+
+        /// Deprecated. Use [`enable_metrics_poll_time_histogram()`] instead.
+        ///
+        /// [`enable_metrics_poll_time_histogram()`]: Builder::enable_metrics_poll_time_histogram
+        #[deprecated(note = "`poll_count_histogram` related methods have been renamed `poll_time_histogram` to better reflect their functionality.")]
+        #[doc(hidden)]
+        pub fn enable_metrics_poll_count_histogram(&mut self) -> &mut Self {
+            self.enable_metrics_poll_time_histogram()
         }
 
         /// Sets the histogram scale for tracking the distribution of task poll
@@ -1010,14 +1172,83 @@ impl Builder {
         /// ```
         /// use tokio::runtime::{self, HistogramScale};
         ///
+        /// # #[allow(deprecated)]
         /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_metrics_poll_count_histogram()
+        ///     .enable_metrics_poll_time_histogram()
         ///     .metrics_poll_count_histogram_scale(HistogramScale::Log)
         ///     .build()
         ///     .unwrap();
         /// ```
+        #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_scale(&mut self, histogram_scale: crate::runtime::HistogramScale) -> &mut Self {
-            self.metrics_poll_count_histogram.scale = histogram_scale;
+            self.metrics_poll_count_histogram.legacy_mut(|b|b.scale = histogram_scale);
+            self
+        }
+
+        /// Configure the histogram for tracking poll times
+        ///
+        /// By default, a linear histogram with 10 buckets each 100 microseconds wide will be used.
+        /// This has an extremely low memory footprint, but may not provide enough granularity. For
+        /// better granularity with low memory usage, use [`LogHistogram`] instead.
+        ///
+        /// # Examples
+        /// Configure a [`LogHistogram`] with [default configuration]:
+        /// ```
+        /// use tokio::runtime;
+        /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_time_histogram()
+        ///     .metrics_poll_time_histogram_configuration(
+        ///         HistogramConfiguration::log(LogHistogram::default())
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        ///
+        /// Configure a linear histogram with 100 buckets, each 10μs wide
+        /// ```
+        /// use tokio::runtime;
+        /// use std::time::Duration;
+        /// use tokio::runtime::HistogramConfiguration;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_time_histogram()
+        ///     .metrics_poll_time_histogram_configuration(
+        ///         HistogramConfiguration::linear(Duration::from_micros(10), 100)
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        ///
+        /// Configure a [`LogHistogram`] with the following settings:
+        /// - Measure times from 100ns to 120s
+        /// - Max error of 0.1
+        /// - No more than 1024 buckets
+        /// ```
+        /// use std::time::Duration;
+        /// use tokio::runtime;
+        /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_time_histogram()
+        ///     .metrics_poll_time_histogram_configuration(
+        ///         HistogramConfiguration::log(LogHistogram::builder()
+        ///             .max_value(Duration::from_secs(120))
+        ///             .min_value(Duration::from_nanos(100))
+        ///             .max_error(0.1)
+        ///             .max_buckets(1024)
+        ///             .expect("configuration uses 488 buckets")
+        ///         )
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        ///
+        /// [`LogHistogram`]: crate::runtime::LogHistogram
+        /// [default configuration]: crate::runtime::LogHistogramBuilder
+        pub fn metrics_poll_time_histogram_configuration(&mut self, configuration: HistogramConfiguration) -> &mut Self {
+            self.metrics_poll_count_histogram.histogram_type = configuration.inner;
             self
         }
 
@@ -1041,19 +1272,22 @@ impl Builder {
         /// use tokio::runtime;
         /// use std::time::Duration;
         ///
+        /// # #[allow(deprecated)]
         /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_metrics_poll_count_histogram()
+        ///     .enable_metrics_poll_time_histogram()
         ///     .metrics_poll_count_histogram_resolution(Duration::from_micros(100))
         ///     .build()
         ///     .unwrap();
         /// ```
+        #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_resolution(&mut self, resolution: Duration) -> &mut Self {
             assert!(resolution > Duration::from_secs(0));
             // Sanity check the argument and also make the cast below safe.
             assert!(resolution <= Duration::from_secs(1));
 
             let resolution = resolution.as_nanos() as u64;
-            self.metrics_poll_count_histogram.resolution = resolution;
+
+            self.metrics_poll_count_histogram.legacy_mut(|b|b.resolution = resolution);
             self
         }
 
@@ -1072,14 +1306,16 @@ impl Builder {
         /// ```
         /// use tokio::runtime;
         ///
+        /// # #[allow(deprecated)]
         /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_metrics_poll_count_histogram()
+        ///     .enable_metrics_poll_time_histogram()
         ///     .metrics_poll_count_histogram_buckets(15)
         ///     .build()
         ///     .unwrap();
         /// ```
+        #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_buckets(&mut self, buckets: usize) -> &mut Self {
-            self.metrics_poll_count_histogram.num_buckets = buckets;
+            self.metrics_poll_count_histogram.legacy_mut(|b|b.num_buckets = buckets);
             self
         }
     }
@@ -1093,8 +1329,40 @@ impl Builder {
     }
 
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
-        use crate::runtime::scheduler::{self, CurrentThread};
-        use crate::runtime::{runtime::Scheduler, Config};
+        use crate::runtime::runtime::Scheduler;
+
+        let (scheduler, handle, blocking_pool) =
+            self.build_current_thread_runtime_components(None)?;
+
+        Ok(Runtime::from_parts(
+            Scheduler::CurrentThread(scheduler),
+            handle,
+            blocking_pool,
+        ))
+    }
+
+    #[cfg(tokio_unstable)]
+    fn build_current_thread_local_runtime(&mut self) -> io::Result<LocalRuntime> {
+        use crate::runtime::local_runtime::LocalRuntimeScheduler;
+
+        let tid = std::thread::current().id();
+
+        let (scheduler, handle, blocking_pool) =
+            self.build_current_thread_runtime_components(Some(tid))?;
+
+        Ok(LocalRuntime::from_parts(
+            LocalRuntimeScheduler::CurrentThread(scheduler),
+            handle,
+            blocking_pool,
+        ))
+    }
+
+    fn build_current_thread_runtime_components(
+        &mut self,
+        local_tid: Option<ThreadId>,
+    ) -> io::Result<(CurrentThread, Handle, BlockingPool)> {
+        use crate::runtime::scheduler;
+        use crate::runtime::Config;
 
         let (driver, driver_handle) = driver::Driver::new(self.get_cfg(1))?;
 
@@ -1118,6 +1386,8 @@ impl Builder {
             Config {
                 before_park: self.before_park.clone(),
                 after_unpark: self.after_unpark.clone(),
+                before_spawn: self.before_spawn.clone(),
+                after_termination: self.after_termination.clone(),
                 global_queue_interval: self.global_queue_interval,
                 event_interval: self.event_interval,
                 local_queue_capacity: self.local_queue_capacity,
@@ -1127,17 +1397,14 @@ impl Builder {
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
             },
+            local_tid,
         );
 
         let handle = Handle {
             inner: scheduler::Handle::CurrentThread(handle),
         };
 
-        Ok(Runtime::from_parts(
-            Scheduler::CurrentThread(scheduler),
-            handle,
-            blocking_pool,
-        ))
+        Ok((scheduler, handle, blocking_pool))
     }
 
     fn metrics_poll_count_histogram_builder(&self) -> Option<HistogramBuilder> {
@@ -1269,6 +1536,8 @@ cfg_rt_multi_thread! {
                 Config {
                     before_park: self.before_park.clone(),
                     after_unpark: self.after_unpark.clone(),
+                    before_spawn: self.before_spawn.clone(),
+                    after_termination: self.after_termination.clone(),
                     global_queue_interval: self.global_queue_interval,
                     event_interval: self.event_interval,
                     local_queue_capacity: self.local_queue_capacity,
@@ -1316,6 +1585,8 @@ cfg_rt_multi_thread! {
                     Config {
                         before_park: self.before_park.clone(),
                         after_unpark: self.after_unpark.clone(),
+                        before_spawn: self.before_spawn.clone(),
+                        after_termination: self.after_termination.clone(),
                         global_queue_interval: self.global_queue_interval,
                         event_interval: self.event_interval,
                         local_queue_capacity: self.local_queue_capacity,

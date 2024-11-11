@@ -1,6 +1,6 @@
 #[cfg(feature = "test-util")]
 use crate::runtime::scheduler;
-use crate::runtime::task::{self, Task};
+use crate::runtime::task::{self, Task, TaskHarnessScheduleHooks};
 use crate::runtime::Handle;
 
 /// `task::Schedule` implementation that does nothing (except some bookkeeping
@@ -12,6 +12,7 @@ use crate::runtime::Handle;
 pub(crate) struct BlockingSchedule {
     #[cfg(feature = "test-util")]
     handle: Handle,
+    hooks: TaskHarnessScheduleHooks,
 }
 
 impl BlockingSchedule {
@@ -32,6 +33,9 @@ impl BlockingSchedule {
         BlockingSchedule {
             #[cfg(feature = "test-util")]
             handle: handle.clone(),
+            hooks: TaskHarnessScheduleHooks {
+                task_terminate_callback: handle.inner.hooks().task_terminate_callback.clone(),
+            },
         }
     }
 }
@@ -56,5 +60,11 @@ impl task::Schedule for BlockingSchedule {
 
     fn schedule(&self, _task: task::Notified<Self>) {
         unreachable!();
+    }
+
+    fn hooks(&self) -> TaskHarnessScheduleHooks {
+        TaskHarnessScheduleHooks {
+            task_terminate_callback: self.hooks.task_terminate_callback.clone(),
+        }
     }
 }

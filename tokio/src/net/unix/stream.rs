@@ -1,4 +1,3 @@
-use crate::future::poll_fn;
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
 use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
@@ -6,6 +5,7 @@ use crate::net::unix::ucred::{self, UCred};
 use crate::net::unix::SocketAddr;
 
 use std::fmt;
+use std::future::poll_fn;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
 #[cfg(target_os = "android")]
@@ -77,7 +77,7 @@ impl UnixStream {
         let addr = {
             let os_str_bytes = path.as_ref().as_os_str().as_bytes();
             if os_str_bytes.starts_with(b"\0") {
-                StdSocketAddr::from_abstract_name(os_str_bytes)?
+                StdSocketAddr::from_abstract_name(&os_str_bytes[1..])?
             } else {
                 StdSocketAddr::from_pathname(path)?
             }
