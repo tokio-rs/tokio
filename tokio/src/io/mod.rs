@@ -154,7 +154,7 @@
 //! These APIs are very similar to the ones provided by `std`, but they also
 //! implement [`AsyncRead`] and [`AsyncWrite`].
 //!
-//! Note that the standard input / output APIs  **must** be used from the
+//! Note that the standard input / output APIs **must** be used from the
 //! context of the Tokio runtime, as they require Tokio-specific features to
 //! function. Calling these functions outside of a Tokio runtime will panic.
 //!

@@ -51,7 +51,7 @@ mod aio {
                 Poll::Pending => Poll::Pending,
                 Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
                 Poll::Ready(Ok(_ev)) => {
-                    // At this point, we could clear readiness.  But there's no
+                    // At this point, we could clear readiness. But there's no
                     // point, since we're about to drop the Aio.
                     let p = unsafe { self.map_unchecked_mut(|s| &mut s.0 .0) };
                     let result = p.aio_return();
@@ -118,7 +118,7 @@ mod aio {
                 Poll::Ready(Ok(ev)) => {
                     // Clearing readiness makes the future non-idempotent; the
                     // caller can't poll it repeatedly after it has already
-                    // returned Ready.  But that's ok; most futures behave this
+                    // returned Ready. But that's ok; most futures behave this
                     // way.
                     self.0.clear_ready(ev);
                     let r = unsafe { libc::aio_return(self.0 .0.as_mut().get_unchecked_mut()) };
@@ -197,7 +197,7 @@ mod lio {
 
     /// Low-level source based on lio_listio
     ///
-    /// An example demonstrating using AIO with `Interest::Lio`.  mio_aio 0.8
+    /// An example demonstrating using AIO with `Interest::Lio`. mio_aio 0.8
     /// doesn't include any bindings for lio_listio, so we've got to go
     /// low-level.
     struct LioSource<'a> {
@@ -259,8 +259,8 @@ mod lio {
                 Poll::Ready(Ok(ev)) => {
                     // Clearing readiness makes the future non-idempotent; the
                     // caller can't poll it repeatedly after it has already
-                    // returned Ready.  But that's ok; most futures behave this
-                    // way.  Clearing readiness is especially useful for
+                    // returned Ready. But that's ok; most futures behave this
+                    // way. Clearing readiness is especially useful for
                     // lio_listio, because sometimes some operations will be
                     // ready but not all.
                     self.0.clear_ready(ev);

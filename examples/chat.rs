@@ -138,8 +138,8 @@ impl Shared {
 
     /// Send a `LineCodec` encoded message to every peer, except
     /// for the sender.
-    async fn broadcast(&mut self, sender: SocketAddr, message: &str) {
-        for peer in self.peers.iter_mut() {
+    fn broadcast(&mut self, sender: SocketAddr, message: &str) {
+        for peer in &mut self.peers {
             if *peer.0 != sender {
                 let _ = peer.1.send(message.into());
             }
@@ -178,13 +178,10 @@ async fn process(
     lines.send("Please enter your username:").await?;
 
     // Read the first line from the `LineCodec` stream to get the username.
-    let username = match lines.next().await {
-        Some(Ok(line)) => line,
+    let Some(Ok(username)) = lines.next().await else {
         // We didn't get a line so we return early here.
-        _ => {
-            tracing::error!("Failed to get username from {}. Client disconnected.", addr);
-            return Ok(());
-        }
+        tracing::error!("Failed to get username from {}. Client disconnected.", addr);
+        return Ok(());
     };
 
     // Register our peer with state which internally sets up some channels.
@@ -193,9 +190,9 @@ async fn process(
     // A client has connected, let's let everyone know.
     {
         let mut state = state.lock().await;
-        let msg = format!("{} has joined the chat", username);
+        let msg = format!("{username} has joined the chat");
         tracing::info!("{}", msg);
-        state.broadcast(addr, &msg).await;
+        state.broadcast(addr, &msg);
     }
 
     // Process incoming messages until our stream is exhausted by a disconnect.
@@ -210,9 +207,9 @@ async fn process(
                 // broadcast this message to the other users.
                 Some(Ok(msg)) => {
                     let mut state = state.lock().await;
-                    let msg = format!("{}: {}", username, msg);
+                    let msg = format!("{username}: {msg}");
 
-                    state.broadcast(addr, &msg).await;
+                    state.broadcast(addr, &msg);
                 }
                 // An error occurred.
                 Some(Err(e)) => {
@@ -234,9 +231,9 @@ async fn process(
         let mut state = state.lock().await;
         state.peers.remove(&addr);
 
-        let msg = format!("{} has left the chat", username);
+        let msg = format!("{username} has left the chat");
         tracing::info!("{}", msg);
-        state.broadcast(addr, &msg).await;
+        state.broadcast(addr, &msg);
     }
 
     Ok(())

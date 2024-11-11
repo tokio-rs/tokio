@@ -15,7 +15,7 @@ use std::path::Path;
 /// # Platform-specific behavior
 ///
 /// This function currently corresponds to the `stat` function on Unix and the
-/// `GetFileAttributesEx` function on Windows.  Note that, this [may change in
+/// `GetFileAttributesEx` function on Windows. Note that, this [may change in
 /// the future][changes].
 ///
 /// [changes]: https://doc.rust-lang.org/std/io/index.html#platform-specific-behavior

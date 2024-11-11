@@ -16,6 +16,7 @@
 
 #![warn(rust_2018_idioms)]
 
+use bytes::BytesMut;
 use futures::StreamExt;
 use tokio::io;
 use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite};
@@ -43,7 +44,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let addr = addr.parse::<SocketAddr>()?;
 
     let stdin = FramedRead::new(io::stdin(), BytesCodec::new());
-    let stdin = stdin.map(|i| i.map(|bytes| bytes.freeze()));
+    let stdin = stdin.map(|i| i.map(BytesMut::freeze));
     let stdout = FramedWrite::new(io::stdout(), BytesCodec::new());
 
     if tcp {
@@ -77,7 +78,7 @@ mod tcp {
                 //BytesMut into Bytes
                 Ok(i) => future::ready(Some(i.freeze())),
                 Err(e) => {
-                    println!("failed to read from socket; error={}", e);
+                    println!("failed to read from socket; error={e}");
                     future::ready(None)
                 }
             })

@@ -186,7 +186,7 @@ fn copy_mem_to_mem(c: &mut Criterion) {
             };
 
             rt.block_on(task());
-        })
+        });
     });
 }
 
@@ -202,7 +202,7 @@ fn copy_mem_to_slow_hdd(c: &mut Criterion) {
             };
 
             rt.block_on(task());
-        })
+        });
     });
 }
 
@@ -219,7 +219,7 @@ fn copy_chunk_to_mem(c: &mut Criterion) {
             };
 
             rt.block_on(task());
-        })
+        });
     });
 }
 
@@ -236,7 +236,7 @@ fn copy_chunk_to_slow_hdd(c: &mut Criterion) {
             };
 
             rt.block_on(task());
-        })
+        });
     });
 }
 

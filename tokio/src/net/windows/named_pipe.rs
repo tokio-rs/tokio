@@ -1782,7 +1782,7 @@ impl ServerOptions {
     /// The default pipe mode is [`PipeMode::Byte`]. See [`PipeMode`] for
     /// documentation of what each mode means.
     ///
-    /// This corresponds to specifying `PIPE_TYPE_` and `PIPE_READMODE_` in  [`dwPipeMode`].
+    /// This corresponds to specifying `PIPE_TYPE_` and `PIPE_READMODE_` in [`dwPipeMode`].
     ///
     /// [`dwPipeMode`]: https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createnamedpipea
     pub fn pipe_mode(&mut self, pipe_mode: PipeMode) -> &mut Self {

@@ -90,7 +90,7 @@ impl RawTask {
     }
 
     /// This call notifies the task. It will not consume any ref-counts, but the
-    /// caller should hold a ref-count.  This will create a new Notified and
+    /// caller should hold a ref-count. This will create a new Notified and
     /// submit it if necessary.
     pub(super) fn wake_by_ref(&self) {
         use super::state::TransitionToNotifiedByRef;

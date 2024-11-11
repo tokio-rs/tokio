@@ -165,7 +165,7 @@ impl OpenOptions {
     /// Sets the option for the append mode.
     ///
     /// This option, when true, means that writes will append to a file instead
-    /// of overwriting previous contents.  Note that setting
+    /// of overwriting previous contents. Note that setting
     /// `.write(true).append(true)` has the same effect as setting only
     /// `.append(true)`.
     ///
@@ -292,7 +292,7 @@ impl OpenOptions {
 
     /// Sets the option to always create a new file.
     ///
-    /// This option indicates whether a new file will be created.  No file is
+    /// This option indicates whether a new file will be created. No file is
     /// allowed to exist at the target location, also no (dangling) symlink.
     ///
     /// This option is useful because it is atomic. Otherwise between checking

@@ -162,7 +162,7 @@ fn write_hits_backpressure() {
 
         // Ensure the mock is empty
         assert_eq!(0, framed.get_ref().calls.len());
-    })
+    });
 }
 
 // // ===== Mock ======
@@ -180,7 +180,7 @@ impl Write for Mock {
                 Ok(data.len())
             }
             Some(Err(e)) => Err(e),
-            None => panic!("unexpected write; {:?}", src),
+            None => panic!("unexpected write; {src:?}"),
         }
     }
 

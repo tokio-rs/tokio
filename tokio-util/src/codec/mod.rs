@@ -77,7 +77,7 @@
 //! A [`Decoder`] is used together with [`FramedRead`] or [`Framed`] to turn an
 //! [`AsyncRead`] into a [`Stream`]. The job of the decoder trait is to specify
 //! how sequences of bytes are turned into a sequence of frames, and to
-//! determine where the boundaries between frames are.  The job of the
+//! determine where the boundaries between frames are. The job of the
 //! `FramedRead` is to repeatedly switch between reading more data from the IO
 //! resource, and asking the decoder whether we have received enough data to
 //! decode another frame of data.
@@ -108,7 +108,7 @@
 //! It is guaranteed that, from one call to `decode` to another, the provided
 //! buffer will contain the exact same data as before, except that if more data
 //! has arrived through the IO resource, that data will have been appended to
-//! the buffer.  This means that reading frames from a `FramedRead` is
+//! the buffer. This means that reading frames from a `FramedRead` is
 //! essentially equivalent to the following loop:
 //!
 //! ```no_run
@@ -217,7 +217,7 @@
 //!
 //! An [`Encoder`] is used together with [`FramedWrite`] or [`Framed`] to turn
 //! an [`AsyncWrite`] into a [`Sink`]. The job of the encoder trait is to
-//! specify how frames are turned into a sequences of bytes.  The job of the
+//! specify how frames are turned into a sequences of bytes. The job of the
 //! `FramedWrite` is to take the resulting sequence of bytes and write it to the
 //! IO resource.
 //!

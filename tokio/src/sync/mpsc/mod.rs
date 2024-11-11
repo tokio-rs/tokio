@@ -59,7 +59,7 @@
 //! **Unbounded channel**: You should use the kind of channel that matches where
 //! the receiver is. So for sending a message _from async to sync_, you should
 //! use [the standard library unbounded channel][std-unbounded] or
-//! [crossbeam][crossbeam-unbounded].  Similarly, for sending a message _from sync
+//! [crossbeam][crossbeam-unbounded]. Similarly, for sending a message _from sync
 //! to async_, you should use an unbounded Tokio `mpsc` channel.
 //!
 //! Please be aware that the above remarks were written with the `mpsc` channel

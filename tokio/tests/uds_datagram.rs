@@ -88,7 +88,7 @@ async fn try_send_recv_never_block() -> io::Result<()> {
                 (io::ErrorKind::WouldBlock, _) => break,
                 (_, Some(libc::ENOBUFS)) => break,
                 _ => {
-                    panic!("unexpected error {:?}", err);
+                    panic!("unexpected error {err:?}");
                 }
             },
             Ok(len) => {
@@ -206,7 +206,7 @@ async fn try_send_to_recv_from() -> std::io::Result<()> {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -223,7 +223,7 @@ async fn try_send_to_recv_from() -> std::io::Result<()> {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }
@@ -253,7 +253,7 @@ async fn try_recv_buf_from() -> std::io::Result<()> {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -270,7 +270,7 @@ async fn try_recv_buf_from() -> std::io::Result<()> {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }
@@ -317,7 +317,7 @@ async fn try_recv_buf_never_block() -> io::Result<()> {
                 (io::ErrorKind::WouldBlock, _) => break,
                 (_, Some(libc::ENOBUFS)) => break,
                 _ => {
-                    panic!("unexpected error {:?}", err);
+                    panic!("unexpected error {err:?}");
                 }
             },
             Ok(len) => {
@@ -388,7 +388,7 @@ async fn poll_ready() -> io::Result<()> {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -405,7 +405,7 @@ async fn poll_ready() -> io::Result<()> {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }

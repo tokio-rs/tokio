@@ -14,8 +14,8 @@ fn time_now_current_thread(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 black_box(tokio::time::Instant::now());
-            })
-        })
+            });
+        });
     });
 }
 

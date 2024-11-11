@@ -83,26 +83,23 @@ impl<T> OrphanQueueImpl<T> {
         // If someone else is holding the lock, they will be responsible for draining
         // the queue as necessary, so we can safely bail if that happens
         if let Some(mut sigchild_guard) = self.sigchild.try_lock() {
-            match &mut *sigchild_guard {
-                Some(sigchild) => {
-                    if sigchild.try_has_changed().and_then(Result::ok).is_some() {
-                        drain_orphan_queue(self.queue.lock());
-                    }
+            if let Some(sigchild) = &mut *sigchild_guard {
+                if sigchild.try_has_changed().and_then(Result::ok).is_some() {
+                    drain_orphan_queue(self.queue.lock());
                 }
-                None => {
-                    let queue = self.queue.lock();
+            } else {
+                let queue = self.queue.lock();
 
-                    // Be lazy and only initialize the SIGCHLD listener if there
-                    // are any orphaned processes in the queue.
-                    if !queue.is_empty() {
-                        // An errors shouldn't really happen here, but if it does it
-                        // means that the signal driver isn't running, in
-                        // which case there isn't anything we can
-                        // register/initialize here, so we can try again later
-                        if let Ok(sigchild) = signal_with_handle(SignalKind::child(), handle) {
-                            *sigchild_guard = Some(sigchild);
-                            drain_orphan_queue(queue);
-                        }
+                // Be lazy and only initialize the SIGCHLD listener if there
+                // are any orphaned processes in the queue.
+                if !queue.is_empty() {
+                    // An errors shouldn't really happen here, but if it does it
+                    // means that the signal driver isn't running, in
+                    // which case there isn't anything we can
+                    // register/initialize here, so we can try again later
+                    if let Ok(sigchild) = signal_with_handle(SignalKind::child(), handle) {
+                        *sigchild_guard = Some(sigchild);
+                        drain_orphan_queue(queue);
                     }
                 }
             }

@@ -68,7 +68,7 @@ fn single_timer() {
         time.process_at_time(0, time.time_source().now(clock) + 2_000_000_000);
 
         jh.join().unwrap();
-    })
+    });
 }
 
 #[test]
@@ -102,7 +102,7 @@ fn drop_timer() {
         time.process_at_time(0, time.time_source().now(clock) + 2_000_000_000);
 
         jh.join().unwrap();
-    })
+    });
 }
 
 #[test]
@@ -135,7 +135,7 @@ fn change_waker() {
         time.process_at_time(0, time.time_source().now(clock) + 2_000_000_000);
 
         jh.join().unwrap();
-    })
+    });
 }
 
 #[test]
@@ -190,7 +190,7 @@ fn reset_future() {
         jh.join().unwrap();
 
         assert!(finished_early.load(Ordering::Relaxed));
-    })
+    });
 }
 
 #[cfg(not(loom))]

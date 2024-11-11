@@ -40,7 +40,7 @@ fn rt_multi_spawn_many_local(c: &mut Criterion) {
 
                 rx.recv().unwrap();
             });
-        })
+        });
     });
 }
 
@@ -60,7 +60,7 @@ fn rt_multi_spawn_many_remote_idle(c: &mut Criterion) {
                     handle.await.unwrap();
                 }
             });
-        })
+        });
     });
 }
 
@@ -94,7 +94,7 @@ fn rt_multi_spawn_many_remote_busy1(c: &mut Criterion) {
                     handle.await.unwrap();
                 }
             });
-        })
+        });
     });
 
     flag.store(false, Relaxed);
@@ -137,7 +137,7 @@ fn rt_multi_spawn_many_remote_busy2(c: &mut Criterion) {
                     handle.await.unwrap();
                 }
             });
-        })
+        });
     });
 
     flag.store(false, Relaxed);
@@ -167,7 +167,7 @@ fn rt_multi_yield_many(c: &mut Criterion) {
             for _ in 0..TASKS {
                 rx.recv().unwrap();
             }
-        })
+        });
     });
 }
 
@@ -212,7 +212,7 @@ fn rt_multi_ping_pong(c: &mut Criterion) {
 
                 done_rx.recv().unwrap();
             });
-        })
+        });
     });
 }
 
@@ -243,7 +243,7 @@ fn rt_multi_chained_spawn(c: &mut Criterion) {
 
                 done_rx.recv().unwrap();
             });
-        })
+        });
     });
 }
 

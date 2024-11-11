@@ -36,7 +36,7 @@ type GuardedWaitList = GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::
 /// The synchronization details of `Notify` are similar to
 /// [`thread::park`][park] and [`Thread::unpark`][unpark] from std. A [`Notify`]
 /// value contains a single permit. [`notified().await`] waits for the permit to
-/// be made available, consumes the permit, and resumes.  [`notify_one()`] sets
+/// be made available, consumes the permit, and resumes. [`notify_one()`] sets
 /// the permit, waking a pending task if there is one.
 ///
 /// If `notify_one()` is called **before** `notified().await`, then the next

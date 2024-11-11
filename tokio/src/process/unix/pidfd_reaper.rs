@@ -43,7 +43,7 @@ impl Pidfd {
             let errno = io::Error::last_os_error().raw_os_error().unwrap();
 
             if errno == ENOSYS {
-                NO_PIDFD_SUPPORT.store(true, Relaxed)
+                NO_PIDFD_SUPPORT.store(true, Relaxed);
             }
 
             None
@@ -120,7 +120,7 @@ where
         match ready!(this.pidfd.poll_read_ready(cx)) {
             Err(err) if is_rt_shutdown_err(&err) => {
                 this.pidfd.reregister(Interest::READABLE)?;
-                ready!(this.pidfd.poll_read_ready(cx))?
+                ready!(this.pidfd.poll_read_ready(cx))?;
             }
             res => res?,
         }
@@ -162,7 +162,7 @@ where
         if let Some(pidfd) = Pidfd::open(inner.id()) {
             match PollEvented::new_with_interest(pidfd, Interest::READABLE) {
                 Ok(pidfd) => Ok(Self {
-                    inner: Some(PidfdReaperInner { pidfd, inner }),
+                    inner: Some(PidfdReaperInner { inner, pidfd }),
                     orphan_queue,
                 }),
                 Err(io_error) => Err((Some(io_error), inner)),
@@ -237,7 +237,7 @@ mod test {
     }
 
     fn run_test(fut: impl Future<Output = ()>) {
-        create_runtime().block_on(fut)
+        create_runtime().block_on(fut);
     }
 
     fn is_pidfd_available() -> bool {

@@ -41,18 +41,15 @@ impl Receiver {
             return false;
         }
 
-        let mut e = match try_enter_blocking_region() {
-            Some(enter) => enter,
-            _ => {
-                if std::thread::panicking() {
-                    // Don't panic in a panic
-                    return false;
-                } else {
-                    panic!(
-                        "Cannot drop a runtime in a context where blocking is not allowed. \
-                        This happens when a runtime is dropped from within an asynchronous context."
-                    );
-                }
+        let Some(mut guard) = try_enter_blocking_region() else {
+            if std::thread::panicking() {
+                // Don't panic in a panic
+                return false;
+            } else {
+                panic!(
+                    "Cannot drop a runtime in a context where blocking is not allowed. \
+                    This happens when a runtime is dropped from within an asynchronous context."
+                );
             }
         };
 
@@ -62,9 +59,9 @@ impl Receiver {
         // current thread (usually, shutting down a runtime stored in a
         // thread-local).
         if let Some(timeout) = timeout {
-            e.block_on_timeout(&mut self.rx, timeout).is_ok()
+            guard.block_on_timeout(&mut self.rx, timeout).is_ok()
         } else {
-            let _ = e.block_on(&mut self.rx);
+            let _ = guard.block_on(&mut self.rx);
             true
         }
     }

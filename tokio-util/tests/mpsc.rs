@@ -37,7 +37,7 @@ async fn simple_ref() {
     let (send, mut recv) = channel(3);
     let mut send = PollSender::new(send);
 
-    for vi in v.iter() {
+    for vi in &v {
         let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
         assert_ready_ok!(reserve.poll());
         send.send_item(vi).unwrap();

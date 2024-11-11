@@ -316,11 +316,8 @@ impl<T> Rx<T> {
                 block.load_next(Acquire)
             };
 
-            let next_block = match next_block {
-                Some(next_block) => next_block,
-                None => {
-                    return false;
-                }
+            let Some(next_block) = next_block else {
+                return false;
             };
 
             self.head = next_block;
@@ -338,9 +335,8 @@ impl<T> Rx<T> {
 
                 let observed_tail_position = block.as_ref().observed_tail_position();
 
-                let required_index = match observed_tail_position {
-                    Some(i) => i,
-                    None => return,
+                let Some(required_index) = observed_tail_position else {
+                    return;
                 };
 
                 if required_index > self.index {

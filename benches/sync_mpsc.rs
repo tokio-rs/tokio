@@ -30,21 +30,21 @@ fn create_medium<const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>) {
     g.bench_function(SIZE.to_string(), |b| {
         b.iter(|| {
             black_box(&mpsc::channel::<Medium>(SIZE));
-        })
+        });
     });
 }
 
 fn send_data<T: Default, const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>, prefix: &str) {
     let rt = rt();
 
-    g.bench_function(format!("{}_{}", prefix, SIZE), |b| {
+    g.bench_function(format!("{prefix}_{SIZE}"), |b| {
         b.iter(|| {
             let (tx, mut rx) = mpsc::channel::<T>(SIZE);
 
             let _ = rt.block_on(tx.send(T::default()));
 
             rt.block_on(rx.recv()).unwrap();
-        })
+        });
     });
 }
 
@@ -68,8 +68,8 @@ fn contention_bounded(g: &mut BenchmarkGroup<WallTime>) {
                 for _ in 0..1_000 * 5 {
                     let _ = rx.recv().await;
                 }
-            })
-        })
+            });
+        });
     });
 }
 
@@ -95,8 +95,8 @@ fn contention_bounded_recv_many(g: &mut BenchmarkGroup<WallTime>) {
                 while total < 1_000 * 5 {
                     total += rx.recv_many(&mut buffer, 5_000).await;
                 }
-            })
-        })
+            });
+        });
     });
 }
 
@@ -120,8 +120,8 @@ fn contention_bounded_full(g: &mut BenchmarkGroup<WallTime>) {
                 for _ in 0..1_000 * 5 {
                     let _ = rx.recv().await;
                 }
-            })
-        })
+            });
+        });
     });
 }
 
@@ -147,8 +147,8 @@ fn contention_bounded_full_recv_many(g: &mut BenchmarkGroup<WallTime>) {
                 while total < 1_000 * 5 {
                     total += rx.recv_many(&mut buffer, 5_000).await;
                 }
-            })
-        })
+            });
+        });
     });
 }
 
@@ -172,8 +172,8 @@ fn contention_unbounded(g: &mut BenchmarkGroup<WallTime>) {
                 for _ in 0..1_000 * 5 {
                     let _ = rx.recv().await;
                 }
-            })
-        })
+            });
+        });
     });
 }
 
@@ -199,8 +199,8 @@ fn contention_unbounded_recv_many(g: &mut BenchmarkGroup<WallTime>) {
                 while total < 1_000 * 5 {
                     total += rx.recv_many(&mut buffer, 5_000).await;
                 }
-            })
-        })
+            });
+        });
     });
 }
 
@@ -219,8 +219,8 @@ fn uncontented_bounded(g: &mut BenchmarkGroup<WallTime>) {
                 for _ in 0..5_000 {
                     let _ = rx.recv().await;
                 }
-            })
-        })
+            });
+        });
     });
 }
 
@@ -241,8 +241,8 @@ fn uncontented_bounded_recv_many(g: &mut BenchmarkGroup<WallTime>) {
                 while total < 1_000 * 5 {
                     total += rx.recv_many(&mut buffer, 5_000).await;
                 }
-            })
-        })
+            });
+        });
     });
 }
 
@@ -261,8 +261,8 @@ fn uncontented_unbounded(g: &mut BenchmarkGroup<WallTime>) {
                 for _ in 0..5_000 {
                     let _ = rx.recv().await;
                 }
-            })
-        })
+            });
+        });
     });
 }
 
@@ -283,8 +283,8 @@ fn uncontented_unbounded_recv_many(g: &mut BenchmarkGroup<WallTime>) {
                 while total < 1_000 * 5 {
                     total += rx.recv_many(&mut buffer, 5_000).await;
                 }
-            })
-        })
+            });
+        });
     });
 }
 

@@ -34,5 +34,5 @@ async fn return_none_after_error() {
         assert!(assert_ready!(pin!(io).poll_next(cx)).unwrap().is_err());
         assert!(assert_ready!(pin!(io).poll_next(cx)).is_none());
         assert_read!(pin!(io).poll_next(cx), b"more data".to_vec());
-    })
+    });
 }

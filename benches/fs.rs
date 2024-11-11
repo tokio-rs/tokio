@@ -39,7 +39,7 @@ fn async_read_codec(c: &mut Criterion) {
             };
 
             rt.block_on(task());
-        })
+        });
     });
 }
 
@@ -98,7 +98,7 @@ fn sync_read(c: &mut Criterion) {
             for _i in 0..BLOCK_COUNT {
                 file.read_exact(&mut buffer).unwrap();
             }
-        })
+        });
     });
 }
 

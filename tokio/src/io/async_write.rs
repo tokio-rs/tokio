@@ -28,7 +28,7 @@ use std::task::{Context, Poll};
 /// This trait importantly means that the [`write`][stdwrite] method only works in
 /// the context of a future's task. The object may panic if used outside of a task.
 ///
-/// Note that this trait also represents that the  [`Write::flush`][stdflush] method
+/// Note that this trait also represents that the [`Write::flush`][stdflush] method
 /// works very similarly to the `write` method, notably that `Ok(())` means that the
 /// writer has successfully been flushed, a "would block" error means that the
 /// current task is ready to receive a notification when flushing can make more

@@ -13,7 +13,7 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// keys.
 ///
 /// This type is very similar to the [`JoinSet`] type in `tokio::task`, with the
-/// addition of a  set of keys associated with each task. These keys allow
+/// addition of a set of keys associated with each task. These keys allow
 /// [cancelling a task][abort] or [multiple tasks][abort_matching] in the
 /// `JoinMap` based on   their keys, or [test whether a task corresponding to a
 /// given key exists][contains] in the `JoinMap`.
@@ -463,7 +463,7 @@ where
     ///    completed. The `value` is the return value of that ask, and `key` is
     ///    the key associated with the task.
     ///  * `Some((key, Err(err))` if one of the tasks in this `JoinMap` has
-    ///    panicked or been aborted. `key` is the key associated  with the task
+    ///    panicked or been aborted. `key` is the key associated with the task
     ///    that panicked or was aborted.
     ///  * `None` if the `JoinMap` is empty.
     ///

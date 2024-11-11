@@ -63,8 +63,8 @@ fn contention_impl<const N_TASKS: usize>(g: &mut BenchmarkGroup<WallTime>) {
                         }
                     }
                 }
-            })
-        })
+            });
+        });
     });
 }
 

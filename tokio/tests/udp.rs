@@ -372,7 +372,7 @@ async fn try_send_spawn() {
         .unwrap();
     assert_eq!(sent, &MSG_LEN);
     let mut buf = [0u8; 32];
-    let mut received = receiver.recv(&mut buf[..]).await.unwrap();
+    let mut bytes_received = receiver.recv(&mut buf[..]).await.unwrap();
 
     sender
         .connect(receiver.local_addr().unwrap())
@@ -380,7 +380,7 @@ async fn try_send_spawn() {
         .unwrap();
     let sent = &sender.try_send(MSG2).unwrap();
     assert_eq!(sent, &MSG2_LEN);
-    received += receiver.recv(&mut buf[..]).await.unwrap();
+    bytes_received += receiver.recv(&mut buf[..]).await.unwrap();
 
     std::thread::spawn(move || {
         let sent = &sender.try_send(MSG).unwrap();
@@ -388,9 +388,9 @@ async fn try_send_spawn() {
     })
     .join()
     .unwrap();
-    received += receiver.recv(&mut buf[..]).await.unwrap();
+    bytes_received += receiver.recv(&mut buf[..]).await.unwrap();
 
-    assert_eq!(received, MSG_LEN * 2 + MSG2_LEN);
+    assert_eq!(bytes_received, MSG_LEN * 2 + MSG2_LEN);
 }
 
 #[tokio::test]
@@ -415,7 +415,7 @@ async fn try_send_recv() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -431,7 +431,7 @@ async fn try_send_recv() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }
@@ -457,7 +457,7 @@ async fn try_send_to_recv_from() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -474,7 +474,7 @@ async fn try_send_to_recv_from() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }
@@ -502,7 +502,7 @@ async fn try_recv_buf() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -518,7 +518,7 @@ async fn try_recv_buf() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }
@@ -561,7 +561,7 @@ async fn try_recv_buf_from() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -578,7 +578,7 @@ async fn try_recv_buf_from() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }
@@ -621,7 +621,7 @@ async fn poll_ready() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -638,7 +638,7 @@ async fn poll_ready() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }

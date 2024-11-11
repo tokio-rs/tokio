@@ -89,5 +89,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
 )))]
 fn main() {
-    println!("task dumps are not available")
+    println!("task dumps are not available");
 }

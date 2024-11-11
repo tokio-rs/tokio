@@ -93,7 +93,7 @@ cfg_rt! {
     /// After reaching the upper limit, the tasks are put in a queue.
     /// The thread limit is very large by default, because `spawn_blocking` is often
     /// used for various kinds of IO operations that cannot be performed
-    /// asynchronously.  When you run CPU-bound code using `spawn_blocking`, you
+    /// asynchronously. When you run CPU-bound code using `spawn_blocking`, you
     /// should keep this large upper limit in mind. When running many CPU-bound
     /// computations, a semaphore or some other synchronization primitive should be
     /// used to limit the number of computation executed in parallel. Specialized
@@ -112,7 +112,7 @@ cfg_rt! {
     /// When you shut down the executor, it will wait indefinitely for all blocking operations to
     /// finish. You can use [`shutdown_timeout`] to stop waiting for them after a
     /// certain timeout. Be aware that this will still not cancel the tasks — they
-    /// are simply allowed to keep running after the method returns.  It is possible
+    /// are simply allowed to keep running after the method returns. It is possible
     /// for a blocking task to be cancelled if it has not yet started running, but this
     /// is not guaranteed.
     ///
@@ -131,7 +131,7 @@ cfg_rt! {
     /// by `spawn_blocking`.
     ///
     /// Another option is [`SyncIoBridge`] for cases where the synchronous context
-    /// is operating on byte streams.  For example, you might use an asynchronous
+    /// is operating on byte streams. For example, you might use an asynchronous
     /// HTTP client such as [hyper] to fetch data, but perform complex parsing
     /// of the payload body using a library written for synchronous I/O.
     ///

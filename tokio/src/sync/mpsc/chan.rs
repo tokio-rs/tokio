@@ -549,7 +549,7 @@ impl Semaphore for bounded::Semaphore {
     }
 
     fn add_permits(&self, n: usize) {
-        self.semaphore.release(n)
+        self.semaphore.release(n);
     }
 
     fn is_idle(&self) -> bool {
