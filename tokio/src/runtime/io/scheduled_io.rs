@@ -221,7 +221,8 @@ impl ScheduledIo {
                 Tick::Set => tick.wrapping_add(1) % MAX_TICK,
             };
 
-            Some(TICK.pack(new_tick, f(Ready::from_usize(curr)).as_usize()))
+            let ready = Ready::from_usize(READINESS.unpack(curr));
+            Some(TICK.pack(new_tick, f(ready).as_usize()))
         };
         let _ = self.readiness.fetch_update(AcqRel, Acquire, update);
     }
@@ -293,7 +294,7 @@ impl ScheduledIo {
 
         ReadyEvent {
             tick: TICK.unpack(curr) as u8,
-            ready: interest.mask() & Ready::from_usize(curr),
+            ready: interest.mask() & Ready::from_usize(READINESS.unpack(curr)),
             is_shutdown: SHUTDOWN.unpack(curr) != 0,
         }
     }
@@ -310,7 +311,7 @@ impl ScheduledIo {
     ) -> Poll<ReadyEvent> {
         let curr = self.readiness.load(Acquire);
 
-        let ready = direction.mask() & Ready::from_usize(curr);
+        let ready = direction.mask() & Ready::from_usize(READINESS.unpack(curr));
         let is_shutdown = SHUTDOWN.unpack(curr) != 0;
 
         if ready.is_empty() && !is_shutdown {
@@ -331,7 +332,7 @@ impl ScheduledIo {
             // Try again, in case the readiness was changed while we were
             // taking the waiters lock
             let curr = self.readiness.load(Acquire);
-            let ready = direction.mask() & Ready::from_usize(curr);
+            let ready = direction.mask() & Ready::from_usize(READINESS.unpack(curr));
             let is_shutdown = SHUTDOWN.unpack(curr) != 0;
             if is_shutdown {
                 Poll::Ready(ReadyEvent {
@@ -444,7 +445,7 @@ impl Future for Readiness<'_> {
 
                     // Safety: `waiter.interest` never changes
                     let interest = unsafe { (*waiter.get()).interest };
-                    let ready = Ready::from_usize(curr).intersection(interest);
+                    let ready = Ready::from_usize(READINESS.unpack(curr)).intersection(interest);
 
                     if !ready.is_empty() || is_shutdown {
                         // Currently ready!
@@ -461,7 +462,7 @@ impl Future for Readiness<'_> {
                     let mut waiters = scheduled_io.waiters.lock();
 
                     let curr = scheduled_io.readiness.load(SeqCst);
-                    let mut ready = Ready::from_usize(curr);
+                    let mut ready = Ready::from_usize(READINESS.unpack(curr));
                     let is_shutdown = SHUTDOWN.unpack(curr) != 0;
 
                     if is_shutdown {
@@ -537,7 +538,7 @@ impl Future for Readiness<'_> {
 
                     // The readiness state could have been cleared in the meantime,
                     // but we allow the returned ready set to be empty.
-                    let ready = Ready::from_usize(curr).intersection(w.interest);
+                    let ready = Ready::from_usize(READINESS.unpack(curr)).intersection(w.interest);
 
                     return Poll::Ready(ReadyEvent {
                         tick,
