@@ -43,17 +43,17 @@ error[E0308]: mismatched types
    |
    = note:   expected enum `Result<(), ()>`
            found unit type `()`
-help: try adding an expression at the end of the block
+help: try wrapping the expression in a variant of `Result`
    |
-23 ~     Ok(());;
-24 +     Ok(())
-   |
+23 |     Ok(Ok(());)
+   |     +++       +
+23 |     Err(Ok(());)
+   |     ++++       +
 
 error[E0308]: mismatched types
-  --> tests/fail/macros_type_mismatch.rs:32:5
+  --> tests/fail/macros_type_mismatch.rs:31:5
    |
 30 | async fn issue_4635() {
    |                      - help: try adding a return type: `-> i32`
 31 |     return 1;
-32 |     ;
-   |     ^ expected `()`, found integer
+   |     ^^^^^^^^^ expected `()`, found integer

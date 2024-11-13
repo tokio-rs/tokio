@@ -1,5 +1,5 @@
-use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use proc_macro2::{Span, TokenStream, TokenTree};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream, Parser};
 use syn::token::Brace;
 use syn::{Attribute, Ident, Path, Signature, Visibility};
@@ -393,28 +393,62 @@ fn build_config(
 fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenStream {
     input.sig.asyncness = None;
 
+    // If type mismatch occurs, the current rustc points to the last statement.
+    let (last_stmt_start_span, last_stmt_end_span) = {
+        // `Span` on stable Rust has a limitation that only points to the first
+        // token, not the whole tokens. We can work around this limitation by
+        // using the first/last span of the tokens like
+        // `syn::Error::new_spanned` does.
+        let mut start = Span::call_site();
+        let mut end = Span::call_site();
+
+        let TokenTree::Group(group) = input.body.clone().into_iter().next().unwrap() else {
+            unreachable!()
+        };
+        let mut stream = group.stream().into_iter();
+        while let Some(tt) = stream.next() {
+            if matches!(&tt, TokenTree::Punct(p) if p.as_char() == ';') {
+                continue;
+            }
+
+            start = tt.span();
+            end = tt.span();
+
+            while let Some(tt) = stream.next() {
+                match tt {
+                    TokenTree::Punct(p) if p.as_char() == ';' => {
+                        end = p.span();
+                        break;
+                    }
+                    tt => end = tt.span(),
+                }
+            }
+        }
+        (start, end)
+    };
+
     let crate_path = config
         .crate_name
         .map(ToTokens::into_token_stream)
-        .unwrap_or_else(|| Ident::new("tokio", Span::call_site()).into_token_stream());
+        .unwrap_or_else(|| Ident::new("tokio", last_stmt_start_span).into_token_stream());
 
     let mut rt = match config.flavor {
-        RuntimeFlavor::CurrentThread => quote! {
+        RuntimeFlavor::CurrentThread => quote_spanned! {last_stmt_start_span=>
             #crate_path::runtime::Builder::new_current_thread()
         },
-        RuntimeFlavor::Threaded => quote! {
+        RuntimeFlavor::Threaded => quote_spanned! {last_stmt_start_span=>
             #crate_path::runtime::Builder::new_multi_thread()
         },
     };
     if let Some(v) = config.worker_threads {
-        rt = quote! { #rt.worker_threads(#v) };
+        rt = quote_spanned! {last_stmt_start_span=> #rt.worker_threads(#v) };
     }
     if let Some(v) = config.start_paused {
-        rt = quote! { #rt.start_paused(#v) };
+        rt = quote_spanned! {last_stmt_start_span=> #rt.start_paused(#v) };
     }
     if let Some(v) = config.unhandled_panic {
         let unhandled_panic = v.into_tokens(&crate_path);
-        rt = quote! { #rt.unhandled_panic(#unhandled_panic) };
+        rt = quote_spanned! {last_stmt_start_span=> #rt.unhandled_panic(#unhandled_panic) };
     }
 
     let generated_attrs = if is_test {
@@ -427,7 +461,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
 
     let body_ident = quote! { body };
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
-    let last_block = quote! {
+    let last_block = quote_spanned! {last_stmt_end_span=>
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
         {
             return #rt
