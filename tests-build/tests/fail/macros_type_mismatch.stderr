@@ -33,27 +33,26 @@ help: consider using `Result::expect` to unwrap the `Result<(), _>` value, panic
    |                   +++++++++++++++++
 
 error[E0308]: mismatched types
-  --> tests/fail/macros_type_mismatch.rs:23:5
+  --> tests/fail/macros_type_mismatch.rs:15:5
    |
 14 | async fn extra_semicolon() -> Result<(), ()> {
    |                               -------------- expected `Result<(), ()>` because of return type
-...
-23 |     Ok(());
+15 |     Ok(());
    |     ^^^^^^^ expected `Result<(), ()>`, found `()`
    |
    = note:   expected enum `Result<(), ()>`
            found unit type `()`
 help: try wrapping the expression in a variant of `Result`
    |
-23 |     Ok(Ok(());)
+15 |     Ok(Ok(());)
    |     +++       +
-23 |     Err(Ok(());)
+15 |     Err(Ok(());)
    |     ++++       +
 
 error[E0308]: mismatched types
-  --> tests/fail/macros_type_mismatch.rs:31:5
+  --> tests/fail/macros_type_mismatch.rs:23:5
    |
-30 | async fn issue_4635() {
+22 | async fn issue_4635() {
    |                      - help: try adding a return type: `-> i32`
-31 |     return 1;
+23 |     return 1;
    |     ^^^^^^^^^ expected `()`, found integer

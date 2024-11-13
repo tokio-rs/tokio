@@ -414,7 +414,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
             start = tt.span();
             end = tt.span();
 
-            while let Some(tt) = stream.next() {
+            for tt in stream.by_ref() {
                 match tt {
                     TokenTree::Punct(p) if p.as_char() == ';' => {
                         end = p.span();
