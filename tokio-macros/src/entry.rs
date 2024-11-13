@@ -402,25 +402,31 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         let mut start = Span::call_site();
         let mut end = Span::call_site();
 
-        let TokenTree::Group(group) = input.body.clone().into_iter().next().unwrap() else {
-            unreachable!()
-        };
-        let mut stream = group.stream().into_iter();
-        while let Some(tt) = stream.next() {
-            if matches!(&tt, TokenTree::Punct(p) if p.as_char() == ';') {
-                continue;
-            }
+        if let Some(tt) = input.body.clone().into_iter().last() {
+            match tt {
+                TokenTree::Group(group) => {
+                    let mut stream = group.stream().into_iter();
+                    while let Some(tt) = stream.next() {
+                        if matches!(&tt, TokenTree::Punct(p) if p.as_char() == ';') {
+                            continue;
+                        }
+                        start = tt.span();
+                        end = tt.span();
 
-            start = tt.span();
-            end = tt.span();
-
-            for tt in stream.by_ref() {
-                match tt {
-                    TokenTree::Punct(p) if p.as_char() == ';' => {
-                        end = p.span();
-                        break;
+                        for tt in stream.by_ref() {
+                            match tt {
+                                TokenTree::Punct(p) if p.as_char() == ';' => {
+                                    // end = p.span();
+                                    break;
+                                }
+                                tt => end = tt.span(),
+                            }
+                        }
                     }
-                    tt => end = tt.span(),
+                }
+                _ => {
+                    start = tt.span();
+                    end = tt.span();
                 }
             }
         }

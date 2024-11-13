@@ -15,6 +15,11 @@ async fn extra_semicolon() -> Result<(), ()> {
     Ok(());
 }
 
+#[tokio::main]
+async fn invalid_return_type() -> Option<()> {
+    ()
+}
+
 // https://github.com/tokio-rs/tokio/issues/4635
 #[allow(redundant_semicolons)]
 #[rustfmt::skip]
