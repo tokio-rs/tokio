@@ -56,7 +56,8 @@ pub(crate) struct Trace {
 pin_project_lite::pin_project! {
     #[derive(Debug, Clone)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct Root<T> {
+    /// before merging add documentation: roots a trace
+    pub struct Root<T> {
         #[pin]
         future: T,
     }
