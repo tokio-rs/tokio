@@ -3,7 +3,9 @@
 //! See [`Handle::dump`][crate::runtime::Handle::dump].
 
 use crate::task::Id;
-use std::{fmt, path::Path};
+use std::{fmt, future::Future, path::Path};
+
+pub use crate::runtime::task::trace::Root;
 
 /// A snapshot of a runtime's state.
 ///
@@ -213,6 +215,66 @@ impl Trace {
                 }
             })
             .collect()
+    }
+
+    /// Runs the function `f` in tracing mode, and returns its result along with the resulting [`Trace`].
+    ///
+    /// The passed-in function is normally a poll function. Due to the way tracing is implemented,
+    /// Tokio leaf futures might, instead of doing their actual work, do the equivalent of a
+    /// `yield_now` (returning a `Poll::Pending` and scheduling the current context for execution),
+    /// which means forward progress is only guaranteed if you eventually call your future outside of
+    /// `capture`.
+    ///
+    /// Example usage:
+    /// ```
+    /// let mut trace = None;
+    ///
+    /// // some future
+    /// let mut test_future = Box::pin(async move { tokio::task::yield_now().await; 0 });
+    ///
+    /// // trace it once
+    /// Trace::root(std::future::poll_fn(|cx| {
+    ///     if trace.is_none() {
+    ///         // make sure we only trace once
+    ///         let (res, captured) = Trace::capture(|| test_future.as_mut().poll(cx));
+    ///         trace = Some(captured);
+    ///         res
+    ///     } else {
+    ///         test_future.as_mut().poll(cx)
+    ///     }
+    /// })).await;@@
+    ///
+    /// // check that there are backtraces
+    /// assert!(!trace.unwrap().resolve_backtraces().is_empty());
+    /// ```
+    ///
+    /// ### Nested calls
+    ///
+    /// Nested calls to `capture` might return partial traces, but will not do any other undesirable behavior (for
+    /// example, they will not panic).
+    ///
+    /// ### Unstable Implementation Details
+    ///
+    /// When run in tracing mode, Tokio leaf futures will return `Poll::Pending` and emit a stack trace
+    /// that will be captured in the returning [`Trace`].
+    pub fn capture<F, R>(f: F) -> (R, Trace)
+    where
+        F: FnOnce() -> R,
+    {
+        let (res, trace) = super::task::trace::Trace::capture(f);
+        (res, Trace { inner: trace })
+    }
+
+    /// Create a root for stack traces captured using [`Trace::capture`]. Stack frames above
+    /// the root will not be captured.
+    ///
+    /// Nesting multiple [`Root`] futures is fine. Captures will stop at the first root. Not having
+    /// a [`Root`] is fine as well, but there is no guarantee on where the capture will stop.
+    pub fn root<F>(f: F) -> Root<F>
+    where
+        F: Future,
+    {
+        crate::runtime::task::trace::Trace::root(f)
     }
 }
 
