@@ -180,7 +180,7 @@ jobs:
         run: |
           set -euxo pipefail
           RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run --workspace --exclude tokio-macros --exclude tests-build --all-features --tests
-  
+
   test-integration-tests-per-feature:
     needs: basics
     name: Run integration tests for each feature
@@ -768,7 +768,15 @@ jobs:
 
   docs:
     name: docs
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.run.os }}
+    strategy:
+      matrix:
+        run:
+          - os: windows-latest
+          - os: ubuntu-latest
+            RUSTFLAGS: --cfg tokio_taskdump
+            RUSTDOCFLAGS: --cfg tokio_taskdump
+
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_nightly }}
@@ -780,8 +788,8 @@ jobs:
         run: |
           cargo doc --lib --no-deps --all-features --document-private-items
         env:
-          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable --cfg tokio_taskdump
-          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable ${{ matrix.run.RUSTFLAGS }}
+          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings ${{ matrix.run.RUSTDOCFLAGS }}
 
   loom-compile:
     name: build loom tests
@@ -1106,11 +1114,11 @@ jobs:
       - name: Make sure dictionary words are sorted and unique
         run: |
           # `sed` removes the first line (number of words) and
-          # the last line (new line). 
-          # 
+          # the last line (new line).
+          #
           # `sort` makes sure everything in between is sorted
           # and contains no duplicates.
-          # 
+          #
           # Since `sort` is sensitive to locale, we set it
           # using LC_ALL to en_US.UTF8 to be consistent in different
           # environments.
