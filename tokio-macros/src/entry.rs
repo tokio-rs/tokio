@@ -556,7 +556,7 @@ struct ItemFn {
     attrs: Vec<Attribute>,
     vis: Visibility,
     sig: Signature,
-    body: proc_macro2::TokenStream,
+    body: TokenStream,
 }
 
 impl Parse for ItemFn {
@@ -572,11 +572,7 @@ impl Parse for ItemFn {
 
 impl ItemFn {
     /// Convert our local function item into a token stream.
-    fn into_tokens(
-        self,
-        generated_attrs: proc_macro2::TokenStream,
-        last_block: proc_macro2::TokenStream,
-    ) -> TokenStream {
+    fn into_tokens(self, generated_attrs: TokenStream, last_block: TokenStream) -> TokenStream {
         let mut tokens = generated_attrs;
         // Outer attributes are simply streamed as-is.
         for attr in self.attrs {
@@ -588,7 +584,7 @@ impl ItemFn {
         Brace::default().surround(&mut tokens, |tokens| {
             // Note: To add `TokenStream`, we need to use `Some(self.body)` instead of `self.body`.
             tokens.extend(Some(self.body));
-            last_block.to_tokens(tokens);
+            tokens.extend(Some(last_block));
         });
         tokens
     }
