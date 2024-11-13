@@ -224,7 +224,9 @@ impl ScheduledIo {
             let ready = Ready::from_usize(READINESS.unpack(curr));
             Some(TICK.pack(new_tick, f(ready).as_usize()))
         };
-        let _ = self.readiness.fetch_update(AcqRel, Acquire, update);
+        let _ = self.readiness.fetch_update(AcqRel, Acquire, |curr| {
+             ...
+        });
     }
 
     /// Notifies all pending waiters that have registered interest in `ready`.
