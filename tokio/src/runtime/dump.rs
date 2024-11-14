@@ -3,7 +3,7 @@
 //! See [Handle::dump][crate::runtime::Handle::dump].
 
 use crate::task::Id;
-use std::fmt;
+use std::{fmt, path::Path};
 
 /// A snapshot of a runtime's state.
 ///
@@ -30,12 +30,156 @@ pub struct Task {
     trace: Trace,
 }
 
+/// A backtrace symbol. This is similar to [backtrace::BacktraceSymbol],
+/// but is a separate struct to avoid public dependency issues.
+///
+/// This struct is guaranteed to be pure data and operations involving
+/// it will not call platform functions that take an unpredictable amount
+/// of time to finish.
+#[derive(Clone, Debug)]
+pub struct BacktraceSymbol {
+    name: Option<Vec<u8>>,
+    name_demangled: Option<String>,
+    addr: Option<*mut std::ffi::c_void>,
+    filename: Option<std::path::PathBuf>,
+    lineno: Option<u32>,
+    colno: Option<u32>,
+}
+
+impl BacktraceSymbol {
+    pub(crate) fn from_backtrace_symbol(sym: &backtrace::BacktraceSymbol) -> Self {
+        let name = sym.name();
+        Self {
+            name: name.as_ref().map(|name| name.as_bytes().into()),
+            name_demangled: name.map(|name| format!("{}", name)),
+            addr: sym.addr(),
+            filename: sym.filename().map(From::from),
+            lineno: sym.lineno(),
+            colno: sym.colno(),
+        }
+    }
+
+    /// Return the raw name of the symbol.
+    pub fn name_raw(&self) -> Option<&[u8]> {
+        self.name.as_deref()
+    }
+
+    /// Return the demangled name of the symbol.
+    pub fn name_demangled(&self) -> Option<&str> {
+        self.name_demangled.as_deref()
+    }
+
+    /// Returns the starting address of this symbol.
+    pub fn addr(&self) -> Option<*mut std::ffi::c_void> {
+        self.addr
+    }
+
+    /// Returns the file name where this function was defined. If debuginfo
+    /// is missing, this is likely to return None.
+    pub fn filename(&self) -> Option<&Path> {
+        self.filename.as_deref()
+    }
+
+    /// Returns the line number for where this symbol is currently executing If debuginfo
+    /// is missing, this is likely to return None.
+    pub fn lineno(&self) -> Option<u32> {
+        self.lineno
+    }
+
+    /// Returns the column number for where this symbol is currently executing If debuginfo
+    /// is missing, this is likely to return None.
+    pub fn colno(&self) -> Option<u32> {
+        self.colno
+    }
+}
+
+/// A backtrace frame. This is similar to [backtrace::BacktraceFrame],
+/// but is a separate struct to avoid public dependency issues.
+///
+/// This struct is guaranteed to be pure data and operations involving
+/// it will not call platform functions that take an unpredictable amount
+/// of time to finish.
+#[derive(Clone, Debug)]
+pub struct BacktraceFrame {
+    ip: *mut std::ffi::c_void,
+    symbol_address: *mut std::ffi::c_void,
+    symbols: Vec<BacktraceSymbol>,
+}
+
+impl BacktraceFrame {
+    pub(crate) fn from_resolved_backtrace_frame(frame: &backtrace::BacktraceFrame) -> Self {
+        Self {
+            ip: frame.ip(),
+            symbol_address: frame.symbol_address(),
+            symbols: frame
+                .symbols()
+                .iter()
+                .map(BacktraceSymbol::from_backtrace_symbol)
+                .collect(),
+        }
+    }
+
+    /// Return the instruction pointer of this frame.
+    ///
+    /// See the ABI docs for your platform for the exact meaning.
+    pub fn ip(&self) -> *mut std::ffi::c_void {
+        self.ip
+    }
+
+    /// Returns the starting symbol address of the frame of this function.
+    pub fn symbol_address(&self) -> *mut std::ffi::c_void {
+        self.symbol_address
+    }
+
+    /// Return an iterator over the symbols of this backtrace frame.
+    ///
+    /// Due to inlining, it is possible for there to be multiple [BacktraceSymbol] items relating
+    /// to a single frame. The first symbol listed is the "innermost function",
+    /// whereas the last symbol is the outermost (last caller).
+    pub fn symbols(&self) -> impl Iterator<Item = &BacktraceSymbol> {
+        self.symbols.iter()
+    }
+}
+
 /// An execution trace of a task's last poll.
+///
+/// <div class="warning">
+/// Resolving a backtrace, either via the [`Display`][std::fmt::Display] impl or via
+/// [`resolve_backtraces`][Trace::resolve_backtraces], parses debuginfo, which is
+/// possibly a CPU-expensive operation that can take a platform-specific but
+/// long time to run - often over 100 milliseconds, especially if the current
+/// process's binary is big. In some cases, the platform might internally cache some of the
+/// debuginfo, so successive calls to `resolve_backtraces` might be faster than
+/// the first call, but all guarantees are platform-dependent.
+///
+/// To avoid blocking the runtime, it is recommended
+/// that you resolve backtraces inside of a [spawn_blocking()][crate::task::spawn_blocking]
+/// and to have some concurrency-limiting mechanism to avoid unexpected performance impact.
+/// </div>
 ///
 /// See [Handle::dump][crate::runtime::Handle::dump].
 #[derive(Debug)]
 pub struct Trace {
     inner: super::task::trace::Trace,
+}
+
+impl Trace {
+    /// Resolve and return a list of backtraces that are involved in polls in this task.
+    pub fn resolve_backtraces(&self) -> Vec<Vec<BacktraceFrame>> {
+        self.inner
+            .backtraces()
+            .iter()
+            .map(|backtrace| {
+                let mut backtrace = backtrace::Backtrace::from(backtrace.clone());
+                backtrace.resolve();
+                backtrace
+                    .frames()
+                    .iter()
+                    .map(BacktraceFrame::from_resolved_backtrace_frame)
+                    .collect()
+            })
+            .collect()
+    }
 }
 
 impl Dump {

@@ -138,6 +138,10 @@ impl Trace {
     pub(crate) fn root<F>(future: F) -> Root<F> {
         Root { future }
     }
+
+    pub(crate) fn backtraces(&self) -> &[Backtrace] {
+        &self.backtraces
+    }
 }
 
 /// If this is a sub-invocation of [`Trace::capture`], capture a backtrace.
