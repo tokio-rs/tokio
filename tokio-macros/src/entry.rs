@@ -390,8 +390,83 @@ fn build_config(
     config.build()
 }
 
+fn fn_without_args(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenStream {
+    let async_keyword = input.sig.asyncness.take();
+    let fn_sig = &input.sig;
+    let fn_name = &input.sig.ident;
+
+    let crate_path = config
+        .crate_name
+        .map(ToTokens::into_token_stream)
+        .unwrap_or_else(|| Ident::new("tokio", Span::call_site()).into_token_stream());
+
+    let mut rt = match config.flavor {
+        RuntimeFlavor::CurrentThread => quote! {
+            #crate_path::runtime::Builder::new_current_thread()
+        },
+        RuntimeFlavor::Threaded => quote! {
+            #crate_path::runtime::Builder::new_multi_thread()
+        },
+    };
+    if let Some(v) = config.worker_threads {
+        rt = quote! { #rt.worker_threads(#v) };
+    }
+    if let Some(v) = config.start_paused {
+        rt = quote! { #rt.start_paused(#v) };
+    }
+    if let Some(v) = config.unhandled_panic {
+        let unhandled_panic = v.into_tokens(&crate_path);
+        rt = quote! { #rt.unhandled_panic(#unhandled_panic) };
+    }
+
+    let generated_attrs = if is_test {
+        quote! { #[::core::prelude::v1::test] }
+    } else {
+        quote! {}
+    };
+
+    // This explicit `return` is intentional. See tokio-rs/tokio#4636
+    let last_block = quote! {
+        #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
+        {
+            return #rt
+                .enable_all()
+                .build()
+                .expect("Failed building the Runtime")
+                .block_on(body);
+        }
+    };
+
+    let body = input.body;
+
+    input.body = if is_test {
+        let output_type = match &input.sig.output {
+            syn::ReturnType::Default => quote! { () },
+            syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
+        };
+        quote! {
+            #async_keyword #fn_sig #body
+            let body = #fn_name();
+
+            #crate_path::pin!(body);
+            let body: ::core::pin::Pin<&mut dyn ::core::future::Future<Output = #output_type>> = body;
+        }
+    } else {
+        quote! {
+            #async_keyword #fn_sig #body
+            let body = #fn_name();
+        }
+    };
+
+    input.into_tokens(generated_attrs, last_block)
+}
+
 fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenStream {
-    input.sig.asyncness = None;
+    if input.sig.inputs.is_empty() {
+        return fn_without_args(input, is_test, config);
+    }
+
+    let async_keyword = input.sig.asyncness.take();
 
     // If type mismatch occurs, the current rustc points to the last statement.
     let (last_stmt_start_span, last_stmt_end_span) = {
@@ -415,10 +490,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
 
                         for tt in stream.by_ref() {
                             match tt {
-                                TokenTree::Punct(p) if p.as_char() == ';' => {
-                                    // end = p.span();
-                                    break;
-                                }
+                                TokenTree::Punct(p) if p.as_char() == ';' => break,
                                 tt => end = tt.span(),
                             }
                         }
@@ -465,7 +537,6 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         quote! {}
     };
 
-    let body_ident = quote! { body };
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
     let last_block = quote_spanned! {last_stmt_end_span=>
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
@@ -474,7 +545,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
                 .enable_all()
                 .build()
                 .expect("Failed building the Runtime")
-                .block_on(#body_ident);
+                .block_on(body);
         }
     };
 
@@ -498,13 +569,13 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
             syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
         };
         quote! {
-            let body = async #body;
+            let body = #async_keyword #body;
             #crate_path::pin!(body);
             let body: ::core::pin::Pin<&mut dyn ::core::future::Future<Output = #output_type>> = body;
         }
     } else {
         quote! {
-            let body = async #body;
+            let body = #async_keyword #body;
         }
     };
     input.into_tokens(generated_attrs, last_block)
