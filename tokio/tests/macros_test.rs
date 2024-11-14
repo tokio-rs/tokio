@@ -42,6 +42,7 @@ fn trait_method() {
 
 // https://github.com/tokio-rs/tokio/issues/4175
 #[tokio::main]
+#[allow(unreachable_code)]
 pub async fn issue_4175_main_1() -> ! {
     panic!();
 }
