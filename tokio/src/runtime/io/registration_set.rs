@@ -62,6 +62,7 @@ impl RegistrationSet {
 
         // Push a ref into the list of all resources.
         synced.registrations.push_front(ret.clone());
+
         Ok(ret)
     }
 
