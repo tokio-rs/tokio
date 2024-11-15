@@ -502,7 +502,7 @@ fn driver_shutdown_wakes_currently_pending() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 fn driver_shutdown_wakes_future_pending() {
     let rt = rt();
 
@@ -630,7 +630,7 @@ fn driver_shutdown_wakes_poll_race() {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No socket on miri.
+#[cfg_attr(miri, ignore)] // No socket in miri.
 #[cfg(any(target_os = "linux", target_os = "android"))]
 async fn priority_event_on_oob_data() {
     use std::net::SocketAddr;
@@ -719,7 +719,7 @@ async fn clear_ready_matching_clears_ready_mut() {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No socket on miri.
+#[cfg_attr(miri, ignore)] // No socket in miri.
 #[cfg(target_os = "linux")]
 async fn await_error_readiness_timestamping() {
     use std::net::{Ipv4Addr, SocketAddr};
