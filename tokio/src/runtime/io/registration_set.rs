@@ -62,8 +62,6 @@ impl RegistrationSet {
 
         // Push a ref into the list of all resources.
         synced.registrations.push_front(ret.clone());
-        // Fix miri error in https://github.com/tokio-rs/tokio/issues/6926
-        super::EXPOSE_IO.expose_provenance(&*ret);
         Ok(ret)
     }
 
