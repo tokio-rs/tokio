@@ -211,7 +211,7 @@ async fn file_debug_fmt() {
     let file = File::open(tempfile.path()).await.unwrap();
 
     assert_eq!(
-        &format!("{:?}", file)[0..33],
+        &format!("{file:?}")[0..33],
         "tokio::fs::File { std: File { fd:"
     );
 }

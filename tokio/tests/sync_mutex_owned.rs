@@ -133,5 +133,5 @@ fn try_lock_owned() {
 async fn debug_format() {
     let s = "debug";
     let m = Arc::new(Mutex::new(s.to_string()));
-    assert_eq!(format!("{:?}", s), format!("{:?}", m.lock_owned().await));
+    assert_eq!(format!("{s:?}"), format!("{:?}", m.lock_owned().await));
 }

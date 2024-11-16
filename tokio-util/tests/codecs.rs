@@ -77,9 +77,7 @@ fn lines_decoder_max_length() {
     let line = codec.decode(buf).unwrap().unwrap();
     assert!(
         line.len() <= MAX_LENGTH,
-        "{:?}.len() <= {:?}",
-        line,
-        MAX_LENGTH
+        "{line:?}.len() <= {MAX_LENGTH:?}"
     );
     assert_eq!("line 2", line);
 
@@ -88,18 +86,14 @@ fn lines_decoder_max_length() {
     let line = codec.decode(buf).unwrap().unwrap();
     assert!(
         line.len() <= MAX_LENGTH,
-        "{:?}.len() <= {:?}",
-        line,
-        MAX_LENGTH
+        "{line:?}.len() <= {MAX_LENGTH:?}"
     );
     assert_eq!("line 4", line);
 
     let line = codec.decode(buf).unwrap().unwrap();
     assert!(
         line.len() <= MAX_LENGTH,
-        "{:?}.len() <= {:?}",
-        line,
-        MAX_LENGTH
+        "{line:?}.len() <= {MAX_LENGTH:?}"
     );
     assert_eq!("", line);
 
@@ -111,9 +105,7 @@ fn lines_decoder_max_length() {
     let line = codec.decode_eof(buf).unwrap().unwrap();
     assert!(
         line.len() <= MAX_LENGTH,
-        "{:?}.len() <= {:?}",
-        line,
-        MAX_LENGTH
+        "{line:?}.len() <= {MAX_LENGTH:?}"
     );
     assert_eq!("\rk", line);
 
@@ -273,18 +265,14 @@ fn any_delimiters_decoder_max_length() {
     let chunk = codec.decode(buf).unwrap().unwrap();
     assert!(
         chunk.len() <= MAX_LENGTH,
-        "{:?}.len() <= {:?}",
-        chunk,
-        MAX_LENGTH
+        "{chunk:?}.len() <= {MAX_LENGTH:?}"
     );
     assert_eq!("chunk 2", chunk);
 
     let chunk = codec.decode(buf).unwrap().unwrap();
     assert!(
         chunk.len() <= MAX_LENGTH,
-        "{:?}.len() <= {:?}",
-        chunk,
-        MAX_LENGTH
+        "{chunk:?}.len() <= {MAX_LENGTH:?}"
     );
     assert_eq!("chunk 3", chunk);
 
@@ -292,36 +280,28 @@ fn any_delimiters_decoder_max_length() {
     let chunk = codec.decode(buf).unwrap().unwrap();
     assert!(
         chunk.len() <= MAX_LENGTH,
-        "{:?}.len() <= {:?}",
-        chunk,
-        MAX_LENGTH
+        "{chunk:?}.len() <= {MAX_LENGTH:?}"
     );
     assert_eq!("", chunk);
 
     let chunk = codec.decode(buf).unwrap().unwrap();
     assert!(
         chunk.len() <= MAX_LENGTH,
-        "{:?}.len() <= {:?}",
-        chunk,
-        MAX_LENGTH
+        "{chunk:?}.len() <= {MAX_LENGTH:?}"
     );
     assert_eq!("chunk 4", chunk);
 
     let chunk = codec.decode(buf).unwrap().unwrap();
     assert!(
         chunk.len() <= MAX_LENGTH,
-        "{:?}.len() <= {:?}",
-        chunk,
-        MAX_LENGTH
+        "{chunk:?}.len() <= {MAX_LENGTH:?}"
     );
     assert_eq!("", chunk);
 
     let chunk = codec.decode(buf).unwrap().unwrap();
     assert!(
         chunk.len() <= MAX_LENGTH,
-        "{:?}.len() <= {:?}",
-        chunk,
-        MAX_LENGTH
+        "{chunk:?}.len() <= {MAX_LENGTH:?}"
     );
     assert_eq!("", chunk);
 
@@ -333,9 +313,7 @@ fn any_delimiters_decoder_max_length() {
     let chunk = codec.decode_eof(buf).unwrap().unwrap();
     assert!(
         chunk.len() <= MAX_LENGTH,
-        "{:?}.len() <= {:?}",
-        chunk,
-        MAX_LENGTH
+        "{chunk:?}.len() <= {MAX_LENGTH:?}"
     );
     assert_eq!("k", chunk);
 

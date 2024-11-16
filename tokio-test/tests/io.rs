@@ -34,7 +34,7 @@ async fn read_error() {
     match mock.read(&mut buf).await {
         Err(error) => {
             assert_eq!(error.kind(), io::ErrorKind::Other);
-            assert_eq!("cruel", format!("{}", error));
+            assert_eq!("cruel", format!("{error}"));
         }
         Ok(_) => panic!("error not received"),
     }
@@ -87,7 +87,7 @@ async fn write_error() {
     match mock.write_all(b"whoa").await {
         Err(error) => {
             assert_eq!(error.kind(), io::ErrorKind::Other);
-            assert_eq!("cruel", format!("{}", error));
+            assert_eq!("cruel", format!("{error}"));
         }
         Ok(_) => panic!("error not received"),
     }

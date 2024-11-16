@@ -301,9 +301,7 @@ mod test {
             assert_eq!(
                 0,
                 level_for(0, pos),
-                "level_for({}) -- binary = {:b}",
-                pos,
-                pos
+                "level_for({pos}) -- binary = {pos:b}"
             );
         }
 
@@ -313,9 +311,7 @@ mod test {
                 assert_eq!(
                     level,
                     level_for(0, a as u64),
-                    "level_for({}) -- binary = {:b}",
-                    a,
-                    a
+                    "level_for({a}) -- binary = {a:b}"
                 );
 
                 if pos > level {
@@ -323,9 +319,7 @@ mod test {
                     assert_eq!(
                         level,
                         level_for(0, a as u64),
-                        "level_for({}) -- binary = {:b}",
-                        a,
-                        a
+                        "level_for({a}) -- binary = {a:b}"
                     );
                 }
 
@@ -334,9 +328,7 @@ mod test {
                     assert_eq!(
                         level,
                         level_for(0, a as u64),
-                        "level_for({}) -- binary = {:b}",
-                        a,
-                        a
+                        "level_for({a}) -- binary = {a:b}"
                     );
                 }
             }

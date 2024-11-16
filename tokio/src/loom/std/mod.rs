@@ -96,11 +96,10 @@ pub(crate) mod sys {
             Ok(s) => {
                 let n = s.parse().unwrap_or_else(|e| {
                     panic!(
-                        "\"{}\" must be usize, error: {}, value: {}",
-                        ENV_WORKER_THREADS, e, s
+                        "\"{ENV_WORKER_THREADS}\" must be usize, error: {e}, value: {s}"
                     )
                 });
-                assert!(n > 0, "\"{}\" cannot be set to 0", ENV_WORKER_THREADS);
+                assert!(n > 0, "\"{ENV_WORKER_THREADS}\" cannot be set to 0");
                 n
             }
             Err(std::env::VarError::NotPresent) => {
@@ -108,8 +107,7 @@ pub(crate) mod sys {
             }
             Err(std::env::VarError::NotUnicode(e)) => {
                 panic!(
-                    "\"{}\" must be valid unicode, error: {:?}",
-                    ENV_WORKER_THREADS, e
+                    "\"{ENV_WORKER_THREADS}\" must be valid unicode, error: {e:?}"
                 )
             }
         }
