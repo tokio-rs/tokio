@@ -75,26 +75,17 @@ fn lines_decoder_max_length() {
     assert!(codec.decode(buf).is_err());
 
     let line = codec.decode(buf).unwrap().unwrap();
-    assert!(
-        line.len() <= MAX_LENGTH,
-        "{line:?}.len() <= {MAX_LENGTH:?}"
-    );
+    assert!(line.len() <= MAX_LENGTH, "{line:?}.len() <= {MAX_LENGTH:?}");
     assert_eq!("line 2", line);
 
     assert!(codec.decode(buf).is_err());
 
     let line = codec.decode(buf).unwrap().unwrap();
-    assert!(
-        line.len() <= MAX_LENGTH,
-        "{line:?}.len() <= {MAX_LENGTH:?}"
-    );
+    assert!(line.len() <= MAX_LENGTH, "{line:?}.len() <= {MAX_LENGTH:?}");
     assert_eq!("line 4", line);
 
     let line = codec.decode(buf).unwrap().unwrap();
-    assert!(
-        line.len() <= MAX_LENGTH,
-        "{line:?}.len() <= {MAX_LENGTH:?}"
-    );
+    assert!(line.len() <= MAX_LENGTH, "{line:?}.len() <= {MAX_LENGTH:?}");
     assert_eq!("", line);
 
     assert_eq!(None, codec.decode(buf).unwrap());
@@ -103,10 +94,7 @@ fn lines_decoder_max_length() {
     assert_eq!(None, codec.decode(buf).unwrap());
 
     let line = codec.decode_eof(buf).unwrap().unwrap();
-    assert!(
-        line.len() <= MAX_LENGTH,
-        "{line:?}.len() <= {MAX_LENGTH:?}"
-    );
+    assert!(line.len() <= MAX_LENGTH, "{line:?}.len() <= {MAX_LENGTH:?}");
     assert_eq!("\rk", line);
 
     assert_eq!(None, codec.decode(buf).unwrap());

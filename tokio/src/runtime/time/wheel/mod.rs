@@ -298,11 +298,7 @@ mod test {
     #[test]
     fn test_level_for() {
         for pos in 0..64 {
-            assert_eq!(
-                0,
-                level_for(0, pos),
-                "level_for({pos}) -- binary = {pos:b}"
-            );
+            assert_eq!(0, level_for(0, pos), "level_for({pos}) -- binary = {pos:b}");
         }
 
         for level in 1..5 {
