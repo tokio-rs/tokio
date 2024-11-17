@@ -257,6 +257,9 @@ use std::os::unix::process::CommandExt;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
+#[cfg(all(target_os = "linux", feature = "rt"))]
+type ProcessHandle = std::os::fd::RawFd;
+
 cfg_windows! {
     use crate::os::windows::io::{AsRawHandle, RawHandle};
 }
@@ -279,7 +282,7 @@ pub struct Command {
 pub(crate) struct SpawnedChild {
     child: imp::Child,
     #[cfg(all(target_os = "linux", feature = "rt"))]
-    os_handle: Option<std::os::fd::RawFd>,
+    os_handle: Option<ProcessHandle>,
     stdin: Option<imp::ChildStdio>,
     stdout: Option<imp::ChildStdio>,
     stderr: Option<imp::ChildStdio>,
@@ -1061,7 +1064,7 @@ enum FusedChild {
 pub struct Child {
     child: FusedChild,
     #[cfg(all(target_os = "linux", feature = "rt"))]
-    os_handle: Option<std::os::fd::RawFd>,
+    os_handle: Option<ProcessHandle>,
 
     /// The handle for writing to the child's standard input (stdin), if it has
     /// been captured. To avoid partially moving the `child` and thus blocking
@@ -1108,9 +1111,9 @@ impl Child {
     /// The caller must respect [the I/O safety requirements](https://doc.rust-lang.org/std/io/index.html#io-safety)
     /// while working with this file descriptor -- specifically, they must not close it
     /// or reseat it with system calls such as ```dup2()``` or ```dup3()```
-    #[cfg(unix)]
-    #[cfg_attr(docsrs, doc(cfg(unix)))]
-    pub unsafe fn get_pidfd(&self) -> Option<std::os::fd::RawFd>
+    #[cfg(all(target_os = "linux", feature = "rt"))]
+    #[cfg_attr(docsrs, doc(cfg(linux, rt)))]
+    pub unsafe fn get_pidfd(&self) -> Option<ProcessHandle>
     {
         self.os_handle
     }
