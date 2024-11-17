@@ -1103,14 +1103,14 @@ pub struct Child {
 }
 
 impl Child {
-    /// Return the pidfd instance associated with the child process.
-    /// May return None if pidfd is not supported
+    /// Return the file descriptor associated with the child process.
+    /// May return None if process file descriptor is not supported
     ///
     /// # Safety
     ///
     /// The caller must respect [the I/O safety requirements](https://doc.rust-lang.org/std/io/index.html#io-safety)
     /// while working with this file descriptor -- specifically, they must not close it
-    /// or reseat it with system calls such as ```dup2()``` or ```dup3()```
+    /// or re-seat it with system calls such as ```dup2()``` or ```dup3()```
     #[cfg(all(target_os = "linux", feature = "rt"))]
     #[cfg_attr(docsrs, doc(cfg(all(linux, rt))))]
     pub unsafe fn get_pidfd(&self) -> Option<ProcessHandle> {
