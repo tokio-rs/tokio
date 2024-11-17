@@ -131,7 +131,7 @@ pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<Spawned
                 stdin,
                 stdout,
                 stderr,
-            })
+            });
         }
         Err((Some(err), _child)) => return Err(err),
         Err((None, child_returned)) => child = child_returned,

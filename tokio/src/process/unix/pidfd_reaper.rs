@@ -191,8 +191,7 @@ where
     W: Wait + Unpin,
     Q: OrphanQueue<W> + Unpin,
 {
-    fn as_raw_fd(&self) -> std::os::fd::RawFd
-    {
+    fn as_raw_fd(&self) -> std::os::fd::RawFd {
         self.os_handle
     }
 }

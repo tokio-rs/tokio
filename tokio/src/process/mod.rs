@@ -1112,9 +1112,8 @@ impl Child {
     /// while working with this file descriptor -- specifically, they must not close it
     /// or reseat it with system calls such as ```dup2()``` or ```dup3()```
     #[cfg(all(target_os = "linux", feature = "rt"))]
-    #[cfg_attr(docsrs, doc(cfg(linux, rt)))]
-    pub unsafe fn get_pidfd(&self) -> Option<ProcessHandle>
-    {
+    #[cfg_attr(docsrs, doc(cfg(all(linux, rt))))]
+    pub unsafe fn get_pidfd(&self) -> Option<ProcessHandle> {
         self.os_handle
     }
 
