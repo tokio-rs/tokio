@@ -1104,7 +1104,7 @@ pub struct Child {
 
 impl Child {
     /// Return the file descriptor associated with the child process.
-    /// May return None if process file descriptor is not supported
+    /// May return None if process file descriptors are not supported
     ///
     /// # Safety
     ///
