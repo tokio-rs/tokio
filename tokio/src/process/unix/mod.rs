@@ -124,8 +124,10 @@ pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<Spawned
     #[cfg(all(target_os = "linux", feature = "rt"))]
     match pidfd_reaper::PidfdReaper::new(child, GlobalOrphanQueue) {
         Ok(pidfd_reaper) => {
+            let saved_fd = pidfd_reaper.as_raw_fd();
             return Ok(SpawnedChild {
                 child: Child::PidfdReaper(pidfd_reaper),
+                os_handle: Option::Some(saved_fd),
                 stdin,
                 stdout,
                 stderr,
@@ -139,6 +141,8 @@ pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<Spawned
 
     Ok(SpawnedChild {
         child: Child::SignalReaper(Reaper::new(child, GlobalOrphanQueue, signal)),
+        #[cfg(all(target_os = "linux", feature = "rt"))]
+        os_handle: None,
         stdin,
         stdout,
         stderr,

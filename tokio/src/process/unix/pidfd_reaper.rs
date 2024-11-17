@@ -62,6 +62,12 @@ impl AsRawFd for Pidfd {
     }
 }
 
+impl std::os::fd::AsFd for Pidfd {
+    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        self.fd.as_fd()
+    }
+}
+
 impl Source for Pidfd {
     fn register(
         &mut self,
@@ -139,6 +145,7 @@ where
 {
     inner: Option<PidfdReaperInner<W>>,
     orphan_queue: Q,
+    os_handle: std::os::fd::RawFd,
 }
 
 impl<W, Q> Deref for PidfdReaper<W, Q>
@@ -160,10 +167,12 @@ where
 {
     pub(crate) fn new(inner: W, orphan_queue: Q) -> Result<Self, (Option<io::Error>, W)> {
         if let Some(pidfd) = Pidfd::open(inner.id()) {
+            let saved_fd = pidfd.as_raw_fd();
             match PollEvented::new_with_interest(pidfd, Interest::READABLE) {
                 Ok(pidfd) => Ok(Self {
                     inner: Some(PidfdReaperInner { pidfd, inner }),
                     orphan_queue,
+                    os_handle: saved_fd,
                 }),
                 Err(io_error) => Err((Some(io_error), inner)),
             }
@@ -174,6 +183,17 @@ where
 
     pub(crate) fn inner_mut(&mut self) -> &mut W {
         &mut self.inner.as_mut().expect("inner has gone away").inner
+    }
+}
+
+impl<W, Q> AsRawFd for PidfdReaper<W, Q>
+where
+    W: Wait + Unpin,
+    Q: OrphanQueue<W> + Unpin,
+{
+    fn as_raw_fd(&self) -> std::os::fd::RawFd
+    {
+        self.os_handle
     }
 }
 

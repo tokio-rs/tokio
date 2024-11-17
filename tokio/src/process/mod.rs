@@ -278,6 +278,8 @@ pub struct Command {
 
 pub(crate) struct SpawnedChild {
     child: imp::Child,
+    #[cfg(all(target_os = "linux", feature = "rt"))]
+    os_handle: Option<std::os::fd::RawFd>,
     stdin: Option<imp::ChildStdio>,
     stdout: Option<imp::ChildStdio>,
     stderr: Option<imp::ChildStdio>,
@@ -856,6 +858,8 @@ impl Command {
                 inner: spawned_child.child,
                 kill_on_drop: self.kill_on_drop,
             }),
+            #[cfg(all(target_os = "linux", feature = "rt"))]
+            os_handle: spawned_child.os_handle,
             stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
             stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
             stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
@@ -1056,6 +1060,8 @@ enum FusedChild {
 #[derive(Debug)]
 pub struct Child {
     child: FusedChild,
+    #[cfg(all(target_os = "linux", feature = "rt"))]
+    os_handle: Option<std::os::fd::RawFd>,
 
     /// The handle for writing to the child's standard input (stdin), if it has
     /// been captured. To avoid partially moving the `child` and thus blocking
@@ -1094,6 +1100,21 @@ pub struct Child {
 }
 
 impl Child {
+    /// Return the pidfd instance associated with the child process.
+    /// May return None if pidfd is not supported
+    ///
+    /// # Safety
+    ///
+    /// The caller must respect [the I/O safety requirements](https://doc.rust-lang.org/std/io/index.html#io-safety)
+    /// while working with this file descriptor -- specifically, they must not close it
+    /// or reseat it with system calls such as ```dup2()``` or ```dup3()```
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    pub unsafe fn get_pidfd(&self) -> Option<std::os::fd::RawFd>
+    {
+        self.os_handle
+    }
+
     /// Returns the OS-assigned process identifier associated with this child
     /// while it is still running.
     ///
