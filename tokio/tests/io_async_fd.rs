@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(unix, feature = "full", not(miri)))]
+#![cfg(all(unix, feature = "full"))]
 
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{
@@ -148,6 +148,7 @@ fn drain(mut fd: &FileDescriptor, mut amt: usize) {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn initially_writable() {
     let (a, b) = socketpair();
 
@@ -166,6 +167,7 @@ async fn initially_writable() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn reset_readable() {
     let (a, mut b) = socketpair();
 
@@ -210,6 +212,7 @@ async fn reset_readable() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn reset_writable() {
     let (a, b) = socketpair();
 
@@ -247,6 +250,7 @@ impl<T: AsRawFd> AsRawFd for ArcFd<T> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn drop_closes() {
     let (a, mut b) = socketpair();
 
@@ -287,6 +291,7 @@ async fn drop_closes() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn reregister() {
     let (a, _b) = socketpair();
 
@@ -296,6 +301,7 @@ async fn reregister() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn try_io() {
     let (a, mut b) = socketpair();
 
@@ -331,6 +337,7 @@ async fn try_io() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn multiple_waiters() {
     let (a, mut b) = socketpair();
     let afd_a = Arc::new(AsyncFd::new(a).unwrap());
@@ -379,6 +386,7 @@ async fn multiple_waiters() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn poll_fns() {
     let (a, b) = socketpair();
     let afd_a = Arc::new(AsyncFd::new(a).unwrap());
@@ -472,6 +480,7 @@ fn rt() -> tokio::runtime::Runtime {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 fn driver_shutdown_wakes_currently_pending() {
     let rt = rt();
 
@@ -493,6 +502,7 @@ fn driver_shutdown_wakes_currently_pending() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 fn driver_shutdown_wakes_future_pending() {
     let rt = rt();
 
@@ -508,6 +518,7 @@ fn driver_shutdown_wakes_future_pending() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 fn driver_shutdown_wakes_pending_race() {
     // TODO: make this a loom test
     for _ in 0..100 {
@@ -538,6 +549,7 @@ async fn poll_writable<T: AsRawFd>(fd: &AsyncFd<T>) -> std::io::Result<AsyncFdRe
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 fn driver_shutdown_wakes_currently_pending_polls() {
     let rt = rt();
 
@@ -560,6 +572,7 @@ fn driver_shutdown_wakes_currently_pending_polls() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 fn driver_shutdown_wakes_poll() {
     let rt = rt();
 
@@ -576,6 +589,7 @@ fn driver_shutdown_wakes_poll() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 fn driver_shutdown_then_clear_readiness() {
     let rt = rt();
 
@@ -593,6 +607,7 @@ fn driver_shutdown_then_clear_readiness() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 fn driver_shutdown_wakes_poll_race() {
     // TODO: make this a loom test
     for _ in 0..100 {
@@ -615,6 +630,7 @@ fn driver_shutdown_wakes_poll_race() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No socket in miri.
 #[cfg(any(target_os = "linux", target_os = "android"))]
 async fn priority_event_on_oob_data() {
     use std::net::SocketAddr;
@@ -655,7 +671,7 @@ fn send_oob_data<S: AsRawFd>(stream: &S, data: &[u8]) -> io::Result<usize> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn clear_ready_matching_clears_ready() {
     use tokio::io::{Interest, Ready};
 
@@ -679,7 +695,7 @@ async fn clear_ready_matching_clears_ready() {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn clear_ready_matching_clears_ready_mut() {
     use tokio::io::{Interest, Ready};
 
@@ -703,8 +719,8 @@ async fn clear_ready_matching_clears_ready_mut() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No socket in miri.
 #[cfg(target_os = "linux")]
-#[cfg_attr(miri, ignore)]
 async fn await_error_readiness_timestamping() {
     use std::net::{Ipv4Addr, SocketAddr};
 
@@ -760,8 +776,8 @@ fn configure_timestamping_socket(udp_socket: &std::net::UdpSocket) -> std::io::R
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 #[cfg(target_os = "linux")]
-#[cfg_attr(miri, ignore)]
 async fn await_error_readiness_invalid_address() {
     use std::net::{Ipv4Addr, SocketAddr};
     use tokio::io::{Interest, Ready};
