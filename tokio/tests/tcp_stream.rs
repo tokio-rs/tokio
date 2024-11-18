@@ -65,7 +65,7 @@ async fn try_read_write() {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 break;
             }
-            Err(e) => panic!("error = {:?}", e),
+            Err(e) => panic!("error = {e:?}"),
         }
     }
 
@@ -84,7 +84,7 @@ async fn try_read_write() {
             match server.try_read(&mut read[i..]) {
                 Ok(n) => i += n,
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("error = {:?}", e),
+                Err(e) => panic!("error = {e:?}"),
             }
         }
 
@@ -106,7 +106,7 @@ async fn try_read_write() {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 break;
             }
-            Err(e) => panic!("error = {:?}", e),
+            Err(e) => panic!("error = {e:?}"),
         }
     }
 
@@ -129,7 +129,7 @@ async fn try_read_write() {
             match server.try_read_vectored(&mut bufs) {
                 Ok(n) => i += n,
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("error = {:?}", e),
+                Err(e) => panic!("error = {e:?}"),
             }
         }
 
@@ -321,7 +321,7 @@ async fn try_read_buf() {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 break;
             }
-            Err(e) => panic!("error = {:?}", e),
+            Err(e) => panic!("error = {e:?}"),
         }
     }
 
@@ -340,7 +340,7 @@ async fn try_read_buf() {
             match server.try_read_buf(&mut read) {
                 Ok(n) => i += n,
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("error = {:?}", e),
+                Err(e) => panic!("error = {e:?}"),
             }
         }
 

@@ -77,7 +77,7 @@ mod tcp {
                 //BytesMut into Bytes
                 Ok(i) => future::ready(Some(i.freeze())),
                 Err(e) => {
-                    println!("failed to read from socket; error={}", e);
+                    println!("failed to read from socket; error={e}");
                     future::ready(None)
                 }
             })
