@@ -302,7 +302,7 @@ async fn reregister() {
 
 #[tokio::test]
 #[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
-async fn try_io() {
+async fn guard_try_io() {
     let (a, mut b) = socketpair();
 
     b.write_all(b"0").unwrap();
@@ -334,6 +334,108 @@ async fn try_io() {
     // Write something down b again and make sure we're reawoken
     b.write_all(b"0").unwrap();
     let _ = readable.await.unwrap();
+}
+
+#[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
+async fn try_io_readable() {
+    let (a, mut b) = socketpair();
+    let mut afd_a = AsyncFd::new(a).unwrap();
+
+    // Give the runtime some time to update bookkeeping.
+    tokio::task::yield_now().await;
+
+    {
+        let mut called = false;
+        let _ = afd_a.try_io_mut(Interest::READABLE, |_| {
+            called = true;
+            Ok(())
+        });
+        assert!(
+            !called,
+            "closure should not have been called, since socket should not be readable"
+        );
+    }
+
+    // Make `a` readable by writing to `b`.
+    // Give the runtime some time to update bookkeeping.
+    b.write_all(&[0]).unwrap();
+    tokio::task::yield_now().await;
+
+    {
+        let mut called = false;
+        let _ = afd_a.try_io(Interest::READABLE, |_| {
+            called = true;
+            Ok(())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should have data available to read"
+        );
+    }
+
+    {
+        let mut called = false;
+        let _ = afd_a.try_io(Interest::READABLE, |_| {
+            called = true;
+            io::Result::<()>::Err(ErrorKind::WouldBlock.into())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should have data available to read"
+        );
+    }
+
+    {
+        let mut called = false;
+        let _ = afd_a.try_io(Interest::READABLE, |_| {
+            called = true;
+            Ok(())
+        });
+        assert!(!called, "closure should not have been called, since socket readable state should have been cleared");
+    }
+}
+
+#[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
+async fn try_io_writable() {
+    let (a, _b) = socketpair();
+    let afd_a = AsyncFd::new(a).unwrap();
+
+    // Give the runtime some time to update bookkeeping.
+    tokio::task::yield_now().await;
+
+    {
+        let mut called = false;
+        let _ = afd_a.try_io(Interest::WRITABLE, |_| {
+            called = true;
+            Ok(())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should still be marked as writable"
+        );
+    }
+    {
+        let mut called = false;
+        let _ = afd_a.try_io(Interest::WRITABLE, |_| {
+            called = true;
+            io::Result::<()>::Err(ErrorKind::WouldBlock.into())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should still be marked as writable"
+        );
+    }
+
+    {
+        let mut called = false;
+        let _ = afd_a.try_io(Interest::WRITABLE, |_| {
+            called = true;
+            Ok(())
+        });
+        assert!(!called, "closure should not have been called, since socket writable state should have been cleared");
+    }
 }
 
 #[tokio::test]

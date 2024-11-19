@@ -872,6 +872,56 @@ impl<T: AsRawFd> AsyncFd<T> {
             .async_io(interest, || f(self.inner.as_mut().unwrap()))
             .await
     }
+
+    /// Tries to read or write from the file descriptor using a user-provided IO operation.
+    ///
+    /// If the file descriptor is ready, the provided closure is called. The closure
+    /// should attempt to perform IO operation on the file descriptor by manually
+    /// calling the appropriate syscall. If the operation fails because the
+    /// file descriptor is not actually ready, then the closure should return a
+    /// `WouldBlock` error and the readiness flag is cleared. The return value
+    /// of the closure is then returned by `try_io`.
+    ///
+    /// If the file descriptor is not ready, then the closure is not called
+    /// and a `WouldBlock` error is returned.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the file descriptor that failed due to the file descriptor not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the file descriptor to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `AsyncFd` type, as this will mess with the
+    /// readiness flag and can cause the file descriptor to behave incorrectly.
+    ///
+    /// This method is not intended to be used with combined interests.
+    /// The closure should perform only one type of IO operation, so it should not
+    /// require more than one ready state. This method may panic or sleep forever
+    /// if it is called with a combined interest.
+    pub fn try_io<R>(
+        &self,
+        interest: Interest,
+        f: impl FnOnce(&T) -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.registration
+            .try_io(interest, || f(self.inner.as_ref().unwrap()))
+    }
+
+    /// Tries to read or write from the file descriptor using a user-provided IO operation.
+    ///
+    /// The behavior is the same as [`try_io`], except that the closure can mutate the inner
+    /// value of the [`AsyncFd`].
+    ///
+    /// [`try_io`]: AsyncFd::try_io
+    pub fn try_io_mut<R>(
+        &mut self,
+        interest: Interest,
+        f: impl FnOnce(&mut T) -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.registration
+            .try_io(interest, || f(self.inner.as_mut().unwrap()))
+    }
 }
 
 impl<T: AsRawFd> AsRawFd for AsyncFd<T> {
