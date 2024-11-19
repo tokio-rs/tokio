@@ -189,6 +189,7 @@ fn lifo_slot_budget() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 fn spawn_shutdown() {
     let rt = rt();
     let (tx, rx) = mpsc::channel();

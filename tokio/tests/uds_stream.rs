@@ -1,7 +1,7 @@
 #![cfg(feature = "full")]
 #![warn(rust_2018_idioms)]
 #![cfg(unix)]
-#![cfg(not(miri))]
+#![cfg(not(miri))] // No socket in miri.
 
 use std::io;
 #[cfg(target_os = "android")]

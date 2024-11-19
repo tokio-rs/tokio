@@ -1,7 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(unix)]
-#![cfg(not(miri))]
 
 use tokio::io::ReadBuf;
 use tokio::net::UnixDatagram;
@@ -22,6 +21,7 @@ async fn echo_server(socket: UnixDatagram) -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn echo() -> io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
@@ -46,6 +46,7 @@ async fn echo() -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn echo_from() -> io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
@@ -72,6 +73,7 @@ async fn echo_from() -> io::Result<()> {
 
 // Even though we use sync non-blocking io we still need a reactor.
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No SOCK_DGRAM for `socketpair` in miri.
 async fn try_send_recv_never_block() -> io::Result<()> {
     let mut recv_buf = [0u8; 16];
     let payload = b"PAYLOAD";
@@ -117,6 +119,7 @@ async fn try_send_recv_never_block() -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn split() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("split.sock");
@@ -141,6 +144,7 @@ async fn split() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn send_to_recv_from_poll() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let sender_path = dir.path().join("sender.sock");
@@ -162,6 +166,7 @@ async fn send_to_recv_from_poll() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn send_recv_poll() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let sender_path = dir.path().join("sender.sock");
@@ -185,6 +190,7 @@ async fn send_recv_poll() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn try_send_to_recv_from() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
@@ -232,6 +238,7 @@ async fn try_send_to_recv_from() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn try_recv_buf_from() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
@@ -279,6 +286,7 @@ async fn try_recv_buf_from() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn recv_buf_from() -> std::io::Result<()> {
     let tmp = tempfile::tempdir()?;
 
@@ -302,6 +310,7 @@ async fn recv_buf_from() -> std::io::Result<()> {
 
 // Even though we use sync non-blocking io we still need a reactor.
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No SOCK_DGRAM for `socketpair` in miri.
 async fn try_recv_buf_never_block() -> io::Result<()> {
     let payload = b"PAYLOAD";
     let mut count = 0;
@@ -349,6 +358,7 @@ async fn try_recv_buf_never_block() -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No SOCK_DGRAM for `socketpair` in miri.
 async fn recv_buf() -> std::io::Result<()> {
     // Create the pair of sockets
     let (sock1, sock2) = UnixDatagram::pair()?;
@@ -367,6 +377,7 @@ async fn recv_buf() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn poll_ready() -> io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");

@@ -9,7 +9,7 @@ use std::net::TcpStream;
 use std::thread;
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn echo_server() {
     const N: usize = 1024;
 

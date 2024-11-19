@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi does not support bind()
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support bind()
 
 use std::time::Duration;
 use tokio::io::{self, copy_bidirectional, AsyncReadExt, AsyncWriteExt};
@@ -59,6 +59,7 @@ where
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn test_basic_transfer() {
     symmetric(|_handle, mut a, mut b| async move {
         a.write_all(b"test").await.unwrap();
@@ -70,6 +71,7 @@ async fn test_basic_transfer() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn test_transfer_after_close() {
     symmetric(|handle, mut a, mut b| async move {
         AsyncWriteExt::shutdown(&mut a).await.unwrap();
@@ -89,6 +91,7 @@ async fn test_transfer_after_close() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn blocking_one_side_does_not_block_other() {
     symmetric(|handle, mut a, mut b| async move {
         block_write(&mut a).await;
