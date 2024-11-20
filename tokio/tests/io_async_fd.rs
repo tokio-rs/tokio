@@ -734,7 +734,6 @@ fn driver_shutdown_wakes_poll_race() {
 #[tokio::test]
 #[cfg_attr(miri, ignore)] // No socket in miri.
 #[cfg(any(target_os = "linux", target_os = "android"))]
-#[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn priority_event_on_oob_data() {
     use std::net::SocketAddr;
 
