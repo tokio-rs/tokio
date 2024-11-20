@@ -22,7 +22,7 @@ use tokio::net::UdpSocket;
 /// Since we are both sending and receiving, that should happen once per 64 packets, because budgets are of size 128
 /// and there are two budget events per packet, a send and a recv.
 #[tokio::test]
-#[cfg_attr(miri, ignore)]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn coop_budget_udp_send_recv() {
     const BUDGET: usize = 128;
     const N_ITERATIONS: usize = 1024;

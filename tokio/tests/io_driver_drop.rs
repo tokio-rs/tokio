@@ -1,11 +1,12 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi does not support bind
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support bind
 
 use tokio::net::TcpListener;
 use tokio::runtime;
 use tokio_test::{assert_err, assert_pending, assert_ready, task};
 
 #[test]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 fn tcp_doesnt_block() {
     let rt = rt();
 
@@ -25,6 +26,7 @@ fn tcp_doesnt_block() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 fn drop_wakes() {
     let rt = rt();
 

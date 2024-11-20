@@ -542,6 +542,7 @@ rt_test! {
     }
 
     #[cfg(not(target_os="wasi"))] // Wasi does not support bind
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     #[test]
     fn block_on_socket() {
         let rt = rt();
@@ -616,6 +617,7 @@ rt_test! {
     }
 
     #[cfg(not(target_os="wasi"))] // Wasi does not support bind
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     #[test]
     fn socket_from_blocking() {
         let rt = rt();
@@ -686,6 +688,7 @@ rt_test! {
     // concern. There also isn't a great/obvious solution to take. For now, the
     // test is disabled.
     #[cfg(not(windows))]
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     #[cfg(not(target_os="wasi"))] // Wasi does not support bind or threads
     fn io_driver_called_when_under_load() {
         let rt = rt();
@@ -740,6 +743,7 @@ rt_test! {
     /// spuriously.
     #[test]
     #[cfg(not(target_os="wasi"))]
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     fn yield_defers_until_park() {
         for _ in 0..10 {
             if yield_defers_until_park_inner() {
@@ -839,6 +843,7 @@ rt_test! {
     }
 
     #[cfg(not(target_os="wasi"))] // Wasi does not support threads
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     #[test]
     fn client_server_block_on() {
         let rt = rt();
@@ -1004,6 +1009,7 @@ rt_test! {
     }
 
     #[cfg(not(target_os="wasi"))] // Wasi doesn't support UDP or bind()
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     #[test]
     fn io_notify_while_shutting_down() {
         use tokio::net::UdpSocket;
@@ -1135,6 +1141,7 @@ rt_test! {
     }
 
     #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     #[test]
     fn local_set_block_on_socket() {
         let rt = rt();
@@ -1157,6 +1164,7 @@ rt_test! {
     }
 
     #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     #[test]
     fn local_set_client_server_block_on() {
         let rt = rt();

@@ -7,7 +7,7 @@ use std::io::Write;
 use tempfile::tempdir;
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)]
+#[cfg_attr(miri, ignore)] // No `linkat` in miri.
 async fn test_hard_link() {
     let dir = tempdir().unwrap();
     let src = dir.path().join("src.txt");

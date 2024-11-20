@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support bind
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support bind
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
 use tokio::net::{TcpListener, TcpStream};
@@ -13,6 +13,7 @@ use std::task::Poll;
 use std::time::Duration;
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn set_linger() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
 
@@ -28,6 +29,7 @@ async fn set_linger() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn try_read_write() {
     const DATA: &[u8] = b"this is some data to write to the socket";
 
@@ -208,6 +210,7 @@ macro_rules! assert_not_writable_by_polling {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn poll_read_ready() {
     let (mut client, mut server) = create_pair().await;
 
@@ -231,6 +234,7 @@ async fn poll_read_ready() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn poll_write_ready() {
     let (mut client, server) = create_pair().await;
 
@@ -284,6 +288,7 @@ fn write_until_pending(stream: &mut TcpStream) -> usize {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn try_read_buf() {
     const DATA: &[u8] = b"this is some data to write to the socket";
 
@@ -363,6 +368,7 @@ async fn try_read_buf() {
 
 // read_closed is a best effort event, so test only for no false positives.
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn read_closed() {
     let (client, mut server) = create_pair().await;
 
@@ -378,6 +384,7 @@ async fn read_closed() {
 
 // write_closed is a best effort event, so test only for no false positives.
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn write_closed() {
     let (mut client, mut server) = create_pair().await;
 

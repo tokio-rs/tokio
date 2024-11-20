@@ -49,6 +49,7 @@ where
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Block on https://github.com/tokio-rs/tokio/issues/6860
 async fn pending_first() {
     let (tx1, rx1) = mpsc::unbounded_channel_stream();
     let (tx2, rx2) = mpsc::unbounded_channel_stream();
