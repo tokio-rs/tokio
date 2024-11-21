@@ -391,7 +391,6 @@ fn build_config(
 }
 
 fn fn_without_args(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenStream {
-    let async_keyword = input.sig.asyncness.take();
     let fn_sig = &input.sig;
     let fn_name = &input.sig.ident;
 
@@ -439,7 +438,7 @@ fn fn_without_args(mut input: ItemFn, is_test: bool, config: FinalConfig) -> Tok
             syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
         };
         quote! {
-            #async_keyword #fn_sig #body
+            #fn_sig #body
             let body = #fn_name();
 
             #crate_path::pin!(body);
@@ -447,24 +446,17 @@ fn fn_without_args(mut input: ItemFn, is_test: bool, config: FinalConfig) -> Tok
         }
     } else {
         quote! {
-            #async_keyword #fn_sig #body
+            #fn_sig #body
             let body = #fn_name();
         }
     };
 
+    input.sig.asyncness.take();
     input.into_tokens(generated_attrs, last_block)
 }
 
-fn has_self_keyword(mut iter: token_stream::IntoIter) -> bool {
-    iter.any(|tt| match tt {
-        TokenTree::Ident(ident) => ident == "Self",
-        TokenTree::Group(group) => has_self_keyword(group.stream().into_iter()),
-        _ => false,
-    })
-}
-
 fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenStream {
-    if is_test || input.sig.inputs.is_empty() && !has_self_keyword(input.body.clone().into_iter()) {
+    if is_test || input.sig.inputs.is_empty() && !input.is_trait_method() {
         return fn_without_args(input, is_test, config);
     }
 
@@ -684,7 +676,27 @@ impl Parse for ItemFn {
     }
 }
 
+fn has_self_keyword(mut iter: token_stream::IntoIter) -> bool {
+    iter.any(|tt| match tt {
+        TokenTree::Ident(ident) => ident == "Self",
+        TokenTree::Group(group) => has_self_keyword(group.stream().into_iter()),
+        _ => false,
+    })
+}
+
 impl ItemFn {
+    fn is_trait_method(&self) -> bool {
+        self.sig
+            .generics
+            .where_clause
+            .as_ref()
+            .is_some_and(|clause| {
+                has_self_keyword(clause.to_token_stream().to_token_stream().into_iter())
+            })
+            || matches!(&self.sig.output, syn::ReturnType::Type(_, ty) if has_self_keyword(ty.to_token_stream().into_iter()))
+            || has_self_keyword(self.body.clone().into_iter())
+    }
+
     /// Convert our local function item into a token stream.
     fn into_tokens(self, generated_attrs: TokenStream, last_block: TokenStream) -> TokenStream {
         let mut tokens = generated_attrs;
