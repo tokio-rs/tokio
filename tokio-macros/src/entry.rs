@@ -464,7 +464,7 @@ fn has_self_keyword(mut iter: token_stream::IntoIter) -> bool {
 }
 
 fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenStream {
-    if !has_self_keyword(input.body.clone().into_iter()) && input.sig.inputs.is_empty() {
+    if is_test || input.sig.inputs.is_empty() && !has_self_keyword(input.body.clone().into_iter()) {
         return fn_without_args(input, is_test, config);
     }
 
