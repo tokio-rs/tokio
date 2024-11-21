@@ -427,14 +427,8 @@ fn fn_without_args(mut input: ItemFn, is_test: bool, config: FinalConfig) -> Tok
 
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
     let last_block = quote! {
-        #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
-        {
-            return #rt
-                .enable_all()
-                .build()
-                .expect("Failed building the Runtime")
-                .block_on(body);
-        }
+        #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
+        #rt.enable_all().build().expect("Failed building the Runtime").block_on(body)
     };
 
     let body = input.body;
