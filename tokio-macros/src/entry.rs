@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream, TokenTree};
+use proc_macro2::{token_stream, Span, TokenStream, TokenTree};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream, Parser};
 use syn::token::Brace;
@@ -455,8 +455,16 @@ fn fn_without_args(mut input: ItemFn, is_test: bool, config: FinalConfig) -> Tok
     input.into_tokens(generated_attrs, last_block)
 }
 
+fn has_self_keyword(mut iter: token_stream::IntoIter) -> bool {
+    iter.any(|tt| match tt {
+        TokenTree::Ident(ident) => ident == "Self",
+        TokenTree::Group(group) => has_self_keyword(group.stream().into_iter()),
+        _ => false,
+    })
+}
+
 fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenStream {
-    if input.sig.inputs.is_empty() {
+    if !has_self_keyword(input.body.clone().into_iter()) && input.sig.inputs.is_empty() {
         return fn_without_args(input, is_test, config);
     }
 
