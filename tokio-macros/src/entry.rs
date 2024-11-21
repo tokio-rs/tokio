@@ -537,6 +537,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         quote! {}
     };
 
+    let body_var = Ident::new("body", Span::call_site());
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
     let last_block = quote_spanned! {last_stmt_end_span=>
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
@@ -545,7 +546,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
                 .enable_all()
                 .build()
                 .expect("Failed building the Runtime")
-                .block_on(body);
+                .block_on(#body_var);
         }
     };
 
@@ -693,7 +694,8 @@ impl ItemFn {
         self.sig.to_tokens(&mut tokens);
 
         Brace::default().surround(&mut tokens, |tokens| {
-            // Note: To add `TokenStream`, we need to use `Some(self.body)` instead of `self.body`.
+            // Note: we used `Some(..)` for optimization. Because,
+            // extend has specialized implementation for `FromIterator<TokenStream>`
             tokens.extend(Some(self.body));
             tokens.extend(Some(last_block));
         });
