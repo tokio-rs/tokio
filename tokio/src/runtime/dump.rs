@@ -164,7 +164,16 @@ pub struct Trace {
 }
 
 impl Trace {
-    /// Resolve and return a list of backtraces that are involved in polls in this task.
+    /// Resolve and return a list of backtraces that are involved in polls in this trace.
+    ///
+    /// The exact backtraces included here are unstable and might change in the future,
+    /// but you can expect one backtrace (one [`Vec<BacktraceFrame>`]) for every call to
+    /// [`poll`] to a bottom-level Tokio future - so if something like [`join!`] is
+    /// used, there will be a backtrace for each future in the join.
+    ///
+
+    /// [`poll`]: std::future::Future::poll
+    /// [`join!`]: macro@join
     pub fn resolve_backtraces(&self) -> Vec<Vec<BacktraceFrame>> {
         self.inner
             .backtraces()
