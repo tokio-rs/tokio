@@ -70,12 +70,6 @@ pub(crate) struct WorkerMetrics {
 }
 
 impl WorkerMetrics {
-    cfg_not_unstable_metrics! {
-        pub(crate) fn from_config(_: &Config) -> WorkerMetrics {
-            WorkerMetrics::new()
-        }
-    }
-
     pub(crate) fn new() -> WorkerMetrics {
         WorkerMetrics::default()
     }
@@ -86,6 +80,12 @@ impl WorkerMetrics {
 
     pub(crate) fn set_thread_id(&self, thread_id: ThreadId) {
         *self.thread_id.lock().unwrap() = Some(thread_id);
+    }
+
+    cfg_not_unstable_metrics! {
+        pub(crate) fn from_config(_: &Config) -> WorkerMetrics {
+            WorkerMetrics::new()
+        }
     }
 
     cfg_unstable_metrics! {

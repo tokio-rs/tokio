@@ -68,18 +68,24 @@ cfg_unstable_metrics! {
 }
 
 impl MetricsBatch {
-    pub(crate) fn new(_worker_metrics: &WorkerMetrics) -> MetricsBatch {
+    pub(crate) fn new(worker_metrics: &WorkerMetrics) -> MetricsBatch {
         let now = Instant::now();
-        #[cfg(not(tokio_unstable))]
-        {
+        Self::new_unstable(worker_metrics, now)
+    }
+
+    cfg_not_unstable_metrics! {
+        #[inline(always)]
+        fn new_unstable(_worker_metrics: &WorkerMetrics, now: Instant) -> MetricsBatch {
             MetricsBatch {
                 busy_duration_total: 0,
                 processing_scheduled_tasks_started_at: now,
             }
         }
+    }
 
-        #[cfg(tokio_unstable)]
-        {
+    cfg_unstable_metrics! {
+        #[inline(always)]
+        fn new_unstable(worker_metrics: &WorkerMetrics, now: Instant) -> MetricsBatch {
             MetricsBatch {
                 park_count: 0,
                 park_unpark_count: 0,
@@ -92,7 +98,7 @@ impl MetricsBatch {
                 overflow_count: 0,
                 busy_duration_total: 0,
                 processing_scheduled_tasks_started_at: now,
-                poll_timer: _worker_metrics.poll_count_histogram.as_ref().map(
+                poll_timer: worker_metrics.poll_count_histogram.as_ref().map(
                     |worker_poll_counts| PollTimer {
                         poll_counts: HistogramBatch::from_histogram(worker_poll_counts),
                         poll_started_at: now,
@@ -102,10 +108,23 @@ impl MetricsBatch {
         }
     }
 
-    pub(crate) fn submit(&mut self, worker: &WorkerMetrics, _mean_poll_time: u64) {
-        #[cfg(tokio_unstable)]
-        {
-            worker.mean_poll_time.store(_mean_poll_time, Relaxed);
+    pub(crate) fn submit(&mut self, worker: &WorkerMetrics, mean_poll_time: u64) {
+        worker
+            .busy_duration_total
+            .store(self.busy_duration_total, Relaxed);
+
+        self.submit_unstable(worker, mean_poll_time);
+    }
+
+    cfg_not_unstable_metrics! {
+        #[inline(always)]
+        fn submit_unstable(&mut self, _worker: &WorkerMetrics, _mean_poll_time: u64) {}
+    }
+
+    cfg_unstable_metrics! {
+        #[inline(always)]
+        fn submit_unstable(&mut self, worker: &WorkerMetrics, mean_poll_time: u64) {
+            worker.mean_poll_time.store(mean_poll_time, Relaxed);
             worker.park_count.store(self.park_count, Relaxed);
             worker
                 .park_unpark_count
@@ -127,32 +146,40 @@ impl MetricsBatch {
                 poll_timer.poll_counts.submit(dst);
             }
         }
-        worker
-            .busy_duration_total
-            .store(self.busy_duration_total, Relaxed);
     }
 
-    /// The worker is about to park.
-    pub(crate) fn about_to_park(&mut self) {
-        #[cfg(tokio_unstable)]
-        {
-            self.park_count += 1;
-            self.park_unpark_count += 1;
+    cfg_unstable_metrics! {
+        /// The worker is about to park.
+        pub(crate) fn about_to_park(&mut self) {
+            #[cfg(tokio_unstable)]
+            {
+                self.park_count += 1;
+                self.park_unpark_count += 1;
 
-            if self.poll_count_on_last_park == self.poll_count {
-                self.noop_count += 1;
-            } else {
-                self.poll_count_on_last_park = self.poll_count;
+                if self.poll_count_on_last_park == self.poll_count {
+                    self.noop_count += 1;
+                } else {
+                    self.poll_count_on_last_park = self.poll_count;
+                }
             }
         }
     }
 
-    /// The worker was unparked.
-    pub(crate) fn unparked(&mut self) {
-        #[cfg(tokio_unstable)]
-        {
+    cfg_not_unstable_metrics! {
+        /// The worker is about to park.
+        pub(crate) fn about_to_park(&mut self) {}
+    }
+
+    cfg_unstable_metrics! {
+        /// The worker was unparked.
+        pub(crate) fn unparked(&mut self) {
             self.park_unpark_count += 1;
         }
+    }
+
+    cfg_not_unstable_metrics! {
+        /// The worker was unparked.
+        pub(crate) fn unparked(&mut self) {}
     }
 
     /// Start processing a batch of tasks
@@ -166,10 +193,9 @@ impl MetricsBatch {
         self.busy_duration_total += duration_as_u64(busy_duration);
     }
 
-    /// Start polling an individual task
-    pub(crate) fn start_poll(&mut self) {
-        #[cfg(tokio_unstable)]
-        {
+    cfg_unstable_metrics! {
+        /// Start polling an individual task
+        pub(crate) fn start_poll(&mut self) {
             self.poll_count += 1;
             if let Some(poll_timer) = &mut self.poll_timer {
                 poll_timer.poll_started_at = Instant::now();
@@ -177,20 +203,35 @@ impl MetricsBatch {
         }
     }
 
-    /// Stop polling an individual task
-    pub(crate) fn end_poll(&mut self) {
-        #[cfg(tokio_unstable)]
-        if let Some(poll_timer) = &mut self.poll_timer {
-            let elapsed = duration_as_u64(poll_timer.poll_started_at.elapsed());
-            poll_timer.poll_counts.measure(elapsed, 1);
+    cfg_not_unstable_metrics! {
+        /// Start polling an individual task
+        pub(crate) fn start_poll(&mut self) {}
+    }
+
+    cfg_unstable_metrics! {
+        /// Stop polling an individual task
+        pub(crate) fn end_poll(&mut self) {
+            #[cfg(tokio_unstable)]
+            if let Some(poll_timer) = &mut self.poll_timer {
+                let elapsed = duration_as_u64(poll_timer.poll_started_at.elapsed());
+                poll_timer.poll_counts.measure(elapsed, 1);
+            }
         }
     }
 
-    pub(crate) fn inc_local_schedule_count(&mut self) {
-        #[cfg(tokio_unstable)]
-        {
+    cfg_not_unstable_metrics! {
+        /// Stop polling an individual task
+        pub(crate) fn end_poll(&mut self) {}
+    }
+
+    cfg_unstable_metrics! {
+        pub(crate) fn inc_local_schedule_count(&mut self) {
             self.local_schedule_count += 1;
         }
+    }
+
+    cfg_not_unstable_metrics! {
+        pub(crate) fn inc_local_schedule_count(&mut self) {}
     }
 }
 
