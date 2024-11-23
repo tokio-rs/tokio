@@ -45,7 +45,7 @@ tokio-util = { version = "0.7.0", path = "../tokio-util", optional = true }
 tokio = { version = "1.2.0", path = "../tokio", features = ["full", "test-util"] }
 async-stream = "0.3"
 parking_lot = "0.12.0"
-tokio-test = { path = "../tokio-test" }
+tokio-test = { version = "0.4", path = "../tokio-test" }
 futures = { version = "0.3", default-features = false }
 
 [package.metadata.docs.rs]

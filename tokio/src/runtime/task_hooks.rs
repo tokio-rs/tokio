@@ -15,6 +15,12 @@ pub(crate) struct TaskHooks {
 }
 
 /// Task metadata supplied to user-provided hooks for task events.
+///
+/// **Note**: This is an [unstable API][unstable]. The public API of this type  
+/// may break in 1.x releases. See [the documentation on unstable  
+/// features][unstable] for details.  
+///  
+/// [unstable]: crate#unstable-features  
 #[allow(missing_debug_implementations)]
 #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
 pub struct TaskMeta<'a> {

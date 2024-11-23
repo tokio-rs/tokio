@@ -322,7 +322,7 @@ impl Spawner {
             // Compat: do not panic here, return the join_handle even though it will never resolve
             Err(SpawnError::ShuttingDown) => join_handle,
             Err(SpawnError::NoThreads(e)) => {
-                panic!("OS can't spawn worker thread: {}", e)
+                panic!("OS can't spawn worker thread: {e}")
             }
         }
     }

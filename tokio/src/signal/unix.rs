@@ -258,7 +258,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     if signal < 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
         return Err(Error::new(
             ErrorKind::Other,
-            format!("Refusing to register signal {}", signal),
+            format!("Refusing to register signal {signal}"),
         ));
     }
 

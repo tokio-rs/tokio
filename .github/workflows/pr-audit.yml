@@ -16,17 +16,8 @@ permissions:
   contents: read
 
 jobs:
-  security-audit:
+  cargo-deny:
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'ci skip')"
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
-
-      - name: Generate lockfile
-        run: cargo generate-lockfile
-
-      - name: Audit dependencies
-        run: cargo audit
+    - uses: actions/checkout@v4
+    - uses: EmbarkStudios/cargo-deny-action@v2

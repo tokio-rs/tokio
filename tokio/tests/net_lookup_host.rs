@@ -23,7 +23,7 @@ async fn lookup_str_socket_addr() {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)]
+#[cfg_attr(miri, ignore)] // No `getaddrinfo` in miri.
 async fn resolve_dns() -> io::Result<()> {
     let mut hosts = net::lookup_host("localhost:3000").await?;
     let host = hosts.next().unwrap();

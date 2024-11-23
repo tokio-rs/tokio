@@ -264,14 +264,14 @@ impl HistogramBuilder {
             }
             None => self.histogram_type,
         };
-        let num_buckets = self.histogram_type.num_buckets();
+        let num_buckets = histogram_type.num_buckets();
 
         Histogram {
             buckets: (0..num_buckets)
                 .map(|_| MetricAtomicU64::new(0))
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
-            histogram_type: histogram_type,
+            histogram_type,
         }
     }
 }
@@ -301,6 +301,13 @@ mod test {
             legacy: None,
         }
         .build()
+    }
+
+    #[test]
+    fn test_legacy_builder() {
+        let mut builder = HistogramBuilder::new();
+        builder.legacy_mut(|b| b.num_buckets = 20);
+        assert_eq!(builder.build().num_buckets(), 20);
     }
 
     #[test]
@@ -355,6 +362,9 @@ mod test {
 
         b.measure(4096, 1);
         assert_bucket_eq!(b, 9, 1);
+
+        b.measure(u64::MAX, 1);
+        assert_bucket_eq!(b, 9, 2);
     }
 
     #[test]

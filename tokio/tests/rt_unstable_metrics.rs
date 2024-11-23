@@ -8,12 +8,12 @@
 ))]
 
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::task::Poll;
 use std::thread;
 use tokio::macros::support::poll_fn;
 
-use tokio::runtime::{HistogramConfiguration, LogHistogram, Runtime};
+use tokio::runtime::{HistogramConfiguration, HistogramScale, LogHistogram, Runtime};
 use tokio::task::consume_budget;
 use tokio::time::{self, Duration};
 
@@ -295,42 +295,34 @@ fn worker_noop_count() {
 }
 
 #[test]
-#[ignore] // this test is flaky, see https://github.com/tokio-rs/tokio/issues/6470
 fn worker_steal_count() {
     // This metric only applies to the multi-threaded runtime.
-    //
-    // We use a blocking channel to backup one worker thread.
-    use std::sync::mpsc::channel;
+    for _ in 0..10 {
+        let rt = threaded_no_lifo();
+        let metrics = rt.metrics();
 
-    let rt = threaded_no_lifo();
-    let metrics = rt.metrics();
+        let successfully_spawned_stealable_task = rt.block_on(async {
+            // The call to `try_spawn_stealable_task` may time out, which means
+            // that the sending task couldn't be scheduled due to a deadlock in
+            // the runtime.
+            // This is expected behaviour, we just retry until we succeed or
+            // exhaust all tries, the latter causing this test to fail.
+            try_spawn_stealable_task().await.is_ok()
+        });
 
-    rt.block_on(async {
-        let (tx, rx) = channel();
+        drop(rt);
 
-        // Move to the runtime.
-        tokio::spawn(async move {
-            // Spawn the task that sends to the channel
-            //
-            // Since the lifo slot is disabled, this task is stealable.
-            tokio::spawn(async move {
-                tx.send(()).unwrap();
-            });
+        if successfully_spawned_stealable_task {
+            let n: u64 = (0..metrics.num_workers())
+                .map(|i| metrics.worker_steal_count(i))
+                .sum();
 
-            // Blocking receive on the channel.
-            rx.recv().unwrap();
-        })
-        .await
-        .unwrap();
-    });
+            assert_eq!(1, n);
+            return;
+        }
+    }
 
-    drop(rt);
-
-    let n: u64 = (0..metrics.num_workers())
-        .map(|i| metrics.worker_steal_count(i))
-        .sum();
-
-    assert_eq!(1, n);
+    panic!("exhausted every try to schedule the stealable task");
 }
 
 #[test]
@@ -355,9 +347,9 @@ fn worker_poll_count_and_time() {
     assert_eq!(Duration::default(), metrics.worker_mean_poll_time(0));
 
     // Does not populate the histogram
-    assert!(!metrics.poll_count_histogram_enabled());
+    assert!(!metrics.poll_time_histogram_enabled());
     for i in 0..10 {
-        assert_eq!(0, metrics.poll_count_histogram_bucket_count(0, i));
+        assert_eq!(0, metrics.poll_time_histogram_bucket_count(0, i));
     }
 
     let rt = threaded();
@@ -382,10 +374,10 @@ fn worker_poll_count_and_time() {
     assert!(n > Duration::default());
 
     // Does not populate the histogram
-    assert!(!metrics.poll_count_histogram_enabled());
+    assert!(!metrics.poll_time_histogram_enabled());
     for n in 0..metrics.num_workers() {
         for i in 0..10 {
-            assert_eq!(0, metrics.poll_count_histogram_bucket_count(n, i));
+            assert_eq!(0, metrics.poll_time_histogram_bucket_count(n, i));
         }
     }
 }
@@ -395,8 +387,8 @@ fn log_histogram() {
     const N: u64 = 50;
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .enable_metrics_poll_count_histogram()
-        .metrics_poll_count_histogram_configuration(HistogramConfiguration::log(
+        .enable_metrics_poll_time_histogram()
+        .metrics_poll_time_histogram_configuration(HistogramConfiguration::log(
             LogHistogram::builder()
                 .max_value(Duration::from_secs(60))
                 .min_value(Duration::from_nanos(100))
@@ -405,7 +397,7 @@ fn log_histogram() {
         .build()
         .unwrap();
     let metrics = rt.metrics();
-    let num_buckets = rt.metrics().poll_count_histogram_num_buckets();
+    let num_buckets = rt.metrics().poll_time_histogram_num_buckets();
     assert_eq!(num_buckets, 119);
     rt.block_on(async {
         for _ in 0..N {
@@ -414,35 +406,50 @@ fn log_histogram() {
     });
     drop(rt);
     assert_eq!(
-        metrics.poll_count_histogram_bucket_range(0),
+        metrics.poll_time_histogram_bucket_range(0),
         Duration::from_nanos(0)..Duration::from_nanos(96)
     );
     assert_eq!(
-        metrics.poll_count_histogram_bucket_range(1),
+        metrics.poll_time_histogram_bucket_range(1),
         Duration::from_nanos(96)..Duration::from_nanos(96 + 2_u64.pow(4))
     );
     assert_eq!(
-        metrics.poll_count_histogram_bucket_range(118).end,
+        metrics.poll_time_histogram_bucket_range(118).end,
         Duration::from_nanos(u64::MAX)
     );
     let n = (0..metrics.num_workers())
         .flat_map(|i| (0..num_buckets).map(move |j| (i, j)))
-        .map(|(worker, bucket)| metrics.poll_count_histogram_bucket_count(worker, bucket))
+        .map(|(worker, bucket)| metrics.poll_time_histogram_bucket_count(worker, bucket))
         .sum();
     assert_eq!(N, n);
+}
+
+#[test]
+#[allow(deprecated)]
+fn legacy_log_histogram() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .enable_metrics_poll_time_histogram()
+        .metrics_poll_count_histogram_scale(HistogramScale::Log)
+        .metrics_poll_count_histogram_resolution(Duration::from_micros(50))
+        .metrics_poll_count_histogram_buckets(20)
+        .build()
+        .unwrap();
+    let num_buckets = rt.metrics().poll_time_histogram_num_buckets();
+    assert_eq!(num_buckets, 20);
 }
 
 #[test]
 fn log_histogram_default_configuration() {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .enable_metrics_poll_count_histogram()
-        .metrics_poll_count_histogram_configuration(HistogramConfiguration::log(
+        .enable_metrics_poll_time_histogram()
+        .metrics_poll_time_histogram_configuration(HistogramConfiguration::log(
             LogHistogram::default(),
         ))
         .build()
         .unwrap();
-    let num_buckets = rt.metrics().poll_count_histogram_num_buckets();
+    let num_buckets = rt.metrics().poll_time_histogram_num_buckets();
     assert_eq!(num_buckets, 119);
 }
 
@@ -453,8 +460,8 @@ fn worker_poll_count_histogram() {
     let rts = [
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
-            .enable_metrics_poll_count_histogram()
-            .metrics_poll_count_histogram_configuration(HistogramConfiguration::linear(
+            .enable_metrics_poll_time_histogram()
+            .metrics_poll_time_histogram_configuration(HistogramConfiguration::linear(
                 Duration::from_millis(50),
                 3,
             ))
@@ -463,8 +470,8 @@ fn worker_poll_count_histogram() {
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
-            .enable_metrics_poll_count_histogram()
-            .metrics_poll_count_histogram_configuration(HistogramConfiguration::linear(
+            .enable_metrics_poll_time_histogram()
+            .metrics_poll_time_histogram_configuration(HistogramConfiguration::linear(
                 Duration::from_millis(50),
                 3,
             ))
@@ -482,14 +489,14 @@ fn worker_poll_count_histogram() {
         drop(rt);
 
         let num_workers = metrics.num_workers();
-        let num_buckets = metrics.poll_count_histogram_num_buckets();
+        let num_buckets = metrics.poll_time_histogram_num_buckets();
 
-        assert!(metrics.poll_count_histogram_enabled());
+        assert!(metrics.poll_time_histogram_enabled());
         assert_eq!(num_buckets, 3);
 
         let n = (0..num_workers)
             .flat_map(|i| (0..num_buckets).map(move |j| (i, j)))
-            .map(|(worker, bucket)| metrics.poll_count_histogram_bucket_count(worker, bucket))
+            .map(|(worker, bucket)| metrics.poll_time_histogram_bucket_count(worker, bucket))
             .sum();
         assert_eq!(N, n);
     }
@@ -501,24 +508,21 @@ fn worker_poll_count_histogram_range() {
 
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .enable_metrics_poll_count_histogram()
-        .metrics_poll_count_histogram_configuration(HistogramConfiguration::linear(us(50), 3))
+        .enable_metrics_poll_time_histogram()
+        .metrics_poll_time_histogram_configuration(HistogramConfiguration::linear(us(50), 3))
         .build()
         .unwrap();
     let metrics = rt.metrics();
 
-    assert_eq!(metrics.poll_count_histogram_bucket_range(0), us(0)..us(50));
-    assert_eq!(
-        metrics.poll_count_histogram_bucket_range(1),
-        us(50)..us(100)
-    );
-    assert_eq!(metrics.poll_count_histogram_bucket_range(2), us(100)..max);
+    assert_eq!(metrics.poll_time_histogram_bucket_range(0), us(0)..us(50));
+    assert_eq!(metrics.poll_time_histogram_bucket_range(1), us(50)..us(100));
+    assert_eq!(metrics.poll_time_histogram_bucket_range(2), us(100)..max);
 
     // ensure the old methods work too
     #[allow(deprecated)]
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .enable_metrics_poll_count_histogram()
+        .enable_metrics_poll_time_histogram()
         .metrics_poll_count_histogram_scale(tokio::runtime::HistogramScale::Log)
         .metrics_poll_count_histogram_buckets(3)
         .metrics_poll_count_histogram_resolution(us(50))
@@ -529,9 +533,9 @@ fn worker_poll_count_histogram_range() {
     let a = Duration::from_nanos(50000_u64.next_power_of_two());
     let b = a * 2;
 
-    assert_eq!(metrics.poll_count_histogram_bucket_range(0), us(0)..a);
-    assert_eq!(metrics.poll_count_histogram_bucket_range(1), a..b);
-    assert_eq!(metrics.poll_count_histogram_bucket_range(2), b..max);
+    assert_eq!(metrics.poll_time_histogram_bucket_range(0), us(0)..a);
+    assert_eq!(metrics.poll_time_histogram_bucket_range(1), a..b);
+    assert_eq!(metrics.poll_time_histogram_bucket_range(2), b..max);
 }
 
 #[test]
@@ -539,7 +543,7 @@ fn worker_poll_count_histogram_disabled_without_explicit_enable() {
     let rts = [
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
-            .metrics_poll_count_histogram_configuration(HistogramConfiguration::linear(
+            .metrics_poll_time_histogram_configuration(HistogramConfiguration::linear(
                 Duration::from_millis(50),
                 3,
             ))
@@ -548,7 +552,7 @@ fn worker_poll_count_histogram_disabled_without_explicit_enable() {
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
-            .metrics_poll_count_histogram_configuration(HistogramConfiguration::linear(
+            .metrics_poll_time_histogram_configuration(HistogramConfiguration::linear(
                 Duration::from_millis(50),
                 3,
             ))
@@ -558,7 +562,7 @@ fn worker_poll_count_histogram_disabled_without_explicit_enable() {
 
     for rt in rts {
         let metrics = rt.metrics();
-        assert!(!metrics.poll_count_histogram_enabled());
+        assert!(!metrics.poll_time_histogram_enabled());
     }
 }
 
@@ -793,6 +797,30 @@ fn io_driver_ready_count() {
     let _stream = rt.block_on(async move { stream.await.unwrap() });
 
     assert_eq!(metrics.io_driver_ready_count(), 1);
+}
+
+async fn try_spawn_stealable_task() -> Result<(), mpsc::RecvTimeoutError> {
+    // We use a blocking channel to synchronize the tasks.
+    let (tx, rx) = mpsc::channel();
+
+    // Make sure we are in the context of the runtime.
+    tokio::spawn(async move {
+        // Spawn the task that sends to the channel.
+        //
+        // Note that the runtime needs to have the lifo slot disabled to make
+        // this task stealable.
+        tokio::spawn(async move {
+            tx.send(()).unwrap();
+        });
+
+        // Blocking receive on the channel, timing out if the sending task
+        // wasn't scheduled in time.
+        rx.recv_timeout(Duration::from_secs(1))
+    })
+    .await
+    .unwrap()?;
+
+    Ok(())
 }
 
 fn current_thread() -> Runtime {

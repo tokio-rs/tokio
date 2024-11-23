@@ -201,7 +201,7 @@ run loom tests that test unstable features.
 You can run miri tests with
 ```
 MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields" \
-    cargo +nightly miri test --features full --lib
+    cargo +nightly miri test --features full --lib --tests
 ```
 
 ### Performing spellcheck on tokio codebase
@@ -269,7 +269,7 @@ To list the available fuzzing harnesses you can run;
 $ cd tokio
 $ cargo fuzz list
 fuzz_linked_list
-````
+```
 
 Running a fuzz test is as simple as;
 

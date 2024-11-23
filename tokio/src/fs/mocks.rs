@@ -129,7 +129,7 @@ impl<T> Future for JoinHandle<T> {
 
         match Pin::new(&mut self.rx).poll(cx) {
             Poll::Ready(Ok(v)) => Poll::Ready(Ok(v)),
-            Poll::Ready(Err(e)) => panic!("error = {:?}", e),
+            Poll::Ready(Err(e)) => panic!("error = {e:?}"),
             Poll::Pending => Poll::Pending,
         }
     }

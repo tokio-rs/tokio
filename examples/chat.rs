@@ -193,7 +193,7 @@ async fn process(
     // A client has connected, let's let everyone know.
     {
         let mut state = state.lock().await;
-        let msg = format!("{} has joined the chat", username);
+        let msg = format!("{username} has joined the chat");
         tracing::info!("{}", msg);
         state.broadcast(addr, &msg).await;
     }
@@ -210,7 +210,7 @@ async fn process(
                 // broadcast this message to the other users.
                 Some(Ok(msg)) => {
                     let mut state = state.lock().await;
-                    let msg = format!("{}: {}", username, msg);
+                    let msg = format!("{username}: {msg}");
 
                     state.broadcast(addr, &msg).await;
                 }
@@ -234,7 +234,7 @@ async fn process(
         let mut state = state.lock().await;
         state.peers.remove(&addr);
 
-        let msg = format!("{} has left the chat", username);
+        let msg = format!("{username} has left the chat");
         tracing::info!("{}", msg);
         state.broadcast(addr, &msg).await;
     }
