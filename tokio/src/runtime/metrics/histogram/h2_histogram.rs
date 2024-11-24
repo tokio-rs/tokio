@@ -164,9 +164,9 @@ impl LogHistogramBuilder {
     /// such that `2^-p` is less than `precision`. To set `p` directly, use
     /// [`LogHistogramBuilder::precision_exact`].
     ///
-    /// To match the behavior of the previous log histogram implementation, use
-    /// `builder.precision_exact(0)`. This creates a histogram where each bucket is twice the size
-    /// of the previous value.
+    /// Precision controls the size of the "bucket groups" (consecutive buckets with identical
+    /// ranges). When `p` is 0, each bucket will be twice the size of the previous bucket. To match
+    /// the behavior of the legacy log histogram implementation, use `builder.precision_exact(0)`.
     ///
     /// The default value is 25% (2^-2)
     ///
@@ -174,15 +174,11 @@ impl LogHistogramBuilder {
     /// less than this will be truncated.
     ///
     /// # Panics
-    /// - `precision` < 0
-    /// - `precision` > 1
+    /// - `max_error` < 0
+    /// - `max_error` > 1
     pub fn max_error(mut self, max_error: f64) -> Self {
-        if max_error < 0.0 {
-            panic!("precision must be >= 0");
-        };
-        if max_error > 1.0 {
-            panic!("precision must be > 1");
-        };
+        assert!(max_error > 0.0, "max_error must be greater than 0");
+        assert!(max_error < 1.0, "max_error must be less than 1");
         let mut p = 2;
         while 2_f64.powf(-1.0 * p as f64) > max_error && p <= MAX_PRECISION {
             p += 1;
@@ -195,16 +191,18 @@ impl LogHistogramBuilder {
     ///
     /// The precision (meaning: the ratio `n/bucket_range(n)` for some given `n`) will be `2^-p`.
     ///
-    /// To match the behavior of the previous log histogram implementation, use
-    /// `builder.precision_exact(0)`. This creates a histogram where each bucket is twice the size
-    /// of the previous value.
+    /// Precision controls the number consecutive buckets with identically sized ranges.
+    /// When `p` is 0, each bucket will be twice the size of the previous bucket (bucket groups are
+    /// only a single bucket wide).
+    ///
+    /// To match the behavior of the legacy implementation ([`HistogramScale::Log`]), use `builder.precision_exact(0)`.
     ///
     /// # Panics
     /// - `p` > 10
+    ///
+    /// [`HistogramScale::Log`]: [crate::runtime::HistogramScale]
     pub fn precision_exact(mut self, p: u32) -> Self {
-        if p > MAX_PRECISION {
-            panic!("precision must be <= 10");
-        };
+        assert!(p <= MAX_PRECISION, "precision must be <= {MAX_PRECISION}");
         self.precision = Some(p);
         self
     }
@@ -307,7 +305,6 @@ mod test {
     use super::InvalidHistogramConfiguration;
     use crate::runtime::metrics::histogram::h2_histogram::LogHistogram;
     use crate::runtime::metrics::histogram::HistogramType;
-    use std::time::Duration;
 
     #[cfg(not(target_family = "wasm"))]
     mod proptests {
@@ -345,11 +342,20 @@ mod test {
                 let first_bucket_end = Duration::from_nanos(histogram.bucket_range(0).end);
                 let last_bucket_start = Duration::from_nanos(histogram.bucket_range(histogram.num_buckets - 1).start);
                 let second_last_bucket_start = Duration::from_nanos(histogram.bucket_range(histogram.num_buckets - 2).start);
-                prop_assert!(first_bucket_end  <= min_value, "first bucket {first_bucket_end:?} must be less than {min_value:?}");
-                prop_assert!(last_bucket_start > max_value, "last bucket start ({last_bucket_start:?} must be at least as big as `max_value` ({max_value:?})");
+                prop_assert!(
+                    first_bucket_end  <= min_value,
+                    "first bucket {first_bucket_end:?} must be less than {min_value:?}"
+                );
+                prop_assert!(
+                    last_bucket_start > max_value,
+                    "last bucket start ({last_bucket_start:?} must be at least as big as `max_value` ({max_value:?})"
+                );
 
                 // We should have the exact right number of buckets. The second to last bucket should be strictly less than max value.
-                prop_assert!(second_last_bucket_start < max_value, "second last bucket end ({second_last_bucket_start:?} must be at least as big as `max_value` ({max_value:?})");
+                prop_assert!(
+                    second_last_bucket_start < max_value,
+                    "second last bucket end ({second_last_bucket_start:?} must be at least as big as `max_value` ({max_value:?})"
+                );
             }
 
             #[test]

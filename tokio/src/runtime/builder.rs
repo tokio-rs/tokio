@@ -1255,7 +1255,7 @@ impl Builder {
         ///     .enable_metrics_poll_time_histogram()
         ///     .metrics_poll_time_histogram_configuration(HistogramConfiguration::log(
         ///         LogHistogram::builder()
-        ///             .max_value(Duration::from_millis(5))
+        ///             .max_value(Duration::from_millis(4))
         ///             .min_value(Duration::from_micros(20))
         ///             // Set `precision_exact` to `0` to match `HistogramScale::Log`
         ///             .precision_exact(0)
