@@ -439,10 +439,15 @@ fn minimal_log_histogram() {
         .unwrap();
     let metrics = rt.metrics();
     let num_buckets = rt.metrics().poll_time_histogram_num_buckets();
-    for b in 0..num_buckets {
+    for b in 1..num_buckets - 1 {
         let range = metrics.poll_time_histogram_bucket_range(b);
         let size = range.end - range.start;
-        println!("bucket {b}: {range:?} (size: {size:?})");
+        // Assert the buckets continue doubling in size
+        assert_eq!(
+            size,
+            Duration::from_nanos((1 << (b - 1)) * 16384),
+            "incorrect range for {b}"
+        );
     }
     assert_eq!(num_buckets, 10);
 }

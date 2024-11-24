@@ -706,11 +706,11 @@ impl Builder {
     ///
     /// This *does not* support [`LocalSet`](crate::task::LocalSet) at this time.
     ///
-    /// **Note**: This is an [unstable API][unstable]. The public API of this type  
-    /// may break in 1.x releases. See [the documentation on unstable  
-    /// features][unstable] for details.  
-    ///  
-    /// [unstable]: crate#unstable-features  
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
+    ///
+    /// [unstable]: crate#unstable-features
     ///
     /// # Examples
     ///
@@ -755,11 +755,11 @@ impl Builder {
     ///
     /// This *does not* support [`LocalSet`](crate::task::LocalSet) at this time.
     ///
-    /// **Note**: This is an [unstable API][unstable]. The public API of this type  
-    /// may break in 1.x releases. See [the documentation on unstable  
-    /// features][unstable] for details.  
-    ///  
-    /// [unstable]: crate#unstable-features  
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
+    ///
+    /// [unstable]: crate#unstable-features
     ///
     /// # Examples
     ///
@@ -1255,7 +1255,7 @@ impl Builder {
         ///     .enable_metrics_poll_time_histogram()
         ///     .metrics_poll_time_histogram_configuration(HistogramConfiguration::log(
         ///         LogHistogram::builder()
-        ///             .max_value(Duration::from_millis(5))
+        ///             .max_value(Duration::from_millis(4))
         ///             .min_value(Duration::from_micros(20))
         ///             // Set `precision_exact` to `0` to match `HistogramScale::Log`
         ///             .precision_exact(0)
