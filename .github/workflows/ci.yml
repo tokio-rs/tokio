@@ -283,7 +283,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+            toolchain: 1.82
 
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
