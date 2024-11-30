@@ -38,8 +38,8 @@ pub struct Task {
 /// of time to finish.
 #[derive(Clone, Debug)]
 pub struct BacktraceSymbol {
-    name: Option<Vec<u8>>,
-    name_demangled: Option<String>,
+    name: Option<Box<[u8]>>,
+    name_demangled: Option<Box<str>>,
     addr: Option<*mut std::ffi::c_void>,
     filename: Option<std::path::PathBuf>,
     lineno: Option<u32>,
@@ -51,7 +51,7 @@ impl BacktraceSymbol {
         let name = sym.name();
         Self {
             name: name.as_ref().map(|name| name.as_bytes().into()),
-            name_demangled: name.map(|name| format!("{}", name)),
+            name_demangled: name.map(|name| format!("{}", name).into()),
             addr: sym.addr(),
             filename: sym.filename().map(From::from),
             lineno: sym.lineno(),
@@ -141,6 +141,25 @@ impl BacktraceFrame {
     }
 }
 
+/// A backtrace. This is similar to [backtrace::Backtrace],
+/// but is a separate struct to avoid public dependency issues.
+///
+/// This struct is guaranteed to be pure data and operations involving
+/// it will not call platform functions that take an unpredictable amount
+/// of time to finish.
+#[derive(Clone, Debug)]
+pub struct Backtrace {
+    frames: Box<[BacktraceFrame]>,
+}
+
+impl Backtrace {
+    /// Return the frames in this backtrace, innermost (in a task dump,
+    /// likely to be a leaf future's poll function) first.
+    pub fn frames(&self) -> impl Iterator<Item = &BacktraceFrame> {
+        self.frames.iter()
+    }
+}
+
 /// An execution trace of a task's last poll.
 ///
 /// <div class="warning">
@@ -167,25 +186,26 @@ impl Trace {
     /// Resolve and return a list of backtraces that are involved in polls in this trace.
     ///
     /// The exact backtraces included here are unstable and might change in the future,
-    /// but you can expect one backtrace (one [`Vec<BacktraceFrame>`]) for every call to
+    /// but you can expect one [`Backtrace`] for every call to
     /// [`poll`] to a bottom-level Tokio future - so if something like [`join!`] is
     /// used, there will be a backtrace for each future in the join.
     ///
-
     /// [`poll`]: std::future::Future::poll
     /// [`join!`]: macro@join
-    pub fn resolve_backtraces(&self) -> Vec<Vec<BacktraceFrame>> {
+    pub fn resolve_backtraces(&self) -> Vec<Backtrace> {
         self.inner
             .backtraces()
             .iter()
             .map(|backtrace| {
                 let mut backtrace = backtrace::Backtrace::from(backtrace.clone());
                 backtrace.resolve();
-                backtrace
-                    .frames()
-                    .iter()
-                    .map(BacktraceFrame::from_resolved_backtrace_frame)
-                    .collect()
+                Backtrace {
+                    frames: backtrace
+                        .frames()
+                        .iter()
+                        .map(BacktraceFrame::from_resolved_backtrace_frame)
+                        .collect(),
+                }
             })
             .collect()
     }
