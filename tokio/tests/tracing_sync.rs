@@ -4,7 +4,7 @@
 //! synchronization primitives is correct.
 #![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
-#![cfg(all(tokio_unstable, feature = "tracing"))]
+#![cfg(all(tokio_unstable, feature = "tracing", target_has_atomic = "64"))]
 
 use tokio::sync;
 use tracing_mock::{expect, subscriber};
