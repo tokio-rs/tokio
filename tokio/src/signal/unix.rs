@@ -34,11 +34,11 @@ impl Init for OsStorage {
         // hasn't changed since 2013. See
         // https://github.com/illumos/illumos-gate/blob/master/usr/src/uts/common/sys/iso/signal_iso.h.
         //
-        // illumos also has real-time signals, but (a) the number of real-time
-        // signals is actually configurable at runtime and (b) this capability
-        // isn't exposed by libc as of 0.2.167, so we don't support them at the
-        // moment. If support for real-time signals on illumos is desired, this
-        // code would have to be changed to accommodate that.
+        // illumos also has real-time signals, but this capability isn't exposed
+        // by libc as of 0.2.167, so we don't support them at the moment. Once
+        // https://github.com/rust-lang/libc/pull/4171 is merged and released in
+        // upstream libc, we should switch the illumos impl to do what Linux
+        // does.
         #[cfg(target_os = "illumos")]
         let possible = 0..=41;
 
