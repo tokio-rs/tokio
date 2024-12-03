@@ -281,9 +281,3 @@ async fn test_semaphore_creates_span() {
 
     handle.assert_finished();
 }
-
-#[test]
-fn this_test_must_fail() {
-    let value = false;
-    assert!(value, "I must fail");
-}
