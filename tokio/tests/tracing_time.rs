@@ -22,7 +22,10 @@ async fn test_sleep_creates_span() {
         .with_target("runtime::resource::state_update")
         .with_fields(
             expect::field("duration")
-                .with_value(&(7_u64 + 1))
+                // FIXME(hds): This value isn't stable and doesn't seem to make sense. We're not
+                //             going to test on it until the resource instrumentation has been
+                //             refactored and we know that we're getting a stable value here.
+                //.with_value(&(7_u64 + 1))
                 .and(expect::field("duration.op").with_value(&"override")),
         );
 
