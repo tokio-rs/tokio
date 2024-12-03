@@ -3,7 +3,7 @@ auto_cancellation: $CIRRUS_BRANCH != 'master' && $CIRRUS_BRANCH !=~ 'tokio-.*'
 freebsd_instance:
   image_family: freebsd-14-1
 env:
-  RUST_STABLE: 1.81
+  RUST_STABLE: stable
   RUST_NIGHTLY: nightly-2024-05-05
   RUSTFLAGS: -D warnings
 
