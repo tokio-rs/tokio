@@ -18,6 +18,7 @@ use support::signal::send_signal;
 use tokio::signal;
 use tokio::signal::unix::SignalKind;
 use tokio::sync::oneshot;
+use tokio::time::{timeout, Duration};
 
 #[tokio::test]
 async fn siginfo() {
@@ -34,5 +35,9 @@ async fn siginfo() {
 
     let _ = fire.send(());
 
-    sig.recv().await.expect("received SIGINFO signal");
+    // Add a timeout to ensure the test doesn't hang.
+    timeout(Duration::from_secs(5), sig.recv())
+        .await
+        .expect("received SIGINFO signal in time")
+        .expect("received SIGINFO signal");
 }
