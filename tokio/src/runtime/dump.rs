@@ -30,6 +30,17 @@ pub struct Task {
     trace: Trace,
 }
 
+/// Represents an address that should not be dereferenced.
+///
+/// This type exists to get the auto traits correct, the public API
+/// uses raw pointers to make life easier for users.
+#[derive(Copy, Clone, Debug)]
+struct Address(*mut std::ffi::c_void);
+
+// Safe since Address should not be dereferenced
+unsafe impl Send for Address {}
+unsafe impl Sync for Address {}
+
 /// A backtrace symbol. This is similar to [`backtrace::BacktraceSymbol`],
 /// but is a separate struct to avoid public dependency issues.
 ///
@@ -40,7 +51,7 @@ pub struct Task {
 pub struct BacktraceSymbol {
     name: Option<Box<[u8]>>,
     name_demangled: Option<Box<str>>,
-    addr: Option<*mut std::ffi::c_void>,
+    addr: Option<Address>,
     filename: Option<std::path::PathBuf>,
     lineno: Option<u32>,
     colno: Option<u32>,
@@ -52,7 +63,7 @@ impl BacktraceSymbol {
         Self {
             name: name.as_ref().map(|name| name.as_bytes().into()),
             name_demangled: name.map(|name| format!("{}", name).into()),
-            addr: sym.addr(),
+            addr: sym.addr().map(Address),
             filename: sym.filename().map(From::from),
             lineno: sym.lineno(),
             colno: sym.colno(),
@@ -71,7 +82,7 @@ impl BacktraceSymbol {
 
     /// Returns the starting address of this symbol.
     pub fn addr(&self) -> Option<*mut std::ffi::c_void> {
-        self.addr
+        self.addr.map(|addr| addr.0)
     }
 
     /// Returns the file name where this function was defined. If debuginfo
@@ -80,14 +91,16 @@ impl BacktraceSymbol {
         self.filename.as_deref()
     }
 
-    /// Returns the line number for where this symbol is currently executing If debuginfo
-    /// is missing, this is likely to return None.
+    /// Returns the line number for where this symbol is currently executing.
+    ///
+    /// If debuginfo is missing, this is likely to return `None`.
     pub fn lineno(&self) -> Option<u32> {
         self.lineno
     }
 
-    /// Returns the column number for where this symbol is currently executing If debuginfo
-    /// is missing, this is likely to return None.
+    /// Returns the column number for where this symbol is currently executing.
+    ///
+    /// If debuginfo is missing, this is likely to return `None`.
     pub fn colno(&self) -> Option<u32> {
         self.colno
     }
@@ -101,20 +114,16 @@ impl BacktraceSymbol {
 /// of time to finish.
 #[derive(Clone, Debug)]
 pub struct BacktraceFrame {
-    ip: *mut std::ffi::c_void,
-    symbol_address: *mut std::ffi::c_void,
+    ip: Address,
+    symbol_address: Address,
     symbols: Vec<BacktraceSymbol>,
 }
-
-// Raw pointers are not actually used as pointers.
-unsafe impl Send for BacktraceFrame {}
-unsafe impl Sync for BacktraceFrame {}
 
 impl BacktraceFrame {
     pub(crate) fn from_resolved_backtrace_frame(frame: &backtrace::BacktraceFrame) -> Self {
         Self {
-            ip: frame.ip(),
-            symbol_address: frame.symbol_address(),
+            ip: Address(frame.ip()),
+            symbol_address: Address(frame.symbol_address()),
             symbols: frame
                 .symbols()
                 .iter()
@@ -127,12 +136,12 @@ impl BacktraceFrame {
     ///
     /// See the ABI docs for your platform for the exact meaning.
     pub fn ip(&self) -> *mut std::ffi::c_void {
-        self.ip
+        self.ip.0
     }
 
     /// Returns the starting symbol address of the frame of this function.
     pub fn symbol_address(&self) -> *mut std::ffi::c_void {
-        self.symbol_address
+        self.symbol_address.0
     }
 
     /// Return an iterator over the symbols of this backtrace frame.
