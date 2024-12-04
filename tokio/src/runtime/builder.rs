@@ -706,11 +706,11 @@ impl Builder {
     ///
     /// This *does not* support [`LocalSet`](crate::task::LocalSet) at this time.
     ///
-    /// **Note**: This is an [unstable API][unstable]. The public API of this type  
-    /// may break in 1.x releases. See [the documentation on unstable  
-    /// features][unstable] for details.  
-    ///  
-    /// [unstable]: crate#unstable-features  
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
+    ///
+    /// [unstable]: crate#unstable-features
     ///
     /// # Examples
     ///
@@ -755,11 +755,11 @@ impl Builder {
     ///
     /// This *does not* support [`LocalSet`](crate::task::LocalSet) at this time.
     ///
-    /// **Note**: This is an [unstable API][unstable]. The public API of this type  
-    /// may break in 1.x releases. See [the documentation on unstable  
-    /// features][unstable] for details.  
-    ///  
-    /// [unstable]: crate#unstable-features  
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
+    ///
+    /// [unstable]: crate#unstable-features
     ///
     /// # Examples
     ///

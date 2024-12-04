@@ -395,9 +395,9 @@ impl<T: 'static> JoinSet<T> {
     ///            tokio::time::sleep(Duration::from_secs(3 - i)).await;
     ///            i
     ///        });
-    ///     }   
+    ///     }
     ///
-    ///     let output = set.join_all().await;  
+    ///     let output = set.join_all().await;
     ///     assert_eq!(output, vec![2, 1, 0]);
     /// }
     /// ```
@@ -414,8 +414,8 @@ impl<T: 'static> JoinSet<T> {
     ///
     ///     for i in 0..3 {
     ///        set.spawn(async move {i});
-    ///     }   
-    ///     
+    ///     }
+    ///
     ///     let mut output = Vec::new();
     ///     while let Some(res) = set.join_next().await{
     ///         match res {
