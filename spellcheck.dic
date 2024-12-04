@@ -45,9 +45,7 @@ awaitable
 backend
 backpressure
 backtrace
-BacktraceFrame
 backtraces
-BacktraceSymbol
 backtracing
 binded
 bitfield

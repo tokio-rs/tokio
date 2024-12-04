@@ -30,7 +30,7 @@ pub struct Task {
     trace: Trace,
 }
 
-/// A backtrace symbol. This is similar to [backtrace::BacktraceSymbol],
+/// A backtrace symbol. This is similar to [`backtrace::BacktraceSymbol`],
 /// but is a separate struct to avoid public dependency issues.
 ///
 /// This struct is guaranteed to be pure data and operations involving
@@ -93,7 +93,7 @@ impl BacktraceSymbol {
     }
 }
 
-/// A backtrace frame. This is similar to [backtrace::BacktraceFrame],
+/// A backtrace frame. This is similar to [`backtrace::BacktraceFrame`],
 /// but is a separate struct to avoid public dependency issues.
 ///
 /// This struct is guaranteed to be pure data and operations involving
@@ -105,6 +105,10 @@ pub struct BacktraceFrame {
     symbol_address: *mut std::ffi::c_void,
     symbols: Vec<BacktraceSymbol>,
 }
+
+// Raw pointers are not actually used as pointers.
+unsafe impl Send for BacktraceFrame {}
+unsafe impl Sync for BacktraceFrame {}
 
 impl BacktraceFrame {
     pub(crate) fn from_resolved_backtrace_frame(frame: &backtrace::BacktraceFrame) -> Self {
@@ -133,7 +137,7 @@ impl BacktraceFrame {
 
     /// Return an iterator over the symbols of this backtrace frame.
     ///
-    /// Due to inlining, it is possible for there to be multiple [BacktraceSymbol] items relating
+    /// Due to inlining, it is possible for there to be multiple [`BacktraceSymbol`] items relating
     /// to a single frame. The first symbol listed is the "innermost function",
     /// whereas the last symbol is the outermost (last caller).
     pub fn symbols(&self) -> impl Iterator<Item = &BacktraceSymbol> {
