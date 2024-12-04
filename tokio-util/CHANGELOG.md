@@ -1,3 +1,11 @@
+# 0.7.13 (December 4th, 2024)
+
+### Fixed
+
+- codec: fix incorrect handling of invalid utf-8 in `LinesCodec::decode_eof` ([#7011])
+
+[#7011]: https://github.com/tokio-rs/tokio/pull/7011
+
 # 0.7.12 (September 5th, 2024)
 
 This release bumps the MSRV to 1.70. ([#6645])
