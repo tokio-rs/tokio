@@ -116,7 +116,7 @@ impl BacktraceSymbol {
 pub struct BacktraceFrame {
     ip: Address,
     symbol_address: Address,
-    symbols: Vec<BacktraceSymbol>,
+    symbols: Box<[BacktraceSymbol]>,
 }
 
 impl BacktraceFrame {
