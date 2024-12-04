@@ -1,13 +1,13 @@
 //! Snapshots of runtime state.
 //!
-//! See [Handle::dump][crate::runtime::Handle::dump].
+//! See [`Handle::dump`][crate::runtime::Handle::dump].
 
 use crate::task::Id;
 use std::{fmt, path::Path};
 
 /// A snapshot of a runtime's state.
 ///
-/// See [Handle::dump][crate::runtime::Handle::dump].
+/// See [`Handle::dump`][crate::runtime::Handle::dump].
 #[derive(Debug)]
 pub struct Dump {
     tasks: Tasks,
@@ -15,7 +15,7 @@ pub struct Dump {
 
 /// Snapshots of tasks.
 ///
-/// See [Handle::dump][crate::runtime::Handle::dump].
+/// See [`Handle::dump`][crate::runtime::Handle::dump].
 #[derive(Debug)]
 pub struct Tasks {
     tasks: Vec<Task>,
@@ -23,7 +23,7 @@ pub struct Tasks {
 
 /// A snapshot of a task.
 ///
-/// See [Handle::dump][crate::runtime::Handle::dump].
+/// See [`Handle::dump`][crate::runtime::Handle::dump].
 #[derive(Debug)]
 pub struct Task {
     id: Id,
@@ -154,7 +154,7 @@ impl BacktraceFrame {
     }
 }
 
-/// A backtrace. This is similar to [backtrace::Backtrace],
+/// A backtrace. This is similar to [`backtrace::Backtrace`],
 /// but is a separate struct to avoid public dependency issues.
 ///
 /// This struct is guaranteed to be pure data and operations involving
@@ -185,11 +185,11 @@ impl Backtrace {
 /// the first call, but all guarantees are platform-dependent.
 ///
 /// To avoid blocking the runtime, it is recommended
-/// that you resolve backtraces inside of a [spawn_blocking()][crate::task::spawn_blocking]
+/// that you resolve backtraces inside of a [`spawn_blocking()`][crate::task::spawn_blocking]
 /// and to have some concurrency-limiting mechanism to avoid unexpected performance impact.
 /// </div>
 ///
-/// See [Handle::dump][crate::runtime::Handle::dump].
+/// See [`Handle::dump`][crate::runtime::Handle::dump].
 #[derive(Debug)]
 pub struct Trace {
     inner: super::task::trace::Trace,
