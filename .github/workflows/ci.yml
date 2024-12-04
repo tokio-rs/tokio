@@ -1103,4 +1103,5 @@ jobs:
           }
       - name: Run cargo-spellcheck
         run: cargo spellcheck --code 1
-
+      - name: Detect trailing whitespace
+        run: if grep --exclude-dir=.git --exclude-dir=target -re '\s$' . ; then exit 1; fi
