@@ -39,9 +39,9 @@ use tokio::task::{spawn_local, JoinHandle, LocalSet};
 ///             task::spawn_local(async move {
 ///                 println!("{}", data_clone);
 ///             });
-///     
+///
 ///             data.to_string()
-///         }   
+///         }
 ///     }).await.unwrap();
 ///     println!("output: {}", output);
 /// }
