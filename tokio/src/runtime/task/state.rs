@@ -89,6 +89,12 @@ pub(crate) enum TransitionToNotifiedByRef {
     Submit,
 }
 
+#[must_use]
+pub(super) struct TransitionToJoinHandleDrop {
+    pub(super) drop_waker: bool,
+    pub(super) drop_output: bool,
+}
+
 /// All transitions are performed via RMW operations. This establishes an
 /// unambiguous modification order.
 impl State {
@@ -373,19 +379,38 @@ impl State {
 
     /// Unsets the `JOIN_INTEREST` flag. If `COMPLETE` is not set, the `JOIN_WAKER`
     /// flag is also unset.
-    pub(super) fn transition_to_join_handle_dropped(&self) -> Snapshot {
+    /// The returned `TransitionToJoinHandleDrop` indicates whether the `JoinHandle` should drop
+    /// the output of the future or the join waker after the transition.
+    pub(super) fn transition_to_join_handle_dropped(&self) -> TransitionToJoinHandleDrop {
         self.fetch_update_action(|mut snapshot| {
             assert!(snapshot.is_join_interested());
+
+            let mut transition = TransitionToJoinHandleDrop {
+                drop_waker: false,
+                drop_output: false,
+            };
 
             snapshot.unset_join_interested();
 
             if !snapshot.is_complete() {
                 // If `COMPLETE` is unset we also unset `JOIN_WAKER` to give the
-                // `JoinHandle` exclusive access to the waker to drop it.
+                // `JoinHandle` exclusive access to the waker following rule 6 in task/mod.rs.
+                // The `JoinHandle` will drop the waker if it has exclusive access
+                // to drop it.
                 snapshot.unset_join_waker();
+            } else {
+                // If `COMPLETE` is set the task is completed so the `JoinHandle` is responsible
+                // for dropping the output.
+                transition.drop_output = true;
             }
 
-            (snapshot, Some(snapshot))
+            if !snapshot.is_join_waker_set() {
+                // If the `JOIN_WAKER` bit is unset and the `JOIN_HANDLE` has exclusive access to
+                // the the join waker and should drop it following this transition.
+                transition.drop_waker = true;
+            }
+
+            (transition, Some(snapshot))
         })
     }
 
@@ -429,24 +454,14 @@ impl State {
         })
     }
 
-    /// Unsets the `JOIN_WAKER` bit only if the `JOIN_INTEREST` is still set.
+    /// Unsets the `JOIN_WAKER` bit unconditionally after task completion.
     ///
-    /// Returns `Ok` has been unset, `Err` otherwise. This operation requires
-    /// the task to be completed.
-    pub(super) fn unset_waker_if_join_interested(&self) -> UpdateResult {
-        self.fetch_update(|curr| {
-            assert!(curr.is_complete());
-            assert!(curr.is_join_waker_set());
-
-            if !curr.is_join_interested() {
-                return None;
-            }
-
-            let mut next = curr;
-            next.unset_join_waker();
-
-            Some(next)
-        })
+    /// This operation requires the task to be completed.
+    pub(super) fn unset_waker_after_complete(&self) -> Snapshot {
+        let prev = Snapshot(self.val.fetch_and(!JOIN_WAKER, AcqRel));
+        assert!(prev.is_complete());
+        assert!(prev.is_join_waker_set());
+        Snapshot(prev.0 & !JOIN_WAKER)
     }
 
     pub(super) fn ref_inc(&self) {

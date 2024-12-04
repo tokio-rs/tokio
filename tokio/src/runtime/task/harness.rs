@@ -286,9 +286,9 @@ where
     pub(super) fn drop_join_handle_slow(self) {
         // Try to unset `JOIN_INTEREST` and `JOIN_WAKER`. This must be done as a first step in
         // case the task concurrently completed.
-        let snapshot = self.state().transition_to_join_handle_dropped();
+        let transition = self.state().transition_to_join_handle_dropped();
 
-        if snapshot.is_complete() {
+        if transition.drop_output {
             // It is our responsibility to drop the output. This is critical as
             // the task output may not be `Send` and as such must remain with
             // the scheduler or `JoinHandle`. i.e. if the output remains in the
@@ -303,7 +303,7 @@ where
             }));
         }
 
-        if !snapshot.is_join_waker_set() {
+        if transition.drop_waker {
             // If the JOIN_WAKER flag is unset at this point, the task is either
             // already terminal or not complete so the `JoinHandle` is responsible
             // for dropping the waker.
@@ -317,9 +317,7 @@ where
             // 2. The task is not completed so the `JoinHandle` was able to unset
             //    `JOIN_WAKER` bit itself to get mutable access to the waker.
             //    The runtime will not access the waker when this flag is unset.
-            unsafe {
-                self.trailer().set_waker(None);
-            }
+            unsafe { self.trailer().set_waker(None) }
         }
 
         // Drop the `JoinHandle` reference, possibly deallocating the task
@@ -349,23 +347,18 @@ where
                 // to transition_to_complete() above set the COMPLETE bit.
                 self.trailer().wake_join();
 
-                // If JOIN_INTEREST is still set at this point the `JoinHandle`
-                // was not dropped since setting COMPLETE so we unset JOIN_WAKER
-                // to give the responsibility of dropping the join waker back to
-                // the `JoinHandle`. `JoinHandle` is able to drop the waker when
-                // itself gets dropped.
-                if self.state().unset_waker_if_join_interested().is_err() {
-                    // Unsetting JOIN_WAKER flag will fail if JOIN_INTERESTED is
-                    // not set to indicate that the runtime has the responsibility
-                    // to drop the join waker here as per rule 7 in task/mod.rs.
-                    // Safety:
-                    // If JOIN_INTEREST got unset since setting COMPLETE we are
-                    // the only ones to have access to the join waker and need
-                    // to drop it here because the `JoinHandle` of the task
-                    // already got dropped.
-                    unsafe {
-                        self.trailer().set_waker(None);
-                    }
+                // Inform the `JoinHandle` that we are done waking the waker by
+                // unsetting the `JOIN_WAKER` bit. If the `JoinHandle` has
+                // already been dropped and `JOIN_INTEREST` is unset, then we must
+                // drop the waker ourselves.
+                if !self
+                    .state()
+                    .unset_waker_after_complete()
+                    .is_join_interested()
+                {
+                    // SAFETY: We have COMPLETE=1 and JOIN_INTEREST=0, so
+                    // we have exclusive access to the waker.
+                    unsafe { self.trailer().set_waker(None) }
                 }
             }
         }));
