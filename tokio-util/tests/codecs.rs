@@ -63,6 +63,19 @@ fn lines_decoder() {
 }
 
 #[test]
+fn lines_decoder_invalid_utf8() {
+    let mut codec = LinesCodec::new();
+    let buf = &mut BytesMut::new();
+    buf.reserve(200);
+    buf.put_slice(b"line 1\xc3\x28");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    assert!(codec.decode_eof(buf).is_err());
+    assert_eq!(None, codec.decode_eof(buf).unwrap());
+    buf.put_slice(b"line 22222222222222\n");
+    assert_eq!("line 22222222222222", codec.decode(buf).unwrap().unwrap());
+}
+
+#[test]
 fn lines_decoder_max_length() {
     const MAX_LENGTH: usize = 6;
 

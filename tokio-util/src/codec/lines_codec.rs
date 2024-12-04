@@ -169,6 +169,7 @@ impl Decoder for LinesCodec {
         Ok(match self.decode(buf)? {
             Some(frame) => Some(frame),
             None => {
+                self.next_index = 0;
                 // No terminating newline - return remaining data, if any
                 if buf.is_empty() || buf == &b"\r"[..] {
                     None
@@ -176,7 +177,6 @@ impl Decoder for LinesCodec {
                     let line = buf.split_to(buf.len());
                     let line = without_carriage_return(&line);
                     let line = utf8(line)?;
-                    self.next_index = 0;
                     Some(line.to_string())
                 }
             }
