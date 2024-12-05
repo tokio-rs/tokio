@@ -50,7 +50,7 @@
 //! [runtime]: crate::runtime
 //! [website]: https://tokio.rs/tokio/tutorial
 //!
-//! MyRustTypeName and trailing whitespace:    
+//! `MyRustTypeName` and trailing white space:    
 //!
 //! # A Tour of Tokio
 //!
