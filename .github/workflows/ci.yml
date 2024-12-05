@@ -1115,7 +1115,7 @@ jobs:
           fi
       - name: Detect trailing whitespace
         run: |
-          if grep --exclude-dir=.git --exclude-dir=target -re '\s$' .
+          if grep --exclude-dir=.git --exclude-dir=target -rne '\s$' .
           then
               echo ''
               echo 'Please remove trailing whitespace from these lines.'
