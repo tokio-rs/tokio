@@ -50,8 +50,6 @@
 //! [runtime]: crate::runtime
 //! [website]: https://tokio.rs/tokio/tutorial
 //!
-//! `MyRustTypeName` and trailing white space:    
-//!
 //! # A Tour of Tokio
 //!
 //! Tokio consists of a number of modules that provide a range of functionality
