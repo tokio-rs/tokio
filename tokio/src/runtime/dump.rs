@@ -41,12 +41,9 @@ struct Address(*mut std::ffi::c_void);
 unsafe impl Send for Address {}
 unsafe impl Sync for Address {}
 
-/// A backtrace symbol. This is similar to [`backtrace::BacktraceSymbol`],
-/// but is a separate struct to avoid public dependency issues.
+/// A backtrace symbol.
 ///
-/// This struct is guaranteed to be pure data and operations involving
-/// it will not call platform functions that take an unpredictable amount
-/// of time to finish.
+/// This struct provides accessors for backtrace symbols, similar to [`backtrace::BacktraceSymbol`].
 #[derive(Clone, Debug)]
 pub struct BacktraceSymbol {
     name: Option<Box<[u8]>>,
@@ -106,12 +103,9 @@ impl BacktraceSymbol {
     }
 }
 
-/// A backtrace frame. This is similar to [`backtrace::BacktraceFrame`],
-/// but is a separate struct to avoid public dependency issues.
+/// A backtrace frame.
 ///
-/// This struct is guaranteed to be pure data and operations involving
-/// it will not call platform functions that take an unpredictable amount
-/// of time to finish.
+/// This struct represents one stack frame in a captured backtrace, similar to [`backtrace::BacktraceFrame`].
 #[derive(Clone, Debug)]
 pub struct BacktraceFrame {
     ip: Address,
@@ -154,12 +148,9 @@ impl BacktraceFrame {
     }
 }
 
-/// A backtrace. This is similar to [`backtrace::Backtrace`],
-/// but is a separate struct to avoid public dependency issues.
+/// A captured backtrace.
 ///
-/// This struct is guaranteed to be pure data and operations involving
-/// it will not call platform functions that take an unpredictable amount
-/// of time to finish.
+/// This struct provides access to each backtrace frame, similar to [`backtrace::Backtrace`].
 #[derive(Clone, Debug)]
 pub struct Backtrace {
     frames: Box<[BacktraceFrame]>,
@@ -176,6 +167,7 @@ impl Backtrace {
 /// An execution trace of a task's last poll.
 ///
 /// <div class="warning">
+///
 /// Resolving a backtrace, either via the [`Display`][std::fmt::Display] impl or via
 /// [`resolve_backtraces`][Trace::resolve_backtraces], parses debuginfo, which is
 /// possibly a CPU-expensive operation that can take a platform-specific but
