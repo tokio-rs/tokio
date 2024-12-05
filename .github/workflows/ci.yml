@@ -1102,6 +1102,22 @@ jobs:
             false
           }
       - name: Run cargo-spellcheck
-        run: cargo spellcheck --code 1
+        run: |
+          if ! cargo spellcheck --code 1
+          then
+              echo ''
+              echo ''
+              echo 'If this is a Rust method/type/variable name, then you should'
+              echo 'enclose it in backticks like this: `MyRustType`.'
+              echo ''
+              echo 'If this is a real word, then you can add it to spellcheck.dic'
+              exit 1
+          fi
       - name: Detect trailing whitespace
-        run: if grep --exclude-dir=.git --exclude-dir=target -re '\s$' . ; then exit 1; fi
+        run: |
+          if grep --exclude-dir=.git --exclude-dir=target -rne '\s$' .
+          then
+              echo ''
+              echo 'Please remove trailing whitespace from these lines.'
+              exit 1
+          fi
