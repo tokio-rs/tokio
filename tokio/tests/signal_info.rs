@@ -17,23 +17,15 @@ use support::signal::send_signal;
 
 use tokio::signal;
 use tokio::signal::unix::SignalKind;
-use tokio::sync::oneshot;
 use tokio::time::{timeout, Duration};
 
 #[tokio::test]
 async fn siginfo() {
     let mut sig = signal::unix::signal(SignalKind::info()).expect("installed signal handler");
 
-    let (fire, wait) = oneshot::channel();
-
-    // NB: simulate a signal coming in by exercising our signal handler
-    // to avoid complications with sending SIGINFO to the test process
     tokio::spawn(async {
-        wait.await.expect("wait failed");
         send_signal(libc::SIGINFO);
     });
-
-    let _ = fire.send(());
 
     // Add a timeout to ensure the test doesn't hang.
     timeout(Duration::from_secs(5), sig.recv())
