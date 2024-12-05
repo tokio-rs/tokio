@@ -330,6 +330,11 @@ impl Command {
         &mut self.std
     }
 
+    /// Cheaply convert into a `std::process::Command`.
+    pub fn into_std(self) -> StdCommand {
+        self.std
+    }
+
     /// Adds an argument to pass to the program.
     ///
     /// Only one argument can be passed per use. So instead of:
