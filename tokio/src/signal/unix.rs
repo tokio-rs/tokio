@@ -23,12 +23,24 @@ pub(crate) type OsStorage = Box<[SignalInfo]>;
 impl Init for OsStorage {
     fn init() -> Self {
         // There are reliable signals ranging from 1 to 33 available on every Unix platform.
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "illumos")))]
         let possible = 0..=33;
 
         // On Linux, there are additional real-time signals available.
         #[cfg(target_os = "linux")]
         let possible = 0..=libc::SIGRTMAX();
+
+        // On illumos, signal numbers go up to 41 (SIGINFO). The list of signals
+        // hasn't changed since 2013. See
+        // https://github.com/illumos/illumos-gate/blob/master/usr/src/uts/common/sys/iso/signal_iso.h.
+        //
+        // illumos also has real-time signals, but this capability isn't exposed
+        // by libc as of 0.2.167, so we don't support them at the moment. Once
+        // https://github.com/rust-lang/libc/pull/4171 is merged and released in
+        // upstream libc, we should switch the illumos impl to do what Linux
+        // does.
+        #[cfg(target_os = "illumos")]
+        let possible = 0..=41;
 
         possible.map(|_| SignalInfo::default()).collect()
     }
@@ -130,7 +142,8 @@ impl SignalKind {
         target_os = "freebsd",
         target_os = "macos",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "illumos"
     ))]
     pub const fn info() -> Self {
         Self(libc::SIGINFO)
