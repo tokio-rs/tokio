@@ -406,7 +406,12 @@ impl State {
 
             if !snapshot.is_join_waker_set() {
                 // If the `JOIN_WAKER` bit is unset and the `JOIN_HANDLE` has exclusive access to
-                // the the join waker and should drop it following this transition.
+                // the join waker and should drop it following this transition.
+                // This might happen in two situations:
+                //  1. The task is not completed and we just unset the `JOIN_WAKer` above in this
+                //     function.
+                //  2. The task is completed. In that case the `JOIN_WAKER` bit was already unset
+                //     by the runtime during completion.
                 transition.drop_waker = true;
             }
 

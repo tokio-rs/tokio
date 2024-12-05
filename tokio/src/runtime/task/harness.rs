@@ -317,7 +317,7 @@ where
             // 2. The task is not completed so the `JoinHandle` was able to unset
             //    `JOIN_WAKER` bit itself to get mutable access to the waker.
             //    The runtime will not access the waker when this flag is unset.
-            unsafe { self.trailer().set_waker(None) }
+            unsafe { self.trailer().set_waker(None) };
         }
 
         // Drop the `JoinHandle` reference, possibly deallocating the task
@@ -358,7 +358,7 @@ where
                 {
                     // SAFETY: We have COMPLETE=1 and JOIN_INTEREST=0, so
                     // we have exclusive access to the waker.
-                    unsafe { self.trailer().set_waker(None) }
+                    unsafe { self.trailer().set_waker(None) };
                 }
             }
         }));
