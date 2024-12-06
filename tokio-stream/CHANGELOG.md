@@ -1,3 +1,14 @@
+# 0.1.17 (December 6th, 2024)
+
+- deps: fix dev-dependency on tokio-test ([#6931], [#7019])
+- stream: fix link on `Peekable` ([#6861])
+- sync: fix `Stream` link in broadcast docs ([#6873])
+
+[#6861]: https://github.com/tokio-rs/tokio/pull/6861
+[#6873]: https://github.com/tokio-rs/tokio/pull/6873
+[#6931]: https://github.com/tokio-rs/tokio/pull/6931
+[#7019]: https://github.com/tokio-rs/tokio/pull/7019
+
 # 0.1.16 (September 5th, 2024)
 
 This release bumps the MSRV of tokio-stream to 1.70.
