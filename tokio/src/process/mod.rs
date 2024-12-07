@@ -332,8 +332,9 @@ impl Command {
 
     /// Cheaply convert into a `std::process::Command`.
     ///
-    /// Note that Tokio specific options (currently only option [`kill_on_drop`](Command::kill_on_drop))
-    /// will be lost.
+    /// Note that Tokio specific options will be lost. Currently, this only applies to [`kill_on_drop`].
+    ///
+    /// [`kill_on_drop`]: Command::kill_on_drop
     pub fn into_std(self) -> StdCommand {
         self.std
     }
