@@ -8,6 +8,25 @@ use tokio::io::{AsyncBufRead, Lines};
 pin_project! {
     /// A wrapper around [`tokio::io::Lines`] that implements [`Stream`].
     ///
+    /// # Example
+    ///
+    /// ```
+    /// use tokio::io::AsyncBufReadExt;
+    /// use tokio_stream::wrappers::LinesStream;
+    /// use tokio_stream::StreamExt;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let input = b"Hello\nWorld\n";
+    ///     let lines = input.lines(); // tokio::io::util::Lines
+    ///     let mut stream = LinesStream::new(lines);
+    ///     while let Some(line) = stream.next().await {
+    ///         println!("{}", line?);
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
     /// [`tokio::io::Lines`]: struct@tokio::io::Lines
     /// [`Stream`]: trait@crate::Stream
     #[derive(Debug)]
