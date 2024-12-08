@@ -5,6 +5,26 @@ use tokio::time::{Instant, Interval};
 
 /// A wrapper around [`Interval`] that implements [`Stream`].
 ///
+/// # Example
+///
+/// ```
+/// use tokio::time::{Duration, Instant};
+/// use tokio_stream::wrappers::IntervalStream;
+/// use tokio_stream::StreamExt;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let interval = tokio::time::interval(Duration::from_millis(10));
+///     let mut stream = IntervalStream::new(interval);
+///     let start = Instant::now();
+///     for _ in 0..3 {
+///         if let Some(instant) = stream.next().await {
+///             println!("elapsed: {:.1?}", instant.duration_since(start));
+///         }
+///     }
+/// }
+/// ```
+///
 /// [`Interval`]: struct@tokio::time::Interval
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]
