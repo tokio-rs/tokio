@@ -5,6 +5,27 @@ use tokio::sync::mpsc::UnboundedReceiver;
 
 /// A wrapper around [`tokio::sync::mpsc::UnboundedReceiver`] that implements [`Stream`].
 ///
+/// # Example
+///
+/// ```
+/// use tokio::sync::mpsc;
+/// use tokio_stream::wrappers::UnboundedReceiverStream;
+/// use tokio_stream::StreamExt;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (tx, rx) = mpsc::unbounded_channel();
+///     tx.send(10).unwrap();
+///     tx.send(20).unwrap();
+///     drop(tx);
+///
+///     let mut stream = UnboundedReceiverStream::new(rx);
+///     assert_eq!(stream.next().await, Some(10));
+///     assert_eq!(stream.next().await, Some(20));
+///     assert_eq!(stream.next().await, None);
+/// }
+/// ```
+///
 /// [`tokio::sync::mpsc::UnboundedReceiver`]: struct@tokio::sync::mpsc::UnboundedReceiver
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]

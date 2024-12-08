@@ -6,6 +6,24 @@ use tokio::fs::{DirEntry, ReadDir};
 
 /// A wrapper around [`tokio::fs::ReadDir`] that implements [`Stream`].
 ///
+/// # Example
+///
+/// ```
+/// use tokio::fs::read_dir;
+/// use tokio_stream::{wrappers::ReadDirStream, StreamExt};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let dirs = read_dir("examples").await?;
+///     let mut dirs = ReadDirStream::new(dirs);
+///     while let Some(dir) = dirs.next().await {
+///         let dir = dir?;
+///         println!("{}", dir.path().display());
+///     }
+///     Ok(())
+/// }
+/// ```
+///
 /// [`tokio::fs::ReadDir`]: struct@tokio::fs::ReadDir
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]
