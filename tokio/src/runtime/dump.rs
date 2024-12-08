@@ -3,7 +3,14 @@
 //! See [Handle::dump][crate::runtime::Handle::dump].
 
 use crate::task::Id;
-use std::fmt;
+use std::{fmt, future::Future};
+
+pub use crate::runtime::task::trace::Root;
+
+/// before merging add documentation
+pub fn root<F: Future>(f: F) -> Root<F> {
+    crate::runtime::task::trace::Trace::root(f)
+}
 
 /// A snapshot of a runtime's state.
 ///
@@ -36,6 +43,25 @@ pub struct Task {
 #[derive(Debug)]
 pub struct Trace {
     inner: super::task::trace::Trace,
+}
+
+impl Trace {
+    /// document
+    pub fn capture<F, R>(f: F) -> (R, Trace)
+    where
+        F: FnOnce() -> R,
+    {
+        let (res, trace) = super::task::trace::Trace::capture(f);
+        (res, Trace { inner: trace })
+    }
+
+    /// doc doc doc
+    pub fn root<F>(f: F) -> Root<F>
+    where
+        F: Future,
+    {
+        crate::runtime::task::trace::Trace::root(f)
+    }
 }
 
 impl Dump {
