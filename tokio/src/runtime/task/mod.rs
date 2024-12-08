@@ -94,16 +94,30 @@
 //!       `JoinHandle` needs to (i) successfully set `JOIN_WAKER` to zero if it is
 //!       not already zero to gain exclusive access to the waker field per rule
 //!       2, (ii) write a waker, and (iii) successfully set `JOIN_WAKER` to one.
+//!       If the `JoinHandle` unsets `JOIN_WAKER` in the process of being dropped
+//!       to clear the waker field, only steps (i) and (ii) are relevant.
 //!
 //!    6. The `JoinHandle` can change `JOIN_WAKER` only if COMPLETE is zero (i.e.
-//!       the task hasn't yet completed).
+//!       the task hasn't yet completed). The runtime can change `JOIN_WAKER` only
+//!       if COMPLETE is one.
+//!
+//!    7. If `JOIN_INTEREST` is zero and COMPLETE is one, then the runtime has
+//!       exclusive (mutable) access to the waker field. This might happen if the
+//!       `JoinHandle` gets dropped right after the task completes and the runtime
+//!       sets the `COMPLETE` bit. In this case the runtime needs the mutable access
+//!       to the waker field to drop it.
 //!
 //!    Rule 6 implies that the steps (i) or (iii) of rule 5 may fail due to a
 //!    race. If step (i) fails, then the attempt to write a waker is aborted. If
 //!    step (iii) fails because COMPLETE is set to one by another thread after
 //!    step (i), then the waker field is cleared. Once COMPLETE is one (i.e.
 //!    task has completed), the `JoinHandle` will not modify `JOIN_WAKER`. After the
-//!    runtime sets COMPLETE to one, it invokes the waker if there is one.
+//!    runtime sets COMPLETE to one, it invokes the waker if there is one so in this
+//!    case when a task completes the `JOIN_WAKER` bit implicates to the runtime
+//!    whether it should invoke the waker or not. After the runtime is done with
+//!    using the waker during task completion, it unsets the `JOIN_WAKER` bit to give
+//!    the `JoinHandle` exclusive access again so that it is able to drop the waker
+//!    at a later point.
 //!
 //! All other fields are immutable and can be accessed immutably without
 //! synchronization by anyone.
