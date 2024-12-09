@@ -150,6 +150,21 @@ where
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<tokio::io::Result<()>> {
         delegate_call!(self.poll_shutdown(cx))
     }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[std::io::IoSlice<'_>],
+    ) -> Poll<std::result::Result<usize, std::io::Error>> {
+        delegate_call!(self.poll_write_vectored(cx, bufs))
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        match self {
+            Self::Left(l) => l.is_write_vectored(),
+            Self::Right(r) => r.is_write_vectored(),
+        }
+    }
 }
 
 impl<L, R> futures_core::stream::Stream for Either<L, R>
