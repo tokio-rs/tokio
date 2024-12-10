@@ -14,7 +14,7 @@ use tokio::net::{TcpListener, TcpStream};
 /// use std::net::{Ipv4Addr, Ipv6Addr};
 ///
 /// use tokio::net::TcpListener;
-/// use tokio_stream::{wrappers::TcpListenerStream, StreamExt};
+/// use tokio_stream::{StreamExt, wrappers::TcpListenerStream};
 ///
 /// # #[tokio::main]
 /// # async fn main() -> std::io::Result<()> {

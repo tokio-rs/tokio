@@ -10,7 +10,7 @@ use tokio::fs::{DirEntry, ReadDir};
 ///
 /// ```
 /// use tokio::fs::read_dir;
-/// use tokio_stream::{wrappers::ReadDirStream, StreamExt};
+/// use tokio_stream::{StreamExt, wrappers::ReadDirStream};
 ///
 /// # #[tokio::main]
 /// # async fn main() -> std::io::Result<()> {
