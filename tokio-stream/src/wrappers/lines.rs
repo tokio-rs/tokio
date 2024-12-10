@@ -15,16 +15,15 @@ pin_project! {
     /// use tokio_stream::wrappers::LinesStream;
     /// use tokio_stream::StreamExt;
     ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let input = b"Hello\nWorld\n";
-    ///     let lines = input.lines(); // tokio::io::util::Lines
-    ///     let mut stream = LinesStream::new(lines);
-    ///     while let Some(line) = stream.next().await {
-    ///         println!("{}", line?);
-    ///     }
-    ///     Ok(())
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let input = b"Hello\nWorld\n";
+    /// let mut stream = LinesStream::new(input.lines());
+    /// while let Some(line) = stream.next().await {
+    ///     println!("{}", line?);
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// [`tokio::io::Lines`]: struct@tokio::io::Lines

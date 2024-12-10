@@ -12,18 +12,20 @@ use tokio::sync::mpsc::UnboundedReceiver;
 /// use tokio_stream::wrappers::UnboundedReceiverStream;
 /// use tokio_stream::StreamExt;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, rx) = mpsc::unbounded_channel();
-///     tx.send(10).unwrap();
-///     tx.send(20).unwrap();
-///     drop(tx);
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), tokio::sync::mpsc::error::SendError<u8>> {
+/// let (tx, rx) = mpsc::unbounded_channel();
+/// tx.send(10)?;
+/// tx.send(20)?;
+/// # // prevent the doc test from hanging
+/// drop(tx);
 ///
-///     let mut stream = UnboundedReceiverStream::new(rx);
-///     assert_eq!(stream.next().await, Some(10));
-///     assert_eq!(stream.next().await, Some(20));
-///     assert_eq!(stream.next().await, None);
-/// }
+/// let mut stream = UnboundedReceiverStream::new(rx);
+/// assert_eq!(stream.next().await, Some(10));
+/// assert_eq!(stream.next().await, Some(20));
+/// assert_eq!(stream.next().await, None);
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// [`tokio::sync::mpsc::UnboundedReceiver`]: struct@tokio::sync::mpsc::UnboundedReceiver

@@ -17,19 +17,20 @@ use std::task::{ready, Context, Poll};
 /// use tokio_stream::wrappers::BroadcastStream;
 /// use tokio_stream::StreamExt;
 ///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let (tx, rx) = broadcast::channel(16);
-///     tx.send(10)?;
-///     tx.send(20)?;
-///     drop(tx);
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), tokio::sync::broadcast::error::SendError<u8>> {
+/// let (tx, rx) = broadcast::channel(16);
+/// tx.send(10)?;
+/// tx.send(20)?;
+/// # // prevent the doc test from hanging
+/// drop(tx);
 ///
-///     let mut stream = BroadcastStream::new(rx);
-///     assert_eq!(stream.next().await, Some(Ok(10)));
-///     assert_eq!(stream.next().await, Some(Ok(20)));
-///     assert_eq!(stream.next().await, None);
-///     Ok(())
-/// }
+/// let mut stream = BroadcastStream::new(rx);
+/// assert_eq!(stream.next().await, Some(Ok(10)));
+/// assert_eq!(stream.next().await, Some(Ok(20)));
+/// assert_eq!(stream.next().await, None);
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// [`tokio::sync::broadcast::Receiver`]: struct@tokio::sync::broadcast::Receiver
