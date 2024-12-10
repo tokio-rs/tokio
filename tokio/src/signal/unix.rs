@@ -26,21 +26,11 @@ impl Init for OsStorage {
         #[cfg(not(any(target_os = "linux", target_os = "illumos")))]
         let possible = 0..=33;
 
-        // On Linux, there are additional real-time signals available.
-        #[cfg(target_os = "linux")]
+        // On Linux and illumos, there are additional real-time signals
+        // available. (This is also likely true on Solaris, but this should be
+        // verified before being enabled.)
+        #[cfg(any(target_os = "linux", target_os = "illumos"))]
         let possible = 0..=libc::SIGRTMAX();
-
-        // On illumos, signal numbers go up to 41 (SIGINFO). The list of signals
-        // hasn't changed since 2013. See
-        // https://github.com/illumos/illumos-gate/blob/master/usr/src/uts/common/sys/iso/signal_iso.h.
-        //
-        // illumos also has real-time signals, but this capability isn't exposed
-        // by libc as of 0.2.167, so we don't support them at the moment. Once
-        // https://github.com/rust-lang/libc/pull/4171 is merged and released in
-        // upstream libc, we should switch the illumos impl to do what Linux
-        // does.
-        #[cfg(target_os = "illumos")]
-        let possible = 0..=41;
 
         possible.map(|_| SignalInfo::default()).collect()
     }
