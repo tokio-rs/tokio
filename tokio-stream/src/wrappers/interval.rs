@@ -12,7 +12,7 @@ use tokio::time::{Instant, Interval};
 /// use tokio_stream::wrappers::IntervalStream;
 /// use tokio_stream::StreamExt;
 ///
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() {
 /// let start = Instant::now();
 /// let interval = interval(Duration::from_millis(10));

@@ -15,7 +15,7 @@ pin_project! {
     /// use tokio_stream::wrappers::LinesStream;
     /// use tokio_stream::StreamExt;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> std::io::Result<()> {
     /// let input = b"Hello\nWorld\n";
     /// let mut stream = LinesStream::new(input.lines());

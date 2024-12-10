@@ -12,7 +12,7 @@ use tokio::sync::mpsc::Receiver;
 /// use tokio_stream::wrappers::ReceiverStream;
 /// use tokio_stream::StreamExt;
 ///
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> Result<(), tokio::sync::mpsc::error::SendError<u8>> {
 /// let (tx, rx) = mpsc::channel(2);
 /// tx.send(10).await?;

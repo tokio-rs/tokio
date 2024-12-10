@@ -14,7 +14,7 @@ pin_project! {
     /// use tokio::io::AsyncBufReadExt;
     /// use tokio_stream::{StreamExt, wrappers::SplitStream};
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> std::io::Result<()> {
     /// let input = "Hello\nWorld\n".as_bytes();
     /// let lines = AsyncBufReadExt::split(input, b'\n');

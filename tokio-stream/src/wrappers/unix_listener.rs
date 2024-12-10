@@ -12,7 +12,7 @@ use tokio::net::{UnixListener, UnixStream};
 /// use tokio::net::UnixListener;
 /// use tokio_stream::{StreamExt, wrappers::UnixListenerStream};
 ///
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
 /// let listener = UnixListener::bind("/tmp/sock")?;
 /// let mut incoming = UnixListenerStream::new(listener);

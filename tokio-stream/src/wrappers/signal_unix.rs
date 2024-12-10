@@ -11,7 +11,7 @@ use tokio::signal::unix::Signal;
 /// use tokio::signal::unix::{signal, SignalKind};
 /// use tokio_stream::{StreamExt, wrappers::SignalStream};
 ///
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
 /// let signals = signal(SignalKind::hangup())?;
 /// let mut stream = SignalStream::new(signals);

@@ -16,7 +16,7 @@ use tokio::net::{TcpListener, TcpStream};
 /// use tokio::net::TcpListener;
 /// use tokio_stream::{StreamExt, wrappers::TcpListenerStream};
 ///
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
 /// let ipv4_listener = TcpListener::bind((Ipv6Addr::LOCALHOST, 8080)).await?;
 /// let ipv6_listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 8080)).await?;

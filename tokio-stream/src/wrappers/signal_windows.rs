@@ -14,7 +14,7 @@ use tokio::signal::windows::{CtrlBreak, CtrlC};
 /// use tokio::signal::windows::ctrl_c;
 /// use tokio_stream::{StreamExt, wrappers::CtrlCStream};
 ///
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
 /// let signals = ctrl_c()?;
 /// let mut stream = CtrlCStream::new(signals);

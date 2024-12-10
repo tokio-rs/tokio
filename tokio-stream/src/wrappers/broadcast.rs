@@ -17,7 +17,7 @@ use std::task::{ready, Context, Poll};
 /// use tokio_stream::wrappers::BroadcastStream;
 /// use tokio_stream::StreamExt;
 ///
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> Result<(), tokio::sync::broadcast::error::SendError<u8>> {
 /// let (tx, rx) = broadcast::channel(16);
 /// tx.send(10)?;

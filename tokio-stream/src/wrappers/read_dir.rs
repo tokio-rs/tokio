@@ -12,7 +12,7 @@ use tokio::fs::{DirEntry, ReadDir};
 /// use tokio::fs::read_dir;
 /// use tokio_stream::{StreamExt, wrappers::ReadDirStream};
 ///
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
 /// let dirs = read_dir(".").await?;
 /// let mut dirs = ReadDirStream::new(dirs);
