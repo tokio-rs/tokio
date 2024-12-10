@@ -37,7 +37,7 @@
 [#6938]: https://github.com/tokio-rs/tokio/pull/6938
 [#6944]: https://github.com/tokio-rs/tokio/pull/6944
 
-# 1.41.0 (Oct 22th, 2024)
+# 1.41.0 (Oct 22nd, 2024)
 
 ### Added
 
