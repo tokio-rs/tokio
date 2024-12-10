@@ -70,7 +70,7 @@ impl AsMut<CtrlC> for CtrlCStream {
 /// use tokio::signal::windows::ctrl_break;
 /// use tokio_stream::{StreamExt, wrappers::CtrlBreakStream};
 ///
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
 /// let signals = ctrl_break()?;
 /// let mut stream = CtrlBreakStream::new(signals);
