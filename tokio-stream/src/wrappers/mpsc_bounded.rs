@@ -5,6 +5,29 @@ use tokio::sync::mpsc::Receiver;
 
 /// A wrapper around [`tokio::sync::mpsc::Receiver`] that implements [`Stream`].
 ///
+/// # Example
+///
+/// ```
+/// use tokio::sync::mpsc;
+/// use tokio_stream::wrappers::ReceiverStream;
+/// use tokio_stream::StreamExt;
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), tokio::sync::mpsc::error::SendError<u8>> {
+/// let (tx, rx) = mpsc::channel(2);
+/// tx.send(10).await?;
+/// tx.send(20).await?;
+/// # // prevent the doc test from hanging
+/// drop(tx);
+///
+/// let mut stream = ReceiverStream::new(rx);
+/// assert_eq!(stream.next().await, Some(10));
+/// assert_eq!(stream.next().await, Some(20));
+/// assert_eq!(stream.next().await, None);
+/// # Ok(())
+/// # }
+/// ```
+///
 /// [`tokio::sync::mpsc::Receiver`]: struct@tokio::sync::mpsc::Receiver
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]
