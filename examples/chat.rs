@@ -141,7 +141,9 @@ impl Shared {
     async fn broadcast(&mut self, sender: SocketAddr, message: &str) {
         for peer in self.peers.iter_mut() {
             if *peer.0 != sender {
-                let _ = peer.1.send(message.into());
+                if let Err(e) = peer.1.send(message.into()) {
+                    tracing::error!("Failed to send message to {}: {:?}", peer.0, e);
+                }
             }
         }
     }
