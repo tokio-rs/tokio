@@ -3,7 +3,7 @@
 use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback};
 #[cfg(tokio_unstable)]
-use crate::runtime::{LocalOptions, LocalRuntime, TaskMeta};
+use crate::runtime::{metrics::HistogramConfiguration, LocalOptions, LocalRuntime, TaskMeta};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use crate::runtime::blocking::BlockingPool;
@@ -706,6 +706,12 @@ impl Builder {
     ///
     /// This *does not* support [`LocalSet`](crate::task::LocalSet) at this time.
     ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
+    ///
+    /// [unstable]: crate#unstable-features
+    ///
     /// # Examples
     ///
     /// ```
@@ -728,6 +734,7 @@ impl Builder {
     /// # }
     /// ```
     #[cfg(all(not(loom), tokio_unstable))]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_task_spawn<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
@@ -747,6 +754,12 @@ impl Builder {
     /// function more than once replaces the last callback defined, rather than adding to it.
     ///
     /// This *does not* support [`LocalSet`](crate::task::LocalSet) at this time.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
+    ///
+    /// [unstable]: crate#unstable-features
     ///
     /// # Examples
     ///
@@ -770,6 +783,7 @@ impl Builder {
     /// # }
     /// ```
     #[cfg(all(not(loom), tokio_unstable))]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_task_terminate<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
@@ -1099,8 +1113,13 @@ impl Builder {
         ///
         /// The histogram uses fixed bucket sizes. In other words, the histogram
         /// buckets are not dynamic based on input values. Use the
-        /// `metrics_poll_count_histogram_` builder methods to configure the
+        /// `metrics_poll_time_histogram` builder methods to configure the
         /// histogram details.
+        ///
+        /// By default, a linear histogram with 10 buckets each 100 microseconds wide will be used.
+        /// This has an extremely low memory footprint, but may not provide enough granularity. For
+        /// better granularity with low memory usage, use [`metrics_poll_time_histogram_configuration()`]
+        /// to select [`LogHistogram`] instead.
         ///
         /// # Examples
         ///
@@ -1108,22 +1127,33 @@ impl Builder {
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_metrics_poll_count_histogram()
+        ///     .enable_metrics_poll_time_histogram()
         ///     .build()
         ///     .unwrap();
         /// # // Test default values here
         /// # fn us(n: u64) -> std::time::Duration { std::time::Duration::from_micros(n) }
         /// # let m = rt.handle().metrics();
-        /// # assert_eq!(m.poll_count_histogram_num_buckets(), 10);
-        /// # assert_eq!(m.poll_count_histogram_bucket_range(0), us(0)..us(100));
-        /// # assert_eq!(m.poll_count_histogram_bucket_range(1), us(100)..us(200));
+        /// # assert_eq!(m.poll_time_histogram_num_buckets(), 10);
+        /// # assert_eq!(m.poll_time_histogram_bucket_range(0), us(0)..us(100));
+        /// # assert_eq!(m.poll_time_histogram_bucket_range(1), us(100)..us(200));
         /// ```
         ///
         /// [`Handle::metrics()`]: crate::runtime::Handle::metrics
         /// [`Instant::now()`]: std::time::Instant::now
-        pub fn enable_metrics_poll_count_histogram(&mut self) -> &mut Self {
+        /// [`LogHistogram`]: crate::runtime::LogHistogram
+        /// [`metrics_poll_time_histogram_configuration()`]: Builder::metrics_poll_time_histogram_configuration
+        pub fn enable_metrics_poll_time_histogram(&mut self) -> &mut Self {
             self.metrics_poll_count_histogram_enable = true;
             self
+        }
+
+        /// Deprecated. Use [`enable_metrics_poll_time_histogram()`] instead.
+        ///
+        /// [`enable_metrics_poll_time_histogram()`]: Builder::enable_metrics_poll_time_histogram
+        #[deprecated(note = "`poll_count_histogram` related methods have been renamed `poll_time_histogram` to better reflect their functionality.")]
+        #[doc(hidden)]
+        pub fn enable_metrics_poll_count_histogram(&mut self) -> &mut Self {
+            self.enable_metrics_poll_time_histogram()
         }
 
         /// Sets the histogram scale for tracking the distribution of task poll
@@ -1142,14 +1172,83 @@ impl Builder {
         /// ```
         /// use tokio::runtime::{self, HistogramScale};
         ///
+        /// # #[allow(deprecated)]
         /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_metrics_poll_count_histogram()
+        ///     .enable_metrics_poll_time_histogram()
         ///     .metrics_poll_count_histogram_scale(HistogramScale::Log)
         ///     .build()
         ///     .unwrap();
         /// ```
+        #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_scale(&mut self, histogram_scale: crate::runtime::HistogramScale) -> &mut Self {
-            self.metrics_poll_count_histogram.scale = histogram_scale;
+            self.metrics_poll_count_histogram.legacy_mut(|b|b.scale = histogram_scale);
+            self
+        }
+
+        /// Configure the histogram for tracking poll times
+        ///
+        /// By default, a linear histogram with 10 buckets each 100 microseconds wide will be used.
+        /// This has an extremely low memory footprint, but may not provide enough granularity. For
+        /// better granularity with low memory usage, use [`LogHistogram`] instead.
+        ///
+        /// # Examples
+        /// Configure a [`LogHistogram`] with [default configuration]:
+        /// ```
+        /// use tokio::runtime;
+        /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_time_histogram()
+        ///     .metrics_poll_time_histogram_configuration(
+        ///         HistogramConfiguration::log(LogHistogram::default())
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        ///
+        /// Configure a linear histogram with 100 buckets, each 10μs wide
+        /// ```
+        /// use tokio::runtime;
+        /// use std::time::Duration;
+        /// use tokio::runtime::HistogramConfiguration;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_time_histogram()
+        ///     .metrics_poll_time_histogram_configuration(
+        ///         HistogramConfiguration::linear(Duration::from_micros(10), 100)
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        ///
+        /// Configure a [`LogHistogram`] with the following settings:
+        /// - Measure times from 100ns to 120s
+        /// - Max error of 0.1
+        /// - No more than 1024 buckets
+        /// ```
+        /// use std::time::Duration;
+        /// use tokio::runtime;
+        /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_poll_time_histogram()
+        ///     .metrics_poll_time_histogram_configuration(
+        ///         HistogramConfiguration::log(LogHistogram::builder()
+        ///             .max_value(Duration::from_secs(120))
+        ///             .min_value(Duration::from_nanos(100))
+        ///             .max_error(0.1)
+        ///             .max_buckets(1024)
+        ///             .expect("configuration uses 488 buckets")
+        ///         )
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        ///
+        /// [`LogHistogram`]: crate::runtime::LogHistogram
+        /// [default configuration]: crate::runtime::LogHistogramBuilder
+        pub fn metrics_poll_time_histogram_configuration(&mut self, configuration: HistogramConfiguration) -> &mut Self {
+            self.metrics_poll_count_histogram.histogram_type = configuration.inner;
             self
         }
 
@@ -1173,19 +1272,22 @@ impl Builder {
         /// use tokio::runtime;
         /// use std::time::Duration;
         ///
+        /// # #[allow(deprecated)]
         /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_metrics_poll_count_histogram()
+        ///     .enable_metrics_poll_time_histogram()
         ///     .metrics_poll_count_histogram_resolution(Duration::from_micros(100))
         ///     .build()
         ///     .unwrap();
         /// ```
+        #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_resolution(&mut self, resolution: Duration) -> &mut Self {
             assert!(resolution > Duration::from_secs(0));
             // Sanity check the argument and also make the cast below safe.
             assert!(resolution <= Duration::from_secs(1));
 
             let resolution = resolution.as_nanos() as u64;
-            self.metrics_poll_count_histogram.resolution = resolution;
+
+            self.metrics_poll_count_histogram.legacy_mut(|b|b.resolution = resolution);
             self
         }
 
@@ -1204,14 +1306,16 @@ impl Builder {
         /// ```
         /// use tokio::runtime;
         ///
+        /// # #[allow(deprecated)]
         /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_metrics_poll_count_histogram()
+        ///     .enable_metrics_poll_time_histogram()
         ///     .metrics_poll_count_histogram_buckets(15)
         ///     .build()
         ///     .unwrap();
         /// ```
+        #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_buckets(&mut self, buckets: usize) -> &mut Self {
-            self.metrics_poll_count_histogram.num_buckets = buckets;
+            self.metrics_poll_count_histogram.legacy_mut(|b|b.num_buckets = buckets);
             self
         }
     }

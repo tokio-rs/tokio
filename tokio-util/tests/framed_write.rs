@@ -180,7 +180,7 @@ impl Write for Mock {
                 Ok(data.len())
             }
             Some(Err(e)) => Err(e),
-            None => panic!("unexpected write; {:?}", src),
+            None => panic!("unexpected write; {src:?}"),
         }
     }
 

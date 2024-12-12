@@ -106,7 +106,7 @@ impl RegistrationSet {
 
         for io in pending {
             // safety: the registration is part of our list
-            unsafe { self.remove(synced, io.as_ref()) }
+            unsafe { self.remove(synced, &io) }
         }
 
         self.num_pending_release.store(0, Release);
@@ -114,9 +114,12 @@ impl RegistrationSet {
 
     // This function is marked as unsafe, because the caller must make sure that
     // `io` is part of the registration set.
-    pub(super) unsafe fn remove(&self, synced: &mut Synced, io: &ScheduledIo) {
-        super::EXPOSE_IO.unexpose_provenance(io);
-        let _ = synced.registrations.remove(io.into());
+    pub(super) unsafe fn remove(&self, synced: &mut Synced, io: &Arc<ScheduledIo>) {
+        // SAFETY: Pointers into an Arc are never null.
+        let io = unsafe { NonNull::new_unchecked(Arc::as_ptr(io).cast_mut()) };
+
+        super::EXPOSE_IO.unexpose_provenance(io.as_ptr());
+        let _ = synced.registrations.remove(io);
     }
 }
 

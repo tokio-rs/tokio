@@ -18,7 +18,7 @@ env:
   rust_stable: stable
   rust_nightly: nightly-2024-05-05
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2024-09-19
+  rust_miri_nightly: nightly-2024-10-21
   rust_clippy: '1.77'
   # When updating this, also update:
   # - README.md
@@ -47,7 +47,6 @@ jobs:
       - test-workspace-all-features
       - test-integration-tests-per-feature
       - test-parking_lot
-      - test-tracing-instrumentation
       - valgrind
       - test-unstable
       - miri
@@ -180,7 +179,7 @@ jobs:
         run: |
           set -euxo pipefail
           RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run --workspace --exclude tokio-macros --exclude tests-build --all-features --tests
-  
+
   test-integration-tests-per-feature:
     needs: basics
     name: Run integration tests for each feature
@@ -246,34 +245,6 @@ jobs:
       - name: Check tests with all features enabled
         run: cargo check --workspace --all-features --tests
 
-  test-tracing-instrumentation:
-    # These tests use the as-yet unpublished `tracing-mock` crate to test the
-    # tracing instrumentation present in Tokio. As such they are placed in
-    # their own test crate outside of the workspace.
-    needs: basics
-    name: test tokio instrumentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.rust_stable }}
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: test tracing-instrumentation
-        run: |
-          set -euxo pipefail
-          cargo nextest run
-        working-directory: tokio/tests/tracing-instrumentation
-        env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
-
   valgrind:
     name: valgrind
     needs: basics
@@ -283,7 +254,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+            toolchain: 1.82
 
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
@@ -768,7 +739,15 @@ jobs:
 
   docs:
     name: docs
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.run.os }}
+    strategy:
+      matrix:
+        run:
+          - os: windows-latest
+          - os: ubuntu-latest
+            RUSTFLAGS: --cfg tokio_taskdump
+            RUSTDOCFLAGS: --cfg tokio_taskdump
+
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_nightly }}
@@ -780,8 +759,8 @@ jobs:
         run: |
           cargo doc --lib --no-deps --all-features --document-private-items
         env:
-          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable --cfg tokio_taskdump
-          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable ${{ matrix.run.RUSTFLAGS }}
+          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings ${{ matrix.run.RUSTDOCFLAGS }}
 
   loom-compile:
     name: build loom tests
@@ -952,10 +931,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust ${{ env.rust_stable }}
+      - name: Install Rust 1.81
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ env.rust_stable }}
+          toolchain: 1.81
       - name: Install wasm-pack
         uses: taiki-e/install-action@wasm-pack
 
@@ -1035,7 +1014,7 @@ jobs:
         rust:
           # `check-external-types` requires a specific Rust nightly version. See
           # the README for details: https://github.com/awslabs/cargo-check-external-types
-          - nightly-2023-10-21
+          - nightly-2024-06-30
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ matrix.rust }}
@@ -1046,7 +1025,7 @@ jobs:
       - name: Install cargo-check-external-types
         uses: taiki-e/cache-cargo-install-action@v1
         with:
-          tool: cargo-check-external-types@0.1.10
+          tool: cargo-check-external-types@0.1.13
       - name: check-external-types
         run: cargo check-external-types --all-features
         working-directory: tokio
@@ -1106,16 +1085,39 @@ jobs:
       - name: Make sure dictionary words are sorted and unique
         run: |
           # `sed` removes the first line (number of words) and
-          # the last line (new line). 
-          # 
+          # the last line (new line).
+          #
           # `sort` makes sure everything in between is sorted
           # and contains no duplicates.
-          # 
+          #
           # Since `sort` is sensitive to locale, we set it
           # using LC_ALL to en_US.UTF8 to be consistent in different
           # environments.
 
-          sed '1d; $d' spellcheck.dic | LC_ALL=en_US.UTF8 sort -uc
+          (
+            sed '1d; $d' spellcheck.dic | LC_ALL=en_US.UTF8 sort -uc
+          ) || {
+            echo "Dictionary is not in sorted order. Correct order is:"
+            LC_ALL=en_US.UTF8 sort -u <(sed '1d; $d' spellcheck.dic)
+            false
+          }
       - name: Run cargo-spellcheck
-        run: cargo spellcheck --code 1
-
+        run: |
+          if ! cargo spellcheck --code 1
+          then
+              echo ''
+              echo ''
+              echo 'If this is a Rust method/type/variable name, then you should'
+              echo 'enclose it in backticks like this: `MyRustType`.'
+              echo ''
+              echo 'If this is a real word, then you can add it to spellcheck.dic'
+              exit 1
+          fi
+      - name: Detect trailing whitespace
+        run: |
+          if grep --exclude-dir=.git --exclude-dir=target -rne '\s$' .
+          then
+              echo ''
+              echo 'Please remove trailing whitespace from these lines.'
+              exit 1
+          fi

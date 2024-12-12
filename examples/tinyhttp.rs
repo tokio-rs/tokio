@@ -31,13 +31,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
     let server = TcpListener::bind(&addr).await?;
-    println!("Listening on: {}", addr);
+    println!("Listening on: {addr}");
 
     loop {
         let (stream, _) = server.accept().await?;
         tokio::spawn(async move {
             if let Err(e) = process(stream).await {
-                println!("failed to process connection; error = {}", e);
+                println!("failed to process connection; error = {e}");
             }
         });
     }
@@ -159,7 +159,7 @@ impl Decoder for Http {
             let mut parsed_headers = [httparse::EMPTY_HEADER; 16];
             let mut r = httparse::Request::new(&mut parsed_headers);
             let status = r.parse(src).map_err(|e| {
-                let msg = format!("failed to parse http request: {:?}", e);
+                let msg = format!("failed to parse http request: {e:?}");
                 io::Error::new(io::ErrorKind::Other, msg)
             })?;
 

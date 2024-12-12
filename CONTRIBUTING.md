@@ -196,12 +196,12 @@ LOOM_MAX_PREEMPTIONS=1 LOOM_MAX_BRANCHES=10000 RUSTFLAGS="--cfg loom -C debug_as
     cargo test --lib --release --features full -- --test-threads=1 --nocapture
 ```
 Additionally, you can also add `--cfg tokio_unstable` to the `RUSTFLAGS` environment variable to
-run loom tests that test unstable features. 
+run loom tests that test unstable features.
 
 You can run miri tests with
 ```
 MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields" \
-    cargo +nightly miri test --features full --lib
+    cargo +nightly miri test --features full --lib --tests
 ```
 
 ### Performing spellcheck on tokio codebase
@@ -216,8 +216,8 @@ cargo install --locked cargo-spellcheck
 cargo spellcheck check
 ```
 
-if the command rejects a word, you should backtick the rejected word if it's code related. If not, the 
-rejected word should be put into `spellcheck.dic` file. 
+if the command rejects a word, you should backtick the rejected word if it's code related. If not, the
+rejected word should be put into `spellcheck.dic` file.
 
 Note that when you add a word into the file, you should also update the first line which tells the spellcheck tool
 the total number of words included in the file
@@ -269,7 +269,7 @@ To list the available fuzzing harnesses you can run;
 $ cd tokio
 $ cargo fuzz list
 fuzz_linked_list
-````
+```
 
 Running a fuzz test is as simple as;
 

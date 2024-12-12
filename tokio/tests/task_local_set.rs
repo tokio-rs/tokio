@@ -385,9 +385,8 @@ fn with_timeout(timeout: Duration, f: impl FnOnce() + Send + 'static) {
     // in case CI is slow, we'll give it a long timeout.
     match done_rx.recv_timeout(timeout) {
         Err(RecvTimeoutError::Timeout) => panic!(
-            "test did not complete within {:?} seconds, \
+            "test did not complete within {timeout:?} seconds, \
              we have (probably) entered an infinite loop!",
-            timeout,
         ),
         // Did the test thread panic? We'll find out for sure when we `join`
         // with it.

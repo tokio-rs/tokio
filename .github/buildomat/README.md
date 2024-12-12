@@ -12,7 +12,7 @@ reproduce the failure on other operating systems, don't worry! The
 [tokio-rs/illumos] team is responsible for maintaining Tokio's illumos support,
 and can be called on to assist contributors with illumos-specific issues. Please
 feel free to tag @tokio-rs/illumos to ask for help resolving build failures on
-illumos 
+illumos.
 
 [illumos]: https://www.illumos.org/
 [Buildomat]: https://github.com/oxidecomputer/buildomat

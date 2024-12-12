@@ -384,8 +384,9 @@ cfg_rt! {
 
     mod task_hooks;
     pub(crate) use task_hooks::{TaskHooks, TaskCallback};
-    #[cfg(tokio_unstable)]
-    pub use task_hooks::TaskMeta;
+    cfg_unstable! {
+        pub use task_hooks::TaskMeta;
+    }
     #[cfg(not(tokio_unstable))]
     pub(crate) use task_hooks::TaskMeta;
 
@@ -410,7 +411,7 @@ cfg_rt! {
     pub use metrics::RuntimeMetrics;
 
     cfg_unstable_metrics! {
-        pub use metrics::HistogramScale;
+        pub use metrics::{HistogramScale, HistogramConfiguration, LogHistogram, LogHistogramBuilder, InvalidHistogramConfiguration} ;
 
         cfg_net! {
             pub(crate) use metrics::IoDriverMetrics;

@@ -787,6 +787,9 @@ impl fmt::Debug for TcpSocket {
     }
 }
 
+// These trait implementations can't be build on Windows, so we completely
+// ignore them, even when building documentation.
+#[cfg(unix)]
 cfg_unix! {
     impl AsRawFd for TcpSocket {
         fn as_raw_fd(&self) -> RawFd {

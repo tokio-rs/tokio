@@ -116,7 +116,7 @@ impl Instant {
     }
 
     /// Returns the amount of time elapsed since this instant was created,
-    /// or zero duration if that this instant is in the future.
+    /// or zero duration if this instant is in the future.
     ///
     /// # Examples
     ///
