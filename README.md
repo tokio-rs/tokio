@@ -78,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             loop {
                 let n = match socket.read(&mut buf).await {
                     // socket closed
-                    Ok(n) if n == 0 => return,
+                    Ok(0) => return,
                     Ok(n) => n,
                     Err(e) => {
                         eprintln!("failed to read from socket; err = {:?}", e);
