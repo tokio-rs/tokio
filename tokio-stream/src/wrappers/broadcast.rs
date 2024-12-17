@@ -10,6 +10,29 @@ use std::task::{ready, Context, Poll};
 
 /// A wrapper around [`tokio::sync::broadcast::Receiver`] that implements [`Stream`].
 ///
+/// # Example
+///
+/// ```
+/// use tokio::sync::broadcast;
+/// use tokio_stream::wrappers::BroadcastStream;
+/// use tokio_stream::StreamExt;
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), tokio::sync::broadcast::error::SendError<u8>> {
+/// let (tx, rx) = broadcast::channel(16);
+/// tx.send(10)?;
+/// tx.send(20)?;
+/// # // prevent the doc test from hanging
+/// drop(tx);
+///
+/// let mut stream = BroadcastStream::new(rx);
+/// assert_eq!(stream.next().await, Some(Ok(10)));
+/// assert_eq!(stream.next().await, Some(Ok(20)));
+/// assert_eq!(stream.next().await, None);
+/// # Ok(())
+/// # }
+/// ```
+///
 /// [`tokio::sync::broadcast::Receiver`]: struct@tokio::sync::broadcast::Receiver
 /// [`Stream`]: trait@futures_core::Stream
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]

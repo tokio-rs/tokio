@@ -47,7 +47,6 @@ jobs:
       - test-workspace-all-features
       - test-integration-tests-per-feature
       - test-parking_lot
-      - test-tracing-instrumentation
       - valgrind
       - test-unstable
       - miri
@@ -246,34 +245,6 @@ jobs:
       - name: Check tests with all features enabled
         run: cargo check --workspace --all-features --tests
 
-  test-tracing-instrumentation:
-    # These tests use the as-yet unpublished `tracing-mock` crate to test the
-    # tracing instrumentation present in Tokio. As such they are placed in
-    # their own test crate outside of the workspace.
-    needs: basics
-    name: test tokio instrumentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.rust_stable }}
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: test tracing-instrumentation
-        run: |
-          set -euxo pipefail
-          cargo nextest run
-        working-directory: tokio/tests/tracing-instrumentation
-        env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
-
   valgrind:
     name: valgrind
     needs: basics
@@ -283,7 +254,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+            toolchain: 1.82
 
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
@@ -1131,5 +1102,22 @@ jobs:
             false
           }
       - name: Run cargo-spellcheck
-        run: cargo spellcheck --code 1
-
+        run: |
+          if ! cargo spellcheck --code 1
+          then
+              echo ''
+              echo ''
+              echo 'If this is a Rust method/type/variable name, then you should'
+              echo 'enclose it in backticks like this: `MyRustType`.'
+              echo ''
+              echo 'If this is a real word, then you can add it to spellcheck.dic'
+              exit 1
+          fi
+      - name: Detect trailing whitespace
+        run: |
+          if grep --exclude-dir=.git --exclude-dir=target -rne '\s$' .
+          then
+              echo ''
+              echo 'Please remove trailing whitespace from these lines.'
+              exit 1
+          fi

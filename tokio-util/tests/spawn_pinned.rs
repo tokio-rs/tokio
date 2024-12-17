@@ -1,7 +1,5 @@
 #![warn(rust_2018_idioms)]
 #![cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
-// Blocked on https://github.com/rust-lang/miri/issues/3911
-#![cfg(not(miri))]
 
 use std::rc::Rc;
 use std::sync::Arc;
