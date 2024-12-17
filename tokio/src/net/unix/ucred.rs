@@ -35,7 +35,8 @@ impl UCred {
     target_os = "linux",
     target_os = "redox",
     target_os = "android",
-    target_os = "openbsd"
+    target_os = "openbsd", 
+    target_os = "haiku"
 ))]
 pub(crate) use self::impl_linux::get_peer_cred;
 
@@ -307,7 +308,7 @@ pub(crate) mod impl_aix {
     }
 }
 
-#[cfg(any(target_os = "espidf", target_os = "vita"))]
+#[cfg(any(target_os = "espidf", target_os = "vita", target_os = "haiku"))]
 pub(crate) mod impl_noproc {
     use crate::net::unix::UnixStream;
     use std::io;
