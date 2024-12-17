@@ -153,9 +153,9 @@ impl SignalKind {
     /// on some file descriptor. By default, this signal is ignored.
     pub const fn io() -> Self {
         #[cfg(not(target_os = "haiku"))]
-        Self(libc::SIGIO)
+        Self(libc::SIGIO);
         #[cfg(target_os = "haiku")]
-        Self(libc::SIGPOLL)
+        Self(libc::SIGPOLL);
     }
 
     /// Represents the `SIGPIPE` signal.
