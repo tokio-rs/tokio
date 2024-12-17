@@ -147,15 +147,19 @@ impl SignalKind {
         Self(libc::SIGINT)
     }
 
-    /// Represents the `SIGIO` signal.
-    ///
-    /// On Unix systems this signal is sent when I/O operations are possible
-    /// on some file descriptor. By default, this signal is ignored.
     #[cfg(target_os = "haiku")]
+    /// Represents the `SIGPOLL` signal.
+    ///
+    /// On POSIX systems this signal is sent when I/O operations are possible
+    /// on some file descriptor. By default, this signal is ignored.
     pub const fn io() -> Self {
         Self(libc::SIGPOLL)
     }
     #[cfg(not(target_os = "haiku"))]
+    /// Represents the `SIGIO` signal.
+    ///
+    /// On Unix systems this signal is sent when I/O operations are possible
+    /// on some file descriptor. By default, this signal is ignored.
     pub const fn io() -> Self {
         Self(libc::SIGIO)
     }
