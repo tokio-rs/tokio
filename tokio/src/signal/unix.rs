@@ -152,7 +152,10 @@ impl SignalKind {
     /// On Unix systems this signal is sent when I/O operations are possible
     /// on some file descriptor. By default, this signal is ignored.
     pub const fn io() -> Self {
+        #[cfg(not(target_os = "haiku"))]
         Self(libc::SIGIO)
+        #[cfg(target_os = "haiku")]
+        Self(libc::SIGPOLL)
     }
 
     /// Represents the `SIGPIPE` signal.
