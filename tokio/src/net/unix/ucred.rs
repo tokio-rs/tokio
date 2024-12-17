@@ -79,7 +79,7 @@ pub(crate) mod impl_linux {
 
     #[cfg(target_os = "openbsd")]
     use libc::sockpeercred as ucred;
-    #[cfg(any(target_os = "linux", target_os = "redox", target_os = "android"))]
+    #[cfg(any(target_os = "linux", target_os = "redox", target_os = "android", target_os = "haiku"))]
     use libc::ucred;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
