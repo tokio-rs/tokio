@@ -68,7 +68,8 @@ pub(crate) use self::impl_noproc::get_peer_cred;
     target_os = "linux",
     target_os = "redox",
     target_os = "android",
-    target_os = "openbsd"
+    target_os = "openbsd",
+    target_os = "haiku"
 ))]
 pub(crate) mod impl_linux {
     use crate::net::unix::{self, UnixStream};
