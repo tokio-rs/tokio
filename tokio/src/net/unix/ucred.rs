@@ -308,7 +308,7 @@ pub(crate) mod impl_aix {
     }
 }
 
-#[cfg(any(target_os = "espidf", target_os = "vita", target_os = "haiku"))]
+#[cfg(any(target_os = "espidf", target_os = "vita"))]
 pub(crate) mod impl_noproc {
     use crate::net::unix::UnixStream;
     use std::io;
