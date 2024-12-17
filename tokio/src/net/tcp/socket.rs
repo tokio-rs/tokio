@@ -168,7 +168,6 @@ impl TcpSocket {
             target_os = "linux",
             target_os = "netbsd",
             target_os = "openbsd",
-            target_os = "haiku"
         ))]
         let ty = ty.nonblocking();
         let inner = socket2::Socket::new(domain, ty, Some(socket2::Protocol::TCP))?;
@@ -181,7 +180,6 @@ impl TcpSocket {
             target_os = "linux",
             target_os = "netbsd",
             target_os = "openbsd",
-            target_os = "haiku"
         )))]
         inner.set_nonblocking(true)?;
         Ok(TcpSocket { inner })
