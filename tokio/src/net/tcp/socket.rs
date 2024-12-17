@@ -167,7 +167,8 @@ impl TcpSocket {
             target_os = "illumos",
             target_os = "linux",
             target_os = "netbsd",
-            target_os = "openbsd"
+            target_os = "openbsd",
+            target_os = "haiku"
         ))]
         let ty = ty.nonblocking();
         let inner = socket2::Socket::new(domain, ty, Some(socket2::Protocol::TCP))?;
@@ -179,7 +180,8 @@ impl TcpSocket {
             target_os = "illumos",
             target_os = "linux",
             target_os = "netbsd",
-            target_os = "openbsd"
+            target_os = "openbsd",
+            target_os = "haiku"
         )))]
         inner.set_nonblocking(true)?;
         Ok(TcpSocket { inner })
@@ -469,6 +471,7 @@ impl TcpSocket {
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
+        target_os = "haiku",
     )))]
     #[cfg_attr(
         docsrs,
@@ -477,6 +480,7 @@ impl TcpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
+            target_os = "haiku",
         ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
@@ -496,6 +500,7 @@ impl TcpSocket {
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
+        target_os = "haiku",
     )))]
     #[cfg_attr(
         docsrs,
@@ -504,6 +509,7 @@ impl TcpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
+            target_os = "haiku",
         ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
