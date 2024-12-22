@@ -104,9 +104,7 @@ fn method_delegation() {
         assert_eq!(1, w.write(&[b'x']).await.unwrap());
         assert_eq!(
             2,
-            w.write_vectored(&[io::IoSlice::new(&[b'x'])])
-                .await
-                .unwrap()
+            w.write_vectored(&[io::IoSlice::new(b"x")]).await.unwrap()
         );
         assert!(w.is_write_vectored());
 

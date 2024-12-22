@@ -54,7 +54,7 @@ struct TrackPolls<'a> {
     listener: &'a mut TcpListener,
 }
 
-impl<'a> Stream for TrackPolls<'a> {
+impl Stream for TrackPolls<'_> {
     type Item = io::Result<(TcpStream, SocketAddr)>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
