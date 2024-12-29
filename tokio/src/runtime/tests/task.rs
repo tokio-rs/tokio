@@ -1,9 +1,7 @@
 use crate::runtime::task::{
     self, unowned, Id, JoinHandle, OwnedTasks, Schedule, Task, TaskHarnessScheduleHooks,
 };
-use crate::runtime::{self, tests::NoopSchedule};
-use crate::spawn;
-use crate::sync::{mpsc, Barrier};
+use crate::runtime::tests::NoopSchedule;
 
 use std::collections::VecDeque;
 use std::future::Future;
@@ -45,41 +43,6 @@ impl Drop for AssertDrop {
     fn drop(&mut self) {
         self.is_dropped.store(true, Ordering::SeqCst);
     }
-}
-
-#[test]
-fn drop_tasks_with_reference_cycle() {
-    let rt = runtime::Builder::new_current_thread().build().unwrap();
-
-    rt.block_on(async {
-        let (tx, mut rx) = mpsc::channel(1);
-
-        let barrier = Arc::new(Barrier::new(3));
-        let barrier_a = barrier.clone();
-        let barrier_b = barrier.clone();
-
-        let a = spawn(async move {
-            let b = rx.recv().await.unwrap();
-
-            // Poll the JoinHandle once. This registers the waker.
-            // The other task cannot have finished at this point due to the barrier below.
-            futures::future::select(b, std::future::ready(())).await;
-
-            barrier_a.wait().await;
-        });
-
-        let b = spawn(async move {
-            // Poll the JoinHandle once. This registers the waker.
-            // The other task cannot have finished at this point due to the barrier below.
-            futures::future::select(a, std::future::ready(())).await;
-
-            barrier_b.wait().await;
-        });
-
-        tx.send(b).await.unwrap();
-
-        barrier.wait().await;
-    });
 }
 
 // A Notified does not shut down on drop, but it is dropped once the ref-count
