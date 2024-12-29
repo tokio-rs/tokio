@@ -2,6 +2,9 @@
 //!
 //! These tests ensure that the instrumentation for tokio
 //! synchronization primitives is correct.
+#![allow(unknown_lints, unexpected_cfgs)]
+#![warn(rust_2018_idioms)]
+#![cfg(all(tokio_unstable, feature = "tracing", target_has_atomic = "64"))]
 
 use tokio::sync;
 use tracing_mock::{expect, subscriber};
@@ -14,19 +17,23 @@ async fn test_barrier_creates_span() {
 
     let size_event = expect::event()
         .with_target("runtime::resource::state_update")
-        .with_fields(expect::field("size").with_value(&1u64));
+        .with_fields(expect::field("size").with_value(&1_u64));
 
     let arrived_event = expect::event()
         .with_target("runtime::resource::state_update")
-        .with_fields(expect::field("arrived").with_value(&0));
+        .with_fields(expect::field("arrived").with_value(&0_i64));
 
     let (subscriber, handle) = subscriber::mock()
-        .new_span(barrier_span.clone().with_explicit_parent(None))
-        .enter(barrier_span.clone())
+        .new_span(
+            barrier_span
+                .clone()
+                .with_ancestry(expect::is_explicit_root()),
+        )
+        .enter(&barrier_span)
         .event(size_event)
         .event(arrived_event)
-        .exit(barrier_span.clone())
-        .drop_span(barrier_span)
+        .exit(&barrier_span)
+        .drop_span(&barrier_span)
         .run_with_handle();
 
     {
@@ -57,16 +64,20 @@ async fn test_mutex_creates_span() {
         .with_fields(expect::field("permits.op").with_value(&"override"));
 
     let (subscriber, handle) = subscriber::mock()
-        .new_span(mutex_span.clone().with_explicit_parent(None))
-        .enter(mutex_span.clone())
+        .new_span(mutex_span.clone().with_ancestry(expect::is_explicit_root()))
+        .enter(&mutex_span)
         .event(locked_event)
-        .new_span(batch_semaphore_span.clone().with_explicit_parent(None))
-        .enter(batch_semaphore_span.clone())
+        .new_span(
+            batch_semaphore_span
+                .clone()
+                .with_ancestry(expect::is_explicit_root()),
+        )
+        .enter(&batch_semaphore_span)
         .event(batch_semaphore_permits_event)
-        .exit(batch_semaphore_span.clone())
-        .exit(mutex_span.clone())
-        .drop_span(mutex_span)
-        .drop_span(batch_semaphore_span)
+        .exit(&batch_semaphore_span)
+        .exit(&mutex_span)
+        .drop_span(&mutex_span)
+        .drop_span(&batch_semaphore_span)
         .run_with_handle();
 
     {
@@ -79,7 +90,9 @@ async fn test_mutex_creates_span() {
 
 #[tokio::test]
 async fn test_oneshot_creates_span() {
+    let oneshot_span_id = expect::id();
     let oneshot_span = expect::span()
+        .with_id(oneshot_span_id.clone())
         .named("runtime.resource")
         .with_target("tokio::sync::oneshot");
 
@@ -113,7 +126,9 @@ async fn test_oneshot_creates_span() {
         .with_fields(expect::field("value_received").with_value(&false))
         .with_fields(expect::field("value_received.op").with_value(&"override"));
 
+    let async_op_span_id = expect::id();
     let async_op_span = expect::span()
+        .with_id(async_op_span_id.clone())
         .named("runtime.resource.async_op")
         .with_target("tokio::sync::oneshot");
 
@@ -122,34 +137,46 @@ async fn test_oneshot_creates_span() {
         .with_target("tokio::sync::oneshot");
 
     let (subscriber, handle) = subscriber::mock()
-        .new_span(oneshot_span.clone().with_explicit_parent(None))
-        .enter(oneshot_span.clone())
+        .new_span(
+            oneshot_span
+                .clone()
+                .with_ancestry(expect::is_explicit_root()),
+        )
+        .enter(&oneshot_span)
         .event(initial_tx_dropped_event)
-        .exit(oneshot_span.clone())
-        .enter(oneshot_span.clone())
+        .exit(&oneshot_span)
+        .enter(&oneshot_span)
         .event(initial_rx_dropped_event)
-        .exit(oneshot_span.clone())
-        .enter(oneshot_span.clone())
+        .exit(&oneshot_span)
+        .enter(&oneshot_span)
         .event(value_sent_event)
-        .exit(oneshot_span.clone())
-        .enter(oneshot_span.clone())
+        .exit(&oneshot_span)
+        .enter(&oneshot_span)
         .event(value_received_event)
-        .exit(oneshot_span.clone())
-        .enter(oneshot_span.clone())
-        .new_span(async_op_span.clone())
-        .exit(oneshot_span.clone())
-        .enter(async_op_span.clone())
-        .new_span(async_op_poll_span.clone())
-        .exit(async_op_span.clone())
-        .enter(oneshot_span.clone())
+        .exit(&oneshot_span)
+        .enter(&oneshot_span)
+        .new_span(
+            async_op_span
+                .clone()
+                .with_ancestry(expect::has_contextual_parent(&oneshot_span_id)),
+        )
+        .exit(&oneshot_span)
+        .enter(&async_op_span)
+        .new_span(
+            async_op_poll_span
+                .clone()
+                .with_ancestry(expect::has_contextual_parent(&async_op_span_id)),
+        )
+        .exit(&async_op_span)
+        .enter(&oneshot_span)
         .event(final_tx_dropped_event)
-        .exit(oneshot_span.clone())
-        .enter(oneshot_span.clone())
+        .exit(&oneshot_span)
+        .enter(&oneshot_span)
         .event(final_rx_dropped_event)
-        .exit(oneshot_span.clone())
+        .exit(&oneshot_span)
         .drop_span(oneshot_span)
         .drop_span(async_op_span)
-        .drop_span(async_op_poll_span)
+        .drop_span(&async_op_poll_span)
         .run_with_handle();
 
     {
@@ -176,7 +203,7 @@ async fn test_rwlock_creates_span() {
 
     let current_readers_event = expect::event()
         .with_target("runtime::resource::state_update")
-        .with_fields(expect::field("current_readers").with_value(&0));
+        .with_fields(expect::field("current_readers").with_value(&0_i64));
 
     let batch_semaphore_span = expect::span()
         .named("runtime.resource")
@@ -188,7 +215,11 @@ async fn test_rwlock_creates_span() {
         .with_fields(expect::field("permits.op").with_value(&"override"));
 
     let (subscriber, handle) = subscriber::mock()
-        .new_span(rwlock_span.clone().with_explicit_parent(None))
+        .new_span(
+            rwlock_span
+                .clone()
+                .with_ancestry(expect::is_explicit_root()),
+        )
         .enter(rwlock_span.clone())
         .event(max_readers_event)
         .event(write_locked_event)
@@ -228,7 +259,11 @@ async fn test_semaphore_creates_span() {
         .with_fields(expect::field("permits.op").with_value(&"override"));
 
     let (subscriber, handle) = subscriber::mock()
-        .new_span(semaphore_span.clone().with_explicit_parent(None))
+        .new_span(
+            semaphore_span
+                .clone()
+                .with_ancestry(expect::is_explicit_root()),
+        )
         .enter(semaphore_span.clone())
         .new_span(batch_semaphore_span.clone())
         .enter(batch_semaphore_span.clone())

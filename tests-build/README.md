@@ -6,5 +6,5 @@ To run all of the tests in this directory, run the following commands:
 cargo test --features full
 cargo test --features rt
 ```
-If one of the tests fail, you can pass `TRYBUILD=overwrite` to the `cargo test`
+If any of the tests fail, you can pass `TRYBUILD=overwrite` to the `cargo test`
 command that failed to have it regenerate the test output.

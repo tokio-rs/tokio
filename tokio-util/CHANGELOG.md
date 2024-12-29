@@ -1,3 +1,11 @@
+# 0.7.13 (December 4th, 2024)
+
+### Fixed
+
+- codec: fix incorrect handling of invalid utf-8 in `LinesCodec::decode_eof` ([#7011])
+
+[#7011]: https://github.com/tokio-rs/tokio/pull/7011
+
 # 0.7.12 (September 5th, 2024)
 
 This release bumps the MSRV to 1.70. ([#6645])
@@ -127,7 +135,7 @@ This release contains one performance improvement:
 [#5630]: https://github.com/tokio-rs/tokio/pull/5630
 [#5632]: https://github.com/tokio-rs/tokio/pull/5632
 
-# 0.7.7 (February 12, 2023)
+# 0.7.7 (February 12th, 2023)
 
 This release reverts the removal of the `Encoder` bound on the `FramedParts`
 constructor from [#5280] since it turned out to be a breaking change. ([#5450])

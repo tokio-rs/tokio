@@ -6,6 +6,25 @@ use tokio::net::{UnixListener, UnixStream};
 
 /// A wrapper around [`UnixListener`] that implements [`Stream`].
 ///
+/// # Example
+///
+/// ```no_run
+/// use tokio::net::UnixListener;
+/// use tokio_stream::{StreamExt, wrappers::UnixListenerStream};
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> std::io::Result<()> {
+/// let listener = UnixListener::bind("/tmp/sock")?;
+/// let mut incoming = UnixListenerStream::new(listener);
+///
+/// while let Some(stream) = incoming.next().await {
+///     let stream = stream?;
+///     let peer_addr = stream.peer_addr()?;
+///     println!("Accepted connection from: {peer_addr:?}");
+/// }
+/// # Ok(())
+/// # }
+/// ```
 /// [`UnixListener`]: struct@tokio::net::UnixListener
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]

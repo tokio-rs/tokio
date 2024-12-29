@@ -2,6 +2,9 @@
 //!
 //! These tests ensure that the instrumentation for task spawning and task
 //! lifecycles is correct.
+#![allow(unknown_lints, unexpected_cfgs)]
+#![warn(rust_2018_idioms)]
+#![cfg(all(tokio_unstable, feature = "tracing", target_has_atomic = "64"))]
 
 use std::{mem, time::Duration};
 
@@ -15,12 +18,12 @@ async fn task_spawn_creates_span() {
         .with_target("tokio::task");
 
     let (subscriber, handle) = subscriber::mock()
-        .new_span(task_span.clone())
-        .enter(task_span.clone())
-        .exit(task_span.clone())
+        .new_span(&task_span)
+        .enter(&task_span)
+        .exit(&task_span)
         // The task span is entered once more when it gets dropped
-        .enter(task_span.clone())
-        .exit(task_span.clone())
+        .enter(&task_span)
+        .exit(&task_span)
         .drop_span(task_span)
         .run_with_handle();
 
@@ -39,7 +42,7 @@ async fn task_spawn_loc_file_recorded() {
     let task_span = expect::span()
         .named("runtime.spawn")
         .with_target("tokio::task")
-        .with_field(expect::field("loc.file").with_value(&file!()));
+        .with_fields(expect::field("loc.file").with_value(&file!()));
 
     let (subscriber, handle) = subscriber::mock().new_span(task_span).run_with_handle();
 
@@ -78,7 +81,7 @@ async fn task_builder_loc_file_recorded() {
     let task_span = expect::span()
         .named("runtime.spawn")
         .with_target("tokio::task")
-        .with_field(expect::field("loc.file").with_value(&file!()));
+        .with_fields(expect::field("loc.file").with_value(&file!()));
 
     let (subscriber, handle) = subscriber::mock().new_span(task_span).run_with_handle();
 
@@ -105,7 +108,7 @@ async fn task_spawn_sizes_recorded() {
         .with_target("tokio::task")
         // TODO(hds): check that original_size.bytes is NOT recorded when this can be done in
         // tracing-mock without listing every other field.
-        .with_field(expect::field("size.bytes").with_value(&size));
+        .with_fields(expect::field("size.bytes").with_value(&size));
 
     let (subscriber, handle) = subscriber::mock().new_span(task_span).run_with_handle();
 
@@ -149,7 +152,7 @@ async fn task_big_spawn_sizes_recorded() {
     let task_span = expect::span()
         .named("runtime.spawn")
         .with_target("tokio::task")
-        .with_field(
+        .with_fields(
             expect::field("size.bytes")
                 .with_value(&boxed_size)
                 .and(expect::field("original_size.bytes").with_value(&size)),
@@ -178,7 +181,7 @@ fn expect_task_named(name: &str) -> NewSpan {
     expect::span()
         .named("runtime.spawn")
         .with_target("tokio::task")
-        .with_field(
+        .with_fields(
             expect::field("task.name").with_value(&tracing::field::debug(format_args!("{}", name))),
         )
 }
