@@ -2,9 +2,9 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::{mpsc, Barrier};
-use std::sync::Arc;
 
 #[test]
 #[cfg_attr(panic = "abort", ignore)]
