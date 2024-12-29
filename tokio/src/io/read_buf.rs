@@ -39,7 +39,7 @@ impl<'a> ReadBuf<'a> {
         }
     }
 
-    /// Creates a new `ReadBuf` from a fully uninitialized buffer.
+    /// Creates a new `ReadBuf` from a buffer that may be fully uninitialized.
     ///
     /// Use `assume_init` if part of the buffer is known to be already initialized.
     #[inline]
