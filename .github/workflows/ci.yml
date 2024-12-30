@@ -467,6 +467,7 @@ jobs:
     strategy:
       matrix:
         target:
+          - name: x86_64-unknown-haiku
           - name: armv7-sony-vita-newlibeabihf
             exclude_features: "process,signal,rt-process-signal,full"
     steps:

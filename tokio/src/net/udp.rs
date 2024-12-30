@@ -1864,6 +1864,7 @@ impl UdpSocket {
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
+        target_os = "haiku"
     )))]
     #[cfg_attr(
         docsrs,
@@ -1872,6 +1873,7 @@ impl UdpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
+            target_os = "haiku"
         ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
@@ -1891,6 +1893,7 @@ impl UdpSocket {
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
+        target_os = "haiku"
     )))]
     #[cfg_attr(
         docsrs,
@@ -1899,6 +1902,7 @@ impl UdpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
+            target_os = "haiku"
         ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
