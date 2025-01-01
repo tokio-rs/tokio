@@ -1193,7 +1193,7 @@ impl Child {
     /// This function is cancel safe.
     ///
     /// ```
-    /// # if cfg!(miri) { return } // No`pidfd_spawnp` in miri.
+    /// # if cfg!(miri) { return } // No `pidfd_spawnp` in miri.
     /// # #[cfg(not(unix))]fn main(){}
     /// # #[cfg(unix)]
     /// use tokio::io::AsyncWriteExt;

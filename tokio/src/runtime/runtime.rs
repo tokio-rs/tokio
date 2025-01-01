@@ -421,7 +421,7 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
-    /// # if cfg!(miri) { return } // miri report error when main thread terminated without waiting all remaining threads.
+    /// # if cfg!(miri) { return } // Miri reports error when main thread terminated without waiting all remaining threads.
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
