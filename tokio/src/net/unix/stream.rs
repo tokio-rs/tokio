@@ -833,6 +833,7 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use std::error::Error;
     /// use std::io::Read;
     /// use tokio::net::UnixListener;

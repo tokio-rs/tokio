@@ -134,6 +134,7 @@ impl UdpSocket {
     /// # Example
     ///
     /// ```no_run
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::UdpSocket;
     /// use std::io;
     ///
@@ -295,6 +296,7 @@ impl UdpSocket {
     /// # Example
     ///
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::UdpSocket;
     ///
     /// # use std::{io, net::SocketAddr};
@@ -1979,6 +1981,7 @@ impl UdpSocket {
     ///
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::UdpSocket;
     /// use std::io;
     ///

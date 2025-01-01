@@ -35,6 +35,7 @@ cfg_net_unix! {
     /// # Examples
     /// Using named sockets, associated with a filesystem path:
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -67,6 +68,7 @@ cfg_net_unix! {
     ///
     /// Using unnamed sockets, created as a pair
     /// ```
+    /// # if cfg!(miri) { return } // No `socketpair` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -371,6 +373,7 @@ impl UnixDatagram {
     ///
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -403,6 +406,7 @@ impl UnixDatagram {
     ///
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No SOCK_DGRAM for socketpair in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -457,6 +461,7 @@ impl UnixDatagram {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -521,6 +526,7 @@ impl UnixDatagram {
     ///
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -560,6 +566,7 @@ impl UnixDatagram {
     ///
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -604,6 +611,7 @@ impl UnixDatagram {
     ///
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No `socketpair` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -734,6 +742,7 @@ impl UnixDatagram {
     ///
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No `socketpair` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -884,6 +893,7 @@ impl UnixDatagram {
         ///
         /// # Examples
         /// ```
+        /// # if cfg!(miri) { return } // No `socket` in miri.
         /// # use std::error::Error;
         /// # #[tokio::main]
         /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -1000,6 +1010,7 @@ impl UnixDatagram {
         ///
         /// # Examples
         /// ```
+        /// # if cfg!(miri) { return } // No `socketpair` in miri.
         /// # use std::error::Error;
         /// # #[tokio::main]
         /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -1050,6 +1061,7 @@ impl UnixDatagram {
     ///
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -1100,6 +1112,7 @@ impl UnixDatagram {
     ///
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -1416,6 +1429,7 @@ impl UnixDatagram {
     /// # Examples
     /// For a socket bound to a local path
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -1438,6 +1452,7 @@ impl UnixDatagram {
     ///
     /// For an unbound socket
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -1462,6 +1477,7 @@ impl UnixDatagram {
     /// # Examples
     /// For a peer with a local path
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -1487,6 +1503,7 @@ impl UnixDatagram {
     ///
     /// For an unbound peer
     /// ```
+    /// # if cfg!(miri) { return } // No `socketpair` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -1508,6 +1525,7 @@ impl UnixDatagram {
     ///
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
@@ -1535,6 +1553,7 @@ impl UnixDatagram {
     ///
     /// # Examples
     /// ```
+    /// # if cfg!(miri) { return } // No `socketpair` in miri.
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {

@@ -743,6 +743,7 @@ impl TcpSocket {
     /// # Examples
     ///
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::TcpSocket;
     /// use socket2::{Domain, Socket, Type};
     ///

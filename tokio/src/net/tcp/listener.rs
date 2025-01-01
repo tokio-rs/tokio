@@ -83,6 +83,7 @@ impl TcpListener {
         /// # Examples
         ///
         /// ```no_run
+        /// # if cfg!(miri) { return } // No `socket` in miri.
         /// use tokio::net::TcpListener;
         ///
         /// use std::io;
