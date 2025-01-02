@@ -1085,6 +1085,31 @@ jobs:
       - uses: actions/checkout@v4
       - name: Make sure dictionary words are sorted and unique
         run: |
+          FILE="spellcheck.dic"
+
+          # Verify the first line is an integer.
+          first_line=$(head -n 1 "$FILE")
+          if ! [[ "$first_line" =~ ^[0-9]+$ ]]; then
+            echo "Error: The first line of $FILE must be an integer, but got: '$first_line'"
+            exit 1
+          fi
+          expected_count="$first_line"
+
+          # Verify the last line is completely empty (no spaces).
+          last_line=$(tail -n 1 "$FILE")
+          if [ -n "$last_line" ]; then
+            echo "Error: The last line of $FILE must be empty (without spaces)."
+            exit 1
+          fi
+
+          # Check that the number of lines between the first and last matches the integer.
+          # xargs (with no arguments) will strip leading/trailing whitespace from wc's output.
+          actual_count=$(sed '1d;$d' "$FILE" | wc -l | xargs)
+          if [ "$expected_count" -ne "$actual_count" ]; then
+            echo "Error: The number of lines between the first and last ($actual_count) does not match $expected_count."
+            exit 1
+          fi
+
           # `sed` removes the first line (number of words) and
           # the last line (new line).
           #
@@ -1096,10 +1121,10 @@ jobs:
           # environments.
 
           (
-            sed '1d; $d' spellcheck.dic | LC_ALL=en_US.UTF8 sort -uc
+            sed '1d; $d' $FILE | LC_ALL=en_US.UTF8 sort -uc
           ) || {
             echo "Dictionary is not in sorted order. Correct order is:"
-            LC_ALL=en_US.UTF8 sort -u <(sed '1d; $d' spellcheck.dic)
+            LC_ALL=en_US.UTF8 sort -u <(sed '1d; $d' $FILE)
             false
           }
       - name: Run cargo-spellcheck
