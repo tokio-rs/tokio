@@ -116,8 +116,12 @@ cfg_io_std! {
     /// ```
     pub fn stdout() -> Stdout {
         let std = io::stdout();
+        // SAFETY: The `Read` implementation of `std` does not read from the
+        // buffer it is borrowing and correctly reports the length of the data
+        // written into the buffer.
+        let blocking = unsafe { Blocking::new(std) };
         Stdout {
-            std: SplitByUtf8BoundaryIfWindows::new(Blocking::new(std)),
+            std: SplitByUtf8BoundaryIfWindows::new(blocking),
         }
     }
 }
