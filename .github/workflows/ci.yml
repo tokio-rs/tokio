@@ -399,10 +399,28 @@ jobs:
       - name: miri
         run: |
           cargo miri nextest run --features full --lib --tests --no-fail-fast
-          cargo miri test --doc --all-features --no-fail-fast
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+
+  miri-doc-test:
+    name: miri-doc-test
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_miri_nightly }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_miri_nightly }}
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      - name: miri-doc-test
+        run: |
+          cargo miri test --doc --all-features --no-fail-fast
+        working-directory: tokio
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields 
 
   asan:
     name: asan
