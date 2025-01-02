@@ -5,6 +5,7 @@ use std::cmp;
 use std::future::Future;
 use std::io;
 use std::io::prelude::*;
+use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
@@ -64,11 +65,11 @@ where
                         return Poll::Ready(Ok(()));
                     }
 
-                    buf.ensure_capacity_for(dst, DEFAULT_MAX_BUF_SIZE);
                     let mut inner = self.inner.take().unwrap();
 
+                    let max_buf_size = cmp::min(dst.remaining(), DEFAULT_MAX_BUF_SIZE);
                     self.state = State::Busy(sys::run(move || {
-                        let res = buf.read_from(&mut inner);
+                        let res = unsafe { buf.read_from(&mut inner, max_buf_size) };
                         (res, buf, inner)
                     }));
                 }
@@ -227,25 +228,22 @@ impl Buf {
         &self.buf[self.pos..]
     }
 
-    pub(crate) fn ensure_capacity_for(&mut self, bytes: &ReadBuf<'_>, max_buf_size: usize) {
+    /// Safety: `rd` must not read from the buffer passed to `read` and
+    /// must correctly report the length of the written portion of the buffer.
+    pub(crate) unsafe fn read_from<T: Read>(
+        &mut self,
+        rd: &mut T,
+        max_buf_size: usize,
+    ) -> io::Result<usize> {
         assert!(self.is_empty());
+        self.buf.reserve(max_buf_size);
 
-        let len = cmp::min(bytes.remaining(), max_buf_size);
-
-        if self.buf.len() < len {
-            self.buf.reserve(len - self.buf.len());
-        }
-
-        unsafe {
-            self.buf.set_len(len);
-        }
-    }
-
-    pub(crate) fn read_from<T: Read>(&mut self, rd: &mut T) -> io::Result<usize> {
-        let res = uninterruptibly!(rd.read(&mut self.buf));
+        let buf = &mut self.buf.spare_capacity_mut()[..max_buf_size];
+        let buf = unsafe { &mut *(buf as *mut [MaybeUninit<u8>] as *mut [u8]) };
+        let res = uninterruptibly!(rd.read(buf));
 
         if let Ok(n) = res {
-            self.buf.truncate(n);
+            unsafe { self.buf.set_len(n) }
         } else {
             self.buf.clear();
         }
