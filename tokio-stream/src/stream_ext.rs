@@ -37,6 +37,10 @@ pub use merge::Merge;
 mod next;
 use next::Next;
 
+mod partition;
+use partition::Partition;
+pub use partition::{FalsePartition, TruePartition};
+
 mod skip;
 pub use skip::Skip;
 
@@ -839,6 +843,35 @@ pub trait StreamExt: Stream {
         F: FnMut(B, Self::Item) -> B,
     {
         FoldFuture::new(self, init, f)
+    }
+
+    /// Partitions the stream into two streams based on the provided predicate.
+    ///
+    /// The first stream contains all elements for which `f` returns `true`, and
+    /// the second contains all elements for which `f` returns `false`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// let s = stream::iter(vec![1, 2, 3, 4, 5]);
+    /// let (even, odd) = s.partition(|x| x % 2 == 0);
+    ///
+    /// let even: Vec<_> = even.collect().await;
+    /// let odd: Vec<_> = odd.collect().await;
+    ///
+    /// assert_eq!(even, vec![2, 4]);
+    /// assert_eq!(odd, vec![1, 3, 5]);
+    /// # }
+    fn partition<F>(self, f: F) -> (TruePartition<Self, F>, FalsePartition<Self, F>)
+    where
+        F: FnMut(&Self::Item) -> bool,
+        Self: Sized,
+    {
+        Partition::new(self, f).split()
     }
 
     /// Drain stream pushing all emitted values into a collection.
