@@ -124,7 +124,7 @@ cfg_io_util! {
         ///
         /// No guarantees are provided about the contents of `buf` when this
         /// function is called, implementations cannot rely on any property of the
-        /// contents of `buf` being `true`. It is recommended that *implementations*
+        /// contents of `buf` being true. It is recommended that *implementations*
         /// only write data to `buf` instead of reading its contents.
         ///
         /// Correspondingly, however, *callers* of this method may not assume
