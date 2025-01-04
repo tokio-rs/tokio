@@ -2,150 +2,140 @@
 
 use crate::Stream;
 
-use core::fmt;
 use std::{
-    collections::VecDeque,
+    fmt,
     pin::Pin,
     sync::{Arc, Mutex},
     task::{Context, Poll, Waker},
 };
 
-pub(super) struct Partition<St, F>
+/// A stream returned by the [`partition`](super::StreamExt::partition) method.
+pub enum Partition<St, F>
+where
+    St: Stream,
+{
+    /// A stream that yields items for which the predicate returns `true`.
+    Matches(Arc<Mutex<Inner<St, F>>>),
+    /// A stream that yields items for which the predicate returns `false`.
+    NonMatches(Arc<Mutex<Inner<St, F>>>),
+}
+
+impl<St, F> fmt::Debug for Partition<St, F>
+where
+    St: fmt::Debug + Stream,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Partition::Matches(inner) => f.debug_tuple("Partition::Matches").field(inner).finish(),
+            Partition::NonMatches(inner) => {
+                f.debug_tuple("Partition::NonMatches").field(inner).finish()
+            }
+        }
+    }
+}
+
+impl<St, F> Partition<St, F>
+where
+    St: Stream + Unpin,
+    F: FnMut(&St::Item) -> bool,
+{
+    pub(super) fn new(stream: St, f: F) -> (Self, Self) {
+        let inner = Arc::new(Mutex::new(Inner::new(stream, f)));
+        (
+            Partition::Matches(inner.clone()),
+            Partition::NonMatches(inner),
+        )
+    }
+}
+
+impl<St, F> Stream for Partition<St, F>
+where
+    St: Stream + Unpin,
+    F: FnMut(&St::Item) -> bool,
+{
+    type Item = St::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match self.get_mut() {
+            Partition::Matches(inner) => inner.lock().unwrap().poll_next(cx, true),
+            Partition::NonMatches(inner) => inner.lock().unwrap().poll_next(cx, false),
+        }
+    }
+}
+
+pub struct Inner<St, F>
 where
     St: Stream,
 {
     stream: St,
     f: F,
-    true_buffer: VecDeque<St::Item>,
-    false_buffer: VecDeque<St::Item>,
-    true_waker: Option<Waker>,
-    false_waker: Option<Waker>,
+    buffered_value: Option<BufferedValue<St::Item>>,
+    waker: Option<Waker>,
 }
 
-impl<St, F> Partition<St, F>
+enum BufferedValue<T> {
+    Match(T),
+    NonMatch(T),
+}
+
+impl<St, F> fmt::Debug for Inner<St, F>
 where
-    St: Stream,
+    St: fmt::Debug + Stream,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Inner")
+            .field("stream", &self.stream)
+            .field("waker", &self.waker)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<St, F> Inner<St, F>
+where
+    St: Stream + Unpin,
+    F: FnMut(&St::Item) -> bool,
 {
     pub(super) fn new(stream: St, f: F) -> Self {
         Self {
             stream,
             f,
-            true_buffer: VecDeque::new(),
-            false_buffer: VecDeque::new(),
-            true_waker: None,
-            false_waker: None,
+            buffered_value: None,
+            waker: None,
         }
     }
 
-    pub(super) fn split(self) -> (TruePartition<St, F>, FalsePartition<St, F>) {
-        let partition = Arc::new(Mutex::new(self));
-        let true_partition = TruePartition::new(partition.clone());
-        let false_partition = FalsePartition::new(partition.clone());
-        (true_partition, false_partition)
-    }
-}
-
-/// A stream that only yields elements that satisfy a predicate.
-///
-/// This stream is produced by the [`StreamExt::partition`] method.
-pub struct TruePartition<St: Stream, F> {
-    partition: Arc<Mutex<Partition<St, F>>>,
-}
-
-impl<St, F> fmt::Debug for TruePartition<St, F>
-where
-    St: Stream,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TruePartition").finish_non_exhaustive()
-    }
-}
-
-impl<St, F> TruePartition<St, F>
-where
-    St: Stream,
-{
-    fn new(partition: Arc<Mutex<Partition<St, F>>>) -> Self {
-        Self { partition }
-    }
-}
-
-impl<St, F> Stream for TruePartition<St, F>
-where
-    St: Stream + Unpin,
-    F: FnMut(&St::Item) -> bool,
-{
-    type Item = St::Item;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut partition = self.partition.lock().unwrap();
-        if let Some(item) = partition.true_buffer.pop_front() {
-            return Poll::Ready(Some(item));
-        }
-
-        match Pin::new(&mut partition.stream).poll_next(cx) {
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Ready(Some(item)) if (partition.f)(&item) => Poll::Ready(Some(item)),
-            Poll::Ready(Some(item)) => {
-                partition.false_buffer.push_back(item);
-                partition.false_waker = Some(cx.waker().clone());
-                cx.waker().wake_by_ref();
-                Poll::Pending
+    fn poll_next(&mut self, cx: &mut Context<'_>, matches: bool) -> Poll<Option<St::Item>> {
+        // Check if there is a buffered value
+        match self.buffered_value.take() {
+            Some(BufferedValue::Match(value)) if matches => return Poll::Ready(Some(value)),
+            Some(BufferedValue::NonMatch(value)) if !matches => return Poll::Ready(Some(value)),
+            Some(value) => {
+                self.buffered_value = Some(value);
+                self.waker = Some(cx.waker().clone());
+                return Poll::Pending;
             }
+            None => {}
+        }
+
+        // Poll the underlying stream
+        match Pin::new(&mut self.stream).poll_next(cx) {
+            Poll::Ready(Some(value)) => match (self.f)(&value) {
+                result if result == matches => Poll::Ready(Some(value)),
+                true => {
+                    self.buffered_value = Some(BufferedValue::Match(value));
+                    self.waker = Some(cx.waker().clone());
+                    Poll::Pending
+                }
+                false => {
+                    self.buffered_value = Some(BufferedValue::NonMatch(value));
+                    self.waker = Some(cx.waker().clone());
+                    Poll::Pending
+                }
+            },
+            Poll::Ready(None) => Poll::Ready(None), // Stream is exhausted
             Poll::Pending => {
-                partition.true_waker = Some(cx.waker().clone());
-                Poll::Pending
-            }
-        }
-    }
-}
-
-/// A stream that only yields elements that do not satisfy a predicate.
-///
-/// This stream is produced by the [`StreamExt::partition`] method.
-pub struct FalsePartition<St: Stream, F> {
-    partition: Arc<Mutex<Partition<St, F>>>,
-}
-
-impl<St, F> fmt::Debug for FalsePartition<St, F>
-where
-    St: Stream,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("FalsePartition").finish_non_exhaustive()
-    }
-}
-
-impl<St: Stream, F> FalsePartition<St, F> {
-    fn new(partition: Arc<Mutex<Partition<St, F>>>) -> Self {
-        Self { partition }
-    }
-}
-
-impl<St, F> Stream for FalsePartition<St, F>
-where
-    St: Stream + Unpin,
-    F: FnMut(&St::Item) -> bool,
-{
-    type Item = St::Item;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut partition = self.partition.lock().unwrap();
-        if let Some(item) = partition.false_buffer.pop_front() {
-            return Poll::Ready(Some(item));
-        }
-
-        match Pin::new(&mut partition.stream).poll_next(cx) {
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Ready(Some(item)) if !(partition.f)(&item) => Poll::Ready(Some(item)),
-            Poll::Ready(Some(item)) => {
-                partition.true_buffer.push_back(item);
-                partition.true_waker = Some(cx.waker().clone());
+                self.waker = Some(cx.waker().clone());
                 cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-            Poll::Pending => {
-                partition.false_waker = Some(cx.waker().clone());
                 Poll::Pending
             }
         }
