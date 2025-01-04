@@ -656,3 +656,54 @@ async fn receiver_recv_is_cooperative() {
         _ = tokio::task::yield_now() => {},
     }
 }
+
+#[test]
+fn broadcast_sender_closed() {
+    let (tx, rx) = broadcast::channel::<()>(1);
+    let rx2 = tx.subscribe();
+
+    let mut task = task::spawn(tx.closed());
+    assert_pending!(task.poll());
+
+    drop(rx);
+    assert!(!task.is_woken());
+    assert_pending!(task.poll());
+
+    drop(rx2);
+    assert!(task.is_woken());
+    assert_ready!(task.poll());
+}
+
+#[test]
+fn broadcast_sender_closed_with_extra_subscribe() {
+    let (tx, rx) = broadcast::channel::<()>(1);
+    let rx2 = tx.subscribe();
+
+    let mut task = task::spawn(tx.closed());
+    assert_pending!(task.poll());
+
+    drop(rx);
+    assert!(!task.is_woken());
+    assert_pending!(task.poll());
+
+    drop(rx2);
+    assert!(task.is_woken());
+
+    let rx3 = tx.subscribe();
+    assert_pending!(task.poll());
+
+    drop(rx3);
+    assert!(task.is_woken());
+    assert_ready!(task.poll());
+
+    let mut task2 = task::spawn(tx.closed());
+    assert_ready!(task2.poll());
+
+    let rx4 = tx.subscribe();
+    let mut task3 = task::spawn(tx.closed());
+    assert_pending!(task3.poll());
+
+    drop(rx4);
+    assert!(task3.is_woken());
+    assert_ready!(task3.poll());
+}
