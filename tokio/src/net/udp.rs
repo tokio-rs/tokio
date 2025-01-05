@@ -1593,11 +1593,7 @@ impl UdpSocket {
     ///
     /// [`poll_peek_sender`]: method@Self::poll_peek_sender
     /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
-    pub fn poll_peek(
-        &self,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
+    pub fn poll_peek(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         #[allow(clippy::blocks_in_conditions)]
         let n = ready!(self.io.registration().poll_read_io(cx, || {
             // Safety: will not read the maybe uninitialized bytes.
