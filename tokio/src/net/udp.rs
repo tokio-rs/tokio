@@ -1553,6 +1553,69 @@ impl UdpSocket {
             .await
     }
 
+    /// Receives data from the connected address, without removing it from the input queue.
+    /// On success, returns the sending address of the datagram.
+    ///
+    /// # Notes
+    ///
+    /// Note that on multiple calls to a `poll_*` method in the `recv` direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and peek returns the error
+    /// `WSAEMSGSIZE(10040)`. The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
+    ///
+    /// MacOS will return an error if you pass a zero-sized buffer.
+    ///
+    /// If you're merely interested in learning the sender of the data at the head of the queue,
+    /// try [`poll_peek_sender`].
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not ready to read
+    /// * `Poll::Ready(Ok(()))` reads data into `ReadBuf` if the socket is ready
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`poll_peek_sender`]: method@Self::poll_peek_sender
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
+    pub fn poll_peek(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        #[allow(clippy::blocks_in_conditions)]
+        let n = ready!(self.io.registration().poll_read_io(cx, || {
+            // Safety: will not read the maybe uninitialized bytes.
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+
+            self.io.peek(b)
+        }))?;
+
+        // Safety: We trust `recv` to have filled up `n` bytes in the buffer.
+        unsafe {
+            buf.assume_init(n);
+        }
+        buf.advance(n);
+        Poll::Ready(Ok(()))
+    }
+
     /// Receives data from the socket, without removing it from the input queue.
     /// On success, returns the number of bytes read and the address from whence
     /// the data came.
