@@ -1503,6 +1503,148 @@ impl UdpSocket {
             .await
     }
 
+    /// Receives a single datagram from the connected address without removing it from the queue.
+    /// On success, returns the number of bytes read from whence the data came.
+    ///
+    /// # Notes
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and `peek_from` returns the error
+    /// `WSAEMSGSIZE(10040)`. The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
+    ///
+    /// MacOS will return an error if you pass a zero-sized buffer.
+    ///
+    /// If you're merely interested in learning the sender of the data at the head of the queue,
+    /// try [`peek_sender`].
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UdpSocket;
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let socket = UdpSocket::bind("127.0.0.1:8080").await?;
+    ///
+    ///     let mut buf = vec![0u8; 32];
+    ///     let len = socket.peek(&mut buf).await?;
+    ///
+    ///     println!("peeked {:?} bytes", len);
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`peek_sender`]: method@Self::peek_sender
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
+    pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io
+            .registration()
+            .async_io(Interest::READABLE, || self.io.peek(buf))
+            .await
+    }
+
+    /// Receives data from the connected address, without removing it from the input queue.
+    /// On success, returns the sending address of the datagram.
+    ///
+    /// # Notes
+    ///
+    /// Note that on multiple calls to a `poll_*` method in the `recv` direction, only the
+    /// `Waker` from the `Context` passed to the most recent call will be scheduled to
+    /// receive a wakeup
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and peek returns the error
+    /// `WSAEMSGSIZE(10040)`. The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
+    ///
+    /// MacOS will return an error if you pass a zero-sized buffer.
+    ///
+    /// If you're merely interested in learning the sender of the data at the head of the queue,
+    /// try [`poll_peek_sender`].
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// # Return value
+    ///
+    /// The function returns:
+    ///
+    /// * `Poll::Pending` if the socket is not ready to read
+    /// * `Poll::Ready(Ok(()))` reads data into `ReadBuf` if the socket is ready
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Errors
+    ///
+    /// This function may encounter any standard I/O error except `WouldBlock`.
+    ///
+    /// [`poll_peek_sender`]: method@Self::poll_peek_sender
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
+    pub fn poll_peek(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+        #[allow(clippy::blocks_in_conditions)]
+        let n = ready!(self.io.registration().poll_read_io(cx, || {
+            // Safety: will not read the maybe uninitialized bytes.
+            let b = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+
+            self.io.peek(b)
+        }))?;
+
+        // Safety: We trust `recv` to have filled up `n` bytes in the buffer.
+        unsafe {
+            buf.assume_init(n);
+        }
+        buf.advance(n);
+        Poll::Ready(Ok(()))
+    }
+
+    /// Tries to receive data on the connected address without removing it from the input queue.
+    /// On success, returns the number of bytes read.
+    ///
+    /// When there is no pending data, `Err(io::ErrorKind::WouldBlock)` is
+    /// returned. This function is usually paired with `readable()`.
+    ///
+    /// # Notes
+    ///
+    /// On Windows, if the data is larger than the buffer specified, the buffer
+    /// is filled with the first part of the data, and peek returns the error
+    /// `WSAEMSGSIZE(10040)`. The excess data is lost.
+    /// Make sure to always use a sufficiently large buffer to hold the
+    /// maximum UDP packet size, which can be up to 65536 bytes in size.
+    ///
+    /// MacOS will return an error if you pass a zero-sized buffer.
+    ///
+    /// If you're merely interested in learning the sender of the data at the head of the queue,
+    /// try [`try_peek_sender`].
+    ///
+    /// Note that the socket address **cannot** be implicitly trusted, because it is relatively
+    /// trivial to send a UDP datagram with a spoofed origin in a [packet injection attack].
+    /// Because UDP is stateless and does not validate the origin of a packet,
+    /// the attacker does not need to be able to intercept traffic in order to interfere.
+    /// It is important to be aware of this when designing your application-level protocol.
+    ///
+    /// [`try_peek_sender`]: method@Self::try_peek_sender
+    /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
+    pub fn try_peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || self.io.peek(buf))
+    }
+
     /// Receives data from the socket, without removing it from the input queue.
     /// On success, returns the number of bytes read and the address from whence
     /// the data came.
