@@ -49,7 +49,9 @@ jobs:
       - test-parking_lot
       - valgrind
       - test-unstable
-      - miri
+      - miri-lib
+      - miri-test
+      - miri-doc
       - asan
       - cross-check
       - cross-check-tier3
