@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "rt", tokio_unstable))]
+#![cfg(feature = "rt")]
 
 use std::panic::AssertUnwindSafe;
 

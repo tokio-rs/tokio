@@ -29,10 +29,6 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 ///
 /// When the `JoinMap` is dropped, all tasks in the `JoinMap` are immediately aborted.
 ///
-/// **Note**: This type depends on Tokio's [unstable API][unstable]. See [the
-/// documentation on unstable features][unstable] for details on how to enable
-/// Tokio's unstable features.
-///
 /// # Examples
 ///
 /// Spawn multiple tasks and wait for them:
@@ -96,11 +92,10 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// ```
 ///
 /// [`JoinSet`]: tokio::task::JoinSet
-/// [unstable]: tokio#unstable-features
 /// [abort]: fn@Self::abort
 /// [abort_matching]: fn@Self::abort_matching
 /// [contains]: fn@Self::contains_key
-#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub struct JoinMap<K, V, S = RandomState> {
     /// A map of the [`AbortHandle`]s of the tasks spawned on this `JoinMap`,
     /// indexed by their keys.
