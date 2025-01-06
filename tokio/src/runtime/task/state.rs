@@ -446,11 +446,14 @@ impl State {
     pub(super) fn unset_waker(&self) -> UpdateResult {
         self.fetch_update(|curr| {
             assert!(curr.is_join_interested());
-            assert!(curr.is_join_waker_set());
 
             if curr.is_complete() {
                 return None;
             }
+
+            // If the task is completed, this bit may have been unset by
+            // `unset_waker_after_complete`.
+            assert!(curr.is_join_waker_set());
 
             let mut next = curr;
             next.unset_join_waker();
