@@ -49,7 +49,9 @@ jobs:
       - test-parking_lot
       - valgrind
       - test-unstable
-      - miri
+      - miri-lib
+      - miri-test
+      - miri-doc
       - asan
       - cross-check
       - cross-check-tier3
@@ -380,8 +382,8 @@ jobs:
           # the unstable cfg to RustDoc
           RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_internal_mt_counters
 
-  miri:
-    name: miri
+  miri-lib:
+    name: miri-lib
     needs: basics
     runs-on: ubuntu-latest
     steps:
@@ -398,13 +400,36 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: miri
         run: |
-          cargo miri nextest run --features full --lib --tests --no-fail-fast
+          cargo miri nextest run --features full --lib --no-fail-fast
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
 
-  miri-doc-test:
-    name: miri-doc-test
+  miri-test:
+    name: miri-test
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_miri_nightly }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_miri_nightly }}
+          components: miri
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - uses: Swatinem/rust-cache@v2
+      - name: miri
+        run: |
+          cargo miri nextest run --features full --test '*' --no-fail-fast
+        working-directory: tokio
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+
+  miri-doc:
+    name: miri-doc
     needs: basics
     runs-on: ubuntu-latest
     steps:
