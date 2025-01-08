@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "rt")]
+#![cfg(feature = "join-map")]
 
 use std::panic::AssertUnwindSafe;
 
