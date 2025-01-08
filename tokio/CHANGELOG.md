@@ -1,3 +1,57 @@
+# 1.43.0 (Jan 8th, 2025)
+
+### Added
+
+- net: add `UdpSocket::peek` methods ([#7068])
+- net: add support for Haiku OS ([#7042])
+- process: add `Command::into_std()` ([#7014])
+- signal: add `SignalKind::info` on illumos ([#6995])
+- signal: add support for realtime signals on illumos ([#7029])
+
+### Fixed
+
+- io: don't call `set_len` before initializing vector in `Blocking` ([#7054])
+- macros: suppress `clippy::needless_return` in `#[tokio::main]` ([#6874])
+- runtime: fix thread parking on WebAssembly ([#7041])
+
+### Changes
+
+- chore: use unsync loads for `unsync_load` ([#7073])
+- io: use `Buf::put_bytes` in `Repeat` read impl ([#7055])
+- task: drop the join waker of a task eagerly ([#6986])
+
+### Changes to unstable APIs
+
+- metrics: improve flexibility of H2Histogram Configuration ([#6963])
+- taskdump: add accessor methods for backtrace ([#6975])
+
+### Documented
+
+- io: clarify `ReadBuf::uninit` allows initialized buffers as well ([#7053])
+- net: fix ambiguity in `TcpStream::try_write_vectored` docs ([#7067])
+- runtime: fix `LocalRuntime` doc links ([#7074])
+- sync: extend documentation for `watch::Receiver::wait_for` ([#7038])
+- sync: fix typos in `OnceCell` docs ([#7047])
+
+[#6874]: https://github.com/tokio-rs/tokio/pull/6874
+[#6963]: https://github.com/tokio-rs/tokio/pull/6963
+[#6975]: https://github.com/tokio-rs/tokio/pull/6975
+[#6986]: https://github.com/tokio-rs/tokio/pull/6986
+[#6995]: https://github.com/tokio-rs/tokio/pull/6995
+[#7014]: https://github.com/tokio-rs/tokio/pull/7014
+[#7029]: https://github.com/tokio-rs/tokio/pull/7029
+[#7038]: https://github.com/tokio-rs/tokio/pull/7038
+[#7041]: https://github.com/tokio-rs/tokio/pull/7041
+[#7042]: https://github.com/tokio-rs/tokio/pull/7042
+[#7047]: https://github.com/tokio-rs/tokio/pull/7047
+[#7053]: https://github.com/tokio-rs/tokio/pull/7053
+[#7054]: https://github.com/tokio-rs/tokio/pull/7054
+[#7055]: https://github.com/tokio-rs/tokio/pull/7055
+[#7067]: https://github.com/tokio-rs/tokio/pull/7067
+[#7068]: https://github.com/tokio-rs/tokio/pull/7068
+[#7073]: https://github.com/tokio-rs/tokio/pull/7073
+[#7074]: https://github.com/tokio-rs/tokio/pull/7074
+
 # 1.42.0 (Dec 3rd, 2024)
 
 ### Added
