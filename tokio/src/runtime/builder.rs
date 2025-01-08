@@ -1245,8 +1245,31 @@ impl Builder {
         ///     .unwrap();
         /// ```
         ///
+        /// When migrating from the legacy histogram ([`HistogramScale::Log`]) and wanting
+        /// to match the previous behavior, use `precision_exact(0)`. This creates a histogram
+        /// where each bucket is twice the size of the previous bucket.
+        /// ```rust
+        /// use std::time::Duration;
+        /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
+        /// let rt = tokio::runtime::Builder::new_current_thread()
+        ///     .enable_all()
+        ///     .enable_metrics_poll_time_histogram()
+        ///     .metrics_poll_time_histogram_configuration(HistogramConfiguration::log(
+        ///         LogHistogram::builder()
+        ///             .min_value(Duration::from_micros(20))
+        ///             .max_value(Duration::from_millis(4))
+        ///             // Set `precision_exact` to `0` to match `HistogramScale::Log`
+        ///             .precision_exact(0)
+        ///             .max_buckets(10)
+        ///             .unwrap(),
+        ///     ))
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        ///
         /// [`LogHistogram`]: crate::runtime::LogHistogram
         /// [default configuration]: crate::runtime::LogHistogramBuilder
+        /// [`HistogramScale::Log`]: crate::runtime::HistogramScale::Log
         pub fn metrics_poll_time_histogram_configuration(&mut self, configuration: HistogramConfiguration) -> &mut Self {
             self.metrics_poll_count_histogram.histogram_type = configuration.inner;
             self
