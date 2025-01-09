@@ -227,25 +227,21 @@ impl Trace {
     ///
     /// Example usage:
     /// ```
-    /// let mut trace = None;
-    ///
     /// // some future
-    /// let mut test_future = Box::pin(async move { tokio::task::yield_now().await; 0 });
+    /// let mut test_future = std::pin::pin!(async move { tokio::task::yield_now().await; 0 });
     ///
     /// // trace it once
-    /// Trace::root(std::future::poll_fn(|cx| {
-    ///     if trace.is_none() {
-    ///         // make sure we only trace once
-    ///         let (res, captured) = Trace::capture(|| test_future.as_mut().poll(cx));
-    ///         trace = Some(captured);
-    ///         res
-    ///     } else {
-    ///         test_future.as_mut().poll(cx)
-    ///     }
-    /// })).await;@@
+    /// let (trace, res) = Trace::root(std::future::poll_fn(|cx| {
+    ///     let (res, trace) = Trace::capture(|| test_future.as_mut().poll(cx));
+    ///     Poll::Ready((trace, res))
+    /// })).await;
     ///
-    /// // check that there are backtraces
-    /// assert!(!trace.unwrap().resolve_backtraces().is_empty());
+    /// let output = match res {
+    ///    Poll::Ready(output) => output,
+    ///    Poll::Pending => test_future.await,
+    /// };
+    ///
+    /// println!("{trace}");
     /// ```
     ///
     /// ### Nested calls

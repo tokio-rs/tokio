@@ -6,22 +6,21 @@
     any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
 ))]
 
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::{Arc, Mutex},
-    task::{Context, Poll},
-    time::{Duration, Instant},
-};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 
 use tokio::runtime::dump::{Root, Trace};
 
-pin_project_lite::pin_project! { pub struct PrettyFuture<F: Future> {
-    #[pin]
-    f: Root<F>,
-    t_last: State,
-    logs: Arc<Mutex<Vec<Trace>>>,
-}
+pin_project_lite::pin_project! {
+    pub struct PrettyFuture<F: Future> {
+        #[pin]
+        f: Root<F>,
+        t_last: State,
+        logs: Arc<Mutex<Vec<Trace>>>,
+    }
 }
 
 enum State {
