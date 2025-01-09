@@ -287,6 +287,54 @@ impl CancellationToken {
         }
         .await
     }
+
+    /// Runs a future to completion and returns its result wrapped inside of an `Option`
+    /// unless the `CancellationToken` is cancelled. In that case the function returns
+    /// `None` and the future gets dropped.
+    ///
+    /// The function takes self by value.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is only cancel safe if `fut` is cancel safe.
+    pub async fn run_until_cancelled_owned<F>(self, fut: F) -> Option<F::Output>
+    where
+        F: Future,
+    {
+        pin_project! {
+            /// A Future that is resolved once the corresponding [`CancellationToken`]
+            /// is cancelled or a given Future gets resolved. It is biased towards the
+            /// Future completion.
+            #[must_use = "futures do nothing unless polled"]
+            struct RunUntilCancelledFuture<F: Future> {
+                #[pin]
+                cancellation: WaitForCancellationFutureOwned,
+                #[pin]
+                future: F,
+            }
+        }
+
+        impl<F: Future> Future for RunUntilCancelledFuture<F> {
+            type Output = Option<F::Output>;
+
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let this = self.project();
+                if let Poll::Ready(res) = this.future.poll(cx) {
+                    Poll::Ready(Some(res))
+                } else if this.cancellation.poll(cx).is_ready() {
+                    Poll::Ready(None)
+                } else {
+                    Poll::Pending
+                }
+            }
+        }
+
+        RunUntilCancelledFuture {
+            cancellation: self.cancelled_owned(),
+            future: fut,
+        }
+        .await
+    }
 }
 
 // ===== impl WaitForCancellationFuture =====
