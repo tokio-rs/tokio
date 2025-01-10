@@ -414,7 +414,7 @@ impl Semaphore {
         } << Self::PERMIT_SHIFT;
 
         let mut available = self.permits.load(Acquire);
-        let mut acquired: usize;
+        let mut acquired_shifted: usize;
 
         // We could acquire the lock right now, but that's going to be
         // expensive. To optimize, we try once without holding the mutex
@@ -429,8 +429,8 @@ impl Semaphore {
                 return Poll::Ready(Err(AcquireError::closed()));
             }
 
-            acquired = cmp::min(available, still_needed);
-            let remaining = available - acquired;
+            acquired_shifted = cmp::min(available, still_needed);
+            let remaining = available - acquired_shifted;
 
             // Not all permits were immediately available, so this waiter will
             // (probably) need to wait. We'll need to acquire a lock on the wait
@@ -439,7 +439,7 @@ impl Semaphore {
             // Otherwise, if we subtract the permits and then acquire the lock,
             // we might miss additional permits being added while waiting for
             // the lock.
-            if acquired < still_needed && queue_guard.is_none() {
+            if acquired_shifted < still_needed && queue_guard.is_none() {
                 queue_guard = Some(self.waiters.lock());
             }
 
@@ -458,19 +458,19 @@ impl Semaphore {
         self.resource_span.in_scope(|| {
             tracing::trace!(
                 target: "runtime::resource::state_update",
-                permits = (acquired >> Self::PERMIT_SHIFT),
+                permits = (acquired_shifted >> Self::PERMIT_SHIFT),
                 permits.op = "sub",
             );
         });
 
         // If the waiter gets all the permits at the first try, don't bother
         // enqueuing it.
-        if acquired == still_needed && !queued {
+        if acquired_shifted == still_needed && !queued {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             self.resource_span.in_scope(|| {
                 tracing::trace!(
                     target: "runtime::resource::async_op::state_update",
-                    permits_obtained = (acquired >> Self::PERMIT_SHIFT),
+                    permits_obtained = (acquired_shifted >> Self::PERMIT_SHIFT),
                     permits.op = "add",
                 )
             });
@@ -482,7 +482,7 @@ impl Semaphore {
             return Poll::Ready(Err(AcquireError::closed()));
         }
 
-        acquired >>= Self::PERMIT_SHIFT;
+        let mut acquired = acquired_shifted >> Self::PERMIT_SHIFT;
 
         if node.assign_permits(&mut acquired) {
             // If the waiter is happy with the acquired permits, return the
