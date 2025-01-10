@@ -984,7 +984,7 @@ impl Command {
 
     /// Returns the boolean value that was previously set by [`Command::kill_on_drop`].
     ///
-    /// Note that if you have not previously called [`Command:: kill_on_drop`], the
+    /// Note that if you have not previously called [`Command::kill_on_drop`], the
     /// default value of `false` will be returned here.
     ///
     /// # Examples
