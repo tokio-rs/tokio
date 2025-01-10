@@ -1035,7 +1035,7 @@ jobs:
 
       - name: test tests-integration --features wasi-rt
         # TODO: this should become: `cargo hack wasi test --each-feature`
-        run: cargo wasi test --test rt_yield --features wasi-rt
+        run: cargo wasi test --target ${{ matrix.target }} --test rt_yield --features wasi-rt
         if: matrix.target == 'wasm32-wasip1'
         working-directory: tests-integration
 
