@@ -227,6 +227,12 @@ impl Trace {
     ///
     /// Example usage:
     /// ```
+    /// # use std::future::Future;
+    /// # use std::task::Poll;
+    ///
+    /// # use tokio::runtime::dump::Trace;
+    ///
+    /// # async fn test_fn() {
     /// // some future
     /// let mut test_future = std::pin::pin!(async move { tokio::task::yield_now().await; 0 });
     ///
@@ -242,6 +248,7 @@ impl Trace {
     /// };
     ///
     /// println!("{trace}");
+    /// # }
     /// ```
     ///
     /// ### Nested calls
