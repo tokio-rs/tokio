@@ -227,10 +227,9 @@ impl Trace {
     ///
     /// Example usage:
     /// ```
-    /// # use std::future::Future;
-    /// # use std::task::Poll;
-    ///
-    /// # use tokio::runtime::dump::Trace;
+    /// use std::future::Future;
+    /// use std::task::Poll;
+    /// use tokio::runtime::dump::Trace;
     ///
     /// # async fn test_fn() {
     /// // some future
