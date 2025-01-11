@@ -810,6 +810,7 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
+    /// # if cfg!(miri) { return } // No `pidfd_spawnp` in miri.
     /// use tokio::process::Command;
     ///
     /// async fn run_ls() -> std::process::ExitStatus {
@@ -979,6 +980,26 @@ impl Command {
         let child = self.spawn();
 
         async { child?.wait_with_output().await }
+    }
+
+    /// Returns the boolean value that was previously set by [`Command::kill_on_drop`].
+    ///
+    /// Note that if you have not previously called [`Command::kill_on_drop`], the
+    /// default value of `false` will be returned here.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::process::Command;
+    ///
+    /// let mut cmd = Command::new("echo");
+    /// assert!(!cmd.get_kill_on_drop());
+    ///
+    /// cmd.kill_on_drop(true);
+    /// assert!(cmd.get_kill_on_drop());
+    /// ```
+    pub fn get_kill_on_drop(&self) -> bool {
+        self.kill_on_drop
     }
 }
 
@@ -1192,6 +1213,7 @@ impl Child {
     /// This function is cancel safe.
     ///
     /// ```
+    /// # if cfg!(miri) { return } // No `pidfd_spawnp` in miri.
     /// # #[cfg(not(unix))]fn main(){}
     /// # #[cfg(unix)]
     /// use tokio::io::AsyncWriteExt;

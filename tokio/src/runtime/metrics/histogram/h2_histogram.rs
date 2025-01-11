@@ -9,6 +9,7 @@ const DEFAULT_MAX_VALUE: Duration = Duration::from_secs(60);
 
 /// Default precision is 2^-2 = 25% max error
 const DEFAULT_PRECISION: u32 = 2;
+const MAX_PRECISION: u32 = 10;
 
 /// Log Histogram
 ///
@@ -57,6 +58,15 @@ impl LogHistogram {
         }
     }
 
+    fn truncate_to_max_value(&self, max_value: u64) -> LogHistogram {
+        let mut hist = self.clone();
+        while hist.max_value() >= max_value {
+            hist.num_buckets -= 1;
+        }
+        hist.num_buckets += 1;
+        hist
+    }
+
     /// Creates a builder for [`LogHistogram`]
     pub fn builder() -> LogHistogramBuilder {
         LogHistogramBuilder::default()
@@ -64,8 +74,7 @@ impl LogHistogram {
 
     /// The maximum value that can be stored before truncation in this histogram
     pub fn max_value(&self) -> u64 {
-        let n = (self.num_buckets / (1 << self.p)) - 1 + self.p as usize;
-        (1_u64 << n) - 1
+        self.bucket_range(self.num_buckets - 2).end
     }
 
     pub(crate) fn value_to_bucket(&self, value: u64) -> usize {
@@ -155,23 +164,23 @@ impl LogHistogramBuilder {
     /// such that `2^-p` is less than `precision`. To set `p` directly, use
     /// [`LogHistogramBuilder::precision_exact`].
     ///
+    /// Precision controls the size of the "bucket groups" (consecutive buckets with identical
+    /// ranges). When `p` is 0, each bucket will be twice the size of the previous bucket. To match
+    /// the behavior of the legacy log histogram implementation, use `builder.precision_exact(0)`.
+    ///
     /// The default value is 25% (2^-2)
     ///
     /// The highest supported precision is `0.0977%` `(2^-10)`. Provided values
     /// less than this will be truncated.
     ///
     /// # Panics
-    /// - `precision` < 0
-    /// - `precision` > 1
+    /// - `max_error` < 0
+    /// - `max_error` > 1
     pub fn max_error(mut self, max_error: f64) -> Self {
-        if max_error < 0.0 {
-            panic!("precision must be >= 0");
-        };
-        if max_error > 1.0 {
-            panic!("precision must be > 1");
-        };
+        assert!(max_error > 0.0, "max_error must be greater than 0");
+        assert!(max_error < 1.0, "max_error must be less than 1");
         let mut p = 2;
-        while 2_f64.powf(-1.0 * p as f64) > max_error && p <= 10 {
+        while 2_f64.powf(-1.0 * p as f64) > max_error && p <= MAX_PRECISION {
             p += 1;
         }
         self.precision = Some(p);
@@ -180,16 +189,20 @@ impl LogHistogramBuilder {
 
     /// Sets the precision of this histogram directly.
     ///
+    /// The precision (meaning: the ratio `n/bucket_range(n)` for some given `n`) will be `2^-p`.
+    ///
+    /// Precision controls the number consecutive buckets with identically sized ranges.
+    /// When `p` is 0, each bucket will be twice the size of the previous bucket (bucket groups are
+    /// only a single bucket wide).
+    ///
+    /// To match the behavior of the legacy implementation ([`HistogramScale::Log`]), use `builder.precision_exact(0)`.
+    ///
     /// # Panics
-    /// - `p` < 2
     /// - `p` > 10
+    ///
+    /// [`HistogramScale::Log`]: [crate::runtime::HistogramScale]
     pub fn precision_exact(mut self, p: u32) -> Self {
-        if p < 2 {
-            panic!("precision must be >= 2");
-        };
-        if p > 10 {
-            panic!("precision must be <= 10");
-        };
+        assert!(p <= MAX_PRECISION, "precision must be <= {MAX_PRECISION}");
         self.precision = Some(p);
         self
     }
@@ -234,16 +247,17 @@ impl LogHistogramBuilder {
 
     /// Builds the log histogram
     pub fn build(&self) -> LogHistogram {
-        let max_value = duration_as_u64(self.max_value.unwrap_or(DEFAULT_MAX_VALUE));
-        let max_value = max_value.next_power_of_two();
+        let requested_max_value = duration_as_u64(self.max_value.unwrap_or(DEFAULT_MAX_VALUE));
+        let max_value = requested_max_value.next_power_of_two();
         let min_value = duration_as_u64(self.min_value.unwrap_or(DEFAULT_MIN_VALUE));
         let p = self.precision.unwrap_or(DEFAULT_PRECISION);
         // determine the bucket offset by finding the bucket for the minimum value. We need to lower
         // this by one to ensure we are at least as granular as requested.
         let bucket_offset = cmp::max(bucket_index(min_value, p), 1) - 1;
         // n must be at least as large as p
-        let n = max_value.ilog2().max(p);
+        let n = max_value.ilog2().max(p) + 1;
         LogHistogram::from_n_p(n, p, bucket_offset as usize)
+            .truncate_to_max_value(requested_max_value)
     }
 }
 
@@ -295,17 +309,55 @@ mod test {
     #[cfg(not(target_family = "wasm"))]
     mod proptests {
         use super::*;
+        use crate::runtime::metrics::batch::duration_as_u64;
+        use crate::runtime::metrics::histogram::h2_histogram::MAX_PRECISION;
         use proptest::prelude::*;
+        use std::time::Duration;
+
         fn valid_log_histogram_strategy() -> impl Strategy<Value = LogHistogram> {
-            (2..=50u32, 2..=16u32, 0..100usize).prop_map(|(n, p, bucket_offset)| {
+            (1..=50u32, 0..=MAX_PRECISION, 0..100usize).prop_map(|(n, p, bucket_offset)| {
                 let p = p.min(n);
                 let base = LogHistogram::from_n_p(n, p, 0);
                 LogHistogram::from_n_p(n, p, bucket_offset.min(base.num_buckets - 1))
             })
         }
 
+        fn log_histogram_settings() -> impl Strategy<Value = (u64, u64, u32)> {
+            (
+                duration_as_u64(Duration::from_nanos(1))..duration_as_u64(Duration::from_secs(20)),
+                duration_as_u64(Duration::from_secs(1))..duration_as_u64(Duration::from_secs(1000)),
+                0..MAX_PRECISION,
+            )
+        }
+
         // test against a wide assortment of different histogram configurations to ensure invariants hold
         proptest! {
+            #[test]
+            fn log_histogram_settings_maintain_invariants((min_value, max_value, p) in log_histogram_settings()) {
+                if max_value < min_value {
+                    return Ok(())
+                }
+                let (min_value, max_value) = (Duration::from_nanos(min_value), Duration::from_nanos(max_value));
+                let histogram = LogHistogram::builder().min_value(min_value).max_value(max_value).precision_exact(p).build();
+                let first_bucket_end = Duration::from_nanos(histogram.bucket_range(0).end);
+                let last_bucket_start = Duration::from_nanos(histogram.bucket_range(histogram.num_buckets - 1).start);
+                let second_last_bucket_start = Duration::from_nanos(histogram.bucket_range(histogram.num_buckets - 2).start);
+                prop_assert!(
+                    first_bucket_end  <= min_value,
+                    "first bucket {first_bucket_end:?} must be less than {min_value:?}"
+                );
+                prop_assert!(
+                    last_bucket_start > max_value,
+                    "last bucket start ({last_bucket_start:?} must be at least as big as `max_value` ({max_value:?})"
+                );
+
+                // We should have the exact right number of buckets. The second to last bucket should be strictly less than max value.
+                prop_assert!(
+                    second_last_bucket_start < max_value,
+                    "second last bucket end ({second_last_bucket_start:?} must be at least as big as `max_value` ({max_value:?})"
+                );
+            }
+
             #[test]
             fn proptest_log_histogram_invariants(histogram in valid_log_histogram_strategy()) {
                 // 1. Assert that the first bucket always starts at 0
@@ -469,7 +521,7 @@ mod test {
                 required_bucket_count,
             } => required_bucket_count,
         };
-        assert_eq!(num_buckets, 27549);
+        assert_eq!(num_buckets, 27291);
     }
 
     #[test]

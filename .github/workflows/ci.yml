@@ -49,7 +49,9 @@ jobs:
       - test-parking_lot
       - valgrind
       - test-unstable
-      - miri
+      - miri-lib
+      - miri-test
+      - miri-doc
       - asan
       - cross-check
       - cross-check-tier3
@@ -380,8 +382,8 @@ jobs:
           # the unstable cfg to RustDoc
           RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_internal_mt_counters
 
-  miri:
-    name: miri
+  miri-lib:
+    name: miri-lib
     needs: basics
     runs-on: ubuntu-latest
     steps:
@@ -398,7 +400,49 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: miri
         run: |
-          cargo miri nextest run --features full --lib --tests --no-fail-fast
+          cargo miri nextest run --features full --lib --no-fail-fast
+        working-directory: tokio
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+
+  miri-test:
+    name: miri-test
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_miri_nightly }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_miri_nightly }}
+          components: miri
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - uses: Swatinem/rust-cache@v2
+      - name: miri
+        run: |
+          cargo miri nextest run --features full --test '*' --no-fail-fast
+        working-directory: tokio
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+
+  miri-doc:
+    name: miri-doc
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_miri_nightly }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_miri_nightly }}
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      - name: miri-doc-test
+        run: |
+          cargo miri test --doc --all-features --no-fail-fast
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
@@ -467,6 +511,7 @@ jobs:
     strategy:
       matrix:
         target:
+          - name: x86_64-unknown-haiku
           - name: armv7-sony-vita-newlibeabihf
             exclude_features: "process,signal,rt-process-signal,full"
     steps:
@@ -964,7 +1009,7 @@ jobs:
       - name: Install cargo-hack, wasmtime, and cargo-wasi
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-hack,wasmtime,cargo-wasi
+          tool: cargo-hack,wasmtime
 
       - uses: Swatinem/rust-cache@v2
       - name: WASI test tokio full
@@ -990,9 +1035,12 @@ jobs:
 
       - name: test tests-integration --features wasi-rt
         # TODO: this should become: `cargo hack wasi test --each-feature`
-        run: cargo wasi test --test rt_yield --features wasi-rt
+        run: cargo test --target ${{ matrix.target }} --test rt_yield --features wasi-rt
         if: matrix.target == 'wasm32-wasip1'
         working-directory: tests-integration
+        env:
+          CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
+          RUSTFLAGS: -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: test tests-integration --features wasi-threads-rt
         run: cargo test --target ${{ matrix.target }} --features wasi-threads-rt
@@ -1084,8 +1132,25 @@ jobs:
       - uses: actions/checkout@v4
       - name: Make sure dictionary words are sorted and unique
         run: |
-          # `sed` removes the first line (number of words) and
-          # the last line (new line).
+          FILE="spellcheck.dic"
+
+          # Verify the first line is an integer.
+          first_line=$(head -n 1 "$FILE")
+          if ! [[ "$first_line" =~ ^[0-9]+$ ]]; then
+            echo "Error: The first line of $FILE must be an integer, but got: '$first_line'"
+            exit 1
+          fi
+          expected_count="$first_line"
+
+          # Check that the number of lines matches the integer.
+          # xargs (with no arguments) will strip leading/trailing whitespacefrom wc's output.
+          actual_count=$(sed '1d' "$FILE" | wc -l | xargs)
+          if [ "$expected_count" -ne "$actual_count" ]; then
+            echo "Error: The number of lines ($actual_count) does not match $expected_count."
+            exit 1
+          fi
+
+          # `sed` removes the first line (number of words).
           #
           # `sort` makes sure everything in between is sorted
           # and contains no duplicates.
@@ -1095,10 +1160,10 @@ jobs:
           # environments.
 
           (
-            sed '1d; $d' spellcheck.dic | LC_ALL=en_US.UTF8 sort -uc
+            sed '1d' $FILE | LC_ALL=en_US.UTF8 sort -uc
           ) || {
             echo "Dictionary is not in sorted order. Correct order is:"
-            LC_ALL=en_US.UTF8 sort -u <(sed '1d; $d' spellcheck.dic)
+            LC_ALL=en_US.UTF8 sort -u <(sed '1d' $FILE)
             false
           }
       - name: Run cargo-spellcheck

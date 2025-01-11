@@ -213,6 +213,7 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use std::error::Error;
     /// use std::io::Read;
     /// use tokio::net::TcpListener;
@@ -919,7 +920,7 @@ impl TcpStream {
     /// were written.
     ///
     /// Data is written from each buffer in order, with the final buffer read
-    /// from possible being only partially consumed. This method behaves
+    /// from possibly being only partially consumed. This method behaves
     /// equivalently to a single call to [`try_write()`] with concatenated
     /// buffers.
     ///
