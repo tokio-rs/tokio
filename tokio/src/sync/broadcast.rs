@@ -825,17 +825,14 @@ impl<T> Sender<T> {
     ///     let (tx, mut rx1) = broadcast::channel::<u32>(16);
     ///     let mut rx2 = tx.subscribe();
     ///
-    ///     tokio::spawn(async move {
-    ///         assert_eq!(rx1.recv().await.unwrap(), 10);
-    ///     });
-    ///
     ///     let _ = tx.send(10);
+    ///
+    ///     assert_eq!(rx1.recv().await.unwrap(), 10);
+    ///     drop(rx1);
     ///     assert!(tx.closed().now_or_never().is_none());
     ///
-    ///     let _ = tokio::spawn(async move {
-    ///         assert_eq!(rx2.recv().await.unwrap(), 10);
-    ///     }).await;
-    ///
+    ///     assert_eq!(rx2.recv().await.unwrap(), 10);
+    ///     drop(rx2);
     ///     assert!(tx.closed().now_or_never().is_some());
     /// }
     /// ```
