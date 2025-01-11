@@ -88,7 +88,7 @@ impl ReadHalf<'_> {
     ///
     /// [`TcpStream::poll_peek`]: TcpStream::poll_peek
     pub fn poll_peek(
-        &mut self,
+        &self,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<usize>> {
@@ -134,7 +134,7 @@ impl ReadHalf<'_> {
     ///
     /// [`read`]: fn@crate::io::AsyncReadExt::read
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
-    pub async fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         let mut buf = ReadBuf::new(buf);
         poll_fn(|cx| self.poll_peek(cx, &mut buf)).await
     }
