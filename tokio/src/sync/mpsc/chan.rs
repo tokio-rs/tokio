@@ -1,6 +1,6 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
-use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::atomic::{AtomicUsize, Ordering};
 use crate::loom::sync::Arc;
 use crate::runtime::park::CachedParkThread;
 use crate::sync::mpsc::error::TryRecvError;
@@ -207,6 +207,10 @@ impl<T, S: Semaphore> Tx<T, S> {
             return;
         }
         notified.await;
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.inner.tx_count.load(Ordering::SeqCst)
     }
 }
 
