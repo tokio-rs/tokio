@@ -492,7 +492,7 @@ impl<T, S: Semaphore> Drop for Rx<T, S> {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
             struct Guard<'a, T, S: Semaphore> {
                 list: &'a mut list::Rx<T>,
-                tx: &'a CachePadded<crate::sync::mpsc::list::Tx<T>>,
+                tx: &'a list::Tx<T>,
                 sem: &'a S,
             }
 
