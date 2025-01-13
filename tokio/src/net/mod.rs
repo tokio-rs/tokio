@@ -35,20 +35,18 @@ cfg_not_wasi! {
 }
 pub use addr::ToSocketAddrs;
 
-cfg_net! {
-    mod lookup_host;
-    pub use lookup_host::lookup_host;
+mod lookup_host;
+pub use lookup_host::lookup_host;
 
-    pub mod tcp;
-    pub use tcp::listener::TcpListener;
-    pub use tcp::stream::TcpStream;
-    cfg_not_wasi! {
-        pub use tcp::socket::TcpSocket;
+pub mod tcp;
+pub use tcp::listener::TcpListener;
+pub use tcp::stream::TcpStream;
+cfg_not_wasi! {
+    pub use tcp::socket::TcpSocket;
 
-        mod udp;
-        #[doc(inline)]
-        pub use udp::UdpSocket;
-    }
+    mod udp;
+    #[doc(inline)]
+    pub use udp::UdpSocket;
 }
 
 cfg_net_unix! {

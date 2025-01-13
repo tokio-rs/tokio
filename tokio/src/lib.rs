@@ -506,7 +506,10 @@ cfg_fs! {
 mod future;
 
 pub mod io;
-pub mod net;
+
+cfg_net! {
+    pub mod net;
+}
 
 mod loom;
 
