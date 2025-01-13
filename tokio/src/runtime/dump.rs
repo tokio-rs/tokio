@@ -219,11 +219,19 @@ impl Trace {
 
     /// Runs the function `f` in tracing mode, and returns its result along with the resulting [`Trace`].
     ///
-    /// The passed-in function is normally a poll function. Due to the way tracing is implemented,
-    /// Tokio leaf futures might, instead of doing their actual work, do the equivalent of a
-    /// `yield_now` (returning a `Poll::Pending` and scheduling the current context for execution),
-    /// which means forward progress is only guaranteed if you eventually call your future outside of
-    /// `capture`.
+    /// This is normally called with `f` being the poll function of a future, and will give you a backtrace
+    /// that tells you what that one future is doing.
+    ///
+    /// Use [`Handle::dump`] instead if you want to know what *all the tasks* in your program are doing.
+    /// Also see [`Handle::dump`] for more documentation about dumps, but unlike [`Handle::dump`], this function
+    /// should not be much slower than calling `f` directly.
+    ///
+    /// Due to the way tracing is implemented, Tokio leaf futures will usually, instead of doing their
+    /// actual work, do the equivalent of a `yield_now` (returning a `Poll::Pending` and scheduling the
+    /// current context for execution), which means forward progress will probably not happen unless
+    /// you eventually call your future outside of `capture`.
+    ///
+    /// [`Handle::dump`]: crate::runtime::Handle::dump
     ///
     /// Example usage:
     /// ```
@@ -235,12 +243,13 @@ impl Trace {
     /// // some future
     /// let mut test_future = std::pin::pin!(async move { tokio::task::yield_now().await; 0 });
     ///
-    /// // trace it once
+    /// // trace it once, see what it's doing
     /// let (trace, res) = Trace::root(std::future::poll_fn(|cx| {
     ///     let (res, trace) = Trace::capture(|| test_future.as_mut().poll(cx));
     ///     Poll::Ready((trace, res))
     /// })).await;
     ///
+    /// // await it to let it finish, outside of a `capture`
     /// let output = match res {
     ///    Poll::Ready(output) => output,
     ///    Poll::Pending => test_future.await,
@@ -254,11 +263,6 @@ impl Trace {
     ///
     /// Nested calls to `capture` might return partial traces, but will not do any other undesirable behavior (for
     /// example, they will not panic).
-    ///
-    /// ### Unstable Implementation Details
-    ///
-    /// When run in tracing mode, Tokio leaf futures will return `Poll::Pending` and emit a stack trace
-    /// that will be captured in the returning [`Trace`].
     pub fn capture<F, R>(f: F) -> (R, Trace)
     where
         F: FnOnce() -> R,
