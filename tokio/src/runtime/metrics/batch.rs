@@ -249,8 +249,8 @@ cfg_rt_multi_thread! {
                 pub(crate) fn incr_steal_count(&mut self, _by: u16) {}
             },
             unstable: {
-                pub(crate) fn incr_steal_count(&mut self, _by: u16) {
-                    self.steal_count += _by as u64;
+                pub(crate) fn incr_steal_count(&mut self, by: u16) {
+                    self.steal_count += by as u64;
                 }
             }
         }

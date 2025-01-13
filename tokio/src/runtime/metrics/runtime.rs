@@ -1,5 +1,4 @@
 use crate::runtime::Handle;
-#[allow(unused_imports)]
 use std::time::Duration;
 
 cfg_64bit_metrics! {

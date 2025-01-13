@@ -18,6 +18,16 @@ cfg_unstable_metrics! {
 #[derive(Debug, Default)]
 #[repr(align(128))]
 pub(crate) struct WorkerMetrics {
+    /// Amount of time the worker spent doing work vs. parking.
+    pub(crate) busy_duration_total: MetricAtomicU64,
+
+    /// Number of tasks currently in the local queue. Used only by the
+    /// current-thread scheduler.
+    pub(crate) queue_depth: MetricAtomicUsize,
+
+    /// Thread id of worker thread.
+    thread_id: Mutex<Option<ThreadId>>,
+
     #[cfg(tokio_unstable)]
     ///  Number of times the worker parked.
     pub(crate) park_count: MetricAtomicU64,
@@ -46,9 +56,6 @@ pub(crate) struct WorkerMetrics {
     /// EWMA task poll time, in nanoseconds.
     pub(crate) mean_poll_time: MetricAtomicU64,
 
-    /// Amount of time the worker spent doing work vs. parking.
-    pub(crate) busy_duration_total: MetricAtomicU64,
-
     #[cfg(tokio_unstable)]
     /// Number of tasks scheduled for execution on the worker's local queue.
     pub(crate) local_schedule_count: MetricAtomicU64,
@@ -57,16 +64,9 @@ pub(crate) struct WorkerMetrics {
     /// Number of tasks moved from the local queue to the global queue to free space.
     pub(crate) overflow_count: MetricAtomicU64,
 
-    /// Number of tasks currently in the local queue. Used only by the
-    /// current-thread scheduler.
-    pub(crate) queue_depth: MetricAtomicUsize,
-
     #[cfg(tokio_unstable)]
     /// If `Some`, tracks the number of polls by duration range.
     pub(super) poll_count_histogram: Option<Histogram>,
-
-    /// Thread id of worker thread.
-    thread_id: Mutex<Option<ThreadId>>,
 }
 
 impl WorkerMetrics {
@@ -82,22 +82,25 @@ impl WorkerMetrics {
         *self.thread_id.lock().unwrap() = Some(thread_id);
     }
 
-    cfg_not_unstable_metrics! {
-        pub(crate) fn from_config(_: &Config) -> WorkerMetrics {
-            WorkerMetrics::new()
+    cfg_metrics_variant! {
+        stable: {
+            pub(crate) fn from_config(_: &Config) -> WorkerMetrics {
+                WorkerMetrics::new()
+            }
+        },
+        unstable: {
+            pub(crate) fn from_config(config: &Config) -> WorkerMetrics {
+                let mut worker_metrics = WorkerMetrics::new();
+                worker_metrics.poll_count_histogram = config
+                    .metrics_poll_count_histogram
+                    .as_ref()
+                    .map(|histogram_builder| histogram_builder.build());
+                worker_metrics
+            }
         }
     }
 
     cfg_unstable_metrics! {
-        pub(crate) fn from_config(config: &Config) -> WorkerMetrics {
-            let mut worker_metrics = WorkerMetrics::new();
-            worker_metrics.poll_count_histogram = config
-                .metrics_poll_count_histogram
-                .as_ref()
-                .map(|histogram_builder| histogram_builder.build());
-            worker_metrics
-        }
-
         pub(crate) fn queue_depth(&self) -> usize {
             self.queue_depth.load(Relaxed)
         }
