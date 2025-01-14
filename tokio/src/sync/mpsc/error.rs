@@ -1,5 +1,7 @@
 //! Channel error types.
 
+use crate::alias::std;
+
 use std::error::Error;
 use std::fmt;
 

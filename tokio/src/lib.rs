@@ -666,6 +666,8 @@ pub(crate) use self::doc::os;
 #[allow(unused)]
 pub(crate) use alias::std::os;
 
+extern crate alloc;
+
 pub(crate) mod alias {
     pub(crate) mod std {
         pub(crate) mod prelude {
@@ -678,8 +680,7 @@ pub(crate) mod alias {
 
         pub(crate) use core::{any, cell, convert, cmp, fmt, future, hint, iter, marker, mem, num, ops, pin, ptr, slice, task};
 
-        extern crate alloc;
-        pub(crate) use alloc::{borrow, boxed, rc, str, string, vec};
+        pub(crate) use crate::alloc::{borrow, boxed, rc, str, string, vec};
 
         #[cfg(feature = "portable-io")]
         pub(crate) use portable_io as io;
@@ -694,17 +695,13 @@ pub(crate) mod alias {
         pub(crate) use std::io;
 
         #[cfg(feature = "std")]
-        pub(crate) use std::{collections, env, error, ffi, fs, hash, os, panic, path, process, result, thread, thread_local};
+        pub(crate) use std::{alloc, collections, env, error, ffi, fs, hash, os, panic, path, process, result, thread, thread_local};
 
         pub(crate) mod sync {
-            extern crate alloc;
-            #[cfg(feature = "std")]
-            extern crate std;
-
             pub(crate) use core::sync::atomic;
-            pub(crate) use alloc::sync::*;
+            pub(crate) use crate::alloc::sync::*;
             #[cfg(feature = "std")]
-            pub(crate) use std::sync::*;
+            pub(crate) use super::std::sync::*;
         }
 
         pub(crate) mod time {

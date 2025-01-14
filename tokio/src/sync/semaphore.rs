@@ -1,7 +1,10 @@
 use super::batch_semaphore as ll; // low level implementation
 use super::{AcquireError, TryAcquireError};
+
+use crate::alias::std;
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;
+
 use std::sync::Arc;
 
 /// Counting semaphore performing asynchronous permit acquisition.

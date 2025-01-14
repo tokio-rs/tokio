@@ -1,3 +1,5 @@
+use crate::alias::std;
+
 use std::future::Future;
 
 cfg_rt! {

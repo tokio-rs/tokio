@@ -87,7 +87,7 @@ signal = [
   "windows-sys/Win32_System_Console",
 ]
 std = []
-sync = []
+sync = ["std"]
 test-util = ["rt", "sync", "time"]
 time = []
 

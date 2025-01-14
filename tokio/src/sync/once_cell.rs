@@ -1,5 +1,8 @@
 use super::{Semaphore, SemaphorePermit, TryAcquireError};
+
+use crate::alias::std;
 use crate::loom::cell::UnsafeCell;
+
 use std::error::Error;
 use std::fmt;
 use std::future::Future;

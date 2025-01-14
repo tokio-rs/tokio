@@ -116,6 +116,7 @@
 //! }
 //! ```
 
+use crate::alias::std::{self, prelude::*};
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard};
@@ -212,6 +213,8 @@ pub struct Receiver<T> {
 
 pub mod error {
     //! Broadcast error types
+
+    use crate::alias::std;
 
     use std::fmt;
 
