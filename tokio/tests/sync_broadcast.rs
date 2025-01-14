@@ -56,6 +56,7 @@ macro_rules! assert_closed {
 trait AssertSend: Send + Sync {}
 impl AssertSend for broadcast::Sender<i32> {}
 impl AssertSend for broadcast::Receiver<i32> {}
+impl AssertSend for broadcast::WeakSender<i32> {}
 
 #[test]
 fn send_try_recv_bounded() {
