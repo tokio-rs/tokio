@@ -80,6 +80,7 @@ process = [
 rt = ["std"]
 rt-multi-thread = ["rt"]
 signal = [
+  "std",
   "libc",
   "mio/os-poll",
   "mio/net",

@@ -3,6 +3,8 @@ use super::unix::{self as os_impl};
 #[cfg(windows)]
 use super::windows::{self as os_impl};
 
+use crate::alias::std;
+
 use std::io;
 
 /// Completes when a "ctrl-c" notification is sent to the process.
