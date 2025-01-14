@@ -1,3 +1,4 @@
+use crate::alias::std;
 use crate::net::unix;
 
 /// Credentials of a process.
@@ -208,6 +209,7 @@ pub(crate) mod impl_bsd {
     target_os = "visionos"
 ))]
 pub(crate) mod impl_macos {
+    use crate::alias::std;
     use crate::net::unix::{self, UnixStream};
 
     use libc::{c_void, getpeereid, getsockopt, pid_t, LOCAL_PEEREPID, SOL_LOCAL};

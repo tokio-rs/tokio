@@ -1,3 +1,4 @@
+use crate::alias::std;
 use crate::io::{Interest, PollEvented};
 use crate::net::tcp::TcpStream;
 
@@ -400,6 +401,7 @@ impl fmt::Debug for TcpListener {
 #[cfg(unix)]
 mod sys {
     use super::TcpListener;
+    use crate::alias::std;
     use std::os::unix::prelude::*;
 
     impl AsRawFd for TcpListener {

@@ -1,3 +1,4 @@
+use crate::alias::std;
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
 
@@ -2165,6 +2166,7 @@ impl fmt::Debug for UdpSocket {
 #[cfg(unix)]
 mod sys {
     use super::UdpSocket;
+    use crate::alias::std;
     use std::os::unix::prelude::*;
 
     impl AsRawFd for UdpSocket {

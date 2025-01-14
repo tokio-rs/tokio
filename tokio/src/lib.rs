@@ -678,7 +678,7 @@ pub(crate) mod alias {
             pub(crate) use super::vec::Vec;
         }
 
-        pub(crate) use core::{any, cell, convert, cmp, fmt, future, hint, iter, marker, mem, num, ops, pin, ptr, slice, task};
+        pub(crate) use core::{any, cell, convert, cmp, fmt, future, hint, iter, marker, mem, num, ops, option, pin, ptr, slice, task};
 
         pub(crate) use crate::alloc::{borrow, boxed, rc, str, string, vec};
 
@@ -695,7 +695,7 @@ pub(crate) mod alias {
         pub(crate) use std::io;
 
         #[cfg(feature = "std")]
-        pub(crate) use std::{alloc, collections, env, error, ffi, fs, hash, os, panic, path, process, result, thread, thread_local};
+        pub(crate) use std::{alloc, collections, env, error, ffi, fs, hash, net, os, panic, path, process, result, thread, thread_local};
 
         pub(crate) mod sync {
             pub(crate) use core::sync::atomic;

@@ -51,6 +51,7 @@ io-util = ["bytes"]
 io-std = ["std"]
 macros = ["std", "tokio-macros"]
 net = [
+  "std",
   "libc",
   "mio/os-poll",
   "mio/os-ext",

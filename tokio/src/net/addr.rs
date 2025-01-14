@@ -1,3 +1,5 @@
+use crate::alias::std::{self, prelude::*};
+
 use std::future;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
@@ -253,6 +255,8 @@ pub(crate) mod sealed {
     //! The contents of this trait are intended to remain private and __not__
     //! part of the `ToSocketAddrs` public API. The details will change over
     //! time.
+
+    use crate::alias::std;
 
     use std::future::Future;
     use std::io;

@@ -1,4 +1,5 @@
 cfg_net! {
+    use crate::alias::std;
     use crate::net::addr::{self, ToSocketAddrs};
 
     use std::io;

@@ -1,5 +1,6 @@
 //! Unix pipe types.
 
+use crate::alias::std;
 use crate::io::interest::Interest;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf, Ready};
 

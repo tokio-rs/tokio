@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "net"), allow(unreachable_pub))]
 
+use crate::alias::std;
 use crate::io::interest::Interest;
 
 use std::fmt;

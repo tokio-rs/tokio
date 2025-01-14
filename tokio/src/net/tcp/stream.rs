@@ -1,3 +1,5 @@
+use crate::alias::std;
+
 cfg_not_wasi! {
     use crate::net::{to_socket_addrs, ToSocketAddrs};
     use std::future::poll_fn;
@@ -1375,6 +1377,7 @@ impl fmt::Debug for TcpStream {
 #[cfg(unix)]
 mod sys {
     use super::TcpStream;
+    use crate::alias::std;
     use std::os::unix::prelude::*;
 
     impl AsRawFd for TcpStream {

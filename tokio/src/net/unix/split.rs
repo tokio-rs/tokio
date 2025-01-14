@@ -8,6 +8,7 @@
 //! split has no associated overhead and enforces all invariants at the type
 //! level.
 
+use crate::alias::std;
 use crate::io::{AsyncRead, AsyncWrite, Interest, ReadBuf, Ready};
 use crate::net::UnixStream;
 

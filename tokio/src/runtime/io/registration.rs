@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "net"), allow(dead_code))]
 
+use crate::alias::std;
 use crate::io::interest::Interest;
 use crate::runtime::io::{Direction, Handle, ReadyEvent, ScheduledIo};
 use crate::runtime::scheduler;

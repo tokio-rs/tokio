@@ -3,6 +3,7 @@ cfg_signal_internal_and_unix! {
     mod signal;
 }
 
+use crate::alias::std;
 use crate::io::interest::Interest;
 use crate::io::ready::Ready;
 use crate::loom::sync::Mutex;

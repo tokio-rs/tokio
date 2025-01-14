@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "net"), allow(dead_code, unreachable_pub))]
 
+use crate::alias::std;
 use crate::io::ready::Ready;
 
 use std::fmt;
