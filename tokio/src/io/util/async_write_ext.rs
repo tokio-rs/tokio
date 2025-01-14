@@ -3,6 +3,8 @@ use crate::io::util::flush::{flush, Flush};
 use crate::io::util::shutdown::{shutdown, Shutdown};
 use crate::io::util::write::{write, Write};
 use crate::io::util::write_all::{write_all, WriteAll};
+// XXX TBD XXX XXX
+#[cfg(not(feature = "portable-io"))]
 use crate::io::util::write_all_buf::{write_all_buf, WriteAllBuf};
 use crate::io::util::write_buf::{write_buf, WriteBuf};
 use crate::io::util::write_int::{WriteF32, WriteF32Le, WriteF64, WriteF64Le};
@@ -317,6 +319,8 @@ cfg_io_util! {
         /// ```
         ///
         /// [`write`]: AsyncWriteExt::write
+        // XXX TBD XXX XXX
+        #[cfg(not(feature = "portable-io"))]
         fn write_all_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteAllBuf<'a, Self, B>
         where
             Self: Sized + Unpin,

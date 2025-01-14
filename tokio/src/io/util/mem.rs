@@ -2,6 +2,12 @@
 
 use crate::alias::std;
 use crate::io::{split, AsyncRead, AsyncWrite, ReadBuf, ReadHalf, WriteHalf};
+#[cfg(all(
+    feature = "parking_lot",
+    not(feature = "std"),
+))]
+use parking_lot::Mutex;
+#[cfg(feature = "std")]
 use crate::loom::sync::Mutex;
 
 use bytes::{Buf, BytesMut};

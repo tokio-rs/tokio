@@ -11,6 +11,12 @@ use std::fmt;
 use std::io;
 use std::pin::Pin;
 use std::sync::Arc;
+#[cfg(all(
+    feature = "parking_lot",
+    not(feature = "std"),
+))]
+use parking_lot::Mutex;
+#[cfg(feature = "std")]
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 
@@ -58,6 +64,12 @@ struct Inner<T> {
 
 impl<T> Inner<T> {
     fn with_lock<R>(&self, f: impl FnOnce(Pin<&mut T>) -> R) -> R {
+        #[cfg(all(
+            feature = "parking_lot",
+            not(feature = "std"),
+        ))]
+        let mut guard = self.stream.lock();
+        #[cfg(feature = "std")]
         let mut guard = self.stream.lock().unwrap();
 
         // safety: we do not move the stream.
@@ -93,6 +105,12 @@ impl<T> ReadHalf<T> {
                 .ok()
                 .expect("`Arc::try_unwrap` failed");
 
+            #[cfg(all(
+                feature = "parking_lot",
+                not(feature = "std"),
+            ))]
+            return inner.stream.into_inner();
+            #[cfg(feature = "std")]
             inner.stream.into_inner().unwrap()
         } else {
             panic!("Unrelated `split::Write` passed to `split::Read::unsplit`.")

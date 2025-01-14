@@ -507,9 +507,15 @@ cfg_fs! {
 
 mod future;
 
-// XXX TODO SUPPORT no-std with portable-io
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+// XXX TBD XXX XXX
+#[cfg(any(
+    feature = "std",
+    feature = "portable-io",
+))]
+#[cfg_attr(docsrs, doc(cfg(any(
+    feature = "std",
+    feature = "portable-io",
+))))]
 pub mod io;
 
 cfg_net! {
@@ -674,11 +680,18 @@ pub(crate) mod alias {
         extern crate alloc;
         pub(crate) use alloc::{boxed, rc, str, string, vec};
 
+        #[cfg(feature = "portable-io")]
+        pub(crate) use portable_io as io;
+
         #[cfg(feature = "std")]
         extern crate std;
 
-        #[cfg(feature = "std")]
+        #[cfg(all(
+            feature = "std",
+            not(feature = "portable-io"),
+        ))]
         pub(crate) use std::io;
+
         #[cfg(feature = "std")]
         pub(crate) use std::{collections, env, hash, os, panic, thread, thread_local};
 

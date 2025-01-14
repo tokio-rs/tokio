@@ -80,6 +80,8 @@ cfg_io_util! {
     mod write_vectored;
     mod write_all;
     mod write_buf;
+    // XXX TBD XXX XXX
+    #[cfg(not(feature = "portable-io"))]
     mod write_all_buf;
     mod write_int;
 
