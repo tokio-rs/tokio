@@ -23,6 +23,6 @@ cfg_trace! {
 
 cfg_not_trace! {
     cfg_rt! {
-        pub(crate) use std::future::Future;
+        pub(crate) use crate::alias::std::future::Future;
     }
 }

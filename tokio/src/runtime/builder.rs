@@ -1,5 +1,6 @@
 #![cfg_attr(loom, allow(unused_imports))]
 
+use crate::alias::std::{self, prelude::*};
 use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback};
 #[cfg(tokio_unstable)]

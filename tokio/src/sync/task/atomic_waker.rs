@@ -1,5 +1,6 @@
 #![cfg_attr(any(loom, not(feature = "sync")), allow(dead_code, unreachable_pub))]
 
+use crate::alias::std;
 use crate::loom::cell::UnsafeCell;
 use crate::loom::hint;
 use crate::loom::sync::atomic::AtomicUsize;

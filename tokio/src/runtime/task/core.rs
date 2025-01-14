@@ -9,6 +9,7 @@
 //! Make sure to consult the relevant safety section of each function before
 //! use.
 
+use crate::alias::std::{self, prelude::*};
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::context;

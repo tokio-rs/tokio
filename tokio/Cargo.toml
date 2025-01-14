@@ -75,7 +75,7 @@ process = [
   "windows-sys/Win32_System_WindowsProgramming",
 ]
 # Includes basic task execution capabilities
-rt = []
+rt = ["std"]
 rt-multi-thread = ["rt"]
 signal = [
   "libc",

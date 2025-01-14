@@ -3,6 +3,7 @@
 //! Each worker holds the `Sender` half. When all the `Sender` halves are
 //! dropped, the `Receiver` receives a notification.
 
+use crate::alias::std;
 use crate::loom::sync::Arc;
 use crate::sync::oneshot;
 

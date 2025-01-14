@@ -1,5 +1,7 @@
 //! This file contains mocks of the types in src/runtime/metrics
 
+use crate::alias::std;
+
 use std::thread::ThreadId;
 
 pub(crate) struct SchedulerMetrics {}

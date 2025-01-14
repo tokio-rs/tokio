@@ -6,6 +6,8 @@
 //! specified using the `T` parameter. It will usually be a `JoinHandle` or
 //! similar.
 
+use crate::alias::std::{self, prelude::*};
+
 use std::marker::PhantomPinned;
 use std::mem::ManuallyDrop;
 use std::ptr::NonNull;

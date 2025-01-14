@@ -1,4 +1,7 @@
 #![allow(dead_code)]
+
+use crate::alias::std;
+
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 use std::sync::Once;

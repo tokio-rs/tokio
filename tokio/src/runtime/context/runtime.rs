@@ -1,5 +1,6 @@
 use super::{BlockingRegionGuard, SetCurrentGuard, CONTEXT};
 
+use crate::alias::std;
 use crate::runtime::scheduler;
 use crate::util::rand::{FastRand, RngSeed};
 

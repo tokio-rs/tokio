@@ -1,3 +1,5 @@
+use crate::alias::std;
+
 use std::num::NonZeroU64;
 
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]

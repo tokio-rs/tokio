@@ -1,5 +1,7 @@
 use super::{FastRand, RngSeed};
 
+use crate::alias::std;
+
 use std::sync::Mutex;
 
 /// A deterministic generator for seeds (and other generators).

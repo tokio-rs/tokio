@@ -78,6 +78,7 @@ impl Handle {
 }
 
 cfg_rt! {
+    use crate::alias::std;
     use crate::future::Future;
     use crate::loom::sync::Arc;
     use crate::runtime::{blocking, task::Id};

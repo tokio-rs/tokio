@@ -3,6 +3,8 @@
 //!
 //! A similar primitive is provided in the `sync_wrapper` crate.
 
+use crate::alias::std::{self, prelude::*};
+
 use std::any::Any;
 
 pub(crate) struct SyncWrapper<T> {

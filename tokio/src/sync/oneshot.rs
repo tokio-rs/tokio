@@ -123,6 +123,7 @@
 //! }
 //! ```
 
+use crate::alias::std;
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
@@ -331,6 +332,8 @@ pub struct Receiver<T> {
 
 pub mod error {
     //! `Oneshot` error types.
+
+    use crate::alias::std;
 
     use std::fmt;
 
