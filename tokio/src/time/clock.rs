@@ -7,6 +7,7 @@
 //! configurable.
 
 cfg_not_test_util! {
+    use crate::alias::std;
     use crate::time::{Instant};
 
     #[derive(Debug, Clone)]
@@ -28,6 +29,7 @@ cfg_not_test_util! {
 }
 
 cfg_test_util! {
+    use crate::alias::std;
     use crate::time::{Duration, Instant};
     use crate::loom::sync::Mutex;
     use crate::loom::sync::atomic::Ordering;

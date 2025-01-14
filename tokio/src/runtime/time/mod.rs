@@ -19,6 +19,7 @@ pub(crate) use source::TimeSource;
 
 mod wheel;
 
+use crate::alias::std::{self, prelude::*};
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Mutex, RwLock};
 use crate::runtime::driver::{self, IoHandle, IoStack};

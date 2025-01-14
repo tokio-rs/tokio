@@ -1,5 +1,7 @@
 #![allow(clippy::trivially_copy_pass_by_ref)]
 
+use crate::alias::std;
+
 use std::fmt;
 use std::ops;
 use std::time::Duration;
@@ -207,6 +209,7 @@ impl fmt::Debug for Instant {
 #[cfg(not(feature = "test-util"))]
 mod variant {
     use super::Instant;
+    use crate::alias::std;
 
     pub(super) fn now() -> Instant {
         Instant::from_std(std::time::Instant::now())

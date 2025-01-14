@@ -1,6 +1,6 @@
-cfg_rt! {
-    use crate::alias::std;
+use crate::alias::std;
 
+cfg_rt! {
     use std::marker::PhantomData;
 
     #[derive(Copy, Clone)]

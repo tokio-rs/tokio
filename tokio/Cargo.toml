@@ -92,7 +92,7 @@ signal = [
 std = []
 sync = ["std"]
 test-util = ["rt", "sync", "time"]
-time = []
+time = ["std"]
 
 [dependencies]
 tokio-macros = { version = "~2.5.0", path = "../tokio-macros", optional = true }

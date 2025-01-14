@@ -54,6 +54,8 @@
 //!
 //! [mark_pending]: TimerHandle::mark_pending
 
+use crate::alias::std;
+
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::atomic::Ordering;

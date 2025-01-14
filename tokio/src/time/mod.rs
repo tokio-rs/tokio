@@ -84,6 +84,8 @@
 //! [`interval`]: crate::time::interval()
 //! [`sleep`]: sleep()
 
+use crate::alias::std;
+
 mod clock;
 pub(crate) use self::clock::Clock;
 cfg_test_util! {

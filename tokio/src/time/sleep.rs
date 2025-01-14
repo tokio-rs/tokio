@@ -1,3 +1,4 @@
+use crate::alias::std;
 use crate::runtime::time::TimerEntry;
 use crate::time::{error::Error, Duration, Instant};
 use crate::util::trace;

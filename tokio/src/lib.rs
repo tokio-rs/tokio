@@ -681,7 +681,7 @@ pub(crate) mod alias {
             pub(crate) use super::vec::Vec;
         }
 
-        pub(crate) use core::{any, cell, convert, cmp, fmt, future, hint, iter, marker, mem, num, ops, option, pin, ptr, slice, task};
+        pub(crate) use core::{any, array, cell, convert, cmp, fmt, future, hint, iter, marker, mem, num, ops, option, pin, ptr, slice, task};
 
         pub(crate) use crate::alloc::{borrow, boxed, format, rc, str, string, vec};
 
@@ -714,7 +714,7 @@ pub(crate) mod alias {
             extern crate std;
 
             #[cfg(feature = "std")]
-            pub(crate) use std::time::*;
+            pub use std::time::*;
         }
     }
 }
