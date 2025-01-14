@@ -42,7 +42,10 @@
 //! }
 //! # }
 //! ```
+
+use crate::alias::std;
 use crate::sync::watch::Receiver;
+
 use std::task::{Context, Poll};
 
 #[cfg(feature = "signal")]

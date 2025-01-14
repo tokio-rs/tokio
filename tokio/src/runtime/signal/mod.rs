@@ -2,6 +2,7 @@
 
 //! Signal driver
 
+use crate::alias::std;
 use crate::runtime::{driver, io};
 use crate::signal::registry::globals;
 

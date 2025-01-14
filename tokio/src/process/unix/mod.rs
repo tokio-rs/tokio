@@ -30,6 +30,7 @@ use reap::Reaper;
 #[cfg(all(target_os = "linux", feature = "rt"))]
 mod pidfd_reaper;
 
+use crate::alias::std;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;

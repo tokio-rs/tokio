@@ -65,6 +65,7 @@ net = [
 ]
 portable-io = ["dep:portable-io"]
 process = [
+  "std",
   "bytes",
   "libc",
   "mio/os-poll",

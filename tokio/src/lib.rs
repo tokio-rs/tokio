@@ -675,6 +675,7 @@ pub(crate) mod alias {
             pub(crate) use super::boxed::Box;
             #[cfg(feature = "std")]
             pub(crate) use super::eprintln;
+            pub(crate) use super::format;
             pub(crate) use super::string::String;
             pub(crate) use super::vec;
             pub(crate) use super::vec::Vec;
@@ -682,7 +683,7 @@ pub(crate) mod alias {
 
         pub(crate) use core::{any, cell, convert, cmp, fmt, future, hint, iter, marker, mem, num, ops, option, pin, ptr, slice, task};
 
-        pub(crate) use crate::alloc::{borrow, boxed, rc, str, string, vec};
+        pub(crate) use crate::alloc::{borrow, boxed, format, rc, str, string, vec};
 
         #[cfg(feature = "portable-io")]
         pub(crate) use portable_io as io;

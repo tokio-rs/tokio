@@ -1,3 +1,5 @@
+use crate::alias::std;
+
 use std::io;
 
 /// An interface for killing a running process.

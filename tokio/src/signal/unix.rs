@@ -6,6 +6,7 @@
 #![cfg(unix)]
 #![cfg_attr(docsrs, doc(cfg(all(unix, feature = "signal"))))]
 
+use crate::alias::std::{self, prelude::*};
 use crate::runtime::scheduler;
 use crate::runtime::signal::Handle;
 use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};

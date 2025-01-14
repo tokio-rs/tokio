@@ -241,6 +241,7 @@ mod imp;
 
 mod kill;
 
+use crate::alias::std::{self, prelude::*};
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::process::kill::Kill;
 
@@ -1490,6 +1491,7 @@ impl TryInto<Stdio> for ChildStderr {
 #[cfg(unix)]
 #[cfg_attr(docsrs, doc(cfg(unix)))]
 mod sys {
+    use crate::alias::std;
     use std::{
         io,
         os::unix::io::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd},
