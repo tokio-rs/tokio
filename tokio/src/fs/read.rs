@@ -1,5 +1,7 @@
+use crate::alias::std::{self, prelude::*};
 use crate::fs::asyncify;
 
+// XXX XXX portable io / fs - XXX
 use std::{io, path::Path};
 
 /// Reads the entire contents of a file into a bytes vector.

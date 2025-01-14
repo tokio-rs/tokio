@@ -15,6 +15,7 @@
 //! tasks are acquiring smaller numbers of permits. This means that in a
 //! use-case like tokio's read-write lock, writers will not be starved by
 //! readers.
+use crate::alias::std;
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Mutex, MutexGuard};

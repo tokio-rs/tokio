@@ -669,16 +669,17 @@ pub(crate) use alias::std::os;
 pub(crate) mod alias {
     pub(crate) mod std {
         pub(crate) mod prelude {
+            pub(crate) use super::borrow::ToOwned;
             pub(crate) use super::boxed::Box;
             pub(crate) use super::string::String;
             pub(crate) use super::vec;
             pub(crate) use super::vec::Vec;
         }
 
-        pub(crate) use core::{cell, convert, cmp, fmt, future, hint, marker, mem, num, ops, pin, slice, task};
+        pub(crate) use core::{cell, convert, cmp, fmt, future, hint, marker, mem, num, ops, pin, ptr, slice, task};
 
         extern crate alloc;
-        pub(crate) use alloc::{boxed, rc, str, string, vec};
+        pub(crate) use alloc::{borrow, boxed, rc, str, string, vec};
 
         #[cfg(feature = "portable-io")]
         pub(crate) use portable_io as io;
@@ -693,7 +694,7 @@ pub(crate) mod alias {
         pub(crate) use std::io;
 
         #[cfg(feature = "std")]
-        pub(crate) use std::{collections, env, hash, os, panic, thread, thread_local};
+        pub(crate) use std::{collections, env, error, ffi, fs, hash, os, panic, path, thread, thread_local};
 
         pub(crate) mod sync {
             extern crate alloc;

@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "sync"), allow(unreachable_pub, dead_code))]
 
+use crate::alias::std;
 use crate::sync::batch_semaphore as semaphore;
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;

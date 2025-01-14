@@ -44,8 +44,7 @@ full = [
   "time",
 ]
 
-# XXX TODO other features will likely require "std" to work
-fs = []
+fs = ["std"]
 # XXX TBD io-util no-std WITH portable-io
 io-util = ["bytes"]
 # stdin, stdout, stderr

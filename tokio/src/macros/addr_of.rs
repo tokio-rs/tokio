@@ -14,7 +14,7 @@ macro_rules! generate_addr_of_methods {
             $(#[$attrs])*
             $vis unsafe fn $fn_name(me: ::core::ptr::NonNull<Self>) -> ::core::ptr::NonNull<$field_type> {
                 let me = me.as_ptr();
-                let field = ::std::ptr::addr_of_mut!((*me) $(.$field_name)+ );
+                let field = ::core::ptr::addr_of_mut!((*me) $(.$field_name)+ );
                 ::core::ptr::NonNull::new_unchecked(field)
             }
         )*}

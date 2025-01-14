@@ -295,7 +295,7 @@ cfg_windows! {
     pub use self::symlink_file::symlink_file;
 }
 
-use std::io;
+use crate::alias::std::io;
 
 #[cfg(not(test))]
 use crate::blocking::spawn_blocking;
