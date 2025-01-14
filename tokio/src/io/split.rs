@@ -4,6 +4,7 @@
 //! To restore this read/write object from its `split::ReadHalf` and
 //! `split::WriteHalf` use `unsplit`.
 
+use crate::alias::std;
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use std::fmt;

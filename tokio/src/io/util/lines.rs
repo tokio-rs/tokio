@@ -1,3 +1,4 @@
+use crate::alias::std::{self, prelude::*};
 use crate::io::util::read_line::read_line_internal;
 use crate::io::AsyncBufRead;
 

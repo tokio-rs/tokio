@@ -1,5 +1,6 @@
 use super::copy::CopyBuffer;
 
+use crate::alias::std;
 use crate::io::{AsyncRead, AsyncWrite};
 
 use std::future::poll_fn;

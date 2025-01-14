@@ -1,3 +1,5 @@
+use crate::alias::std::prelude::*;
+
 use crate::io::util::chain::{chain, Chain};
 use crate::io::util::read::{read, Read};
 use crate::io::util::read_buf::{read_buf, ReadBuf};

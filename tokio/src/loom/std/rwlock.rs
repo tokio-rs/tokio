@@ -1,3 +1,5 @@
+use crate::alias::std;
+
 use std::sync::{self, RwLockReadGuard, RwLockWriteGuard, TryLockError};
 
 /// Adapter for `std::sync::RwLock` that removes the poisoning aspects

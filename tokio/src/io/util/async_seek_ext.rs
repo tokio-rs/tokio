@@ -1,3 +1,4 @@
+use crate::alias::std;
 use crate::io::seek::{seek, Seek};
 use crate::io::AsyncSeek;
 use std::io::SeekFrom;

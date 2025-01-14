@@ -1,3 +1,5 @@
+use crate::alias::{std, std::prelude::*};
+
 use crate::io::util::read_line::finish_string_read;
 use crate::io::util::read_to_end::read_to_end_internal;
 use crate::io::util::vec_with_initialized::VecWithInitialized;

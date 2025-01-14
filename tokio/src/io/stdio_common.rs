@@ -1,5 +1,8 @@
 //! Contains utilities for stdout and stderr.
+
+use crate::alias::std;
 use crate::io::AsyncWrite;
+
 use std::pin::Pin;
 use std::task::{Context, Poll};
 /// # Windows

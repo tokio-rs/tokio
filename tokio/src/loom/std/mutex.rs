@@ -1,3 +1,5 @@
+use crate::alias::std;
+
 use std::sync::{self, MutexGuard, TryLockError};
 
 /// Adapter for `std::Mutex` that removes the poisoning aspects

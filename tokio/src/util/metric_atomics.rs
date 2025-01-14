@@ -1,3 +1,5 @@
+use crate::alias::std;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 cfg_64bit_metrics! {

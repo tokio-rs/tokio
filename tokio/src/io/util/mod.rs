@@ -1,6 +1,8 @@
 #![allow(unreachable_pub)] // https://github.com/rust-lang/rust/issues/57411
 
 cfg_io_util! {
+    use crate::alias::std;
+
     mod async_buf_read_ext;
     pub use async_buf_read_ext::AsyncBufReadExt;
 

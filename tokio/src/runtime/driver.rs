@@ -7,6 +7,8 @@
     allow(dead_code)
 )]
 
+use crate::alias::std;
+
 use crate::runtime::park::{ParkThread, UnparkThread};
 
 use std::io;

@@ -1,5 +1,6 @@
 //! In-process memory IO types.
 
+use crate::alias::std;
 use crate::io::{split, AsyncRead, AsyncWrite, ReadBuf, ReadHalf, WriteHalf};
 use crate::loom::sync::Mutex;
 

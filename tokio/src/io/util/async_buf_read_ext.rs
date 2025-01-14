@@ -1,3 +1,4 @@
+use crate::alias::std::{self, prelude::*};
 use crate::io::util::fill_buf::{fill_buf, FillBuf};
 use crate::io::util::lines::{lines, Lines};
 use crate::io::util::read_line::{read_line, ReadLine};

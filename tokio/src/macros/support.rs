@@ -1,3 +1,5 @@
+use crate::alias::std;
+
 cfg_macros! {
     pub use crate::future::maybe_done::maybe_done;
 

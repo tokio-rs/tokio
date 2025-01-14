@@ -2,6 +2,8 @@
 //!
 //! This implementation mirrors that of the Rust standard library.
 
+use crate::alias::std;
+
 use crate::loom::sync::{Condvar, Mutex};
 use std::fmt;
 use std::time::{Duration, Instant};

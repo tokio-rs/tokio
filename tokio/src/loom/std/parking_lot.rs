@@ -3,6 +3,8 @@
 //!
 //! This can be extended to additional types/methods as required.
 
+use crate::alias::std;
+
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};

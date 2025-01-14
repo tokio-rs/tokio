@@ -194,6 +194,8 @@ cfg_io_blocking! {
     pub(crate) mod blocking;
 }
 
+use crate::alias::std;
+
 mod async_buf_read;
 pub use self::async_buf_read::AsyncBufRead;
 

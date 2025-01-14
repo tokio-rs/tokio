@@ -10,6 +10,8 @@ cfg_rt! {
 }
 
 cfg_not_rt! {
+    use crate::alias::std;
+
     use std::fmt;
     use std::future::Future;
     use std::pin::Pin;

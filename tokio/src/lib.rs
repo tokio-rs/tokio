@@ -21,6 +21,8 @@
 #![cfg_attr(loom, allow(dead_code, unreachable_pub))]
 #![cfg_attr(windows, allow(rustdoc::broken_intra_doc_links))]
 
+#![no_std]
+
 //! A runtime for writing reliable network applications without compromising speed.
 //!
 //! Tokio is an event-driven, non-blocking I/O platform for writing asynchronous
@@ -505,12 +507,16 @@ cfg_fs! {
 
 mod future;
 
+// XXX TODO SUPPORT no-std with portable-io
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 pub mod io;
 
 cfg_net! {
     pub mod net;
 }
 
+#[cfg(feature = "std")]
 mod loom;
 
 cfg_process! {
@@ -528,9 +534,11 @@ mod blocking;
 cfg_rt! {
     pub mod runtime;
 }
-cfg_not_rt! {
-    pub(crate) mod runtime;
-}
+#[cfg(all(
+    not(feature = "rt"),
+    feature = "std")
+)]
+pub(crate) mod runtime;
 
 cfg_signal! {
     pub mod signal;
@@ -560,6 +568,7 @@ cfg_time! {
 }
 
 mod trace {
+    use crate::alias::std;
     use std::future::Future;
     use std::pin::Pin;
     use std::task::{Context, Poll};
@@ -645,9 +654,56 @@ pub mod doc;
 #[allow(unused)]
 pub(crate) use self::doc::os;
 
+// XXX TBD RECONSIDER possibly unused crate::os - ???
+#[cfg(feature = "std")]
 #[cfg(not(all(docsrs, unix)))]
 #[allow(unused)]
-pub(crate) use std::os;
+pub(crate) use alias::std::os;
+
+pub(crate) mod alias {
+    pub(crate) mod std {
+        pub(crate) mod prelude {
+            pub(crate) use super::boxed::Box;
+            pub(crate) use super::string::String;
+            pub(crate) use super::vec;
+            pub(crate) use super::vec::Vec;
+        }
+
+        pub(crate) use core::{cell, convert, cmp, fmt, future, hint, marker, mem, num, ops, pin, slice, task};
+
+        extern crate alloc;
+        pub(crate) use alloc::{boxed, rc, str, string, vec};
+
+        #[cfg(feature = "std")]
+        extern crate std;
+
+        #[cfg(feature = "std")]
+        pub(crate) use std::io;
+        #[cfg(feature = "std")]
+        pub(crate) use std::{collections, env, hash, os, panic, thread, thread_local};
+
+        pub(crate) mod sync {
+            extern crate alloc;
+            #[cfg(feature = "std")]
+            extern crate std;
+
+            pub(crate) use core::sync::atomic;
+            pub(crate) use alloc::sync::*;
+            #[cfg(feature = "std")]
+            pub(crate) use std::sync::*;
+        }
+
+        pub(crate) mod time {
+            pub(crate) use core::time::*;
+
+            #[cfg(feature = "std")]
+            extern crate std;
+
+            #[cfg(feature = "std")]
+            pub(crate) use std::time::*;
+        }
+    }
+}
 
 cfg_macros! {
     /// Implementation detail of the `select!` macro. This macro is **not**

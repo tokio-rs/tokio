@@ -1,5 +1,7 @@
 #![cfg_attr(not(feature = "full"), allow(dead_code))]
 
+use crate::alias::std;
+
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 

@@ -135,6 +135,8 @@ cfg_rt! {
 }
 
 cfg_coop! {
+    use crate::alias::std;
+
     use pin_project_lite::pin_project;
     use std::cell::Cell;
     use std::future::Future;

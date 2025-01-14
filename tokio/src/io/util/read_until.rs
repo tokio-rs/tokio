@@ -1,3 +1,6 @@
+use crate::alias::std;
+use crate::alias::std::prelude::*;
+
 use crate::io::AsyncBufRead;
 use crate::util::memchr;
 

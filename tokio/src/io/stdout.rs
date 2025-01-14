@@ -1,6 +1,9 @@
+use crate::alias::std;
+
 use crate::io::blocking::Blocking;
 use crate::io::stdio_common::SplitByUtf8BoundaryIfWindows;
 use crate::io::AsyncWrite;
+
 use std::io;
 use std::pin::Pin;
 use std::task::Context;
@@ -128,6 +131,8 @@ cfg_io_std! {
 
 #[cfg(unix)]
 mod sys {
+    use crate::alias::std;
+
     use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, RawFd};
 
     use super::Stdout;

@@ -1,5 +1,6 @@
 //! Join two values implementing `AsyncRead` and `AsyncWrite` into a single one.
 
+use crate::alias::std;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncWrite, ReadBuf};
 
 use std::io;

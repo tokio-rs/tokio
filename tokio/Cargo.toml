@@ -24,6 +24,8 @@ keywords = ["io", "async", "non-blocking", "futures"]
 [features]
 # Include nothing by default
 default = []
+# XXX TODO:
+# default = ["std"]
 
 # enable everything
 full = [
@@ -37,14 +39,17 @@ full = [
   "rt",
   "rt-multi-thread",
   "signal",
+  "std",
   "sync",
   "time",
 ]
 
+# XXX TODO other features will likely require "std" to work
 fs = []
-io-util = ["bytes"]
+# XXX TBD io-util no-std WITH portable-io
+io-util = ["std", "bytes"]
 # stdin, stdout, stderr
-io-std = []
+io-std = ["std"]
 macros = ["tokio-macros"]
 net = [
   "libc",
@@ -81,6 +86,7 @@ signal = [
   "windows-sys/Win32_Foundation",
   "windows-sys/Win32_System_Console",
 ]
+std = []
 sync = []
 test-util = ["rt", "sync", "time"]
 time = []
