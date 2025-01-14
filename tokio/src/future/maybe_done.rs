@@ -1,5 +1,7 @@
 //! Definition of the [`MaybeDone`] combinator.
 
+use crate::alias::std;
+
 use pin_project_lite::pin_project;
 use std::future::{Future, IntoFuture};
 use std::pin::Pin;

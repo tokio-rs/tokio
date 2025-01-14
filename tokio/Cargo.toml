@@ -49,7 +49,7 @@ fs = ["std"]
 io-util = ["bytes"]
 # stdin, stdout, stderr
 io-std = ["std"]
-macros = ["tokio-macros"]
+macros = ["std", "tokio-macros"]
 net = [
   "libc",
   "mio/os-poll",
