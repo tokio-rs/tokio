@@ -208,10 +208,6 @@ impl<T, S: Semaphore> Tx<T, S> {
         }
         notified.await;
     }
-
-    pub(crate) fn len(&self) -> usize {
-        self.inner.tx_count.load(Ordering::SeqCst)
-    }
 }
 
 impl<T, S> Clone for Tx<T, S> {

@@ -676,9 +676,10 @@ impl<T> UnboundedSender<T> {
         self.chan.weak_count()
     }
 
-    //Returns length of [`UnboundedSender`] semaphores /2, supposidly the number of messages.
+    ///Returns length of [`UnboundedSender`] semaphores /2, the number of messages.
     pub fn len(&self) -> usize{
-        self.chan.len()
+        (self.strong_count() + self.weak_count()) / 2
+        
     }
 }
 
