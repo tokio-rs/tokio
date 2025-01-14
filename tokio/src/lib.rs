@@ -673,6 +673,8 @@ pub(crate) mod alias {
         pub(crate) mod prelude {
             pub(crate) use super::borrow::ToOwned;
             pub(crate) use super::boxed::Box;
+            #[cfg(feature = "std")]
+            pub(crate) use super::eprintln;
             pub(crate) use super::string::String;
             pub(crate) use super::vec;
             pub(crate) use super::vec::Vec;
@@ -695,7 +697,7 @@ pub(crate) mod alias {
         pub(crate) use std::io;
 
         #[cfg(feature = "std")]
-        pub(crate) use std::{alloc, collections, env, error, ffi, fs, hash, net, os, panic, path, process, result, thread, thread_local};
+        pub(crate) use std::{alloc, collections, env, eprintln, error, ffi, fs, hash, net, os, panic, path, process, result, thread, thread_local};
 
         pub(crate) mod sync {
             pub(crate) use core::sync::atomic;

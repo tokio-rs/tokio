@@ -37,6 +37,7 @@ cfg_not_taskdump! {
 
 pub(crate) use worker::block_in_place;
 
+use crate::alias::std;
 use crate::loom::sync::Arc;
 use crate::runtime::{
     blocking,

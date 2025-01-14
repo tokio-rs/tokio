@@ -1,3 +1,4 @@
+use crate::alias::std;
 use crate::runtime::{Config, MetricsBatch, WorkerMetrics};
 
 use std::time::{Duration, Instant};
