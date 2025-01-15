@@ -47,6 +47,12 @@ where
 
         let me = self.project();
         while me.buf.has_remaining() {
+            // XXX QUICK ADAPTATION NEEDED to work with portable-io - XXX TBD OPEN QUESTION:
+            // Considering that Buf::chunks_vectored() only does 1 chunk at a time,
+            // the extra logic required here to call AsyncWrite::poll_write_vectored()
+            // does not seem to reduce the number of I/O poll calls.
+            // XXX TODO KEEP THIS FOR SEPARATE DISCUSSION
+            #[cfg(not(feature = "portable-io"))]
             let n = if me.writer.is_write_vectored() {
                 let mut slices = [IoSlice::new(&[]); MAX_VECTOR_ELEMENTS];
                 let cnt = me.buf.chunks_vectored(&mut slices);
@@ -54,6 +60,8 @@ where
             } else {
                 ready!(Pin::new(&mut *me.writer).poll_write(cx, me.buf.chunk())?)
             };
+            #[cfg(feature = "portable-io")]
+            let n = ready!(Pin::new(&mut *me.writer).poll_write(cx, me.buf.chunk())?);
             me.buf.advance(n);
             if n == 0 {
                 return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
