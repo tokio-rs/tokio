@@ -498,13 +498,6 @@ linux, on `aarch64`, `x86` and `x86_64`."
 #[cfg(not(any(feature = "std", feature = "portable-io")))]
 compile_error!("std or portable-io feature is required (may use both)");
 
-#[cfg(all(
-    feature = "io-util",
-    not(feature = "std"),
-    not(feature = "parking_lot"),
-))]
-compile_error!("io-util requires parking_lot to compile with no-std");
-
 #[cfg(all(feature = "portable-io", any(
     feature = "fs",
     feature = "net",

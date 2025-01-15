@@ -59,7 +59,7 @@ net = [
   "windows-sys/Win32_System_Pipes",
   "windows-sys/Win32_System_SystemServices",
 ]
-portable-io = ["dep:portable-io"]
+portable-io = ["parking_lot", "dep:portable-io"]
 process = [
   "std",
   "bytes",
