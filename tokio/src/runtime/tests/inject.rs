@@ -1,4 +1,8 @@
+extern crate std;
+
 use crate::runtime::scheduler::inject;
+
+use std::println;
 
 #[test]
 fn push_and_pop() {

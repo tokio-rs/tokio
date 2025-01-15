@@ -154,6 +154,7 @@ impl<T> fmt::Debug for ReusableBoxFuture<T> {
 
 #[cfg(test)]
 mod test {
+    extern crate std;
     use super::ReusableBoxFuture;
     use futures::future::FutureExt;
     use std::alloc::Layout;

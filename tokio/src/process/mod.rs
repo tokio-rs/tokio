@@ -1591,6 +1591,8 @@ mod test {
     use super::kill::Kill;
     use super::ChildDropGuard;
 
+    extern crate std;
+
     use futures::future::FutureExt;
     use std::future::Future;
     use std::io;

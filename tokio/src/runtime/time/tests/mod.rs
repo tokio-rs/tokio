@@ -1,6 +1,12 @@
 #![cfg(not(target_os = "wasi"))]
 
+extern crate std;
+
 use std::{task::Context, time::Duration};
+use std::boxed::Box;
+
+// XXX TODO TEST ONLY
+use std::vec;
 
 #[cfg(not(loom))]
 use futures::task::noop_waker_ref;

@@ -1,3 +1,4 @@
+extern crate std;
 use std::fmt;
 use std::future::Future;
 use std::panic;

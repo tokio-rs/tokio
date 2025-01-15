@@ -25,6 +25,8 @@ pub(crate) fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::memchr;
+    extern crate std;
+    use std::vec::Vec;
 
     #[test]
     fn memchr_test() {

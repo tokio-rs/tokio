@@ -29,6 +29,7 @@ mod noop_scheduler {
 }
 
 mod unowned_wrapper {
+    extern crate std;
     use crate::runtime::task::{Id, JoinHandle, Notified};
     use crate::runtime::tests::NoopSchedule;
 

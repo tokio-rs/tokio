@@ -140,6 +140,8 @@ mod test {
     use std::process::ExitStatus;
     use std::task::Context;
     use std::task::Poll;
+    use std::vec;
+    use std::vec::Vec;
 
     #[derive(Debug)]
     struct MockWait {

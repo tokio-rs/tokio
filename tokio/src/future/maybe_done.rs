@@ -76,11 +76,15 @@ impl<Fut: Future> Future for MaybeDone<Fut> {
 // Test for https://github.com/tokio-rs/tokio/issues/6729
 #[cfg(test)]
 mod miri_tests {
+    extern crate std;
+    use std::borrow::ToOwned;
+
     use super::maybe_done;
 
     use std::{
         future::Future,
         pin::Pin,
+        string::String,
         sync::Arc,
         task::{Context, Poll, Wake},
     };

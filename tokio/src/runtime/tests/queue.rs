@@ -1,9 +1,14 @@
 use crate::runtime::scheduler::multi_thread::{queue, Stats};
 use crate::runtime::task::{self, Schedule, Task, TaskHarnessScheduleHooks};
 
+extern crate std;
+
 use std::cell::RefCell;
 use std::thread;
 use std::time::Duration;
+// XXX TBD TEST ???
+use std::vec;
+use std::vec::Vec;
 
 #[allow(unused)]
 macro_rules! assert_metrics {

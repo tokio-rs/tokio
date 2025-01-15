@@ -1,6 +1,8 @@
 use crate::sync::AtomicWaker;
 use tokio_test::task;
 
+extern crate std;
+
 use std::task::Waker;
 
 #[allow(unused)]

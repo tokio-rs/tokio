@@ -112,12 +112,14 @@ where
 #[cfg(test)]
 #[cfg(not(loom))]
 mod tests {
+    extern crate std;
     use crate::io::blocking::DEFAULT_MAX_BUF_SIZE;
     use crate::io::AsyncWriteExt;
     use std::io;
     use std::pin::Pin;
     use std::task::Context;
     use std::task::Poll;
+    use std::vec::Vec;
 
     struct TextMockWriter;
 
