@@ -493,6 +493,16 @@ compile_error!(
 linux, on `aarch64`, `x86` and `x86_64`."
 );
 
+#[cfg(not(any(feature = "std", feature = "portable-io")))]
+compile_error!("std or portable-io feature is required (may use both)");
+
+#[cfg(all(
+    feature = "io-util",
+    not(feature = "std"),
+    not(feature = "parking_lot"),
+))]
+compile_error!("io-util requires parking_lot to compile with no-std");
+
 // Includes re-exports used by macros.
 //
 // This module is not intended to be part of the public API. In general, any
@@ -507,15 +517,6 @@ cfg_fs! {
 
 mod future;
 
-// XXX TBD XXX XXX
-#[cfg(any(
-    feature = "std",
-    feature = "portable-io",
-))]
-#[cfg_attr(docsrs, doc(cfg(any(
-    feature = "std",
-    feature = "portable-io",
-))))]
 pub mod io;
 
 cfg_net! {

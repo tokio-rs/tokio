@@ -42,7 +42,6 @@ full = [
 ]
 
 fs = ["std"]
-# XXX TBD io-util no-std WITH portable-io
 io-util = ["bytes"]
 # stdin, stdout, stderr
 io-std = ["std"]
