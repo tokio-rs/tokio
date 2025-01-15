@@ -22,10 +22,7 @@ categories = ["asynchronous", "network-programming"]
 keywords = ["io", "async", "non-blocking", "futures"]
 
 [features]
-# Include nothing by default
-default = []
-# XXX TODO:
-# default = ["std"]
+default = ["std"]
 
 # enable everything
 full = [
