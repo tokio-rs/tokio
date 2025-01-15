@@ -1069,7 +1069,7 @@ impl<T> Sender<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let (tx, rx) = mpsc::unbounded_channel();
+    ///     let (tx, rx) = mpsc::channel(10);
     ///     assert!(rx.is_empty());
     ///
     ///     tx.send(0).await.unwrap();
@@ -1088,7 +1088,7 @@ impl<T> Sender<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let (tx, rx) = mpsc::unbounded_channel();
+    ///     let (tx, rx) = mpsc::channel(10);
     ///     assert_eq!(0, rx.len());
     ///
     ///     tx.send(0).await.unwrap();
