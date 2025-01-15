@@ -503,6 +503,15 @@ compile_error!("std or portable-io feature is required (may use both)");
 ))]
 compile_error!("io-util requires parking_lot to compile with no-std");
 
+#[cfg(all(feature = "portable-io", any(
+    feature = "fs",
+    feature = "net",
+    feature = "process",
+    feature = "rt",
+    feature = "signal",
+)))]
+compile_error!("cannot use portable-io with fs, net, process, rt or signal");
+
 // Includes re-exports used by macros.
 //
 // This module is not intended to be part of the public API. In general, any
