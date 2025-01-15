@@ -382,7 +382,6 @@ impl<T> UnboundedReceiver<T> {
     ///     tx.send(0).unwrap();
     ///     assert!(!rx.is_empty());
     /// }
-    ///
     /// ```
     pub fn is_empty(&self) -> bool {
         self.chan.is_empty()
@@ -575,6 +574,46 @@ impl<T> UnboundedSender<T> {
                 }
             }
         }
+    }
+
+    /// Checks if a channel is empty.
+    ///
+    /// This method returns `true` if the channel has no messages.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::unbounded_channel();
+    ///     assert!(tx.is_empty());
+    ///
+    ///     tx.send(0).unwrap();
+    ///     assert!(!tx.is_empty());
+    /// }
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.chan.is_empty()
+    }
+
+    /// Returns the number of messages in the channel.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::unbounded_channel();
+    ///     assert_eq!(0, tx.len());
+    ///
+    ///     tx.send(0).unwrap();
+    ///     assert_eq!(1, tx.len());
+    /// }
+    /// ```
+    pub fn len(&self) -> usize {
+        self.chan.len()
     }
 
     /// Completes when the receiver has dropped.
