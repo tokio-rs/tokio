@@ -88,6 +88,11 @@ pub struct Builder {
     /// To run before each task is spawned.
     pub(super) before_spawn: Option<TaskCallback>,
 
+    /// To run before each poll
+    pub(super) before_poll: Option<TaskCallback>,
+
+    pub(super) after_poll: Option<TaskCallback>,
+
     /// To run after each task is terminated.
     pub(super) after_termination: Option<TaskCallback>,
 
@@ -305,6 +310,9 @@ impl Builder {
 
             before_spawn: None,
             after_termination: None,
+
+            before_poll: None,
+            after_poll: None,
 
             keep_alive: None,
 
@@ -740,6 +748,24 @@ impl Builder {
         F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
     {
         self.before_spawn = Some(std::sync::Arc::new(f));
+        self
+    }
+
+    #[cfg(tokio_unstable)]
+    pub fn on_before_task_poll<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
+    {
+        self.before_poll = Some(std::sync::Arc::new(f));
+        self
+    }
+
+    #[cfg(tokio_unstable)]
+    pub fn on_after_task_poll<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
+    {
+        self.after_poll = Some(std::sync::Arc::new(f));
         self
     }
 
@@ -1410,6 +1436,8 @@ impl Builder {
                 before_park: self.before_park.clone(),
                 after_unpark: self.after_unpark.clone(),
                 before_spawn: self.before_spawn.clone(),
+                before_poll: self.before_poll.clone(),
+                after_poll: self.after_poll.clone(),
                 after_termination: self.after_termination.clone(),
                 global_queue_interval: self.global_queue_interval,
                 event_interval: self.event_interval,
@@ -1560,6 +1588,8 @@ cfg_rt_multi_thread! {
                     before_park: self.before_park.clone(),
                     after_unpark: self.after_unpark.clone(),
                     before_spawn: self.before_spawn.clone(),
+                    before_poll: self.before_poll.clone(),
+                    after_poll: self.after_poll.clone(),
                     after_termination: self.after_termination.clone(),
                     global_queue_interval: self.global_queue_interval,
                     event_interval: self.event_interval,
@@ -1610,6 +1640,8 @@ cfg_rt_multi_thread! {
                         after_unpark: self.after_unpark.clone(),
                         before_spawn: self.before_spawn.clone(),
                         after_termination: self.after_termination.clone(),
+                        before_poll: self.before_poll.clone(),
+                        after_poll: self.after_poll.clone(),
                         global_queue_interval: self.global_queue_interval,
                         event_interval: self.event_interval,
                         local_queue_capacity: self.local_queue_capacity,

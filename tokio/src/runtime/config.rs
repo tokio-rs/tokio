@@ -27,6 +27,12 @@ pub(crate) struct Config {
     /// To run after each task is terminated.
     pub(crate) after_termination: Option<TaskCallback>,
 
+    /// To run before each poll
+    pub(crate) before_poll: Option<TaskCallback>,
+
+    /// To run after each poll
+    pub(crate) after_poll: Option<TaskCallback>,
+
     /// The multi-threaded scheduler includes a per-worker LIFO slot used to
     /// store the last scheduled task. This can improve certain usage patterns,
     /// especially message passing between tasks. However, this LIFO slot is not

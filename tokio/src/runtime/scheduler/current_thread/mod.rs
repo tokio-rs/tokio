@@ -145,6 +145,8 @@ impl CurrentThread {
             task_hooks: TaskHooks {
                 task_spawn_callback: config.before_spawn.clone(),
                 task_terminate_callback: config.after_termination.clone(),
+                before_poll_callback: config.before_poll.clone(),
+                after_poll_callback: config.after_poll.clone(),
             },
             shared: Shared {
                 inject: Inject::new(),

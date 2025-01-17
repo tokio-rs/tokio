@@ -57,12 +57,12 @@
 //! leak.
 
 use crate::loom::sync::{Arc, Mutex};
-use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
     idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
 use crate::runtime::scheduler::{inject, Defer, Lock};
 use crate::runtime::task::{OwnedTasks, TaskHarnessScheduleHooks};
+use crate::runtime::{self, TaskMeta};
 use crate::runtime::{
     blocking, coop, driver, scheduler, task, Config, SchedulerMetrics, WorkerMetrics,
 };
@@ -74,6 +74,8 @@ use std::cell::RefCell;
 use std::task::Waker;
 use std::thread;
 use std::time::Duration;
+
+use self::task::Id;
 
 mod metrics;
 
@@ -282,10 +284,7 @@ pub(super) fn create(
 
     let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
-        task_hooks: TaskHooks {
-            task_spawn_callback: config.before_spawn.clone(),
-            task_terminate_callback: config.after_termination.clone(),
-        },
+        task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
             inject,
@@ -573,7 +572,28 @@ impl Context {
         Err(())
     }
 
+    #[inline]
+    fn poll_start_callback(&self, id: Id) {
+        if let Some(poll_start) = &self.worker.handle.task_hooks.before_poll_callback {
+            (poll_start)(&TaskMeta {
+                id,
+                _phantom: std::marker::PhantomData,
+            })
+        }
+    }
+
+    #[inline]
+    fn poll_stop_callback(&self, id: Id) {
+        if let Some(poll_stop) = &self.worker.handle.task_hooks.after_poll_callback {
+            poll_stop(&TaskMeta {
+                id,
+                _phantom: std::marker::PhantomData,
+            })
+        }
+    }
+
     fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
+        let task_id = task.task_id();
         let task = self.worker.handle.shared.owned.assert_owner(task);
 
         // Make sure the worker is not in the **searching** state. This enables
@@ -588,12 +608,17 @@ impl Context {
         // purposes. These tasks inherent the "parent"'s limits.
         core.stats.start_poll();
 
+        // Unlike the poll time above, poll start callback is attached to the task id,
+        // so it is tightly associated with the actual poll invocation.
+        self.poll_start_callback(task_id);
+
         // Make the core available to the runtime context
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
         coop::budget(|| {
             task.run();
+            self.poll_stop_callback(task_id);
             let mut lifo_polls = 0;
 
             // As long as there is budget remaining and a task exists in the
@@ -656,7 +681,10 @@ impl Context {
                 // Run the LIFO task, then loop
                 *self.core.borrow_mut() = Some(core);
                 let task = self.worker.handle.shared.owned.assert_owner(task);
+                let task_id = task.task_id();
+                self.poll_start_callback(task_id);
                 task.run();
+                self.poll_stop_callback(task_id);
             }
         })
     }

@@ -1,9 +1,20 @@
 use std::marker::PhantomData;
 
+use super::Config;
+
 impl TaskHooks {
     pub(crate) fn spawn(&self, meta: &TaskMeta<'_>) {
         if let Some(f) = self.task_spawn_callback.as_ref() {
             f(meta)
+        }
+    }
+
+    pub(crate) fn from_config(config: &Config) -> Self {
+        Self {
+            task_spawn_callback: config.before_spawn.clone(),
+            task_terminate_callback: config.after_termination.clone(),
+            before_poll_callback: config.before_poll.clone(),
+            after_poll_callback: config.after_poll.clone(),
         }
     }
 }
@@ -12,6 +23,8 @@ impl TaskHooks {
 pub(crate) struct TaskHooks {
     pub(crate) task_spawn_callback: Option<TaskCallback>,
     pub(crate) task_terminate_callback: Option<TaskCallback>,
+    pub(crate) before_poll_callback: Option<TaskCallback>,
+    pub(crate) after_poll_callback: Option<TaskCallback>,
 }
 
 /// Task metadata supplied to user-provided hooks for task events.
