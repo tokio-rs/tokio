@@ -12,7 +12,11 @@ cfg_macros! {
         #[cfg(feature = "rt")]
         { crate::task::poll_budget_available(cx) }
         #[cfg(not(feature = "rt"))]
-        { std::task::Poll::Ready(()) }
+        {
+            // Use the `cx` argument to suppress unused variable warnings
+            let _ = cx;
+            std::task::Poll::Ready(())
+        }
     }
 }
 
