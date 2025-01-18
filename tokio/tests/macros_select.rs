@@ -630,7 +630,7 @@ async fn mut_ref_patterns() {
     };
 }
 
-#[maybe_tokio_test]
+#[tokio::test]
 async fn select_is_budget_aware() {
     const BUDGET: usize = 128;
 

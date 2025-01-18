@@ -7,6 +7,13 @@ cfg_macros! {
     pub fn thread_rng_n(n: u32) -> u32 {
         crate::runtime::context::thread_rng_n(n)
     }
+
+    pub fn poll_budget_available(cx: &mut std::task::Context<'_>) -> std::task::Poll<()> {
+        #[cfg(feature = "rt")]
+        { crate::task::poll_budget_available(cx) }
+        #[cfg(not(feature = "rt"))]
+        { std::task::Poll::Ready(()) }
+    }
 }
 
 pub use std::future::{Future, IntoFuture};
