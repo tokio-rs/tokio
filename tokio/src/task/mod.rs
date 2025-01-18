@@ -313,10 +313,94 @@
 //! # }
 //! ```
 //!
+//! #### `poll_budget_available`
+//!
+//! Futures created by the tokio library functions are budget-aware and yield when there is no more
+//! budget left, but not all futures will be budget-aware. Consider future `A` that polls two inner
+//! futures `B` and `C`, and returns `Poll::Ready` when one of them is ready. If both inner futures
+//! were budget-aware, at some point the budget would be depleted which would cause both futures to
+//! return `Poll::Pending` resulting in `A` returning `Poll::Pending` as well. Yielding all the way
+//! back to the runtime, the budget would be reset, and `B` and `C` could make progress again.
+//! Now let's consider `B` is budget-aware, but `C` is not and is always ready. The budget will be
+//! depleted as before, but now since `C` always returns `Poll::Ready`, `A` will always return
+//! `Poll::Ready` as well. This way, `A` will not yield back to the runtime which will cause the budget
+//! to stay depleted and `B` not making progress.
+//!
+//! In these scenarios you could use [`task::poll_budget_available`] to check whether the budget has been depleted
+//! or not and act accordingly:
+//! ```
+//! # use std::future::{poll_fn, Future};
+//! # use std::task::{ready, Context, Poll};
+//! # use std::pin::{pin, Pin};
+//! # use std::sync::atomic::{AtomicBool, Ordering};
+//! # use tokio::task::{consume_budget, poll_budget_available};
+//! #
+//! # #[tokio::main]
+//! # async fn main() {
+//! struct Greedy;
+//! struct Aware;
+//! struct Combined {
+//!     greedy: Greedy,
+//!     aware: Aware,
+//! }
+//!
+//! impl Future for Greedy {
+//!     type Output = ();
+//!
+//!     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
+//!         Poll::Ready(())
+//!     }
+//! }
+//!
+//! impl Future for Aware {
+//!     type Output = ();
+//!
+//!     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+//!         pin!(consume_budget()).poll(cx)
+//!     }
+//! }
+//!
+//! impl Future for Combined {
+//!     type Output = ();
+//!
+//!     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+//!         let this = Pin::into_inner(self);
+//!
+//!         ready!(poll_budget_available(cx));
+//!
+//!         if Pin::new(&mut this.aware).poll(cx).is_ready() {
+//!             return Poll::Ready(());
+//!         } else {
+//!             return Pin::new(&mut this.greedy).poll(cx);
+//!         }
+//!     }
+//! }
+//!
+//! let did_yield = AtomicBool::new(false);
+//!
+//! while !did_yield.load(Ordering::Relaxed) {
+//!     poll_fn(|cx| {
+//!         let combined = pin!(Combined {
+//!             greedy: Greedy,
+//!             aware: Aware,
+//!         });
+//!
+//!         if combined.poll(cx).is_pending() {
+//!             did_yield.store(true, Ordering::Relaxed);
+//!         }
+//!
+//!         Poll::Ready(())
+//!     })
+//!     .await;
+//! }
+//! # }
+//!```
+//!
 //! [`task::spawn_blocking`]: crate::task::spawn_blocking
 //! [`task::block_in_place`]: crate::task::block_in_place
 //! [rt-multi-thread]: ../runtime/index.html#threaded-scheduler
 //! [`task::yield_now`]: crate::task::yield_now()
+//! [`task::poll_budget_available`]: crate::task::poll_budget_available()
 //! [`thread::yield_now`]: std::thread::yield_now
 //! [`task::unconstrained`]: crate::task::unconstrained()
 //! [`poll`]: method@std::future::Future::poll
@@ -337,8 +421,8 @@ cfg_rt! {
     mod yield_now;
     pub use yield_now::yield_now;
 
-    mod consume_budget;
-    pub use consume_budget::consume_budget;
+    mod budget;
+    pub use budget::{consume_budget, poll_budget_available};
 
     mod local;
     pub use local::{spawn_local, LocalSet, LocalEnterGuard};

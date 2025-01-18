@@ -524,6 +524,10 @@ doc! {macro_rules! select {
                 // supplied.
                 let start = $start;
 
+                // Return `Pending` when the task budget is depleted since budget-aware futures
+                // are going to yield anyway and other futures will not cooperate.
+                ::std::task::ready!($crate::task::poll_budget_available(cx));
+
                 for i in 0..BRANCHES {
                     let branch;
                     #[allow(clippy::modulo_one)]
