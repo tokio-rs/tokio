@@ -145,6 +145,143 @@ macro_rules! doc {
         /// application is shutting down, then you probably don't care that partially
         /// read data is lost.
         ///
+        /// # Alternatives from the Ecosystem
+        ///
+        /// The `select!` macro is a versatile tool for working with multiple asynchronous
+        /// branches, allowing tasks to run concurrently within the same thread. However,
+        /// depending on your use case, ecosystem alternatives can provide additional
+        /// benefits, such as more straightforward syntax, more transparent control flow or
+        /// reducing the burned of cancellation safety or fuse semantics.
+        ///
+        /// ## Merging Streams
+        ///
+        /// For cases where `loop { select! { ... } }` is used to poll multiple tasks,
+        /// stream merging offers a concise alternative, inherently handle cancellation-safe
+        /// processing, removing the risk of data loss. Libraries like
+        /// [`tokio-stream`](https://docs.rs/tokio-stream/latest/tokio_stream/) and
+        /// [`futures-concurrency`](https://docs.rs/futures-concurrency/latest/futures_concurrency/)
+        /// provide tools for merging streams and handling their outputs sequentially.
+        ///
+        /// ### Example with `select!`
+        ///
+        /// ```ignore
+        /// use std::pin::pin;
+        ///
+        /// struct File;
+        /// struct Channel;
+        /// struct Socket;
+        ///
+        /// impl Socket {
+        ///     async fn read_packet(&mut self) -> Vec<u8> {
+        ///         todo!()
+        ///     }
+        /// }
+        ///
+        /// async fn read_send(file: &mut File, channel: &mut Channel) {
+        ///     // do work that is not cancel safe
+        /// }
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     // open our IO types
+        ///     let mut file = File;
+        ///     let mut channel = Channel;
+        ///     let mut socket = Socket;
+        ///
+        ///     loop {
+        ///         tokio::select! {
+        ///             _ = read_send(&mut file, &mut channel) => { /* ... */ },
+        ///             data = socket.read_packet() => { /* ... */ }
+        ///         }
+        ///     }
+        /// }
+        /// ```
+        ///
+        /// ### Moving to `merge`
+        ///
+        /// By using merge, you can unify multiple asynchronous tasks into a single stream,
+        /// eliminating the need to manage tasks manually and reducing the risk of
+        /// unintended behavior like data loss.
+        ///
+        /// ```ignore
+        /// use std::pin::pin;
+        ///
+        /// use futures_concurrency::stream::{Merge, StreamExt as _};
+        /// use futures_lite::stream::{unfold, StreamExt as _};
+        ///
+        /// struct File;
+        /// struct Channel;
+        /// struct Socket;
+        ///
+        /// impl Socket {
+        ///     async fn read_packet(&mut self) -> Vec<u8> {
+        ///         todo!()
+        ///     }
+        /// }
+        ///
+        /// async fn read_send(file: &mut File, channel: &mut Channel) {
+        ///     // do work that is not cancel safe
+        /// }
+        ///
+        /// enum Message {
+        ///     None,
+        ///     Data(Vec<u8>),
+        /// }
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     // open our IO types
+        ///     let mut file = File;
+        ///     let mut channel = Channel;
+        ///     let mut socket = Socket;
+        ///
+        ///     let a = unfold((file, channel), |(mut file, mut channel)| async {
+        ///         read_send(&mut file, &mut channel).await;
+        ///         Some((Message::None, (file, channel)))
+        ///     });
+        ///     let b = unfold(socket, |mut socket| async {
+        ///         let data = socket.read_packet().await;
+        ///         Some((Message::Data(data), socket))
+        ///     });
+        ///
+        ///     let mut s = pin!(a.merge(b));
+        ///     while let Some(msg) = s.next().await {
+        ///         match msg {
+        ///             Message::None => continue,
+        ///             Message::Data(data) => { /* ... */ }
+        ///         }
+        ///     }
+        /// }
+        /// ```
+        ///
+        /// ## Racing Futures
+        ///
+        /// If you need to wait for the first completion among several asynchronous tasks,
+        /// ecosystem utilities such as
+        /// [`futures-lite`](https://docs.rs/futures-lite/latest/futures_lite/) or
+        /// [`futures-concurrency`](https://docs.rs/futures-concurrency/latest/futures_concurrency/)
+        /// provide streamlined syntax for racing futures:
+        ///
+        /// - [`futures-lite::future::or`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.or.html)
+        /// - [`futures-lite::future::race`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.race.html)
+        /// - [`futures_concurrency::future::Race`](https://docs.rs/futures-concurrency/latest/futures_concurrency/future/trait.Race.html)
+        ///
+        /// ```ignore
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let result = futures_lite::future::race(
+        ///         async { Ok("ok") }, /* Task A */
+        ///         async { Err("error") }, /* Task B */
+        ///     )
+        ///     .await;
+        ///
+        ///     match result {
+        ///         Ok(output) => println!("First task completed with: {output}"),
+        ///         Err(err) => eprintln!("Error occurred: {err}"),
+        ///     }
+        /// }
+        /// ```
+        ///
         /// # Examples
         ///
         /// Basic select with two branches.
