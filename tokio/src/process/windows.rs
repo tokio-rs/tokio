@@ -24,7 +24,9 @@ use std::fmt;
 use std::fs::File as StdFile;
 use std::future::Future;
 use std::io;
-use std::os::windows::prelude::{AsRawHandle, IntoRawHandle, OwnedHandle, RawHandle};
+use std::os::windows::prelude::{
+    AsHandle, AsRawHandle, BorrowedHandle, IntoRawHandle, OwnedHandle, RawHandle,
+};
 use std::pin::Pin;
 use std::process::Stdio;
 use std::process::{Child as StdChild, Command as StdCommand, ExitStatus};
@@ -199,11 +201,21 @@ impl ChildStdio {
     pub(super) fn into_owned_handle(self) -> io::Result<OwnedHandle> {
         convert_to_file(self).map(OwnedHandle::from)
     }
+
+    pub(crate) fn is_terminal(&self) -> bool {
+        self.as_handle().is_terminal()
+    }
 }
 
 impl AsRawHandle for ChildStdio {
     fn as_raw_handle(&self) -> RawHandle {
         self.raw.as_raw_handle()
+    }
+}
+
+impl AsHandle for ChildStdio {
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        self.raw.as_handle()
     }
 }
 

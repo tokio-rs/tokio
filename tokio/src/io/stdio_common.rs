@@ -17,6 +17,10 @@ impl<W> SplitByUtf8BoundaryIfWindows<W> {
     pub(crate) fn new(inner: W) -> Self {
         Self { inner }
     }
+
+    pub(crate) fn inner(&self) -> &W {
+        &self.inner
+    }
 }
 
 // this constant is defined by Unicode standard.

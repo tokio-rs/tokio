@@ -1381,6 +1381,11 @@ impl ChildStdin {
             inner: imp::stdio(inner)?,
         })
     }
+
+    /// Returns true if the descriptor/handle refers to a terminal/tty.
+    pub fn is_terminal(&self) -> bool {
+        self.inner.is_terminal()
+    }
 }
 
 impl ChildStdout {
@@ -1396,6 +1401,11 @@ impl ChildStdout {
             inner: imp::stdio(inner)?,
         })
     }
+
+    /// Returns true if the descriptor/handle refers to a terminal/tty.
+    pub fn is_terminal(&self) -> bool {
+        self.inner.is_terminal()
+    }
 }
 
 impl ChildStderr {
@@ -1410,6 +1420,11 @@ impl ChildStderr {
         Ok(Self {
             inner: imp::stdio(inner)?,
         })
+    }
+
+    /// Returns true if the descriptor/handle refers to a terminal/tty.
+    pub fn is_terminal(&self) -> bool {
+        self.inner.is_terminal()
     }
 }
 
