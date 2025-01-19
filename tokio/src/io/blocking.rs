@@ -51,6 +51,7 @@ cfg_io_blocking! {
 }
 
 impl<T> Blocking<T> {
+    #[cfg_attr(not(feature = "io-std"), allow(dead_code))]
     pub(crate) fn inner(&self) -> Option<&T> {
         self.inner.as_ref()
     }
