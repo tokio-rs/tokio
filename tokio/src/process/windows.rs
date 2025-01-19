@@ -24,6 +24,7 @@ use std::fmt;
 use std::fs::File as StdFile;
 use std::future::Future;
 use std::io;
+use std::io::IsTerminal;
 use std::os::windows::prelude::{
     AsHandle, AsRawHandle, BorrowedHandle, IntoRawHandle, OwnedHandle, RawHandle,
 };
