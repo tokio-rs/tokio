@@ -4,6 +4,8 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
+use tokio::runtime::coop::has_budget_remaining;
+use tokio::task::consume_budget;
 
 /// Ensure that UDP sockets have functional budgeting
 ///
@@ -75,4 +77,19 @@ async fn coop_budget_udp_send_recv() {
     }
 
     assert_eq!(N_ITERATIONS / (BUDGET / 2), tracker.load(Ordering::SeqCst));
+}
+
+#[tokio::test]
+async fn test_has_budget_remaining() {
+    const BUDGET: usize = 128;
+
+    // At the begining budget should be available
+    assert!(has_budget_remaining());
+
+    // Deplete the budget
+    for _ in 0..BUDGET {
+        consume_budget().await;
+    }
+
+    assert!(!has_budget_remaining());
 }

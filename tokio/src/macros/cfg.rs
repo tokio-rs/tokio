@@ -549,6 +549,20 @@ macro_rules! cfg_not_coop {
     }
 }
 
+macro_rules! cfg_pub_if_rt {
+    ($($(#[$meta:meta])* fn $($inner:tt)*)*) => {
+        $(
+            $(#[$meta])*
+            #[cfg(feature = "rt")]
+            pub fn $($inner)*
+
+            $(#[$meta])*
+            #[cfg(not(feature = "rt"))]
+            pub(crate) fn $($inner)*
+        )*
+    }
+}
+
 macro_rules! cfg_has_atomic_u64 {
     ($($item:item)*) => {
         $(

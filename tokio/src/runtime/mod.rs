@@ -321,7 +321,12 @@ mod tests;
 
 pub(crate) mod context;
 
-pub(crate) mod coop;
+cfg_rt! {
+    pub mod coop;
+}
+cfg_not_rt! {
+    pub(crate) mod coop;
+}
 
 pub(crate) mod park;
 
