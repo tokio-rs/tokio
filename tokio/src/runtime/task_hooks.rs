@@ -9,6 +9,7 @@ impl TaskHooks {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn from_config(config: &Config) -> Self {
         Self {
             task_spawn_callback: config.before_spawn.clone(),

@@ -426,6 +426,7 @@ impl<S: 'static> Notified<S> {
     }
 
     #[cfg(tokio_unstable)]
+    #[allow(dead_code)]
     pub(crate) fn task_id(&self) -> crate::task::Id {
         self.0.id()
     }
