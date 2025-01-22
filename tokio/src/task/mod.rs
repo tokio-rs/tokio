@@ -283,7 +283,7 @@ cfg_rt! {
     pub use yield_now::yield_now;
 
     pub mod coop;
-    #[doc(inline)]
+    #[doc(hidden)]
     pub use coop::consume_budget;
 
     mod local;
