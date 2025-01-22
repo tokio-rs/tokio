@@ -588,16 +588,16 @@ impl Context {
         // purposes. These tasks inherent the "parent"'s limits.
         core.stats.start_poll();
 
-        // Unlike the poll time above, poll start callback is attached to the task id,
-        // so it is tightly associated with the actual poll invocation.
-        #[cfg(tokio_unstable)]
-        self.worker.handle.task_hooks.poll_start_callback(task_id);
-
         // Make the core available to the runtime context
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
         coop::budget(|| {
+            // Unlike the poll time above, poll start callback is attached to the task id,
+            // so it is tightly associated with the actual poll invocation.
+            #[cfg(tokio_unstable)]
+            self.worker.handle.task_hooks.poll_start_callback(task_id);
+
             task.run();
 
             #[cfg(tokio_unstable)]
