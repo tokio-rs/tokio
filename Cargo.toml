@@ -17,3 +17,10 @@ members = [
 
 [workspace.metadata.spellcheck]
 config = "spellcheck.toml"
+
+
+[patch.crates-io]
+# TODO: Consume a release of `mio` that contains <https://github.com/tokio-rs/mio/pull/1857>.
+mio = { git = "https://github.com/erichdongubler-contrib/mio", rev = "1ef9c035f9c147621a6aa1d7b80a14d7acb09555" }
+# TODO: Consume a release of `socket2` that contains <https://github.com/rust-lang/socket2/pull/545>.
+socket2 = { git = "https://github.com/erichdongubler-contrib/socket2", rev = "d4ed5f73ddb051ac700e1b7ee66a72905a86a05e" }
