@@ -756,6 +756,41 @@ impl Builder {
         self
     }
 
+    /// Executes function `f` just before a task is polled
+    ///
+    /// `f` is called within the Tokio context, so functions like
+    /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback being
+    /// invoked immediately.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
+    ///
+    /// [unstable]: crate#unstable-features
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::sync::{atomic::AtomicUsize, Arc};
+    /// # use tokio::task::yield_now;
+    /// # pub fn main() {
+    /// let poll_start_counter = Arc::new(AtomicUsize::new(0));
+    /// let poll_start = poll_start_counter.clone();
+    /// let rt = tokio::runtime::Builder::new_multi_thread()
+    ///     .enable_all()
+    ///     .on_before_task_poll(move |_meta| {
+    ///         poll_start_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    ///     })
+    ///     .build()
+    ///     .unwrap();
+    /// let task = rt.spawn(async {
+    ///     yield_now().await;
+    /// });
+    /// let _ = rt.block_on(task);
+    /// assert_eq!(poll_start.load(std::sync::atomic::Ordering::SeqCst), 2);
+    ///
+    /// # }
+    /// ```
     #[cfg(tokio_unstable)]
     pub fn on_before_task_poll<F>(&mut self, f: F) -> &mut Self
     where
@@ -765,6 +800,41 @@ impl Builder {
         self
     }
 
+    /// Executes function `f` just after a task is polled
+    ///
+    /// `f` is called within the Tokio context, so functions like
+    /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback being
+    /// invoked immediately.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The public API of this type
+    /// may break in 1.x releases. See [the documentation on unstable
+    /// features][unstable] for details.
+    ///
+    /// [unstable]: crate#unstable-features
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::sync::{atomic::AtomicUsize, Arc};
+    /// # use tokio::task::yield_now;
+    /// # pub fn main() {
+    /// let poll_stop_counter = Arc::new(AtomicUsize::new(0));
+    /// let poll_stop = poll_stop_counter.clone();
+    /// let rt = tokio::runtime::Builder::new_multi_thread()
+    ///     .enable_all()
+    ///     .on_after_task_poll(move |_meta| {
+    ///         poll_stop_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    ///     })
+    ///     .build()
+    ///     .unwrap();
+    /// let task = rt.spawn(async {
+    ///     yield_now().await;
+    /// });
+    /// let _ = rt.block_on(task);
+    /// assert_eq!(poll_stop.load(std::sync::atomic::Ordering::SeqCst), 2);
+    ///
+    /// # }
+    /// ```
     #[cfg(tokio_unstable)]
     pub fn on_after_task_poll<F>(&mut self, f: F) -> &mut Self
     where
