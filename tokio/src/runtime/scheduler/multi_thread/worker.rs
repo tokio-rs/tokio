@@ -62,7 +62,6 @@ use crate::runtime::scheduler::multi_thread::{
 };
 use crate::runtime::scheduler::{inject, Defer, Lock};
 use crate::runtime::task::{OwnedTasks, TaskHarnessScheduleHooks};
-use crate::runtime::{self, TaskMeta};
 use crate::runtime::{
     blocking, coop, driver, scheduler, task, Config, SchedulerMetrics, WorkerMetrics,
 };
@@ -572,26 +571,6 @@ impl Context {
         Err(())
     }
 
-    #[inline]
-    fn poll_start_callback(&self, id: Id) {
-        if let Some(poll_start) = &self.worker.handle.task_hooks.before_poll_callback {
-            (poll_start)(&TaskMeta {
-                id,
-                _phantom: std::marker::PhantomData,
-            })
-        }
-    }
-
-    #[inline]
-    fn poll_stop_callback(&self, id: Id) {
-        if let Some(poll_stop) = &self.worker.handle.task_hooks.after_poll_callback {
-            poll_stop(&TaskMeta {
-                id,
-                _phantom: std::marker::PhantomData,
-            })
-        }
-    }
-
     fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
         let task_id = task.task_id();
         let task = self.worker.handle.shared.owned.assert_owner(task);
@@ -610,7 +589,8 @@ impl Context {
 
         // Unlike the poll time above, poll start callback is attached to the task id,
         // so it is tightly associated with the actual poll invocation.
-        self.poll_start_callback(task_id);
+        #[cfg(tokio_unstable)]
+        self.worker.handle.task_hooks.poll_start_callback(task_id);
 
         // Make the core available to the runtime context
         *self.core.borrow_mut() = Some(core);
@@ -618,7 +598,10 @@ impl Context {
         // Run the task
         coop::budget(|| {
             task.run();
-            self.poll_stop_callback(task_id);
+
+            #[cfg(tokio_unstable)]
+            self.worker.handle.task_hooks.poll_stop_callback(task_id);
+
             let mut lifo_polls = 0;
 
             // As long as there is budget remaining and a task exists in the
@@ -682,9 +665,14 @@ impl Context {
                 *self.core.borrow_mut() = Some(core);
                 let task = self.worker.handle.shared.owned.assert_owner(task);
                 let task_id = task.task_id();
-                self.poll_start_callback(task_id);
+
+                #[cfg(tokio_unstable)]
+                self.worker.handle.task_hooks.poll_start_callback(task_id);
+
                 task.run();
-                self.poll_stop_callback(task_id);
+
+                #[cfg(tokio_unstable)]
+                self.worker.handle.task_hooks.poll_stop_callback(task_id);
             }
         })
     }

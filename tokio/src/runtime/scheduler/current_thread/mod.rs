@@ -768,8 +768,17 @@ impl CoreGuard<'_> {
 
                     let task = context.handle.shared.owned.assert_owner(task);
 
+                    #[cfg(tokio_unstable)]
+                    let task_id = task.task_id();
+
                     let (c, ()) = context.run_task(core, || {
+                        #[cfg(tokio_unstable)]
+                        context.handle.task_hooks.poll_start_callback(task_id);
+
                         task.run();
+
+                        #[cfg(tokio_unstable)]
+                        context.handle.task_hooks.poll_stop_callback(task_id);
                     });
 
                     core = c;

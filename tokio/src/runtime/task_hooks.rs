@@ -17,6 +17,28 @@ impl TaskHooks {
             after_poll_callback: config.after_poll.clone(),
         }
     }
+
+    #[cfg(tokio_unstable)]
+    #[inline]
+    pub(crate) fn poll_start_callback(&self, id: super::task::Id) {
+        if let Some(poll_start) = &self.before_poll_callback {
+            (poll_start)(&TaskMeta {
+                id,
+                _phantom: std::marker::PhantomData,
+            })
+        }
+    }
+
+    #[cfg(tokio_unstable)]
+    #[inline]
+    pub(crate) fn poll_stop_callback(&self, id: super::task::Id) {
+        if let Some(poll_stop) = &self.after_poll_callback {
+            (poll_stop)(&TaskMeta {
+                id,
+                _phantom: std::marker::PhantomData,
+            })
+        }
+    }
 }
 
 #[derive(Clone)]
