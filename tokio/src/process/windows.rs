@@ -28,6 +28,7 @@ use std::os::windows::prelude::{AsRawHandle, IntoRawHandle, OwnedHandle, RawHand
 use std::pin::Pin;
 use std::process::Stdio;
 use std::process::{Child as StdChild, Command as StdCommand, ExitStatus};
+use std::ptr::null_mut;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
@@ -120,7 +121,7 @@ impl Future for Child {
             }
             let (tx, rx) = oneshot::channel();
             let ptr = Box::into_raw(Box::new(Some(tx)));
-            let mut wait_object = 0;
+            let mut wait_object = null_mut();
             let rc = unsafe {
                 RegisterWaitForSingleObject(
                     &mut wait_object,
