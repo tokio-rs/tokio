@@ -57,6 +57,7 @@
 //! leak.
 
 use crate::loom::sync::{Arc, Mutex};
+use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
     idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
@@ -73,8 +74,6 @@ use std::cell::RefCell;
 use std::task::Waker;
 use std::thread;
 use std::time::Duration;
-
-use self::task::Id;
 
 mod metrics;
 
@@ -572,7 +571,9 @@ impl Context {
     }
 
     fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
+        #[cfg(tokio_unstable)]
         let task_id = task.task_id();
+
         let task = self.worker.handle.shared.owned.assert_owner(task);
 
         // Make sure the worker is not in the **searching** state. This enables
@@ -664,6 +665,8 @@ impl Context {
                 // Run the LIFO task, then loop
                 *self.core.borrow_mut() = Some(core);
                 let task = self.worker.handle.shared.owned.assert_owner(task);
+
+                #[cfg(tokio_unstable)]
                 let task_id = task.task_id();
 
                 #[cfg(tokio_unstable)]

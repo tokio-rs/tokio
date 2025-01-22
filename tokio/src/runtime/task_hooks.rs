@@ -13,7 +13,9 @@ impl TaskHooks {
         Self {
             task_spawn_callback: config.before_spawn.clone(),
             task_terminate_callback: config.after_termination.clone(),
+            #[cfg(tokio_unstable)]
             before_poll_callback: config.before_poll.clone(),
+            #[cfg(tokio_unstable)]
             after_poll_callback: config.after_poll.clone(),
         }
     }
@@ -45,7 +47,9 @@ impl TaskHooks {
 pub(crate) struct TaskHooks {
     pub(crate) task_spawn_callback: Option<TaskCallback>,
     pub(crate) task_terminate_callback: Option<TaskCallback>,
+    #[cfg(tokio_unstable)]
     pub(crate) before_poll_callback: Option<TaskCallback>,
+    #[cfg(tokio_unstable)]
     pub(crate) after_poll_callback: Option<TaskCallback>,
 }
 

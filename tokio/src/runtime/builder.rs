@@ -89,8 +89,11 @@ pub struct Builder {
     pub(super) before_spawn: Option<TaskCallback>,
 
     /// To run before each poll
+    #[cfg(tokio_unstable)]
     pub(super) before_poll: Option<TaskCallback>,
 
+    /// To run after each poll
+    #[cfg(tokio_unstable)]
     pub(super) after_poll: Option<TaskCallback>,
 
     /// To run after each task is terminated.
@@ -311,7 +314,9 @@ impl Builder {
             before_spawn: None,
             after_termination: None,
 
+            #[cfg(tokio_unstable)]
             before_poll: None,
+            #[cfg(tokio_unstable)]
             after_poll: None,
 
             keep_alive: None,
@@ -1436,7 +1441,9 @@ impl Builder {
                 before_park: self.before_park.clone(),
                 after_unpark: self.after_unpark.clone(),
                 before_spawn: self.before_spawn.clone(),
+                #[cfg(tokio_unstable)]
                 before_poll: self.before_poll.clone(),
+                #[cfg(tokio_unstable)]
                 after_poll: self.after_poll.clone(),
                 after_termination: self.after_termination.clone(),
                 global_queue_interval: self.global_queue_interval,
@@ -1588,7 +1595,9 @@ cfg_rt_multi_thread! {
                     before_park: self.before_park.clone(),
                     after_unpark: self.after_unpark.clone(),
                     before_spawn: self.before_spawn.clone(),
+                    #[cfg(tokio_unstable)]
                     before_poll: self.before_poll.clone(),
+                    #[cfg(tokio_unstable)]
                     after_poll: self.after_poll.clone(),
                     after_termination: self.after_termination.clone(),
                     global_queue_interval: self.global_queue_interval,
@@ -1640,7 +1649,9 @@ cfg_rt_multi_thread! {
                         after_unpark: self.after_unpark.clone(),
                         before_spawn: self.before_spawn.clone(),
                         after_termination: self.after_termination.clone(),
+                        #[cfg(tokio_unstable)]
                         before_poll: self.before_poll.clone(),
+                        #[cfg(tokio_unstable)]
                         after_poll: self.after_poll.clone(),
                         global_queue_interval: self.global_queue_interval,
                         event_interval: self.event_interval,
