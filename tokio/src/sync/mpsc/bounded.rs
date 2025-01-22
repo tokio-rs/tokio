@@ -1070,10 +1070,10 @@ impl<T> Sender<T> {
     /// #[tokio::main]
     /// async fn main() {
     ///     let (tx, rx) = mpsc::channel(10);
-    ///     assert!(rx.is_empty());
+    ///     assert!(tx.is_empty());
     ///
     ///     tx.send(0).await.unwrap();
-    ///     assert!(!rx.is_empty());
+    ///     assert!(!tx.is_empty());
     /// }
     /// ```
     pub fn is_empty(&self) -> bool {
@@ -1089,10 +1089,10 @@ impl<T> Sender<T> {
     /// #[tokio::main]
     /// async fn main() {
     ///     let (tx, rx) = mpsc::channel(10);
-    ///     assert_eq!(0, rx.len());
+    ///     assert_eq!(0, tx.len());
     ///
     ///     tx.send(0).await.unwrap();
-    ///     assert_eq!(1, rx.len());
+    ///     assert_eq!(1, tx.len());
     /// }
     /// ```
     pub fn len(&self) -> usize {
