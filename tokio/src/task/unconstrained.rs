@@ -22,7 +22,7 @@ where
     cfg_coop! {
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             let inner = self.project().inner;
-            crate::runtime::coop::with_unconstrained(|| inner.poll(cx))
+            crate::task::coop::with_unconstrained(|| inner.poll(cx))
         }
     }
 

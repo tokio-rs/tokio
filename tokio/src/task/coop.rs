@@ -1,8 +1,69 @@
 #![cfg_attr(not(feature = "full"), allow(dead_code))]
+#![cfg_attr(not(feature = "rt"), allow(unreachable_pub))]
 
 //! Utilities for improved cooperative scheduling.
 //!
 //! See the "Cooperative scheduling" section in the [task](crate::task#cooperative-scheduling) module.
+//!
+//! ### Cooperative scheduling
+//!
+//! A single call to [`poll`] on a top-level task may potentially do a lot of
+//! work before it returns `Poll::Pending`. If a task runs for a long period of
+//! time without yielding back to the executor, it can starve other tasks
+//! waiting on that executor to execute them, or drive underlying resources.
+//! Since Rust does not have a runtime, it is difficult to forcibly preempt a
+//! long-running task. Instead, this module provides an opt-in mechanism for
+//! futures to collaborate with the executor to avoid starvation.
+//!
+//! Consider a future like this one:
+//!
+//! ```
+//! # use tokio_stream::{Stream, StreamExt};
+//! async fn drop_all<I: Stream + Unpin>(mut input: I) {
+//!     while let Some(_) = input.next().await {}
+//! }
+//! ```
+//!
+//! It may look harmless, but consider what happens under heavy load if the
+//! input stream is _always_ ready. If we spawn `drop_all`, the task will never
+//! yield, and will starve other tasks and resources on the same executor.
+//!
+//! To account for this, Tokio has explicit yield points in a number of library
+//! functions, which force tasks to return to the executor periodically.
+//!
+//!
+//! #### unconstrained
+//!
+//! If necessary, [`task::unconstrained`] lets you opt a future out of Tokio's cooperative
+//! scheduling. When a future is wrapped with `unconstrained`, it will never be forced to yield to
+//! Tokio. For example:
+//!
+//! ```
+//! # #[tokio::main]
+//! # async fn main() {
+//! use tokio::{task, sync::mpsc};
+//!
+//! let fut = async {
+//!     let (tx, mut rx) = mpsc::unbounded_channel();
+//!
+//!     for i in 0..1000 {
+//!         let _ = tx.send(());
+//!         // This will always be ready. If coop was in effect, this code would be forced to yield
+//!         // periodically. However, if left unconstrained, then this code will never yield.
+//!         rx.recv().await;
+//!     }
+//! };
+//!
+//! task::unconstrained(fut).await;
+//! # }
+//! ```
+//! [`poll`]: method@std::future::Future::poll
+//! [`task::unconstrained`]: crate::task::unconstrained()
+
+cfg_rt! {
+    mod consume_budget;
+    pub use consume_budget::consume_budget;
+}
 
 // ```ignore
 // # use tokio_stream::{Stream, StreamExt};
@@ -55,7 +116,7 @@ impl Budget {
     }
 
     /// Returns an unconstrained budget. Operations will not be limited.
-    pub(super) const fn unconstrained() -> Budget {
+    pub(crate) const fn unconstrained() -> Budget {
         Budget(None)
     }
 
@@ -105,98 +166,96 @@ fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
     f()
 }
 
-cfg_pub_if_rt! {
-    /// Returns `true` if there is still budget left on the task.
-    ///
-    /// Futures created by the tokio library functions are budget-aware and yield when there is no more
-    /// budget left, but not all futures will be budget-aware. Consider future `A` that polls two inner
-    /// futures `B` and `C`, and returns `Poll::Ready` when one of them is ready. If both inner futures
-    /// were budget-aware, at some point the budget would be depleted which would cause both futures to
-    /// return `Poll::Pending` resulting in `A` returning `Poll::Pending` as well. Yielding all the way
-    /// back to the runtime, the budget would be reset, and `B` and `C` could make progress again.
-    /// Now let's consider `B` is budget-aware, but `C` is not and is always ready. The budget will be
-    /// depleted as before, but now since `C` always returns `Poll::Ready`, `A` will always return
-    /// `Poll::Ready` as well. This way, `A` will not yield back to the runtime which will keep the budget
-    /// depleted and `B` not making progress.
-    ///
-    /// In these scenarios you could use [`has_budget_remaining`] to check whether the budget has been depleted
-    /// or not and act accordingly:
-    /// ```
-    /// # use std::future::{poll_fn, Future};
-    /// # use std::task::{Context, Poll};
-    /// # use std::pin::{pin, Pin};
-    /// # use std::sync::atomic::{AtomicBool, Ordering};
-    /// # use tokio::task::consume_budget;
-    /// # use tokio::runtime::coop::has_budget_remaining;
-    /// #
-    /// # #[tokio::main]
-    /// # async fn main() {
-    /// struct Greedy;
-    /// struct Aware;
-    /// struct Combined {
-    ///     greedy: Greedy,
-    ///     aware: Aware,
-    /// }
-    ///
-    /// impl Future for Greedy {
-    ///     type Output = ();
-    ///
-    ///     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-    ///         Poll::Ready(())
-    ///     }
-    /// }
-    ///
-    /// impl Future for Aware {
-    ///     type Output = ();
-    ///
-    ///     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-    ///         pin!(consume_budget()).poll(cx)
-    ///     }
-    /// }
-    ///
-    /// impl Future for Combined {
-    ///     type Output = ();
-    ///
-    ///     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-    ///         let this = Pin::into_inner(self);
-    ///
-    ///         if !has_budget_remaining() {
-    ///             return Poll::Pending;
-    ///         }
-    ///
-    ///         if Pin::new(&mut this.aware).poll(cx).is_ready() {
-    ///             return Poll::Ready(());
-    ///         } else {
-    ///             return Pin::new(&mut this.greedy).poll(cx);
-    ///         }
-    ///     }
-    /// }
-    ///
-    /// let did_yield = AtomicBool::new(false);
-    ///
-    /// while !did_yield.load(Ordering::Relaxed) {
-    ///     poll_fn(|cx| {
-    ///         let combined = pin!(Combined {
-    ///             greedy: Greedy,
-    ///             aware: Aware,
-    ///         });
-    ///
-    ///         if combined.poll(cx).is_pending() {
-    ///             did_yield.store(true, Ordering::Relaxed);
-    ///         }
-    ///
-    ///         Poll::Ready(())
-    ///     })
-    ///     .await;
-    /// }
-    /// # }
-    ///```
-    #[inline(always)]
-    fn has_budget_remaining() -> bool {
-        // If the current budget cannot be accessed due to the thread-local being
-        // shutdown, then we assume there is budget remaining.
-        context::budget(|cell| cell.get().has_remaining()).unwrap_or(true)
-    }
+/// Returns `true` if there is still budget left on the task.
+///
+/// Futures created by the tokio library functions are budget-aware and yield when there is no more
+/// budget left, but not all futures will be budget-aware. Consider future `A` that polls two inner
+/// futures `B` and `C`, and returns `Poll::Ready` when one of them is ready. If both inner futures
+/// were budget-aware, at some point the budget would be depleted which would cause both futures to
+/// return `Poll::Pending` resulting in `A` returning `Poll::Pending` as well. Yielding all the way
+/// back to the runtime, the budget would be reset, and `B` and `C` could make progress again.
+/// Now let's consider `B` is budget-aware, but `C` is not and is always ready. The budget will be
+/// depleted as before, but now since `C` always returns `Poll::Ready`, `A` will always return
+/// `Poll::Ready` as well. This way, `A` will not yield back to the runtime which will keep the budget
+/// depleted and `B` not making progress.
+///
+/// In these scenarios you could use [`has_budget_remaining`] to check whether the budget has been depleted
+/// or not and act accordingly:
+/// ```
+/// # use std::future::{poll_fn, Future};
+/// # use std::task::{Context, Poll};
+/// # use std::pin::{pin, Pin};
+/// # use std::sync::atomic::{AtomicBool, Ordering};
+/// # use tokio::task::coop::{consume_budget, has_budget_remaining};
+/// #
+/// # #[tokio::main]
+/// # async fn main() {
+/// struct Greedy;
+/// struct Aware;
+/// struct Combined {
+///     greedy: Greedy,
+///     aware: Aware,
+/// }
+///
+/// impl Future for Greedy {
+///     type Output = ();
+///
+///     fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
+///         Poll::Ready(())
+///     }
+/// }
+///
+/// impl Future for Aware {
+///     type Output = ();
+///
+///     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+///         pin!(consume_budget()).poll(cx)
+///     }
+/// }
+///
+/// impl Future for Combined {
+///     type Output = ();
+///
+///     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+///         let this = Pin::into_inner(self);
+///
+///         if !has_budget_remaining() {
+///             return Poll::Pending;
+///         }
+///
+///         if Pin::new(&mut this.aware).poll(cx).is_ready() {
+///             return Poll::Ready(());
+///         } else {
+///             return Pin::new(&mut this.greedy).poll(cx);
+///         }
+///     }
+/// }
+///
+/// let did_yield = AtomicBool::new(false);
+///
+/// while !did_yield.load(Ordering::Relaxed) {
+///     poll_fn(|cx| {
+///         let combined = pin!(Combined {
+///             greedy: Greedy,
+///             aware: Aware,
+///         });
+///
+///         if combined.poll(cx).is_pending() {
+///             did_yield.store(true, Ordering::Relaxed);
+///         }
+///
+///         Poll::Ready(())
+///     })
+///     .await;
+/// }
+/// # }
+///```
+#[inline(always)]
+#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+pub fn has_budget_remaining() -> bool {
+    // If the current budget cannot be accessed due to the thread-local being
+    // shutdown, then we assume there is budget remaining.
+    context::budget(|cell| cell.get().has_remaining()).unwrap_or(true)
 }
 
 cfg_rt_multi_thread! {

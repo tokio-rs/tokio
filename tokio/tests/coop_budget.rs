@@ -4,8 +4,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
-use tokio::runtime::coop::has_budget_remaining;
-use tokio::task::consume_budget;
+use tokio::task::coop::{consume_budget, has_budget_remaining};
 
 /// Ensure that UDP sockets have functional budgeting
 ///

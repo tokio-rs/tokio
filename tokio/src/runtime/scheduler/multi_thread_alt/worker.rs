@@ -64,8 +64,9 @@ use crate::runtime::scheduler::multi_thread_alt::{
 };
 use crate::runtime::scheduler::{self, inject, Lock};
 use crate::runtime::task::{OwnedTasks, TaskHarnessScheduleHooks};
-use crate::runtime::{blocking, coop, driver, task, Config, SchedulerMetrics, WorkerMetrics};
+use crate::runtime::{blocking, driver, task, Config, SchedulerMetrics, WorkerMetrics};
 use crate::runtime::{context, TaskHooks};
+use crate::task::coop;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
