@@ -92,7 +92,7 @@ pin-project-lite = "0.2.11"
 
 # Everything else is optional...
 bytes = { version = "1.2.1", optional = true }
-mio = { version = "1.0.1", optional = true, default-features = false }
+mio = { version = "1.0.4", optional = true, default-features = false }
 parking_lot = { version = "0.12.0", optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
@@ -106,7 +106,7 @@ tracing = { version = "0.1.29", default-features = false, features = ["std"], op
 [target.'cfg(all(tokio_uring, target_os = "linux"))'.dependencies]
 io-uring = { version = "0.7.6", default-features = false }
 libc = { version = "0.2.168" }
-mio = { version = "1.0.1", default-features = false, features = ["os-poll", "os-ext"] }
+mio = { version = "1.0.4", default-features = false, features = ["os-poll", "os-ext"] }
 slab = "0.4.9"
 
 # Currently unstable. The API exposed by these features may be broken at any time.
@@ -123,11 +123,11 @@ libc = { version = "0.2.168" }
 nix = { version = "0.29.0", default-features = false, features = ["aio", "fs", "socket"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.52"
+version = "0.59"
 optional = true
 
 [target.'cfg(windows)'.dev-dependencies.windows-sys]
-version = "0.52"
+version = "0.59"
 features = [
   "Win32_Foundation",
   "Win32_Security_Authorization",
