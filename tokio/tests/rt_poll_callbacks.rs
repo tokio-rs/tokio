@@ -81,12 +81,15 @@ mod unstable {
             yield_now().await;
             yield_now().await;
             yield_now().await;
+            5
         });
         let task = rt.spawn(task);
 
         let spawned_task_id = task.id();
 
-        rt.block_on(task).expect("task should succeed");
+        assert_eq!(rt.block_on(task).expect("task should succeed"), 5);
+        // We need to drop the runtime to force the workers to cleanly exit
+        drop(rt);
 
         assert_eq!(
             before_task_poll_callback_task_id.lock().unwrap().unwrap(),
