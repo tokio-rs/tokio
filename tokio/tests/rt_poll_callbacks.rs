@@ -86,7 +86,7 @@ mod unstable {
 
         let spawned_task_id = task.id();
 
-        let _ = rt.block_on(task);
+        rt.block_on(task).expect("task should succeed");
 
         assert_eq!(
             before_task_poll_callback_task_id.lock().unwrap().unwrap(),
@@ -99,11 +99,13 @@ mod unstable {
         let actual_count = count.load(std::sync::atomic::Ordering::SeqCst);
         assert_eq!(
             poll_start.load(std::sync::atomic::Ordering::SeqCst),
-            actual_count
+            actual_count,
+            "unexpected number of poll starts"
         );
         assert_eq!(
             poll_stop.load(std::sync::atomic::Ordering::SeqCst),
-            actual_count
+            actual_count,
+            "unexpected number of poll stops"
         );
     }
 
