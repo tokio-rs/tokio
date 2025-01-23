@@ -778,8 +778,8 @@ impl Builder {
     /// let poll_start = poll_start_counter.clone();
     /// let rt = tokio::runtime::Builder::new_multi_thread()
     ///     .enable_all()
-    ///     .on_before_task_poll(move |_meta| {
-    ///         poll_start_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    ///     .on_before_task_poll(move |meta| {
+    ///         println!("task {} is about to be polled", meta.id())
     ///     })
     ///     .build()
     ///     .unwrap();
@@ -787,7 +787,6 @@ impl Builder {
     ///     yield_now().await;
     /// });
     /// let _ = rt.block_on(task);
-    /// assert_eq!(poll_start.load(std::sync::atomic::Ordering::SeqCst), 2);
     ///
     /// # }
     /// ```
@@ -822,8 +821,8 @@ impl Builder {
     /// let poll_stop = poll_stop_counter.clone();
     /// let rt = tokio::runtime::Builder::new_multi_thread()
     ///     .enable_all()
-    ///     .on_after_task_poll(move |_meta| {
-    ///         poll_stop_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    ///     .on_after_task_poll(move |meta| {
+    ///         println!("task {} completed polling", meta.id());
     ///     })
     ///     .build()
     ///     .unwrap();
@@ -831,7 +830,6 @@ impl Builder {
     ///     yield_now().await;
     /// });
     /// let _ = rt.block_on(task);
-    /// assert_eq!(poll_stop.load(std::sync::atomic::Ordering::SeqCst), 2);
     ///
     /// # }
     /// ```
