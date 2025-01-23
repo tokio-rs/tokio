@@ -284,6 +284,7 @@ cfg_rt! {
 
     pub mod coop;
     #[doc(hidden)]
+    #[deprecated]
     pub use coop::consume_budget;
 
     mod local;
