@@ -2,9 +2,47 @@
 
 #[cfg(tokio_unstable)]
 mod unstable {
-    use std::sync::{atomic::AtomicUsize, Arc, Mutex};
+    use std::{
+        future::Future,
+        sync::{atomic::AtomicUsize, Arc, Mutex},
+    };
 
     use tokio::task::yield_now;
+
+    pin_project_lite::pin_project! {
+        struct PollCounter<F> {
+            #[pin]
+            inner: F,
+            counter: Arc<AtomicUsize>,
+        }
+    }
+
+    impl<F: Future> Future for PollCounter<F> {
+        type Output = F::Output;
+
+        fn poll(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Self::Output> {
+            let this = self.project();
+            this.counter
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            this.inner.poll(cx)
+        }
+    }
+
+    impl PollCounter<()> {
+        fn new<F: Future>(future: F) -> (PollCounter<F>, Arc<AtomicUsize>) {
+            let counter = Arc::new(AtomicUsize::new(0));
+            (
+                PollCounter {
+                    inner: future,
+                    counter: counter.clone(),
+                },
+                counter,
+            )
+        }
+    }
 
     #[cfg(not(target_os = "wasi"))]
     #[test]
@@ -39,11 +77,12 @@ mod unstable {
             })
             .build()
             .unwrap();
-        let task = rt.spawn(async {
+        let (task, count) = PollCounter::new(async {
             yield_now().await;
             yield_now().await;
             yield_now().await;
         });
+        let task = rt.spawn(task);
 
         let spawned_task_id = task.id();
 
@@ -57,8 +96,15 @@ mod unstable {
             after_task_poll_callback_task_id.lock().unwrap().unwrap(),
             spawned_task_id
         );
-        assert_eq!(poll_start.load(std::sync::atomic::Ordering::SeqCst), 4);
-        assert_eq!(poll_stop.load(std::sync::atomic::Ordering::SeqCst), 4);
+        let actual_count = count.load(std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(
+            poll_start.load(std::sync::atomic::Ordering::SeqCst),
+            actual_count
+        );
+        assert_eq!(
+            poll_stop.load(std::sync::atomic::Ordering::SeqCst),
+            actual_count
+        );
     }
 
     #[test]
