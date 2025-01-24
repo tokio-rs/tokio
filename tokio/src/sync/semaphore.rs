@@ -375,7 +375,7 @@ use std::sync::Arc;
 /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
 /// async fn main() {
 ///     let capacity = 5;
-///     let update_interval = Duration::from_secs_f32(1.0 / capacity as f32);
+///         let update_interval = Duration::from_secs_f32(1.0 / capacity as f32);
 ///     let bucket = TokenBucket::new(update_interval, capacity);
 ///
 ///     for _ in 0..5 {
@@ -383,6 +383,77 @@ use std::sync::Arc;
 ///
 ///         // do the operation
 ///     }
+/// }
+/// ```
+///
+/// ## Countdown latch
+///
+/// A `Semaphore` may be used to implement a countdown latch, a synchronization
+/// primitive where one task waits until a set number of other tasks to have
+/// completed before continuing.
+///
+/// The task awaiting the countdown should call [`Semaphore::acquire_many`] to
+/// acquire a number of permits equal to the number of tasks which hold the
+/// latch open. The tasks whose completion is awaited by the latch should call
+/// [`Semaphore::add_permits`] with a single permit to increment the countdown
+/// latch as they complete. For example:
+///
+/// ```
+/// use tokio::sync::Semaphore;
+/// use std::future::Future;
+/// use std::sync::Arc;
+///
+/// /// A token that holds a countdown latch open until it is dropped.
+/// #[derive(Clone)]
+/// pub struct Countdown(Arc<Semaphore>);
+///
+/// impl Drop for Countdown {
+///     fn drop(&mut self) {
+///         self.0.add_permits(1);
+///     }
+/// }
+///
+/// impl Countdown {
+///     /// Returns a new countdown latch which completes when `n` tasks
+///     /// have exited.
+///     ///
+///     /// This method returns a tuple of a `Countdown` token which
+///     /// holds the latch open and incrememts the count of completed
+///     /// tasks when it is dropped, and a `Future` which completes when
+///     /// `n` clones of the `Countdown` token have been dropped.
+///     pub fn latch(n: u32) -> (Self, impl Future + Send) {
+///         let sem = Arc::new(Semaphore::new(0));
+///         let latch = Self(sem.clone());
+///
+///         let wait = async move {
+///             let _ = sem.acquire_many(n).await;
+///         };
+///
+///         (latch, wait)
+///     }
+/// }
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let (latch, wait) = Countdown::new(5);
+///     for i in 1..=5 {
+///         let latch = latch.clone();
+///         tokio::spawn(async move {
+///             // move the latch into the task.
+///             let _latch = latch;
+///
+///             // do stuff...
+///             println!("countdown task {i} running...");
+///             tokio::task::yield_now().await;
+///
+///             // when the task completes, the latch is dropped.
+///             println!("countdown task {i} done!");
+///         });
+///     }
+///
+///     println!("waiting for tasks to complete...");
+///     wait.await;
+///     println!("tasks completed!");
 /// }
 /// ```
 ///
