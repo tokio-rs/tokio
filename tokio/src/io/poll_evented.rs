@@ -69,6 +69,68 @@ cfg_io_driver! {
     }
 }
 
+#[cfg(target_os = "linux")]
+impl<E: std::os::unix::io::AsRawFd + Source> PollEvented<E> {
+    /// Creates a new `PollEvented` associated with the default reactor.
+    ///
+    /// The returned `PollEvented` has readable and writable interests. For more control, use
+    /// [`Self::new_with_interest`].
+    ///
+    /// This will also use additional provided raw flags for epoll.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[track_caller]
+    #[cfg_attr(feature = "signal", allow(unused))]
+    #[cfg(all(target_os = "linux", tokio_unstable))]
+    pub(crate) fn new_raw(io: E, flags: u32) -> io::Result<Self> {
+        PollEvented::new_with_interest_raw(io, flags)
+    }
+
+    /// Creates a new `PollEvented` associated with the default reactor, for
+    /// specific `Interest` state. `new_with_interest` should be used over `new`
+    /// when you need control over the readiness state, such as when a file
+    /// descriptor only allows reads. This does not add `hup` or `error` so if
+    /// you are interested in those states, you will need to add them to the
+    /// readiness state passed to this function.
+    ///
+    /// This will also use additional provided raw flags for epoll.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if thread-local runtime is not set.
+    ///
+    /// The runtime is usually set implicitly when this function is called from
+    /// a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter)
+    /// function.
+    #[track_caller]
+    #[cfg_attr(feature = "signal", allow(unused))]
+    #[cfg(all(target_os = "linux", tokio_unstable))]
+    pub(crate) fn new_with_interest_raw(io: E, flags: u32) -> io::Result<Self> {
+        Self::new_with_interest_and_handle_raw(io, flags, scheduler::Handle::current())
+    }
+
+    #[track_caller]
+    #[cfg(all(target_os = "linux", tokio_unstable))]
+    pub(crate) fn new_with_interest_and_handle_raw(
+        mut io: E,
+        flags: u32,
+        handle: scheduler::Handle,
+    ) -> io::Result<Self> {
+        let registration = Registration::new_with_flags_and_handle(&mut io, flags, handle)?;
+        Ok(Self {
+            io: Some(io),
+            registration,
+        })
+    }
+}
+
 // ===== impl PollEvented =====
 
 impl<E: Source> PollEvented<E> {
