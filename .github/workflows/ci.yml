@@ -16,9 +16,9 @@ env:
   RUSTUP_WINDOWS_PATH_ADD_BIN: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2024-05-05
+  rust_nightly: nightly-2025-01-25
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2024-10-21
+  rust_miri_nightly: nightly-2025-01-25
   rust_clippy: '1.77'
   # When updating this, also update:
   # - README.md
