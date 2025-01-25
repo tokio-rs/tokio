@@ -3,6 +3,7 @@ name = "benches"
 version = "0.0.0"
 publish = false
 edition = "2021"
+license = "MIT"
 
 [features]
 test-util = ["tokio/test-util"]
@@ -15,7 +16,7 @@ rand_chacha = "0.3"
 
 [dev-dependencies]
 tokio-util = { version = "0.7.0", path = "../tokio-util", features = ["full"] }
-tokio-stream = { path = "../tokio-stream" }
+tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.42"

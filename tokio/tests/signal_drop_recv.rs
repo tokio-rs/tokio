@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(unix)]
+#![cfg(not(miri))] // No `sigaction` in Miri.
 
 mod support {
     pub mod signal;

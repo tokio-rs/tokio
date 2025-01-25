@@ -10,6 +10,7 @@ use tokio::{
 };
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn datagram_echo_server() -> io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
@@ -51,6 +52,7 @@ async fn datagram_echo_server() -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn listen_and_stream() -> std::io::Result<()> {
     let dir = tempfile::Builder::new().tempdir().unwrap();
     let sock_path = dir.path().join("connect.sock");
@@ -90,6 +92,7 @@ async fn listen_and_stream() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn assert_usage() -> std::io::Result<()> {
     let datagram_socket = UnixSocket::new_datagram()?;
     let result = datagram_socket

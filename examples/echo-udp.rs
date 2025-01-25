@@ -38,7 +38,7 @@ impl Server {
             if let Some((size, peer)) = to_send {
                 let amt = socket.send_to(&buf[..size], &peer).await?;
 
-                println!("Echoed {}/{} bytes to {}", amt, size, peer);
+                println!("Echoed {amt}/{size} bytes to {peer}");
             }
 
             // If we're here then `to_send` is `None`, so we take a look for the

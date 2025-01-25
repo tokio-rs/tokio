@@ -16,9 +16,7 @@ cfg_rt_multi_thread! {
     mod rt_multi_thread;
 }
 
-cfg_unstable_metrics! {
-    mod metrics;
-}
+mod metrics;
 
 /// Growable, MPMC queue used to inject new tasks into the scheduler and as an
 /// overflow queue when the local, fixed-size, array queue overflows.

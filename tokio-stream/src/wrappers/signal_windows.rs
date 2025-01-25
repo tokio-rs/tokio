@@ -7,6 +7,23 @@ use tokio::signal::windows::{CtrlBreak, CtrlC};
 ///
 /// [`CtrlC`]: struct@tokio::signal::windows::CtrlC
 /// [`Stream`]: trait@crate::Stream
+///
+/// # Example
+///
+/// ```no_run
+/// use tokio::signal::windows::ctrl_c;
+/// use tokio_stream::{StreamExt, wrappers::CtrlCStream};
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> std::io::Result<()> {
+/// let signals = ctrl_c()?;
+/// let mut stream = CtrlCStream::new(signals);
+/// while stream.next().await.is_some() {
+///     println!("ctrl-c received");
+/// }
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
 #[cfg_attr(docsrs, doc(cfg(all(windows, feature = "signal"))))]
 pub struct CtrlCStream {
@@ -46,6 +63,23 @@ impl AsMut<CtrlC> for CtrlCStream {
 }
 
 /// A wrapper around [`CtrlBreak`] that implements [`Stream`].
+///
+/// # Example
+///
+/// ```no_run
+/// use tokio::signal::windows::ctrl_break;
+/// use tokio_stream::{StreamExt, wrappers::CtrlBreakStream};
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> std::io::Result<()> {
+/// let signals = ctrl_break()?;
+/// let mut stream = CtrlBreakStream::new(signals);
+/// while stream.next().await.is_some() {
+///     println!("ctrl-break received");
+/// }
+/// # Ok(())
+/// # }
+/// ```
 ///
 /// [`CtrlBreak`]: struct@tokio::signal::windows::CtrlBreak
 /// [`Stream`]: trait@crate::Stream

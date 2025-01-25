@@ -242,7 +242,11 @@ where
     use std::os::windows::prelude::FromRawHandle;
 
     let raw = Arc::new(unsafe { StdFile::from_raw_handle(io.into_raw_handle()) });
-    let io = Blocking::new(ArcFile(raw.clone()));
+    let io = ArcFile(raw.clone());
+    // SAFETY: the `Read` implementation of `io` does not
+    // read from the buffer it is borrowing and correctly
+    // reports the length of the data written into the buffer.
+    let io = unsafe { Blocking::new(io) };
     Ok(ChildStdio { raw, io })
 }
 

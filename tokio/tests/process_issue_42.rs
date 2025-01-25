@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(unix)]
+#![cfg(not(miri))]
 
 use futures::future::join_all;
 use std::process::Stdio;
@@ -19,7 +20,7 @@ async fn issue_42() {
         task::spawn(async {
             let processes = (0..10usize).map(|i| {
                 let mut child = Command::new("echo")
-                    .arg(format!("I am spawned process #{}", i))
+                    .arg(format!("I am spawned process #{i}"))
                     .stdin(Stdio::null())
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())

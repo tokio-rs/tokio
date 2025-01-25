@@ -224,7 +224,7 @@
 //! The main method on the `Encoder` trait is the [`encode`] method. This method
 //! takes an item that is being written, and a buffer to write the item to. The
 //! buffer may already contain data, and in this case, the encoder should append
-//! the new frame the to buffer rather than overwrite the existing data.
+//! the new frame to the buffer rather than overwrite the existing data.
 //!
 //! It is guaranteed that, from one call to `encode` to another, the provided
 //! buffer will contain the exact same data as before, except that some of the

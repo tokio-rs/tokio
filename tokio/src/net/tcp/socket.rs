@@ -63,7 +63,7 @@ cfg_net! {
     ///     // previous one.
     ///     //
     ///     // On Windows, this allows rebinding sockets which are actively in use,
-    ///     // which allows “socket hijacking”, so we explicitly don't set it here.
+    ///     // which allows "socket hijacking", so we explicitly don't set it here.
     ///     // https://docs.microsoft.com/en-us/windows/win32/winsock/using-so-reuseaddr-and-so-exclusiveaddruse
     ///     socket.set_reuseaddr(true)?;
     ///     socket.bind(addr)?;
@@ -425,7 +425,7 @@ impl TcpSocket {
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
     /// let socket = TcpSocket::new_v4()?;
     ///
-    /// println!("{:?}", socket.nodelay()?);
+    /// socket.set_nodelay(true)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -445,9 +445,9 @@ impl TcpSocket {
     /// use tokio::net::TcpSocket;
     ///
     /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
-    /// let stream = TcpSocket::new_v4()?;
+    /// let socket = TcpSocket::new_v4()?;
     ///
-    /// stream.set_nodelay(true)?;
+    /// println!("{:?}", socket.nodelay()?);
     /// # Ok(())
     /// # }
     /// ```
@@ -469,6 +469,7 @@ impl TcpSocket {
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
+        target_os = "haiku"
     )))]
     #[cfg_attr(
         docsrs,
@@ -477,6 +478,7 @@ impl TcpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
+            target_os = "haiku"
         ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
@@ -496,6 +498,7 @@ impl TcpSocket {
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
+        target_os = "haiku"
     )))]
     #[cfg_attr(
         docsrs,
@@ -504,6 +507,7 @@ impl TcpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
+            target_os = "haiku"
         ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
@@ -739,6 +743,7 @@ impl TcpSocket {
     /// # Examples
     ///
     /// ```
+    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::TcpSocket;
     /// use socket2::{Domain, Socket, Type};
     ///
@@ -787,6 +792,9 @@ impl fmt::Debug for TcpSocket {
     }
 }
 
+// These trait implementations can't be build on Windows, so we completely
+// ignore them, even when building documentation.
+#[cfg(unix)]
 cfg_unix! {
     impl AsRawFd for TcpSocket {
         fn as_raw_fd(&self) -> RawFd {

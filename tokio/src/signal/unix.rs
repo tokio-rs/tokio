@@ -18,16 +18,18 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
 
-pub(crate) type OsStorage = Vec<SignalInfo>;
+pub(crate) type OsStorage = Box<[SignalInfo]>;
 
 impl Init for OsStorage {
     fn init() -> Self {
         // There are reliable signals ranging from 1 to 33 available on every Unix platform.
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "illumos")))]
         let possible = 0..=33;
 
-        // On Linux, there are additional real-time signals available.
-        #[cfg(target_os = "linux")]
+        // On Linux and illumos, there are additional real-time signals
+        // available. (This is also likely true on Solaris, but this should be
+        // verified before being enabled.)
+        #[cfg(any(target_os = "linux", target_os = "illumos"))]
         let possible = 0..=libc::SIGRTMAX();
 
         possible.map(|_| SignalInfo::default()).collect()
@@ -130,7 +132,8 @@ impl SignalKind {
         target_os = "freebsd",
         target_os = "macos",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "illumos"
     ))]
     pub const fn info() -> Self {
         Self(libc::SIGINFO)
@@ -144,6 +147,15 @@ impl SignalKind {
         Self(libc::SIGINT)
     }
 
+    #[cfg(target_os = "haiku")]
+    /// Represents the `SIGPOLL` signal.
+    ///
+    /// On POSIX systems this signal is sent when I/O operations are possible
+    /// on some file descriptor. By default, this signal is ignored.
+    pub const fn io() -> Self {
+        Self(libc::SIGPOLL)
+    }
+    #[cfg(not(target_os = "haiku"))]
     /// Represents the `SIGIO` signal.
     ///
     /// On Unix systems this signal is sent when I/O operations are possible
@@ -258,7 +270,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     if signal < 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
         return Err(Error::new(
             ErrorKind::Other,
-            format!("Refusing to register signal {}", signal),
+            format!("Refusing to register signal {signal}"),
         ));
     }
 

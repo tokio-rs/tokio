@@ -76,7 +76,7 @@ impl<S: Storage> Registry<S> {
     fn register_listener(&self, event_id: EventId) -> watch::Receiver<()> {
         self.storage
             .event_info(event_id)
-            .unwrap_or_else(|| panic!("invalid event_id: {}", event_id))
+            .unwrap_or_else(|| panic!("invalid event_id: {event_id}"))
             .tx
             .subscribe()
     }

@@ -10,7 +10,6 @@ use std::task::{Context, Poll};
 use std::{fmt, panic};
 
 use crate::runtime::Handle;
-#[cfg(tokio_unstable)]
 use crate::task::Id;
 use crate::task::{unconstrained, AbortHandle, JoinError, JoinHandle, LocalSet};
 use crate::util::IdleNotifiedSet;
@@ -281,7 +280,7 @@ impl<T: 'static> JoinSet<T> {
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinSet`.
     pub async fn join_next(&mut self) -> Option<Result<T, JoinError>> {
-        crate::future::poll_fn(|cx| self.poll_join_next(cx)).await
+        std::future::poll_fn(|cx| self.poll_join_next(cx)).await
     }
 
     /// Waits until one of the tasks in the set completes and returns its
@@ -300,10 +299,8 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// [task ID]: crate::task::Id
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub async fn join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
-        crate::future::poll_fn(|cx| self.poll_join_next_with_id(cx)).await
+        std::future::poll_fn(|cx| self.poll_join_next_with_id(cx)).await
     }
 
     /// Tries to join one of the tasks in the set that has completed and return its output.
@@ -338,8 +335,6 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// [task ID]: crate::task::Id
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn try_join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         // Loop over all notified `JoinHandle`s to find one that's ready, or until none are left.
         loop {
@@ -400,9 +395,9 @@ impl<T: 'static> JoinSet<T> {
     ///            tokio::time::sleep(Duration::from_secs(3 - i)).await;
     ///            i
     ///        });
-    ///     }   
+    ///     }
     ///
-    ///     let output = set.join_all().await;  
+    ///     let output = set.join_all().await;
     ///     assert_eq!(output, vec![2, 1, 0]);
     /// }
     /// ```
@@ -419,8 +414,8 @@ impl<T: 'static> JoinSet<T> {
     ///
     ///     for i in 0..3 {
     ///        set.spawn(async move {i});
-    ///     }   
-    ///     
+    ///     }
+    ///
     ///     let mut output = Vec::new();
     ///     while let Some(res) = set.join_next().await{
     ///         match res {
@@ -544,8 +539,6 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// [coop budget]: crate::task#cooperative-scheduling
     /// [task ID]: crate::task::Id
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn poll_join_next_with_id(
         &mut self,
         cx: &mut Context<'_>,

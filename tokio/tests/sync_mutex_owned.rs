@@ -59,6 +59,7 @@ fn readiness() {
 /// is aborted prematurely.
 #[tokio::test]
 #[cfg(feature = "full")]
+#[cfg_attr(miri, ignore)]
 async fn aborted_future_1() {
     use std::time::Duration;
     use tokio::time::{interval, timeout};
@@ -132,5 +133,5 @@ fn try_lock_owned() {
 async fn debug_format() {
     let s = "debug";
     let m = Arc::new(Mutex::new(s.to_string()));
-    assert_eq!(format!("{:?}", s), format!("{:?}", m.lock_owned().await));
+    assert_eq!(format!("{s:?}"), format!("{:?}", m.lock_owned().await));
 }

@@ -1,8 +1,13 @@
 #![cfg(feature = "full")]
 #![warn(rust_2018_idioms)]
 #![cfg(unix)]
+#![cfg(not(miri))] // No socket in miri.
 
 use std::io;
+#[cfg(target_os = "android")]
+use std::os::android::net::SocketAddrExt;
+#[cfg(target_os = "linux")]
+use std::os::linux::net::SocketAddrExt;
 use std::task::Poll;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
@@ -101,7 +106,7 @@ async fn try_read_write() -> std::io::Result<()> {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 break;
             }
-            Err(e) => panic!("error = {:?}", e),
+            Err(e) => panic!("error = {e:?}"),
         }
     }
 
@@ -120,7 +125,7 @@ async fn try_read_write() -> std::io::Result<()> {
             match server.try_read(&mut read[i..]) {
                 Ok(n) => i += n,
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("error = {:?}", e),
+                Err(e) => panic!("error = {e:?}"),
             }
         }
 
@@ -142,7 +147,7 @@ async fn try_read_write() -> std::io::Result<()> {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 break;
             }
-            Err(e) => panic!("error = {:?}", e),
+            Err(e) => panic!("error = {e:?}"),
         }
     }
 
@@ -165,7 +170,7 @@ async fn try_read_write() -> std::io::Result<()> {
             match server.try_read_vectored(&mut bufs) {
                 Ok(n) => i += n,
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("error = {:?}", e),
+                Err(e) => panic!("error = {e:?}"),
             }
         }
 
@@ -338,7 +343,7 @@ async fn try_read_buf() -> std::io::Result<()> {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 break;
             }
-            Err(e) => panic!("error = {:?}", e),
+            Err(e) => panic!("error = {e:?}"),
         }
     }
 
@@ -357,7 +362,7 @@ async fn try_read_buf() -> std::io::Result<()> {
             match server.try_read_buf(&mut read) {
                 Ok(n) => i += n,
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("error = {:?}", e),
+                Err(e) => panic!("error = {e:?}"),
             }
         }
 
@@ -431,5 +436,11 @@ async fn abstract_socket_name() {
     let accept = listener.accept();
     let connect = UnixStream::connect(&socket_path);
 
-    try_join(accept, connect).await.unwrap();
+    let ((stream, _), _) = try_join(accept, connect).await.unwrap();
+
+    let local_addr = stream.into_std().unwrap().local_addr().unwrap();
+    let abstract_path_name = local_addr.as_abstract_name().unwrap();
+
+    // `as_abstract_name` removes leading zero bytes
+    assert_eq!(abstract_path_name, b"aaa");
 }

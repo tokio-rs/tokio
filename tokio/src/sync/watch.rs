@@ -111,6 +111,7 @@
 //! [`Sender::closed`]: crate::sync::watch::Sender::closed
 //! [`Sender::subscribe()`]: crate::sync::watch::Sender::subscribe
 
+use crate::runtime::coop::cooperative;
 use crate::sync::notify::Notify;
 
 use crate::loom::sync::atomic::AtomicUsize;
@@ -575,7 +576,7 @@ impl<T> Receiver<T> {
     /// assert_eq!(*rx.borrow(), "hello");
     /// ```
     pub fn borrow(&self) -> Ref<'_, T> {
-        let inner = self.shared.value.read().unwrap();
+        let inner = self.shared.value.read();
 
         // After obtaining a read-lock no concurrent writes could occur
         // and the loaded version matches that of the borrowed reference.
@@ -622,7 +623,7 @@ impl<T> Receiver<T> {
     /// [`changed`]: Receiver::changed
     /// [`borrow`]: Receiver::borrow
     pub fn borrow_and_update(&mut self) -> Ref<'_, T> {
-        let inner = self.shared.value.read().unwrap();
+        let inner = self.shared.value.read();
 
         // After obtaining a read-lock no concurrent writes could occur
         // and the loaded version matches that of the borrowed reference.
@@ -743,7 +744,7 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
-        changed_impl(&self.shared, &mut self.version).await
+        cooperative(changed_impl(&self.shared, &mut self.version)).await
     }
 
     /// Waits for a value that satisfies the provided condition.
@@ -766,54 +767,68 @@ impl<T> Receiver<T> {
     /// When this function returns, the value that was passed to the closure
     /// when it returned `true` will be considered seen.
     ///
-    /// If the channel is closed, then `wait_for` will return a `RecvError`.
+    /// If the channel is closed, then `wait_for` will return a [`RecvError`].
     /// Once this happens, no more messages can ever be sent on the channel.
     /// When an error is returned, it is guaranteed that the closure has been
     /// called on the last value, and that it returned `false` for that value.
     /// (If the closure returned `true`, then the last value would have been
     /// returned instead of the error.)
     ///
-    /// Like the `borrow` method, the returned borrow holds a read lock on the
+    /// Like the [`borrow`] method, the returned borrow holds a read lock on the
     /// inner value. This means that long-lived borrows could cause the producer
     /// half to block. It is recommended to keep the borrow as short-lived as
     /// possible. See the documentation of `borrow` for more information on
     /// this.
     ///
-    /// [`Receiver::changed()`]: crate::sync::watch::Receiver::changed
+    /// [`borrow`]: Receiver::borrow
+    /// [`RecvError`]: error::RecvError
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If you use it as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that the last seen value `val`
+    /// (if any) satisfies `f(val) == false`.
+    ///
+    /// # Panics
+    ///
+    /// If and only if the closure `f` panics. In that case, no resource owned
+    /// or shared by this [`Receiver`] will be poisoned.
     ///
     /// # Examples
     ///
     /// ```
     /// use tokio::sync::watch;
+    /// use tokio::time::{sleep, Duration};
     ///
-    /// #[tokio::main]
-    ///
+    /// #[tokio::main(flavor = "current_thread", start_paused = true)]
     /// async fn main() {
-    ///     let (tx, _rx) = watch::channel("hello");
+    ///     let (tx, mut rx) = watch::channel("hello");
     ///
-    ///     tx.send("goodbye").unwrap();
+    ///     tokio::spawn(async move {
+    ///         sleep(Duration::from_secs(1)).await;
+    ///         tx.send("goodbye").unwrap();
+    ///     });
     ///
-    ///     // here we subscribe to a second receiver
-    ///     // now in case of using `changed` we would have
-    ///     // to first check the current value and then wait
-    ///     // for changes or else `changed` would hang.
-    ///     let mut rx2 = tx.subscribe();
-    ///
-    ///     // in place of changed we have use `wait_for`
-    ///     // which would automatically check the current value
-    ///     // and wait for changes until the closure returns true.
-    ///     assert!(rx2.wait_for(|val| *val == "goodbye").await.is_ok());
-    ///     assert_eq!(*rx2.borrow(), "goodbye");
+    ///     assert!(rx.wait_for(|val| *val == "goodbye").await.is_ok());
+    ///     assert_eq!(*rx.borrow(), "goodbye");
     /// }
     /// ```
     pub async fn wait_for(
+        &mut self,
+        f: impl FnMut(&T) -> bool,
+    ) -> Result<Ref<'_, T>, error::RecvError> {
+        cooperative(self.wait_for_inner(f)).await
+    }
+
+    async fn wait_for_inner(
         &mut self,
         mut f: impl FnMut(&T) -> bool,
     ) -> Result<Ref<'_, T>, error::RecvError> {
         let mut closed = false;
         loop {
             {
-                let inner = self.shared.value.read().unwrap();
+                let inner = self.shared.value.read();
 
                 let new_version = self.shared.state.load().version();
                 let has_changed = self.version != new_version;
@@ -1087,7 +1102,7 @@ impl<T> Sender<T> {
     {
         {
             // Acquire the write lock and update the value.
-            let mut lock = self.shared.value.write().unwrap();
+            let mut lock = self.shared.value.write();
 
             // Update the value and catch possible panic inside func.
             let result = panic::catch_unwind(panic::AssertUnwindSafe(|| modify(&mut lock)));
@@ -1164,7 +1179,7 @@ impl<T> Sender<T> {
     /// assert_eq!(*tx.borrow(), "hello");
     /// ```
     pub fn borrow(&self) -> Ref<'_, T> {
-        let inner = self.shared.value.read().unwrap();
+        let inner = self.shared.value.read();
 
         // The sender/producer always sees the current version
         let has_changed = false;
@@ -1224,19 +1239,22 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub async fn closed(&self) {
-        crate::trace::async_trace_leaf().await;
+        cooperative(async {
+            crate::trace::async_trace_leaf().await;
 
-        while self.receiver_count() > 0 {
-            let notified = self.shared.notify_tx.notified();
+            while self.receiver_count() > 0 {
+                let notified = self.shared.notify_tx.notified();
 
-            if self.receiver_count() == 0 {
-                return;
+                if self.receiver_count() == 0 {
+                    return;
+                }
+
+                notified.await;
+                // The channel could have been reopened in the meantime by calling
+                // `subscribe`, so we loop again.
             }
-
-            notified.await;
-            // The channel could have been reopened in the meantime by calling
-            // `subscribe`, so we loop again.
-        }
+        })
+        .await;
     }
 
     /// Creates a new [`Receiver`] connected to this `Sender`.
@@ -1323,6 +1341,29 @@ impl<T> Sender<T> {
     /// ```
     pub fn receiver_count(&self) -> usize {
         self.shared.ref_count_rx.load(Relaxed)
+    }
+
+    /// Returns the number of senders that currently exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx1, rx) = watch::channel("hello");
+    ///
+    ///     assert_eq!(1, tx1.sender_count());
+    ///
+    ///     let tx2 = tx1.clone();
+    ///
+    ///     assert_eq!(2, tx1.sender_count());
+    ///     assert_eq!(2, tx2.sender_count());
+    /// }
+    /// ```
+    pub fn sender_count(&self) -> usize {
+        self.shared.ref_count_tx.load(Relaxed)
     }
 
     /// Returns `true` if senders belong to the same channel.

@@ -1,4 +1,3 @@
-use crate::future::poll_fn;
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
@@ -15,10 +14,11 @@ use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
+use std::thread::ThreadId;
 use std::time::Duration;
 use std::{fmt, thread};
 
@@ -48,6 +48,9 @@ pub(crate) struct Handle {
 
     /// User-supplied hooks to invoke for things
     pub(crate) task_hooks: TaskHooks,
+
+    /// If this is a `LocalRuntime`, flags the owning thread ID.
+    pub(crate) local_tid: Option<ThreadId>,
 }
 
 /// Data required for executing the scheduler. The struct is passed around to
@@ -128,6 +131,7 @@ impl CurrentThread {
         blocking_spawner: blocking::Spawner,
         seed_generator: RngSeedGenerator,
         config: Config,
+        local_tid: Option<ThreadId>,
     ) -> (CurrentThread, Arc<Handle>) {
         let worker_metrics = WorkerMetrics::from_config(&config);
         worker_metrics.set_thread_id(thread::current().id());
@@ -153,6 +157,7 @@ impl CurrentThread {
             driver: driver_handle,
             blocking_spawner,
             seed_generator,
+            local_tid,
         });
 
         let core = AtomicCell::new(Some(Box::new(Core {
@@ -448,7 +453,35 @@ impl Handle {
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
 
         me.task_hooks.spawn(&TaskMeta {
-            #[cfg(tokio_unstable)]
+            id,
+            _phantom: Default::default(),
+        });
+
+        if let Some(notified) = notified {
+            me.schedule(notified);
+        }
+
+        handle
+    }
+
+    /// Spawn a task which isn't safe to send across thread boundaries onto the runtime.
+    ///
+    /// # Safety
+    /// This should only be used when this is a `LocalRuntime` or in another case where the runtime
+    /// provably cannot be driven from or moved to different threads from the one on which the task
+    /// is spawned.
+    pub(crate) unsafe fn spawn_local<F>(
+        me: &Arc<Self>,
+        future: F,
+        id: crate::runtime::task::Id,
+    ) -> JoinHandle<F::Output>
+    where
+        F: crate::future::Future + 'static,
+        F::Output: 'static,
+    {
+        let (handle, notified) = me.shared.owned.bind_local(future, me.clone(), id);
+
+        me.task_hooks.spawn(&TaskMeta {
             id,
             _phantom: Default::default(),
         });
@@ -529,16 +562,16 @@ impl Handle {
     pub(crate) fn num_alive_tasks(&self) -> usize {
         self.shared.owned.num_alive_tasks()
     }
+
+    pub(crate) fn injection_queue_depth(&self) -> usize {
+        self.shared.inject.len()
+    }
 }
 
 cfg_unstable_metrics! {
     impl Handle {
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
             &self.shared.scheduler_metrics
-        }
-
-        pub(crate) fn injection_queue_depth(&self) -> usize {
-            self.shared.inject.len()
         }
 
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {

@@ -1,6 +1,7 @@
 #![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))]
+// Too slow on miri.
+#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -8,8 +9,7 @@ use tokio::runtime;
 use tokio::sync::oneshot;
 use tokio_test::{assert_err, assert_ok};
 
-use futures::future::poll_fn;
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -189,6 +189,7 @@ fn lifo_slot_budget() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 fn spawn_shutdown() {
     let rt = rt();
     let (tx, rx) = mpsc::channel();
@@ -322,6 +323,8 @@ fn start_stop_callbacks_called() {
 }
 
 #[test]
+// too slow on miri
+#[cfg_attr(miri, ignore)]
 fn blocking() {
     // used for notifying the main thread
     const NUM: usize = 1_000;

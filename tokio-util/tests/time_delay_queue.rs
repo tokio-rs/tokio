@@ -92,6 +92,7 @@ async fn single_short_delay() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Too slow on miri.
 async fn multi_delay_at_start() {
     time::pause();
 
@@ -110,7 +111,7 @@ async fn multi_delay_at_start() {
 
     let start = Instant::now();
     for elapsed in 0..1200 {
-        println!("elapsed: {:?}", elapsed);
+        println!("elapsed: {elapsed:?}");
         let elapsed = elapsed + 1;
         tokio::time::sleep_until(start + ms(elapsed)).await;
 
@@ -327,7 +328,7 @@ async fn remove_at_timer_wheel_threshold() {
             let entry = queue.remove(&key1).into_inner();
             assert_eq!(entry, "foo");
         }
-        other => panic!("other: {:?}", other),
+        other => panic!("other: {other:?}"),
     }
 }
 

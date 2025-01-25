@@ -14,7 +14,7 @@ use tokio::task::{spawn_local, JoinHandle, LocalSet};
 /// Internally the local pool uses a [`tokio::task::LocalSet`] for each worker thread
 /// in the pool. Consequently you can also use [`tokio::task::spawn_local`] (which will
 /// execute on the same thread) inside the Future you supply to the various spawn methods
-/// of `LocalPoolHandle`,
+/// of `LocalPoolHandle`.
 ///
 /// [`tokio::task::LocalSet`]: tokio::task::LocalSet
 /// [`tokio::task::spawn_local`]: tokio::task::spawn_local
@@ -39,9 +39,9 @@ use tokio::task::{spawn_local, JoinHandle, LocalSet};
 ///             task::spawn_local(async move {
 ///                 println!("{}", data_clone);
 ///             });
-///     
+///
 ///             data.to_string()
-///         }   
+///         }
 ///     }).await.unwrap();
 ///     println!("output: {}", output);
 /// }
@@ -194,7 +194,7 @@ enum WorkerChoice {
 }
 
 struct LocalPool {
-    workers: Vec<LocalWorkerHandle>,
+    workers: Box<[LocalWorkerHandle]>,
 }
 
 impl LocalPool {
@@ -249,7 +249,7 @@ impl LocalPool {
             // Send the callback to the LocalSet task
             if let Err(e) = worker_spawner.send(spawn_task) {
                 // Propagate the error as a panic in the join handle.
-                panic!("Failed to send job to worker: {}", e);
+                panic!("Failed to send job to worker: {e}");
             }
 
             // Wait for the task's join handle
@@ -260,7 +260,7 @@ impl LocalPool {
                     // join handle... We assume something happened to the worker
                     // and the task was not spawned. Propagate the error as a
                     // panic in the join handle.
-                    panic!("Worker failed to send join handle: {}", e);
+                    panic!("Worker failed to send join handle: {e}");
                 }
             };
 
@@ -284,12 +284,12 @@ impl LocalPool {
                         // No one else should have the join handle, so this is
                         // unexpected. Forward this error as a panic in the join
                         // handle.
-                        panic!("spawn_pinned task was canceled: {}", e);
+                        panic!("spawn_pinned task was canceled: {e}");
                     } else {
                         // Something unknown happened (not a panic or
                         // cancellation). Forward this error as a panic in the
                         // join handle.
-                        panic!("spawn_pinned task failed: {}", e);
+                        panic!("spawn_pinned task failed: {e}");
                     }
                 }
             }

@@ -26,14 +26,14 @@ pub use ucred::UCred;
 
 pub mod pipe;
 
-/// A type representing process and process group IDs.
+/// A type representing user ID.
 #[allow(non_camel_case_types)]
 pub type uid_t = u32;
 
-/// A type representing user ID.
+/// A type representing group ID.
 #[allow(non_camel_case_types)]
 pub type gid_t = u32;
 
-/// A type representing group ID.
+/// A type representing process and process group IDs.
 #[allow(non_camel_case_types)]
 pub type pid_t = i32;

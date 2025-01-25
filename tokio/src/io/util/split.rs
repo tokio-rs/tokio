@@ -59,7 +59,7 @@ where
     /// # }
     /// ```
     pub async fn next_segment(&mut self) -> io::Result<Option<Vec<u8>>> {
-        use crate::future::poll_fn;
+        use std::future::poll_fn;
 
         poll_fn(|cx| Pin::new(&mut *self).poll_next_segment(cx)).await
     }

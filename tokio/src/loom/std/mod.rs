@@ -8,6 +8,7 @@ mod barrier;
 mod mutex;
 #[cfg(all(feature = "parking_lot", not(miri)))]
 mod parking_lot;
+mod rwlock;
 mod unsafe_cell;
 
 pub(crate) mod cell {
@@ -64,10 +65,13 @@ pub(crate) mod sync {
 
     #[cfg(not(all(feature = "parking_lot", not(miri))))]
     #[allow(unused_imports)]
-    pub(crate) use std::sync::{Condvar, MutexGuard, RwLock, RwLockReadGuard, WaitTimeoutResult};
+    pub(crate) use std::sync::{Condvar, MutexGuard, RwLockReadGuard, WaitTimeoutResult};
 
     #[cfg(not(all(feature = "parking_lot", not(miri))))]
     pub(crate) use crate::loom::std::mutex::Mutex;
+
+    #[cfg(not(all(feature = "parking_lot", not(miri))))]
+    pub(crate) use crate::loom::std::rwlock::RwLock;
 
     pub(crate) mod atomic {
         pub(crate) use crate::loom::std::atomic_u16::AtomicU16;
@@ -91,22 +95,16 @@ pub(crate) mod sys {
         match std::env::var(ENV_WORKER_THREADS) {
             Ok(s) => {
                 let n = s.parse().unwrap_or_else(|e| {
-                    panic!(
-                        "\"{}\" must be usize, error: {}, value: {}",
-                        ENV_WORKER_THREADS, e, s
-                    )
+                    panic!("\"{ENV_WORKER_THREADS}\" must be usize, error: {e}, value: {s}")
                 });
-                assert!(n > 0, "\"{}\" cannot be set to 0", ENV_WORKER_THREADS);
+                assert!(n > 0, "\"{ENV_WORKER_THREADS}\" cannot be set to 0");
                 n
             }
             Err(std::env::VarError::NotPresent) => {
                 std::thread::available_parallelism().map_or(1, NonZeroUsize::get)
             }
             Err(std::env::VarError::NotUnicode(e)) => {
-                panic!(
-                    "\"{}\" must be valid unicode, error: {:?}",
-                    ENV_WORKER_THREADS, e
-                )
+                panic!("\"{ENV_WORKER_THREADS}\" must be valid unicode, error: {e:?}")
             }
         }
     }

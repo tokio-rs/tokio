@@ -1,7 +1,8 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support bind or UDP
+#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi does not support bind or UDP
+                                                                   // No `socket` on miri.
 
-use futures::future::poll_fn;
+use std::future::poll_fn;
 use std::io;
 use std::sync::Arc;
 use tokio::{io::ReadBuf, net::UdpSocket};
@@ -415,7 +416,7 @@ async fn try_send_recv() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -431,7 +432,7 @@ async fn try_send_recv() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }
@@ -457,7 +458,7 @@ async fn try_send_to_recv_from() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -474,7 +475,7 @@ async fn try_send_to_recv_from() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }
@@ -502,7 +503,7 @@ async fn try_recv_buf() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -518,7 +519,7 @@ async fn try_recv_buf() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }
@@ -561,7 +562,7 @@ async fn try_recv_buf_from() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -578,7 +579,7 @@ async fn try_recv_buf_from() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }
@@ -621,7 +622,7 @@ async fn poll_ready() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
 
@@ -638,7 +639,7 @@ async fn poll_ready() {
                     break;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
-                Err(e) => panic!("{:?}", e),
+                Err(e) => panic!("{e:?}"),
             }
         }
     }

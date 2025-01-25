@@ -14,3 +14,6 @@ use scheduled_io::ScheduledIo;
 
 mod metrics;
 use metrics::IoDriverMetrics;
+
+use crate::util::ptr_expose::PtrExposeDomain;
+static EXPOSE_IO: PtrExposeDomain<ScheduledIo> = PtrExposeDomain::new();
