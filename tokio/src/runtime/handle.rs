@@ -416,6 +416,8 @@ impl Handle {
     ///   println!("Current runtime id: {}", Handle::current().id());
     /// }
     /// ```
+    ///
+    /// [`Id`]: crate::runtime::Id
     pub fn id(&self) -> crate::runtime::Id {
         let owned_id = match &self.inner {
             scheduler::Handle::CurrentThread(handle) => handle.owned_id(),
