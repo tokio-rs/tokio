@@ -1,5 +1,3 @@
-#[cfg(tokio_unstable)]
-use crate::runtime;
 use crate::runtime::{context, scheduler, RuntimeFlavor, RuntimeMetrics};
 
 /// Handle to the runtime.
