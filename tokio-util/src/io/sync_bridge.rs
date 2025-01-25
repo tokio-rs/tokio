@@ -41,6 +41,9 @@ use tokio::io::{
 /// the data fits into memory, the easiest is to read the data into a `Vec<u8>`
 /// and hash it:
 ///
+/// Explanation: This example demonstrates how to asynchronously read data from a
+/// reader into memory and hash it using a synchronous hashing function. The
+/// `SyncIoBridge` is avoided, ensuring that the async runtime is not blocked.
 /// ```rust
 /// use tokio::io::AsyncReadExt;
 /// use tokio::io::AsyncRead;
@@ -66,14 +69,15 @@ use tokio::io::{
 ///     hash_contents(reader).await
 /// }
 /// ```
-/// Explanation: This example demonstrates how to asynchronously read data from a
-/// reader into memory and hash it using a synchronous hashing function. The
-/// `SyncIoBridge` is avoided, ensuring that the async runtime is not blocked.
-///
 ///
 /// When the data doesn't fit into memory, the hashing library will usually
 /// provide a `hasher` that you can repeatedly call `update` on to hash the data
-/// one chunk at the time. For example:
+/// one chunk at the time.
+///
+/// Explanation: This example demonstrates how to asynchronously stream data in
+/// chunks for hashing. Each chunk is read asynchronously, and the hash is updated
+/// incrementally. This avoids blocking and improves performance over using
+/// `SyncIoBridge`.
 ///
 /// ```rust
 /// use tokio::io::AsyncReadExt;
@@ -111,10 +115,6 @@ use tokio::io::{
 ///     hash_stream(reader, hasher).await
 /// }
 /// ```
-/// Explanation: This example demonstrates how to asynchronously stream data in
-/// chunks for hashing. Each chunk is read asynchronously, and the hash is updated
-/// incrementally. This avoids blocking and improves performance over using
-/// `SyncIoBridge`.
 ///
 ///
 /// ## Example 2: Compressing Data
@@ -123,6 +123,11 @@ use tokio::io::{
 /// blocking and inefficient code. Instead, you can utilize an async compression library
 /// such as the [`async-compression`](https://docs.rs/async-compression/latest/async_compression/)
 /// crate, which is built to handle asynchronous data streams efficiently.
+///
+/// Explanation: This example shows how to asynchronously compress data using an
+/// async compression library. By reading and writing asynchronously, it avoids
+/// blocking and is more efficient than using `SyncIoBridge` with a non-async
+/// compression library.
 ///
 /// ```ignore
 /// use async_compression::tokio::write::GzipEncoder;
@@ -151,18 +156,19 @@ use tokio::io::{
 ///     compresses_data(reader).await
 /// }
 /// ```
-/// Explanation: This example shows how to asynchronously compress data using an
-/// async compression library. By reading and writing asynchronously, it avoids
-/// blocking and is more efficient than using `SyncIoBridge` with a non-async
-/// compression library.
 ///
 ///
-/// ## Example 3: Parsing `JSON`
+/// ## Example 3: Parsing Data Formats
 ///
 ///
 /// `SyncIoBridge` is not ideal when parsing data formats such as `JSON`, as it
 /// blocks async operations. A more efficient approach is to read data asynchronously
 /// into memory and then `deserialize` it, avoiding unnecessary synchronization overhead.
+///
+/// Explanation: This example shows how to asynchronously read data into memory
+/// and then parse it as `JSON`. By avoiding `SyncIoBridge`, the asynchronous runtime
+/// remains unblocked, leading to better performance when working with asynchronous
+/// I/O streams.
 ///
 /// ```rust,no_run
 /// use tokio::io::AsyncRead;
@@ -201,16 +207,16 @@ use tokio::io::{
 ///     Ok(())
 /// }
 /// ```
-/// Explanation: This example shows how to asynchronously read data into memory
-/// and then parse it as `JSON`. By avoiding `SyncIoBridge`, the asynchronous runtime
-/// remains unblocked, leading to better performance when working with asynchronous
-/// I/O streams.
-///
 ///
 /// ## Correct Usage of `SyncIoBridge` inside `spawn_blocking`
 ///
 /// `SyncIoBridge` is mainly useful when you need to interface with synchronous
-/// libraries from an asynchronous context. Here is how you can do it correctly:
+/// libraries from an asynchronous context.
+///
+/// Explanation: This example shows how to use `SyncIoBridge` inside a `spawn_blocking`
+/// task to safely perform synchronous I/O without blocking the async runtime. The
+/// `spawn_blocking` ensures that the synchronous code is offloaded to a dedicated
+/// thread pool, preventing it from interfering with the async tasks.
 ///
 /// ```rust
 /// use tokio::task::spawn_blocking;
@@ -253,10 +259,6 @@ use tokio::io::{
 ///     Ok(())
 /// }
 /// ```
-/// Explanation: This example shows how to use `SyncIoBridge` inside a `spawn_blocking`
-/// task to safely perform synchronous I/O without blocking the async runtime. The
-/// `spawn_blocking` ensures that the synchronous code is offloaded to a dedicated
-/// thread pool, preventing it from interfering with the async tasks.
 ///
 #[derive(Debug)]
 pub struct SyncIoBridge<T> {
