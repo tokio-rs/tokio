@@ -68,3 +68,6 @@ rustc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable"]
 
 [package.metadata.playground]
 features = ["full"]
+
+[lints]
+workspace = true
