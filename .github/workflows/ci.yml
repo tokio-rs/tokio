@@ -532,15 +532,19 @@ jobs:
 
   cross-test-with-parking_lot:
     needs: basics
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - target: i686-unknown-linux-gnu
+            os: ubuntu-latest
             rustflags: --cfg tokio_taskdump
           - target: armv5te-unknown-linux-gnueabi
+            os: ubuntu-latest
           - target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
           - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
             rustflags: --cfg tokio_taskdump
     steps:
       - uses: actions/checkout@v4
@@ -572,15 +576,19 @@ jobs:
 
   cross-test-without-parking_lot:
     needs: basics
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - target: i686-unknown-linux-gnu
+            os: ubuntu-latest
             rustflags: --cfg tokio_taskdump
           - target: armv5te-unknown-linux-gnueabi
+            os: ubuntu-latest
           - target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
           - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
             rustflags: --cfg tokio_taskdump
     steps:
       - uses: actions/checkout@v4
