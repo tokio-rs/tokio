@@ -33,6 +33,21 @@ fn new(signum: u32) -> io::Result<RxFuture> {
     Ok(RxFuture::new(rx))
 }
 
+fn event_requires_infinite_sleep_in_handler(signum: u32) -> bool {
+    // Returning from the handler function of those events immediately terminates the process.
+    // So for async systems, the easiest solution is to simply never return from
+    // the handler function.
+    //
+    // For more information, see:
+    // https://learn.microsoft.com/en-us/windows/console/handlerroutine#remarks
+    match signum {
+        console::CTRL_CLOSE_EVENT => true,
+        console::CTRL_LOGOFF_EVENT => true,
+        console::CTRL_SHUTDOWN_EVENT => true,
+        _ => false,
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct OsStorage {
     ctrl_break: EventInfo,
@@ -114,7 +129,15 @@ unsafe extern "system" fn handler(ty: u32) -> BOOL {
     // the handler routine is always invoked in a new thread, thus we don't
     // have the same restrictions as in Unix signal handlers, meaning we can
     // go ahead and perform the broadcast here.
-    if globals.broadcast() {
+    let event_was_handled = globals.broadcast();
+
+    if event_requires_infinite_sleep_in_handler(ty) {
+        loop {
+            std::thread::sleep(std::time::Duration::MAX);
+        }
+    }
+
+    if event_was_handled {
         1
     } else {
         // No one is listening for this notification any more
