@@ -15,3 +15,6 @@ tokio = { version = "1.0.0", path = "../tokio", optional = true }
 
 [dev-dependencies]
 trybuild = "1.0"
+
+[lints]
+workspace = true
