@@ -273,6 +273,30 @@ impl TcpStream {
         }
     }
 
+    /// Shuts down the read half, write half, or both halves of this connection.
+    ///
+    /// This method will cause all pending and future I/O in the given directions to return
+    /// immediately with an appropriate value (see the documentation of [`Shutdown`]).
+    ///
+    /// [`Shutdown`]: https://doc.rust-lang.org/std/net/enum.Shutdown.html
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    /// use std::net::Shutdown;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    /// stream.shutdown(Shutdown::Both)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn shutdown(&self, how: std::net::Shutdown) -> io::Result<()> {
+        self.io.shutdown(how)
+    }
+
     /// Returns the local address that this stream is bound to.
     ///
     /// # Examples
