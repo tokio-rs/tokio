@@ -703,7 +703,7 @@ impl<T> Sender<T> {
     /// the channel is closed.
     #[must_use = "Downgrade creates a WeakSender without destroying the original non-weak sender."]
     pub fn downgrade(&self) -> WeakSender<T> {
-        self.shared.num_weak_tx.fetch_add(1, SeqCst);
+        self.shared.num_weak_tx.fetch_add(1, Relaxed);
         WeakSender {
             shared: self.shared.clone(),
         }
@@ -919,7 +919,7 @@ impl<T> Sender<T> {
 
     /// Returns the number of [`WeakSender`] handles.
     pub fn weak_count(&self) -> usize {
-        self.shared.num_weak_tx.load(SeqCst)
+        self.shared.num_weak_tx.load(Acquire)
     }
 }
 
@@ -1091,7 +1091,7 @@ impl<T> WeakSender<T> {
             match self
                 .shared
                 .num_tx
-                .compare_exchange_weak(tx_count, tx_count + 1, AcqRel, Acquire)
+                .compare_exchange_weak(tx_count, tx_count + 1, Relaxed, Acquire)
             {
                 Ok(_) => {
                     return Some(Sender {
@@ -1110,14 +1110,14 @@ impl<T> WeakSender<T> {
 
     /// Returns the number of [`WeakSender`] handles.
     pub fn weak_count(&self) -> usize {
-        self.shared.num_weak_tx.load(SeqCst)
+        self.shared.num_weak_tx.load(Acquire)
     }
 }
 
 impl<T> Clone for WeakSender<T> {
     fn clone(&self) -> WeakSender<T> {
         let shared = self.shared.clone();
-        shared.num_weak_tx.fetch_add(1, SeqCst);
+        shared.num_weak_tx.fetch_add(1, Relaxed);
 
         Self { shared }
     }
@@ -1125,7 +1125,7 @@ impl<T> Clone for WeakSender<T> {
 
 impl<T> Drop for WeakSender<T> {
     fn drop(&mut self) {
-        self.shared.num_weak_tx.fetch_sub(1, SeqCst);
+        self.shared.num_weak_tx.fetch_sub(1, AcqRel);
     }
 }
 
@@ -1338,7 +1338,7 @@ impl<T> Receiver<T> {
 
     /// Returns the number of [`WeakSender`] handles.
     pub fn sender_weak_count(&self) -> usize {
-        self.shared.num_weak_tx.load(SeqCst)
+        self.shared.num_weak_tx.load(Acquire)
     }
 
     /// Checks if a channel is closed.
