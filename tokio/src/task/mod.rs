@@ -284,7 +284,7 @@ cfg_rt! {
 
     pub mod coop;
     #[doc(hidden)]
-    #[deprecated]
+    #[deprecated = "Moved to tokio::task::coop::consume_budget"]
     pub use coop::consume_budget;
 
     mod local;
