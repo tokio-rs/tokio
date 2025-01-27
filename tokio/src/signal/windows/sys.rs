@@ -133,7 +133,7 @@ unsafe extern "system" fn handler(ty: u32) -> BOOL {
 
     if event_requires_infinite_sleep_in_handler(ty) {
         loop {
-            std::thread::sleep(std::time::Duration::MAX);
+            std::thread::park();
         }
     }
 
