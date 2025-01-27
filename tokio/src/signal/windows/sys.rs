@@ -200,9 +200,9 @@ mod tests {
             // Windows doesn't have a good programmatic way of sending events
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
-            unsafe {
+            std::thread::spawn(|| unsafe {
                 super::handler(console::CTRL_CLOSE_EVENT);
-            }
+            });
 
             ctrl_close.recv().await.unwrap();
         });
@@ -218,9 +218,9 @@ mod tests {
             // Windows doesn't have a good programmatic way of sending events
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
-            unsafe {
+            std::thread::spawn(|| unsafe {
                 super::handler(console::CTRL_SHUTDOWN_EVENT);
-            }
+            });
 
             ctrl_shutdown.recv().await.unwrap();
         });
@@ -236,9 +236,9 @@ mod tests {
             // Windows doesn't have a good programmatic way of sending events
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
-            unsafe {
+            std::thread::spawn(|| unsafe {
                 super::handler(console::CTRL_LOGOFF_EVENT);
-            }
+            });
 
             ctrl_logoff.recv().await.unwrap();
         });
