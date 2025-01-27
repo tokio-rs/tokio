@@ -153,4 +153,18 @@ impl<T: Unpin> SyncIoBridge<T> {
     pub fn into_inner(self) -> T {
         self.src
     }
+
+    /// Returns a shared reference to the inner resource.
+    ///
+    /// It is inadvisable to directly read/write from the underlying resource.
+    pub fn get_ref(&self) -> &T {
+        &self.src
+    }
+
+    /// Returns a mutable reference to the inner resource.
+    ///
+    /// It is inadvisable to directly read/write from the underlying resource.
+    pub fn get_mut(&mut self) -> &T {
+        &mut self.src
+    }
 }
