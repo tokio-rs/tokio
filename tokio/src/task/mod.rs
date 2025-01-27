@@ -293,8 +293,12 @@ cfg_rt! {
     mod task_local;
     pub use task_local::LocalKey;
 
-    mod unconstrained;
-    pub use unconstrained::{unconstrained, Unconstrained};
+    #[doc(hidden)]
+    #[deprecated = "Moved to tokio::task::coop::unconstrained"]
+    pub use coop::unconstrained;
+    #[doc(hidden)]
+    #[deprecated = "Moved to tokio::task::coop::Unconstrained"]
+    pub use coop::Unconstrained;
 
     #[doc(inline)]
     pub use join_set::JoinSet;

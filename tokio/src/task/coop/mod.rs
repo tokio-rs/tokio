@@ -3,8 +3,6 @@
 
 //! Utilities for improved cooperative scheduling.
 //!
-//! See the "Cooperative scheduling" section in the [task](crate::task#cooperative-scheduling) module.
-//!
 //! ### Cooperative scheduling
 //!
 //! A single call to [`poll`] on a top-level task may potentially do a lot of
@@ -54,7 +52,7 @@
 //!     }
 //! };
 //!
-//! task::unconstrained(fut).await;
+//! task::coop::unconstrained(fut).await;
 //! # }
 //! ```
 //! [`poll`]: method@std::future::Future::poll
@@ -63,6 +61,9 @@
 cfg_rt! {
     mod consume_budget;
     pub use consume_budget::consume_budget;
+
+    mod unconstrained;
+    pub use unconstrained::{unconstrained, Unconstrained};
 }
 
 // ```ignore
