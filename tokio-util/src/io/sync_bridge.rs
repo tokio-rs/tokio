@@ -164,7 +164,7 @@ impl<T: Unpin> SyncIoBridge<T> {
     /// Returns a mutable reference to the inner resource.
     ///
     /// It is inadvisable to directly read/write from the underlying resource.
-    pub fn get_mut(&mut self) -> &T {
+    pub fn get_mut(&mut self) -> &mut T {
         &mut self.src
     }
 }
