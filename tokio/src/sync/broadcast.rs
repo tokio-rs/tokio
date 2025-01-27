@@ -914,7 +914,7 @@ impl<T> Sender<T> {
 
     /// Returns the number of [`Sender`] handles.
     pub fn strong_count(&self) -> usize {
-        self.shared.num_tx.load(SeqCst)
+        self.shared.num_tx.load(Acquire)
     }
 
     /// Returns the number of [`WeakSender`] handles.
@@ -1061,7 +1061,7 @@ impl<T> Shared<T> {
 impl<T> Clone for Sender<T> {
     fn clone(&self) -> Sender<T> {
         let shared = self.shared.clone();
-        shared.num_tx.fetch_add(1, SeqCst);
+        shared.num_tx.fetch_add(1, Relaxed);
 
         Sender { shared }
     }
@@ -1069,7 +1069,7 @@ impl<T> Clone for Sender<T> {
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        if 1 == self.shared.num_tx.fetch_sub(1, SeqCst) {
+        if 1 == self.shared.num_tx.fetch_sub(1, AcqRel) {
             self.close_channel();
         }
     }
@@ -1105,7 +1105,7 @@ impl<T> WeakSender<T> {
 
     /// Returns the number of [`Sender`] handles.
     pub fn strong_count(&self) -> usize {
-        self.shared.num_tx.load(SeqCst)
+        self.shared.num_tx.load(Acquire)
     }
 
     /// Returns the number of [`WeakSender`] handles.
@@ -1333,7 +1333,7 @@ impl<T> Receiver<T> {
 
     /// Returns the number of [`Sender`] handles.
     pub fn sender_strong_count(&self) -> usize {
-        self.shared.num_tx.load(SeqCst)
+        self.shared.num_tx.load(Acquire)
     }
 
     /// Returns the number of [`WeakSender`] handles.
