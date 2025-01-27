@@ -17,16 +17,17 @@ use tokio::io::{
 ///
 /// ### Why It Matters:
 ///
-/// `SyncIoBridge` allows you to use synchronous I/O operations in an asynchronous
+/// `SyncIoBridge` allows you to use asynchronous I/O operations in an synchronous
 /// context by blocking the current thread. However, this can be inefficient because:
-/// - **Blocking**: The use of `SyncIoBridge` may block a valuable async runtime
-///   thread, which could otherwise be used to handle more tasks concurrently.
-/// - **Thread Pool Saturation**: If many threads are blocked using `SyncIoBridge`,
-///   it can exhaust the async runtime's thread pool, leading to increased latency
-///   and reduced throughput.
-/// - **Lack of Parallelism**: By blocking on synchronous operations, you may miss
-///   out on the benefits of running tasks concurrently, especially in I/O-bound
-///   operations where async tasks could be interleaved.
+/// - **Inefficient Resource Usage**: `SyncIoBridge` takes up an entire OS thread,
+///   which is inefficient compared to asynchronous code that can multiplex many
+///   tasks on a single thread.
+/// - **Thread Pool Saturation**: Excessive use of `SyncIoBridge` can exhaust the
+///   async runtime's thread pool, reducing the number of threads available for
+///   other tasks and impacting overall performance.
+/// - **Missed Concurrency Benefits**: By using synchronous operations with
+///   `SyncIoBridge`, you lose the ability to interleave tasks efficiently,
+///   which is a key advantage of asynchronous programming.
 ///
 /// ## Example 1: Hashing Data
 ///
