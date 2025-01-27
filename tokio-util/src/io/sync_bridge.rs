@@ -223,7 +223,7 @@ use tokio::io::{
 /// use std::marker::Unpin;
 /// use std::io::Cursor;
 ///
-/// /// Wraps an async reader with `SyncIoBridge` and performs syncrhonous I/O operations in a blocking task.
+/// /// Wraps an async reader with `SyncIoBridge` and performs synchronous I/O operations in a blocking task.
 /// async fn process_sync_io(reader: impl AsyncRead + Unpin + Send + 'static) -> Result<Vec<u8>, std::io::Error> {
 ///    // Wrap the async reader with `SyncIoBridge` to allow synchronous reading.
 ///    let mut sync_reader = SyncIoBridge::new(reader);
