@@ -515,19 +515,19 @@ macro_rules! doc {
         /// [`futures-concurrency`](https://docs.rs/futures-concurrency/latest/futures_concurrency/)
         /// provide streamlined syntax for racing futures:
         ///
+        /// - [`futures_concurrency::future::Race`](https://docs.rs/futures-concurrency/latest/futures_concurrency/future/trait.Race.html)
         /// - [`futures::stream::select_all` (for streams)](https://docs.rs/futures/latest/futures/stream/select_all/index.html)
         /// - [`futures-lite::future::or`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.or.html)
         /// - [`futures-lite::future::race`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.race.html)
-        /// - [`futures_concurrency::future::Race`](https://docs.rs/futures-concurrency/latest/futures_concurrency/future/trait.Race.html)
         ///
         /// ```ignore
+        /// use futures_concurrency::future::Race;
+        ///
         /// #[tokio::main]
         /// async fn main() {
-        ///     let result = futures_lite::future::race(
-        ///         async { Ok("ok") }, /* Task A */
-        ///         async { Err("error") }, /* Task B */
-        ///     )
-        ///     .await;
+        ///     let task_a = async { Ok("ok") };
+        ///     let task_b = async { Err("error") };
+        ///     let result = (task_a, task_b).race().await;
         ///
         ///     match result {
         ///         Ok(output) => println!("First task completed with: {output}"),
