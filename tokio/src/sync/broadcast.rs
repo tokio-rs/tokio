@@ -1076,9 +1076,11 @@ impl<T> Drop for Sender<T> {
 }
 
 impl<T> WeakSender<T> {
-    /// Tries to convert a `WeakSender` into a [`Sender`]. This will return `Some`
-    /// if there are other `Sender` instances alive and the channel wasn't
-    /// previously dropped, otherwise `None` is returned.
+    /// Tries to convert a `WeakSender` into a [`Sender`].
+    ///
+    /// This will return `Some` if there are other `Sender` instances alive and
+    /// the channel wasn't previously dropped, otherwise `None` is returned.
+    #[must_use]
     pub fn upgrade(&self) -> Option<Sender<T>> {
         let mut tx_count = self.shared.num_tx.load(Acquire);
 
