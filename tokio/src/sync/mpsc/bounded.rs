@@ -515,7 +515,6 @@ impl<T> Receiver<T> {
     ///     tx.send(0).await.unwrap();
     ///     assert!(!rx.is_empty());
     /// }
-    ///
     /// ```
     pub fn is_empty(&self) -> bool {
         self.chan.is_empty()
@@ -1058,6 +1057,46 @@ impl<T> Sender<T> {
     /// ```
     pub fn is_closed(&self) -> bool {
         self.chan.is_closed()
+    }
+
+    /// Checks if a channel is empty.
+    ///
+    /// This method returns `true` if the channel has no messages.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel(10);
+    ///     assert!(tx.is_empty());
+    ///
+    ///     tx.send(0).await.unwrap();
+    ///     assert!(!tx.is_empty());
+    /// }
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.chan.semaphore().bound - self.chan.semaphore().semaphore.available_permits() == 0
+    }
+
+    /// Returns the number of messages in the channel.
+    ///
+    /// # Examples
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel(10);
+    ///     assert_eq!(0, tx.len());
+    ///
+    ///     tx.send(0).await.unwrap();
+    ///     assert_eq!(1, tx.len());
+    /// }
+    /// ```
+    pub fn len(&self) -> usize {
+        self.chan.semaphore().bound - self.chan.semaphore().semaphore.available_permits()
     }
 
     /// Waits for channel capacity. Once capacity to send one message is
