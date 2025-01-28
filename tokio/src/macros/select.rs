@@ -411,9 +411,9 @@ macro_rules! doc {
         /// For cases where `loop { select! { ... } }` is used to poll multiple tasks,
         /// stream merging offers a concise alternative, inherently handle cancellation-safe
         /// processing, removing the risk of data loss. Libraries like
-        /// [`tokio-stream`](https://docs.rs/tokio-stream/latest/tokio_stream/),
+        /// [`tokio_stream`](https://docs.rs/tokio-stream/latest/tokio_stream/),
         /// [`futures::stream`](https://docs.rs/futures/latest/futures/stream/) and
-        /// [`futures-concurrency`](https://docs.rs/futures-concurrency/latest/futures_concurrency/)
+        /// [`futures_concurrency`](https://docs.rs/futures-concurrency/latest/futures_concurrency/)
         /// provide tools for merging streams and handling their outputs sequentially.
         ///
         /// ### Example with `select!`
@@ -517,8 +517,8 @@ macro_rules! doc {
         ///
         /// - [`futures_concurrency::future::Race`](https://docs.rs/futures-concurrency/latest/futures_concurrency/future/trait.Race.html)
         /// - [`futures::stream::select_all` (for streams)](https://docs.rs/futures/latest/futures/stream/select_all/index.html)
-        /// - [`futures-lite::future::or`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.or.html)
-        /// - [`futures-lite::future::race`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.race.html)
+        /// - [`futures_lite::future::or`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.or.html)
+        /// - [`futures_lite::future::race`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.race.html)
         ///
         /// ```ignore
         /// use futures_concurrency::future::Race;
