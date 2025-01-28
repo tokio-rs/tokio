@@ -512,13 +512,14 @@ macro_rules! doc {
         ///
         /// If you need to wait for the first completion among several asynchronous tasks,
         /// ecosystem utilities such as
-        /// [`futures`](https://docs.rs/futures/latest/futures/) or
+        /// [`futures`](https://docs.rs/futures/latest/futures/),
         /// [`futures-lite`](https://docs.rs/futures-lite/latest/futures_lite/) or
         /// [`futures-concurrency`](https://docs.rs/futures-concurrency/latest/futures_concurrency/)
         /// provide streamlined syntax for racing futures:
         ///
         /// - [`futures_concurrency::future::Race`](https://docs.rs/futures-concurrency/latest/futures_concurrency/future/trait.Race.html)
-        /// - [`futures::stream::select_all` (for streams)](https://docs.rs/futures/latest/futures/stream/select_all/index.html)
+        /// - [`futures::select!`](https://docs.rs/futures/latest/futures/macro.select.html)
+        /// - [`futures::stream::select_all`](https://docs.rs/futures/latest/futures/stream/select_all/index.html) (for streams)
         /// - [`futures_lite::future::or`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.or.html)
         /// - [`futures_lite::future::race`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.race.html)
         ///
