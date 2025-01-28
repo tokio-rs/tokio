@@ -400,11 +400,13 @@ macro_rules! doc {
         /// ```
         /// # Alternatives from the Ecosystem
         ///
-        /// The `select!` macro is a versatile tool for working with multiple asynchronous
-        /// branches, allowing tasks to run concurrently within the same thread. However,
-        /// depending on your use case, ecosystem alternatives can provide additional
-        /// benefits, such as more straightforward syntax, more transparent control flow or
-        /// reducing the burned of cancellation safety or fuse semantics.
+        /// The select! macro is a powerful tool for managing multiple asynchronous
+        /// branches, enabling tasks to run concurrently within the same thread. However,
+        /// its use can introduce challenges, particularly around cancellation safety, which
+        /// can lead to subtle and hard-to-debug errors. For many use cases, ecosystem
+        /// alternatives may be preferable as they mitigate these concerns by offering
+        /// clearer syntax, more predictable control flow, and reducing the need to manually
+        /// handle issues like fuse semantics or cancellation safety.
         ///
         /// ## Merging Streams
         ///
