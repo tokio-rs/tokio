@@ -418,9 +418,7 @@ macro_rules! doc {
         ///
         /// ### Example with `select!`
         ///
-        /// ```ignore
-        /// use std::pin::pin;
-        ///
+        /// ```
         /// struct File;
         /// struct Channel;
         /// struct Socket;
@@ -431,7 +429,7 @@ macro_rules! doc {
         ///     }
         /// }
         ///
-        /// async fn read_send(file: &mut File, channel: &mut Channel) {
+        /// async fn read_send(_file: &mut File, _channel: &mut Channel) {
         ///     // do work that is not cancel safe
         /// }
         ///
@@ -445,7 +443,7 @@ macro_rules! doc {
         ///     loop {
         ///         tokio::select! {
         ///             _ = read_send(&mut file, &mut channel) => { /* ... */ },
-        ///             data = socket.read_packet() => { /* ... */ }
+        ///             _data = socket.read_packet() => { /* ... */ }
         ///         }
         ///     }
         /// }
@@ -457,7 +455,7 @@ macro_rules! doc {
         /// eliminating the need to manage tasks manually and reducing the risk of
         /// unintended behavior like data loss.
         ///
-        /// ```ignore
+        /// ```
         /// use std::pin::pin;
         ///
         /// use futures::stream::unfold;
@@ -473,7 +471,7 @@ macro_rules! doc {
         ///     }
         /// }
         ///
-        /// async fn read_send(file: &mut File, channel: &mut Channel) {
+        /// async fn read_send(_file: &mut File, _channel: &mut Channel) {
         ///     // do work that is not cancel safe
         /// }
         ///
@@ -485,9 +483,9 @@ macro_rules! doc {
         /// #[tokio::main]
         /// async fn main() {
         ///     // open our IO types
-        ///     let mut file = File;
-        ///     let mut channel = Channel;
-        ///     let mut socket = Socket;
+        ///     let file = File;
+        ///     let channel = Channel;
+        ///     let socket = Socket;
         ///
         ///     let a = unfold((file, channel), |(mut file, mut channel)| async {
         ///         read_send(&mut file, &mut channel).await;
@@ -502,7 +500,7 @@ macro_rules! doc {
         ///     while let Some(msg) = s.next().await {
         ///         match msg {
         ///             Message::None => continue,
-        ///             Message::Data(data) => { /* ... */ }
+        ///             Message::Data(_data) => { /* ... */ }
         ///         }
         ///     }
         /// }
