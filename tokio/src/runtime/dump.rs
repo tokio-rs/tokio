@@ -3,7 +3,9 @@
 //! See [`Handle::dump`][crate::runtime::Handle::dump].
 
 use crate::task::Id;
-use std::{fmt, path::Path};
+use std::{fmt, future::Future, path::Path};
+
+pub use crate::runtime::task::trace::Root;
 
 /// A snapshot of a runtime's state.
 ///
@@ -213,6 +215,72 @@ impl Trace {
                 }
             })
             .collect()
+    }
+
+    /// Runs the function `f` in tracing mode, and returns its result along with the resulting [`Trace`].
+    ///
+    /// This is normally called with `f` being the poll function of a future, and will give you a backtrace
+    /// that tells you what that one future is doing.
+    ///
+    /// Use [`Handle::dump`] instead if you want to know what *all the tasks* in your program are doing.
+    /// Also see [`Handle::dump`] for more documentation about dumps, but unlike [`Handle::dump`], this function
+    /// should not be much slower than calling `f` directly.
+    ///
+    /// Due to the way tracing is implemented, Tokio leaf futures will usually, instead of doing their
+    /// actual work, do the equivalent of a `yield_now` (returning a `Poll::Pending` and scheduling the
+    /// current context for execution), which means forward progress will probably not happen unless
+    /// you eventually call your future outside of `capture`.
+    ///
+    /// [`Handle::dump`]: crate::runtime::Handle::dump
+    ///
+    /// Example usage:
+    /// ```
+    /// use std::future::Future;
+    /// use std::task::Poll;
+    /// use tokio::runtime::dump::Trace;
+    ///
+    /// # async fn test_fn() {
+    /// // some future
+    /// let mut test_future = std::pin::pin!(async move { tokio::task::yield_now().await; 0 });
+    ///
+    /// // trace it once, see what it's doing
+    /// let (trace, res) = Trace::root(std::future::poll_fn(|cx| {
+    ///     let (res, trace) = Trace::capture(|| test_future.as_mut().poll(cx));
+    ///     Poll::Ready((trace, res))
+    /// })).await;
+    ///
+    /// // await it to let it finish, outside of a `capture`
+    /// let output = match res {
+    ///    Poll::Ready(output) => output,
+    ///    Poll::Pending => test_future.await,
+    /// };
+    ///
+    /// println!("{trace}");
+    /// # }
+    /// ```
+    ///
+    /// ### Nested calls
+    ///
+    /// Nested calls to `capture` might return partial traces, but will not do any other undesirable behavior (for
+    /// example, they will not panic).
+    pub fn capture<F, R>(f: F) -> (R, Trace)
+    where
+        F: FnOnce() -> R,
+    {
+        let (res, trace) = super::task::trace::Trace::capture(f);
+        (res, Trace { inner: trace })
+    }
+
+    /// Create a root for stack traces captured using [`Trace::capture`]. Stack frames above
+    /// the root will not be captured.
+    ///
+    /// Nesting multiple [`Root`] futures is fine. Captures will stop at the first root. Not having
+    /// a [`Root`] is fine as well, but there is no guarantee on where the capture will stop.
+    pub fn root<F>(f: F) -> Root<F>
+    where
+        F: Future,
+    {
+        crate::runtime::task::trace::Trace::root(f)
     }
 }
 
