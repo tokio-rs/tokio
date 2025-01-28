@@ -427,7 +427,7 @@ macro_rules! doc {
         ///
         /// impl Socket {
         ///     async fn read_packet(&mut self) -> Vec<u8> {
-        ///         todo!()
+        ///         vec![]
         ///     }
         /// }
         ///
@@ -469,7 +469,7 @@ macro_rules! doc {
         ///
         /// impl Socket {
         ///     async fn read_packet(&mut self) -> Vec<u8> {
-        ///         todo!()
+        ///         vec![]
         ///     }
         /// }
         ///
