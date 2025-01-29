@@ -42,7 +42,7 @@ async fn correct_behavior_on_errors() {
     let mut had_error = false;
     loop {
         let item = stream.next().await.unwrap();
-        println!("{:?}", item);
+        println!("{item:?}");
         match item {
             Ok(bytes) => {
                 let bytes = &*bytes;

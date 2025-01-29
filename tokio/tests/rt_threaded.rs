@@ -1,4 +1,3 @@
-#![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
 // Too slow on miri.
 #![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))]
@@ -189,6 +188,7 @@ fn lifo_slot_budget() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 fn spawn_shutdown() {
     let rt = rt();
     let (tx, rx) = mpsc::channel();

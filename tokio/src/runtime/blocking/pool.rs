@@ -128,7 +128,7 @@ pub(crate) struct Task {
 
 #[derive(PartialEq, Eq)]
 pub(crate) enum Mandatory {
-    #[cfg_attr(not(fs), allow(dead_code))]
+    #[cfg_attr(not(feature = "fs"), allow(dead_code))]
     Mandatory,
     NonMandatory,
 }
@@ -322,7 +322,7 @@ impl Spawner {
             // Compat: do not panic here, return the join_handle even though it will never resolve
             Err(SpawnError::ShuttingDown) => join_handle,
             Err(SpawnError::NoThreads(e)) => {
-                panic!("OS can't spawn worker thread: {}", e)
+                panic!("OS can't spawn worker thread: {e}")
             }
         }
     }

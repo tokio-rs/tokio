@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
 
     let listener = TcpListener::bind(&addr).await?;
-    println!("Listening on: {}", addr);
+    println!("Listening on: {addr}");
 
     // Create the shared state of this server that will be shared amongst all
     // clients. We populate the initial database and then create the `Database`
@@ -131,11 +131,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 let response = response.serialize();
 
                                 if let Err(e) = lines.send(response.as_str()).await {
-                                    println!("error on sending response; error = {:?}", e);
+                                    println!("error on sending response; error = {e:?}");
                                 }
                             }
                             Err(e) => {
-                                println!("error on decoding from socket; error = {:?}", e);
+                                println!("error on decoding from socket; error = {e:?}");
                             }
                         }
                     }
@@ -143,7 +143,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     // The connection will be closed at this point as `lines.next()` has returned `None`.
                 });
             }
-            Err(e) => println!("error accepting socket; error = {:?}", e),
+            Err(e) => println!("error accepting socket; error = {e:?}"),
         }
     }
 }
@@ -162,7 +162,7 @@ fn handle_request(line: &str, db: &Arc<Database>) -> Response {
                 value: value.clone(),
             },
             None => Response::Error {
-                msg: format!("no key {}", key),
+                msg: format!("no key {key}"),
             },
         },
         Request::Set { key, value } => {
@@ -203,7 +203,7 @@ impl Request {
                     value: value.to_string(),
                 })
             }
-            Some(cmd) => Err(format!("unknown command: {}", cmd)),
+            Some(cmd) => Err(format!("unknown command: {cmd}")),
             None => Err("empty input".into()),
         }
     }
@@ -212,13 +212,13 @@ impl Request {
 impl Response {
     fn serialize(&self) -> String {
         match *self {
-            Response::Value { ref key, ref value } => format!("{} = {}", key, value),
+            Response::Value { ref key, ref value } => format!("{key} = {value}"),
             Response::Set {
                 ref key,
                 ref value,
                 ref previous,
-            } => format!("set {} = `{}`, previous: {:?}", key, value, previous),
-            Response::Error { ref msg } => format!("error: {}", msg),
+            } => format!("set {key} = `{value}`, previous: {previous:?}"),
+            Response::Error { ref msg } => format!("error: {msg}"),
         }
     }
 }

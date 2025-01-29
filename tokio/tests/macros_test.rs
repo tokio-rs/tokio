@@ -1,4 +1,3 @@
-#![allow(unknown_lints, unexpected_cfgs)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support threading
 
 use tokio::test;

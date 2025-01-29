@@ -9,7 +9,7 @@ use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 // This file contains an implementation of an OnceCell. The principle
-// behind the safety the of the cell is that any thread with an `&OnceCell` may
+// behind the safety of the cell is that any thread with an `&OnceCell` may
 // access the `value` field according the following rules:
 //
 //  1. When `value_set` is false, the `value` field may be modified by the
@@ -179,8 +179,8 @@ impl<T> OnceCell<T> {
     ///
     /// [`OnceCell::new`]: crate::sync::OnceCell::new
     // Once https://github.com/rust-lang/rust/issues/73255 lands
-    // and tokio MSRV is bumped to the rustc version with it stablised,
-    // we can made this function available in const context,
+    // and tokio MSRV is bumped to the rustc version with it stabilised,
+    // we can make this function available in const context,
     // by creating `Semaphore::const_new_closed`.
     pub fn new_with(value: Option<T>) -> Self {
         if let Some(v) = value {

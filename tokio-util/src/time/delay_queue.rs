@@ -665,7 +665,7 @@ impl<T> DelayQueue<T> {
                 // The delay is already expired, store it in the expired queue
                 self.expired.push(key, &mut self.slab);
             }
-            Err((_, err)) => panic!("invalid deadline; err={:?}", err),
+            Err((_, err)) => panic!("invalid deadline; err={err:?}"),
         }
     }
 

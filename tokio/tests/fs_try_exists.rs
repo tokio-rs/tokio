@@ -5,7 +5,7 @@ use tempfile::tempdir;
 use tokio::fs;
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)]
+#[cfg_attr(miri, ignore)] // No `chmod` in miri.
 async fn try_exists() {
     let dir = tempdir().unwrap();
 

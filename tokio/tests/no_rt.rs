@@ -1,4 +1,4 @@
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi does not support panic recovery
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support panic recovery
 
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
@@ -20,6 +20,7 @@ fn timeout_panics_when_no_tokio_context() {
 #[should_panic(
     expected = "there is no reactor running, must be called from the context of a Tokio 1.x runtime"
 )]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 fn panics_when_no_reactor() {
     let srv = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = srv.local_addr().unwrap();
@@ -36,6 +37,7 @@ async fn timeout_value() {
 #[should_panic(
     expected = "there is no reactor running, must be called from the context of a Tokio 1.x runtime"
 )]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 fn io_panics_when_no_tokio_context() {
     let _ = tokio::net::TcpListener::from_std(std::net::TcpListener::bind("127.0.0.1:0").unwrap());
 }

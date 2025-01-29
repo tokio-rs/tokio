@@ -1,3 +1,9 @@
+# 2.5.0 (Jan 8th, 2025)
+
+- macros: suppress `clippy::needless_return` in `#[tokio::main]` ([#6874])
+
+[#6874]: https://github.com/tokio-rs/tokio/pull/6874
+
 # 2.4.0 (July 22nd, 2024)
 
 - msrv: increase MSRV to 1.70 ([#6645])

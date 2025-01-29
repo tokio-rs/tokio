@@ -21,7 +21,7 @@ impl RuntimeFlavor {
             "single_thread" => Err("The single threaded runtime flavor is called `current_thread`.".to_string()),
             "basic_scheduler" => Err("The `basic_scheduler` runtime flavor has been renamed to `current_thread`.".to_string()),
             "threaded_scheduler" => Err("The `threaded_scheduler` runtime flavor has been renamed to `multi_thread`.".to_string()),
-            _ => Err(format!("No such runtime flavor `{}`. The runtime flavors are `current_thread` and `multi_thread`.", s)),
+            _ => Err(format!("No such runtime flavor `{s}`. The runtime flavors are `current_thread` and `multi_thread`.")),
         }
     }
 }
@@ -37,7 +37,7 @@ impl UnhandledPanic {
         match s {
             "ignore" => Ok(UnhandledPanic::Ignore),
             "shutdown_runtime" => Ok(UnhandledPanic::ShutdownRuntime),
-            _ => Err(format!("No such unhandled panic behavior `{}`. The unhandled panic behaviors are `ignore` and `shutdown_runtime`.", s)),
+            _ => Err(format!("No such unhandled panic behavior `{s}`. The unhandled panic behaviors are `ignore` and `shutdown_runtime`.")),
         }
     }
 
@@ -240,12 +240,12 @@ fn parse_int(int: syn::Lit, span: Span, field: &str) -> Result<usize, syn::Error
             Ok(value) => Ok(value),
             Err(e) => Err(syn::Error::new(
                 span,
-                format!("Failed to parse value of `{}` as integer: {}", field, e),
+                format!("Failed to parse value of `{field}` as integer: {e}"),
             )),
         },
         _ => Err(syn::Error::new(
             span,
-            format!("Failed to parse value of `{}` as integer.", field),
+            format!("Failed to parse value of `{field}` as integer."),
         )),
     }
 }
@@ -256,7 +256,7 @@ fn parse_string(int: syn::Lit, span: Span, field: &str) -> Result<String, syn::E
         syn::Lit::Verbatim(s) => Ok(s.to_string()),
         _ => Err(syn::Error::new(
             span,
-            format!("Failed to parse value of `{}` as string.", field),
+            format!("Failed to parse value of `{field}` as string."),
         )),
     }
 }
@@ -276,7 +276,7 @@ fn parse_path(lit: syn::Lit, span: Span, field: &str) -> Result<Path, syn::Error
         }
         _ => Err(syn::Error::new(
             span,
-            format!("Failed to parse value of `{}` as path.", field),
+            format!("Failed to parse value of `{field}` as path."),
         )),
     }
 }
@@ -286,7 +286,7 @@ fn parse_bool(bool: syn::Lit, span: Span, field: &str) -> Result<bool, syn::Erro
         syn::Lit::Bool(b) => Ok(b.value),
         _ => Err(syn::Error::new(
             span,
-            format!("Failed to parse value of `{}` as bool.", field),
+            format!("Failed to parse value of `{field}` as bool."),
         )),
     }
 }
@@ -343,8 +343,7 @@ fn build_config(
                     }
                     name => {
                         let msg = format!(
-                            "Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`",
-                            name,
+                            "Unknown attribute {name} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`",
                         );
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
@@ -359,21 +358,19 @@ fn build_config(
                 let msg = match name.as_str() {
                     "threaded_scheduler" | "multi_thread" => {
                         format!(
-                            "Set the runtime flavor with #[{}(flavor = \"multi_thread\")].",
-                            macro_name
+                            "Set the runtime flavor with #[{macro_name}(flavor = \"multi_thread\")]."
                         )
                     }
                     "basic_scheduler" | "current_thread" | "single_threaded" => {
                         format!(
-                            "Set the runtime flavor with #[{}(flavor = \"current_thread\")].",
-                            macro_name
+                            "Set the runtime flavor with #[{macro_name}(flavor = \"current_thread\")]."
                         )
                     }
                     "flavor" | "worker_threads" | "start_paused" | "crate" | "unhandled_panic" => {
-                        format!("The `{}` attribute requires an argument.", name)
+                        format!("The `{name}` attribute requires an argument.")
                     }
                     name => {
-                        format!("Unknown attribute {} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`.", name)
+                        format!("Unknown attribute {name} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`.")
                     }
                 };
                 return Err(syn::Error::new_spanned(path, msg));

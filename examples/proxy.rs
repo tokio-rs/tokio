@@ -38,8 +38,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .nth(2)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
 
-    println!("Listening on: {}", listen_addr);
-    println!("Proxying to: {}", server_addr);
+    println!("Listening on: {listen_addr}");
+    println!("Proxying to: {server_addr}");
 
     let listener = TcpListener::bind(listen_addr).await?;
 
@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             copy_bidirectional(&mut inbound, &mut outbound)
                 .map(|r| {
                     if let Err(e) = r {
-                        println!("Failed to transfer; error={}", e);
+                        println!("Failed to transfer; error={e}");
                     }
                 })
                 .await
