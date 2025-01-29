@@ -3,6 +3,7 @@ use crate::io::stdio_common::SplitByUtf8BoundaryIfWindows;
 use crate::io::AsyncWrite;
 
 use std::io;
+use std::io::IsTerminal;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
@@ -130,5 +131,16 @@ impl AsyncWrite for Stderr {
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), io::Error>> {
         Pin::new(&mut self.std).poll_shutdown(cx)
+    }
+}
+
+impl Stderr {
+    /// Returns true if the descriptor/handle refers to a terminal/tty.
+    pub fn is_terminal(&self) -> bool {
+        self.std
+            .inner()
+            .inner()
+            .map(|stderr| stderr.is_terminal())
+            .unwrap_or_default()
     }
 }

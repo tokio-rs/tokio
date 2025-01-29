@@ -41,7 +41,7 @@ use mio::unix::SourceFd;
 use std::fmt;
 use std::fs::File;
 use std::future::Future;
-use std::io;
+use std::io::{self, IsTerminal};
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::pin::Pin;
 use std::process::{Child as StdChild, ExitStatus, Stdio};
@@ -278,6 +278,10 @@ pub(crate) struct ChildStdio {
 impl ChildStdio {
     pub(super) fn into_owned_fd(self) -> io::Result<OwnedFd> {
         convert_to_blocking_file(self).map(OwnedFd::from)
+    }
+
+    pub(crate) fn is_terminal(&self) -> bool {
+        self.as_fd().is_terminal()
     }
 }
 
