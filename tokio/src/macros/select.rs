@@ -446,9 +446,11 @@ macro_rules! doc {
         ///         tokio::select! {
         ///             _ = read_send(&mut file, &mut channel) => { /* ... */ },
         ///             _data = socket.read_packet() => { /* ... */ }
+        ///             _ = futures::future::ready(()) => break
         ///         }
         ///     }
         /// }
+        ///
         /// ```
         ///
         /// ### Moving to `merge`
@@ -461,7 +463,7 @@ macro_rules! doc {
         /// use std::pin::pin;
         ///
         /// use futures::stream::unfold;
-        /// use tokio_stream::StreamExt as _;
+        /// use tokio_stream::{StreamExt, iter};
         ///
         /// struct File;
         /// struct Channel;
@@ -478,7 +480,8 @@ macro_rules! doc {
         /// }
         ///
         /// enum Message {
-        ///     None,
+        ///     Stop,
+        ///     Sent,
         ///     Data(Vec<u8>),
         /// }
         ///
@@ -491,18 +494,20 @@ macro_rules! doc {
         ///
         ///     let a = unfold((file, channel), |(mut file, mut channel)| async {
         ///         read_send(&mut file, &mut channel).await;
-        ///         Some((Message::None, (file, channel)))
+        ///         Some((Message::Sent, (file, channel)))
         ///     });
         ///     let b = unfold(socket, |mut socket| async {
         ///         let data = socket.read_packet().await;
         ///         Some((Message::Data(data), socket))
         ///     });
+        ///     let c = iter([Message::Stop]);
         ///
-        ///     let mut s = pin!(a.merge(b));
+        ///     let mut s = pin!(a.merge(b).merge(c));
         ///     while let Some(msg) = s.next().await {
         ///         match msg {
-        ///             Message::None => continue,
         ///             Message::Data(_data) => { /* ... */ }
+        ///             Message::Sent => continue,
+        ///             Message::Stop => break,
         ///         }
         ///     }
         /// }
