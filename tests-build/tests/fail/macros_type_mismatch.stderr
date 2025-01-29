@@ -30,9 +30,34 @@ error[E0308]: mismatched types
            found unit type `()`
 
 error[E0308]: mismatched types
-  --> tests/fail/macros_type_mismatch.rs:23:12
+  --> tests/fail/macros_type_mismatch.rs:31:69
    |
-22 | async fn issue_4635() {
+31 |   async fn question_mark_operator_with_invalid_option() -> Option<()> {
+   |  _____________________________________________________________________^
+32 | |     None?;
+   | |          - help: remove this semicolon to return this value
+33 | | }
+   | |_^ expected `Option<()>`, found `()`
+   |
+   = note:   expected enum `Option<()>`
+           found unit type `()`
+
+error[E0308]: mismatched types
+  --> tests/fail/macros_type_mismatch.rs:48:73
+   |
+48 |   async fn question_mark_operator_with_invalid_result() -> Result<(), ()> {
+   |  _________________________________________________________________________^
+49 | |     Ok(())?;
+50 | | }
+   | |_^ expected `Result<(), ()>`, found `()`
+   |
+   = note:   expected enum `Result<(), ()>`
+           found unit type `()`
+
+error[E0308]: mismatched types
+  --> tests/fail/macros_type_mismatch.rs:57:12
+   |
+56 | async fn issue_4635() {
    |                      - help: try adding a return type: `-> i32`
-23 |     return 1;
+57 |     return 1;
    |            ^ expected `()`, found integer
