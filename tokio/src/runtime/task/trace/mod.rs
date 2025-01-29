@@ -24,7 +24,7 @@ use super::{Notified, OwnedTasks, Schedule};
 type Backtrace = Vec<BacktraceFrame>;
 type SymbolTrace = Vec<Symbol>;
 
-/// The ambiant backtracing context.
+/// The ambient backtracing context.
 pub(crate) struct Context {
     /// The address of [`Trace::root`] establishes an upper unwinding bound on
     /// the backtraces in `Trace`.
@@ -56,7 +56,8 @@ pub(crate) struct Trace {
 pin_project_lite::pin_project! {
     #[derive(Debug, Clone)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct Root<T> {
+    /// A future wrapper that roots traces (captured with [`Trace::capture`]).
+    pub struct Root<T> {
         #[pin]
         future: T,
     }
@@ -137,6 +138,10 @@ impl Trace {
     #[inline(never)]
     pub(crate) fn root<F>(future: F) -> Root<F> {
         Root { future }
+    }
+
+    pub(crate) fn backtraces(&self) -> &[Backtrace] {
+        &self.backtraces
     }
 }
 

@@ -16,9 +16,9 @@ env:
   RUSTUP_WINDOWS_PATH_ADD_BIN: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2024-05-05
+  rust_nightly: nightly-2025-01-25
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2024-09-19
+  rust_miri_nightly: nightly-2025-01-25
   rust_clippy: '1.77'
   # When updating this, also update:
   # - README.md
@@ -47,10 +47,11 @@ jobs:
       - test-workspace-all-features
       - test-integration-tests-per-feature
       - test-parking_lot
-      - test-tracing-instrumentation
       - valgrind
       - test-unstable
-      - miri
+      - miri-lib
+      - miri-test
+      - miri-doc
       - asan
       - cross-check
       - cross-check-tier3
@@ -180,7 +181,7 @@ jobs:
         run: |
           set -euxo pipefail
           RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run --workspace --exclude tokio-macros --exclude tests-build --all-features --tests
-  
+
   test-integration-tests-per-feature:
     needs: basics
     name: Run integration tests for each feature
@@ -246,34 +247,6 @@ jobs:
       - name: Check tests with all features enabled
         run: cargo check --workspace --all-features --tests
 
-  test-tracing-instrumentation:
-    # These tests use the as-yet unpublished `tracing-mock` crate to test the
-    # tracing instrumentation present in Tokio. As such they are placed in
-    # their own test crate outside of the workspace.
-    needs: basics
-    name: test tokio instrumentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.rust_stable }}
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: test tracing-instrumentation
-        run: |
-          set -euxo pipefail
-          cargo nextest run
-        working-directory: tokio/tests/tracing-instrumentation
-        env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
-
   valgrind:
     name: valgrind
     needs: basics
@@ -283,7 +256,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+            toolchain: 1.82
 
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
@@ -409,8 +382,8 @@ jobs:
           # the unstable cfg to RustDoc
           RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_internal_mt_counters
 
-  miri:
-    name: miri
+  miri-lib:
+    name: miri-lib
     needs: basics
     runs-on: ubuntu-latest
     steps:
@@ -427,7 +400,49 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: miri
         run: |
-          cargo miri nextest run --features full --lib --tests --no-fail-fast
+          cargo miri nextest run --features full --lib --no-fail-fast
+        working-directory: tokio
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+
+  miri-test:
+    name: miri-test
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_miri_nightly }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_miri_nightly }}
+          components: miri
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - uses: Swatinem/rust-cache@v2
+      - name: miri
+        run: |
+          cargo miri nextest run --features full --test '*' --no-fail-fast
+        working-directory: tokio
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+
+  miri-doc:
+    name: miri-doc
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_miri_nightly }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_miri_nightly }}
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      - name: miri-doc-test
+        run: |
+          cargo miri test --doc --all-features --no-fail-fast
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
@@ -496,6 +511,7 @@ jobs:
     strategy:
       matrix:
         target:
+          - name: x86_64-unknown-haiku
           - name: armv7-sony-vita-newlibeabihf
             exclude_features: "process,signal,rt-process-signal,full"
     steps:
@@ -516,15 +532,19 @@ jobs:
 
   cross-test-with-parking_lot:
     needs: basics
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - target: i686-unknown-linux-gnu
+            os: ubuntu-latest
             rustflags: --cfg tokio_taskdump
           - target: armv5te-unknown-linux-gnueabi
+            os: ubuntu-latest
           - target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
           - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
             rustflags: --cfg tokio_taskdump
     steps:
       - uses: actions/checkout@v4
@@ -556,15 +576,19 @@ jobs:
 
   cross-test-without-parking_lot:
     needs: basics
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - target: i686-unknown-linux-gnu
+            os: ubuntu-latest
             rustflags: --cfg tokio_taskdump
           - target: armv5te-unknown-linux-gnueabi
+            os: ubuntu-latest
           - target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
           - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
             rustflags: --cfg tokio_taskdump
     steps:
       - uses: actions/checkout@v4
@@ -768,7 +792,15 @@ jobs:
 
   docs:
     name: docs
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.run.os }}
+    strategy:
+      matrix:
+        run:
+          - os: windows-latest
+          - os: ubuntu-latest
+            RUSTFLAGS: --cfg tokio_taskdump
+            RUSTDOCFLAGS: --cfg tokio_taskdump
+
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_nightly }}
@@ -780,8 +812,8 @@ jobs:
         run: |
           cargo doc --lib --no-deps --all-features --document-private-items
         env:
-          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable --cfg tokio_taskdump
-          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable ${{ matrix.run.RUSTFLAGS }}
+          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings ${{ matrix.run.RUSTDOCFLAGS }}
 
   loom-compile:
     name: build loom tests
@@ -985,7 +1017,7 @@ jobs:
       - name: Install cargo-hack, wasmtime, and cargo-wasi
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-hack,wasmtime,cargo-wasi
+          tool: cargo-hack,wasmtime
 
       - uses: Swatinem/rust-cache@v2
       - name: WASI test tokio full
@@ -1011,9 +1043,12 @@ jobs:
 
       - name: test tests-integration --features wasi-rt
         # TODO: this should become: `cargo hack wasi test --each-feature`
-        run: cargo wasi test --test rt_yield --features wasi-rt
+        run: cargo test --target ${{ matrix.target }} --test rt_yield --features wasi-rt
         if: matrix.target == 'wasm32-wasip1'
         working-directory: tests-integration
+        env:
+          CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
+          RUSTFLAGS: -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: test tests-integration --features wasi-threads-rt
         run: cargo test --target ${{ matrix.target }} --features wasi-threads-rt
@@ -1050,23 +1085,6 @@ jobs:
       - name: check-external-types
         run: cargo check-external-types --all-features
         working-directory: tokio
-
-  check-unexpected-lints-cfgs:
-    name: check unexpected lints and cfgs
-    needs: basics
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.rust_nightly }}
-      - name: don't allow warnings
-        run: sed -i '/#!\[allow(unknown_lints, unexpected_cfgs)\]/d' */src/lib.rs */tests/*.rs
-      - name: check for unknown lints and cfgs
-        run: cargo check --all-features --tests
-        env:
-          RUSTFLAGS: -Dwarnings --check-cfg=cfg(loom,tokio_unstable,tokio_taskdump,fuzzing,mio_unsupported_force_poll_poll,tokio_internal_mt_counters,fs,tokio_no_parking_lot,tokio_no_tuning_tests) -Funexpected_cfgs -Funknown_lints
 
   check-fuzzing:
     name: check-fuzzing
@@ -1105,23 +1123,57 @@ jobs:
       - uses: actions/checkout@v4
       - name: Make sure dictionary words are sorted and unique
         run: |
-          # `sed` removes the first line (number of words) and
-          # the last line (new line). 
-          # 
+          FILE="spellcheck.dic"
+
+          # Verify the first line is an integer.
+          first_line=$(head -n 1 "$FILE")
+          if ! [[ "$first_line" =~ ^[0-9]+$ ]]; then
+            echo "Error: The first line of $FILE must be an integer, but got: '$first_line'"
+            exit 1
+          fi
+          expected_count="$first_line"
+
+          # Check that the number of lines matches the integer.
+          # xargs (with no arguments) will strip leading/trailing whitespacefrom wc's output.
+          actual_count=$(sed '1d' "$FILE" | wc -l | xargs)
+          if [ "$expected_count" -ne "$actual_count" ]; then
+            echo "Error: The number of lines ($actual_count) does not match $expected_count."
+            exit 1
+          fi
+
+          # `sed` removes the first line (number of words).
+          #
           # `sort` makes sure everything in between is sorted
           # and contains no duplicates.
-          # 
+          #
           # Since `sort` is sensitive to locale, we set it
           # using LC_ALL to en_US.UTF8 to be consistent in different
           # environments.
 
           (
-            sed '1d; $d' spellcheck.dic | LC_ALL=en_US.UTF8 sort -uc
+            sed '1d' $FILE | LC_ALL=en_US.UTF8 sort -uc
           ) || {
             echo "Dictionary is not in sorted order. Correct order is:"
-            LC_ALL=en_US.UTF8 sort -u <(sed '1d; $d' spellcheck.dic)
+            LC_ALL=en_US.UTF8 sort -u <(sed '1d' $FILE)
             false
           }
       - name: Run cargo-spellcheck
-        run: cargo spellcheck --code 1
-
+        run: |
+          if ! cargo spellcheck --code 1
+          then
+              echo ''
+              echo ''
+              echo 'If this is a Rust method/type/variable name, then you should'
+              echo 'enclose it in backticks like this: `MyRustType`.'
+              echo ''
+              echo 'If this is a real word, then you can add it to spellcheck.dic'
+              exit 1
+          fi
+      - name: Detect trailing whitespace
+        run: |
+          if grep --exclude-dir=.git --exclude-dir=target -rne '\s$' .
+          then
+              echo ''
+              echo 'Please remove trailing whitespace from these lines.'
+              exit 1
+          fi

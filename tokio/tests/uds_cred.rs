@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
-#![cfg(all(unix, not(target_os = "dragonfly"), not(miri)))]
+#![cfg(all(unix, not(target_os = "dragonfly"), not(miri)))] // No `getsockopt` on miri.
 
 use tokio::net::UnixStream;
 

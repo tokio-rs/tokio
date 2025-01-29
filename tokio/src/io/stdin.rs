@@ -42,8 +42,12 @@ cfg_io_std! {
     /// user input and use blocking IO directly in that thread.
     pub fn stdin() -> Stdin {
         let std = io::stdin();
+        // SAFETY: The `Read` implementation of `std` does not read from the
+        // buffer it is borrowing and correctly reports the length of the data
+        // written into the buffer.
+        let std = unsafe { Blocking::new(std) };
         Stdin {
-            std: Blocking::new(std),
+            std,
         }
     }
 }

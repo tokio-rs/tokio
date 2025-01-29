@@ -1,5 +1,3 @@
-#![allow(unknown_lints, unexpected_cfgs)]
-
 //! This example demonstrates tokio's experimental task dumping functionality.
 //! This application deadlocks. Input CTRL+C to display traces of each task, or
 //! input CTRL+C twice within 1 second to quit.

@@ -65,12 +65,7 @@ impl ParkThread {
     pub(crate) fn park_timeout(&mut self, duration: Duration) {
         #[cfg(loom)]
         CURRENT_THREAD_PARK_COUNT.with(|count| count.fetch_add(1, SeqCst));
-
-        // Wasm doesn't have threads, so just sleep.
-        #[cfg(not(target_family = "wasm"))]
         self.inner.park_timeout(duration);
-        #[cfg(target_family = "wasm")]
-        std::thread::sleep(duration);
     }
 
     pub(crate) fn shutdown(&mut self) {
@@ -109,7 +104,7 @@ impl Inner {
 
                 return;
             }
-            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
+            Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
 
         loop {
@@ -155,19 +150,27 @@ impl Inner {
 
                 return;
             }
-            Err(actual) => panic!("inconsistent park_timeout state; actual = {}", actual),
+            Err(actual) => panic!("inconsistent park_timeout state; actual = {actual}"),
         }
 
+        #[cfg(not(all(target_family = "wasm", not(target_feature = "atomics"))))]
         // Wait with a timeout, and if we spuriously wake up or otherwise wake up
         // from a notification, we just want to unconditionally set the state back to
         // empty, either consuming a notification or un-flagging ourselves as
         // parked.
         let (_m, _result) = self.condvar.wait_timeout(m, dur).unwrap();
 
+        #[cfg(all(target_family = "wasm", not(target_feature = "atomics")))]
+        // Wasm without atomics doesn't have threads, so just sleep.
+        {
+            let _m = m;
+            std::thread::sleep(dur);
+        }
+
         match self.state.swap(EMPTY, SeqCst) {
             NOTIFIED => {} // got a notification, hurray!
             PARKED => {}   // no notification, alas
-            n => panic!("inconsistent park_timeout state: {}", n),
+            n => panic!("inconsistent park_timeout state: {n}"),
         }
     }
 

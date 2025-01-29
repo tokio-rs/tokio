@@ -12,13 +12,15 @@ use crate::signal::RxFuture;
 use std::io;
 use std::task::{Context, Poll};
 
-#[cfg(not(docsrs))]
+#[cfg(windows)]
 #[path = "windows/sys.rs"]
 mod imp;
-#[cfg(not(docsrs))]
+
+#[cfg(windows)]
 pub(crate) use self::imp::{OsExtraData, OsStorage};
 
-#[cfg(docsrs)]
+// For building documentation on Unix machines when the `docsrs` flag is set.
+#[cfg(not(windows))]
 #[path = "windows/stub.rs"]
 mod imp;
 

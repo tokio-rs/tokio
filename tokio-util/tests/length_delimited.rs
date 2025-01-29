@@ -789,7 +789,7 @@ impl AsyncWrite for Mock {
         match self.calls.pop_front() {
             Some(Poll::Ready(Ok(Op::Data(data)))) => {
                 let len = data.len();
-                assert!(src.len() >= len, "expect={:?}; actual={:?}", data, src);
+                assert!(src.len() >= len, "expect={data:?}; actual={src:?}");
                 assert_eq!(&data[..], &src[..len]);
                 Poll::Ready(Ok(len))
             }

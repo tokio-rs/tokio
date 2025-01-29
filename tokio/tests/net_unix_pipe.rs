@@ -1,6 +1,5 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
-#![cfg(not(miri))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
 use tokio::net::unix::pipe;
@@ -38,6 +37,7 @@ impl AsRef<Path> for TempFifo {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn fifo_simple_send() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
@@ -69,6 +69,7 @@ async fn fifo_simple_send() -> io::Result<()> {
 
 #[tokio::test]
 #[cfg(target_os = "linux")]
+#[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn fifo_simple_send_sender_first() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
@@ -105,6 +106,7 @@ async fn write_and_close(path: impl AsRef<Path>, msg: &[u8]) -> io::Result<()> {
 /// Checks EOF behavior with single reader and writers sequentially opening
 /// and closing a FIFO.
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn fifo_multiple_writes() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
@@ -133,6 +135,7 @@ async fn fifo_multiple_writes() -> io::Result<()> {
 /// with writers sequentially opening and closing a FIFO.
 #[tokio::test]
 #[cfg(target_os = "linux")]
+#[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn fifo_resilient_reader() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
@@ -163,6 +166,7 @@ async fn fifo_resilient_reader() -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `O_NONBLOCK` for open64 in miri.
 async fn open_detects_not_a_fifo() -> io::Result<()> {
     let dir = tempfile::Builder::new()
         .prefix("tokio-fifo-tests")
@@ -185,6 +189,7 @@ async fn open_detects_not_a_fifo() -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn from_file() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
@@ -221,6 +226,7 @@ async fn from_file() -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `fstat` in miri.
 async fn from_file_detects_not_a_fifo() -> io::Result<()> {
     let dir = tempfile::Builder::new()
         .prefix("tokio-fifo-tests")
@@ -245,6 +251,7 @@ async fn from_file_detects_not_a_fifo() -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn from_file_detects_wrong_access_mode() -> io::Result<()> {
     let fifo = TempFifo::new("wrong_access_mode")?;
 
@@ -276,6 +283,7 @@ fn is_nonblocking<T: AsRawFd>(fd: &T) -> io::Result<bool> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn from_file_sets_nonblock() -> io::Result<()> {
     let fifo = TempFifo::new("sets_nonblock")?;
 
@@ -303,6 +311,7 @@ fn writable_by_poll(writer: &pipe::Sender) -> bool {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn try_read_write() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
@@ -343,6 +352,7 @@ async fn try_read_write() -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn try_read_write_vectored() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
@@ -390,6 +400,7 @@ async fn try_read_write_vectored() -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn try_read_buf() -> std::io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
 
@@ -458,6 +469,7 @@ async fn anon_pipe_simple_send() -> io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
     use tokio::process::Command;
 
@@ -488,6 +500,7 @@ async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
 
 #[tokio::test]
 #[cfg(target_os = "linux")]
+#[cfg_attr(miri, ignore)] // No `fstat` in miri.
 async fn anon_pipe_from_owned_fd() -> std::io::Result<()> {
     use nix::fcntl::OFlag;
 
@@ -507,6 +520,7 @@ async fn anon_pipe_from_owned_fd() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn anon_pipe_into_nonblocking_fd() -> std::io::Result<()> {
     let (tx, rx) = pipe::pipe()?;
 
@@ -520,6 +534,7 @@ async fn anon_pipe_into_nonblocking_fd() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn anon_pipe_into_blocking_fd() -> std::io::Result<()> {
     let (tx, rx) = pipe::pipe()?;
 

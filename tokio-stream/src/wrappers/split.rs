@@ -8,6 +8,24 @@ use tokio::io::{AsyncBufRead, Split};
 pin_project! {
     /// A wrapper around [`tokio::io::Split`] that implements [`Stream`].
     ///
+    /// # Example
+    ///
+    /// ```
+    /// use tokio::io::AsyncBufReadExt;
+    /// use tokio_stream::{StreamExt, wrappers::SplitStream};
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let input = "Hello\nWorld\n".as_bytes();
+    /// let lines = AsyncBufReadExt::split(input, b'\n');
+    ///
+    /// let mut stream = SplitStream::new(lines);
+    /// while let Some(line) = stream.next().await {
+    ///     println!("length = {}", line?.len())
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     /// [`tokio::io::Split`]: struct@tokio::io::Split
     /// [`Stream`]: trait@crate::Stream
     #[derive(Debug)]

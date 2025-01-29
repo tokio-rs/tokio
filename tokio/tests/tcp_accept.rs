@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support bind
+                                                                   // No `socket` on miri.
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, oneshot};

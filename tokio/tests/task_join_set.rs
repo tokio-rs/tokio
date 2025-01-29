@@ -1,4 +1,3 @@
-#![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
@@ -254,7 +253,7 @@ async fn join_set_coop() {
     loop {
         match set.join_next().now_or_never() {
             Some(Some(Ok(()))) => {}
-            Some(Some(Err(err))) => panic!("failed: {}", err),
+            Some(Some(Err(err))) => panic!("failed: {err}"),
             None => {
                 coop_count += 1;
                 tokio::task::yield_now().await;
@@ -294,7 +293,7 @@ async fn try_join_next() {
             Some(Ok(())) => {
                 count += 1;
             }
-            Some(Err(err)) => panic!("failed: {}", err),
+            Some(Err(err)) => panic!("failed: {err}"),
             None => {
                 break;
             }

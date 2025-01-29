@@ -20,7 +20,7 @@ async fn issue_42() {
         task::spawn(async {
             let processes = (0..10usize).map(|i| {
                 let mut child = Command::new("echo")
-                    .arg(format!("I am spawned process #{}", i))
+                    .arg(format!("I am spawned process #{i}"))
                     .stdin(Stdio::null())
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())

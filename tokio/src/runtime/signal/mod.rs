@@ -118,7 +118,7 @@ impl Driver {
                 Ok(0) => panic!("EOF on self-pipe"),
                 Ok(_) => continue, // Keep reading
                 Err(e) if e.kind() == std_io::ErrorKind::WouldBlock => break,
-                Err(e) => panic!("Bad read on self-pipe: {}", e),
+                Err(e) => panic!("Bad read on self-pipe: {e}"),
             }
         }
 

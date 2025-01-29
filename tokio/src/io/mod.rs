@@ -231,6 +231,9 @@ cfg_io_driver_impl! {
     pub(crate) use poll_evented::PollEvented;
 }
 
+// The bsd module can't be build on Windows, so we completely ignore it, even
+// when building documentation.
+#[cfg(unix)]
 cfg_aio! {
     /// BSD-specific I/O types.
     pub mod bsd {

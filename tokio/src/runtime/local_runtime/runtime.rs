@@ -166,7 +166,8 @@ impl LocalRuntime {
     ///
     /// This function _will_ be run on another thread.
     ///
-    /// See the documentation in the non-local runtime for more information.
+    /// See the [documentation in the non-local runtime][Runtime] for more
+    /// information.
     ///
     /// [Runtime]: crate::runtime::Runtime::spawn_blocking
     ///
@@ -197,7 +198,8 @@ impl LocalRuntime {
     /// Runs a future to completion on the Tokio runtime. This is the
     /// runtime's entry point.
     ///
-    /// See the documentation for [the equivalent method on Runtime] for more information.
+    /// See the documentation for [the equivalent method on Runtime][Runtime]
+    /// for more information.
     ///
     /// [Runtime]: crate::runtime::Runtime::block_on
     ///

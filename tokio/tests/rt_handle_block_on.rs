@@ -212,6 +212,7 @@ rt_test! {
     // ==== net ======
 
     #[test]
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     fn tcp_listener_bind() {
         let rt = rt();
         let _enter = rt.enter();
@@ -262,6 +263,7 @@ rt_test! {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     fn udp_socket_bind() {
         let rt = rt();
         let _enter = rt.enter();
@@ -422,6 +424,7 @@ rt_test! {
 #[cfg(not(target_os = "wasi"))]
 multi_threaded_rt_test! {
     #[cfg(unix)]
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     #[test]
     fn unix_listener_bind() {
         let rt = rt();

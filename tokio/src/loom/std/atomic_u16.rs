@@ -26,8 +26,7 @@ impl AtomicU16 {
     /// All mutations must have happened before the unsynchronized load.
     /// Additionally, there must be no concurrent mutations.
     pub(crate) unsafe fn unsync_load(&self) -> u16 {
-        // See <https://github.com/tokio-rs/tokio/issues/6155>
-        self.load(std::sync::atomic::Ordering::Relaxed)
+        core::ptr::read(self.inner.get() as *const u16)
     }
 }
 
