@@ -15,7 +15,7 @@ env:
   RUST_BACKTRACE: 1
   RUSTUP_WINDOWS_PATH_ADD_BIN: 1
   # Change to specific Rust release to pin
-  rust_stable: stable
+  rust_stable: beta
   rust_nightly: nightly-2025-01-25
   # Pin a specific miri version
   rust_miri_nightly: nightly-2025-01-25
