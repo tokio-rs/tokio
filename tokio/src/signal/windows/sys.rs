@@ -131,7 +131,7 @@ unsafe extern "system" fn handler(ty: u32) -> BOOL {
     // go ahead and perform the broadcast here.
     let event_was_handled = globals.broadcast();
 
-    if event_requires_infinite_sleep_in_handler(ty) {
+    if event_was_handled && event_requires_infinite_sleep_in_handler(ty) {
         loop {
             std::thread::park();
         }
