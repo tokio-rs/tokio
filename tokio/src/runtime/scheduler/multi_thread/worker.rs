@@ -600,9 +600,6 @@ impl Context {
 
             task.run();
 
-            // <we pause here for infinity>
-            // thread.sleep(60 seconds)
-
             #[cfg(tokio_unstable)]
             self.worker.handle.task_hooks.poll_stop_callback(task_id);
 
