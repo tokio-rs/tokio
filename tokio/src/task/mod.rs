@@ -286,19 +286,18 @@ cfg_rt! {
     #[doc(hidden)]
     #[deprecated = "Moved to tokio::task::coop::consume_budget"]
     pub use coop::consume_budget;
-
-    mod local;
-    pub use local::{spawn_local, LocalSet, LocalEnterGuard};
-
-    mod task_local;
-    pub use task_local::LocalKey;
-
     #[doc(hidden)]
     #[deprecated = "Moved to tokio::task::coop::unconstrained"]
     pub use coop::unconstrained;
     #[doc(hidden)]
     #[deprecated = "Moved to tokio::task::coop::Unconstrained"]
     pub use coop::Unconstrained;
+
+    mod local;
+    pub use local::{spawn_local, LocalSet, LocalEnterGuard};
+
+    mod task_local;
+    pub use task_local::LocalKey;
 
     #[doc(inline)]
     pub use join_set::JoinSet;
