@@ -1,6 +1,7 @@
 use crate::io::util::chain::{chain, Chain};
 use crate::io::util::read::{read, Read};
 use crate::io::util::read_buf::{read_buf, ReadBuf};
+use crate::io::util::read_buf_exact::{read_buf_exact, ReadBufExact};
 use crate::io::util::read_exact::{read_exact, ReadExact};
 use crate::io::util::read_int::{ReadF32, ReadF32Le, ReadF64, ReadF64Le};
 use crate::io::util::read_int::{
@@ -249,6 +250,68 @@ cfg_io_util! {
             B: BufMut + ?Sized,
         {
             read_buf(self, buf)
+        }
+
+        /// Reads the exact number of bytes required to fill `buf`, advancing the buffer's
+        /// internal cursor.
+        ///
+        /// Equivalent to:
+        /// ```ignore
+        /// async fn read_buf_exact<B: BufMut>(&mut self, buf: &mut B) -> io::Result<usize>;
+        /// ```
+        ///
+        /// This function reads as many bytes as necessary to completely fill
+        /// the specified buffer `buf`.
+        ///
+        /// # Errors
+        ///
+        /// If the operation encounters an "end of file" before completely
+        /// filling the buffer, it returns an error of the kind
+        /// [`ErrorKind::UnexpectedEof`]. The contents of `buf` are unspecified
+        /// in this case.
+        ///
+        /// If any other read error is encountered then the operation
+        /// immediately returns. The contents of `buf` are unspecified in this
+        /// case.
+        ///
+        /// If this operation returns an error, it is unspecified how many bytes
+        /// it has read, but it will never read more than would be necessary to
+        /// completely fill the buffer.
+        ///
+        /// # Cancel safety
+        ///
+        /// This method is not cancellation safe. If the method is used as the
+        /// event in a [`tokio::select!`](crate::select) statement and some
+        /// other branch completes first, then some data may already have been
+        /// read into `buf`.
+        ///
+        /// # Examples
+        ///
+        /// [`File`][crate::fs::File]s implement `Read`:
+        ///
+        /// ```no_run
+        /// use tokio::fs::File;
+        /// use tokio::io::{self, AsyncReadExt};
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     let mut f = File::open("foo.txt").await?;
+        ///     let len = 10;
+        ///     let mut buffer = vec![0; len];
+        ///
+        ///     // read exactly 10 bytes
+        ///     f.read_buf_exact(&mut buffer).await?;
+        ///     Ok(())
+        /// }
+        /// ```
+        ///
+        /// [`ErrorKind::UnexpectedEof`]: std::io::ErrorKind::UnexpectedEof
+        fn read_buf_exact<'a, B>(&'a mut self, buf: &'a mut B) -> ReadBufExact<'a, Self, B>
+        where
+            Self: Unpin,
+            B: BufMut + ?Sized,
+        {
+            read_buf_exact(self, buf)
         }
 
         /// Reads the exact number of bytes required to fill `buf`.
