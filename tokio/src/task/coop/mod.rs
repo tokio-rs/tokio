@@ -169,7 +169,7 @@ fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
 
 /// Returns `true` if there is still budget left on the task.
 ///
-/// This function is similar to [`consume_budget`], but doesn't decrement the
+/// This function is similar to [`consume_budget()`], but doesn't decrement the
 /// budget when non-zero.
 ///
 /// # Examples
