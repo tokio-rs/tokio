@@ -322,7 +322,7 @@ impl<T> Future for JoinHandle<T> {
         let mut ret = Poll::Pending;
 
         // Keep track of task budget
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         // Try to read the task output. If the task is not yet complete, the
         // waker is stored and is notified once the task does complete.

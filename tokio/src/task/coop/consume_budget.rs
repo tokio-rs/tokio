@@ -1,5 +1,3 @@
-use std::task::{ready, Poll};
-
 /// Consumes a unit of budget and returns the execution back to the Tokio
 /// runtime *if* the task's coop budget was exhausted.
 ///
@@ -25,14 +23,14 @@ use std::task::{ready, Poll};
 /// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub async fn consume_budget() {
-    let mut status = Poll::Pending;
+    let mut status = std::task::Poll::Pending;
 
     std::future::poll_fn(move |cx| {
-        ready!(crate::trace::trace_leaf(cx));
+        std::task::ready!(crate::trace::trace_leaf(cx));
         if status.is_ready() {
             return status;
         }
-        status = crate::runtime::coop::poll_proceed(cx).map(|restore| {
+        status = crate::task::coop::poll_proceed(cx).map(|restore| {
             restore.made_progress();
         });
         status

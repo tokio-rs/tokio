@@ -119,7 +119,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard};
-use crate::runtime::coop::cooperative;
+use crate::task::coop::cooperative;
 use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
 use crate::util::WakeList;
 

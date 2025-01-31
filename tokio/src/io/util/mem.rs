@@ -332,7 +332,7 @@ impl AsyncRead for SimplexStream {
             buf: &mut ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
             ready!(crate::trace::trace_leaf(cx));
-            let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+            let coop = ready!(crate::task::coop::poll_proceed(cx));
 
             let ret = self.poll_read_internal(cx, buf);
             if ret.is_ready() {
@@ -362,7 +362,7 @@ impl AsyncWrite for SimplexStream {
             buf: &[u8],
         ) -> Poll<std::io::Result<usize>> {
             ready!(crate::trace::trace_leaf(cx));
-            let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+            let coop = ready!(crate::task::coop::poll_proceed(cx));
 
             let ret = self.poll_write_internal(cx, buf);
             if ret.is_ready() {
@@ -390,7 +390,7 @@ impl AsyncWrite for SimplexStream {
             bufs: &[std::io::IoSlice<'_>],
         ) -> Poll<Result<usize, std::io::Error>> {
             ready!(crate::trace::trace_leaf(cx));
-            let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+            let coop = ready!(crate::task::coop::poll_proceed(cx));
 
             let ret = self.poll_write_vectored_internal(cx, bufs);
             if ret.is_ready() {
