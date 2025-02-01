@@ -20,7 +20,7 @@ impl<'a, T: 'static> Pop<'a, T> {
     }
 }
 
-impl<'a, T: 'static> Iterator for Pop<'a, T> {
+impl<T: 'static> Iterator for Pop<'_, T> {
     type Item = task::Notified<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -42,13 +42,13 @@ impl<'a, T: 'static> Iterator for Pop<'a, T> {
     }
 }
 
-impl<'a, T: 'static> ExactSizeIterator for Pop<'a, T> {
+impl<T: 'static> ExactSizeIterator for Pop<'_, T> {
     fn len(&self) -> usize {
         self.len
     }
 }
 
-impl<'a, T: 'static> Drop for Pop<'a, T> {
+impl<T: 'static> Drop for Pop<'_, T> {
     fn drop(&mut self) {
         for _ in self.by_ref() {}
     }

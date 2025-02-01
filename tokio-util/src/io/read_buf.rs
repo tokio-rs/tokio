@@ -50,7 +50,7 @@ where
 
     struct ReadBufFn<'a, R, B>(&'a mut R, &'a mut B);
 
-    impl<'a, R, B> Future for ReadBufFn<'a, R, B>
+    impl<R, B> Future for ReadBufFn<'_, R, B>
     where
         R: AsyncRead + Unpin,
         B: BufMut,

@@ -355,7 +355,7 @@ unsafe fn move_to_new_list<T>(from: &mut LinkedList<T>, to: &mut LinkedList<T>) 
     }
 }
 
-impl<'a, T> EntryInOneOfTheLists<'a, T> {
+impl<T> EntryInOneOfTheLists<'_, T> {
     /// Remove this entry from the list it is in, returning the value associated
     /// with the entry.
     ///

@@ -266,7 +266,7 @@ impl CancellationToken {
             }
         }
 
-        impl<'a, F: Future> Future for RunUntilCancelledFuture<'a, F> {
+        impl<F: Future> Future for RunUntilCancelledFuture<'_, F> {
             type Output = Option<F::Output>;
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -291,13 +291,13 @@ impl CancellationToken {
 
 // ===== impl WaitForCancellationFuture =====
 
-impl<'a> core::fmt::Debug for WaitForCancellationFuture<'a> {
+impl core::fmt::Debug for WaitForCancellationFuture<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("WaitForCancellationFuture").finish()
     }
 }
 
-impl<'a> Future for WaitForCancellationFuture<'a> {
+impl Future for WaitForCancellationFuture<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {

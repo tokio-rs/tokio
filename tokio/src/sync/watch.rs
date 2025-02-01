@@ -194,7 +194,7 @@ pub struct Ref<'a, T> {
     has_changed: bool,
 }
 
-impl<'a, T> Ref<'a, T> {
+impl<T> Ref<'_, T> {
     /// Indicates if the borrowed value is considered as _changed_ since the last
     /// time it has been marked as seen.
     ///

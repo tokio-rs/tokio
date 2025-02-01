@@ -679,7 +679,7 @@ impl<F: fmt::Debug> fmt::Debug for TrackedFuture<F> {
     }
 }
 
-impl<'a> Future for TaskTrackerWaitFuture<'a> {
+impl Future for TaskTrackerWaitFuture<'_> {
     type Output = ();
 
     #[inline]
@@ -701,7 +701,7 @@ impl<'a> Future for TaskTrackerWaitFuture<'a> {
     }
 }
 
-impl<'a> fmt::Debug for TaskTrackerWaitFuture<'a> {
+impl fmt::Debug for TaskTrackerWaitFuture<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         struct Helper<'a>(&'a TaskTrackerInner);
 

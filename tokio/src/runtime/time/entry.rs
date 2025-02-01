@@ -500,7 +500,7 @@ impl TimerEntry {
                 *self.inner.get() = Some(TimerShared::new(shard_id));
             }
         }
-        return inner.as_ref().unwrap();
+        inner.as_ref().unwrap()
     }
 
     pub(crate) fn deadline(&self) -> Instant {

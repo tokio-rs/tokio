@@ -1247,7 +1247,7 @@ impl<'a, T: ?Sized> MappedMutexGuard<'a, T> {
     }
 }
 
-impl<'a, T: ?Sized> Drop for MappedMutexGuard<'a, T> {
+impl<T: ?Sized> Drop for MappedMutexGuard<'_, T> {
     fn drop(&mut self) {
         self.s.release(1);
 
@@ -1261,26 +1261,26 @@ impl<'a, T: ?Sized> Drop for MappedMutexGuard<'a, T> {
     }
 }
 
-impl<'a, T: ?Sized> Deref for MappedMutexGuard<'a, T> {
+impl<T: ?Sized> Deref for MappedMutexGuard<'_, T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         unsafe { &*self.data }
     }
 }
 
-impl<'a, T: ?Sized> DerefMut for MappedMutexGuard<'a, T> {
+impl<T: ?Sized> DerefMut for MappedMutexGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.data }
     }
 }
 
-impl<'a, T: ?Sized + fmt::Debug> fmt::Debug for MappedMutexGuard<'a, T> {
+impl<T: ?Sized + fmt::Debug> fmt::Debug for MappedMutexGuard<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&**self, f)
     }
 }
 
-impl<'a, T: ?Sized + fmt::Display> fmt::Display for MappedMutexGuard<'a, T> {
+impl<T: ?Sized + fmt::Display> fmt::Display for MappedMutexGuard<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&**self, f)
     }

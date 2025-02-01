@@ -305,7 +305,7 @@ impl<T> Local<T> {
             head: UnsignedLong,
             i: UnsignedLong,
         }
-        impl<'a, T: 'static> Iterator for BatchTaskIter<'a, T> {
+        impl<T: 'static> Iterator for BatchTaskIter<'_, T> {
             type Item = task::Notified<T>;
 
             #[inline]

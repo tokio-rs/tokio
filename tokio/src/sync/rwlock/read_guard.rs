@@ -157,7 +157,7 @@ impl<T: ?Sized> ops::Deref for RwLockReadGuard<'_, T> {
     }
 }
 
-impl<'a, T: ?Sized> fmt::Debug for RwLockReadGuard<'a, T>
+impl<T: ?Sized> fmt::Debug for RwLockReadGuard<'_, T>
 where
     T: fmt::Debug,
 {
@@ -166,7 +166,7 @@ where
     }
 }
 
-impl<'a, T: ?Sized> fmt::Display for RwLockReadGuard<'a, T>
+impl<T: ?Sized> fmt::Display for RwLockReadGuard<'_, T>
 where
     T: fmt::Display,
 {
@@ -175,7 +175,7 @@ where
     }
 }
 
-impl<'a, T: ?Sized> Drop for RwLockReadGuard<'a, T> {
+impl<T: ?Sized> Drop for RwLockReadGuard<'_, T> {
     fn drop(&mut self) {
         self.s.release(1);
 

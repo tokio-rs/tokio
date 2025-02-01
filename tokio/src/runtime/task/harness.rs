@@ -521,7 +521,7 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
         struct Guard<'a, T: Future, S: Schedule> {
             core: &'a Core<T, S>,
         }
-        impl<'a, T: Future, S: Schedule> Drop for Guard<'a, T, S> {
+        impl<T: Future, S: Schedule> Drop for Guard<'_, T, S> {
             fn drop(&mut self) {
                 // If the future panics on poll, we drop it inside the panic
                 // guard.

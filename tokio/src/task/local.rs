@@ -312,7 +312,7 @@ struct LocalDataEnterGuard<'a> {
     wake_on_schedule: bool,
 }
 
-impl<'a> Drop for LocalDataEnterGuard<'a> {
+impl Drop for LocalDataEnterGuard<'_> {
     fn drop(&mut self) {
         self.local_data_ref.ctx.set(self.ctx.take());
         self.local_data_ref

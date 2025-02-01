@@ -284,7 +284,7 @@ cfg_io_driver_impl! {
         }
     }
 
-    impl<'a, T, F> Iterator for DrainFilter<'a, T, F>
+    impl<T, F> Iterator for DrainFilter<'_, T, F>
     where
         T: Link,
         F: FnMut(&T::Target) -> bool,

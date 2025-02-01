@@ -1174,7 +1174,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     }
 }
 
-impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
+impl<Inner: AsRawFd> AsyncFdReadyMutGuard<'_, Inner> {
     /// Indicates to tokio that the file descriptor is no longer ready. All
     /// internal readiness flags will be cleared, and tokio will wait for the
     /// next edge-triggered readiness notification from the OS.
@@ -1369,7 +1369,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     }
 }
 
-impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyGuard<'a, T> {
+impl<T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyGuard<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ReadyGuard")
             .field("async_fd", &self.async_fd)
@@ -1377,7 +1377,7 @@ impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyGuard<'a,
     }
 }
 
-impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyMutGuard<'a, T> {
+impl<T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyMutGuard<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MutReadyGuard")
             .field("async_fd", &self.async_fd)

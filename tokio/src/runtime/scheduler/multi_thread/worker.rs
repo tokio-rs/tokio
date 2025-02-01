@@ -1251,7 +1251,7 @@ pub(crate) struct InjectGuard<'a> {
     lock: crate::loom::sync::MutexGuard<'a, Synced>,
 }
 
-impl<'a> AsMut<inject::Synced> for InjectGuard<'a> {
+impl AsMut<inject::Synced> for InjectGuard<'_> {
     fn as_mut(&mut self) -> &mut inject::Synced {
         &mut self.lock.inject
     }

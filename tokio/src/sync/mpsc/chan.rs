@@ -496,7 +496,7 @@ impl<T, S: Semaphore> Drop for Rx<T, S> {
                 sem: &'a S,
             }
 
-            impl<'a, T, S: Semaphore> Guard<'a, T, S> {
+            impl<T, S: Semaphore> Guard<'_, T, S> {
                 fn drain(&mut self) {
                     // call T's destructor.
                     while let Some(Value(_)) = self.list.pop(self.tx) {
@@ -505,7 +505,7 @@ impl<T, S: Semaphore> Drop for Rx<T, S> {
                 }
             }
 
-            impl<'a, T, S: Semaphore> Drop for Guard<'a, T, S> {
+            impl<T, S: Semaphore> Drop for Guard<'_, T, S> {
                 fn drop(&mut self) {
                     self.drain();
                 }

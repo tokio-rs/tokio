@@ -69,7 +69,7 @@ pub struct TaskMeta<'a> {
     pub(crate) _phantom: PhantomData<&'a ()>,
 }
 
-impl<'a> TaskMeta<'a> {
+impl TaskMeta<'_> {
     /// Return the opaque ID of the task.
     #[cfg_attr(not(tokio_unstable), allow(unreachable_pub, dead_code))]
     pub fn id(&self) -> super::task::Id {

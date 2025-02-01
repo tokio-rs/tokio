@@ -964,7 +964,7 @@ impl Semaphore {
     }
 }
 
-impl<'a> SemaphorePermit<'a> {
+impl SemaphorePermit<'_> {
     /// Forgets the permit **without** releasing it back to the semaphore.
     /// This can be used to reduce the amount of permits available from a
     /// semaphore.

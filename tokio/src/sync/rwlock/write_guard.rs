@@ -423,7 +423,7 @@ impl<T: ?Sized> ops::DerefMut for RwLockWriteGuard<'_, T> {
     }
 }
 
-impl<'a, T: ?Sized> fmt::Debug for RwLockWriteGuard<'a, T>
+impl<T: ?Sized> fmt::Debug for RwLockWriteGuard<'_, T>
 where
     T: fmt::Debug,
 {
@@ -432,7 +432,7 @@ where
     }
 }
 
-impl<'a, T: ?Sized> fmt::Display for RwLockWriteGuard<'a, T>
+impl<T: ?Sized> fmt::Display for RwLockWriteGuard<'_, T>
 where
     T: fmt::Display,
 {
@@ -441,7 +441,7 @@ where
     }
 }
 
-impl<'a, T: ?Sized> Drop for RwLockWriteGuard<'a, T> {
+impl<T: ?Sized> Drop for RwLockWriteGuard<'_, T> {
     fn drop(&mut self) {
         self.s.release(self.permits_acquired as usize);
 

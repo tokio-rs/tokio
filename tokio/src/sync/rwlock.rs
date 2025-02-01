@@ -1094,7 +1094,7 @@ impl<T> From<T> for RwLock<T> {
     }
 }
 
-impl<T: ?Sized> Default for RwLock<T>
+impl<T> Default for RwLock<T>
 where
     T: Default,
 {

@@ -86,7 +86,7 @@ impl FastRand {
         let s0 = self.two;
 
         s1 ^= s1 << 17;
-        s1 = s1 ^ s0 ^ s1 >> 7 ^ s0 >> 16;
+        s1 = s1 ^ s0 ^ (s1 >> 7) ^ (s0 >> 16);
 
         self.one = s0;
         self.two = s1;

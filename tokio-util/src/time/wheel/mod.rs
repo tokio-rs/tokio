@@ -72,13 +72,13 @@ where
     ///
     /// # Arguments
     ///
-    /// * `when`: is the instant at which the entry should be fired. It is
-    ///           represented as the number of milliseconds since the creation
-    ///           of the timing wheel.
+    /// `when`: is the instant at which the entry should be fired. It is
+    /// represented as the number of milliseconds since the creation
+    /// of the timing wheel.
     ///
-    /// * `item`: The item to insert into the wheel.
+    /// `item`: The item to insert into the wheel.
     ///
-    /// * `store`: The slab or `()` when using heap storage.
+    /// `store`: The slab or `()` when using heap storage.
     ///
     /// # Return
     ///

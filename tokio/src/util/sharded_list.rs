@@ -132,7 +132,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
     }
 }
 
-impl<'a, L: ShardedListItem> ShardGuard<'a, L, L::Target> {
+impl<L: ShardedListItem> ShardGuard<'_, L, L::Target> {
     /// Push a value to this shard.
     pub(crate) fn push(mut self, val: L::Handle) {
         let id = unsafe { L::get_shard_id(L::as_raw(&val)) };

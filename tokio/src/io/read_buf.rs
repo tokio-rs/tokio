@@ -276,7 +276,7 @@ impl<'a> ReadBuf<'a> {
 
 #[cfg(feature = "io-util")]
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
-unsafe impl<'a> bytes::BufMut for ReadBuf<'a> {
+unsafe impl bytes::BufMut for ReadBuf<'_> {
     fn remaining_mut(&self) -> usize {
         self.remaining()
     }

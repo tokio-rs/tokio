@@ -185,7 +185,7 @@ impl<T: 'static> LocalKey<T> {
             slot: &'a mut Option<T>,
         }
 
-        impl<'a, T: 'static> Drop for Guard<'a, T> {
+        impl<T: 'static> Drop for Guard<'_, T> {
             fn drop(&mut self) {
                 // This should not panic.
                 //
@@ -414,7 +414,7 @@ where
         struct TransparentOption<'a, T> {
             value: &'a Option<T>,
         }
-        impl<'a, T: fmt::Debug> fmt::Debug for TransparentOption<'a, T> {
+        impl<T: fmt::Debug> fmt::Debug for TransparentOption<'_, T> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 match self.value.as_ref() {
                     Some(value) => value.fmt(f),

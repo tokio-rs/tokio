@@ -394,8 +394,8 @@ pub struct Notified<'a> {
     waiter: Waiter,
 }
 
-unsafe impl<'a> Send for Notified<'a> {}
-unsafe impl<'a> Sync for Notified<'a> {}
+unsafe impl Send for Notified<'_> {}
+unsafe impl Sync for Notified<'_> {}
 
 #[derive(Debug)]
 enum State {

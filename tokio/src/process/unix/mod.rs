@@ -199,13 +199,13 @@ impl<T: IntoRawFd> From<T> for Pipe {
     }
 }
 
-impl<'a> io::Read for &'a Pipe {
+impl io::Read for &'_ Pipe {
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
         (&self.fd).read(bytes)
     }
 }
 
-impl<'a> io::Write for &'a Pipe {
+impl io::Write for &'_ Pipe {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         (&self.fd).write(bytes)
     }

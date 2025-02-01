@@ -403,8 +403,8 @@ struct Recv<'a, T> {
     waiter: UnsafeCell<Waiter>,
 }
 
-unsafe impl<'a, T: Send> Send for Recv<'a, T> {}
-unsafe impl<'a, T: Send> Sync for Recv<'a, T> {}
+unsafe impl<T: Send> Send for Recv<'_, T> {}
+unsafe impl<T: Send> Sync for Recv<'_, T> {}
 
 /// Max number of receivers. Reserve space to lock.
 const MAX_RECEIVERS: usize = usize::MAX >> 2;
@@ -890,7 +890,7 @@ struct WaitersList<'a, T> {
     shared: &'a Shared<T>,
 }
 
-impl<'a, T> Drop for WaitersList<'a, T> {
+impl<T> Drop for WaitersList<'_, T> {
     fn drop(&mut self) {
         // If the list is not empty, we unlink all waiters from it.
         // We do not wake the waiters to avoid double panics.
@@ -1448,7 +1448,7 @@ impl<'a, T> Recv<'a, T> {
     }
 }
 
-impl<'a, T> Future for Recv<'a, T>
+impl<T> Future for Recv<'_, T>
 where
     T: Clone,
 {
@@ -1470,7 +1470,7 @@ where
     }
 }
 
-impl<'a, T> Drop for Recv<'a, T> {
+impl<T> Drop for Recv<'_, T> {
     fn drop(&mut self) {
         // Safety: `waiter.queued` is atomic.
         // Acquire ordering is required to synchronize with
@@ -1540,7 +1540,7 @@ impl<T> fmt::Debug for Receiver<T> {
     }
 }
 
-impl<'a, T> RecvGuard<'a, T> {
+impl<T> RecvGuard<'_, T> {
     fn clone_value(&self) -> Option<T>
     where
         T: Clone,
@@ -1549,7 +1549,7 @@ impl<'a, T> RecvGuard<'a, T> {
     }
 }
 
-impl<'a, T> Drop for RecvGuard<'a, T> {
+impl<T> Drop for RecvGuard<'_, T> {
     fn drop(&mut self) {
         // Decrement the remaining counter
         if 1 == self.slot.rem.fetch_sub(1, SeqCst) {
