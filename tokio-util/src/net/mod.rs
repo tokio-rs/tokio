@@ -1,5 +1,4 @@
 //! TCP/UDP/Unix helpers for tokio.
-
 use crate::either::Either;
 use std::future::Future;
 use std::io::Result;
@@ -13,6 +12,7 @@ pub mod unix;
 pub trait Listener {
     /// The stream's type of this listener.
     type Io: tokio::io::AsyncRead + tokio::io::AsyncWrite;
+
     /// The socket address type of this listener.
     type Addr;
 
@@ -39,8 +39,9 @@ impl Listener for tokio::net::TcpListener {
         Self::poll_accept(self, cx)
     }
 
+    // Fixed: Removed the redundant conversion
     fn local_addr(&self) -> Result<Self::Addr> {
-        self.local_addr().map(Into::into)
+        self.local_addr()
     }
 }
 

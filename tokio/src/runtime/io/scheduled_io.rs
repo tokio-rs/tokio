@@ -203,7 +203,7 @@ impl ScheduledIo {
     ///
     /// # Arguments
     /// - `tick`: whether setting the tick or trying to clear readiness for a
-    ///    specific tick.
+    ///   specific tick.
     /// - `f`: a closure returning a new readiness value given the previous
     ///   readiness.
     pub(super) fn set_readiness(&self, tick_op: Tick, f: impl Fn(Ready) -> Ready) {

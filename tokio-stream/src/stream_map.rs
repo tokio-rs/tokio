@@ -803,7 +803,7 @@ mod rand {
             let s0 = self.two.get();
 
             s1 ^= s1 << 17;
-            s1 = s1 ^ s0 ^ s1 >> 7 ^ s0 >> 16;
+            s1 = s1 ^ s0 ^ (s1 >> 7) ^ (s0 >> 16);
 
             self.one.set(s0);
             self.two.set(s1);
