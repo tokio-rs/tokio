@@ -1011,25 +1011,23 @@ impl<T> Receiver<T> {
     /// }
     /// ```
     pub fn is_empty(&self) -> bool {
-        if let Some(inner) = self.inner.as_ref() {
-            let state = State::load(&inner.state, Acquire);
-            if state.is_complete() {
-                // SAFETY: If `state.is_complete()` returns true, then the
-                // `VALUE_SENT` bit has been set and the sender side of the
-                // channel will no longer attempt to access the inner
-                // `UnsafeCell`. Therefore, it is now safe for us to access the
-                // cell.
-                //
-                // The channel is empty if it does not have a value.
-                unsafe { !inner.has_value() }
-            } else if state.is_closed() {
-                // The receiver closed the channel...
-                true
-            } else {
-                // No value has been sent yet.
-                true
-            }
+        let Some(inner) = self.inner.as_ref() else {
+            // The channel has already terminated.
+            return true;
+        };
+
+        let state = State::load(&inner.state, Acquire);
+        if state.is_complete() {
+            // SAFETY: If `state.is_complete()` returns true, then the
+            // `VALUE_SENT` bit has been set and the sender side of the
+            // channel will no longer attempt to access the inner
+            // `UnsafeCell`. Therefore, it is now safe for us to access the
+            // cell.
+            //
+            // The channel is empty if it does not have a value.
+            unsafe { !inner.has_value() }
         } else {
+            // The receiver closed the channel or no value has been sent yet.
             true
         }
     }
