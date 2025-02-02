@@ -989,6 +989,51 @@ impl<T> Receiver<T> {
         self.inner.is_none()
     }
 
+    /// Checks if a channel is empty.
+    ///
+    /// This method returns `true` if the channel has no messages.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel();
+    ///     assert!(rx.is_empty());
+    ///
+    ///     tx.send(0).unwrap();
+    ///     assert!(!rx.is_empty());
+    ///
+    ///     let _ = (&mut rx).await;
+    ///     assert!(rx.is_empty());
+    /// }
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        if let Some(inner) = self.inner.as_ref() {
+            let state = State::load(&inner.state, Acquire);
+            if state.is_complete() {
+                // SAFETY: If `state.is_complete()` returns true, then the
+                // `VALUE_SENT` bit has been set and the sender side of the
+                // channel will no longer attempt to access the inner
+                // `UnsafeCell`. Therefore, it is now safe for us to access the
+                // cell.
+                //
+                // The channel is empty if it does not have a value.
+                unsafe { !inner.has_value() }
+            } else if state.is_closed() {
+                // The receiver closed the channel...
+                true
+            } else {
+                // No value has been sent yet.
+                true
+            }
+        } else {
+            true
+        }
+    }
+
     /// Attempts to receive a value.
     ///
     /// If a pending value exists in the channel, it is returned. If no value
@@ -1290,6 +1335,19 @@ impl<T> Inner<T> {
     /// if it is set, then only the receiver may call this method.
     unsafe fn consume_value(&self) -> Option<T> {
         self.value.with_mut(|ptr| (*ptr).take())
+    }
+
+    /// Returns true if there is a value. This function does not check `state`.
+    ///
+    /// # Safety
+    ///
+    /// Calling this method concurrently on multiple threads will result in a
+    /// data race. The `VALUE_SENT` state bit is used to ensure that only the
+    /// sender *or* the receiver will call this method at a given point in time.
+    /// If `VALUE_SENT` is not set, then only the sender may call this method;
+    /// if it is set, then only the receiver may call this method.
+    unsafe fn has_value(&self) -> bool {
+        self.value.with(|ptr| (*ptr).is_some())
     }
 }
 
