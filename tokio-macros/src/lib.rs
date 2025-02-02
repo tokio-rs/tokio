@@ -1,4 +1,3 @@
-#![allow(unknown_lints, unexpected_cfgs)]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,
@@ -211,7 +210,6 @@ use proc_macro::TokenStream;
 /// This option is only compatible with the `current_thread` runtime.
 ///
 /// ```no_run
-/// # #![allow(unknown_lints, unexpected_cfgs)]
 /// #[cfg(tokio_unstable)]
 /// #[tokio::main(flavor = "current_thread", unhandled_panic = "shutdown_runtime")]
 /// async fn main() {
@@ -226,7 +224,6 @@ use proc_macro::TokenStream;
 /// Equivalent code not using `#[tokio::main]`
 ///
 /// ```no_run
-/// # #![allow(unknown_lints, unexpected_cfgs)]
 /// #[cfg(tokio_unstable)]
 /// fn main() {
 ///     tokio::runtime::Builder::new_current_thread()
@@ -480,7 +477,6 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// This option is only compatible with the `current_thread` runtime.
 ///
 /// ```no_run
-/// # #![allow(unknown_lints, unexpected_cfgs)]
 /// #[cfg(tokio_unstable)]
 /// #[tokio::test(flavor = "current_thread", unhandled_panic = "shutdown_runtime")]
 /// async fn my_test() {
@@ -495,7 +491,6 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// Equivalent code not using `#[tokio::test]`
 ///
 /// ```no_run
-/// # #![allow(unknown_lints, unexpected_cfgs)]
 /// #[cfg(tokio_unstable)]
 /// #[test]
 /// fn my_test() {

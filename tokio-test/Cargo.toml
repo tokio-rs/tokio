@@ -30,3 +30,6 @@ futures-util = "0.3.0"
 
 [package.metadata.docs.rs]
 all-features = true
+
+[lints]
+workspace = true

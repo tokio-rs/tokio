@@ -1,4 +1,3 @@
-#![allow(unknown_lints, unexpected_cfgs)]
 #![cfg(all(tokio_unstable, feature = "tracing"))]
 
 use std::rc::Rc;
