@@ -403,6 +403,20 @@ fn receiver_is_empty_send() {
 }
 
 #[test]
+fn receiver_is_empty_try_recv() {
+    let (tx, mut rx) = oneshot::channel::<i32>();
+
+    assert!(rx.is_empty(), "channel IS empty before value is sent");
+    tx.send(17).unwrap();
+    assert!(!rx.is_empty(), "channel is NOT empty after value is sent");
+
+    let value = rx.try_recv().expect("value is waiting");
+    assert_eq!(value, 17);
+
+    assert!(rx.is_empty(), "channel IS empty after value is read");
+}
+
+#[test]
 fn receiver_is_empty_drop() {
     let (tx, mut rx) = oneshot::channel::<i32>();
 
