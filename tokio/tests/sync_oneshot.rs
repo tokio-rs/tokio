@@ -292,3 +292,71 @@ fn sender_changes_task() {
 
     assert_ready!(task2.enter(|cx, _| tx.poll_closed(cx)));
 }
+
+#[test]
+fn receiver_is_closed_send() {
+    let (tx, rx) = oneshot::channel::<i32>();
+    assert!(
+        !rx.is_closed(),
+        "channel is NOT closed before value is sent"
+    );
+    tx.send(17).unwrap();
+    assert!(rx.is_closed(), "channel IS closed after value is sent");
+}
+
+#[test]
+fn receiver_is_closed_drop() {
+    let (tx, rx) = oneshot::channel::<i32>();
+    assert!(
+        !rx.is_closed(),
+        "channel is NOT closed before sender is dropped"
+    );
+    drop(tx);
+    assert!(rx.is_closed(), "channel IS closed after sender is dropped");
+}
+
+#[test]
+fn receiver_is_closed_rx_close() {
+    let (_tx, mut rx) = oneshot::channel::<i32>();
+    assert!(!rx.is_closed());
+    rx.close();
+    assert!(rx.is_closed());
+}
+
+#[test]
+fn receiver_is_empty_send() {
+    let (tx, mut rx) = oneshot::channel::<i32>();
+
+    assert!(rx.is_empty(), "channel IS empty before value is sent");
+    tx.send(17).unwrap();
+    assert!(!rx.is_empty(), "channel is NOT empty after value is sent");
+
+    let mut task = task::spawn(());
+    let poll = task.enter(|cx, _| Pin::new(&mut rx).poll(cx));
+    assert_ready_eq!(poll, Ok(17));
+
+    assert!(rx.is_empty(), "channel IS empty after value is read");
+}
+
+#[test]
+fn receiver_is_empty_drop() {
+    let (tx, mut rx) = oneshot::channel::<i32>();
+
+    assert!(rx.is_empty(), "channel IS empty before sender is dropped");
+    drop(tx);
+    assert!(rx.is_empty(), "channel IS empty after sender is dropped");
+
+    let mut task = task::spawn(());
+    let poll = task.enter(|cx, _| Pin::new(&mut rx).poll(cx));
+    assert_ready_err!(poll);
+
+    assert!(rx.is_empty(), "channel IS empty after value is read");
+}
+
+#[test]
+fn receiver_is_empty_rx_close() {
+    let (_tx, mut rx) = oneshot::channel::<i32>();
+    assert!(rx.is_empty());
+    rx.close();
+    assert!(rx.is_empty());
+}
