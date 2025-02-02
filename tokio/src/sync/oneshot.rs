@@ -1028,6 +1028,67 @@ impl<T> Receiver<T> {
         }
     }
 
+    /// Checks if this receiver is finished.
+    ///
+    /// This returns true if this receiver has already yielded a [`Poll::Ready`] result, whether
+    /// that was a value `T`, or a [`RecvError`].
+    ///
+    /// # Examples
+    ///
+    /// Sending a value and polling it.
+    ///
+    /// ```
+    /// use futures::task::noop_waker_ref;
+    /// use tokio::sync::oneshot;
+    ///
+    /// use std::future::Future;
+    /// use std::pin::Pin;
+    /// use std::task::{Context, Poll};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel();
+    ///
+    ///     // A receiver is not finished when it is initialized.
+    ///     assert!(!rx.is_finished());
+    ///
+    ///     // A receiver is not finished it is polled and is still pending.
+    ///     let poll = Pin::new(&mut rx).poll(&mut Context::from_waker(noop_waker_ref()));
+    ///     assert_eq!(poll, Poll::Pending);
+    ///     assert!(!rx.is_finished());
+    ///
+    ///     // A receiver is not finished if a value has been sent, but not yet read.
+    ///     tx.send(0).unwrap();
+    ///     assert!(!rx.is_finished());
+    ///
+    ///     // A receiver *is* finished after it has been polled and yielded a value.
+    ///     assert_eq!((&mut rx).await, Ok(0));
+    ///     assert!(rx.is_finished());
+    /// }
+    /// ```
+    ///
+    /// Dropping the sender.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel::<()>();
+    ///
+    ///     // A receiver is not immediately finished when the sender is dropped.
+    ///     drop(tx);
+    ///     assert!(!rx.is_finished());
+    ///
+    ///     // A receiver *is* finished after it has been polled and yielded an error.
+    ///     let _ = (&mut rx).await.unwrap_err();
+    ///     assert!(rx.is_finished());
+    /// }
+    /// ```
+    pub fn is_finished(&self) -> bool {
+        self.inner.is_none()
+    }
+
     /// Attempts to receive a value.
     ///
     /// If a pending value exists in the channel, it is returned. If no value
@@ -1203,10 +1264,10 @@ impl<T> Future for Receiver<T> {
 
         let ret = if let Some(inner) = self.as_ref().get_ref().inner.as_ref() {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx)))?;
+            let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx))).map_err(Into::into);
 
             #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-            let res = ready!(inner.poll_recv(cx))?;
+            let res = ready!(inner.poll_recv(cx)).map_err(Into::into);
 
             res
         } else {
@@ -1214,7 +1275,7 @@ impl<T> Future for Receiver<T> {
         };
 
         self.inner = None;
-        Ready(Ok(ret))
+        Ready(ret)
     }
 }
 

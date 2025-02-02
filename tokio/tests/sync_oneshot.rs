@@ -360,3 +360,59 @@ fn receiver_is_empty_rx_close() {
     rx.close();
     assert!(rx.is_empty());
 }
+
+#[test]
+fn receiver_is_finished_send() {
+    let (tx, mut rx) = oneshot::channel::<i32>();
+
+    assert!(
+        !rx.is_finished(),
+        "channel is NOT finished before value is sent"
+    );
+    tx.send(17).unwrap();
+    assert!(
+        !rx.is_finished(),
+        "channel is NOT finished after value is sent"
+    );
+
+    let mut task = task::spawn(());
+    let poll = task.enter(|cx, _| Pin::new(&mut rx).poll(cx));
+    assert_ready_eq!(poll, Ok(17));
+
+    assert!(rx.is_finished(), "channel IS finished after value is read");
+}
+
+#[test]
+fn receiver_is_finished_drop() {
+    let (tx, mut rx) = oneshot::channel::<i32>();
+
+    assert!(
+        !rx.is_finished(),
+        "channel is NOT finished before sender is dropped"
+    );
+    drop(tx);
+    assert!(
+        !rx.is_finished(),
+        "channel is NOT finished after sender is dropped"
+    );
+
+    let mut task = task::spawn(());
+    let poll = task.enter(|cx, _| Pin::new(&mut rx).poll(cx));
+    assert_ready_err!(poll);
+
+    assert!(rx.is_finished(), "channel IS finished after value is read");
+}
+
+#[test]
+fn receiver_is_finished_rx_close() {
+    let (_tx, mut rx) = oneshot::channel::<i32>();
+    assert!(!rx.is_finished(), "channel is NOT finished before closing");
+    rx.close();
+    assert!(!rx.is_finished(), "channel is NOT finished before closing");
+
+    let mut task = task::spawn(());
+    let poll = task.enter(|cx, _| Pin::new(&mut rx).poll(cx));
+    assert_ready_err!(poll);
+
+    assert!(rx.is_finished(), "channel IS finished after value is read");
+}
