@@ -941,12 +941,9 @@ impl<T> Receiver<T> {
     /// Sending a value and polling it.
     ///
     /// ```
-    /// use futures::task::noop_waker_ref;
     /// use tokio::sync::oneshot;
     ///
-    /// use std::future::Future;
-    /// use std::pin::Pin;
-    /// use std::task::{Context, Poll};
+    /// use std::task::Poll;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -956,7 +953,7 @@ impl<T> Receiver<T> {
     ///     assert!(!rx.is_terminated());
     ///
     ///     // A receiver is not terminated it is polled and is still pending.
-    ///     let poll = Pin::new(&mut rx).poll(&mut Context::from_waker(noop_waker_ref()));
+    ///     let poll = futures::poll!(&mut rx);
     ///     assert_eq!(poll, Poll::Pending);
     ///     assert!(!rx.is_terminated());
     ///
