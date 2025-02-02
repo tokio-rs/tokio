@@ -528,7 +528,7 @@ macro_rules! doc {
         /// - [`futures_lite::future::or`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.or.html)
         /// - [`futures_lite::future::race`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.race.html)
         ///
-        /// ```ignore
+        /// ```
         /// use futures_concurrency::future::Race;
         ///
         /// #[tokio::main]
