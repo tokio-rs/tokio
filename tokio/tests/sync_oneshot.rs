@@ -318,6 +318,29 @@ fn receiver_is_terminated_send() {
 }
 
 #[test]
+fn receiver_is_terminated_try_recv() {
+    let (tx, mut rx) = oneshot::channel::<i32>();
+
+    assert!(
+        !rx.is_terminated(),
+        "channel is NOT terminated before value is sent"
+    );
+    tx.send(17).unwrap();
+    assert!(
+        !rx.is_terminated(),
+        "channel is NOT terminated after value is sent"
+    );
+
+    let value = rx.try_recv().expect("value is waiting");
+    assert_eq!(value, 17);
+
+    assert!(
+        rx.is_terminated(),
+        "channel IS terminated after value is read"
+    );
+}
+
+#[test]
 fn receiver_is_terminated_drop() {
     let (tx, mut rx) = oneshot::channel::<i32>();
 
