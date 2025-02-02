@@ -938,12 +938,7 @@ impl<T> Receiver<T> {
     /// # Examples
     ///
     /// ```
-    /// use futures::task::noop_waker_ref;
     /// use tokio::sync::oneshot;
-    ///
-    /// use std::future::Future;
-    /// use std::pin::Pin;
-    /// use std::task::{Context, Poll};
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -953,8 +948,7 @@ impl<T> Receiver<T> {
     ///     tx.send(0).unwrap();
     ///     assert!(!rx.is_empty());
     ///
-    ///     let poll = Pin::new(&mut rx).poll(&mut Context::from_waker(noop_waker_ref()));
-    ///     assert_eq!(poll, Poll::Ready(Ok(0)));
+    ///     assert_eq!((&mut rx).await, Ok(0));
     ///     assert!(rx.is_empty());
     /// }
     /// ```
