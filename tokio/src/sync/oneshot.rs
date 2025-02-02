@@ -993,7 +993,13 @@ impl<T> Receiver<T> {
     ///
     /// This method returns `true` if the channel has no messages.
     ///
+    /// It is not necessarily safe to poll an empty receiver, which may have
+    /// already yielded a value. Use [`is_terminated()`][Self::is_terminated]
+    /// to check whether or not a receiver can be safely polled, instead.
+    ///
     /// # Examples
+    ///
+    /// Sending a value.
     ///
     /// ```
     /// use tokio::sync::oneshot;
@@ -1008,6 +1014,42 @@ impl<T> Receiver<T> {
     ///
     ///     let _ = (&mut rx).await;
     ///     assert!(rx.is_empty());
+    /// }
+    /// ```
+    ///
+    /// Dropping the sender.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel::<()>();
+    ///
+    ///     // A channel is empty if the sender is dropped.
+    ///     drop(tx);
+    ///     assert!(rx.is_empty());
+    ///
+    ///     // A closed channel still yields an error, however.
+    ///     (&mut rx).await.expect_err("should yield an error");
+    ///     assert!(rx.is_empty());
+    /// }
+    /// ```
+    ///
+    /// Terminated channels are empty.
+    ///
+    /// ```should_panic
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel();
+    ///     tx.send(0).unwrap();
+    ///     let _ = (&mut rx).await;
+    ///
+    ///     // NB: an empty channel is not necessarily safe to poll!
+    ///     assert!(rx.is_empty());
+    ///     let _ = (&mut rx).await;
     /// }
     /// ```
     pub fn is_empty(&self) -> bool {
