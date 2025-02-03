@@ -400,7 +400,7 @@ macro_rules! doc {
         /// ```
         /// # Alternatives from the Ecosystem
         ///
-        /// The select! macro is a powerful tool for managing multiple asynchronous
+        /// The `select!` macro is a powerful tool for managing multiple asynchronous
         /// branches, enabling tasks to run concurrently within the same thread. However,
         /// its use can introduce challenges, particularly around cancellation safety, which
         /// can lead to subtle and hard-to-debug errors. For many use cases, ecosystem
@@ -412,11 +412,13 @@ macro_rules! doc {
         ///
         /// For cases where `loop { select! { ... } }` is used to poll multiple tasks,
         /// stream merging offers a concise alternative, inherently handle cancellation-safe
-        /// processing, removing the risk of data loss. Libraries like
-        /// [`tokio_stream`](https://docs.rs/tokio-stream/latest/tokio_stream/),
-        /// [`futures::stream`](https://docs.rs/futures/latest/futures/stream/) and
-        /// [`futures_concurrency`](https://docs.rs/futures-concurrency/latest/futures_concurrency/)
-        /// provide tools for merging streams and handling their outputs sequentially.
+        /// processing, removing the risk of data loss. Libraries such as [`tokio_stream`],
+        /// [`futures::stream`] and [`futures_concurrency`] provide tools for merging
+        /// streams and handling their outputs sequentially.
+        ///
+        /// [`tokio_stream`]: https://docs.rs/tokio-stream/latest/tokio_stream/
+        /// [`futures::stream`]: https://docs.rs/futures/latest/futures/stream/
+        /// [`futures_concurrency`]: https://docs.rs/futures-concurrency/latest/futures_concurrency/
         ///
         /// ### Example with `select!`
         ///
@@ -463,7 +465,7 @@ macro_rules! doc {
         /// use std::pin::pin;
         ///
         /// use futures::stream::unfold;
-        /// use tokio_stream::{StreamExt, iter};
+        /// use tokio_stream::StreamExt;
         ///
         /// struct File;
         /// struct Channel;
@@ -500,7 +502,7 @@ macro_rules! doc {
         ///         let data = socket.read_packet().await;
         ///         Some((Message::Data(data), socket))
         ///     });
-        ///     let c = iter([Message::Stop]);
+        ///     let c = tokio_stream::iter([Message::Stop]);
         ///
         ///     let mut s = pin!(a.merge(b).merge(c));
         ///     while let Some(msg) = s.next().await {
@@ -523,7 +525,7 @@ macro_rules! doc {
         /// provide streamlined syntax for racing futures:
         ///
         /// - [`futures_concurrency::future::Race`](https://docs.rs/futures-concurrency/latest/futures_concurrency/future/trait.Race.html)
-        /// - [`futures::select!`](https://docs.rs/futures/latest/futures/macro.select.html)
+        /// - [`futures::select`](https://docs.rs/futures/latest/futures/macro.select.html)
         /// - [`futures::stream::select_all`](https://docs.rs/futures/latest/futures/stream/select_all/index.html) (for streams)
         /// - [`futures_lite::future::or`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.or.html)
         /// - [`futures_lite::future::race`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.race.html)
