@@ -1,17 +1,19 @@
 use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Arc;
+#[cfg(tokio_unstable)]
+use crate::runtime::context::with_task_hooks;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
-use crate::runtime::task::{
-    self, JoinHandle, OwnedTasks, Schedule, Task, TaskHarnessScheduleHooks,
-};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, Task};
+use crate::runtime::{blocking, context, Config, MetricsBatch, SchedulerMetrics, WorkerMetrics};
+#[cfg(tokio_unstable)]
 use crate::runtime::{
-    blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
+    OnChildTaskSpawnContext, OnTopLevelTaskSpawnContext, OptionalTaskHooks,
+    OptionalTaskHooksFactory, OptionalTaskHooksFactoryRef,
 };
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
-
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
@@ -20,7 +22,7 @@ use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
 use std::thread::ThreadId;
 use std::time::Duration;
-use std::{fmt, thread};
+use std::{fmt, panic, thread};
 
 /// Executes tasks on the current thread
 pub(crate) struct CurrentThread {
@@ -47,7 +49,8 @@ pub(crate) struct Handle {
     pub(crate) seed_generator: RngSeedGenerator,
 
     /// User-supplied hooks to invoke for things
-    pub(crate) task_hooks: TaskHooks,
+    #[cfg(tokio_unstable)]
+    pub(crate) task_hooks: OptionalTaskHooksFactory,
 
     /// If this is a `LocalRuntime`, flags the owning thread ID.
     pub(crate) local_tid: Option<ThreadId>,
@@ -142,14 +145,8 @@ impl CurrentThread {
             .unwrap_or(DEFAULT_GLOBAL_QUEUE_INTERVAL);
 
         let handle = Arc::new(Handle {
-            task_hooks: TaskHooks {
-                task_spawn_callback: config.before_spawn.clone(),
-                task_terminate_callback: config.after_termination.clone(),
-                #[cfg(tokio_unstable)]
-                before_poll_callback: config.before_poll.clone(),
-                #[cfg(tokio_unstable)]
-                after_poll_callback: config.after_poll.clone(),
-            },
+            #[cfg(tokio_unstable)]
+            task_hooks: config.task_hook_factory.clone(),
             shared: Shared {
                 inject: Inject::new(),
                 owned: OwnedTasks::new(1),
@@ -448,18 +445,60 @@ impl Handle {
     pub(crate) fn spawn<F>(
         me: &Arc<Self>,
         future: F,
-        id: crate::runtime::task::Id,
+        id: task::Id,
+        #[cfg(tokio_unstable)] hooks_override: OptionalTaskHooks,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
-
-        me.task_hooks.spawn(&TaskMeta {
-            id,
-            _phantom: Default::default(),
+        // preference order for hook selection:
+        // 1. "hook override" - comes from builder
+        // 2. parent task's hook
+        // 3. runtime hook factory
+        #[cfg(tokio_unstable)]
+        let hooks = hooks_override.or_else(|| {
+            with_task_hooks(|parent| {
+                parent
+                    .map(|parent| {
+                        if let Ok(r) = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                            parent.on_child_spawn(&mut OnChildTaskSpawnContext {
+                                id,
+                                _phantom: Default::default(),
+                            })
+                        })) {
+                            r
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten()
+            })
+            .ok()
+            .flatten()
+            .or_else(|| {
+                if let Some(hooks) = me.hooks_factory_ref() {
+                    if let Ok(r) = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                        hooks.on_top_level_spawn(&mut OnTopLevelTaskSpawnContext {
+                            id,
+                            _phantom: Default::default(),
+                        })
+                    })) {
+                        r
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
         });
+
+        #[cfg(tokio_unstable)]
+        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, hooks);
+
+        #[cfg(not(tokio_unstable))]
+        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
 
         if let Some(notified) = notified {
             me.schedule(notified);
@@ -477,18 +516,62 @@ impl Handle {
     pub(crate) unsafe fn spawn_local<F>(
         me: &Arc<Self>,
         future: F,
-        id: crate::runtime::task::Id,
+        id: task::Id,
+        #[cfg(tokio_unstable)] hooks_override: OptionalTaskHooks,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + 'static,
         F::Output: 'static,
     {
-        let (handle, notified) = me.shared.owned.bind_local(future, me.clone(), id);
-
-        me.task_hooks.spawn(&TaskMeta {
-            id,
-            _phantom: Default::default(),
+        // preference order for hook selection:
+        // 1. "hook override" - comes from builder
+        // 2. parent task's hook
+        // 3. runtime hook factory
+        #[cfg(tokio_unstable)]
+        let hooks = hooks_override.or_else(|| {
+            with_task_hooks(|parent| {
+                parent
+                    .map(|parent| {
+                        if let Ok(r) = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                            parent.on_child_spawn(&mut OnChildTaskSpawnContext {
+                                id,
+                                _phantom: Default::default(),
+                            })
+                        })) {
+                            r
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten()
+            })
+            .ok()
+            .flatten()
+            .or_else(|| {
+                if let Some(hooks) = me.hooks_factory_ref() {
+                    if let Ok(r) = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                        hooks.on_top_level_spawn(&mut OnTopLevelTaskSpawnContext {
+                            id,
+                            _phantom: Default::default(),
+                        })
+                    })) {
+                        r
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
         });
+
+        let (handle, notified) = me.shared.owned.bind_local(
+            future,
+            me.clone(),
+            id,
+            #[cfg(tokio_unstable)]
+            hooks,
+        );
 
         if let Some(notified) = notified {
             me.schedule(notified);
@@ -654,10 +737,14 @@ impl Schedule for Arc<Handle> {
         });
     }
 
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
-        }
+    #[cfg(tokio_unstable)]
+    fn hooks_factory(&self) -> OptionalTaskHooksFactory {
+        self.task_hooks.clone()
+    }
+
+    #[cfg(tokio_unstable)]
+    fn hooks_factory_ref(&self) -> OptionalTaskHooksFactoryRef<'_> {
+        self.task_hooks.as_ref().map(AsRef::as_ref)
     }
 
     cfg_unstable! {
@@ -770,17 +857,8 @@ impl CoreGuard<'_> {
 
                     let task = context.handle.shared.owned.assert_owner(task);
 
-                    #[cfg(tokio_unstable)]
-                    let task_id = task.task_id();
-
                     let (c, ()) = context.run_task(core, || {
-                        #[cfg(tokio_unstable)]
-                        context.handle.task_hooks.poll_start_callback(task_id);
-
                         task.run();
-
-                        #[cfg(tokio_unstable)]
-                        context.handle.task_hooks.poll_stop_callback(task_id);
                     });
 
                     core = c;

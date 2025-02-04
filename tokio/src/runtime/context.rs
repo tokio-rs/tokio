@@ -1,10 +1,14 @@
+#[cfg(all(feature = "rt", tokio_unstable))]
+use crate::loom::cell::UnsafeCell;
 use crate::loom::thread::AccessError;
+#[cfg(all(feature = "rt", tokio_unstable))]
+use crate::runtime::{OptionalTaskHooksMut, OptionalTaskHooksWeak, TaskHookHarness};
 use crate::task::coop;
-
-use std::cell::Cell;
-
 #[cfg(any(feature = "rt", feature = "macros", feature = "time"))]
 use crate::util::rand::FastRand;
+use std::cell::Cell;
+#[cfg(all(feature = "rt", tokio_unstable))]
+use std::ptr::NonNull;
 
 cfg_rt! {
     mod blocking;
@@ -49,6 +53,10 @@ struct Context {
     #[cfg(feature = "rt")]
     current_task_id: Cell<Option<Id>>,
 
+    /// Tracks the current set of task hooks,
+    #[cfg(all(feature = "rt", tokio_unstable))]
+    current_task_hooks: OptionalTaskHooksWeak,
+
     /// Tracks if the current thread is currently driving a runtime.
     /// Note, that if this is set to "entered", the current scheduler
     /// handle may not reference the runtime currently executing. This
@@ -91,6 +99,9 @@ tokio_thread_local! {
 
             #[cfg(feature = "rt")]
             current_task_id: Cell::new(None),
+
+            #[cfg(all(feature = "rt", tokio_unstable))]
+            current_task_hooks: UnsafeCell::new(None),
 
             // Tracks if the current thread is currently driving a runtime.
             // Note, that if this is set to "entered", the current scheduler
@@ -139,6 +150,16 @@ pub(crate) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> Result<R, A
     CONTEXT.try_with(|ctx| f(&ctx.budget))
 }
 
+#[cfg(all(feature = "rt", tokio_unstable))]
+pub(crate) struct SetTaskHooksGuard;
+
+#[cfg(all(feature = "rt", tokio_unstable))]
+impl Drop for SetTaskHooksGuard {
+    fn drop(&mut self) {
+        let _ = clear_task_hooks();
+    }
+}
+
 cfg_rt! {
     use crate::runtime::ThreadId;
 
@@ -161,6 +182,47 @@ cfg_rt! {
 
     pub(crate) fn current_task_id() -> Option<Id> {
         CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or(None)
+    }
+
+    #[track_caller]
+    #[cfg(tokio_unstable)]
+    pub(super) fn set_task_hooks(hooks: Option<NonNull<dyn TaskHookHarness + Send + Sync + 'static>>) -> Result<SetTaskHooksGuard, AccessError> {
+        CONTEXT.try_with(|ctx| {
+            ctx.current_task_hooks.with_mut(|x| {
+                unsafe {
+                    *x = hooks;
+                }
+            })
+        })?;
+
+        Ok(SetTaskHooksGuard)
+    }
+
+    #[track_caller]
+    #[cfg(tokio_unstable)]
+    pub(super) fn clear_task_hooks() -> Result<(), AccessError> {
+        CONTEXT.try_with(|ctx| {
+            ctx.current_task_hooks.with_mut(|x| {
+                unsafe {
+                    *x = None;
+                }
+            })
+        })?;
+
+        Ok(())
+    }
+
+    #[track_caller]
+    #[cfg(tokio_unstable)]
+    pub(super) fn with_task_hooks<R>(f: impl FnOnce(OptionalTaskHooksMut<'_>) -> R) -> Result<R, AccessError> {
+        CONTEXT.try_with(|ctx| {
+            ctx.current_task_hooks.with_mut(|ptr| {
+                let hooks = unsafe { &mut *ptr };
+                unsafe {
+                    f(hooks.as_mut().map(|x| x.as_mut()))
+                }
+            })
+        })
     }
 
     #[track_caller]

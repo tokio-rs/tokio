@@ -58,14 +58,17 @@
 
 use crate::loom::sync::{Arc, Condvar, Mutex, MutexGuard};
 use crate::runtime;
+use crate::runtime::context;
 use crate::runtime::driver::Driver;
 use crate::runtime::scheduler::multi_thread_alt::{
     idle, queue, stats, Counters, Handle, Idle, Overflow, Stats, TraceStatus,
 };
 use crate::runtime::scheduler::{self, inject, Lock};
-use crate::runtime::task::{OwnedTasks, TaskHarnessScheduleHooks};
-use crate::runtime::{blocking, driver, task, Config, SchedulerMetrics, WorkerMetrics};
-use crate::runtime::{context, TaskHooks};
+use crate::runtime::task::OwnedTasks;
+use crate::runtime::{
+    blocking, driver, task, Config, OptionalTaskHooksFactory, OptionalTaskHooksFactoryRef,
+    SchedulerMetrics, WorkerMetrics,
+};
 use crate::task::coop;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
@@ -304,7 +307,6 @@ pub(super) fn create(
     let (inject, inject_synced) = inject::Shared::new();
 
     let handle = Arc::new(Handle {
-        task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
             inject,
@@ -1558,10 +1560,16 @@ impl task::Schedule for Arc<Handle> {
         self.shared.schedule_task(task, false);
     }
 
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
-        }
+    fn hooks_factory(&self) -> OptionalTaskHooksFactory {
+        self.shared.config.task_hook_factory.clone()
+    }
+
+    fn hooks_factory_ref(&self) -> OptionalTaskHooksFactoryRef<'_> {
+        self.shared
+            .config
+            .task_hook_factory
+            .as_ref()
+            .map(AsRef::as_ref)
     }
 
     fn yield_now(&self, task: Notified) {

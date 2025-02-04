@@ -14,7 +14,9 @@ use crate::loom::cell::UnsafeCell;
 use crate::runtime::context;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
-use crate::runtime::task::{Id, Schedule, TaskHarnessScheduleHooks};
+use crate::runtime::task::{Id, Schedule};
+#[cfg(tokio_unstable)]
+use crate::runtime::OptionalTaskHooks;
 use crate::util::linked_list;
 
 use std::num::NonZeroU64;
@@ -186,7 +188,8 @@ pub(super) struct Trailer {
     /// Consumer task waiting on completion of this task.
     pub(super) waker: UnsafeCell<Option<Waker>>,
     /// Optional hooks needed in the harness.
-    pub(super) hooks: TaskHarnessScheduleHooks,
+    #[cfg(tokio_unstable)]
+    pub(super) hooks: UnsafeCell<OptionalTaskHooks>,
 }
 
 generate_addr_of_methods! {
@@ -208,7 +211,13 @@ pub(super) enum Stage<T: Future> {
 impl<T: Future, S: Schedule> Cell<T, S> {
     /// Allocates a new task cell, containing the header, trailer, and core
     /// structures.
-    pub(super) fn new(future: T, scheduler: S, state: State, task_id: Id) -> Box<Cell<T, S>> {
+    pub(super) fn new(
+        future: T,
+        scheduler: S,
+        state: State,
+        task_id: Id,
+        #[cfg(tokio_unstable)] hooks: OptionalTaskHooks,
+    ) -> Box<Cell<T, S>> {
         // Separated into a non-generic function to reduce LLVM codegen
         fn new_header(
             state: State,
@@ -229,7 +238,13 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         let tracing_id = future.id();
         let vtable = raw::vtable::<T, S>();
         let result = Box::new(Cell {
-            trailer: Trailer::new(scheduler.hooks()),
+            #[cfg(tokio_unstable)]
+            trailer: Trailer::new(
+                #[cfg(tokio_unstable)]
+                hooks,
+            ),
+            #[cfg(not(tokio_unstable))]
+            trailer: Trailer::new(),
             header: new_header(
                 state,
                 vtable,
@@ -462,11 +477,12 @@ impl Header {
 }
 
 impl Trailer {
-    fn new(hooks: TaskHarnessScheduleHooks) -> Self {
+    fn new(#[cfg(tokio_unstable)] hooks: OptionalTaskHooks) -> Self {
         Trailer {
             waker: UnsafeCell::new(None),
             owned: linked_list::Pointers::new(),
-            hooks,
+            #[cfg(tokio_unstable)]
+            hooks: UnsafeCell::new(hooks),
         }
     }
 

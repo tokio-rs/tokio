@@ -311,6 +311,10 @@ cfg_rt! {
 
     pub use crate::runtime::task::{Id, id, try_id};
 
+    cfg_unstable! {
+        pub use spawn::spawn_with_hooks;
+    }
+
     cfg_trace! {
         mod builder;
         pub use builder::Builder;
