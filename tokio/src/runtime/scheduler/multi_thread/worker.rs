@@ -58,13 +58,15 @@
 
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
+use crate::runtime::context;
 use crate::runtime::scheduler::multi_thread::{
     idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
 use crate::runtime::scheduler::{inject, Defer, Lock};
-use crate::runtime::task::{OwnedTasks, TaskHarnessScheduleHooks};
+use crate::runtime::task::OwnedTasks;
 use crate::runtime::{blocking, driver, scheduler, task, Config, SchedulerMetrics, WorkerMetrics};
-use crate::runtime::{context, TaskHooks};
+#[cfg(tokio_unstable)]
+use crate::runtime::{OptionalTaskHooksFactory, OptionalTaskHooksFactoryRef};
 use crate::task::coop;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
@@ -281,7 +283,6 @@ pub(super) fn create(
 
     let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
-        task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
             inject,
@@ -570,9 +571,6 @@ impl Context {
     }
 
     fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
-        #[cfg(tokio_unstable)]
-        let task_id = task.task_id();
-
         let task = self.worker.handle.shared.owned.assert_owner(task);
 
         // Make sure the worker is not in the **searching** state. This enables
@@ -592,15 +590,7 @@ impl Context {
 
         // Run the task
         coop::budget(|| {
-            // Unlike the poll time above, poll start callback is attached to the task id,
-            // so it is tightly associated with the actual poll invocation.
-            #[cfg(tokio_unstable)]
-            self.worker.handle.task_hooks.poll_start_callback(task_id);
-
             task.run();
-
-            #[cfg(tokio_unstable)]
-            self.worker.handle.task_hooks.poll_stop_callback(task_id);
 
             let mut lifo_polls = 0;
 
@@ -665,16 +655,7 @@ impl Context {
                 *self.core.borrow_mut() = Some(core);
                 let task = self.worker.handle.shared.owned.assert_owner(task);
 
-                #[cfg(tokio_unstable)]
-                let task_id = task.task_id();
-
-                #[cfg(tokio_unstable)]
-                self.worker.handle.task_hooks.poll_start_callback(task_id);
-
                 task.run();
-
-                #[cfg(tokio_unstable)]
-                self.worker.handle.task_hooks.poll_stop_callback(task_id);
             }
         })
     }
@@ -1063,10 +1044,18 @@ impl task::Schedule for Arc<Handle> {
         self.schedule_task(task, false);
     }
 
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
-        }
+    #[cfg(tokio_unstable)]
+    fn hooks_factory(&self) -> OptionalTaskHooksFactory {
+        self.shared.config.task_hook_factory.clone()
+    }
+
+    #[cfg(tokio_unstable)]
+    fn hooks_factory_ref(&self) -> OptionalTaskHooksFactoryRef<'_> {
+        self.shared
+            .config
+            .task_hook_factory
+            .as_ref()
+            .map(AsRef::as_ref)
     }
 
     fn yield_now(&self, task: Notified) {

@@ -155,9 +155,9 @@ impl LocalRuntime {
         // safety: spawn_local can only be called from `LocalRuntime`, which this is
         unsafe {
             if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
-                self.handle.spawn_local_named(Box::pin(future), meta)
+                self.handle.spawn_local_named(Box::pin(future), meta, None)
             } else {
-                self.handle.spawn_local_named(future, meta)
+                self.handle.spawn_local_named(future, meta, None)
             }
         }
     }

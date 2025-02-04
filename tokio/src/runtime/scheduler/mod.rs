@@ -8,8 +8,6 @@ cfg_rt! {
     pub(crate) mod inject;
     pub(crate) use inject::Inject;
 
-    use crate::runtime::TaskHooks;
-
     use crate::runtime::WorkerMetrics;
 }
 
@@ -25,6 +23,10 @@ cfg_rt_multi_thread! {
 }
 
 use crate::runtime::driver;
+#[cfg(all(feature = "rt", tokio_unstable))]
+use crate::runtime::task::Schedule;
+#[cfg(all(feature = "rt", tokio_unstable))]
+use crate::runtime::{OptionalTaskHooks, OptionalTaskHooksFactory};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Handle {
@@ -117,11 +119,24 @@ cfg_rt! {
             }
         }
 
-        pub(crate) fn spawn<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
+        pub(crate) fn spawn<F>(&self,
+            future: F,
+            id: Id,
+            #[cfg(tokio_unstable)]
+            hooks_override: OptionalTaskHooks
+        ) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
+            #[cfg(tokio_unstable)]
+            return match self {
+                Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id, hooks_override),
+
+                #[cfg(feature = "rt-multi-thread")]
+                Handle::MultiThread(h) => multi_thread::Handle::spawn(h, future, id, hooks_override),
+            };
+            #[cfg(not(tokio_unstable))]
             match self {
                 Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id),
 
@@ -136,12 +151,15 @@ cfg_rt! {
         /// This should only be called in `LocalRuntime` if the runtime has been verified to be owned
         /// by the current thread.
         #[allow(irrefutable_let_patterns)]
-        pub(crate) unsafe fn spawn_local<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
+        pub(crate) unsafe fn spawn_local<F>(&self, future: F, id: Id, #[cfg(tokio_unstable)] hooks_override: OptionalTaskHooks) -> JoinHandle<F::Output>
         where
             F: Future + 'static,
             F::Output: 'static,
         {
             if let Handle::CurrentThread(h) = self {
+                #[cfg(tokio_unstable)]
+                return current_thread::Handle::spawn_local(h, future, id, hooks_override);
+                #[cfg(not(tokio_unstable))]
                 current_thread::Handle::spawn_local(h, future, id)
             } else {
                 panic!("Only current_thread and LocalSet have spawn_local internals implemented")
@@ -169,12 +187,9 @@ cfg_rt! {
             }
         }
 
-        pub(crate) fn hooks(&self) -> &TaskHooks {
-            match self {
-                Handle::CurrentThread(h) => &h.task_hooks,
-                #[cfg(feature = "rt-multi-thread")]
-                Handle::MultiThread(h) => &h.task_hooks,
-            }
+        #[cfg(tokio_unstable)]
+        pub(crate) fn hooks_factory(&self) -> OptionalTaskHooksFactory {
+            match_flavor!(self, Handle(h) => h.hooks_factory())
         }
     }
 

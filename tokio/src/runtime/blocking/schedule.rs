@@ -1,7 +1,9 @@
 #[cfg(feature = "test-util")]
 use crate::runtime::scheduler;
-use crate::runtime::task::{self, Task, TaskHarnessScheduleHooks};
+use crate::runtime::task::{self, Task};
 use crate::runtime::Handle;
+#[cfg(tokio_unstable)]
+use crate::runtime::{OptionalTaskHooksFactory, OptionalTaskHooksFactoryRef};
 
 /// `task::Schedule` implementation that does nothing (except some bookkeeping
 /// in test-util builds). This is unique to the blocking scheduler as tasks
@@ -12,7 +14,8 @@ use crate::runtime::Handle;
 pub(crate) struct BlockingSchedule {
     #[cfg(feature = "test-util")]
     handle: Handle,
-    hooks: TaskHarnessScheduleHooks,
+    #[cfg(tokio_unstable)]
+    hooks_factory: OptionalTaskHooksFactory,
 }
 
 impl BlockingSchedule {
@@ -31,9 +34,8 @@ impl BlockingSchedule {
         BlockingSchedule {
             #[cfg(feature = "test-util")]
             handle: handle.clone(),
-            hooks: TaskHarnessScheduleHooks {
-                task_terminate_callback: handle.inner.hooks().task_terminate_callback.clone(),
-            },
+            #[cfg(tokio_unstable)]
+            hooks_factory: handle.inner.hooks_factory(),
         }
     }
 }
@@ -58,9 +60,13 @@ impl task::Schedule for BlockingSchedule {
         unreachable!();
     }
 
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: self.hooks.task_terminate_callback.clone(),
-        }
+    #[cfg(tokio_unstable)]
+    fn hooks_factory(&self) -> OptionalTaskHooksFactory {
+        self.hooks_factory.clone()
+    }
+
+    #[cfg(tokio_unstable)]
+    fn hooks_factory_ref(&self) -> OptionalTaskHooksFactoryRef<'_> {
+        self.hooks_factory.as_ref().map(AsRef::as_ref)
     }
 }

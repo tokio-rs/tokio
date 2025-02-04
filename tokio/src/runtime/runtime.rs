@@ -233,6 +233,15 @@ impl Runtime {
         F::Output: Send + 'static,
     {
         let fut_size = mem::size_of::<F>();
+        #[cfg(tokio_unstable)]
+        return if fut_size > BOX_FUTURE_THRESHOLD {
+            self.handle
+                .spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size), None)
+        } else {
+            self.handle
+                .spawn_named(future, SpawnMeta::new_unnamed(fut_size), None)
+        };
+        #[cfg(not(tokio_unstable))]
         if fut_size > BOX_FUTURE_THRESHOLD {
             self.handle
                 .spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))

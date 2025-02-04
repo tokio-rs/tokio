@@ -44,8 +44,12 @@ use std::{future::Future, io, mem};
 ///     loop {
 ///         let (socket, _) = listener.accept().await?;
 ///
-///         tokio::task::Builder::new()
-///             .name("tcp connection handler")
+///         let mut builder = tokio::task::Builder::new();
+///
+///         builder
+///             .name("tcp connection handler");
+///
+///         builder
 ///             .spawn(async move {
 ///                 // Process each socket concurrently.
 ///                 process(socket).await
@@ -71,8 +75,9 @@ impl<'a> Builder<'a> {
     }
 
     /// Assigns a name to the task which will be spawned.
-    pub fn name(&self, name: &'a str) -> Self {
-        Self { name: Some(name) }
+    pub fn name(&mut self, name: &'a str) -> &mut Self {
+        self.name = Some(name);
+        self
     }
 
     /// Spawns a task with this builder's settings on the current runtime.
@@ -91,9 +96,9 @@ impl<'a> Builder<'a> {
     {
         let fut_size = mem::size_of::<Fut>();
         Ok(if fut_size > BOX_FUTURE_THRESHOLD {
-            super::spawn::spawn_inner(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            super::spawn::spawn_inner(Box::pin(future), SpawnMeta::new(self.name, fut_size), None)
         } else {
-            super::spawn::spawn_inner(future, SpawnMeta::new(self.name, fut_size))
+            super::spawn::spawn_inner(future, SpawnMeta::new(self.name, fut_size), None)
         })
     }
 
@@ -112,9 +117,9 @@ impl<'a> Builder<'a> {
     {
         let fut_size = mem::size_of::<Fut>();
         Ok(if fut_size > BOX_FUTURE_THRESHOLD {
-            handle.spawn_named(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            handle.spawn_named(Box::pin(future), SpawnMeta::new(self.name, fut_size), None)
         } else {
-            handle.spawn_named(future, SpawnMeta::new(self.name, fut_size))
+            handle.spawn_named(future, SpawnMeta::new(self.name, fut_size), None)
         })
     }
 
@@ -140,9 +145,13 @@ impl<'a> Builder<'a> {
     {
         let fut_size = mem::size_of::<Fut>();
         Ok(if fut_size > BOX_FUTURE_THRESHOLD {
-            super::local::spawn_local_inner(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            super::local::spawn_local_inner(
+                Box::pin(future),
+                SpawnMeta::new(self.name, fut_size),
+                None,
+            )
         } else {
-            super::local::spawn_local_inner(future, SpawnMeta::new(self.name, fut_size))
+            super::local::spawn_local_inner(future, SpawnMeta::new(self.name, fut_size), None)
         })
     }
 
