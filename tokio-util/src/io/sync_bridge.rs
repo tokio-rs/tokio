@@ -5,7 +5,7 @@ use tokio::io::{
 };
 
 /// Use a [`tokio::io::AsyncRead`] synchronously as a [`std::io::Read`] or
-/// a [`tokio::io::AsyncWrite`] as a [`std::io::Write`].
+/// a [`tokio::io::AsyncWrite`] synchronously as a [`std::io::Write`].
 ///
 /// # Alternatives
 ///
@@ -56,7 +56,7 @@ use tokio::io::{
 ///    // Hash the data using the blake3 hashing function.
 ///    let hash = blake3::hash(&data);
 ///
-///    Ok(())
+///    Ok(hash)
 ///}
 ///
 /// #[tokio::main]
@@ -101,7 +101,7 @@ use tokio::io::{
 ///    // Finalize the hash after all data has been processed.
 ///    let hash = hasher.finalize();
 ///
-///    Ok(())
+///    Ok(hash)
 ///}
 ///
 /// #[tokio::main]
@@ -130,8 +130,8 @@ use tokio::io::{
 /// ```ignore
 /// use async_compression::tokio::write::GzipEncoder;
 /// use tokio::io::AsyncReadExt;
-/// use tokio::io::Cursor;
-/// use std::io::AsyncRead;
+/// use std::io::Cursor;
+/// use tokio::io::AsyncRead;
 ///
 /// /// Asynchronously compresses data from an async reader using Gzip and an async encoder.
 /// async fn compress_data(mut reader: impl AsyncRead + Unpin) -> Result<(), std::io::Error> {
@@ -151,7 +151,9 @@ use tokio::io::{
 ///     // Example: In-memory data.
 ///     let data = b"Hello, world!"; // A byte slice.
 ///     let reader = Cursor::new(data); // Create an in-memory AsyncRead.
-///     compresses_data(reader).await
+///     compress_data(reader).await;
+///     
+///   Ok(())
 /// }
 /// ```
 ///
