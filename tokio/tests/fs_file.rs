@@ -7,6 +7,7 @@ use tempfile::NamedTempFile;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 use tokio_test::task;
+use futures::future::FutureExt;
 
 const HELLO: &[u8] = b"hello world...";
 
@@ -172,6 +173,24 @@ async fn read_file_from_std() {
 
     let mut buf = [0; 1024];
     let n = file.read(&mut buf).await.unwrap();
+    assert_eq!(n, HELLO.len());
+    assert_eq!(&buf[..n], HELLO);
+}
+
+#[tokio::test]
+async fn empty_read() {
+    let mut tempfile = tempfile();
+    tempfile.write_all(HELLO).unwrap();
+
+    let mut file = File::open(tempfile.path()).await.unwrap();
+
+    // Perform an empty read and get a length of zero.
+    assert!(matches!(file.read(&mut []).now_or_never(), Some(Ok(0))));
+
+    // Check that we don't get EOF on the next read.
+    let mut buf = [0; 1024];
+    let n = file.read(&mut buf).await.unwrap();
+
     assert_eq!(n, HELLO.len());
     assert_eq!(&buf[..n], HELLO);
 }
