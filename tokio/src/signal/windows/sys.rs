@@ -153,6 +153,16 @@ mod tests {
 
     use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 
+    unsafe fn raise_event(signum: u32) {
+        if event_requires_infinite_sleep_in_handler(signum) {
+            // Those events will enter an infinite loop in `handler`, so
+            // we need to run them on a separate thread
+            std::thread::spawn(move || super::handler(signum));
+        } else {
+            super::handler(signum);
+        }
+    }
+
     #[test]
     fn ctrl_c() {
         let rt = rt();
@@ -166,7 +176,7 @@ mod tests {
         // like sending signals on Unix, so we'll stub out the actual OS
         // integration and test that our handling works.
         unsafe {
-            super::handler(console::CTRL_C_EVENT);
+            raise_event(console::CTRL_C_EVENT);
         }
 
         assert_ready_ok!(ctrl_c.poll());
@@ -183,7 +193,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                super::handler(console::CTRL_BREAK_EVENT);
+                raise_event(console::CTRL_BREAK_EVENT);
             }
 
             ctrl_break.recv().await.unwrap();
@@ -200,9 +210,9 @@ mod tests {
             // Windows doesn't have a good programmatic way of sending events
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
-            std::thread::spawn(|| unsafe {
-                super::handler(console::CTRL_CLOSE_EVENT);
-            });
+            unsafe {
+                raise_event(console::CTRL_CLOSE_EVENT);
+            }
 
             ctrl_close.recv().await.unwrap();
         });
@@ -218,9 +228,9 @@ mod tests {
             // Windows doesn't have a good programmatic way of sending events
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
-            std::thread::spawn(|| unsafe {
-                super::handler(console::CTRL_SHUTDOWN_EVENT);
-            });
+            unsafe {
+                raise_event(console::CTRL_SHUTDOWN_EVENT);
+            }
 
             ctrl_shutdown.recv().await.unwrap();
         });
@@ -236,9 +246,9 @@ mod tests {
             // Windows doesn't have a good programmatic way of sending events
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
-            std::thread::spawn(|| unsafe {
-                super::handler(console::CTRL_LOGOFF_EVENT);
-            });
+            unsafe {
+                raise_event(console::CTRL_LOGOFF_EVENT);
+            }
 
             ctrl_logoff.recv().await.unwrap();
         });
