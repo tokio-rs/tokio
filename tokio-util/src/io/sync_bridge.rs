@@ -150,7 +150,7 @@ use tokio::io::{
 ///     // Example: In-memory data.
 ///     let data = b"Hello, world!"; // A byte slice.
 ///     let reader = Cursor::new(data); // Create an in-memory AsyncRead.
-///     let _ = compress_data(reader).await;
+///     compress_data(reader).await?;
 ///
 ///   Ok(())
 /// }
