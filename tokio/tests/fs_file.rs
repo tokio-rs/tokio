@@ -1,13 +1,13 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
 
+use futures::future::FutureExt;
 use std::io::prelude::*;
 use std::io::IoSlice;
 use tempfile::NamedTempFile;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 use tokio_test::task;
-use futures::future::FutureExt;
 
 const HELLO: &[u8] = b"hello world...";
 
