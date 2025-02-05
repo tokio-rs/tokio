@@ -129,13 +129,12 @@ use tokio::io::{
 ///
 /// ```ignore
 /// use async_compression::tokio::write::GzipEncoder;
-/// use tokio::io::AsyncReadExt;
 /// use std::io::Cursor;
 /// use tokio::io::AsyncRead;
 ///
 /// /// Asynchronously compresses data from an async reader using Gzip and an async encoder.
 /// async fn compress_data(mut reader: impl AsyncRead + Unpin) -> Result<(), std::io::Error> {
-///    let mut writer = tokio::io::sink();
+///    let writer = tokio::io::sink();
 ///
 ///    // Create a Gzip encoder that wraps the writer.
 ///    let mut encoder = GzipEncoder::new(writer);
@@ -151,7 +150,7 @@ use tokio::io::{
 ///     // Example: In-memory data.
 ///     let data = b"Hello, world!"; // A byte slice.
 ///     let reader = Cursor::new(data); // Create an in-memory AsyncRead.
-///     compress_data(reader).await;
+///     let _ = compress_data(reader).await;
 ///
 ///   Ok(())
 /// }
