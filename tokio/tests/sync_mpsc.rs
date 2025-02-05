@@ -25,8 +25,8 @@ mod support {
 #[allow(unused)]
 trait AssertRefUnwindSafe: panic::RefUnwindSafe {}
 impl<T> AssertRefUnwindSafe for mpsc::OwnedPermit<T> {}
-impl<'a, T> AssertRefUnwindSafe for mpsc::Permit<'a, T> {}
-impl<'a, T> AssertRefUnwindSafe for mpsc::PermitIterator<'a, T> {}
+impl<T> AssertRefUnwindSafe for mpsc::Permit<'_, T> {}
+impl<T> AssertRefUnwindSafe for mpsc::PermitIterator<'_, T> {}
 impl<T> AssertRefUnwindSafe for mpsc::Receiver<T> {}
 impl<T> AssertRefUnwindSafe for mpsc::Sender<T> {}
 impl<T> AssertRefUnwindSafe for mpsc::UnboundedReceiver<T> {}
@@ -37,8 +37,8 @@ impl<T> AssertRefUnwindSafe for mpsc::WeakUnboundedSender<T> {}
 #[allow(unused)]
 trait AssertUnwindSafe: panic::UnwindSafe {}
 impl<T> AssertUnwindSafe for mpsc::OwnedPermit<T> {}
-impl<'a, T> AssertUnwindSafe for mpsc::Permit<'a, T> {}
-impl<'a, T> AssertUnwindSafe for mpsc::PermitIterator<'a, T> {}
+impl<T> AssertUnwindSafe for mpsc::Permit<'_, T> {}
+impl<T> AssertUnwindSafe for mpsc::PermitIterator<'_, T> {}
 impl<T> AssertUnwindSafe for mpsc::Receiver<T> {}
 impl<T> AssertUnwindSafe for mpsc::Sender<T> {}
 impl<T> AssertUnwindSafe for mpsc::UnboundedReceiver<T> {}

@@ -37,7 +37,7 @@ impl<'a, 'b> IoBufs<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Deref for IoBufs<'a, 'b> {
+impl<'a> Deref for IoBufs<'a, '_> {
     type Target = [IoSlice<'a>];
     fn deref(&self) -> &[IoSlice<'a>] {
         self.0

@@ -39,7 +39,6 @@ impl Listener for tokio::net::TcpListener {
         Self::poll_accept(self, cx)
     }
 
-    // Fixed: Removed the redundant conversion
     fn local_addr(&self) -> Result<Self::Addr> {
         self.local_addr()
     }

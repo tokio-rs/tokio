@@ -7,14 +7,14 @@
 //!
 //! # Organization
 //!
-//! [`TcpListener`] and [`TcpStream`] provide functionality for communication over TCP
-//! [`UdpSocket`] provides functionality for communication over UDP
-//! [`UnixListener`] and [`UnixStream`] provide functionality for communication over a
-//! Unix Domain Stream Socket **(available on Unix only)**
-//! [`UnixDatagram`] provides functionality for communication
-//! over Unix Domain Datagram Socket **(available on Unix only)**
-//! [`tokio::net::unix::pipe`] for FIFO pipes **(available on Unix only)**
-//! [`tokio::net::windows::named_pipe`] for Named Pipes **(available on Windows only)**
+//!   [`TcpListener`] and [`TcpStream`] provide functionality for communication over TCP
+//!   [`UdpSocket`] provides functionality for communication over UDP
+//!   [`UnixListener`] and [`UnixStream`] provide functionality for communication over a
+//!   Unix Domain Stream Socket **(available on Unix only)**
+//!   [`UnixDatagram`] provides functionality for communication
+//!   over Unix Domain Datagram Socket **(available on Unix only)**
+//!   [`tokio::net::unix::pipe`] for FIFO pipes **(available on Unix only)**
+//!   [`tokio::net::windows::named_pipe`] for Named Pipes **(available on Windows only)**
 //!
 //! For IO resources not available in `tokio::net`, you can use [`AsyncFd`].
 //!

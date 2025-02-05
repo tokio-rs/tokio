@@ -471,13 +471,13 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// This function returns:
     ///
-    /// `Poll::Pending` if the `JoinSet` is not empty but there is no task whose output is
-    /// available right now.
-    /// `Poll::Ready(Some(Ok(value)))` if one of the tasks in this `JoinSet` has completed.
-    /// The `value` is the return value of one of the tasks that completed.
-    /// `Poll::Ready(Some(Err(err)))` if one of the tasks in this `JoinSet` has panicked or been
-    /// aborted. The `err` is the `JoinError` from the panicked/aborted task.
-    /// `Poll::Ready(None)` if the `JoinSet` is empty.
+    ///   `Poll::Pending` if the `JoinSet` is not empty but there is no task whose output is
+    ///   available right now.
+    ///   `Poll::Ready(Some(Ok(value)))` if one of the tasks in this `JoinSet` has completed.
+    ///   The `value` is the return value of one of the tasks that completed.
+    ///   `Poll::Ready(Some(Err(err)))` if one of the tasks in this `JoinSet` has panicked or been
+    ///   aborted. The `err` is the `JoinError` from the panicked/aborted task.
+    ///   `Poll::Ready(None)` if the `JoinSet` is empty.
     ///
     /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
     /// This can happen if the [coop budget] is reached.
@@ -525,14 +525,14 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// This function returns:
     ///
-    /// `Poll::Pending` if the `JoinSet` is not empty but there is no task whose output is
-    /// available right now.
-    /// `Poll::Ready(Some(Ok((id, value))))` if one of the tasks in this `JoinSet` has completed.
-    /// The `value` is the return value of one of the tasks that completed, and
-    /// `id` is the [task ID] of that task.
-    /// `Poll::Ready(Some(Err(err)))` if one of the tasks in this `JoinSet` has panicked or been
-    /// aborted. The `err` is the `JoinError` from the panicked/aborted task.
-    /// `Poll::Ready(None)` if the `JoinSet` is empty.
+    ///   `Poll::Pending` if the `JoinSet` is not empty but there is no task whose output is
+    ///   available right now.
+    ///   `Poll::Ready(Some(Ok((id, value))))` if one of the tasks in this `JoinSet` has completed.
+    ///   The `value` is the return value of one of the tasks that completed, and
+    ///   `id` is the [task ID] of that task.
+    ///   `Poll::Ready(Some(Err(err)))` if one of the tasks in this `JoinSet` has panicked or been
+    ///   aborted. The `err` is the `JoinError` from the panicked/aborted task.
+    ///   `Poll::Ready(None)` if the `JoinSet` is empty.
     ///
     /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
     /// This can happen if the [coop budget] is reached.

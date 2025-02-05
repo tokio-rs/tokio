@@ -15,7 +15,7 @@ impl AsyncRead for R {
         _cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        buf.put_slice(&[b'z']);
+        buf.put_slice(&[b'z'][..]);
         Poll::Ready(Ok(()))
     }
 }
@@ -61,22 +61,22 @@ fn is_send_and_sync() {
 
 #[test]
 fn method_delegation() {
+    use std::io::IoSlice;
+
     let mut rw = join(R, W);
     let mut buf = [0; 1];
 
     tokio_test::block_on(async move {
         assert_eq!(1, rw.read(&mut buf).await.unwrap());
         assert_eq!(b'z', buf[0]);
-
-        assert_eq!(1, rw.write(&[b'x']).await.unwrap());
+        assert_eq!(1, rw.write(&[b'x'][..]).await.unwrap());
         assert_eq!(
-            2,
-            rw.write_vectored(&[io::IoSlice::new(&[b'x'])])
+            1,
+            rw.write_vectored(&[IoSlice::new(&[b'x'][..])])
                 .await
                 .unwrap()
         );
         assert!(rw.is_write_vectored());
-
         assert!(rw.flush().await.is_ok());
         assert!(rw.shutdown().await.is_ok());
     });

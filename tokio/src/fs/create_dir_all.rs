@@ -21,10 +21,10 @@ use std::path::Path;
 /// This function will return an error in the following situations, but is not
 /// limited to just these cases:
 ///
-/// If any directory in the path specified by `path` does not already exist
-/// and it could not be created otherwise. The specific error conditions for
-/// when a directory is being created (after it is determined to not exist) are
-/// outlined by [`fs::create_dir`].
+///   If any directory in the path specified by `path` does not already exist
+///   and it could not be created otherwise. The specific error conditions for
+///   when a directory is being created (after it is determined to not exist) are
+///   outlined by [`fs::create_dir`].
 ///
 /// Notable exception is made for situations where any of the directories
 /// specified in the `path` could not be created as it was being created concurrently.

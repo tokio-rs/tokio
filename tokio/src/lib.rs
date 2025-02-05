@@ -1,4 +1,5 @@
 #![allow(
+    clippy::needless_lifetimes,
     clippy::cognitive_complexity,
     clippy::large_enum_variant,
     clippy::module_inception,

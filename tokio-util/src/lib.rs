@@ -1,3 +1,4 @@
+#![allow(clippy::needless_lifetimes)]
 #![allow(clippy::needless_doctest_main)]
 #![warn(
     missing_debug_implementations,

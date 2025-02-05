@@ -17,7 +17,7 @@ impl AsyncRead for RW {
         _cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        buf.put_slice(&[b'z']);
+        buf.put_slice(b"z");
         Poll::Ready(Ok(()))
     }
 }
@@ -96,20 +96,15 @@ fn unsplit_err2() {
 fn method_delegation() {
     let (mut r, mut w) = split(RW);
     let mut buf = [0; 1];
-
     tokio_test::block_on(async move {
         assert_eq!(1, r.read(&mut buf).await.unwrap());
         assert_eq!(b'z', buf[0]);
-
-        assert_eq!(1, w.write(&[b'x']).await.unwrap());
+        assert_eq!(1, w.write(b"x").await.unwrap());
         assert_eq!(
             2,
-            w.write_vectored(&[io::IoSlice::new(&[b'x'])])
-                .await
-                .unwrap()
+            w.write_vectored(&[io::IoSlice::new(b"x")]).await.unwrap()
         );
         assert!(w.is_write_vectored());
-
         assert!(w.flush().await.is_ok());
         assert!(w.shutdown().await.is_ok());
     });

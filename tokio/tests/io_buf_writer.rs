@@ -460,7 +460,7 @@ impl VectoredWriteHarness {
         }
     }
 
-    async fn write_all<'a, 'b>(&mut self, mut io_vec: IoBufs<'a, 'b>) -> usize {
+    async fn write_all(&mut self, mut io_vec: IoBufs<'_, '_>) -> usize {
         let mut total_written = 0;
         while !io_vec.is_empty() {
             let n = assert_ok!(write_vectored(&mut self.writer, &io_vec).await);
