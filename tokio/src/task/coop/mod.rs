@@ -169,16 +169,55 @@ fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
 
 /// Returns `true` if there is still budget left on the task.
 ///
-/// This function is similar to [`consume_budget()`], but doesn't decrement the
-/// budget when non-zero.
-///
 /// # Examples
 ///
-/// ```ignore
-/// if !has_budget_remaining() {
-///     tokio::task::yield_now().await;
-/// }
+/// This example defines a `Timeout` future that requires a given `future` to complete before the
+/// specified duration elapses. If it does, its result is returned; otherwise, an error is returned
+/// and the future is canceled.
+///
+/// Note that the future could exhaust the budget before we evaluate the timeout. Using `has_budget_remaining`,
+/// we can detect this scenario and ensure the timeout is always checked.
+///
 /// ```
+/// # use std::future::Future;
+/// # use std::pin::{pin, Pin};
+/// # use std::task::{ready, Context, Poll};
+/// # use tokio::task::coop;
+/// # use tokio::time::Sleep;
+/// pub struct Timeout<T> {
+///     future: T,
+///     delay: Pin<Box<Sleep>>,
+/// }
+///
+/// impl<T> Future for Timeout<T>
+/// where
+///     T: Future + Unpin,
+/// {
+///     type Output = Result<T::Output, ()>;
+///
+///     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+///         let this = Pin::into_inner(self);
+///         let future = pin!(&mut this.future);
+///         let delay = pin!(&mut this.delay);
+///
+///         // check if the future is ready
+///         let had_budget_before = coop::has_budget_remaining();
+///         if let Poll::Ready(v) = future.poll(cx) {
+///             return Poll::Ready(Ok(v));
+///         }
+///         let has_budget_now = coop::has_budget_remaining();
+///
+///         // evaluate the timeout
+///         if let (true, false) = (had_budget_before, has_budget_now) {
+///             // it is the underlying future that exhausted the budget
+///             ready!(pin!(coop::unconstrained(delay)).poll(cx));
+///         } else {
+///             ready!(delay.poll(cx));
+///         }
+///         return Poll::Ready(Err(()));
+///     }
+/// }
+///```
 #[inline(always)]
 #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub fn has_budget_remaining() -> bool {
