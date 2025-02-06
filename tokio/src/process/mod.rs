@@ -1193,8 +1193,9 @@ impl Child {
     /// }
     /// ```
     ///
-    /// It is also possible to interact with the stdio of the child, for example
-    /// reading from its stdout, while waiting for it to exit.
+    /// You can also interact with the child's standard I/O. For example, you can
+    /// read its stdout while waiting for it to exit.
+    ///
     /// ```no_run
     /// # use std::process::Stdio;
     /// #
@@ -1220,7 +1221,7 @@ impl Child {
     ///
     ///     tokio::select! {
     ///             _ = wait_for_output => {}
-    ///             _ = rx => { child.kill().await.expect("kill failed") },
+    ///             _ = rx => child.kill().await.expect("kill failed"),
     ///     }
     ///
     ///     assert_eq!(buff, b"Hello World!\n");
