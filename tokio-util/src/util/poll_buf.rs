@@ -2,7 +2,6 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use bytes::{Buf, BufMut};
 use std::io::{self, IoSlice};
-use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
@@ -59,7 +58,7 @@ pub fn poll_read_buf<T: AsyncRead + ?Sized, B: BufMut>(
 
         // Safety: `chunk_mut()` returns a `&mut UninitSlice`, and `UninitSlice` is a
         // transparent wrapper around `[MaybeUninit<u8>]`.
-        let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
+        let dst = unsafe { dst.as_uninit_slice_mut() };
         let mut buf = ReadBuf::uninit(dst);
         let ptr = buf.filled().as_ptr();
         ready!(io.poll_read(cx, &mut buf)?);
