@@ -7,7 +7,7 @@ use std::path::Path;
 ///
 /// This is an async version of [`std::fs::hard_link`].
 ///
-/// The `dst` path will be a link pointing to the `src` path. Note that systems
+/// The `link` path will be a link pointing to the `original` path. Note that systems
 /// often require these two paths to both be located on the same filesystem.
 ///
 /// # Platform-specific behavior
@@ -23,7 +23,7 @@ use std::path::Path;
 /// This function will return an error in the following situations, but is not
 /// limited to just these cases:
 ///
-/// * The `src` path is not a file or doesn't exist.
+/// * The `original` path is not a file or doesn't exist.
 ///
 /// # Examples
 ///
@@ -36,9 +36,9 @@ use std::path::Path;
 ///     Ok(())
 /// }
 /// ```
-pub async fn hard_link(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
-    let src = src.as_ref().to_owned();
-    let dst = dst.as_ref().to_owned();
+pub async fn hard_link(original: impl AsRef<Path>, link: impl AsRef<Path>) -> io::Result<()> {
+    let original = original.as_ref().to_owned();
+    let link = link.as_ref().to_owned();
 
-    asyncify(move || std::fs::hard_link(src, dst)).await
+    asyncify(move || std::fs::hard_link(original, link)).await
 }
