@@ -1202,8 +1202,6 @@ impl Child {
     /// # use tokio::io::AsyncReadExt;
     /// # use tokio::process::Command;
     /// # use tokio::sync::oneshot::channel;
-    /// #
-    /// # use futures::future::join;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -1216,13 +1214,20 @@ impl Child {
     ///         .unwrap();
     ///
     ///     let mut stdout = child.stdout.take().expect("stdout is not captured");
-    ///     let mut buff = Vec::new();
-    ///     let wait_for_output = join(child.wait(), stdout.read_to_end(&mut buff));
+    ///
+    ///     let read_stdout = tokio::spawn(async move {
+    ///         let mut buff = Vec::new();
+    ///         let _ = stdout.read_to_end(&mut buff).await;
+    ///
+    ///         buff
+    ///     });
     ///
     ///     tokio::select! {
-    ///             _ = wait_for_output => {}
-    ///             _ = rx => child.kill().await.expect("kill failed"),
+    ///             _ = child.wait() => {}
+    ///             _ = rx => { child.kill().await.expect("kill failed") },
     ///     }
+    ///
+    ///     let buff = read_stdout.await.unwrap();
     ///
     ///     assert_eq!(buff, b"Hello World!\n");
     /// }
