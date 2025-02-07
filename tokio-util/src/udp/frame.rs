@@ -91,9 +91,9 @@ where
                 assert_eq!(ptr, read.filled().as_ptr());
                 let addr = res?;
 
+                let filled = read.filled().len();
                 // Safety: This is guaranteed to be the number of initialized (and read) bytes due
                 // to the invariants provided by `ReadBuf::filled`.
-                let filled = read.filled().len();
                 unsafe { pin.rd.advance_mut(filled) };
 
                 addr
