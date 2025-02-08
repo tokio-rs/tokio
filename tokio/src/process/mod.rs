@@ -1169,6 +1169,8 @@ impl Child {
     ///
     /// This is equivalent to sending a `SIGKILL` on unix platforms.
     ///
+    /// # Examples
+    ///
     /// If the child has to be killed remotely, it is possible to do it using
     /// a combination of the select! macro and a `oneshot` channel. In the following
     /// example, the child will run until completion unless a message is sent on
@@ -1188,6 +1190,46 @@ impl Child {
     ///         _ = child.wait() => {}
     ///         _ = recv => child.kill().await.expect("kill failed"),
     ///     }
+    /// }
+    /// ```
+    ///
+    /// You can also interact with the child's standard I/O. For example, you can
+    /// read its stdout while waiting for it to exit.
+    ///
+    /// ```no_run
+    /// # use std::process::Stdio;
+    /// #
+    /// # use tokio::io::AsyncReadExt;
+    /// # use tokio::process::Command;
+    /// # use tokio::sync::oneshot::channel;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (_tx, rx) = channel::<()>();
+    ///
+    ///     let mut child = Command::new("echo")
+    ///         .arg("Hello World!")
+    ///         .stdout(Stdio::piped())
+    ///         .spawn()
+    ///         .unwrap();
+    ///
+    ///     let mut stdout = child.stdout.take().expect("stdout is not captured");
+    ///
+    ///     let read_stdout = tokio::spawn(async move {
+    ///         let mut buff = Vec::new();
+    ///         let _ = stdout.read_to_end(&mut buff).await;
+    ///
+    ///         buff
+    ///     });
+    ///
+    ///     tokio::select! {
+    ///         _ = child.wait() => {}
+    ///         _ = rx => { child.kill().await.expect("kill failed") },
+    ///     }
+    ///
+    ///     let buff = read_stdout.await.unwrap();
+    ///
+    ///     assert_eq!(buff, b"Hello World!\n");
     /// }
     /// ```
     pub async fn kill(&mut self) -> io::Result<()> {
