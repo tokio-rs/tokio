@@ -1223,8 +1223,8 @@ impl Child {
     ///     });
     ///
     ///     tokio::select! {
-    ///             _ = child.wait() => {}
-    ///             _ = rx => { child.kill().await.expect("kill failed") },
+    ///         _ = child.wait() => {}
+    ///         _ = rx => { child.kill().await.expect("kill failed") },
     ///     }
     ///
     ///     let buff = read_stdout.await.unwrap();
