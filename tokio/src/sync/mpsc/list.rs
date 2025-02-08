@@ -400,7 +400,7 @@ impl<T> Rx<T> {
                 let res = Self::advance_step(&mut next_head, index);
                 return res.map_break(|_advanced_to_next_block| ());
             }
-            return ControlFlow::Break(())
+            ControlFlow::Break(())
         };
 
         while advance_if_final(self.index.wrapping_add(index)).is_continue() {
@@ -421,12 +421,8 @@ impl<T> Rx<T> {
             }
 
             match block.load_next(Acquire) {
-                Some(next_block) => {
-                    next_block
-                }
-                None => {
-                    return ControlFlow::Break(false)
-                }
+                Some(next_block) => next_block,
+                None => return ControlFlow::Break(false)
             }
         };
 
