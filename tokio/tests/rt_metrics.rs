@@ -1,4 +1,3 @@
-#![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi"), target_has_atomic = "64"))]
 

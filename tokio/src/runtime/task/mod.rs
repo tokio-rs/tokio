@@ -256,6 +256,13 @@ pub(crate) struct LocalNotified<S: 'static> {
     _not_send: PhantomData<*const ()>,
 }
 
+impl<S> LocalNotified<S> {
+    #[cfg(tokio_unstable)]
+    pub(crate) fn task_id(&self) -> Id {
+        self.task.id()
+    }
+}
+
 /// A task that is not owned by any `OwnedTasks`. Used for blocking tasks.
 /// This type holds two ref-counts.
 pub(crate) struct UnownedTask<S: 'static> {
@@ -386,6 +393,16 @@ impl<S: 'static> Task<S> {
         self.raw.header_ptr()
     }
 
+    /// Returns a [task ID] that uniquely identifies this task relative to other
+    /// currently spawned tasks.
+    ///
+    /// [task ID]: crate::task::Id
+    #[cfg(tokio_unstable)]
+    pub(crate) fn id(&self) -> crate::task::Id {
+        // Safety: The header pointer is valid.
+        unsafe { Header::get_id(self.raw.header_ptr()) }
+    }
+
     cfg_taskdump! {
         /// Notify the task for task dumping.
         ///
@@ -400,21 +417,18 @@ impl<S: 'static> Task<S> {
             }
         }
 
-        /// Returns a [task ID] that uniquely identifies this task relative to other
-        /// currently spawned tasks.
-        ///
-        /// [task ID]: crate::task::Id
-        #[cfg(tokio_unstable)]
-        pub(crate) fn id(&self) -> crate::task::Id {
-            // Safety: The header pointer is valid.
-            unsafe { Header::get_id(self.raw.header_ptr()) }
-        }
     }
 }
 
 impl<S: 'static> Notified<S> {
     fn header(&self) -> &Header {
         self.0.header()
+    }
+
+    #[cfg(tokio_unstable)]
+    #[allow(dead_code)]
+    pub(crate) fn task_id(&self) -> crate::task::Id {
+        self.0.id()
     }
 }
 

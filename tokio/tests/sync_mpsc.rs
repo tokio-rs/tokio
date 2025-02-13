@@ -1454,4 +1454,50 @@ async fn test_is_empty_32_msgs() {
     }
 }
 
+#[test]
+#[cfg(not(panic = "abort"))]
+fn drop_all_elements_during_panic() {
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering::Relaxed;
+    use tokio::sync::mpsc::UnboundedReceiver;
+    use tokio::sync::mpsc::UnboundedSender;
+
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    struct A(bool);
+    impl Drop for A {
+        // cause a panic when inner value is `true`.
+        fn drop(&mut self) {
+            COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if self.0 {
+                panic!("panic!")
+            }
+        }
+    }
+
+    fn func(tx: UnboundedSender<A>, rx: UnboundedReceiver<A>) {
+        tx.send(A(true)).unwrap();
+        tx.send(A(false)).unwrap();
+        tx.send(A(false)).unwrap();
+
+        drop(rx);
+
+        // `mpsc::Rx`'s drop is called and gets panicked while dropping the first value,
+        // but will keep dropping following elements.
+    }
+
+    let (tx, rx) = mpsc::unbounded_channel();
+
+    let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        func(tx.clone(), rx);
+    }));
+
+    // all A's destructor should be called at this point, even before `mpsc::Chan`'s
+    // drop gets called.
+    assert_eq!(COUNTER.load(Relaxed), 3);
+
+    drop(tx);
+    // `mpsc::Chan`'s drop is called, freeing the `Block` memory allocation.
+}
+
 fn is_debug<T: fmt::Debug>(_: &T) {}
