@@ -197,8 +197,8 @@ fn with_budget<R>(budget: Budget, f: impl FnOnce() -> R) -> R {
 ///
 ///     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 ///         let this = Pin::into_inner(self);
-///         let future = pin!(&mut this.future);
-///         let delay = pin!(&mut this.delay);
+///         let future = Pin::new(&mut this.future);
+///         let delay = Pin::new(&mut this.delay);
 ///
 ///         // check if the future is ready
 ///         let had_budget_before = coop::has_budget_remaining();
