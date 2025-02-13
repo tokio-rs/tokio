@@ -602,3 +602,17 @@ macro_rules! cfg_is_wasm_not_wasi {
         )*
     }
 }
+
+/// Use this macro to provide two different implementations of the same API — one for stable
+/// builds and one for unstable builds.
+macro_rules! cfg_metrics_variant {
+    (stable: {$($stable_code:tt)*}, unstable: {$($unstable_code:tt)*}) => {
+        cfg_not_unstable_metrics! {
+            $($stable_code)*
+        }
+
+        cfg_unstable_metrics! {
+            $($unstable_code)*
+        }
+    }
+}
