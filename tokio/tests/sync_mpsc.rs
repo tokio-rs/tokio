@@ -1454,6 +1454,116 @@ async fn test_is_empty_32_msgs() {
     }
 }
 
+#[tokio::test]
+async fn can_peek() {
+    let (sender, receiver) = mpsc::channel(1);
+    sender.send(14).await.unwrap();
+    let peeked = receiver.peek().await.unwrap();
+    assert_eq!(peeked, &14);
+}
+
+#[tokio::test]
+async fn can_peek_then_recv() {
+    let (sender, mut receiver) = mpsc::channel(1);
+    sender.send(14).await.unwrap();
+    let peeked = receiver.peek().await.unwrap();
+    assert_eq!(peeked, &14);
+    let peeked_clone = peeked.clone();
+    let received = receiver.recv().await.unwrap();
+    assert_eq!(peeked_clone, received);
+}
+
+#[tokio::test]
+async fn can_try_peeking() {
+    let (sender, receiver) = mpsc::channel(1);
+    sender.send(14).await.unwrap();
+    let peeked = receiver.try_peek().unwrap();
+    assert_eq!(peeked, &14);
+}
+
+#[tokio::test]
+async fn can_try_peeking_then_try_receveing() {
+    let (sender, mut receiver) = mpsc::channel(1);
+    sender.send(14).await.unwrap();
+    let peeked = receiver.try_peek().unwrap();
+    let peeked_clone = peeked.clone();
+    let received = receiver.try_recv().unwrap();
+    assert_eq!(peeked_clone, received);
+}
+
+
+#[tokio::test]
+async fn can_recv_then_peek() {
+    let (sender, mut receiver) = mpsc::channel(101);
+    let _ = tokio::task::spawn(async move {
+        for i in 0..102 {
+            sender.send(i).await.unwrap();
+        }
+    });
+
+    for i in 0..101 {
+        assert_eq!(i, receiver.recv().await.unwrap());
+        assert_eq!(i + 1, *receiver.peek().await.unwrap());
+    }
+
+    assert_eq!(101, *receiver.peek().await.unwrap());
+    assert_eq!(101, receiver.recv().await.unwrap());
+
+}
+
+#[tokio::test]
+async fn can_peek_then_recv_multiple() {
+    let (sender, mut receiver) = mpsc::channel(101);
+    for i in 0..101 {
+        sender.send(i).await.unwrap();
+    }
+
+    for i in 0..101 {
+        assert_eq!(i, *receiver.peek().await.unwrap());
+        assert_eq!(i, receiver.recv().await.unwrap());
+    }
+}
+
+
+
+#[tokio::test]
+async fn can_make_peek_recv_progress() {
+    let (sender, mut receiver) = mpsc::channel(257);
+    assert_err!(receiver.try_peek());
+
+    for value in 0..257 {
+        sender.send(value).await.unwrap();
+        let peeked = receiver.peek().await.unwrap();
+        assert_eq!(peeked, &value);
+
+        let peeked = peeked.clone();
+        let received = receiver.recv().await.unwrap();
+        assert_eq!(peeked, received);
+
+        assert!(receiver.is_empty(), "{value}. len: {}", receiver.len());
+    }
+}
+
+
+#[tokio::test]
+async fn can_peek_post_block_cap() {
+    let block_cap = 33;
+    let (sender, mut receiver) = mpsc::channel(block_cap);
+    assert_err!(receiver.try_peek());
+
+    for value in 0..block_cap {
+        sender.send(value).await.unwrap();
+        let peeked = receiver.peek().await.unwrap();
+        assert_eq!(peeked, &value);
+
+        let peeked = peeked.clone();
+        let received = receiver.recv().await.unwrap();
+        assert_eq!(peeked, received);
+
+        assert!(receiver.is_empty(), "{value}. len: {}", receiver.len());
+    }
+}
+
 #[test]
 #[cfg(not(panic = "abort"))]
 fn drop_all_elements_during_panic() {

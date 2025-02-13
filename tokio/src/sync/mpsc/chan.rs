@@ -285,23 +285,17 @@ impl<T, S: Semaphore> Rx<T, S> {
         })
     }
 
-    /// Receive the next value
-    pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+    pub(crate) fn peek(&self, cx: &mut Context<'_>) -> Poll<Option<&T>> {
         use super::block::Read;
-
         ready!(crate::trace::trace_leaf(cx));
-
-        // Keep track of task budget
         let coop = ready!(crate::runtime::coop::poll_proceed(cx));
 
-        self.inner.rx_fields.with_mut(|rx_fields_ptr| {
-            let rx_fields = unsafe { &mut *rx_fields_ptr };
-
-            macro_rules! try_recv {
+        self.inner.rx_fields.with(|rx_fields_ptr| {
+            let rx_fields = unsafe { &*rx_fields_ptr };
+            macro_rules! try_peek {
                 () => {
-                    match rx_fields.list.pop(&self.inner.tx) {
+                    match rx_fields.list.peek() {
                         Some(Read::Value(value)) => {
-                            self.inner.semaphore.add_permit();
                             coop.made_progress();
                             return Ready(Some(value));
                         }
@@ -316,19 +310,14 @@ impl<T, S: Semaphore> Rx<T, S> {
                             coop.made_progress();
                             return Ready(None);
                         }
-                        None => {} // fall through
+                        None => {}
                     }
                 };
             }
 
-            try_recv!();
-
+            try_peek!();
             self.inner.rx_waker.register_by_ref(cx.waker());
-
-            // It is possible that a value was pushed between attempting to read
-            // and registering the task, so we have to check the channel a
-            // second time here.
-            try_recv!();
+            try_peek!();
 
             if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
                 coop.made_progress();
@@ -336,7 +325,81 @@ impl<T, S: Semaphore> Rx<T, S> {
             } else {
                 Pending
             }
+
         })
+    }
+
+    // TODO: Consolidate with try_pop
+    pub(crate) fn try_peek(&self) -> Result<&T, TryRecvError> {
+        use super::list::TryReadResult;
+
+        self.inner.rx_fields.with(|rx_fields_ptr| {
+            let rx_fields = unsafe { &*rx_fields_ptr };
+
+            macro_rules! try_peek {
+                () => {
+                    match rx_fields.list.try_peek(&self.inner.tx) {
+                        TryReadResult::Ok(value) => {
+                            return Ok(value);
+                        }
+                        TryReadResult::Closed => return Err(TryRecvError::Disconnected),
+                        TryReadResult::Empty => return Err(TryRecvError::Empty),
+                        TryReadResult::Busy => {} // fall through
+                    }
+                };
+            }
+
+            try_peek!();
+
+            // If a previous `poll_recv` call has set a waker, we wake it here.
+            // This allows us to put our own CachedParkThread waker in the
+            // AtomicWaker slot instead.
+            //
+            // This is not a spurious wakeup to `poll_recv` since we just got a
+            // Busy from `try_peek`, which only happens if there are messages in
+            // the queue.
+            self.inner.rx_waker.wake();
+
+            // Park the thread until the problematic send has completed.
+            let mut park = CachedParkThread::new();
+            let waker = park.waker().unwrap();
+            loop {
+                self.inner.rx_waker.register_by_ref(&waker);
+                // It is possible that the problematic send has now completed,
+                // so we have to check for messages again.
+                try_peek!();
+                park.park();
+            }
+        })
+    }
+
+    /// Receive the next value by peeking and then advancing the list
+    pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        use std::ptr;
+
+        ready!(crate::trace::trace_leaf(cx));
+
+        // Keep track of task budget
+        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+
+        match self.peek(cx) {
+            Ready(Some(peeked_value)) => {
+                let val = unsafe { ptr::read(peeked_value) };
+                self.advance_rx();
+                self.inner.semaphore.add_permit();
+                coop.made_progress();
+                Poll::Ready(Some(val))
+            },
+            Ready(None) => Poll::Ready(None),
+            Pending => Poll::Pending,
+        }
+    }
+
+    fn advance_rx(&mut self) {
+        self.inner.rx_fields.with_mut(|rx_fields_ptr| {
+            let rx_fields = unsafe { &mut *rx_fields_ptr };
+            rx_fields.list.advance(&self.inner.tx);
+        });
     }
 
     /// Receives up to `limit` values into `buffer`
@@ -426,7 +489,7 @@ impl<T, S: Semaphore> Rx<T, S> {
 
     /// Try to receive the next value.
     pub(crate) fn try_recv(&mut self) -> Result<T, TryRecvError> {
-        use super::list::TryPopResult;
+        use super::list::TryReadResult;
 
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
@@ -434,13 +497,13 @@ impl<T, S: Semaphore> Rx<T, S> {
             macro_rules! try_recv {
                 () => {
                     match rx_fields.list.try_pop(&self.inner.tx) {
-                        TryPopResult::Ok(value) => {
+                        TryReadResult::Ok(value) => {
                             self.inner.semaphore.add_permit();
                             return Ok(value);
                         }
-                        TryPopResult::Closed => return Err(TryRecvError::Disconnected),
-                        TryPopResult::Empty => return Err(TryRecvError::Empty),
-                        TryPopResult::Busy => {} // fall through
+                        TryReadResult::Closed => return Err(TryRecvError::Disconnected),
+                        TryReadResult::Empty => return Err(TryRecvError::Empty),
+                        TryReadResult::Busy => {} // fall through
                     }
                 };
             }

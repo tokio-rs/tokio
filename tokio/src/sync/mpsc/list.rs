@@ -5,6 +5,7 @@ use crate::loom::thread;
 use crate::sync::mpsc::block::{self, Block};
 
 use std::fmt;
+use std::ops::ControlFlow;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 
@@ -30,8 +31,8 @@ pub(crate) struct Rx<T> {
     free_head: NonNull<Block<T>>,
 }
 
-/// Return value of `Rx::try_pop`.
-pub(crate) enum TryPopResult<T> {
+/// Return value of `Rx::try_pop` and `Rx::try_peek`.
+pub(crate) enum TryReadResult<T> {
     /// Successfully popped a value.
     Ok(T),
     /// The channel is empty.
@@ -257,10 +258,19 @@ impl<T> Rx<T> {
         tail_position - self.index - (tx.is_closed() as usize)
     }
 
+    pub(crate) fn peek(&self) -> Option<block::Read<&T>> {
+        let head = self.try_peeking_ahead();
+        unsafe {
+            let block = head.as_ref();
+            let ret = block.peek(self.index);
+            ret
+        }
+    }
+
     /// Pops the next value off the queue.
     pub(crate) fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
         // Advance `head`, if needed
-        if !self.try_advancing_head() {
+        if !Self::try_advancing_head(&mut self.head, self.index) {
             return None;
         }
 
@@ -287,44 +297,39 @@ impl<T> Rx<T> {
     /// This can happen if the fully delivered message is behind another message
     /// that is in the middle of being written to the block, since the channel
     /// can't return the messages out of order.
-    pub(crate) fn try_pop(&mut self, tx: &Tx<T>) -> TryPopResult<T> {
+    pub(crate) fn try_pop(&mut self, tx: &Tx<T>) -> TryReadResult<T> {
         let tail_position = tx.tail_position.load(Acquire);
         let result = self.pop(tx);
 
         match result {
-            Some(block::Read::Value(t)) => TryPopResult::Ok(t),
-            Some(block::Read::Closed) => TryPopResult::Closed,
-            None if tail_position == self.index => TryPopResult::Empty,
-            None => TryPopResult::Busy,
+            Some(block::Read::Value(t)) => TryReadResult::Ok(t),
+            Some(block::Read::Closed) => TryReadResult::Closed,
+            None if tail_position == self.index => TryReadResult::Empty,
+            None => TryReadResult::Busy,
+        }
+    }
+
+    // TODO: Unify logic with try_pop
+    pub(crate) fn try_peek(&self, tx: &Tx<T>) -> TryReadResult<&T> {
+        let tail_position = tx.tail_position.load(Acquire);
+        let result = self.peek();
+
+        match result {
+            Some(block::Read::Value(t)) => TryReadResult::Ok(t),
+            Some(block::Read::Closed) => TryReadResult::Closed,
+            None if tail_position == self.index => TryReadResult::Empty,
+            None => TryReadResult::Busy,
         }
     }
 
     /// Tries advancing the block pointer to the block referenced by `self.index`.
     ///
     /// Returns `true` if successful, `false` if there is no next block to load.
-    fn try_advancing_head(&mut self) -> bool {
-        let block_index = block::start_index(self.index);
-
+    fn try_advancing_head<I>(head: &mut NonNull<Block<I>>, index: usize) -> bool {
         loop {
-            let next_block = {
-                let block = unsafe { self.head.as_ref() };
-
-                if block.is_at_index(block_index) {
-                    return true;
-                }
-
-                block.load_next(Acquire)
-            };
-
-            let next_block = match next_block {
-                Some(next_block) => next_block,
-                None => {
-                    return false;
-                }
-            };
-
-            self.head = next_block;
-
+            if let ControlFlow::Break(was_successful) = Self::advance_step(head, index) {
+                return was_successful;
+            }
             thread::yield_now();
         }
     }
@@ -385,6 +390,55 @@ impl<T> Rx<T> {
             drop(Box::from_raw(block.as_ptr()));
         }
     }
+
+    fn try_peeking_ahead(&self) -> NonNull<Block<T>> {
+        let mut next_head: NonNull<Block<T>> = self.head;
+        let mut index  = 0;
+
+        let mut advance_if_final = |index: usize| {
+            if unsafe { next_head.as_ref().is_final() } {
+                let res = Self::advance_step(&mut next_head, index);
+                return res.map_break(|_advanced_to_next_block| ());
+            }
+            ControlFlow::Break(())
+        };
+
+        while advance_if_final(self.index.wrapping_add(index)).is_continue() {
+            index += 1;
+            thread::yield_now();
+        }
+
+        next_head
+    }
+
+    fn advance_step<R>(block: &mut NonNull<Block<R>>, index: usize) -> ControlFlow<bool> {
+        let block_index = block::start_index(index);
+        
+        let next_block = {
+            let block = unsafe { block.as_ref() };
+            if block.is_at_index(block_index) {
+                return ControlFlow::Break(true);
+            }
+
+            match block.load_next(Acquire) {
+                Some(next_block) => next_block,
+                None => return ControlFlow::Break(false)
+            }
+        };
+
+        *block = next_block;
+
+        ControlFlow::Continue(())
+    }
+
+    pub(crate) fn advance(&mut self, tx: &Tx<T>) {
+        if !Self::try_advancing_head(&mut self.head, self.index) {
+            return;
+        }
+        self.reclaim_blocks(tx);
+        self.index = self.index.wrapping_add(1);
+    }
+
 }
 
 impl<T> fmt::Debug for Rx<T> {

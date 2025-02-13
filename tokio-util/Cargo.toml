@@ -35,7 +35,7 @@ __docs_rs = ["futures-util"]
 
 [dependencies]
 tokio = { version = "1.28.0", path = "../tokio", features = ["sync"] }
-bytes = "1.0.0"
+bytes = "1.2.1"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
 futures-io = { version = "0.3.0", optional = true }
