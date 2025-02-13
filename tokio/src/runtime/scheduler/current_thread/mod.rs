@@ -365,7 +365,7 @@ impl Context {
     /// thread-local context.
     fn run_task<R>(&self, mut core: Box<Core>, f: impl FnOnce() -> R) -> (Box<Core>, R) {
         core.metrics.start_poll();
-        let mut ret = self.enter(core, || crate::runtime::coop::budget(f));
+        let mut ret = self.enter(core, || crate::task::coop::budget(f));
         ret.0.metrics.end_poll();
         ret
     }
@@ -730,7 +730,7 @@ impl CoreGuard<'_> {
 
                 if handle.reset_woken() {
                     let (c, res) = context.enter(core, || {
-                        crate::runtime::coop::budget(|| future.as_mut().poll(&mut cx))
+                        crate::task::coop::budget(|| future.as_mut().poll(&mut cx))
                     });
 
                     core = c;

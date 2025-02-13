@@ -111,8 +111,8 @@
 //! [`Sender::closed`]: crate::sync::watch::Sender::closed
 //! [`Sender::subscribe()`]: crate::sync::watch::Sender::subscribe
 
-use crate::runtime::coop::cooperative;
 use crate::sync::notify::Notify;
+use crate::task::coop::cooperative;
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::atomic::Ordering::{AcqRel, Relaxed};

@@ -439,7 +439,7 @@
 //! or even use them from non-Tokio runtimes.
 //!
 //! When used in a Tokio runtime, the synchronization primitives participate in
-//! [cooperative scheduling](crate::task#cooperative-scheduling) to avoid
+//! [cooperative scheduling](crate::task::coop#cooperative-scheduling) to avoid
 //! starvation. This feature does not apply when used from non-Tokio runtimes.
 //!
 //! As an exception, methods ending in `_timeout` are not runtime agnostic

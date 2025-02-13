@@ -88,7 +88,7 @@ cfg_io_util! {
 
     cfg_coop! {
         fn poll_proceed_and_make_progress(cx: &mut std::task::Context<'_>) -> std::task::Poll<()> {
-            let coop = std::task::ready!(crate::runtime::coop::poll_proceed(cx));
+            let coop = std::task::ready!(crate::task::coop::poll_proceed(cx));
             coop.made_progress();
             std::task::Poll::Ready(())
         }

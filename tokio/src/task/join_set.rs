@@ -482,7 +482,7 @@ impl<T: 'static> JoinSet<T> {
     /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
     /// This can happen if the [coop budget] is reached.
     ///
-    /// [coop budget]: crate::task#cooperative-scheduling
+    /// [coop budget]: crate::task::coop#cooperative-scheduling
     pub fn poll_join_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<T, JoinError>>> {
         // The call to `pop_notified` moves the entry to the `idle` list. It is moved back to
         // the `notified` list if the waker is notified in the `poll` call below.
@@ -537,7 +537,7 @@ impl<T: 'static> JoinSet<T> {
     /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
     /// This can happen if the [coop budget] is reached.
     ///
-    /// [coop budget]: crate::task#cooperative-scheduling
+    /// [coop budget]: crate::task::coop#cooperative-scheduling
     /// [task ID]: crate::task::Id
     pub fn poll_join_next_with_id(
         &mut self,

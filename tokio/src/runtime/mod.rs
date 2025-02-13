@@ -310,7 +310,7 @@
 //! [`event_interval`]: crate::runtime::Builder::event_interval
 //! [`disable_lifo_slot`]: crate::runtime::Builder::disable_lifo_slot
 //! [the lifo slot optimization]: crate::runtime::Builder::disable_lifo_slot
-//! [coop budget]: crate::task#cooperative-scheduling
+//! [coop budget]: crate::task::coop#cooperative-scheduling
 //! [`worker_mean_poll_time`]: crate::runtime::RuntimeMetrics::worker_mean_poll_time
 
 // At the top due to macros
@@ -320,8 +320,6 @@
 mod tests;
 
 pub(crate) mod context;
-
-pub(crate) mod coop;
 
 pub(crate) mod park;
 
