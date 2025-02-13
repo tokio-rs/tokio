@@ -158,7 +158,6 @@ impl MetricsBatch {
         unstable: {
             /// The worker is about to park.
             pub(crate) fn about_to_park(&mut self) {
-                #[cfg(tokio_unstable)]
                 {
                     self.park_count += 1;
                     self.park_unpark_count += 1;
@@ -221,7 +220,6 @@ impl MetricsBatch {
         unstable: {
             /// Stop polling an individual task
             pub(crate) fn end_poll(&mut self) {
-                #[cfg(tokio_unstable)]
                 if let Some(poll_timer) = &mut self.poll_timer {
                     let elapsed = duration_as_u64(poll_timer.poll_started_at.elapsed());
                     poll_timer.poll_counts.measure(elapsed, 1);
