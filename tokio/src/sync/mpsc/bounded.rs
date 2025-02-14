@@ -180,6 +180,70 @@ impl<T> Receiver<T> {
         Receiver { chan }
     }
 
+    /// Peeks at the next value available for this receiver.
+    /// The referenced value returned by `peek` is identical to the one that will be returned by
+    /// the next call to `recv`.
+    /// Once a value is consumed by `recv`, it can no longer be peeked.
+    ///
+    /// This method returns `None` if the channel has been closed and there are
+    /// no remaining messages in the channel's buffer. This indicates that no
+    /// further values can ever be received from this `Receiver`. The channel is
+    /// closed when all senders have been dropped, or when [`close`] is called.
+    ///
+    /// If there are no messages in the channel's buffer, but the channel has
+    /// not yet been closed, this method will sleep until a message is sent or
+    /// the channel is closed.  Note that if [`close`] is called, but there are
+    /// still outstanding [`Permits`] from before it was closed, the channel is
+    /// not considered closed by `peek` until the permits are released.
+    pub async fn peek(&self) -> Option<&T> {
+        use std::future::poll_fn;
+        poll_fn(|cx| self.chan.peek(cx)).await
+    }
+
+    /// Tries to peek the next value for this receiver.
+    ///
+    /// This method returns the [`Empty`] error if the channel is currently
+    /// empty, but there are still outstanding [senders] or [permits].
+    ///
+    /// This method returns the [`Disconnected`] error if the channel is
+    /// currently empty, and there are no outstanding [senders] or [permits].
+    ///
+    /// Unlike the [`poll_recv`] method, this method will never return an
+    /// [`Empty`] error spuriously.
+    ///
+    /// [`Empty`]: crate::sync::mpsc::error::TryRecvError::Empty
+    /// [`Disconnected`]: crate::sync::mpsc::error::TryRecvError::Disconnected
+    /// [`poll_recv`]: Self::poll_recv
+    /// [senders]: crate::sync::mpsc::Sender
+    /// [permits]: crate::sync::mpsc::Permit
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    /// use tokio::sync::mpsc::error::TryRecvError;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel(100);
+    ///
+    ///     tx.send("hello").await.unwrap();
+    ///
+    ///     assert_eq!(Ok(&"hello"), rx.try_peek());
+    ///     assert_eq!(Err(TryRecvError::Empty), rx.try_peek());
+    ///
+    ///     tx.send("hello").await.unwrap();
+    ///     // Drop the last sender, closing the channel.
+    ///     drop(tx);
+    ///
+    ///     assert_eq!(Ok(&"hello"), rx.try_peek());
+    ///     assert_eq!(Err(TryRecvError::Disconnected), rx.try_peek());
+    /// }
+    /// ```
+    pub fn try_peek(&self) -> Result<&T, TryRecvError> {
+        self.chan.try_peek()
+    }
+
     /// Receives the next value for this receiver.
     ///
     /// This method returns `None` if the channel has been closed and there are
