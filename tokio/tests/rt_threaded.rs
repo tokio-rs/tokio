@@ -1,4 +1,3 @@
-#![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
 // Too slow on miri.
 #![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))]

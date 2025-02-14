@@ -447,6 +447,9 @@ cfg_taskdump! {
     impl Handle {
         /// Captures a snapshot of the runtime's state.
         ///
+        /// If you only want to capture a snapshot of a single future's state, you can use
+        /// [`Trace::capture`][crate::runtime::dump::Trace].
+        ///
         /// This functionality is experimental, and comes with a number of
         /// requirements and limitations.
         ///

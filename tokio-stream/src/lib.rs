@@ -1,4 +1,3 @@
-#![allow(unknown_lints, unexpected_cfgs)]
 #![allow(
     clippy::cognitive_complexity,
     clippy::large_enum_variant,

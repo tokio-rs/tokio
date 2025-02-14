@@ -2,7 +2,6 @@
 //!
 //! These tests ensure that the instrumentation for tokio
 //! synchronization primitives is correct.
-#![allow(unknown_lints, unexpected_cfgs)]
 #![warn(rust_2018_idioms)]
 #![cfg(all(tokio_unstable, feature = "tracing", target_has_atomic = "64"))]
 

@@ -1164,8 +1164,8 @@ impl UdpSocket {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn send_to<A: ToSocketAddrs>(&self, buf: &[u8], target: A) -> io::Result<usize> {
-        let mut addrs = to_socket_addrs(target).await?;
+    pub async fn send_to<A: ToSocketAddrs>(&self, buf: &[u8], addr: A) -> io::Result<usize> {
+        let mut addrs = to_socket_addrs(addr).await?;
 
         match addrs.next() {
             Some(target) => self.send_to_addr(buf, target).await,

@@ -95,3 +95,6 @@ harness = false
 name = "time_timeout"
 path = "time_timeout.rs"
 harness = false
+
+[lints]
+workspace = true

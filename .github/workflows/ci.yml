@@ -16,9 +16,9 @@ env:
   RUSTUP_WINDOWS_PATH_ADD_BIN: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2024-05-05
+  rust_nightly: nightly-2025-01-25
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2024-10-21
+  rust_miri_nightly: nightly-2025-01-25
   rust_clippy: '1.77'
   # When updating this, also update:
   # - README.md
@@ -532,15 +532,19 @@ jobs:
 
   cross-test-with-parking_lot:
     needs: basics
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - target: i686-unknown-linux-gnu
+            os: ubuntu-latest
             rustflags: --cfg tokio_taskdump
           - target: armv5te-unknown-linux-gnueabi
+            os: ubuntu-latest
           - target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
           - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
             rustflags: --cfg tokio_taskdump
     steps:
       - uses: actions/checkout@v4
@@ -572,15 +576,19 @@ jobs:
 
   cross-test-without-parking_lot:
     needs: basics
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - target: i686-unknown-linux-gnu
+            os: ubuntu-latest
             rustflags: --cfg tokio_taskdump
           - target: armv5te-unknown-linux-gnueabi
+            os: ubuntu-latest
           - target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
           - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
             rustflags: --cfg tokio_taskdump
     steps:
       - uses: actions/checkout@v4
@@ -1077,23 +1085,6 @@ jobs:
       - name: check-external-types
         run: cargo check-external-types --all-features
         working-directory: tokio
-
-  check-unexpected-lints-cfgs:
-    name: check unexpected lints and cfgs
-    needs: basics
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.rust_nightly }}
-      - name: don't allow warnings
-        run: sed -i '/#!\[allow(unknown_lints, unexpected_cfgs)\]/d' */src/lib.rs */tests/*.rs
-      - name: check for unknown lints and cfgs
-        run: cargo check --all-features --tests
-        env:
-          RUSTFLAGS: -Dwarnings --check-cfg=cfg(loom,tokio_unstable,tokio_taskdump,fuzzing,mio_unsupported_force_poll_poll,tokio_internal_mt_counters,fs,tokio_no_parking_lot,tokio_no_tuning_tests) -Funexpected_cfgs -Funknown_lints
 
   check-fuzzing:
     name: check-fuzzing
