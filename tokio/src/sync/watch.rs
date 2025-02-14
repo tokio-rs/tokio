@@ -949,6 +949,26 @@ impl<T> Drop for Receiver<T> {
     }
 }
 
+/// Return value of [`Sender::send_if_modified`].
+///
+/// Allows to capture data from within the locking scope.
+/// If the modification does not capture and return any data
+/// then `bool` could be used.
+pub trait SendIfModifiedReturn {
+    /// Indicates if the watched value has been modified.
+    ///
+    /// Returns `true` if the watched value has been modified
+    /// by a sender and receivers need to be notified.
+    /// Returns `false` if the watched value is unchanged.
+    fn is_modified(&self) -> bool;
+}
+
+impl SendIfModifiedReturn for bool {
+    fn is_modified(&self) -> bool {
+        *self
+    }
+}
+
 impl<T> Sender<T> {
     /// Creates the sending-half of the [`watch`] channel.
     ///
@@ -1046,19 +1066,19 @@ impl<T> Sender<T> {
     /// having to allocate a new instance. Additionally, this
     /// method permits sending values even when there are no receivers.
     ///
-    /// The `modify` closure must return `true` if the value has actually
-    /// been modified during the mutable borrow. It should only return `false`
-    /// if the value is guaranteed to be unmodified despite the mutable
-    /// borrow.
+    /// The `modify` closure must return a value that implements [`SendIfModifiedReturn`].
+    /// This could either be a custom data type or a `bool`ean value that becomes the result
+    /// of [`SendIfModifiedReturn::is_modified()`]. A result of `true` indicates that the
+    /// watched value has actually been modified during the mutable borrow and that receivers
+    /// must be notified.
     ///
-    /// Receivers are only notified if the closure returned `true`. If the
-    /// closure has modified the value but returned `false` this results
+    /// Receivers are only notified if [`SendIfModifiedReturn::is_modified()`] returns `true`.
+    /// If the  closure has modified the value but returned `false` this results
     /// in a *silent modification*, i.e. the modified value will be visible
     /// in subsequent calls to `borrow`, but receivers will not receive
     /// a change notification.
     ///
-    /// Returns the result of the closure, i.e. `true` if the value has
-    /// been modified and `false` otherwise.
+    /// Returns the result of the `modify` closure.
     ///
     /// # Panics
     ///
@@ -1075,6 +1095,7 @@ impl<T> Sender<T> {
     /// struct State {
     ///     counter: usize,
     /// }
+    ///
     /// let (state_tx, mut state_rx) = watch::channel(State { counter: 1 });
     /// let inc_counter_if_odd = |state: &mut State| {
     ///     if state.counter % 2 == 1 {
@@ -1096,23 +1117,25 @@ impl<T> Sender<T> {
     /// assert!(!state_rx.has_changed().unwrap());
     /// assert_eq!(state_rx.borrow_and_update().counter, 2);
     /// ```
-    pub fn send_if_modified<F>(&self, modify: F) -> bool
+    pub fn send_if_modified<F, R>(&self, modify: F) -> R
     where
-        F: FnOnce(&mut T) -> bool,
+        F: FnOnce(&mut T) -> R,
+        R: SendIfModifiedReturn,
     {
-        {
+        let modified = {
             // Acquire the write lock and update the value.
             let mut lock = self.shared.value.write();
 
             // Update the value and catch possible panic inside func.
             let result = panic::catch_unwind(panic::AssertUnwindSafe(|| modify(&mut lock)));
-            match result {
-                Ok(modified) => {
-                    if !modified {
-                        // Abort, i.e. don't notify receivers if unmodified
-                        return false;
+            let modified = match result {
+                Ok(return_value) => {
+                    if !return_value.is_modified() {
+                        // Abort, i.e. don't notify receivers if unmodified.
+                        return return_value;
                     }
-                    // Continue if modified
+                    // Continue if the value has been modified.
+                    return_value
                 }
                 Err(panicked) => {
                     // Drop the lock to avoid poisoning it.
@@ -1131,11 +1154,13 @@ impl<T> Sender<T> {
             // that receivers are able to figure out the version number of the
             // value they are currently looking at.
             drop(lock);
-        }
+
+            modified
+        };
 
         self.shared.notify_rx.notify_waiters();
 
-        true
+        modified
     }
 
     /// Sends a new value via the channel, notifying all receivers and returning
