@@ -31,3 +31,6 @@ tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }
 
 [package.metadata.docs.rs]
 all-features = true
+
+[lints]
+workspace = true

@@ -56,7 +56,8 @@ pub(crate) struct Trace {
 pin_project_lite::pin_project! {
     #[derive(Debug, Clone)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub(crate) struct Root<T> {
+    /// A future wrapper that roots traces (captured with [`Trace::capture`]).
+    pub struct Root<T> {
         #[pin]
         future: T,
     }

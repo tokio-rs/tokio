@@ -128,7 +128,7 @@ pub(crate) struct Task {
 
 #[derive(PartialEq, Eq)]
 pub(crate) enum Mandatory {
-    #[cfg_attr(not(fs), allow(dead_code))]
+    #[cfg_attr(not(feature = "fs"), allow(dead_code))]
     Mandatory,
     NonMandatory,
 }

@@ -154,3 +154,15 @@ impl<T: Unpin> SyncIoBridge<T> {
         self.src
     }
 }
+
+impl<T> AsMut<T> for SyncIoBridge<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.src
+    }
+}
+
+impl<T> AsRef<T> for SyncIoBridge<T> {
+    fn as_ref(&self) -> &T {
+        &self.src
+    }
+}

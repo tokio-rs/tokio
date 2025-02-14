@@ -56,3 +56,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 # This should allow `docsrs` to be read across projects, so that `tokio-stream`
 # can pick up stubbed types exported by `tokio`.
 rustc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
