@@ -503,25 +503,6 @@ impl Semaphore {
         }
     }
 
-    /// Creates a new closed semaphore with 0 permits.
-    pub(crate) fn new_closed() -> Self {
-        Self {
-            ll_sem: ll::Semaphore::new_closed(),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: tracing::Span::none(),
-        }
-    }
-
-    /// Creates a new closed semaphore with 0 permits.
-    #[cfg(not(all(loom, test)))]
-    pub(crate) const fn const_new_closed() -> Self {
-        Self {
-            ll_sem: ll::Semaphore::const_new_closed(),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: tracing::Span::none(),
-        }
-    }
-
     /// Returns the current number of available permits.
     pub fn available_permits(&self) -> usize {
         self.ll_sem.available_permits()

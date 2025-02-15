@@ -144,6 +144,20 @@ macro_rules! cfg_io_driver_impl {
     }
 }
 
+macro_rules! cfg_io_driver_or_sync {
+    ( $( $item:item )* ) => {
+        $(
+            #[cfg(any(
+                feature = "net",
+                all(unix, feature = "process"),
+                all(unix, feature = "signal"),
+                feature = "sync",
+            ))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_not_io_driver {
     ($($item:item)*) => {
         $(

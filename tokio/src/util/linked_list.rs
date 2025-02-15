@@ -263,7 +263,7 @@ impl<L: Link> Default for LinkedList<L, L::Target> {
 
 // ===== impl DrainFilter =====
 
-cfg_io_driver_impl! {
+cfg_io_driver_or_sync! {
     pub(crate) struct DrainFilter<'a, T: Link, F> {
         list: &'a mut LinkedList<T, T::Target>,
         filter: F,
