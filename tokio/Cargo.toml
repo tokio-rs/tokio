@@ -133,6 +133,7 @@ tokio-stream = { version = "0.1", path = "../tokio-stream" }
 futures = { version = "0.3.0", features = ["async-await"] }
 mockall = "0.11.1"
 async-stream = "0.3"
+futures-concurrency = "7.6.3"
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 socket2 = "0.5.5"
