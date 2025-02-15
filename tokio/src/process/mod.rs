@@ -1158,10 +1158,7 @@ impl Child {
     pub fn start_kill(&mut self) -> io::Result<()> {
         match &mut self.child {
             FusedChild::Child(child) => child.kill(),
-            FusedChild::Done(_) => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "invalid argument: can't kill an exited process",
-            )),
+            FusedChild::Done(_) => Ok(()),
         }
     }
 
