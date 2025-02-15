@@ -292,7 +292,11 @@ async fn test_once_cell_creates_span() {
         .with_fields(expect::field("state").with_value(&"unset"));
 
     let (subscriber, handle) = subscriber::mock()
-        .new_span(once_cell_span.clone().with_explicit_parent(None))
+        .new_span(
+            once_cell_span
+                .clone()
+                .with_ancestry(expect::is_explicit_root()),
+        )
         .enter(once_cell_span.clone())
         .event(state_event)
         .exit(once_cell_span.clone())
