@@ -46,6 +46,7 @@ cfg_io_util! {
 
     mod read;
     mod read_buf;
+    mod read_buf_exact;
     mod read_exact;
     mod read_int;
     mod read_line;
