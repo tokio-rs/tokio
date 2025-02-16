@@ -452,11 +452,18 @@ impl<T> OnceCell<T> {
     }
 
     fn poll_wait(&self, cx: &mut Context<'_>, node: Pin<&mut Waiter>, queued: bool) -> Poll<u8> {
+        // Checks if there is no need to wait, using acquire ordering
+        // as value may be accessed after in case of success.
+        let state = self.state.load(Ordering::Acquire);
+        if state == STATE_SET || node.is_initializer && state == STATE_UNSET {
+            return Poll::Ready(state);
+        }
         // Clone the waker before locking, a waker clone can be triggering arbitrary code.
         let waker = cx.waker().clone();
         let mut waiters = self.waiters.lock();
-        // With the waiters lock acquired, checks if there is no need to wait.
-        // Uses acquire ordering as value may be accessed after in case of success.
+        // Checks the state, this time with the lock held, so the state access
+        // is synchronized by the lock. If the waiter has been notified, then the
+        // state is ensured to have been modified.
         let state = self.state.load(Ordering::Acquire);
         if state == STATE_SET || node.is_initializer && state == STATE_UNSET {
             return Poll::Ready(state);
@@ -477,9 +484,6 @@ impl<T> OnceCell<T> {
     /// Waits for the `OnceCell` to be initialized, and returns a reference
     /// to the value stored.
     pub async fn wait_initialized(&self) -> &T {
-        if let Some(value) = self.get() {
-            return value;
-        }
         let state = WaitFuture::new(self, false).await;
         debug_assert_eq!(state, STATE_SET);
         // SAFETY: the cell has been initialized
