@@ -15,6 +15,7 @@ use std::ptr;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering;
 use std::task::{ready, Context, Poll, Waker};
+
 // This file contains an implementation of an OnceCell. The principle
 // behind the safety of the cell is that any thread with an `&OnceCell` may
 // access the `value` field according the following rules:
@@ -268,12 +269,22 @@ impl<T> OnceCell<T> {
         }
     }
 
+    // Acquire memory ordering to load the state. In case of ZST, there is no
+    // memory to synchronize, so relaxed ordering is fine.
+    fn ordering_acquire() -> Ordering {
+        if std::mem::size_of::<T>() == 0 {
+            Ordering::Relaxed
+        } else {
+            Ordering::Acquire
+        }
+    }
+
     /// Returns `true` if the `OnceCell` currently contains a value, and `false`
     /// otherwise.
     pub fn initialized(&self) -> bool {
         // Using acquire ordering so any threads that read a true from this
         // atomic is able to read the value.
-        self.state.load(Ordering::Acquire) == STATE_SET
+        self.state.load(Self::ordering_acquire()) == STATE_SET
     }
 
     /// Returns `true` if the `OnceCell` currently contains a value, and `false`
@@ -303,7 +314,13 @@ impl<T> OnceCell<T> {
 
         // Using release ordering so any threads that read a true from this
         // atomic is able to read the value we just stored.
-        self.state.store(STATE_SET, Ordering::Release);
+        // In case of ZST, there is no memory to synchronize, so relaxed is fine.
+        let ordering_release = if std::mem::size_of::<T>() == 0 {
+            Ordering::Relaxed
+        } else {
+            Ordering::Release
+        };
+        self.state.store(STATE_SET, ordering_release);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         self.resource_span.in_scope(|| {
             tracing::trace!(
@@ -454,7 +471,7 @@ impl<T> OnceCell<T> {
     fn poll_wait(&self, cx: &mut Context<'_>, node: Pin<&mut Waiter>, queued: bool) -> Poll<u8> {
         // Checks if there is no need to wait, using acquire ordering
         // as value may be accessed after in case of success.
-        let state = self.state.load(Ordering::Acquire);
+        let state = self.state.load(Self::ordering_acquire());
         if state == STATE_SET || node.is_initializer && state == STATE_UNSET {
             return Poll::Ready(state);
         }
@@ -464,7 +481,7 @@ impl<T> OnceCell<T> {
         // Checks the state, this time with the lock held, so the state access
         // is synchronized by the lock. If the waiter has been notified, then the
         // state is ensured to have been modified.
-        let state = self.state.load(Ordering::Acquire);
+        let state = self.state.load(Self::ordering_acquire());
         if state == STATE_SET || node.is_initializer && state == STATE_UNSET {
             return Poll::Ready(state);
         }
@@ -541,7 +558,7 @@ impl<T> OnceCell<T> {
                 STATE_UNSET,
                 STATE_LOCKED,
                 Ordering::Relaxed,
-                Ordering::Acquire,
+                Self::ordering_acquire(),
             ) {
                 // State has been successfully locked,
                 // execute the initializer and set the result.
