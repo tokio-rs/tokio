@@ -452,14 +452,8 @@ impl<T> OnceCell<T> {
     }
 
     fn poll_wait(&self, cx: &mut Context<'_>, node: Pin<&mut Waiter>, queued: bool) -> Poll<u8> {
-        // If the future was queued, then it has been wakened up,
-        // so it should be ready.
-        if queued {
-            // Force a synchronization of the state.
-            // Otherwise, a task wakened up may not see the state initialized.
-            let state = self.state.fetch_add(0, Ordering::Acquire);
-            return Poll::Ready(state);
-        }
+        // Clone the waker before locking, a waker clone can be triggering arbitrary code.
+        let waker = cx.waker().clone();
         let mut waiters = self.waiters.lock();
         // With the waiters lock acquired, checks if there is no need to wait.
         // Uses acquire ordering as value may be accessed after in case of success.
@@ -471,8 +465,11 @@ impl<T> OnceCell<T> {
         unsafe {
             let node = node.get_unchecked_mut();
             // waker is only accessed with the waiters lock acquired
-            node.waker = Some(cx.waker().clone());
-            waiters.push_front(NonNull::from(node));
+            node.waker = Some(waker);
+            // If the waiter is not already in the wait queue, enqueue it.
+            if !queued {
+                waiters.push_front(NonNull::from(node));
+            }
         }
         Poll::Pending
     }
@@ -485,6 +482,7 @@ impl<T> OnceCell<T> {
         }
         let state = WaitFuture::new(self, false).await;
         debug_assert_eq!(state, STATE_SET);
+        // SAFETY: the cell has been initialized
         unsafe { self.get_unchecked() }
     }
 
@@ -740,7 +738,6 @@ impl<T> Future for WaitFuture<'_, T> {
         match cell.poll_wait(cx, node, *queued) {
             Poll::Ready(state) => {
                 coop.made_progress();
-                *queued = false;
                 Poll::Ready(state)
             }
             Poll::Pending => {
