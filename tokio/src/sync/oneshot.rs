@@ -931,6 +931,64 @@ impl<T> Receiver<T> {
         }
     }
 
+    /// Checks if the channel has been closed.
+    ///
+    /// This happens when the corresponding sender is either dropped or sends a
+    /// value, or when this receiver has closed the channel.
+    ///
+    /// # Examples
+    ///
+    /// Sending a value.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = oneshot::channel();
+    ///     assert!(!rx.is_closed());
+    ///
+    ///     tx.send(0).unwrap();
+    ///     assert!(rx.is_closed());
+    /// }
+    /// ```
+    ///
+    /// Dropping the sender.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = oneshot::channel::<()>();
+    ///     assert!(!rx.is_closed());
+    ///     drop(tx);
+    ///     assert!(rx.is_closed());
+    /// }
+    /// ```
+    ///
+    /// Closing the receiver.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel::<()>();
+    ///     assert!(!rx.is_closed());
+    ///     rx.close();
+    ///     assert!(rx.is_closed());
+    /// }
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        if let Some(inner) = self.inner.as_ref() {
+            let state = State::load(&inner.state, Acquire);
+            state.is_closed() || state.is_complete()
+        } else {
+            true
+        }
+    }
+
     /// Attempts to receive a value.
     ///
     /// If a pending value exists in the channel, it is returned. If no value
