@@ -279,7 +279,7 @@ impl<T> OnceCell<T> {
     /// Returns `true` if the `OnceCell` currently contains a value, and `false`
     /// otherwise.
     fn initialized_mut(&mut self) -> bool {
-        *self.state.get_mut() == STATE_SET
+        self.state.with_mut(|s| *s == STATE_SET)
     }
 
     // SAFETY: The OnceCell must not be empty.
@@ -451,18 +451,21 @@ impl<T> OnceCell<T> {
         }
     }
 
-    fn poll_wait(&self, cx: &mut Context<'_>, node: Pin<&mut Waiter>, queued: bool) -> Poll<()> {
+    fn poll_wait(&self, cx: &mut Context<'_>, node: Pin<&mut Waiter>, queued: bool) -> Poll<u8> {
         // If the future was queued, then it has been wakened up,
         // so it should be ready.
         if queued {
-            return Poll::Ready(());
+            // Force a synchronization of the state.
+            // Otherwise, a task wakened up may not see the state initialized.
+            let state = self.state.fetch_add(0, Ordering::Acquire);
+            return Poll::Ready(state);
         }
         let mut waiters = self.waiters.lock();
         // With the waiters lock acquired, checks if there is no need to wait.
         // Uses acquire ordering as value may be accessed after in case of success.
         let state = self.state.load(Ordering::Acquire);
         if state == STATE_SET || node.is_initializer && state == STATE_UNSET {
-            return Poll::Ready(());
+            return Poll::Ready(state);
         }
         // SAFETY: node is not moved out of pinned reference
         unsafe {
@@ -480,7 +483,8 @@ impl<T> OnceCell<T> {
         if let Some(value) = self.get() {
             return value;
         }
-        WaitFuture::new(self, false).await;
+        let state = WaitFuture::new(self, false).await;
+        debug_assert_eq!(state, STATE_SET);
         unsafe { self.get_unchecked() }
     }
 
@@ -573,14 +577,12 @@ impl<T> OnceCell<T> {
                 // State is currently locked by another initializer,
                 // wait for it to succeed or fail.
                 Err(STATE_LOCKED) => {
-                    WaitFuture::new(self, true).await;
-                    // It would be technically possible to return from `WaitFuture`
-                    // if the cell had been initialized, but it would make the code
-                    // a lot more complex. This is already an edge case, so we don't
-                    // mind using an additional atomic load.
-                    if let Some(value) = self.get() {
-                        return Ok(value);
+                    let state = WaitFuture::new(self, true).await;
+                    // SAFETY: the cell has been initialized
+                    if state == STATE_SET {
+                        return Ok(unsafe { self.get_unchecked() });
                     }
+                    debug_assert_eq!(state, STATE_UNSET);
                     // The other initializer has failed, try to lock the state again
                     continue;
                 }
@@ -597,7 +599,7 @@ impl<T> OnceCell<T> {
     pub fn into_inner(mut self) -> Option<T> {
         if self.initialized_mut() {
             // Set to uninitialized for the destructor of `OnceCell` to work properly
-            *self.state.get_mut() = STATE_UNSET;
+            self.state.with_mut(|s| *s = STATE_UNSET);
             Some(unsafe { self.value.with(|ptr| ptr::read(ptr).assume_init()) })
         } else {
             None
@@ -729,17 +731,17 @@ impl<T> Drop for WaitFuture<'_, T> {
 }
 
 impl<T> Future for WaitFuture<'_, T> {
-    type Output = ();
+    type Output = u8;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let (node, cell, queued) = self.project();
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         match cell.poll_wait(cx, node, *queued) {
-            Poll::Ready(_) => {
+            Poll::Ready(state) => {
                 coop.made_progress();
                 *queued = false;
-                Poll::Ready(())
+                Poll::Ready(state)
             }
             Poll::Pending => {
                 *queued = true;
