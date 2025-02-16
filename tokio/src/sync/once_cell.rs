@@ -85,8 +85,8 @@ pub struct OnceCell<T> {
 }
 
 const STATE_UNSET: u8 = 0;
-const STATE_LOCKED: u8 = 1;
-const STATE_SET: u8 = 2;
+const STATE_LOCKED: u8 = 2;
+const STATE_SET: u8 = 1;
 
 impl<T> Default for OnceCell<T> {
     fn default() -> OnceCell<T> {
