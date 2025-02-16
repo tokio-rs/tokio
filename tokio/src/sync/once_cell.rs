@@ -85,8 +85,8 @@ pub struct OnceCell<T> {
 }
 
 const STATE_UNSET: u8 = 0;
-const STATE_LOCKED: u8 = 2;
 const STATE_SET: u8 = 1;
+const STATE_LOCKED: u8 = 2;
 
 impl<T> Default for OnceCell<T> {
     fn default() -> OnceCell<T> {
@@ -269,22 +269,12 @@ impl<T> OnceCell<T> {
         }
     }
 
-    // Acquire memory ordering to load the state. In case of ZST, there is no
-    // memory to synchronize, so relaxed ordering is fine.
-    fn ordering_acquire() -> Ordering {
-        if std::mem::size_of::<T>() == 0 {
-            Ordering::Relaxed
-        } else {
-            Ordering::Acquire
-        }
-    }
-
     /// Returns `true` if the `OnceCell` currently contains a value, and `false`
     /// otherwise.
     pub fn initialized(&self) -> bool {
         // Using acquire ordering so any threads that read a true from this
         // atomic is able to read the value.
-        self.state.load(Self::ordering_acquire()) == STATE_SET
+        self.state.load(Ordering::Acquire) == STATE_SET
     }
 
     /// Returns `true` if the `OnceCell` currently contains a value, and `false`
@@ -314,13 +304,7 @@ impl<T> OnceCell<T> {
 
         // Using release ordering so any threads that read a true from this
         // atomic is able to read the value we just stored.
-        // In case of ZST, there is no memory to synchronize, so relaxed is fine.
-        let ordering_release = if std::mem::size_of::<T>() == 0 {
-            Ordering::Relaxed
-        } else {
-            Ordering::Release
-        };
-        self.state.store(STATE_SET, ordering_release);
+        self.state.store(STATE_SET, Ordering::Release);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         self.resource_span.in_scope(|| {
             tracing::trace!(
@@ -375,13 +359,14 @@ impl<T> OnceCell<T> {
             return self.set_zst(value);
         }
         // Try to lock the state. Relaxed ordering is enough for success,
-        // as the value is written but not read after. Same for failure,
-        // as the value is not accessed either.
+        // as the value is written but not read after. In case of failure,
+        // acquire ordering is used to have happens-before the successful
+        // initialization.
         match self.state.compare_exchange(
             STATE_UNSET,
             STATE_LOCKED,
             Ordering::Relaxed,
-            Ordering::Relaxed,
+            Ordering::Acquire,
         ) {
             Ok(_) => {
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -406,12 +391,14 @@ impl<T> OnceCell<T> {
     /// `MaybeUninit::assume_init` is indeed always safe and valid for ZSTs.
     fn set_zst(&self, value: T) -> Result<(), SetError<T>> {
         assert_eq!(std::mem::size_of::<T>(), 0);
-        // There is no memory to synchronize with ZSTs, hence relaxed ordering.
+        // Even if there is no value set, user may expect to have `set`
+        // happens-before `wait_initialized`, and successful `set` happens-before
+        // failing `set`, so release ordering is used for store and acquire for load.
         match self.state.compare_exchange(
             STATE_UNSET,
             STATE_SET,
-            Ordering::Relaxed,
-            Ordering::Relaxed,
+            Ordering::Release,
+            Ordering::Acquire,
         ) {
             Ok(_) => {
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -471,7 +458,7 @@ impl<T> OnceCell<T> {
     fn poll_wait(&self, cx: &mut Context<'_>, node: Pin<&mut Waiter>, queued: bool) -> Poll<u8> {
         // Checks if there is no need to wait, using acquire ordering
         // as value may be accessed after in case of success.
-        let state = self.state.load(Self::ordering_acquire());
+        let state = self.state.load(Ordering::Acquire);
         if state == STATE_SET || node.is_initializer && state == STATE_UNSET {
             return Poll::Ready(state);
         }
@@ -481,7 +468,7 @@ impl<T> OnceCell<T> {
         // Checks the state, this time with the lock held, so the state access
         // is synchronized by the lock. If the waiter has been notified, then the
         // state is ensured to have been modified.
-        let state = self.state.load(Self::ordering_acquire());
+        let state = self.state.load(Ordering::Acquire);
         if state == STATE_SET || node.is_initializer && state == STATE_UNSET {
             return Poll::Ready(state);
         }
@@ -553,12 +540,12 @@ impl<T> OnceCell<T> {
         loop {
             // Try to lock the state. Relaxed ordering is enough for success,
             // as the value is written not read after. However, failure must use
-            // `Acquire` ordering to access the value set by another thread.
+            // acquire ordering to access the value set by another thread.
             match self.state.compare_exchange(
                 STATE_UNSET,
                 STATE_LOCKED,
                 Ordering::Relaxed,
-                Self::ordering_acquire(),
+                Ordering::Acquire,
             ) {
                 // State has been successfully locked,
                 // execute the initializer and set the result.
