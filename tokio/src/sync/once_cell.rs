@@ -389,7 +389,7 @@ impl<T> OnceCell<T> {
     /// `MaybeUninit::assume_init` is indeed always safe and valid for ZSTs.
     fn set_zst(&self, value: T) -> Result<(), SetError<T>> {
         assert_eq!(std::mem::size_of::<T>(), 0);
-        // There is no memory to synchronized with ZSTs, hence relaxed ordering.
+        // There is no memory to synchronize with ZSTs, hence relaxed ordering.
         match self.state.compare_exchange(
             STATE_UNSET,
             STATE_SET,
@@ -608,7 +608,7 @@ impl<T> OnceCell<T> {
         }
     }
 
-    /// Takes ownership of the current value, leaving the cell empty.  Returns
+    /// Takes ownership of the current value, leaving the cell empty. Returns
     /// `None` if the cell is empty.
     pub fn take(&mut self) -> Option<T> {
         std::mem::take(self).into_inner()
@@ -715,7 +715,7 @@ impl<'a, T> WaitFuture<'a, T> {
 
 impl<T> Drop for WaitFuture<'_, T> {
     fn drop(&mut self) {
-        // If the future is completed, there is no node in the wait list, so we
+        // If the future has not been queued, there is no node in the wait list, so we
         // can skip acquiring the lock.
         if !self.queued {
             return;
