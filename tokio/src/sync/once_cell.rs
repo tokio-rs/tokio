@@ -16,21 +16,23 @@ use std::ptr::NonNull;
 use std::sync::atomic::Ordering;
 use std::task::{ready, Context, Poll, Waker};
 
-// This file contains an implementation of an OnceCell. The principle
-// behind the safety of the cell is that any thread with an `&OnceCell` may
-// access the `value` field according the following rules:
+// This file contains an implementation of an OnceCell. Its synchronization relies
+// on an atomic state with 3 possible values:
+// - STATE_UNSET: the cell is uninitialized
+// - STATE_SET: the cell is initialized, its value can be accessed
+// - STATE_LOCKED: the cell is locked, its value can be set
 //
-//  1. When `value_set` is false, the `value` field may be modified by the
-//     thread holding the permit on the semaphore.
-//  2. When `value_set` is true, the `value` field may be accessed immutably by
-//     any thread.
-//
-// It is an invariant that if the semaphore is closed, then `value_set` is true.
-// The reverse does not necessarily hold — but if not, the semaphore may not
-// have any available permits.
-//
-// A thread with a `&mut OnceCell` may modify the value in any way it wants as
-// long as the invariants are upheld.
+// Initializing the cell is done in 3 steps:
+// - acquire the cell lock by setting its state to `STATE_LOCKED` with a CAS
+// - writing the cell value
+// - setting the state to `STATE_SET`
+
+/// Cell is uninitialized.
+const STATE_UNSET: u8 = 0;
+/// Cell is initialized.
+const STATE_SET: u8 = 1;
+/// Cell is locked for initialization.
+const STATE_LOCKED: u8 = 2;
 
 /// A thread-safe cell that can be written to only once.
 ///
@@ -83,10 +85,6 @@ pub struct OnceCell<T> {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,
 }
-
-const STATE_UNSET: u8 = 0;
-const STATE_SET: u8 = 1;
-const STATE_LOCKED: u8 = 2;
 
 impl<T> Default for OnceCell<T> {
     fn default() -> OnceCell<T> {
