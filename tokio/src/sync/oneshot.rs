@@ -794,7 +794,7 @@ impl<T> Sender<T> {
         ready!(crate::trace::trace_leaf(cx));
 
         // Keep track of task budget
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         let inner = self.inner.as_ref().unwrap();
 
@@ -928,6 +928,149 @@ impl<T> Receiver<T> {
                 rx_dropped.op = "override",
                 )
             });
+        }
+    }
+
+    /// Checks if this receiver is terminated.
+    ///
+    /// This function returns true if this receiver has already yielded a [`Poll::Ready`] result.
+    /// If so, this receiver should no longer be polled.
+    ///
+    /// # Examples
+    ///
+    /// Sending a value and polling it.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// use std::task::Poll;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel();
+    ///
+    ///     // A receiver is not terminated when it is initialized.
+    ///     assert!(!rx.is_terminated());
+    ///
+    ///     // A receiver is not terminated it is polled and is still pending.
+    ///     let poll = futures::poll!(&mut rx);
+    ///     assert_eq!(poll, Poll::Pending);
+    ///     assert!(!rx.is_terminated());
+    ///
+    ///     // A receiver is not terminated if a value has been sent, but not yet read.
+    ///     tx.send(0).unwrap();
+    ///     assert!(!rx.is_terminated());
+    ///
+    ///     // A receiver *is* terminated after it has been polled and yielded a value.
+    ///     assert_eq!((&mut rx).await, Ok(0));
+    ///     assert!(rx.is_terminated());
+    /// }
+    /// ```
+    ///
+    /// Dropping the sender.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel::<()>();
+    ///
+    ///     // A receiver is not immediately terminated when the sender is dropped.
+    ///     drop(tx);
+    ///     assert!(!rx.is_terminated());
+    ///
+    ///     // A receiver *is* terminated after it has been polled and yielded an error.
+    ///     let _ = (&mut rx).await.unwrap_err();
+    ///     assert!(rx.is_terminated());
+    /// }
+    /// ```
+    pub fn is_terminated(&self) -> bool {
+        self.inner.is_none()
+    }
+
+    /// Checks if a channel is empty.
+    ///
+    /// This method returns `true` if the channel has no messages.
+    ///
+    /// It is not necessarily safe to poll an empty receiver, which may have
+    /// already yielded a value. Use [`is_terminated()`][Self::is_terminated]
+    /// to check whether or not a receiver can be safely polled, instead.
+    ///
+    /// # Examples
+    ///
+    /// Sending a value.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel();
+    ///     assert!(rx.is_empty());
+    ///
+    ///     tx.send(0).unwrap();
+    ///     assert!(!rx.is_empty());
+    ///
+    ///     let _ = (&mut rx).await;
+    ///     assert!(rx.is_empty());
+    /// }
+    /// ```
+    ///
+    /// Dropping the sender.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel::<()>();
+    ///
+    ///     // A channel is empty if the sender is dropped.
+    ///     drop(tx);
+    ///     assert!(rx.is_empty());
+    ///
+    ///     // A closed channel still yields an error, however.
+    ///     (&mut rx).await.expect_err("should yield an error");
+    ///     assert!(rx.is_empty());
+    /// }
+    /// ```
+    ///
+    /// Terminated channels are empty.
+    ///
+    /// ```should_panic
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel();
+    ///     tx.send(0).unwrap();
+    ///     let _ = (&mut rx).await;
+    ///
+    ///     // NB: an empty channel is not necessarily safe to poll!
+    ///     assert!(rx.is_empty());
+    ///     let _ = (&mut rx).await;
+    /// }
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        let Some(inner) = self.inner.as_ref() else {
+            // The channel has already terminated.
+            return true;
+        };
+
+        let state = State::load(&inner.state, Acquire);
+        if state.is_complete() {
+            // SAFETY: If `state.is_complete()` returns true, then the
+            // `VALUE_SENT` bit has been set and the sender side of the
+            // channel will no longer attempt to access the inner
+            // `UnsafeCell`. Therefore, it is now safe for us to access the
+            // cell.
+            //
+            // The channel is empty if it does not have a value.
+            unsafe { !inner.has_value() }
+        } else {
+            // The receiver closed the channel or no value has been sent yet.
+            true
         }
     }
 
@@ -1106,10 +1249,10 @@ impl<T> Future for Receiver<T> {
 
         let ret = if let Some(inner) = self.as_ref().get_ref().inner.as_ref() {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx)))?;
+            let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx))).map_err(Into::into);
 
             #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-            let res = ready!(inner.poll_recv(cx))?;
+            let res = ready!(inner.poll_recv(cx)).map_err(Into::into);
 
             res
         } else {
@@ -1117,7 +1260,7 @@ impl<T> Future for Receiver<T> {
         };
 
         self.inner = None;
-        Ready(Ok(ret))
+        Ready(ret)
     }
 }
 
@@ -1142,7 +1285,7 @@ impl<T> Inner<T> {
     fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
         ready!(crate::trace::trace_leaf(cx));
         // Keep track of task budget
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         // Load the state
         let mut state = State::load(&self.state, Acquire);
@@ -1232,6 +1375,19 @@ impl<T> Inner<T> {
     /// if it is set, then only the receiver may call this method.
     unsafe fn consume_value(&self) -> Option<T> {
         self.value.with_mut(|ptr| (*ptr).take())
+    }
+
+    /// Returns true if there is a value. This function does not check `state`.
+    ///
+    /// # Safety
+    ///
+    /// Calling this method concurrently on multiple threads will result in a
+    /// data race. The `VALUE_SENT` state bit is used to ensure that only the
+    /// sender *or* the receiver will call this method at a given point in time.
+    /// If `VALUE_SENT` is not set, then only the sender may call this method;
+    /// if it is set, then only the receiver may call this method.
+    unsafe fn has_value(&self) -> bool {
+        self.value.with(|ptr| (*ptr).is_some())
     }
 }
 

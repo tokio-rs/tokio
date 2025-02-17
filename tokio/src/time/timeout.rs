@@ -5,7 +5,7 @@
 //! [`Timeout`]: struct@Timeout
 
 use crate::{
-    runtime::coop,
+    task::coop,
     time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
     util::trace,
 };
