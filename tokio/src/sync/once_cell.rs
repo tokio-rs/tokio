@@ -466,7 +466,7 @@ impl<T> OnceCell<T> {
         // Uses acquire ordering as value may be accessed after in case of success.
         let state = self.state.load(Ordering::Acquire);
         if state == STATE_SET || node.is_initializer && state == STATE_UNSET {
-            // If there was a waker, it means the node was queued,
+            // If there is a waker, it means the node is queued,
             // so it is removed from the list.
             if node.waker.take().is_some() {
                 // SAFETY: The node is contained in the list.
@@ -474,7 +474,7 @@ impl<T> OnceCell<T> {
             }
             Poll::Ready(state)
         } else {
-            // If there was no waker, it means the node was not queued,
+            // If there is no waker, it means the node is not queued,
             // so it is pushed in the list.
             if node.waker.replace(waker).is_none() {
                 waiters.push_front(NonNull::from(node));
