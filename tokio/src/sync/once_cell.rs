@@ -398,6 +398,8 @@ impl<T> OnceCell<T> {
             Ordering::Acquire,
         ) {
             Ok(_) => {
+                // Forget the value, as `T` could implement `Drop`.
+                std::mem::forget(value);
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 self.resource_span.in_scope(|| {
                     tracing::trace!(
@@ -405,8 +407,6 @@ impl<T> OnceCell<T> {
                         state = "set",
                     );
                 });
-                // Forget the value, as `T` could implement `Drop`.
-                std::mem::forget(value);
                 self.notify_initialized();
                 Ok(())
             }
