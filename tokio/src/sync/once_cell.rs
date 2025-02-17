@@ -356,14 +356,13 @@ impl<T> OnceCell<T> {
         if std::mem::size_of::<T>() == 0 {
             return self.set_zst(value);
         }
-        // Try to lock the state. Relaxed ordering is enough for success,
-        // as the value is written but not read after. In case of failure,
-        // acquire ordering is used to have happens-before the successful
-        // initialization.
+        // Try to lock the state, using acquire `Acquire` ordering for both success
+        // and failure to have happens-before relation with previous initialization
+        // attempts.
         match self.state.compare_exchange(
             STATE_UNSET,
             STATE_LOCKED,
-            Ordering::Relaxed,
+            Ordering::Acquire,
             Ordering::Acquire,
         ) {
             Ok(_) => {
@@ -536,13 +535,13 @@ impl<T> OnceCell<T> {
         crate::trace::async_trace_leaf().await;
 
         loop {
-            // Try to lock the state. Relaxed ordering is enough for success,
-            // as the value is written not read after. However, failure must use
-            // acquire ordering to access the value set by another thread.
+            // Try to lock the state, using acquire `Acquire` ordering for both success
+            // and failure to have happens-before relation with previous initialization
+            // attempts.
             match self.state.compare_exchange(
                 STATE_UNSET,
                 STATE_LOCKED,
-                Ordering::Relaxed,
+                Ordering::Acquire,
                 Ordering::Acquire,
             ) {
                 // State has been successfully locked,
@@ -560,8 +559,9 @@ impl<T> OnceCell<T> {
                     struct DropGuard<'a, T>(&'a OnceCell<T>);
                     impl<T> Drop for DropGuard<'_, T> {
                         fn drop(&mut self) {
-                            // Cell value was not touched, hence relaxed ordering.
-                            self.0.state.store(STATE_UNSET, Ordering::Relaxed);
+                            // Use release ordering to for this failed initialization
+                            // attempt to happens-before the next one.
+                            self.0.state.store(STATE_UNSET, Ordering::Release);
                             #[cfg(all(tokio_unstable, feature = "tracing"))]
                             self.0.resource_span.in_scope(|| {
                                 tracing::trace!(
