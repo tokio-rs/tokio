@@ -7,7 +7,7 @@ use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 #[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
 use tokio::test as maybe_tokio_test;
 
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 use tokio_test::{assert_ok, assert_pending, assert_ready};
 
 use std::future::poll_fn;
@@ -715,4 +715,40 @@ async fn temporary_lifetime_extension() {
     tokio::select! {
         () = &mut std::future::ready(()) => {},
     }
+}
+
+#[tokio::test]
+async fn select_is_budget_aware() {
+    const BUDGET: usize = 128;
+
+    let message_sent = BUDGET + 1;
+    let (sender, mut receiver) = mpsc::channel(message_sent);
+
+    let jh = tokio::spawn(async move {
+        for n in 0usize..message_sent {
+            sender.send(n).await.unwrap();
+        }
+    });
+
+    // Wait for all messages to be sent
+    jh.await.unwrap();
+
+    let mut message_received = 0;
+    loop {
+        tokio::select! {
+            // Poll the `receiver` first in order to deplete the budget
+            biased;
+
+            msg = receiver.recv() => {
+                if msg.is_some() {
+                    message_received += 1
+                } else {
+                    break;
+                }
+            },
+            () = std::future::ready(()) => {}
+        }
+    }
+
+    assert_eq!(message_sent, message_received);
 }
