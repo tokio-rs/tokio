@@ -27,18 +27,18 @@ default = []
 
 # enable everything
 full = [
-    "fs",
-    "io-util",
-    "io-std",
-    "macros",
-    "net",
-    "parking_lot",
-    "process",
-    "rt",
-    "rt-multi-thread",
-    "signal",
-    "sync",
-    "time",
+  "fs",
+  "io-util",
+  "io-std",
+  "macros",
+  "net",
+  "parking_lot",
+  "process",
+  "rt",
+  "rt-multi-thread",
+  "signal",
+  "sync",
+  "time",
 ]
 
 fs = []
@@ -47,39 +47,39 @@ io-util = ["bytes"]
 io-std = []
 macros = ["tokio-macros"]
 net = [
-    "libc",
-    "mio/os-poll",
-    "mio/os-ext",
-    "mio/net",
-    "socket2",
-    "windows-sys/Win32_Foundation",
-    "windows-sys/Win32_Security",
-    "windows-sys/Win32_Storage_FileSystem",
-    "windows-sys/Win32_System_Pipes",
-    "windows-sys/Win32_System_SystemServices",
+  "libc",
+  "mio/os-poll",
+  "mio/os-ext",
+  "mio/net",
+  "socket2",
+  "windows-sys/Win32_Foundation",
+  "windows-sys/Win32_Security",
+  "windows-sys/Win32_Storage_FileSystem",
+  "windows-sys/Win32_System_Pipes",
+  "windows-sys/Win32_System_SystemServices",
 ]
 process = [
-    "bytes",
-    "libc",
-    "mio/os-poll",
-    "mio/os-ext",
-    "mio/net",
-    "signal-hook-registry",
-    "windows-sys/Win32_Foundation",
-    "windows-sys/Win32_System_Threading",
-    "windows-sys/Win32_System_WindowsProgramming",
+  "bytes",
+  "libc",
+  "mio/os-poll",
+  "mio/os-ext",
+  "mio/net",
+  "signal-hook-registry",
+  "windows-sys/Win32_Foundation",
+  "windows-sys/Win32_System_Threading",
+  "windows-sys/Win32_System_WindowsProgramming",
 ]
 # Includes basic task execution capabilities
 rt = []
 rt-multi-thread = ["rt"]
 signal = [
-    "libc",
-    "mio/os-poll",
-    "mio/net",
-    "mio/os-ext",
-    "signal-hook-registry",
-    "windows-sys/Win32_Foundation",
-    "windows-sys/Win32_System_Console",
+  "libc",
+  "mio/os-poll",
+  "mio/net",
+  "mio/os-ext",
+  "signal-hook-registry",
+  "windows-sys/Win32_Foundation",
+  "windows-sys/Win32_System_Console",
 ]
 sync = []
 test-util = ["rt", "sync", "time"]
@@ -123,8 +123,8 @@ optional = true
 [target.'cfg(windows)'.dev-dependencies.windows-sys]
 version = "0.52"
 features = [
-    "Win32_Foundation",
-    "Win32_Security_Authorization",
+  "Win32_Foundation",
+  "Win32_Security_Authorization",
 ]
 
 [dev-dependencies]
@@ -169,9 +169,9 @@ features = ["full", "test-util"]
 # The following are types that are allowed to be exposed in Tokio's public API.
 # The standard library is allowed by default.
 allowed_external_types = [
-    "bytes::buf::buf_impl::Buf",
-    "bytes::buf::buf_mut::BufMut",
-    "tokio_macros::*",
+  "bytes::buf::buf_impl::Buf",
+  "bytes::buf::buf_mut::BufMut",
+  "tokio_macros::*",
 ]
 
 [lints]
