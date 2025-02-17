@@ -452,39 +452,43 @@ impl<T> OnceCell<T> {
         }
     }
 
-    fn poll_wait(&self, cx: &mut Context<'_>, node: Pin<&mut Waiter>, queued: bool) -> Poll<u8> {
-        // Checks if there is no need to wait, using acquire ordering
-        // as value may be accessed after in case of success.
-        let state = self.state.load(Ordering::Acquire);
-        if state == STATE_SET || node.is_initializer && state == STATE_UNSET {
-            return Poll::Ready(state);
-        }
+    /// Wait for the state to have the required value.
+    /// If the node is pushed in the waiter
+    fn poll_wait(&self, cx: &mut Context<'_>, node: Pin<&mut Waiter>) -> Poll<u8> {
         // Clone the waker before locking, a waker clone can be triggering arbitrary code.
         let waker = cx.waker().clone();
         let mut waiters = self.waiters.lock();
-        // Checks the state, this time with the lock held, so the state access
-        // is synchronized by the lock. If the waiter has been notified, then the
-        // state is ensured to have been modified.
+        // SAFETY: node is not moved out of pinned reference,
+        // and it is accessed with the lock held
+        let node = unsafe { node.get_unchecked_mut() };
+        // Checks the state with the lock held; if the waiter has been notified,
+        // then the state is ensured to have been modified.
+        // Uses acquire ordering as value may be accessed after in case of success.
         let state = self.state.load(Ordering::Acquire);
         if state == STATE_SET || node.is_initializer && state == STATE_UNSET {
-            return Poll::Ready(state);
-        }
-        // SAFETY: node is not moved out of pinned reference
-        unsafe {
-            let node = node.get_unchecked_mut();
-            // waker is only accessed with the waiters lock acquired
-            node.waker = Some(waker);
-            // If the waiter is not already in the wait queue, enqueue it.
-            if !queued {
+            // If there was a waker, it means the node was queued,
+            // so it is removed from the list.
+            if node.waker.take().is_some() {
+                // SAFETY: The node is contained in the list.
+                unsafe { waiters.remove(NonNull::from(node)) };
+            }
+            Poll::Ready(state)
+        } else {
+            // If there was no waker, it means the node was not queued,
+            // so it is pushed in the list.
+            if node.waker.replace(waker).is_none() {
                 waiters.push_front(NonNull::from(node));
             }
+            Poll::Pending
         }
-        Poll::Pending
     }
 
     /// Waits for the `OnceCell` to be initialized, and returns a reference
     /// to the value stored.
     pub async fn wait_initialized(&self) -> &T {
+        if let Some(value) = self.get() {
+            return value;
+        }
         let state = WaitFuture::new(self, false).await;
         debug_assert_eq!(state, STATE_SET);
         // SAFETY: the cell has been initialized
@@ -630,10 +634,14 @@ unsafe impl<T: Sync + Send> Sync for OnceCell<T> {}
 unsafe impl<T: Send> Send for OnceCell<T> {}
 
 /// An entry in the wait queue.
+///
+/// `Waiter` should be accessed with the wait queue lock acquired.
 struct Waiter {
     /// If the waiter is a cell initializer.
     is_initializer: bool,
-    /// Waiting task.
+    /// The waker of the awaiting task. A waker is present
+    /// if and only if the waiter is queued in the wait queue;
+    /// the invariant must be upheld when the queue lock is released.
     waker: Option<Waker>,
     /// Intrusive linked-list pointers.
     pointers: linked_list::Pointers<Waiter>,
@@ -683,7 +691,9 @@ generate_addr_of_methods! {
 struct WaitFuture<'a, T> {
     node: Waiter,
     cell: &'a OnceCell<T>,
-    queued: bool,
+    /// If `true`, the node *may* be queued in the wait queue.
+    /// If `false`, the node is not in the wait queue.
+    maybe_queued: bool,
 }
 
 impl<'a, T> WaitFuture<'a, T> {
@@ -695,7 +705,7 @@ impl<'a, T> WaitFuture<'a, T> {
         Self {
             cell,
             node: Waiter::new(is_initializer),
-            queued: false,
+            maybe_queued: false,
         }
     }
 
@@ -709,7 +719,7 @@ impl<'a, T> WaitFuture<'a, T> {
             (
                 Pin::new_unchecked(&mut this.node),
                 this.cell,
-                &mut this.queued,
+                &mut this.maybe_queued,
             )
         }
     }
@@ -717,9 +727,8 @@ impl<'a, T> WaitFuture<'a, T> {
 
 impl<T> Drop for WaitFuture<'_, T> {
     fn drop(&mut self) {
-        // If the future has not been queued, there is no node in the wait list, so we
-        // can skip acquiring the lock.
-        if !self.queued {
+        // If the node is not in the queue, we can skip acquiring the lock.
+        if !self.maybe_queued {
             return;
         }
         // This is where we ensure safety. The future is being dropped,
@@ -738,16 +747,17 @@ impl<T> Future for WaitFuture<'_, T> {
     type Output = u8;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let (node, cell, queued) = self.project();
+        let (node, cell, maybe_queued) = self.project();
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 
-        match cell.poll_wait(cx, node, *queued) {
+        match cell.poll_wait(cx, node) {
             Poll::Ready(state) => {
                 coop.made_progress();
+                *maybe_queued = true;
                 Poll::Ready(state)
             }
             Poll::Pending => {
-                *queued = true;
+                *maybe_queued = false;
                 Poll::Pending
             }
         }
