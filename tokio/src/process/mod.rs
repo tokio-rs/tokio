@@ -1164,7 +1164,13 @@ impl Child {
 
     /// Forces the child to exit.
     ///
-    /// This is equivalent to sending a `SIGKILL` on unix platforms.
+    /// This is equivalent to sending a `SIGKILL` on unix platforms
+    /// followed by [`wait(2)`](https://man7.org/linux/man-pages/man2/wait.2.html)
+    /// ([`Child::wait`]).
+    ///
+    /// Note: behavior of this function is different from std version of
+    /// [`Child::kill`](std::process::Child::kill): std version does not `wait`.
+    /// Tokio [`start_kill`](Child::start_kill) is equivalent to std `Child::kill`.
     ///
     /// # Examples
     ///
