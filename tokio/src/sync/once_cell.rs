@@ -753,11 +753,11 @@ impl<T> Future for WaitFuture<'_, T> {
         match cell.poll_wait(cx, node) {
             Poll::Ready(state) => {
                 coop.made_progress();
-                *maybe_queued = true;
+                *maybe_queued = false;
                 Poll::Ready(state)
             }
             Poll::Pending => {
-                *maybe_queued = false;
+                *maybe_queued = true;
                 Poll::Pending
             }
         }
