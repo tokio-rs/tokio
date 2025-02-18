@@ -374,9 +374,7 @@ impl<T> OnceCell<T> {
             while wakers.can_push() {
                 if let Some(mut waiter) = waiters.pop_front() {
                     // Safety: we hold the lock, so we can access the waker.
-                    if let Some(waker) = unsafe { waiter.as_mut().waker.take() } {
-                        wakers.push(waker);
-                    }
+                    wakers.push(unsafe { waiter.as_mut().waker.take() }.unwrap());
                 } else {
                     // Release the lock before notifying
                     drop(waiters);
@@ -395,9 +393,9 @@ impl<T> OnceCell<T> {
         let mut waiters = self.waiters.lock();
         if let Some(mut waiter) = waiters.drain_filter(|w| w.is_initializer).next() {
             // SAFETY: we hold the lock, so we can access the waker.
-            let waker = unsafe { waiter.as_mut().waker.take() };
+            let waker = unsafe { waiter.as_mut().waker.take() }.unwrap();
             drop(waiters);
-            waker.unwrap().wake();
+            waker.wake();
         }
     }
 
@@ -415,18 +413,28 @@ impl<T> OnceCell<T> {
         // Uses acquire ordering as value may be accessed after in case of success.
         let state = self.state.load(Ordering::Acquire);
         if state == STATE_SET || node.is_initializer && state == STATE_UNSET {
-            // If there is a waker, it means the node is queued,
-            // so it is removed from the list.
-            if node.waker.take().is_some() {
-                // SAFETY: The node is contained in the list.
-                unsafe { waiters.remove(NonNull::from(node)) };
-            }
+            let prev_waker = node.waker.take();
+            // Removes the node from the list, in case the task was
+            // not awakened by the waker (e.g. in a `select!`).
+            // SAFETY: The node is contained in the list.
+            let removed = unsafe { waiters.remove(NonNull::from(node)) };
+            debug_assert_eq!(removed.is_some(), prev_waker.is_some());
+            drop(waiters);
+            // Drops previous waker after unlocking
+            drop(prev_waker);
             Poll::Ready(state)
         } else {
             // If there is no waker, it means the node is not queued,
             // so it is pushed in the list.
-            if node.waker.replace(waker).is_none() {
+            if node.waker.is_none() {
+                node.waker = Some(waker);
                 waiters.push_front(NonNull::from(node));
+            // Otherwise, replaces the waker if needed.
+            } else if !node.waker.as_ref().unwrap().will_wake(&waker) {
+                let prev_waker = node.waker.replace(waker);
+                drop(waiters);
+                // Drops previous waker after unlocking
+                drop(prev_waker);
             }
             Poll::Pending
         }
