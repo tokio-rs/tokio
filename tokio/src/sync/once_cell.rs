@@ -81,7 +81,6 @@ pub struct OnceCell<T> {
     state: AtomicU8,
     value: UnsafeCell<MaybeUninit<T>>,
     waiters: Mutex<LinkedList<Waiter, <Waiter as linked_list::Link>::Target>>,
-    /// The current number of available permits in the semaphore.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     resource_span: tracing::Span,
 }
