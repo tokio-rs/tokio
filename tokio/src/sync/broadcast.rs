@@ -431,8 +431,46 @@ struct RecvGuard<'a, T> {
     slot: RwLockReadGuard<'a, Slot<T>>,
 }
 
+pub(crate) mod future {
+    use std::{
+        future::Future,
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use pin_project_lite::pin_project;
+
+    use crate::runtime::coop::Coop;
+
+    use super::{error::RecvError, RecvInner};
+
+    pin_project! {
+        /// Future for the [`Receiver::recv`][super::Receiver::recv] method.
+        pub struct Recv<'a, T>
+        where
+            T: Clone,
+        {
+            #[pin]
+            pub(super) inner: Coop<RecvInner<'a, T>>,
+        }
+    }
+
+    impl<'a, T> Future for Recv<'a, T>
+    where
+        T: Clone,
+    {
+        type Output = Result<T, RecvError>;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            self.project().inner.poll(cx)
+        }
+    }
+}
+
+use self::future::Recv;
+
 /// Receive a value future.
-struct Recv<'a, T> {
+struct RecvInner<'a, T> {
     /// Receiver being waited on.
     receiver: &'a mut Receiver<T>,
 
@@ -440,8 +478,8 @@ struct Recv<'a, T> {
     waiter: UnsafeCell<Waiter>,
 }
 
-unsafe impl<'a, T: Send> Send for Recv<'a, T> {}
-unsafe impl<'a, T: Send> Sync for Recv<'a, T> {}
+unsafe impl<'a, T: Send> Send for RecvInner<'a, T> {}
+unsafe impl<'a, T: Send> Sync for RecvInner<'a, T> {}
 
 /// Max number of receivers. Reserve space to lock.
 const MAX_RECEIVERS: usize = usize::MAX >> 2;
@@ -1400,6 +1438,12 @@ impl<T: Clone> Receiver<T> {
     }
     /// Receives the next value for this receiver.
     ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn recv(&self) -> Result<T, RecvError>;
+    /// ```
+    ///
     /// Each [`Receiver`] handle will receive a clone of all values sent
     /// **after** it has subscribed.
     ///
@@ -1470,8 +1514,10 @@ impl<T: Clone> Receiver<T> {
     ///     assert_eq!(30, rx.recv().await.unwrap());
     /// }
     /// ```
-    pub async fn recv(&mut self) -> Result<T, RecvError> {
-        cooperative(Recv::new(self)).await
+    pub fn recv(&mut self) -> Recv<'_, T> {
+        Recv {
+            inner: cooperative(RecvInner::new(self)),
+        }
     }
 
     /// Attempts to return a pending value on this receiver without awaiting.
@@ -1577,9 +1623,9 @@ impl<T> Drop for Receiver<T> {
     }
 }
 
-impl<'a, T> Recv<'a, T> {
-    fn new(receiver: &'a mut Receiver<T>) -> Recv<'a, T> {
-        Recv {
+impl<'a, T> RecvInner<'a, T> {
+    fn new(receiver: &'a mut Receiver<T>) -> RecvInner<'a, T> {
+        RecvInner {
             receiver,
             waiter: UnsafeCell::new(Waiter {
                 queued: AtomicBool::new(false),
@@ -1603,7 +1649,7 @@ impl<'a, T> Recv<'a, T> {
     }
 }
 
-impl<'a, T> Future for Recv<'a, T>
+impl<'a, T> Future for RecvInner<'a, T>
 where
     T: Clone,
 {
@@ -1625,7 +1671,7 @@ where
     }
 }
 
-impl<'a, T> Drop for Recv<'a, T> {
+impl<'a, T> Drop for RecvInner<'a, T> {
     fn drop(&mut self) {
         // Safety: `waiter.queued` is atomic.
         // Acquire ordering is required to synchronize with
