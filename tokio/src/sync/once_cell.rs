@@ -81,8 +81,6 @@ pub struct OnceCell<T> {
     state: AtomicU8,
     value: UnsafeCell<MaybeUninit<T>>,
     waiters: Mutex<LinkedList<Waiter, <Waiter as linked_list::Link>::Target>>,
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    resource_span: tracing::Span,
 }
 
 impl<T> Default for OnceCell<T> {
@@ -176,8 +174,6 @@ impl<T> OnceCell<T> {
             state: AtomicU8::new(STATE_UNSET),
             value: UnsafeCell::new(MaybeUninit::uninit()),
             waiters: Mutex::const_new(LinkedList::new()),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: tracing::Span::none(),
         }
     }
 
@@ -192,27 +188,6 @@ impl<T> OnceCell<T> {
     // by creating `Semaphore::const_new_closed`.
     #[track_caller]
     pub fn new_with(value: Option<T>) -> Self {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let resource_span = {
-            let location = std::panic::Location::caller();
-
-            tracing::trace_span!(
-                parent: None,
-                "runtime.resource",
-                concrete_type = "OnceCell",
-                kind = "Sync",
-                loc.file = location.file(),
-                loc.line = location.line(),
-                loc.col = location.column(),
-            )
-        };
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        resource_span.in_scope(|| {
-            tracing::trace!(
-                target: "runtime::resource::state_update",
-                state = "unset",
-            );
-        });
         let (state, value) = match value {
             Some(v) => (STATE_SET, MaybeUninit::new(v)),
             None => (STATE_UNSET, MaybeUninit::uninit()),
@@ -221,8 +196,6 @@ impl<T> OnceCell<T> {
             state: AtomicU8::new(state),
             value: UnsafeCell::new(value),
             waiters: Mutex::new(LinkedList::new()),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span,
         }
     }
 
@@ -261,8 +234,6 @@ impl<T> OnceCell<T> {
             state: AtomicU8::new(STATE_SET),
             value: UnsafeCell::new(MaybeUninit::new(value)),
             waiters: Mutex::const_new(LinkedList::new()),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            resource_span: tracing::Span::none(),
         }
     }
 
@@ -302,13 +273,6 @@ impl<T> OnceCell<T> {
         // Using release ordering so any threads that read a true from this
         // atomic is able to read the value we just stored.
         self.state.store(STATE_SET, Ordering::Release);
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        self.resource_span.in_scope(|| {
-            tracing::trace!(
-                target: "runtime::resource::state_update",
-                state = "set",
-            );
-        });
         self.notify_initialized();
 
         // SAFETY: We just initialized the cell.
@@ -365,13 +329,6 @@ impl<T> OnceCell<T> {
             Ordering::Acquire,
         ) {
             Ok(_) => {
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
-                self.resource_span.in_scope(|| {
-                    tracing::trace!(
-                        target: "runtime::resource::state_update",
-                        state = "locked",
-                    );
-                });
                 // SAFETY: state has been locked
                 unsafe { self.set_value(value) };
                 Ok(())
@@ -399,13 +356,6 @@ impl<T> OnceCell<T> {
             Ok(_) => {
                 // Forget the value, as `T` could implement `Drop`.
                 std::mem::forget(value);
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
-                self.resource_span.in_scope(|| {
-                    tracing::trace!(
-                        target: "runtime::resource::state_update",
-                        state = "set",
-                    );
-                });
                 self.notify_initialized();
                 Ok(())
             }
@@ -550,13 +500,6 @@ impl<T> OnceCell<T> {
                 // State has been successfully locked,
                 // execute the initializer and set the result.
                 Ok(_) => {
-                    #[cfg(all(tokio_unstable, feature = "tracing"))]
-                    self.resource_span.in_scope(|| {
-                        tracing::trace!(
-                            target: "runtime::resource::state_update",
-                            state = "locked",
-                        );
-                    });
                     // If `f().await` panics, is cancelled, or fails,
                     // the state will be unlocked by the guard.
                     struct DropGuard<'a, T>(&'a OnceCell<T>);
@@ -565,13 +508,6 @@ impl<T> OnceCell<T> {
                             // Use release ordering to for this failed initialization
                             // attempt to happens-before the next one.
                             self.0.state.store(STATE_UNSET, Ordering::Release);
-                            #[cfg(all(tokio_unstable, feature = "tracing"))]
-                            self.0.resource_span.in_scope(|| {
-                                tracing::trace!(
-                                    target: "runtime::resource::state_update",
-                                    state = "unset",
-                                );
-                            });
                             self.0.notify_unlocked();
                         }
                     }

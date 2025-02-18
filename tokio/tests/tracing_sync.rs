@@ -280,33 +280,3 @@ async fn test_semaphore_creates_span() {
 
     handle.assert_finished();
 }
-
-#[tokio::test]
-async fn test_once_cell_creates_span() {
-    let once_cell_span = expect::span()
-        .named("runtime.resource")
-        .with_target("tokio::sync::once_cell");
-
-    let state_event = expect::event()
-        .with_target("runtime::resource::state_update")
-        .with_fields(expect::field("state").with_value(&"unset"));
-
-    let (subscriber, handle) = subscriber::mock()
-        .new_span(
-            once_cell_span
-                .clone()
-                .with_ancestry(expect::is_explicit_root()),
-        )
-        .enter(once_cell_span.clone())
-        .event(state_event)
-        .exit(once_cell_span.clone())
-        .drop_span(once_cell_span)
-        .run_with_handle();
-
-    {
-        let _guard = tracing::subscriber::set_default(subscriber);
-        let _ = sync::OnceCell::<()>::new();
-    }
-
-    handle.assert_finished();
-}
