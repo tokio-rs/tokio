@@ -1,7 +1,8 @@
-use proc_macro2::{Span, TokenStream, TokenTree};
+use proc_macro2::{token_stream, Span, TokenStream, TokenTree};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream, Parser};
-use syn::{braced, Attribute, Ident, Path, Signature, Visibility};
+use syn::token::Brace;
+use syn::{Attribute, Ident, Path, Signature, Visibility};
 
 // syn::AttributeArgs does not implement syn::Parse
 type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
@@ -386,19 +387,112 @@ fn build_config(
     config.build()
 }
 
+fn fn_without_args(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenStream {
+    let fn_sig = &input.sig;
+    let fn_name = &input.sig.ident;
+
+    let crate_path = config
+        .crate_name
+        .map(ToTokens::into_token_stream)
+        .unwrap_or_else(|| Ident::new("tokio", Span::call_site()).into_token_stream());
+
+    let mut rt = match config.flavor {
+        RuntimeFlavor::CurrentThread => quote! {
+            #crate_path::runtime::Builder::new_current_thread()
+        },
+        RuntimeFlavor::Threaded => quote! {
+            #crate_path::runtime::Builder::new_multi_thread()
+        },
+    };
+    if let Some(v) = config.worker_threads {
+        rt = quote! { #rt.worker_threads(#v) };
+    }
+    if let Some(v) = config.start_paused {
+        rt = quote! { #rt.start_paused(#v) };
+    }
+    if let Some(v) = config.unhandled_panic {
+        let unhandled_panic = v.into_tokens(&crate_path);
+        rt = quote! { #rt.unhandled_panic(#unhandled_panic) };
+    }
+
+    let generated_attrs = if is_test {
+        quote! { #[::core::prelude::v1::test] }
+    } else {
+        quote! {}
+    };
+
+    // This explicit `return` is intentional. See tokio-rs/tokio#4636
+    let last_block = quote! {
+        #[allow(clippy::expect_used, clippy::diverging_sub_expression)]
+        #rt.enable_all().build().expect("Failed building the Runtime").block_on(body)
+    };
+
+    let body = input.body;
+
+    input.body = if is_test {
+        let output_type = match &input.sig.output {
+            syn::ReturnType::Default => quote! { () },
+            syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
+        };
+        quote! {
+            #fn_sig #body
+            let body = #fn_name();
+
+            #crate_path::pin!(body);
+            let body: ::core::pin::Pin<&mut dyn ::core::future::Future<Output = #output_type>> = body;
+        }
+    } else {
+        quote! {
+            #fn_sig #body
+            let body = #fn_name();
+        }
+    };
+
+    input.sig.asyncness.take();
+    input.into_tokens(generated_attrs, last_block)
+}
+
 fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenStream {
-    input.sig.asyncness = None;
+    if is_test || input.sig.inputs.is_empty() && !input.is_trait_method() {
+        return fn_without_args(input, is_test, config);
+    }
+
+    let async_keyword = input.sig.asyncness.take();
 
     // If type mismatch occurs, the current rustc points to the last statement.
     let (last_stmt_start_span, last_stmt_end_span) = {
-        let mut last_stmt = input.stmts.last().cloned().unwrap_or_default().into_iter();
-
         // `Span` on stable Rust has a limitation that only points to the first
         // token, not the whole tokens. We can work around this limitation by
         // using the first/last span of the tokens like
         // `syn::Error::new_spanned` does.
-        let start = last_stmt.next().map_or_else(Span::call_site, |t| t.span());
-        let end = last_stmt.last().map_or(start, |t| t.span());
+        let mut start = Span::call_site();
+        let mut end = Span::call_site();
+
+        if let Some(tt) = input.body.clone().into_iter().last() {
+            match tt {
+                TokenTree::Group(group) => {
+                    let mut stream = group.stream().into_iter();
+                    while let Some(tt) = stream.next() {
+                        if matches!(&tt, TokenTree::Punct(p) if p.as_char() == ';') {
+                            continue;
+                        }
+                        start = tt.span();
+                        end = tt.span();
+
+                        for tt in stream.by_ref() {
+                            match tt {
+                                TokenTree::Punct(p) if p.as_char() == ';' => break,
+                                tt => end = tt.span(),
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    start = tt.span();
+                    end = tt.span();
+                }
+            }
+        }
         (start, end)
     };
 
@@ -434,7 +528,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         quote! {}
     };
 
-    let body_ident = quote! { body };
+    let body_var = Ident::new("body", Span::call_site());
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
     let last_block = quote_spanned! {last_stmt_end_span=>
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
@@ -443,11 +537,11 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
                 .enable_all()
                 .build()
                 .expect("Failed building the Runtime")
-                .block_on(#body_ident);
+                .block_on(#body_var);
         }
     };
 
-    let body = input.body();
+    let body = input.body;
 
     // For test functions pin the body to the stack and use `Pin<&mut dyn
     // Future>` to reduce the amount of `Runtime::block_on` (and related
@@ -458,7 +552,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     //
     // We don't do this for the main function as it should only be used once so
     // there will be no benefit.
-    let body = if is_test {
+    input.body = if is_test {
         let output_type = match &input.sig.output {
             // For functions with no return value syn doesn't print anything,
             // but that doesn't work as `Output` for our boxed `Future`, so
@@ -467,17 +561,16 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
             syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
         };
         quote! {
-            let body = async #body;
+            let body = #async_keyword #body;
             #crate_path::pin!(body);
             let body: ::core::pin::Pin<&mut dyn ::core::future::Future<Output = #output_type>> = body;
         }
     } else {
         quote! {
-            let body = async #body;
+            let body = #async_keyword #body;
         }
     };
-
-    input.into_tokens(generated_attrs, body, last_block)
+    input.into_tokens(generated_attrs, last_block)
 }
 
 fn token_stream_with_error(mut tokens: TokenStream, error: syn::Error) -> TokenStream {
@@ -546,7 +639,8 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
         Ok(it) => it,
         Err(e) => return token_stream_with_error(item, e),
     };
-    let config = if let Some(attr) = input.attrs().find(|attr| is_test_attribute(attr)) {
+
+    let config = if let Some(attr) = input.attrs.iter().find(|attr| is_test_attribute(attr)) {
         let msg = "second test attribute is supplied, consider removing or changing the order of your test attributes";
         Err(syn::Error::new_spanned(attr, msg))
     } else {
@@ -562,126 +656,60 @@ pub(crate) fn test(args: TokenStream, item: TokenStream, rt_multi_thread: bool) 
 }
 
 struct ItemFn {
-    outer_attrs: Vec<Attribute>,
+    attrs: Vec<Attribute>,
     vis: Visibility,
     sig: Signature,
-    brace_token: syn::token::Brace,
-    inner_attrs: Vec<Attribute>,
-    stmts: Vec<proc_macro2::TokenStream>,
-}
-
-impl ItemFn {
-    /// Access all attributes of the function item.
-    fn attrs(&self) -> impl Iterator<Item = &Attribute> {
-        self.outer_attrs.iter().chain(self.inner_attrs.iter())
-    }
-
-    /// Get the body of the function item in a manner so that it can be
-    /// conveniently used with the `quote!` macro.
-    fn body(&self) -> Body<'_> {
-        Body {
-            brace_token: self.brace_token,
-            stmts: &self.stmts,
-        }
-    }
-
-    /// Convert our local function item into a token stream.
-    fn into_tokens(
-        self,
-        generated_attrs: proc_macro2::TokenStream,
-        body: proc_macro2::TokenStream,
-        last_block: proc_macro2::TokenStream,
-    ) -> TokenStream {
-        let mut tokens = proc_macro2::TokenStream::new();
-        // Outer attributes are simply streamed as-is.
-        for attr in self.outer_attrs {
-            attr.to_tokens(&mut tokens);
-        }
-
-        // Inner attributes require extra care, since they're not supported on
-        // blocks (which is what we're expanded into) we instead lift them
-        // outside of the function. This matches the behavior of `syn`.
-        for mut attr in self.inner_attrs {
-            attr.style = syn::AttrStyle::Outer;
-            attr.to_tokens(&mut tokens);
-        }
-
-        // Add generated macros at the end, so macros processed later are aware of them.
-        generated_attrs.to_tokens(&mut tokens);
-
-        self.vis.to_tokens(&mut tokens);
-        self.sig.to_tokens(&mut tokens);
-
-        self.brace_token.surround(&mut tokens, |tokens| {
-            body.to_tokens(tokens);
-            last_block.to_tokens(tokens);
-        });
-
-        tokens
-    }
+    body: TokenStream,
 }
 
 impl Parse for ItemFn {
-    #[inline]
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        // This parse implementation has been largely lifted from `syn`, with
-        // the exception of:
-        // * We don't have access to the plumbing necessary to parse inner
-        //   attributes in-place.
-        // * We do our own statements parsing to avoid recursively parsing
-        //   entire statements and only look for the parts we're interested in.
-
-        let outer_attrs = input.call(Attribute::parse_outer)?;
-        let vis: Visibility = input.parse()?;
-        let sig: Signature = input.parse()?;
-
-        let content;
-        let brace_token = braced!(content in input);
-        let inner_attrs = Attribute::parse_inner(&content)?;
-
-        let mut buf = proc_macro2::TokenStream::new();
-        let mut stmts = Vec::new();
-
-        while !content.is_empty() {
-            if let Some(semi) = content.parse::<Option<syn::Token![;]>>()? {
-                semi.to_tokens(&mut buf);
-                stmts.push(buf);
-                buf = proc_macro2::TokenStream::new();
-                continue;
-            }
-
-            // Parse a single token tree and extend our current buffer with it.
-            // This avoids parsing the entire content of the sub-tree.
-            buf.extend([content.parse::<TokenTree>()?]);
-        }
-
-        if !buf.is_empty() {
-            stmts.push(buf);
-        }
-
         Ok(Self {
-            outer_attrs,
-            vis,
-            sig,
-            brace_token,
-            inner_attrs,
-            stmts,
+            attrs: input.call(Attribute::parse_outer)?,
+            vis: input.parse()?,
+            sig: input.parse()?,
+            body: input.parse()?,
         })
     }
 }
 
-struct Body<'a> {
-    brace_token: syn::token::Brace,
-    // Statements, with terminating `;`.
-    stmts: &'a [TokenStream],
+fn has_self_keyword(mut iter: token_stream::IntoIter) -> bool {
+    iter.any(|tt| match tt {
+        TokenTree::Ident(ident) => ident == "Self",
+        TokenTree::Group(group) => has_self_keyword(group.stream().into_iter()),
+        _ => false,
+    })
 }
 
-impl ToTokens for Body<'_> {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        self.brace_token.surround(tokens, |tokens| {
-            for stmt in self.stmts {
-                stmt.to_tokens(tokens);
-            }
+impl ItemFn {
+    fn is_trait_method(&self) -> bool {
+        self.sig
+            .generics
+            .where_clause
+            .as_ref()
+            .is_some_and(|clause| {
+                has_self_keyword(clause.to_token_stream().to_token_stream().into_iter())
+            })
+            || matches!(&self.sig.output, syn::ReturnType::Type(_, ty) if has_self_keyword(ty.to_token_stream().into_iter()))
+            || has_self_keyword(self.body.clone().into_iter())
+    }
+
+    /// Convert our local function item into a token stream.
+    fn into_tokens(self, generated_attrs: TokenStream, last_block: TokenStream) -> TokenStream {
+        let mut tokens = generated_attrs;
+        // Outer attributes are simply streamed as-is.
+        for attr in self.attrs {
+            attr.to_tokens(&mut tokens);
+        }
+        self.vis.to_tokens(&mut tokens);
+        self.sig.to_tokens(&mut tokens);
+
+        Brace::default().surround(&mut tokens, |tokens| {
+            // Note: we used `Some(..)` for optimization. Because,
+            // extend has specialized implementation for `FromIterator<TokenStream>`
+            tokens.extend(Some(self.body));
+            tokens.extend(Some(last_block));
         });
+        tokens
     }
 }
