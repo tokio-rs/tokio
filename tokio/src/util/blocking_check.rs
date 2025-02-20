@@ -1,7 +1,5 @@
 #[cfg(unix)]
 use std::os::fd::AsFd;
-#[cfg(windows)]
-use std::os::windows::io::AsSocket;
 
 #[cfg(unix)]
 #[allow(unused_variables)]
@@ -18,9 +16,10 @@ pub(crate) fn check_socket_for_blocking<S: AsFd>(s: &S) -> crate::io::Result<()>
     Ok(())
 }
 
-#[cfg(windows)]
+#[cfg(not(unix))]
 #[allow(unused_variables)]
-pub(crate) fn check_socket_for_blocking<S: AsSocket>(s: &S) -> crate::io::Result<()> {
+pub(crate) fn check_socket_for_blocking<S>(s: &S) -> crate::io::Result<()> {
     // we cannot retrieve the nonblocking status on windows
+    // and i dont know how to support wasi yet
     Ok(())
 }
