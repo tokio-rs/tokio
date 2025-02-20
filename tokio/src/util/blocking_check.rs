@@ -9,7 +9,7 @@ pub(crate) fn check_socket_for_blocking<S: AsFd>(s: &S) -> crate::io::Result<()>
         let sock = socket2::SockRef::from(s);
 
         if !sock.nonblocking()? {
-            eprintln!("Warning: binding a nonblocking socket, this may be a bug!");
+            eprintln!("Warning: registering a blocking socket, this may be a bug!");
         }
     }
 
