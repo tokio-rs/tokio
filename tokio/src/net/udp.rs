@@ -5,6 +5,7 @@ use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::task::{ready, Context, Poll};
+use crate::util::blocking_check::check_socket_for_blocking;
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -192,6 +193,8 @@ impl UdpSocket {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Tokio's handling of blocking sockets may change in the future.
+    /// 
     /// [`set_nonblocking`]: std::net::UdpSocket::set_nonblocking
     ///
     /// # Panics
@@ -220,6 +223,8 @@ impl UdpSocket {
     /// ```
     #[track_caller]
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
+        check_socket_for_blocking(&socket)?;
+        
         let io = mio::net::UdpSocket::from_std(socket);
         UdpSocket::new(io)
     }

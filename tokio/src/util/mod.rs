@@ -10,6 +10,9 @@ pub(crate) mod metric_atomics;
 #[cfg(any(feature = "rt", feature = "signal", feature = "process"))]
 pub(crate) mod once_cell;
 
+#[cfg(feature = "net")]
+pub(crate) mod blocking_check;
+
 #[cfg(any(
     // io driver uses `WakeList` directly
     feature = "net",

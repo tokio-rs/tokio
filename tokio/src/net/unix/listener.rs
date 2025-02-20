@@ -13,6 +13,7 @@ use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr as StdSocketAddr};
 use std::path::Path;
 use std::task::{ready, Context, Poll};
+use crate::util::blocking_check::check_socket_for_blocking;
 
 cfg_net_unix! {
     /// A Unix socket which can accept connections from other Unix sockets.
@@ -106,6 +107,8 @@ impl UnixListener {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Tokio's handling of blocking sockets may change in the future.
+    ///
     /// [`set_nonblocking`]: std::os::unix::net::UnixListener::set_nonblocking
     ///
     /// # Examples
@@ -133,6 +136,8 @@ impl UnixListener {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
     pub fn from_std(listener: net::UnixListener) -> io::Result<UnixListener> {
+        check_socket_for_blocking(&listener)?;
+        
         let listener = mio::net::UnixListener::from_std(listener);
         let io = PollEvented::new(listener)?;
         Ok(UnixListener { io })

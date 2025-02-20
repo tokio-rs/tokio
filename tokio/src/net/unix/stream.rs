@@ -19,6 +19,7 @@ use std::os::unix::net::{self, SocketAddr as StdSocketAddr};
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use crate::util::blocking_check::check_socket_for_blocking;
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -791,6 +792,8 @@ impl UnixStream {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Tokio's handling of blocking sockets may change in the future.
+    ///
     /// [`set_nonblocking`]: std::os::unix::net::UnixStream::set_nonblocking
     ///
     /// # Examples
@@ -818,6 +821,8 @@ impl UnixStream {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
+        check_socket_for_blocking(&stream)?;
+        
         let stream = mio::net::UnixStream::from_std(stream);
         let io = PollEvented::new(stream)?;
 

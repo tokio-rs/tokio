@@ -13,6 +13,7 @@ use std::io;
 use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
+use crate::util::blocking_check::check_socket_for_blocking;
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -173,6 +174,8 @@ impl TcpStream {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Tokio's handling of blocking sockets may change in the future.
+    ///
     /// [`set_nonblocking`]: std::net::TcpStream::set_nonblocking
     ///
     /// # Examples
@@ -200,6 +203,8 @@ impl TcpStream {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
     pub fn from_std(stream: std::net::TcpStream) -> io::Result<TcpStream> {
+        check_socket_for_blocking(&stream)?;
+        
         let io = mio::net::TcpStream::from_std(stream);
         let io = PollEvented::new(io)?;
         Ok(TcpStream { io })

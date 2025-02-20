@@ -9,6 +9,7 @@ use std::fmt;
 use std::io;
 use std::net::{self, SocketAddr};
 use std::task::{ready, Context, Poll};
+use crate::util::blocking_check::check_socket_for_blocking;
 
 cfg_net! {
     /// A TCP socket server, listening for connections.
@@ -208,6 +209,8 @@ impl TcpListener {
     /// non-blocking mode. Otherwise all I/O operations on the listener
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
+    /// 
+    /// Tokio's handling of blocking sockets may change in the future.
     ///
     /// [`set_nonblocking`]: std::net::TcpListener::set_nonblocking
     ///
@@ -236,6 +239,8 @@ impl TcpListener {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
+        check_socket_for_blocking(&listener)?;
+        
         let io = mio::net::TcpListener::from_std(listener);
         let io = PollEvented::new(io)?;
         Ok(TcpListener { io })
