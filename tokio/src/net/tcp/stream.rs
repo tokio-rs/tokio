@@ -8,12 +8,12 @@ use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 
+use crate::util::blocking_check::check_socket_for_blocking;
 use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
-use crate::util::blocking_check::check_socket_for_blocking;
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -204,7 +204,7 @@ impl TcpStream {
     #[track_caller]
     pub fn from_std(stream: std::net::TcpStream) -> io::Result<TcpStream> {
         check_socket_for_blocking(&stream)?;
-        
+
         let io = mio::net::TcpStream::from_std(stream);
         let io = PollEvented::new(io)?;
         Ok(TcpStream { io })

@@ -4,6 +4,7 @@ use crate::net::unix::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::unix::ucred::{self, UCred};
 use crate::net::unix::SocketAddr;
 
+use crate::util::blocking_check::check_socket_for_blocking;
 use std::fmt;
 use std::future::poll_fn;
 use std::io::{self, Read, Write};
@@ -19,7 +20,6 @@ use std::os::unix::net::{self, SocketAddr as StdSocketAddr};
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use crate::util::blocking_check::check_socket_for_blocking;
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -822,7 +822,7 @@ impl UnixStream {
     #[track_caller]
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
         check_socket_for_blocking(&stream)?;
-        
+
         let stream = mio::net::UnixStream::from_std(stream);
         let io = PollEvented::new(stream)?;
 
