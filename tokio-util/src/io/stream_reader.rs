@@ -169,7 +169,7 @@ where
     /// Convert a stream of byte chunks into an [`AsyncRead`].
     ///
     /// The item should be a [`Result`] with the ok variant being something that
-    /// implements the [`Buf`] trait (e.g. `Vec<u8>` or `Bytes`). The error
+    /// implements the [`Buf`] trait (e.g. `Cursor<Vec<u8>>` or `Bytes`). The error
     /// should be convertible into an [io error].
     ///
     /// [`Result`]: std::result::Result
