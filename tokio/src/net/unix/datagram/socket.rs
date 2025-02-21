@@ -1,6 +1,7 @@
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
 use crate::net::unix::SocketAddr;
 
+use crate::util::blocking_check::check_socket_for_blocking;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
@@ -449,6 +450,8 @@ impl UnixDatagram {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Tokio's handling of blocking sockets may change in the future.
+    ///
     /// [`set_nonblocking`]: std::os::unix::net::UnixDatagram::set_nonblocking
     ///
     /// # Panics
@@ -484,6 +487,8 @@ impl UnixDatagram {
     /// ```
     #[track_caller]
     pub fn from_std(datagram: net::UnixDatagram) -> io::Result<UnixDatagram> {
+        check_socket_for_blocking(&datagram)?;
+
         let socket = mio::net::UnixDatagram::from_std(datagram);
         let io = PollEvented::new(socket)?;
         Ok(UnixDatagram { io })

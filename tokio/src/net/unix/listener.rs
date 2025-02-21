@@ -1,6 +1,7 @@
 use crate::io::{Interest, PollEvented};
 use crate::net::unix::{SocketAddr, UnixStream};
 
+use crate::util::blocking_check::check_socket_for_blocking;
 use std::fmt;
 use std::io;
 #[cfg(target_os = "android")]
@@ -106,6 +107,8 @@ impl UnixListener {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Tokio's handling of blocking sockets may change in the future.
+    ///
     /// [`set_nonblocking`]: std::os::unix::net::UnixListener::set_nonblocking
     ///
     /// # Examples
@@ -133,6 +136,8 @@ impl UnixListener {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
     pub fn from_std(listener: net::UnixListener) -> io::Result<UnixListener> {
+        check_socket_for_blocking(&listener)?;
+
         let listener = mio::net::UnixListener::from_std(listener);
         let io = PollEvented::new(listener)?;
         Ok(UnixListener { io })

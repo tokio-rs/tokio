@@ -4,6 +4,7 @@ use crate::net::unix::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::unix::ucred::{self, UCred};
 use crate::net::unix::SocketAddr;
 
+use crate::util::blocking_check::check_socket_for_blocking;
 use std::fmt;
 use std::future::poll_fn;
 use std::io::{self, Read, Write};
@@ -791,6 +792,8 @@ impl UnixStream {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Tokio's handling of blocking sockets may change in the future.
+    ///
     /// [`set_nonblocking`]: std::os::unix::net::UnixStream::set_nonblocking
     ///
     /// # Examples
@@ -818,6 +821,8 @@ impl UnixStream {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
+        check_socket_for_blocking(&stream)?;
+
         let stream = mio::net::UnixStream::from_std(stream);
         let io = PollEvented::new(stream)?;
 
