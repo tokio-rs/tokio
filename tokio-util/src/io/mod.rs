@@ -12,6 +12,7 @@
 
 mod copy_to_bytes;
 mod inspect;
+mod read_arc;
 mod read_buf;
 mod reader_stream;
 mod sink_writer;
@@ -24,6 +25,7 @@ cfg_io_util! {
 
 pub use self::copy_to_bytes::CopyToBytes;
 pub use self::inspect::{InspectReader, InspectWriter};
+pub use self::read_arc::read_exact_arc;
 pub use self::read_buf::read_buf;
 pub use self::reader_stream::ReaderStream;
 pub use self::sink_writer::SinkWriter;
