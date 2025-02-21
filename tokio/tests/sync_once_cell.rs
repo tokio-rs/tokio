@@ -272,3 +272,28 @@ fn get_or_try_init() {
         assert_eq!(*result2.unwrap(), 10);
     });
 }
+
+#[test]
+fn wait_initialized() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .unwrap();
+
+    static ONCE: OnceCell<u32> = OnceCell::const_new();
+
+    rt.block_on(async {
+        let handle1 = rt.spawn(async { ONCE.wait_initialized().await });
+        let handle2 = rt.spawn(async { ONCE.get_or_init(func2).await });
+
+        time::advance(Duration::from_millis(1)).await;
+        time::resume();
+
+        let result1 = handle1.await.unwrap();
+        let result2 = handle2.await.unwrap();
+
+        assert_eq!(*result1, 10);
+        assert_eq!(*result2, 10);
+    });
+}
