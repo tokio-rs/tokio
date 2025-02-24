@@ -567,7 +567,7 @@ impl Handle {
         self.shared.owned.num_alive_tasks()
     }
 
-    pub(crate) fn injection_queue_depth(&self) -> usize {
+    pub(crate) fn injection_queue_depth(&self, _group: usize) -> usize {
         self.shared.inject.len()
     }
 }

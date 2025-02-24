@@ -13,8 +13,8 @@ impl Handle {
         self.shared.owned.num_alive_tasks()
     }
 
-    pub(crate) fn injection_queue_depth(&self) -> usize {
-        self.shared.injection_queue_depth()
+    pub(crate) fn injection_queue_depth(&self, group: usize) -> usize {
+        self.shared.injection_queue_depth(group)
     }
 
     cfg_unstable_metrics! {

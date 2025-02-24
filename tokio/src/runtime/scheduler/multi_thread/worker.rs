@@ -59,9 +59,9 @@
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
-    idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
+    idle, queue, Counters, Handle, Idle, Parker, Stats, TraceStatus, Unparker,
 };
-use crate::runtime::scheduler::{inject, Defer, Lock};
+use crate::runtime::scheduler::{inject, Defer};
 use crate::runtime::task::{OwnedTasks, TaskHarnessScheduleHooks};
 use crate::runtime::{
     blocking, coop, driver, scheduler, task, Config, SchedulerMetrics, WorkerMetrics,
@@ -74,6 +74,8 @@ use std::cell::RefCell;
 use std::task::Waker;
 use std::thread;
 use std::time::Duration;
+
+use super::overflow::OverflowShard;
 
 mod metrics;
 
@@ -92,6 +94,9 @@ pub(super) struct Worker {
 
     /// Index holding this worker's remote state
     index: usize,
+
+    /// TODO(i.erin) ask about locallity
+    group: usize,
 
     /// Used to hand-off a worker's core to another thread.
     core: AtomicCell<Core>,
@@ -146,12 +151,15 @@ struct Core {
 pub(crate) struct Shared {
     /// Per-worker remote state. All other workers have access to this and is
     /// how they communicate between each other.
+    ///
+    /// worker group consists of [ngroup * size, (ngroup + 1) * size - 1] remotes
+    /// handler for local communication
     remotes: Box<[Remote]>,
 
-    /// Global task queue used for:
+    /// Global task's queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
-    pub(super) inject: inject::Shared<Arc<Handle>>,
+    pub (super) injects: Box<[inject::Inject<Arc<Handle>>]>,
 
     /// Coordinates idle workers
     idle: Idle,
@@ -191,9 +199,6 @@ pub(crate) struct Shared {
 pub(crate) struct Synced {
     /// Synchronized state for `Idle`.
     pub(super) idle: idle::Synced,
-
-    /// Synchronized state for `Inject`.
-    pub(crate) inject: inject::Synced,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -240,18 +245,19 @@ const MAX_LIFO_POLLS_PER_TICK: usize = 3;
 
 pub(super) fn create(
     size: usize,
+    ngroup: usize,
     park: Parker,
     driver_handle: driver::Handle,
     blocking_spawner: blocking::Spawner,
     seed_generator: RngSeedGenerator,
     config: Config,
 ) -> (Arc<Handle>, Launch) {
-    let mut cores = Vec::with_capacity(size);
-    let mut remotes = Vec::with_capacity(size);
-    let mut worker_metrics = Vec::with_capacity(size);
+    let mut cores = Vec::with_capacity(size * ngroup);
+    let mut remotes = Vec::with_capacity(size * ngroup);
+    let mut worker_metrics = Vec::with_capacity(size * ngroup);
 
     // Create the local queues
-    for _ in 0..size {
+    for _ in 0..size * ngroup {
         let (steal, run_queue) = queue::local();
 
         let park = park.clone();
@@ -278,19 +284,22 @@ pub(super) fn create(
     }
 
     let (idle, idle_synced) = Idle::new(size);
-    let (inject, inject_synced) = inject::Shared::new();
+
+    let injects = (0..ngroup)
+        .map(|_| inject::Inject::new())
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
 
     let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
         task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
-            inject,
+            injects,
             idle,
             owned: OwnedTasks::new(size),
             synced: Mutex::new(Synced {
-                idle: idle_synced,
-                inject: inject_synced,
+                idle: idle_synced
             }),
             shutdown_cores: Mutex::new(vec![]),
             trace_status: TraceStatus::new(remotes_len),
@@ -306,10 +315,12 @@ pub(super) fn create(
 
     let mut launch = Launch(vec![]);
 
-    for (index, core) in cores.drain(..).enumerate() {
+    debug_assert_eq!(cores.len(), size * ngroup);
+    for (nworker, core) in cores.drain(..).enumerate() {
         launch.0.push(Arc::new(Worker {
             handle: handle.clone(),
-            index,
+            index: nworker,
+            group: nworker / size,
             core: AtomicCell::new(Some(core)),
         }));
     }
@@ -411,7 +422,7 @@ where
         // stolen, so we move the task out of the lifo_slot to the run_queue.
         if let Some(task) = core.lifo_slot.take() {
             core.run_queue
-                .push_back_or_overflow(task, &*cx.worker.handle, &mut core.stats);
+                .push_back_or_overflow(task, cx.worker.group, &*cx.worker.handle, &mut core.stats);
         }
 
         // We are taking the core from the context and sending it to another
@@ -637,6 +648,7 @@ impl Context {
                     // the back of the queue and return.
                     core.run_queue.push_back_or_overflow(
                         task,
+                        self.worker.group,
                         &*self.worker.handle,
                         &mut core.stats,
                     );
@@ -806,7 +818,7 @@ impl Core {
 
             worker
                 .handle
-                .next_remote_task()
+                .next_remote_task(Some(worker.group))
                 .or_else(|| self.next_local_task())
         } else {
             let maybe_task = self.next_local_task();
@@ -815,6 +827,7 @@ impl Core {
                 return maybe_task;
             }
 
+            // TODO(i.erin) now checked only group inject
             if worker.inject().is_empty() {
                 return None;
             }
@@ -840,9 +853,9 @@ impl Core {
             // and not pushed onto the local queue.
             let n = usize::max(1, n);
 
-            let mut synced = worker.handle.shared.synced.lock();
+            let mut synced = worker.inject().synced().lock();
             // safety: passing in the correct `inject::Synced`.
-            let mut tasks = unsafe { worker.inject().pop_n(&mut synced.inject, n) };
+            let mut tasks = unsafe { worker.inject().shared().pop_n(&mut synced, n) };
 
             // Pop the first task to return immediately
             let ret = tasks.next();
@@ -863,6 +876,8 @@ impl Core {
     /// Note: Only if less than half the workers are searching for tasks to steal
     /// a new worker will actually try to steal. The idea is to make sure not all
     /// workers will be trying to steal at the same time.
+    ///
+    /// TODO(i.erin) use locallity with index
     fn steal_work(&mut self, worker: &Worker) -> Option<Notified> {
         if !self.transition_to_searching(worker) {
             return None;
@@ -890,7 +905,7 @@ impl Core {
         }
 
         // Fallback on checking the global queue
-        worker.handle.next_remote_task()
+        worker.handle.next_remote_task(Some(worker.group))
     }
 
     fn transition_to_searching(&mut self, worker: &Worker) -> bool {
@@ -990,8 +1005,7 @@ impl Core {
 
         if !self.is_shutdown {
             // Check if the scheduler has been shutdown
-            let synced = worker.handle.shared.synced.lock();
-            self.is_shutdown = worker.inject().is_closed(&synced.inject);
+            self.is_shutdown = worker.inject().is_closed();
         }
 
         if !self.is_traced {
@@ -1043,8 +1057,8 @@ impl Core {
 
 impl Worker {
     /// Returns a reference to the scheduler's injection queue.
-    fn inject(&self) -> &inject::Shared<Arc<Handle>> {
-        &self.handle.shared.inject
+    fn inject(&self) -> &inject::Inject <Arc<Handle>> {
+        &self.handle.shared.injects[self.group]
     }
 }
 
@@ -1077,14 +1091,14 @@ impl Handle {
                 if self.ptr_eq(&cx.worker.handle) {
                     // And the current thread still holds a core
                     if let Some(core) = cx.core.borrow_mut().as_mut() {
-                        self.schedule_local(core, task, is_yield);
+                        self.schedule_local(core, task, cx.worker.group, is_yield);
                         return;
                     }
                 }
             }
 
             // Otherwise, use the inject queue.
-            self.push_remote_task(task);
+            self.push_remote_task(None, task);
             self.notify_parked_remote();
         });
     }
@@ -1095,7 +1109,7 @@ impl Handle {
         }
     }
 
-    fn schedule_local(&self, core: &mut Core, task: Notified, is_yield: bool) {
+    fn schedule_local(&self, core: &mut Core, task: Notified, group: usize, is_yield: bool) {
         core.stats.inc_local_schedule_count();
 
         // Spawning from the worker thread. If scheduling a "yield" then the
@@ -1104,7 +1118,7 @@ impl Handle {
         // flexibility and the task may go to the front of the queue.
         let should_notify = if is_yield || !core.lifo_enabled {
             core.run_queue
-                .push_back_or_overflow(task, self, &mut core.stats);
+                .push_back_or_overflow(task, group, self, &mut core.stats);
             true
         } else {
             // Push to the LIFO slot
@@ -1113,7 +1127,8 @@ impl Handle {
 
             if let Some(prev) = prev {
                 core.run_queue
-                    .push_back_or_overflow(prev, self, &mut core.stats);
+                    // TODO(i.erin) explicit group structure to specify overflow
+                    .push_back_or_overflow(prev, group, self, &mut core.stats);
             }
 
             core.lifo_slot = Some(task);
@@ -1129,32 +1144,52 @@ impl Handle {
         }
     }
 
-    fn next_remote_task(&self) -> Option<Notified> {
-        if self.shared.inject.is_empty() {
-            return None;
-        }
+    fn random_groups(&self) -> impl Iterator<Item = usize> {
+        let ngroup = self.shared.injects.len();
+        let start = context::thread_rng_n(ngroup as u32) as usize;
 
-        let mut synced = self.shared.synced.lock();
-        // safety: passing in correct `idle::Synced`
-        unsafe { self.shared.inject.pop(&mut synced.inject) }
+        (start..start + ngroup).map(move |i| i % ngroup)
     }
 
-    fn push_remote_task(&self, task: Notified) {
+    fn next_remote_task(&self, group: Option<usize>) -> Option<Notified> {
+        // fast path --- check owr group inject
+        if let Some(group) = group {
+            let inject = &self.shared.injects[group];
+            if !inject.is_empty() {
+                return inject.pop();
+            }
+        }
+
+        // pick random start and linearly search for task
+        for group in self.random_groups() {
+            let inject = &self.shared.injects[group];
+            if inject.is_empty() {
+                continue
+            }
+
+            return inject.pop();
+        }
+
+        None
+    }
+
+    fn push_remote_task(&self, group: Option<usize>, task: Notified) {
+        // TODO(i.erin) inc certain remote schedule
         self.shared.scheduler_metrics.inc_remote_schedule_count();
-
-        let mut synced = self.shared.synced.lock();
-        // safety: passing in correct `idle::Synced`
-        unsafe {
-            self.shared.inject.push(&mut synced.inject, task);
+        if let Some(group) = group {
+            self.shared.injects[group].push(task);
+            return;
         }
+
+        let rnd_group = self.random_groups().next().unwrap();
+        self.shared.injects[rnd_group].push(task)
     }
 
-    pub(super) fn close(&self) {
-        if self
-            .shared
-            .inject
-            .close(&mut self.shared.synced.lock().inject)
-        {
+    pub(super) fn close(&self,) {
+        let close = self.shared.injects.iter().all(|i| {
+            i.close()
+        });
+        if close {
             self.notify_all();
         }
     }
@@ -1188,8 +1223,10 @@ impl Handle {
             }
         }
 
-        if !self.shared.inject.is_empty() {
-            self.notify_parked_local();
+        for inject in self.shared.injects.iter() {
+            if !inject.is_empty() {
+                self.notify_parked_local();
+            }
         }
     }
 
@@ -1222,7 +1259,8 @@ impl Handle {
         // Drain the injection queue
         //
         // We already shut down every task, so we can simply drop the tasks.
-        while let Some(task) = self.next_remote_task() {
+        // TODO(i.erin) smarter choose tasks
+        while let Some(task) = self.next_remote_task(None) {
             drop(task);
         }
     }
@@ -1232,38 +1270,16 @@ impl Handle {
     }
 }
 
-impl Overflow<Arc<Handle>> for Handle {
-    fn push(&self, task: task::Notified<Arc<Handle>>) {
-        self.push_remote_task(task);
+impl OverflowShard<Arc<Handle>> for Handle {
+    fn push(&self, task: task::Notified<Arc<Handle>>, group: usize) {
+        self.push_remote_task(Some(group), task);
     }
 
-    fn push_batch<I>(&self, iter: I)
+    fn push_batch<I>(&self, iter: I, group: usize)
     where
         I: Iterator<Item = task::Notified<Arc<Handle>>>,
     {
-        unsafe {
-            self.shared.inject.push_batch(self, iter);
-        }
-    }
-}
-
-pub(crate) struct InjectGuard<'a> {
-    lock: crate::loom::sync::MutexGuard<'a, Synced>,
-}
-
-impl<'a> AsMut<inject::Synced> for InjectGuard<'a> {
-    fn as_mut(&mut self) -> &mut inject::Synced {
-        &mut self.lock.inject
-    }
-}
-
-impl<'a> Lock<inject::Synced> for &'a Handle {
-    type Handle = InjectGuard<'a>;
-
-    fn lock(self) -> Self::Handle {
-        InjectGuard {
-            lock: self.shared.synced.lock(),
-        }
+        self.shared.injects[group].push_batch(iter);
     }
 }
 

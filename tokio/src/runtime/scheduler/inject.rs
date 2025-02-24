@@ -1,5 +1,6 @@
 //! Inject queue used to send wakeups to a work-stealing scheduler
 
+
 use crate::loom::sync::Mutex;
 use crate::runtime::task;
 
@@ -36,7 +37,7 @@ impl<T: 'static> Inject<T> {
     }
 
     // Kind of annoying to have to include the cfg here
-    #[cfg(tokio_taskdump)]
+    #[cfg(any(tokio_taskdump, feature = "rt-multi-thread"))]
     pub(crate) fn is_closed(&self) -> bool {
         let synced = self.synced.lock();
         self.shared.is_closed(&synced)
@@ -67,4 +68,24 @@ impl<T: 'static> Inject<T> {
         // safety: passing correct `Synced`
         unsafe { self.shared.pop(&mut synced) }
     }
+
+cfg_rt_multi_thread! {
+    pub (crate) fn is_empty(&self) -> bool {
+        self.shared.is_empty()
+    }
+
+    pub (crate) fn synced(&self) -> &Mutex<Synced> {
+        &self.synced
+    }
+
+    pub (crate) fn shared(&self) -> &Shared<T> {
+        &self.shared
+    }
+
+    pub (crate) fn push_batch<I>(&self, iter: I)
+        where I: Iterator<Item = task::Notified<T>> {
+        let mut sync = self.synced.lock();
+        unsafe { self.shared.push_batch(sync.as_mut(), iter); }
+    }
+}
 }

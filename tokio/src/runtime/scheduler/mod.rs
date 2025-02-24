@@ -233,8 +233,8 @@ cfg_rt! {
             match_flavor!(self, Handle(handle) => handle.num_alive_tasks())
         }
 
-        pub(crate) fn injection_queue_depth(&self) -> usize {
-            match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
+        pub(crate) fn injection_queue_depth(&self, group: usize) -> usize {
+            match_flavor!(self, Handle(handle) => handle.injection_queue_depth(group))
         }
     }
 

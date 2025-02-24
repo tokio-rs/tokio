@@ -1,8 +1,8 @@
 use super::Shared;
 
 impl Shared {
-    pub(crate) fn injection_queue_depth(&self) -> usize {
-        self.inject.len()
+    pub(crate) fn injection_queue_depth(&self, group: usize) -> usize {
+        self.injects[group].len()
     }
 }
 

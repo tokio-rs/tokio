@@ -64,6 +64,9 @@ pub struct Builder {
     /// Only used when not using the current-thread executor.
     worker_threads: Option<usize>,
 
+    /// TODO(i.erin)
+    worker_group: usize,
+
     /// Cap on thread usage.
     max_blocking_threads: usize,
 
@@ -297,6 +300,8 @@ impl Builder {
             // Default to lazy auto-detection (one thread per CPU core)
             worker_threads: None,
 
+            worker_group: 1,
+
             max_blocking_threads: 512,
 
             // Default thread name
@@ -425,6 +430,13 @@ impl Builder {
     pub fn worker_threads(&mut self, val: usize) -> &mut Self {
         assert!(val > 0, "Worker threads cannot be set to 0");
         self.worker_threads = Some(val);
+        self
+    }
+
+    /// TODO(i.erin)
+    pub fn worker_group(&mut self, val: usize) -> &mut Self {
+        assert!(val > 0, "Worker groups cannot be set to 0");
+        self.worker_group = val;
         self
     }
 
@@ -1641,8 +1653,9 @@ cfg_rt_multi_thread! {
             use crate::runtime::scheduler::{self, MultiThread};
 
             let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
+            let core_groups = self.worker_group;
 
-            let (driver, driver_handle) = driver::Driver::new(self.get_cfg(core_threads))?;
+            let (driver, driver_handle) = driver::Driver::new(self.get_cfg(core_threads * core_groups))?;
 
             // Create the blocking pool
             let blocking_pool =
@@ -1655,6 +1668,7 @@ cfg_rt_multi_thread! {
 
             let (scheduler, handle, launch) = MultiThread::new(
                 core_threads,
+                core_groups,
                 driver,
                 driver_handle,
                 blocking_spawner,

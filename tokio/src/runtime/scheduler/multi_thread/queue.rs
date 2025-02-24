@@ -2,7 +2,7 @@
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::Arc;
-use crate::runtime::scheduler::multi_thread::{Overflow, Stats};
+use crate::runtime::scheduler::multi_thread::{overflow::OverflowShard, Stats};
 use crate::runtime::task;
 
 use std::mem::{self, MaybeUninit};
@@ -182,9 +182,10 @@ impl<T> Local<T> {
     /// When the queue overflows, half of the current contents of the queue is
     /// moved to the given Injection queue. This frees up capacity for more
     /// tasks to be pushed into the local queue.
-    pub(crate) fn push_back_or_overflow<O: Overflow<T>>(
+    pub(crate) fn push_back_or_overflow<O: OverflowShard<T>>(
         &mut self,
         mut task: task::Notified<T>,
+        group: usize,
         overflow: &O,
         stats: &mut Stats,
     ) {
@@ -201,12 +202,12 @@ impl<T> Local<T> {
             } else if steal != real {
                 // Concurrently stealing, this will free up capacity, so only
                 // push the task onto the inject queue
-                overflow.push(task);
+                overflow.push(task, group);
                 return;
             } else {
                 // Push the current task and half of the queue into the
                 // inject queue.
-                match self.push_overflow(task, real, tail, overflow, stats) {
+                match self.push_overflow(task, group, real, tail, overflow, stats) {
                     Ok(_) => return,
                     // Lost the race, try again
                     Err(v) => {
@@ -247,9 +248,10 @@ impl<T> Local<T> {
     /// workers "missed" some of the tasks during a steal, they will get
     /// another opportunity.
     #[inline(never)]
-    fn push_overflow<O: Overflow<T>>(
+    fn push_overflow<O: OverflowShard<T>>(
         &mut self,
         task: task::Notified<T>,
+        group: usize,
         head: UnsignedShort,
         tail: UnsignedShort,
         overflow: &O,
@@ -333,7 +335,7 @@ impl<T> Local<T> {
             head: head as UnsignedLong,
             i: 0,
         };
-        overflow.push_batch(batch_iter.chain(std::iter::once(task)));
+        overflow.push_batch(batch_iter.chain(std::iter::once(task)), group);
 
         // Add 1 to factor in the task currently being scheduled.
         stats.incr_overflow_count();

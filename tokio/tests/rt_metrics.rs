@@ -60,7 +60,7 @@ fn global_queue_depth_current_thread() {
     .join()
     .unwrap();
 
-    assert_eq!(1, metrics.global_queue_depth());
+    assert_eq!(1, metrics.global_queue_depth(0));
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn global_queue_depth_multi_thread() {
 
         if let Ok(_blocking_tasks) = try_block_threaded(&rt) {
             for i in 0..10 {
-                assert_eq!(i, metrics.global_queue_depth());
+                assert_eq!(i, metrics.global_queue_depth(0));
                 rt.spawn(async {});
             }
 
