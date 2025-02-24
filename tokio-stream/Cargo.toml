@@ -36,17 +36,17 @@ sync = ["tokio/sync", "tokio-util"]
 signal = ["tokio/signal"]
 
 [dependencies]
-futures-core = { version = "0.3.0" }
-pin-project-lite = "0.2.11"
+futures-core = { workspace = true }
+pin-project-lite = { workspace = true }
 tokio = { version = "1.15.0", path = "../tokio", features = ["sync"] }
-tokio-util = { version = "0.7.0", path = "../tokio-util", optional = true }
+tokio-util = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.2.0", path = "../tokio", features = ["full", "test-util"] }
-async-stream = "0.3"
-parking_lot = "0.12.0"
+async-stream = { workspace = true }
+parking_lot = { workspace = true }
 tokio-test = { version = "0.4", path = "../tokio-test" }
-futures = { version = "0.3", default-features = false }
+futures = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true

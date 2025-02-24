@@ -29,3 +29,39 @@ unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(tokio_taskdump)',
   'cfg(tokio_unstable)',
 ] }
+
+[workspace.dependencies]
+async-stream = "0.3.3"
+bytes = "1.2.1"
+criterion = "0.5.1"
+doc-comment = "0.3.1"
+futures = { version = "0.3.0", default-features = false }
+futures-concurrency = "7.6.3"
+futures-core = "0.3.0"
+futures-io = "0.3.0"
+futures-sink = "0.3.0"
+futures-test = "0.3.5"
+futures-util = "0.3.0"
+http = "0.2"
+httparse = "1.0"
+httpdate = "1.0"
+mio = { version = "1.0.1", default-features = false }
+mockall = "0.11.1"
+once_cell = "1.5.2"
+parking_lot = "0.12.0"
+pin-project-lite = "0.2.11"
+proc-macro2 = "1.0.60"
+quote = "1"
+rand = "0.8.3"
+rand_chacha = "0.3"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+slab = "0.4.4"
+syn = "2.0"
+tempfile = "3.1.0"
+tokio-macros = { version = "~2.5.0", path = "tokio-macros" }
+tokio-util = { version = "0.7.0", path = "tokio-util" }
+tracing = { version = "0.1.29", default-features = false }
+tracing-subscriber = { version = "0.3.1", default-features = false }
+trybuild = "1.0"
