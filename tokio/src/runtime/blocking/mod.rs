@@ -8,7 +8,7 @@ pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
 
 mod sharded;
 
-cfg_fs! {
+cfg_io_blocking! {
     pub(crate) use pool::spawn_mandatory_blocking;
 }
 
