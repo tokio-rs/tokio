@@ -9,6 +9,7 @@ cfg_macros! {
     }
 
     #[doc(hidden)]
+    #[inline]
     pub fn has_budget_remaining() -> bool {
         #[cfg(feature = "rt")]
         { crate::task::coop::has_budget_remaining() }
