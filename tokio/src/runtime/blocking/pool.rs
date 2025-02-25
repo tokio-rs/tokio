@@ -252,7 +252,7 @@ where
     rt.spawn_blocking(func)
 }
 
-cfg_fs! {
+cfg_io_blocking! {
     #[cfg_attr(any(
         all(loom, not(test)), // the function is covered by loom tests
         test,
@@ -396,7 +396,7 @@ impl Spawner {
         }
     }
 
-    cfg_fs! {
+    cfg_io_blocking! {
         #[track_caller]
         #[cfg_attr(any(
             all(loom, not(test)), // the function is covered by loom tests

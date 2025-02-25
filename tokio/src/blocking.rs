@@ -2,7 +2,7 @@ cfg_rt! {
     #[cfg(any(not(target_os = "emscripten"), target_feature = "atomics"))]
     pub(crate) use crate::runtime::spawn_blocking;
 
-    cfg_fs! {
+    cfg_io_blocking! {
         #[cfg(any(not(target_os = "emscripten"), target_feature = "atomics"))]
         #[allow(unused_imports)]
         pub(crate) use crate::runtime::spawn_mandatory_blocking;
@@ -61,7 +61,7 @@ cfg_not_rt! {
         panic!("requires the `rt` Tokio feature flag")
     }
 
-    cfg_fs! {
+    cfg_io_blocking! {
         pub(crate) fn spawn_mandatory_blocking<F, R>(_f: F) -> Option<JoinHandle<R>>
         where
             F: FnOnce() -> R + Send + 'static,
