@@ -28,13 +28,10 @@ pub async fn read_exact_arc<R: AsyncRead>(read: R, len: usize) -> io::Result<Arc
     // equivalent, and generates the same assembly, but works without requiring MSRV 1.82.
     let mut arc: Arc<[MaybeUninit<u8>]> = (0..len).map(|_| MaybeUninit::uninit()).collect();
     let mut buf = unsafe { Arc::get_mut(&mut arc).unwrap_unchecked() };
-    let mut bytes_remaining = len;
-    while bytes_remaining != 0 {
-        let bytes_read = read.read_buf(&mut buf).await?;
-        if bytes_read == 0 {
+    while !buf.is_empty() {
+        if read.read_buf(&mut buf).await? == 0 {
             return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "early eof"));
         }
-        bytes_remaining -= bytes_read;
     }
     // TODO(MSRV 1.82): When bumping MSRV, switch to `arc.assume_init()`. The following is
     // equivalent, and generates the same assembly, but works without requiring MSRV 1.82.
