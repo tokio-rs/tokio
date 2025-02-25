@@ -1,5 +1,6 @@
 cfg_rt! {
     #[cfg(any(not(target_os = "emscripten"), target_feature = "atomics"))]
+    #[allow(unused_imports)]
     pub(crate) use crate::runtime::spawn_blocking;
 
     cfg_io_blocking! {
@@ -52,6 +53,7 @@ cfg_not_rt! {
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
+    #[allow(dead_code)]
     pub(crate) fn spawn_blocking<F, R>(_f: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -95,6 +97,7 @@ cfg_not_rt! {
         }
     }
 
+    #[allow(dead_code)]
     fn assert_send_sync<T: Send + Sync>() {
     }
 }
