@@ -22,9 +22,9 @@ proc-macro = true
 [features]
 
 [dependencies]
-proc-macro2 = "1.0.60"
-quote = "1"
-syn = { version = "2.0", features = ["full"] }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
 tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }
