@@ -197,8 +197,8 @@ impl Drop for DuplexStream {
 /// ```
 /// # async fn ex() -> std::io::Result<()> {
 /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
-/// let (writer, reader) = tokio::io::simplex(64);
-/// let mut simplex_stream = writer.unsplit(reader);
+/// let (reader, writer) = tokio::io::simplex(64);
+/// let mut simplex_stream = reader.unsplit(writer);
 /// simplex_stream.write_all(b"hello").await?;
 ///
 /// let mut buf = [0u8; 5];
