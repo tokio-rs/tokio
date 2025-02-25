@@ -289,7 +289,7 @@ cfg_io_blocking! {
     /// Types in this module can be mocked out in tests.
     mod sys {
         // TODO: don't rename
-        pub(crate) use crate::blocking::spawn_blocking as run;
+        pub(crate) use crate::blocking::spawn_mandatory_blocking as run;
         pub(crate) use crate::blocking::JoinHandle as Blocking;
     }
 }
