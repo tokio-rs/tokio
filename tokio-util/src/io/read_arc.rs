@@ -26,8 +26,9 @@ pub async fn read_exact_arc<R: AsyncRead>(read: R, len: usize) -> io::Result<Arc
     tokio::pin!(read);
     // TODO(MSRV 1.82): When bumping MSRV, switch to `Arc::new_uninit_slice(len)`. The following is
     // equivalent, and generates the same assembly, but works without requiring MSRV 1.82.
-    let mut arc: Arc<[MaybeUninit<u8>]> = (0..len).map(|_| MaybeUninit::uninit()).collect();
-    let mut buf = unsafe { Arc::get_mut(&mut arc).unwrap_unchecked() };
+    let arc: Arc<[MaybeUninit<u8>]> = (0..len).map(|_| MaybeUninit::uninit()).collect();
+    // TODO(MSRV future): Use `Arc::get_mut_unchecked` once it's stabilized.
+    let mut buf = unsafe { &mut *(Arc::as_ptr(&arc) as *mut [MaybeUninit<u8>]) };
     while !buf.is_empty() {
         if read.read_buf(&mut buf).await? == 0 {
             return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "early eof"));
