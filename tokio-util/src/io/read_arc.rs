@@ -28,6 +28,8 @@ pub async fn read_exact_arc<R: AsyncRead>(read: R, len: usize) -> io::Result<Arc
     // equivalent, and generates the same assembly, but works without requiring MSRV 1.82.
     let arc: Arc<[MaybeUninit<u8>]> = (0..len).map(|_| MaybeUninit::uninit()).collect();
     // TODO(MSRV future): Use `Arc::get_mut_unchecked` once it's stabilized.
+    // SAFETY: We're the only owner of the `Arc`, and we keep the `Arc` valid throughout this loop
+    // as we write through this reference.
     let mut buf = unsafe { &mut *(Arc::as_ptr(&arc) as *mut [MaybeUninit<u8>]) };
     while !buf.is_empty() {
         if read.read_buf(&mut buf).await? == 0 {
@@ -36,5 +38,7 @@ pub async fn read_exact_arc<R: AsyncRead>(read: R, len: usize) -> io::Result<Arc
     }
     // TODO(MSRV 1.82): When bumping MSRV, switch to `arc.assume_init()`. The following is
     // equivalent, and generates the same assembly, but works without requiring MSRV 1.82.
+    // SAFETY: This changes `[MaybeUninit<u8>]` to `[u8]`, and we've initialized all the bytes in
+    // the loop above.
     Ok(unsafe { Arc::from_raw(Arc::into_raw(arc) as *const [u8]) })
 }
