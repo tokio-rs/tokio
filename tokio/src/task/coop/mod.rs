@@ -350,7 +350,7 @@ cfg_coop! {
         #[inline(always)]
         fn inc_budget_forced_yield_count() {}
 
-        fn defer(cx: &mut Context<'_>) {
+        fn register_waker(cx: &mut Context<'_>) {
             cx.waker().wake_by_ref()
         }
     }
