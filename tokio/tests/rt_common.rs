@@ -5,6 +5,8 @@
 
 // Tests to run on both current-thread & multi-thread runtime variants.
 
+const BUDGET: usize = 128;
+
 macro_rules! rt_test {
     ($($t:tt)*) => {
         mod current_thread_scheduler {
@@ -823,7 +825,7 @@ rt_test! {
                             if use_coop {
                                 // Consume a good chunk of budget, which should
                                 // force at least one yield.
-                                for _ in 0..200 {
+                                for _ in 0..crate::BUDGET {
                                     tokio::task::consume_budget().await;
                                 }
                             } else {
