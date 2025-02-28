@@ -5,8 +5,6 @@
 
 // Tests to run on both current-thread & multi-thread runtime variants.
 
-const BUDGET: usize = 128;
-
 macro_rules! rt_test {
     ($($t:tt)*) => {
         mod current_thread_scheduler {
@@ -784,6 +782,8 @@ rt_test! {
         use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
         use std::sync::Barrier;
 
+        const BUDGET: usize = 128;
+
         let rt = rt();
 
         let flag = Arc::new(AtomicBool::new(false));
@@ -825,7 +825,7 @@ rt_test! {
                             if use_coop {
                                 // Consume a good chunk of budget, which should
                                 // force at least one yield.
-                                for _ in 0..crate::BUDGET {
+                                for _ in 0..BUDGET {
                                     tokio::task::consume_budget().await;
                                 }
                             } else {
