@@ -1,5 +1,6 @@
 #![allow(clippy::trivially_copy_pass_by_ref)]
 
+use super::StdInstant;
 use std::fmt;
 use std::ops;
 use std::time::Duration;
@@ -32,7 +33,7 @@ use std::time::Duration;
 /// take advantage of `time::pause()` and `time::advance()`.
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Instant {
-    std: std::time::Instant,
+    std: StdInstant,
 }
 
 impl Instant {
@@ -49,8 +50,8 @@ impl Instant {
         variant::now()
     }
 
-    /// Create a `tokio::time::Instant` from a `std::time::Instant`.
-    pub fn from_std(std: std::time::Instant) -> Instant {
+    /// Create a `tokio::time::Instant` from a `StdInstant`.
+    pub fn from_std(std: StdInstant) -> Instant {
         Instant { std }
     }
 
@@ -62,8 +63,8 @@ impl Instant {
         Self::now() + Duration::from_secs(86400 * 365 * 30)
     }
 
-    /// Convert the value into a `std::time::Instant`.
-    pub fn into_std(self) -> std::time::Instant {
+    /// Convert the value into a `StdInstant`.
+    pub fn into_std(self) -> StdInstant {
         self.std
     }
 
@@ -150,14 +151,14 @@ impl Instant {
     }
 }
 
-impl From<std::time::Instant> for Instant {
-    fn from(time: std::time::Instant) -> Instant {
+impl From<StdInstant> for Instant {
+    fn from(time: StdInstant) -> Instant {
         Instant::from_std(time)
     }
 }
 
-impl From<Instant> for std::time::Instant {
-    fn from(time: Instant) -> std::time::Instant {
+impl From<Instant> for StdInstant {
+    fn from(time: Instant) -> StdInstant {
         time.into_std()
     }
 }
@@ -188,7 +189,7 @@ impl ops::Sub<Duration> for Instant {
     type Output = Instant;
 
     fn sub(self, rhs: Duration) -> Instant {
-        Instant::from_std(std::time::Instant::sub(self.std, rhs))
+        Instant::from_std(StdInstant::sub(self.std, rhs))
     }
 }
 
@@ -209,15 +210,27 @@ mod variant {
     use super::Instant;
 
     pub(super) fn now() -> Instant {
-        Instant::from_std(std::time::Instant::now())
+        Instant::from_std(StdInstant::now())
     }
 }
 
-#[cfg(feature = "test-util")]
+#[cfg(all(feature = "test-util", not(target_arch = "wasm32")))]
 mod variant {
     use super::Instant;
 
     pub(super) fn now() -> Instant {
         crate::time::clock::now()
+    }
+}
+
+#[cfg(all(feature = "test-util", target_arch = "wasm32"))]
+mod variant {
+    use super::Instant;
+    use std::time::Duration;
+    use wasm_bindgen::prelude::*;
+    use web_sys::Performance;
+
+    pub(super) fn now() -> Instant {
+        Instant::from_std(web_time::Instant::now())
     }
 }

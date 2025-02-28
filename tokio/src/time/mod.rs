@@ -108,3 +108,9 @@ pub use timeout::{timeout, timeout_at, Timeout};
 // Re-export for convenience
 #[doc(no_inline)]
 pub use std::time::Duration;
+
+#[cfg(not(target_arch = "wasm32"))]
+type StdInstant = std::time::Instant;
+
+#[cfg(target_arch = "wasm32")]
+type StdInstant = web_time::Instant;
