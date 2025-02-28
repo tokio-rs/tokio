@@ -8,16 +8,23 @@ cfg_macros! {
         crate::runtime::context::thread_rng_n(n)
     }
 
-    #[doc(hidden)]
-    #[inline]
-    pub fn has_budget_remaining() -> bool {
-        #[cfg(feature = "rt")]
-        { crate::task::coop::has_budget_remaining() }
-        #[cfg(not(feature = "rt"))]
-        { true }
+    cfg_coop! {
+        #[doc(hidden)]
+        #[inline]
+        pub fn poll_budget_available(cx: &mut Context<'_>) -> Poll<()> {
+            crate::task::coop::poll_budget_available(cx)
+        }
+    }
+
+    cfg_not_coop! {
+        #[doc(hidden)]
+        #[inline]
+        pub fn poll_budget_available(cx: &mut Context<'_>) -> Poll<()> {
+            Poll::Ready(())
+        }
     }
 }
 
 pub use std::future::{Future, IntoFuture};
 pub use std::pin::Pin;
-pub use std::task::Poll;
+pub use std::task::{Context, Poll};

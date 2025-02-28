@@ -662,11 +662,7 @@ doc! {macro_rules! select {
             $crate::macros::support::poll_fn(|cx| {
                 // Return `Pending` when the task budget is depleted since budget-aware futures
                 // are going to yield anyway and other futures will not cooperate.
-                if !$crate::macros::support::has_budget_remaining() {
-                    cx.waker().wake_by_ref();
-
-                    return ::std::task::Poll::Pending;
-                }
+                ::std::task::ready!($crate::macros::support::poll_budget_available(cx));
 
                 // Track if any branch returns pending. If no branch completes
                 // **or** returns pending, this implies that all branches are
