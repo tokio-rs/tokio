@@ -19,7 +19,7 @@ cfg_macros! {
     cfg_not_coop! {
         #[doc(hidden)]
         #[inline]
-        pub fn poll_budget_available(cx: &mut Context<'_>) -> Poll<()> {
+        pub fn poll_budget_available(_: &mut Context<'_>) -> Poll<()> {
             Poll::Ready(())
         }
     }
