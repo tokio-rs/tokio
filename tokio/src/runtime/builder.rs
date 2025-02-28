@@ -1640,13 +1640,13 @@ cfg_rt_multi_thread! {
             use crate::runtime::{Config, runtime::Scheduler};
             use crate::runtime::scheduler::{self, MultiThread};
 
-            let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
+            let worker_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
-            let (driver, driver_handle) = driver::Driver::new(self.get_cfg(core_threads))?;
+            let (driver, driver_handle) = driver::Driver::new(self.get_cfg(worker_threads))?;
 
             // Create the blocking pool
             let blocking_pool =
-                blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
+                blocking::create_blocking_pool(self, self.max_blocking_threads + worker_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             // Generate a rng seed for this runtime.
@@ -1654,7 +1654,7 @@ cfg_rt_multi_thread! {
             let seed_generator_2 = self.seed_generator.next_generator();
 
             let (scheduler, handle, launch) = MultiThread::new(
-                core_threads,
+                worker_threads,
                 driver,
                 driver_handle,
                 blocking_spawner,
@@ -1694,12 +1694,12 @@ cfg_rt_multi_thread! {
                 use crate::runtime::{Config, runtime::Scheduler};
                 use crate::runtime::scheduler::MultiThreadAlt;
 
-                let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
-                let (driver, driver_handle) = driver::Driver::new(self.get_cfg(core_threads))?;
+                let worker_threads = self.worker_threads.unwrap_or_else(num_cpus);
+                let (driver, driver_handle) = driver::Driver::new(self.get_cfg(worker_threads))?;
 
                 // Create the blocking pool
                 let blocking_pool =
-                    blocking::create_blocking_pool(self, self.max_blocking_threads + core_threads);
+                    blocking::create_blocking_pool(self, self.max_blocking_threads + worker_threads);
                 let blocking_spawner = blocking_pool.spawner().clone();
 
                 // Generate a rng seed for this runtime.
@@ -1707,7 +1707,7 @@ cfg_rt_multi_thread! {
                 let seed_generator_2 = self.seed_generator.next_generator();
 
                 let (scheduler, handle) = MultiThreadAlt::new(
-                    core_threads,
+                    worker_threads,
                     driver,
                     driver_handle,
                     blocking_spawner,
