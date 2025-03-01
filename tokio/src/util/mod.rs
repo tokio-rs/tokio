@@ -5,6 +5,11 @@ cfg_io_driver! {
 #[cfg(feature = "rt")]
 pub(crate) mod atomic_cell;
 
+#[cfg(feature = "net")]
+mod blocking_check;
+#[cfg(feature = "net")]
+pub(crate) use blocking_check::check_socket_for_blocking;
+
 pub(crate) mod metric_atomics;
 
 #[cfg(any(feature = "rt", feature = "signal", feature = "process"))]
@@ -53,11 +58,6 @@ cfg_rt! {
 
 #[cfg(any(feature = "rt", feature = "macros", feature = "time"))]
 pub(crate) mod rand;
-
-cfg_net! {
-    mod blocking_check;
-    pub(crate) use blocking_check::check_socket_for_blocking;
-}
 
 cfg_rt! {
     mod idle_notified_set;
