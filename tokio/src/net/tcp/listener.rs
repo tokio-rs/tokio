@@ -210,7 +210,7 @@ impl TcpListener {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
-    /// Passing a listener in blocking mode is always errornous, and the behavior in that case may change in the future. For example, it could panic.
+    /// Passing a listener in blocking mode is always erroneous, and the behavior in that case may change in the future. For example, it could panic.
     ///
     /// [`set_nonblocking`]: std::net::TcpListener::set_nonblocking
     ///
