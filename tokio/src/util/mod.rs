@@ -8,6 +8,7 @@ pub(crate) mod atomic_cell;
 #[cfg(feature = "net")]
 mod blocking_check;
 #[cfg(feature = "net")]
+#[allow(unused_imports)]
 pub(crate) use blocking_check::check_socket_for_blocking;
 
 pub(crate) mod metric_atomics;
