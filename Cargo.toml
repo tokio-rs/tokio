@@ -23,6 +23,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(fuzzing)',
   'cfg(loom)',
   'cfg(mio_unsupported_force_poll_poll)',
+  'cfg(tokio_allow_from_blocking_fd)',
   'cfg(tokio_internal_mt_counters)',
   'cfg(tokio_no_parking_lot)',
   'cfg(tokio_no_tuning_tests)',

@@ -3,14 +3,18 @@ use std::os::fd::AsFd;
 
 #[cfg(unix)]
 #[allow(unused_variables)]
+#[track_caller]
 pub(crate) fn check_socket_for_blocking<S: AsFd>(s: &S) -> crate::io::Result<()> {
-    #[cfg(debug_assertions)]
+    #[cfg(not(tokio_allow_from_blocking_fd))]
     {
         let sock = socket2::SockRef::from(s);
 
-        if !sock.nonblocking()? {
-            eprintln!("Warning: registering a blocking socket, this may be a bug!");
-        }
+        debug_assert!(
+            sock.nonblocking()?,
+            "Registering a blocking socket with the tokio runtime is unsupported. \
+            If you wish to do anyways, please add `--cfg tokio_allow_from_blocking_fd` to your \
+            RUSTFLAGS. See 7172 for more details."
+        );
     }
 
     Ok(())

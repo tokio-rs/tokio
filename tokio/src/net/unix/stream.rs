@@ -3,8 +3,8 @@ use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::unix::ucred::{self, UCred};
 use crate::net::unix::SocketAddr;
+use crate::util::check_socket_for_blocking;
 
-use crate::util::blocking_check::check_socket_for_blocking;
 use std::fmt;
 use std::future::poll_fn;
 use std::io::{self, Read, Write};
@@ -792,7 +792,7 @@ impl UnixStream {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
-    /// Tokio's handling of blocking sockets may change in the future.
+    /// Passing a listener in blocking mode is always errornous, and the behavior in that case may change in the future. For example, it could panic.
     ///
     /// [`set_nonblocking`]: std::os::unix::net::UnixStream::set_nonblocking
     ///

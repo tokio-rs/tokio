@@ -1,7 +1,7 @@
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
 use crate::net::unix::SocketAddr;
+use crate::util::check_socket_for_blocking;
 
-use crate::util::blocking_check::check_socket_for_blocking;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
@@ -450,7 +450,7 @@ impl UnixDatagram {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
-    /// Tokio's handling of blocking sockets may change in the future.
+    /// Passing a listener in blocking mode is always errornous, and the behavior in that case may change in the future. For example, it could panic.
     ///
     /// [`set_nonblocking`]: std::os::unix::net::UnixDatagram::set_nonblocking
     ///

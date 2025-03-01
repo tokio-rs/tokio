@@ -10,9 +10,6 @@ pub(crate) mod metric_atomics;
 #[cfg(any(feature = "rt", feature = "signal", feature = "process"))]
 pub(crate) mod once_cell;
 
-#[cfg(feature = "net")]
-pub(crate) mod blocking_check;
-
 #[cfg(any(
     // io driver uses `WakeList` directly
     feature = "net",
@@ -56,6 +53,11 @@ cfg_rt! {
 
 #[cfg(any(feature = "rt", feature = "macros", feature = "time"))]
 pub(crate) mod rand;
+
+cfg_net! {
+    mod blocking_check;
+    pub(crate) use blocking_check::check_socket_for_blocking;
+}
 
 cfg_rt! {
     mod idle_notified_set;
