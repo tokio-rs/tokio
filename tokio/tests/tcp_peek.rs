@@ -24,6 +24,9 @@ async fn peek() {
     left.set_nonblocking(true).unwrap();
 
     let mut right = t.join().unwrap();
+
+    right.set_nonblocking(true).unwrap();
+
     let _ = right.write(&[1, 2, 3, 4]).unwrap();
 
     let mut left: TcpStream = left.try_into().unwrap();
