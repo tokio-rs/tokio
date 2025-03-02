@@ -217,7 +217,7 @@ where
 
     fn encode(&mut self, chunk: T, buf: &mut BytesMut) -> Result<(), AnyDelimiterCodecError> {
         let chunk = chunk.as_ref();
-        buf.reserve(chunk.len() + 1);
+        buf.reserve(chunk.len() + self.sequence_writer.len());
         buf.put(chunk.as_bytes());
         buf.put(self.sequence_writer.as_ref());
 
