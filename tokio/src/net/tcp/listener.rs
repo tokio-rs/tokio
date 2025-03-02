@@ -204,12 +204,7 @@ impl TcpListener {
     ///
     /// # Notes
     ///
-    /// The caller is responsible for ensuring that the listener is in
-    /// non-blocking mode. Otherwise all I/O operations on the listener
-    /// will block the thread, which will cause unexpected behavior.
-    /// Non-blocking mode can be set using [`set_nonblocking`].
-    ///
-    /// [`set_nonblocking`]: std::net::TcpListener::set_nonblocking
+    /// This sets the socket to non-blocking mode if it isn't already non-blocking.
     ///
     /// # Examples
     ///
@@ -220,8 +215,7 @@ impl TcpListener {
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let std_listener = std::net::TcpListener::bind("127.0.0.1:0")?;
-    ///     std_listener.set_nonblocking(true)?;
-    ///     let listener = TcpListener::from_std(std_listener)?;
+    ///     let listener = TcpListener::from_std_set_nonblocking(std_listener)?;
     ///     Ok(())
     /// }
     /// ```
@@ -235,10 +229,79 @@ impl TcpListener {
     /// from a future driven by a tokio runtime, otherwise runtime can be set
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
-    pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
+    pub fn from_std_set_nonblocking(listener: net::TcpListener) -> io::Result<TcpListener> {
+        listener.set_nonblocking(true)?;
+        Self::from_std_assume_nonblocking(listener)
+    }
+
+    /// Creates new `TcpListener` from a `std::net::TcpListener` without
+    /// checking that it's non-blocking.
+    ///
+    /// This function is intended to be used to wrap a TCP listener from the
+    /// standard library in the Tokio equivalent. However, it does not check
+    /// that it's already in non-blocking mode.
+    ///
+    /// Instead, the caller is responsible for ensuring that the listener is in
+    /// non-blocking mode, otherwise all I/O operations on the listener
+    /// will block the thread, which will cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::net::TcpListener::set_nonblocking
+    ///
+    /// It may be preferrable to use
+    /// [`from_std_set_nonblocking`](TcpListener::from_std_set_nonblocking),
+    /// which sets `nonblocking`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use std::error::Error;
+    /// use tokio::net::TcpListener;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn Error>> {
+    ///     let std_listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+    ///     std_listener.set_nonblocking(true)?;
+    ///     let listener = TcpListener::from_std_assume_nonblocking(std_listener)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[track_caller]
+    pub fn from_std_assume_nonblocking(listener: net::TcpListener) -> io::Result<TcpListener> {
+        debug_check_non_blocking!(
+            listener,
+            "TcpListener::from_std",
+            "TcpListener::from_std_set_nonblocking"
+        );
         let io = mio::net::TcpListener::from_std(listener);
         let io = PollEvented::new(io)?;
         Ok(TcpListener { io })
+    }
+
+    #[doc(hidden)]
+    /// Creates new `TcpListener` from a `std::net::TcpListener`.
+    ///
+    /// This function is doc-hidden because it's easy to misuse,
+    /// and naming doesn't warn enough about it.
+    ///
+    /// It may be preferrable to use
+    /// [`from_std_set_nonblocking`](TcpListener::from_std_set_nonblocking),
+    /// which sets `nonblocking`.
+    ///
+    /// This function however has the same behavior as
+    /// [`TcpListener::from_std_assume_nonblocking`].
+    #[track_caller]
+    pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
+        Self::from_std_assume_nonblocking(listener)
     }
 
     /// Turns a [`tokio::net::TcpListener`] into a [`std::net::TcpListener`].
@@ -385,9 +448,22 @@ impl TryFrom<net::TcpListener> for TcpListener {
     /// Consumes stream, returning the tokio I/O object.
     ///
     /// This is equivalent to
-    /// [`TcpListener::from_std(stream)`](TcpListener::from_std).
+    /// [`TcpListener::from_std_assume_nonblocking(stream)`](TcpListener::from_std_assume_nonblocking).
+    ///
+    /// # Notes
+    ///
+    /// The caller is responsible for ensuring that the listener is in
+    /// non-blocking mode. Otherwise all I/O operations on the listener
+    /// will block the thread, which will cause unexpected behavior.
+    /// Non-blocking mode can be set using [`set_nonblocking`].
+    ///
+    /// [`set_nonblocking`]: std::net::TcpListener::set_nonblocking
+    ///
+    /// It may be preferrable to use
+    /// [`from_std_set_nonblocking`](TcpListener::from_std_set_nonblocking),
+    /// which sets `nonblocking`.
     fn try_from(stream: net::TcpListener) -> Result<Self, Self::Error> {
-        Self::from_std(stream)
+        Self::from_std_assume_nonblocking(stream)
     }
 }
 

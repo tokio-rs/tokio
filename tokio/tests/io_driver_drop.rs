@@ -13,7 +13,7 @@ fn tcp_doesnt_block() {
     let listener = {
         let _enter = rt.enter();
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        TcpListener::from_std(listener).unwrap()
+        TcpListener::from_std(listener).unwrap() // Given the name of this test it looks like it hasn't fulfilled its purpose when going from mio 0.6 to mio 0.7 -> TODO investigate why
     };
 
     drop(rt);
