@@ -13,6 +13,9 @@ use std::{io::Write, net};
 #[tokio::test]
 async fn peek() {
     let listener = net::TcpListener::bind("127.0.0.1:0").unwrap();
+
+    listener.set_nonblocking(true).unwrap();
+
     let addr = listener.local_addr().unwrap();
     let t = thread::spawn(move || assert_ok!(listener.accept()).0);
 
