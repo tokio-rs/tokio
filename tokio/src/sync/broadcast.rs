@@ -1173,7 +1173,7 @@ impl<T> Receiver<T> {
     /// Returns true if there aren't any messages in the channel that the [`Receiver`]
     /// has yet to receive.
     ///
-    /// [`Receiver]: create::sync::broadcast::Receiver
+    /// [`Receiver]: crate::sync::broadcast::Receiver
     ///
     /// # Examples
     ///
