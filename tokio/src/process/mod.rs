@@ -1382,7 +1382,7 @@ impl Child {
 
 /// The standard input stream for spawned children.
 ///
-/// This type implements the `AsyncWrite` trait to pass data to the stdin handle of
+/// This type implements the `AsyncWrite` trait to pass data to the stdin
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStdin {
