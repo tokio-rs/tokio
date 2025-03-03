@@ -205,8 +205,8 @@ works with the MSRV of that minor release.
 
 ## Release schedule
 
-Tokio doesn't follow a fixed release schedule, but we typically make one to two
-new minor releases each month. We make patch releases for bugfixes as necessary.
+Tokio doesn't follow a fixed release schedule, but we typically make one minor
+release each month. We make patch releases for bugfixes as necessary.
 
 ## Bug patching policy
 
