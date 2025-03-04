@@ -305,7 +305,7 @@ cfg_coop! {
 
                 Poll::Ready(restore)
             } else {
-                defer(cx);
+                register_waker(cx);
                 Poll::Pending
             }
         }).unwrap_or(Poll::Ready(RestoreOnPending(Cell::new(Budget::unconstrained()))))
