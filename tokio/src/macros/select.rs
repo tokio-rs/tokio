@@ -660,6 +660,10 @@ doc! {macro_rules! select {
             let mut futures = &mut futures;
 
             $crate::macros::support::poll_fn(|cx| {
+                // Return `Pending` when the task budget is depleted since budget-aware futures
+                // are going to yield anyway and other futures will not cooperate.
+                ::std::task::ready!($crate::macros::support::poll_budget_available(cx));
+
                 // Track if any branch returns pending. If no branch completes
                 // **or** returns pending, this implies that all branches are
                 // disabled.

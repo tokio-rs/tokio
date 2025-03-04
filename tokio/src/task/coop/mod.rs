@@ -305,10 +305,25 @@ cfg_coop! {
 
                 Poll::Ready(restore)
             } else {
-                defer(cx);
+                register_waker(cx);
                 Poll::Pending
             }
         }).unwrap_or(Poll::Ready(RestoreOnPending(Cell::new(Budget::unconstrained()))))
+    }
+
+    /// Returns `Poll::Ready` if the current task has budget to consume, and `Poll::Pending` otherwise.
+    ///
+    /// Note that in contrast to `poll_proceed`, this method does not consume any budget and is used when
+    /// polling for budget availability.
+    #[inline]
+    pub(crate) fn poll_budget_available(cx: &mut Context<'_>) -> Poll<()> {
+        if has_budget_remaining() {
+            Poll::Ready(())
+        } else {
+            register_waker(cx);
+
+            Poll::Pending
+        }
     }
 
     cfg_rt! {
@@ -326,7 +341,7 @@ cfg_coop! {
             fn inc_budget_forced_yield_count() {}
         }
 
-        fn defer(cx: &mut Context<'_>) {
+        fn register_waker(cx: &mut Context<'_>) {
             context::defer(cx.waker());
         }
     }
@@ -335,8 +350,8 @@ cfg_coop! {
         #[inline(always)]
         fn inc_budget_forced_yield_count() {}
 
-        fn defer(cx: &mut Context<'_>) {
-            cx.waker().wake_by_ref();
+        fn register_waker(cx: &mut Context<'_>) {
+            cx.waker().wake_by_ref()
         }
     }
 
