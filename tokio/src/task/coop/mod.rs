@@ -305,7 +305,7 @@ cfg_coop! {
 
                 Poll::Ready(restore)
             } else {
-                cx.waker().wake_by_ref();
+                defer(cx);
                 Poll::Pending
             }
         }).unwrap_or(Poll::Ready(RestoreOnPending(Cell::new(Budget::unconstrained()))))
@@ -325,11 +325,19 @@ cfg_coop! {
             #[inline(always)]
             fn inc_budget_forced_yield_count() {}
         }
+
+        fn defer(cx: &mut Context<'_>) {
+            context::defer(cx.waker());
+        }
     }
 
     cfg_not_rt! {
         #[inline(always)]
         fn inc_budget_forced_yield_count() {}
+
+        fn defer(cx: &mut Context<'_>) {
+            cx.waker().wake_by_ref();
+        }
     }
 
     impl Budget {
