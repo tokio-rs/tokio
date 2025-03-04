@@ -476,11 +476,7 @@ impl Interval {
         // schedule the next tick according to how the user specified with
         // `MissedTickBehavior`
 
-        let next = if now
-            > timeout
-                .checked_add(Duration::from_millis(5))
-                .unwrap_or_else(Instant::far_future)
-        {
+        let next = if now.saturating_duration_since(timeout) > Duration::from_millis(5) {
             self.missed_tick_behavior
                 .next_timeout(timeout, now, self.period)
         } else {
