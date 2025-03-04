@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "rt", tokio_unstable))]
+#![cfg(feature = "join-map")]
 
 use tokio::sync::oneshot;
 use tokio::time::Duration;
@@ -24,7 +24,7 @@ async fn test_with_sleep() {
     map.detach_all();
     assert_eq!(map.len(), 0);
 
-    assert!(matches!(map.join_next().await, None));
+    assert!(map.join_next().await.is_none());
 
     for i in 0..10 {
         map.spawn(i, async move {
@@ -43,7 +43,7 @@ async fn test_with_sleep() {
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(map.join_next().await, None));
+    assert!(map.join_next().await.is_none());
 
     // Do it again.
     for i in 0..10 {
@@ -62,7 +62,7 @@ async fn test_with_sleep() {
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(map.join_next().await, None));
+    assert!(map.join_next().await.is_none());
 }
 
 #[tokio::test]
