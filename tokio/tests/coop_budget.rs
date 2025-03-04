@@ -81,7 +81,7 @@ async fn coop_budget_udp_send_recv() {
 
 #[tokio::test]
 async fn test_has_budget_remaining() {
-    // At the begining budget should be available
+    // At the beginning, budget should be available.
     assert!(has_budget_remaining());
 
     // Deplete the budget
