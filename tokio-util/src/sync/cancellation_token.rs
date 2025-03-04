@@ -287,6 +287,22 @@ impl CancellationToken {
         }
         .await
     }
+
+    /// Runs a future to completion and returns its result wrapped inside of an `Option`
+    /// unless the `CancellationToken` is cancelled. In that case the function returns
+    /// `None` and the future gets dropped.
+    ///
+    /// The function takes self by value and returns a future that owns the token.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is only cancel safe if `fut` is cancel safe.
+    pub async fn run_until_cancelled_owned<F>(self, fut: F) -> Option<F::Output>
+    where
+        F: Future,
+    {
+        self.run_until_cancelled(fut).await
+    }
 }
 
 // ===== impl WaitForCancellationFuture =====
