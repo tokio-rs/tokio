@@ -13,7 +13,7 @@ pub(crate) fn check_socket_for_blocking<S: AsFd>(s: &S) -> crate::io::Result<()>
             sock.nonblocking()?,
             "Registering a blocking socket with the tokio runtime is unsupported. \
             If you wish to do anyways, please add `--cfg tokio_allow_from_blocking_fd` to your \
-            RUSTFLAGS. See 7172 for more details."
+            RUSTFLAGS. See github.com/tokio-rs/tokio/issues/7172 for details."
         );
     }
 
