@@ -96,7 +96,10 @@ fn panics_when_io_disabled() {
     let rt = runtime::Builder::new_current_thread().build().unwrap();
 
     rt.block_on(async {
-        let _ =
-            tokio::net::TcpListener::from_std(std::net::TcpListener::bind("127.0.0.1:0").unwrap());
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+
+        listener.set_nonblocking(true).unwrap();
+
+        let _ = tokio::net::TcpListener::from_std(listener);
     });
 }

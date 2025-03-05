@@ -1,5 +1,6 @@
 use crate::io::{Interest, PollEvented};
 use crate::net::tcp::TcpStream;
+use crate::util::check_socket_for_blocking;
 
 cfg_not_wasi! {
     use crate::net::{to_socket_addrs, ToSocketAddrs};
@@ -209,6 +210,10 @@ impl TcpListener {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Passing a listener in blocking mode is always erroneous,
+    /// and the behavior in that case may change in the future.
+    /// For example, it could panic.
+    ///
     /// [`set_nonblocking`]: std::net::TcpListener::set_nonblocking
     ///
     /// # Examples
@@ -236,6 +241,8 @@ impl TcpListener {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
     pub fn from_std(listener: net::TcpListener) -> io::Result<TcpListener> {
+        check_socket_for_blocking(&listener)?;
+
         let io = mio::net::TcpListener::from_std(listener);
         let io = PollEvented::new(io)?;
         Ok(TcpListener { io })

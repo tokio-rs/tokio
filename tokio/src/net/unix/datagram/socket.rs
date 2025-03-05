@@ -1,5 +1,6 @@
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
 use crate::net::unix::SocketAddr;
+use crate::util::check_socket_for_blocking;
 
 use std::fmt;
 use std::io;
@@ -449,6 +450,10 @@ impl UnixDatagram {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Passing a listener in blocking mode is always erroneous,
+    /// and the behavior in that case may change in the future.
+    /// For example, it could panic.
+    ///
     /// [`set_nonblocking`]: std::os::unix::net::UnixDatagram::set_nonblocking
     ///
     /// # Panics
@@ -484,6 +489,8 @@ impl UnixDatagram {
     /// ```
     #[track_caller]
     pub fn from_std(datagram: net::UnixDatagram) -> io::Result<UnixDatagram> {
+        check_socket_for_blocking(&datagram)?;
+
         let socket = mio::net::UnixDatagram::from_std(datagram);
         let io = PollEvented::new(socket)?;
         Ok(UnixDatagram { io })
