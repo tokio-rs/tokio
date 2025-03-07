@@ -1,9 +1,11 @@
 # 1.44.0 (March 7th, 2025)
 
-This release changes the `from_std` method on sockets to panic if provided a
-blocking socket, which may be breaking for some users. We are making this
-change to fix one of Tokio's most common footguns. Please comment on [#7172] if
-this causes an issue for you.
+This release changes the `from_std` method on sockets to panic if a blocking
+socket is provided. We determined this change is not a breaking change as Tokio is not
+intended to operate using blocking sockets. Doing so results in runtime hangs and
+should be considered a bug. Accidentally passing a blocking socket to Tokio is one
+of the most common user mistakes. If this change causes an issue for you, please
+comment on [#7172].
 
 ### Added
 
