@@ -91,7 +91,7 @@ jobs:
             toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
       - name: loom ${{ matrix.scope }}
-        run: cargo test --lib --release --features full -- $SCOPE
+        run: cargo test --lib --release --features full -- --nocapture $SCOPE
         working-directory: tokio
         env:
           SCOPE: ${{ matrix.scope }}
@@ -116,7 +116,7 @@ jobs:
             toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
       - name: loom ${{ matrix.scope }}
-        run: cargo test --lib --release --features full -- $SCOPE
+        run: cargo test --lib --release --features full -- --nocapture $SCOPE
         working-directory: tokio
         env:
           SCOPE: ${{ matrix.scope }}
