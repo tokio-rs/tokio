@@ -1,5 +1,5 @@
 #[cfg(tokio_unstable)]
-use crate::runtime;
+use crate::runtime::{self, OptionalTaskHooks};
 use crate::runtime::{context, scheduler, RuntimeFlavor, RuntimeMetrics};
 
 /// Handle to the runtime.
@@ -191,6 +191,13 @@ impl Handle {
         F::Output: Send + 'static,
     {
         let fut_size = mem::size_of::<F>();
+        #[cfg(tokio_unstable)]
+        return if fut_size > BOX_FUTURE_THRESHOLD {
+            self.spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size), None)
+        } else {
+            self.spawn_named(future, SpawnMeta::new_unnamed(fut_size), None)
+        };
+        #[cfg(not(tokio_unstable))]
         if fut_size > BOX_FUTURE_THRESHOLD {
             self.spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
@@ -329,7 +336,12 @@ impl Handle {
     }
 
     #[track_caller]
-    pub(crate) fn spawn_named<F>(&self, future: F, _meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
+    pub(crate) fn spawn_named<F>(
+        &self,
+        future: F,
+        _meta: SpawnMeta<'_>,
+        #[cfg(tokio_unstable)] parent: OptionalTaskHooks,
+    ) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -345,6 +357,9 @@ impl Handle {
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", _meta, id.as_u64());
+        #[cfg(tokio_unstable)]
+        return self.inner.spawn(future, id, parent);
+        #[cfg(not(tokio_unstable))]
         self.inner.spawn(future, id)
     }
 
@@ -354,6 +369,7 @@ impl Handle {
         &self,
         future: F,
         _meta: SpawnMeta<'_>,
+        #[cfg(tokio_unstable)] hooks_override: OptionalTaskHooks,
     ) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -370,6 +386,9 @@ impl Handle {
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", _meta, id.as_u64());
+        #[cfg(tokio_unstable)]
+        return self.inner.spawn_local(future, id, hooks_override);
+        #[cfg(not(tokio_unstable))]
         self.inner.spawn_local(future, id)
     }
 

@@ -1,4 +1,6 @@
 use crate::runtime::BOX_FUTURE_THRESHOLD;
+#[cfg(tokio_unstable)]
+use crate::runtime::{OptionalTaskHooks, TaskHookHarness};
 use crate::task::JoinHandle;
 use crate::util::trace::SpawnMeta;
 
@@ -169,6 +171,13 @@ cfg_rt! {
         F::Output: Send + 'static,
     {
         let fut_size = std::mem::size_of::<F>();
+        #[cfg(tokio_unstable)]
+        if fut_size > BOX_FUTURE_THRESHOLD {
+            spawn_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size), None)
+        } else {
+            spawn_inner(future, SpawnMeta::new_unnamed(fut_size), None)
+        }
+        #[cfg(not(tokio_unstable))]
         if fut_size > BOX_FUTURE_THRESHOLD {
             spawn_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
@@ -176,8 +185,26 @@ cfg_rt! {
         }
     }
 
+    /// Spawn a future with a custom set of task hooks
     #[track_caller]
-    pub(super) fn spawn_inner<T>(future: T, meta: SpawnMeta<'_>) -> JoinHandle<T::Output>
+    #[cfg(tokio_unstable)]
+    pub fn spawn_with_hooks<F, T>(future: F, hooks: T) -> JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+        T: TaskHookHarness + Send + Sync + 'static,
+    {
+        let fut_size = std::mem::size_of::<F>();
+
+        if fut_size > BOX_FUTURE_THRESHOLD {
+            spawn_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size), Some(Box::new(hooks)))
+        } else {
+            spawn_inner(future, SpawnMeta::new_unnamed(fut_size), Some(Box::new(hooks)))
+        }
+    }
+
+    #[track_caller]
+    pub(super) fn spawn_inner<T>(future: T, meta: SpawnMeta<'_>, #[cfg(tokio_unstable)] hooks_override: OptionalTaskHooks) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
@@ -199,6 +226,13 @@ cfg_rt! {
         let id = task::Id::next();
         let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
+        #[cfg(tokio_unstable)]
+        return match context::with_current(|handle| handle.spawn(task, id, hooks_override)) {
+            Ok(join_handle) => join_handle,
+            Err(e) => panic!("{}", e),
+        };
+
+        #[cfg(not(tokio_unstable))]
         match context::with_current(|handle| handle.spawn(task, id)) {
             Ok(join_handle) => join_handle,
             Err(e) => panic!("{}", e),

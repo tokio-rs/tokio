@@ -64,9 +64,11 @@ async fn task_builder_name_recorded() {
 
     {
         let _guard = tracing::subscriber::set_default(subscriber);
-        task::Builder::new()
-            .name("test-task")
-            .spawn(futures::future::ready(()))
+        let mut b = task::Builder::new();
+
+        b.name("test-task");
+
+        b.spawn(futures::future::ready(()))
             .unwrap()
             .await
             .expect("failed to await join handle");

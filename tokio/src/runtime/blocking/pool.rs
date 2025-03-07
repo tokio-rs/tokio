@@ -375,10 +375,15 @@ impl Spawner {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        // let parent = with_c
         let id = task::Id::next();
         let fut =
             blocking_task::<F, BlockingTask<F>>(BlockingTask::new(func), spawn_meta, id.as_u64());
 
+        #[cfg(tokio_unstable)]
+        let (task, handle) = task::unowned(fut, BlockingSchedule::new(rt), id, None);
+
+        #[cfg(not(tokio_unstable))]
         let (task, handle) = task::unowned(fut, BlockingSchedule::new(rt), id);
 
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);

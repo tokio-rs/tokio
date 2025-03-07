@@ -8,22 +8,22 @@ use tokio::{
 
 #[test]
 async fn spawn_with_name() {
-    let result = Builder::new()
-        .name("name")
-        .spawn(async { "task executed" })
-        .unwrap()
-        .await;
+    let mut b = Builder::new();
+
+    b.name("name");
+
+    let result = b.spawn(async { "task executed" }).unwrap().await;
 
     assert_eq!(result.unwrap(), "task executed");
 }
 
 #[test]
 async fn spawn_blocking_with_name() {
-    let result = Builder::new()
-        .name("name")
-        .spawn_blocking(|| "task executed")
-        .unwrap()
-        .await;
+    let mut b = Builder::new();
+
+    b.name("name");
+
+    let result = b.spawn_blocking(|| "task executed").unwrap().await;
 
     assert_eq!(result.unwrap(), "task executed");
 }
@@ -33,11 +33,11 @@ async fn spawn_local_with_name() {
     let unsend_data = Rc::new("task executed");
     let result = LocalSet::new()
         .run_until(async move {
-            Builder::new()
-                .name("name")
-                .spawn_local(async move { unsend_data })
-                .unwrap()
-                .await
+            let mut b = Builder::new();
+
+            b.name("name");
+
+            b.spawn_local(async move { unsend_data }).unwrap().await
         })
         .await;
 

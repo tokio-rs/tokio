@@ -221,10 +221,10 @@ cfg_taskdump! {
 }
 
 use crate::future::Future;
+#[cfg(tokio_unstable)]
+use crate::runtime::{OptionalTaskHooks, OptionalTaskHooksFactory, OptionalTaskHooksFactoryRef};
 use crate::util::linked_list;
 use crate::util::sharded_list;
-
-use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::{fmt, mem};
@@ -256,13 +256,6 @@ pub(crate) struct LocalNotified<S: 'static> {
     _not_send: PhantomData<*const ()>,
 }
 
-impl<S> LocalNotified<S> {
-    #[cfg(tokio_unstable)]
-    pub(crate) fn task_id(&self) -> Id {
-        self.task.id()
-    }
-}
-
 /// A task that is not owned by any `OwnedTasks`. Used for blocking tasks.
 /// This type holds two ref-counts.
 pub(crate) struct UnownedTask<S: 'static> {
@@ -277,12 +270,6 @@ unsafe impl<S> Sync for UnownedTask<S> {}
 /// Task result sent back.
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
-/// Hooks for scheduling tasks which are needed in the task harness.
-#[derive(Clone)]
-pub(crate) struct TaskHarnessScheduleHooks {
-    pub(crate) task_terminate_callback: Option<TaskCallback>,
-}
-
 pub(crate) trait Schedule: Sync + Sized + 'static {
     /// The task has completed work and is ready to be released. The scheduler
     /// should release it immediately and return it. The task module will batch
@@ -294,7 +281,11 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     /// Schedule the task
     fn schedule(&self, task: Notified<Self>);
 
-    fn hooks(&self) -> TaskHarnessScheduleHooks;
+    #[cfg(tokio_unstable)]
+    fn hooks_factory(&self) -> OptionalTaskHooksFactory;
+
+    #[cfg(tokio_unstable)]
+    fn hooks_factory_ref(&self) -> OptionalTaskHooksFactoryRef<'_>;
 
     /// Schedule the task to run in the near future, yielding the thread to
     /// other tasks.
@@ -317,13 +308,19 @@ cfg_rt! {
         task: T,
         scheduler: S,
         id: Id,
+        #[cfg(tokio_unstable)]
+        hooks: OptionalTaskHooks
     ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
+        #[cfg(tokio_unstable)]
+        let raw = RawTask::new::<T, S>(task, scheduler, id, hooks);
+        #[cfg(not(tokio_unstable))]
         let raw = RawTask::new::<T, S>(task, scheduler, id);
+
         let task = Task {
             raw,
             _p: PhantomData,
@@ -341,12 +338,16 @@ cfg_rt! {
     /// only when the task is not going to be stored in an `OwnedTasks` list.
     ///
     /// Currently only blocking tasks use this method.
-    pub(crate) fn unowned<T, S>(task: T, scheduler: S, id: Id) -> (UnownedTask<S>, JoinHandle<T::Output>)
+    pub(crate) fn unowned<T, S>(task: T, scheduler: S, id: Id, #[cfg(tokio_unstable)] hooks: OptionalTaskHooks) -> (UnownedTask<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Send + Future + 'static,
         T::Output: Send + 'static,
     {
+        #[cfg(tokio_unstable)]
+        let (task, notified, join) = new_task(task, scheduler, id, hooks);
+
+        #[cfg(not(tokio_unstable))]
         let (task, notified, join) = new_task(task, scheduler, id);
 
         // This transfers the ref-count of task and notified into an UnownedTask.
@@ -459,6 +460,7 @@ impl<S: Schedule> LocalNotified<S> {
     /// Runs the task.
     pub(crate) fn run(self) {
         let raw = self.task.raw;
+
         mem::forget(self);
         raw.poll();
     }

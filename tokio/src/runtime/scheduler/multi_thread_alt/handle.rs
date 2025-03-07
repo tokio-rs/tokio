@@ -4,11 +4,13 @@ use crate::runtime::scheduler::multi_thread_alt::worker;
 use crate::runtime::{
     blocking, driver,
     task::{self, JoinHandle},
-    TaskHooks, TaskMeta,
+    OnChildTaskSpawnContext, OnTopLevelTaskSpawnContext, OptionalTaskHooks,
 };
 use crate::util::RngSeedGenerator;
 
-use std::fmt;
+use crate::runtime::context::with_task_hooks;
+use crate::runtime::task::Schedule;
+use std::{fmt, panic};
 
 cfg_unstable_metrics! {
     mod metrics;
@@ -27,19 +29,21 @@ pub(crate) struct Handle {
 
     /// Current random number generator seed
     pub(crate) seed_generator: RngSeedGenerator,
-
-    /// User-supplied hooks to invoke for things
-    pub(crate) task_hooks: TaskHooks,
 }
 
 impl Handle {
     /// Spawns a future onto the thread pool
-    pub(crate) fn spawn<F>(me: &Arc<Self>, future: F, id: task::Id) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(
+        me: &Arc<Self>,
+        future: F,
+        id: task::Id,
+        hooks_override: OptionalTaskHooks,
+    ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        Self::bind_new_task(me, future, id)
+        Self::bind_new_task(me, future, id, hooks_override)
     }
 
     pub(crate) fn shutdown(&self) {
@@ -47,18 +51,58 @@ impl Handle {
         self.driver.unpark();
     }
 
-    pub(super) fn bind_new_task<T>(me: &Arc<Self>, future: T, id: task::Id) -> JoinHandle<T::Output>
+    pub(super) fn bind_new_task<T>(
+        me: &Arc<Self>,
+        future: T,
+        id: task::Id,
+        hooks_override: OptionalTaskHooks,
+    ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
-
-        me.task_hooks.spawn(&TaskMeta {
-            #[cfg(tokio_unstable)]
-            id,
-            _phantom: Default::default(),
+        // preference order for hook selection:
+        // 1. "hook override" - comes from builder
+        // 2. parent task's hook
+        // 3. runtime hook factory
+        let hooks = hooks_override.or_else(|| {
+            with_task_hooks(|parent| {
+                parent
+                    .map(|parent| {
+                        if let Ok(r) = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                            parent.on_child_spawn(&mut OnChildTaskSpawnContext {
+                                id,
+                                _phantom: Default::default(),
+                            })
+                        })) {
+                            r
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten()
+            })
+            .ok()
+            .flatten()
+            .or_else(|| {
+                if let Some(hooks) = me.hooks_factory_ref() {
+                    if let Ok(r) = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                        hooks.on_top_level_spawn(&mut OnTopLevelTaskSpawnContext {
+                            id,
+                            _phantom: Default::default(),
+                        })
+                    })) {
+                        r
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
         });
+
+        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, hooks);
 
         if let Some(notified) = notified {
             me.shared.schedule_task(notified, false);

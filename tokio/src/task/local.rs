@@ -1,9 +1,11 @@
 //! Runs `!Send` futures on the current thread.
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex};
+use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
 #[cfg(tokio_unstable)]
-use crate::runtime;
-use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task, TaskHarnessScheduleHooks};
+use crate::runtime::{
+    self, OptionalTaskHooks, OptionalTaskHooksFactory, OptionalTaskHooksFactoryRef,
+};
 use crate::runtime::{context, ThreadId, BOX_FUTURE_THRESHOLD};
 use crate::sync::AtomicWaker;
 use crate::util::trace::SpawnMeta;
@@ -371,6 +373,13 @@ cfg_rt! {
         F::Output: 'static,
     {
         let fut_size = std::mem::size_of::<F>();
+        #[cfg(tokio_unstable)]
+        if fut_size > BOX_FUTURE_THRESHOLD {
+            spawn_local_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size), None)
+        } else {
+            spawn_local_inner(future, SpawnMeta::new_unnamed(fut_size), None)
+        }
+        #[cfg(not(tokio_unstable))]
         if fut_size > BOX_FUTURE_THRESHOLD {
             spawn_local_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
@@ -380,7 +389,7 @@ cfg_rt! {
 
 
     #[track_caller]
-    pub(super) fn spawn_local_inner<F>(future: F, meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
+    pub(super) fn spawn_local_inner<F>(future: F, meta: SpawnMeta<'_>, #[cfg(tokio_unstable)] hooks_override: OptionalTaskHooks) -> JoinHandle<F::Output>
     where F: Future + 'static,
           F::Output: 'static
     {
@@ -412,6 +421,9 @@ cfg_rt! {
                 let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
                 // safety: we have verified that this is a `LocalRuntime` owned by the current thread
+                #[cfg(tokio_unstable)]
+                unsafe { handle.spawn_local(task, id, hooks_override) }
+                #[cfg(not(tokio_unstable))]
                 unsafe { handle.spawn_local(task, id) }
             } else {
                 match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
@@ -1004,6 +1016,15 @@ impl Context {
         let future = crate::util::trace::task(future, "local", meta, id.as_u64());
 
         // Safety: called from the thread that owns the `LocalSet`
+        #[cfg(tokio_unstable)]
+        let (handle, notified) = {
+            self.shared.local_state.assert_called_from_owner_thread();
+            self.shared
+                .local_state
+                .owned
+                .bind(future, self.shared.clone(), id, None)
+        };
+        #[cfg(not(tokio_unstable))]
         let (handle, notified) = {
             self.shared.local_state.assert_called_from_owner_thread();
             self.shared
@@ -1117,11 +1138,15 @@ impl task::Schedule for Arc<Shared> {
         Shared::schedule(self, task);
     }
 
-    // localset does not currently support task hooks
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: None,
-        }
+    #[cfg(tokio_unstable)]
+    fn hooks_factory(&self) -> OptionalTaskHooksFactory {
+        None
+    }
+
+    // localset does not support task hooks
+    #[cfg(tokio_unstable)]
+    fn hooks_factory_ref(&self) -> OptionalTaskHooksFactoryRef<'_> {
+        None
     }
 
     cfg_unstable! {
