@@ -68,15 +68,15 @@ impl<T: ?Sized + AsyncSeek + Unpin> AsyncSeek for &mut T {
 
 impl<P> AsyncSeek for Pin<P>
 where
-    P: DerefMut + Unpin,
+    P: DerefMut,
     P::Target: AsyncSeek,
 {
     fn start_seek(self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
-        self.get_mut().as_mut().start_seek(pos)
+        self.as_deref_mut().start_seek(pos)
     }
 
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        self.get_mut().as_mut().poll_complete(cx)
+        self.as_deref_mut().poll_complete(cx)
     }
 }
 
