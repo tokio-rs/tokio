@@ -80,7 +80,7 @@ impl<T: ?Sized + AsyncRead + Unpin> AsyncRead for &mut T {
 
 impl<P> AsyncRead for Pin<P>
 where
-    P: DerefMut + Unpin,
+    P: DerefMut,
     P::Target: AsyncRead,
 {
     fn poll_read(
@@ -88,7 +88,7 @@ where
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        self.get_mut().as_mut().poll_read(cx, buf)
+        self.as_deref_mut().poll_read(cx, buf)
     }
 }
 
