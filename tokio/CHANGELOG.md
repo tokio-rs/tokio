@@ -1,3 +1,82 @@
+# 1.44.0 (March 7th, 2025)
+
+This release changes the `from_std` method on sockets to panic if a blocking
+socket is provided. We determined this change is not a breaking change as Tokio is not
+intended to operate using blocking sockets. Doing so results in runtime hangs and
+should be considered a bug. Accidentally passing a blocking socket to Tokio is one
+of the most common user mistakes. If this change causes an issue for you, please
+comment on [#7172].
+
+### Added
+
+ - coop: add `task::coop` module ([#7116])
+ - process: add `Command::get_kill_on_drop()` ([#7086])
+ - sync: add `broadcast::Sender::closed` ([#6685], [#7090])
+ - sync: add `broadcast::WeakSender` ([#7100])
+ - sync: add `oneshot::Receiver::is_empty()` ([#7153])
+ - sync: add `oneshot::Receiver::is_terminated()` ([#7152])
+
+### Fixed
+
+ - fs: empty reads on `File` should not start a background read ([#7139])
+ - process: calling `start_kill` on exited child should not fail ([#7160])
+ - signal: fix `CTRL_CLOSE`, `CTRL_LOGOFF`, `CTRL_SHUTDOWN` on windows ([#7122])
+ - sync: properly handle panic during mpsc drop ([#7094])
+
+### Changes
+
+ - runtime: clean up magic number in registration set ([#7112])
+ - coop: make coop yield using waker defer strategy ([#7185])
+ - macros: make `select!` budget-aware ([#7164])
+ - net: panic when passing a blocking socket to `from_std` ([#7166])
+ - io: clean up buffer casts ([#7142])
+
+### Changes to unstable APIs
+
+ - rt: add before and after task poll callbacks ([#7120])
+ - tracing: make the task tracing API unstable public ([#6972])
+
+### Documented
+
+ - docs: fix nesting of sections in top-level docs ([#7159])
+ - fs: rename symlink and hardlink parameter names ([#7143])
+ - io: swap reader/writer in simplex doc test ([#7176])
+ - macros: docs about `select!` alternatives ([#7110])
+ - net: rename the argument for `send_to` ([#7146])
+ - process: add example for reading `Child` stdout ([#7141])
+ - process: clarify `Child::kill` behavior ([#7162])
+ - process: fix grammar of the `ChildStdin` struct doc comment ([#7192])
+ - runtime: consistently use `worker_threads` instead of `core_threads` ([#7186])
+
+[#6685]: https://github.com/tokio-rs/tokio/pull/6685
+[#6972]: https://github.com/tokio-rs/tokio/pull/6972
+[#7086]: https://github.com/tokio-rs/tokio/pull/7086
+[#7090]: https://github.com/tokio-rs/tokio/pull/7090
+[#7094]: https://github.com/tokio-rs/tokio/pull/7094
+[#7100]: https://github.com/tokio-rs/tokio/pull/7100
+[#7110]: https://github.com/tokio-rs/tokio/pull/7110
+[#7112]: https://github.com/tokio-rs/tokio/pull/7112
+[#7116]: https://github.com/tokio-rs/tokio/pull/7116
+[#7120]: https://github.com/tokio-rs/tokio/pull/7120
+[#7122]: https://github.com/tokio-rs/tokio/pull/7122
+[#7139]: https://github.com/tokio-rs/tokio/pull/7139
+[#7141]: https://github.com/tokio-rs/tokio/pull/7141
+[#7142]: https://github.com/tokio-rs/tokio/pull/7142
+[#7143]: https://github.com/tokio-rs/tokio/pull/7143
+[#7146]: https://github.com/tokio-rs/tokio/pull/7146
+[#7152]: https://github.com/tokio-rs/tokio/pull/7152
+[#7153]: https://github.com/tokio-rs/tokio/pull/7153
+[#7159]: https://github.com/tokio-rs/tokio/pull/7159
+[#7160]: https://github.com/tokio-rs/tokio/pull/7160
+[#7162]: https://github.com/tokio-rs/tokio/pull/7162
+[#7164]: https://github.com/tokio-rs/tokio/pull/7164
+[#7166]: https://github.com/tokio-rs/tokio/pull/7166
+[#7172]: https://github.com/tokio-rs/tokio/pull/7172
+[#7176]: https://github.com/tokio-rs/tokio/pull/7176
+[#7185]: https://github.com/tokio-rs/tokio/pull/7185
+[#7186]: https://github.com/tokio-rs/tokio/pull/7186
+[#7192]: https://github.com/tokio-rs/tokio/pull/7192
+
 # 1.43.0 (Jan 8th, 2025)
 
 ### Added
