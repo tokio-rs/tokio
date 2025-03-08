@@ -23,10 +23,11 @@ async-stream = "0.3.3"
 
 bytes = "1.0.0"
 futures-core = "0.3.0"
+futures-sink = "0.3.0"
 
 [dev-dependencies]
 tokio = { version = "1.2.0", path = "../tokio", features = ["full"] }
-futures-util = "0.3.0"
+futures-util = { version = "0.3.0", features = ["sink"] }
 
 [package.metadata.docs.rs]
 all-features = true
