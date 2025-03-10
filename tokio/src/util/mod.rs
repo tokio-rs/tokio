@@ -13,9 +13,6 @@ pub(crate) use blocking_check::check_socket_for_blocking;
 
 pub(crate) mod metric_atomics;
 
-#[cfg(any(feature = "rt", feature = "signal", feature = "process"))]
-pub(crate) mod once_cell;
-
 #[cfg(any(
     // io driver uses `WakeList` directly
     feature = "net",

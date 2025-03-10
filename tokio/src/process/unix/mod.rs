@@ -66,11 +66,11 @@ impl Kill for StdChild {
 
 cfg_not_has_const_mutex_new! {
     fn get_orphan_queue() -> &'static OrphanQueueImpl<StdChild> {
-        use crate::util::once_cell::OnceCell;
+        use std::sync::OnceLock;
 
-        static ORPHAN_QUEUE: OnceCell<OrphanQueueImpl<StdChild>> = OnceCell::new();
+        static ORPHAN_QUEUE: OnceLock<OrphanQueueImpl<StdChild>> = OnceLock::new();
 
-        ORPHAN_QUEUE.get(OrphanQueueImpl::new)
+        ORPHAN_QUEUE.get_or_init(OrphanQueueImpl::new)
     }
 }
 

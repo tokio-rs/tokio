@@ -1,10 +1,10 @@
 use super::AtomicU64;
 use crate::loom::sync::{atomic::Ordering, Mutex};
-use crate::util::once_cell::OnceCell;
+use std::sync::OnceLock;
 
 pub(crate) struct StaticAtomicU64 {
     init: u64,
-    cell: OnceCell<Mutex<u64>>,
+    cell: OnceLock<Mutex<u64>>,
 }
 
 impl AtomicU64 {
@@ -19,7 +19,7 @@ impl StaticAtomicU64 {
     pub(crate) const fn new(val: u64) -> StaticAtomicU64 {
         StaticAtomicU64 {
             init: val,
-            cell: OnceCell::new(),
+            cell: OnceLock::new(),
         }
     }
 
@@ -52,6 +52,6 @@ impl StaticAtomicU64 {
     }
 
     fn inner(&self) -> &Mutex<u64> {
-        self.cell.get(|| Mutex::new(self.init))
+        self.cell.get_or_init(|| Mutex::new(self.init))
     }
 }
