@@ -493,3 +493,58 @@ fn run_until_cancelled_test() {
         );
     }
 }
+
+#[test]
+fn run_until_cancelled_owned_test() {
+    let (waker, _) = new_count_waker();
+
+    {
+        let token = CancellationToken::new();
+        let to_cancel = token.clone();
+
+        let takes_ownership = move |token: CancellationToken| {
+            token.run_until_cancelled_owned(std::future::pending::<()>())
+        };
+
+        let fut = takes_ownership(token);
+        pin!(fut);
+
+        assert_eq!(
+            Poll::Pending,
+            fut.as_mut().poll(&mut Context::from_waker(&waker))
+        );
+
+        to_cancel.cancel();
+
+        assert_eq!(
+            Poll::Ready(None),
+            fut.as_mut().poll(&mut Context::from_waker(&waker))
+        );
+    }
+
+    {
+        let (tx, rx) = oneshot::channel::<()>();
+
+        let token = CancellationToken::new();
+        let takes_ownership = move |token: CancellationToken, rx: oneshot::Receiver<()>| {
+            token.run_until_cancelled_owned(async move {
+                rx.await.unwrap();
+                42
+            })
+        };
+        let fut = takes_ownership(token, rx);
+        pin!(fut);
+
+        assert_eq!(
+            Poll::Pending,
+            fut.as_mut().poll(&mut Context::from_waker(&waker))
+        );
+
+        tx.send(()).unwrap();
+
+        assert_eq!(
+            Poll::Ready(Some(42)),
+            fut.as_mut().poll(&mut Context::from_waker(&waker))
+        );
+    }
+}
