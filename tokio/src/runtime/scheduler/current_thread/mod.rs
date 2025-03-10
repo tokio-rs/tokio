@@ -570,17 +570,17 @@ impl Handle {
     pub(crate) fn injection_queue_depth(&self) -> usize {
         self.shared.inject.len()
     }
+
+    pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
+        assert_eq!(0, worker);
+        &self.shared.worker_metrics
+    }
 }
 
 cfg_unstable_metrics! {
     impl Handle {
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
             &self.shared.scheduler_metrics
-        }
-
-        pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
-            assert_eq!(0, worker);
-            &self.shared.worker_metrics
         }
 
         pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {

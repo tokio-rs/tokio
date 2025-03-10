@@ -82,6 +82,49 @@ fn global_queue_depth_multi_thread() {
     panic!("exhausted every try to block the runtime");
 }
 
+#[test]
+fn worker_total_busy_duration() {
+    const N: usize = 5;
+
+    let zero = Duration::from_millis(0);
+
+    let rt = current_thread();
+    let metrics = rt.metrics();
+
+    rt.block_on(async {
+        for _ in 0..N {
+            tokio::spawn(async {
+                tokio::task::yield_now().await;
+            })
+            .await
+            .unwrap();
+        }
+    });
+
+    drop(rt);
+
+    assert!(zero < metrics.worker_total_busy_duration(0));
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+
+    rt.block_on(async {
+        for _ in 0..N {
+            tokio::spawn(async {
+                tokio::task::yield_now().await;
+            })
+            .await
+            .unwrap();
+        }
+    });
+
+    drop(rt);
+
+    for i in 0..metrics.num_workers() {
+        assert!(zero < metrics.worker_total_busy_duration(i));
+    }
+}
+
 fn try_block_threaded(rt: &Runtime) -> Result<Vec<mpsc::Sender<()>>, mpsc::RecvTimeoutError> {
     let (tx, rx) = mpsc::channel();
 
