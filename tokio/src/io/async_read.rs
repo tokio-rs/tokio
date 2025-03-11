@@ -2,7 +2,31 @@ use super::ReadBuf;
 use std::io;
 use std::ops::DerefMut;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
+
+#[cold]
+fn eof() -> io::Error {
+    io::Error::new(io::ErrorKind::UnexpectedEof, "early eof")
+}
+
+fn default_poll_read_exact<R: AsyncRead + ?Sized>(
+    mut reader: Pin<&mut R>,
+    cx: &mut Context<'_>,
+    buf: &mut ReadBuf<'_>,
+) -> Poll<io::Result<()>> {
+    loop {
+        // if our buffer is empty, then we need to read some data to continue.
+        let rem = buf.remaining();
+        if rem != 0 {
+            ready!(reader.as_mut().poll_read(cx, buf))?;
+            if buf.remaining() == rem {
+                return Poll::Ready(Err(eof()));
+            }
+        } else {
+            return Poll::Ready(Ok(()));
+        }
+    }
+}
 
 /// Reads bytes from a source.
 ///
@@ -56,6 +80,25 @@ pub trait AsyncRead {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>>;
+
+    /// Attempts to read the exact number of bytes required to fill `buf`.
+    ///
+    /// On success, returns `Poll::Ready(Ok(()))` and places data in the
+    /// unfilled portion of `buf`.
+    ///
+    /// If EOF was reached, this function returns an error of kind
+    /// `ErrorKind::UnexpectedEof`.
+    ///
+    /// If an error occurs or `Poll::Pending` is returned, `buf` contains
+    /// all bytes read so far. This means that calling `poll_read_exact`
+    /// with the same `ReadBuf` until it succeeds will work as intended.
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        default_poll_read_exact(self, cx, buf)
+    }
 }
 
 macro_rules! deref_async_read {
@@ -66,6 +109,14 @@ macro_rules! deref_async_read {
             buf: &mut ReadBuf<'_>,
         ) -> Poll<io::Result<()>> {
             Pin::new(&mut **self).poll_read(cx, buf)
+        }
+
+        fn poll_read_exact(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            Pin::new(&mut **self).poll_read_exact(cx, buf)
         }
     };
 }
@@ -89,6 +140,14 @@ where
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         crate::util::pin_as_deref_mut(self).poll_read(cx, buf)
+    }
+
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        crate::util::pin_as_deref_mut(self).poll_read_exact(cx, buf)
     }
 }
 
