@@ -1,6 +1,5 @@
 use crate::io::{AsyncRead, ReadBuf};
 
-use bytes::Buf;
 use pin_project_lite::pin_project;
 use std::future::Future;
 use std::io;
@@ -10,10 +9,10 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 macro_rules! reader {
-    ($name:ident, $ty:ty, $reader:ident) => {
-        reader!($name, $ty, $reader, std::mem::size_of::<$ty>());
+    ($name:ident, $ty:ty, $convert:ident) => {
+        reader!($name, $ty, $convert, std::mem::size_of::<$ty>());
     };
-    ($name:ident, $ty:ty, $reader:ident, $bytes:expr) => {
+    ($name:ident, $ty:ty, $convert:ident, $bytes:expr) => {
         pin_project! {
             #[doc(hidden)]
             #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -48,30 +47,13 @@ macro_rules! reader {
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 let mut me = self.project();
 
-                if *me.read == $bytes as u8 {
-                    return Poll::Ready(Ok(Buf::$reader(&mut &me.buf[..])));
-                }
+                let mut buf = ReadBuf::new(&mut me.buf[*me.read as usize..]);
 
-                while *me.read < $bytes as u8 {
-                    let mut buf = ReadBuf::new(&mut me.buf[*me.read as usize..]);
+                let result = me.src.as_mut().poll_read_exact(cx, &mut buf);
+                *me.read += buf.filled().len() as u8;
+                std::task::ready!(result)?;
 
-                    *me.read += match me.src.as_mut().poll_read(cx, &mut buf) {
-                        Poll::Pending => return Poll::Pending,
-                        Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
-                        Poll::Ready(Ok(())) => {
-                            let n = buf.filled().len();
-                            if n == 0 {
-                                return Poll::Ready(Err(UnexpectedEof.into()));
-                            }
-
-                            n as u8
-                        }
-                    };
-                }
-
-                let num = Buf::$reader(&mut &me.buf[..]);
-
-                Poll::Ready(Ok(num))
+                Poll::Ready(Ok(<$ty>::$convert(*me.buf)))
             }
         }
     };
@@ -131,28 +113,28 @@ macro_rules! reader8 {
 reader8!(ReadU8, u8);
 reader8!(ReadI8, i8);
 
-reader!(ReadU16, u16, get_u16);
-reader!(ReadU32, u32, get_u32);
-reader!(ReadU64, u64, get_u64);
-reader!(ReadU128, u128, get_u128);
+reader!(ReadU16, u16, from_be_bytes);
+reader!(ReadU32, u32, from_be_bytes);
+reader!(ReadU64, u64, from_be_bytes);
+reader!(ReadU128, u128, from_be_bytes);
 
-reader!(ReadI16, i16, get_i16);
-reader!(ReadI32, i32, get_i32);
-reader!(ReadI64, i64, get_i64);
-reader!(ReadI128, i128, get_i128);
+reader!(ReadI16, i16, from_be_bytes);
+reader!(ReadI32, i32, from_be_bytes);
+reader!(ReadI64, i64, from_be_bytes);
+reader!(ReadI128, i128, from_be_bytes);
 
-reader!(ReadF32, f32, get_f32);
-reader!(ReadF64, f64, get_f64);
+reader!(ReadF32, f32, from_be_bytes);
+reader!(ReadF64, f64, from_be_bytes);
 
-reader!(ReadU16Le, u16, get_u16_le);
-reader!(ReadU32Le, u32, get_u32_le);
-reader!(ReadU64Le, u64, get_u64_le);
-reader!(ReadU128Le, u128, get_u128_le);
+reader!(ReadU16Le, u16, from_le_bytes);
+reader!(ReadU32Le, u32, from_le_bytes);
+reader!(ReadU64Le, u64, from_le_bytes);
+reader!(ReadU128Le, u128, from_le_bytes);
 
-reader!(ReadI16Le, i16, get_i16_le);
-reader!(ReadI32Le, i32, get_i32_le);
-reader!(ReadI64Le, i64, get_i64_le);
-reader!(ReadI128Le, i128, get_i128_le);
+reader!(ReadI16Le, i16, from_le_bytes);
+reader!(ReadI32Le, i32, from_le_bytes);
+reader!(ReadI64Le, i64, from_le_bytes);
+reader!(ReadI128Le, i128, from_le_bytes);
 
-reader!(ReadF32Le, f32, get_f32_le);
-reader!(ReadF64Le, f64, get_f64_le);
+reader!(ReadF32Le, f32, from_le_bytes);
+reader!(ReadF64Le, f64, from_le_bytes);
