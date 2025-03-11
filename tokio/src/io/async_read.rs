@@ -5,11 +5,11 @@ use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
 #[cold]
-fn eof() -> io::Error {
+pub(crate) fn eof() -> io::Error {
     io::Error::new(io::ErrorKind::UnexpectedEof, "early eof")
 }
 
-fn default_poll_read_exact<R: AsyncRead + ?Sized>(
+pub(crate) fn default_poll_read_exact<R: AsyncRead + ?Sized>(
     mut reader: Pin<&mut R>,
     cx: &mut Context<'_>,
     buf: &mut ReadBuf<'_>,
@@ -163,6 +163,21 @@ impl AsyncRead for &[u8] {
         *self = b;
         Poll::Ready(Ok(()))
     }
+
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let _ = self.poll_read(cx, buf);
+
+        // If there was enough data, `poll_read` has filled the buffer
+        if buf.remaining() == 0 {
+            Poll::Ready(Ok(()))
+        } else {
+            Poll::Ready(Err(eof()))
+        }
+    }
 }
 
 impl<T: AsRef<[u8]> + Unpin> AsyncRead for io::Cursor<T> {
@@ -187,5 +202,20 @@ impl<T: AsRef<[u8]> + Unpin> AsyncRead for io::Cursor<T> {
         self.set_position(end as u64);
 
         Poll::Ready(Ok(()))
+    }
+
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let _ = self.poll_read(cx, buf);
+
+        // If there was enough data, `poll_read` has filled the buffer
+        if buf.remaining() == 0 {
+            Poll::Ready(Ok(()))
+        } else {
+            Poll::Ready(Err(eof()))
+        }
     }
 }

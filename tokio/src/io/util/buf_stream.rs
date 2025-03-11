@@ -156,6 +156,14 @@ impl<RW: AsyncRead + AsyncWrite> AsyncRead for BufStream<RW> {
     ) -> Poll<io::Result<()>> {
         self.project().inner.poll_read(cx, buf)
     }
+
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        self.project().inner.poll_read_exact(cx, buf)
+    }
 }
 
 /// Seek to an offset, in bytes, in the underlying stream.

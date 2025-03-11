@@ -131,6 +131,15 @@ impl AsyncRead for DuplexStream {
     ) -> Poll<std::io::Result<()>> {
         Pin::new(&mut *self.read.lock()).poll_read(cx, buf)
     }
+
+    #[allow(unused_mut)]
+    fn poll_read_exact(
+        mut self: Pin<&mut Self>,
+        cx: &mut task::Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut *self.read.lock()).poll_read_exact(cx, buf)
+    }
 }
 
 impl AsyncWrite for DuplexStream {

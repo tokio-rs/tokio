@@ -75,6 +75,22 @@ impl AsyncRead for Empty {
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }
+
+    #[inline]
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
+
+        if buf.remaining() == 0 {
+            Poll::Ready(Ok(()))
+        } else {
+            Poll::Ready(Err(crate::io::async_read::eof()))
+        }
+    }
 }
 
 impl AsyncBufRead for Empty {

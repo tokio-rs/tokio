@@ -95,6 +95,15 @@ impl<R: AsyncRead> BufReader<R> {
         *me.pos = 0;
         *me.cap = 0;
     }
+
+    #[cold]
+    fn poll_read_exact_slow(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        crate::io::async_read::default_poll_read_exact(self, cx, buf)
+    }
 }
 
 impl<R: AsyncRead> AsyncRead for BufReader<R> {
@@ -116,6 +125,22 @@ impl<R: AsyncRead> AsyncRead for BufReader<R> {
         buf.put_slice(&rem[..amt]);
         self.consume(amt);
         Poll::Ready(Ok(()))
+    }
+
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        // Fast path: all the data we need is already in the buffer
+        if let Some(data) = self.buffer().get(..buf.remaining()) {
+            buf.put_slice(data);
+            *self.project().pos += data.len();
+            debug_assert!(buf.remaining() == 0);
+            return Poll::Ready(Ok(()));
+        }
+
+        self.poll_read_exact_slow(cx, buf)
     }
 }
 

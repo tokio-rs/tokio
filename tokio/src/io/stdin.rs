@@ -95,4 +95,12 @@ impl AsyncRead for Stdin {
     ) -> Poll<io::Result<()>> {
         Pin::new(&mut self.std).poll_read(cx, buf)
     }
+
+    fn poll_read_exact(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.std).poll_read_exact(cx, buf)
+    }
 }

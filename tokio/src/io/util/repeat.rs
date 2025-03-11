@@ -61,6 +61,18 @@ impl AsyncRead for Repeat {
         buf.put_bytes(self.byte, buf.remaining());
         Poll::Ready(Ok(()))
     }
+
+    #[inline]
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
+        buf.put_bytes(self.byte, buf.remaining());
+        Poll::Ready(Ok(()))
+    }
 }
 
 #[cfg(test)]

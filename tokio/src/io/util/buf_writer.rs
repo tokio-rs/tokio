@@ -274,6 +274,14 @@ impl<W: AsyncWrite + AsyncRead> AsyncRead for BufWriter<W> {
     ) -> Poll<io::Result<()>> {
         self.get_pin_mut().poll_read(cx, buf)
     }
+
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        self.get_pin_mut().poll_read_exact(cx, buf)
+    }
 }
 
 impl<W: AsyncWrite + AsyncBufRead> AsyncBufRead for BufWriter<W> {
