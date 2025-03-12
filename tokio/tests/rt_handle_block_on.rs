@@ -126,6 +126,17 @@ fn unbounded_mpsc_channel() {
     })
 }
 
+#[test]
+fn yield_in_block_in_place() {
+    test_with_runtimes(|| {
+        Handle::current().block_on(async {
+            tokio::task::block_in_place(|| {
+                Handle::current().block_on(tokio::task::yield_now());
+            });
+        });
+    })
+}
+
 #[cfg(not(target_os = "wasi"))] // Wasi doesn't support file operations or bind
 rt_test! {
     use tokio::fs;
