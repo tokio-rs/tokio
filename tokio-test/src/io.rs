@@ -52,6 +52,7 @@ pub struct Handle {
 pub struct Builder {
     // Sequence of actions for the Mock to take
     actions: VecDeque<Action>,
+    name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +72,7 @@ struct Inner {
     sleep: Option<Pin<Box<Sleep>>>,
     read_wait: Option<Waker>,
     rx: UnboundedReceiverStream<Action>,
+    name: String,
 }
 
 impl Builder {
@@ -127,6 +129,12 @@ impl Builder {
         self
     }
 
+    /// Set name of the mock IO object to include in panic messages and debug output
+    pub fn name(&mut self, name: impl Into<String>) -> &mut Self {
+        self.name = name.into();
+        self
+    }
+
     /// Build a `Mock` value according to the defined script.
     pub fn build(&mut self) -> Mock {
         let (mock, _) = self.build_with_handle();
@@ -135,7 +143,7 @@ impl Builder {
 
     /// Build a `Mock` value paired with a handle
     pub fn build_with_handle(&mut self) -> (Mock, Handle) {
-        let (inner, handle) = Inner::new(self.actions.clone());
+        let (inner, handle) = Inner::new(self.actions.clone(), self.name.clone());
 
         let mock = Mock { inner };
 
@@ -184,7 +192,7 @@ impl Handle {
 }
 
 impl Inner {
-    fn new(actions: VecDeque<Action>) -> (Inner, Handle) {
+    fn new(actions: VecDeque<Action>, name: String) -> (Inner, Handle) {
         let (tx, rx) = mpsc::unbounded_channel();
 
         let rx = UnboundedReceiverStream::new(rx);
@@ -195,6 +203,7 @@ impl Inner {
             read_wait: None,
             rx,
             waiting: None,
+            name,
         };
 
         let handle = Handle { tx };
@@ -256,7 +265,7 @@ impl Inner {
                 Action::Write(ref mut expect) => {
                     let n = cmp::min(src.len(), expect.len());
 
-                    assert_eq!(&src[..n], &expect[..n]);
+                    assert_eq!(&src[..n], &expect[..n], "name={} i={}", self.name, i);
 
                     // Drop data that was matched
                     expect.drain(..n);
@@ -418,7 +427,7 @@ impl AsyncWrite for Mock {
                         self.inner.actions.push_back(action);
                     }
                     Poll::Ready(None) => {
-                        panic!("unexpected write");
+                        panic!("unexpected write {}", self.pmsg());
                     }
                 }
             }
@@ -429,7 +438,7 @@ impl AsyncWrite for Mock {
                         let until = Instant::now() + rem;
                         self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
                     } else {
-                        panic!("unexpected WouldBlock");
+                        panic!("unexpected WouldBlock {}", self.pmsg());
                     }
                 }
                 Ok(0) => {
@@ -445,7 +454,7 @@ impl AsyncWrite for Mock {
                             continue;
                         }
                         None => {
-                            panic!("unexpected write");
+                            panic!("unexpected write {}", self.pmsg());
                         }
                     }
                 }
@@ -475,8 +484,16 @@ impl Drop for Mock {
         }
 
         self.inner.actions.iter().for_each(|a| match a {
-            Action::Read(data) => assert!(data.is_empty(), "There is still data left to read."),
-            Action::Write(data) => assert!(data.is_empty(), "There is still data left to write."),
+            Action::Read(data) => assert!(
+                data.is_empty(),
+                "There is still data left to read. {}",
+                self.pmsg()
+            ),
+            Action::Write(data) => assert!(
+                data.is_empty(),
+                "There is still data left to write. {}",
+                self.pmsg()
+            ),
             _ => (),
         });
     }
@@ -505,6 +522,33 @@ fn is_task_ctx() -> bool {
 
 impl fmt::Debug for Inner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Inner {{...}}")
+        if self.name.is_empty() {
+            write!(f, "Inner {{...}}")
+        } else {
+            write!(f, "Inner {{name={}, ...}}", self.name)
+        }
+    }
+}
+
+struct PanicMsgSnippet<'a>(&'a Inner);
+
+impl<'a> fmt::Display for PanicMsgSnippet<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.0.name.is_empty() {
+            write!(f, "({} actions remain)", self.0.actions.len())
+        } else {
+            write!(
+                f,
+                "(name {}, {} actions remain)",
+                self.0.name,
+                self.0.actions.len()
+            )
+        }
+    }
+}
+
+impl Mock {
+    fn pmsg(&self) -> PanicMsgSnippet<'_> {
+        PanicMsgSnippet(&self.inner)
     }
 }
