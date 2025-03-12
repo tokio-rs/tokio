@@ -680,7 +680,7 @@ fn mutex_in_block_in_place() {
         tokio::spawn(async move {
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async move {
-                    for i in 0..(N + 1) {
+                    for i in 0..(BUDGET + 1) {
                         let mut guard = lock.lock().await;
                         *guard = i;
                     }
