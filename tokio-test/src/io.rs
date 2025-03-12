@@ -130,8 +130,8 @@ impl Builder {
     }
 
     /// Set name of the mock IO object to include in panic messages and debug output
-    pub fn name(&mut self, name: String) -> &mut Self {
-        self.name = name;
+    pub fn name(&mut self, name: impl Into<String>) -> &mut Self {
+        self.name = name.into();
         self
     }
 
