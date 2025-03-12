@@ -782,7 +782,13 @@ impl Context {
     }
 
     pub(crate) fn defer(&self, waker: &Waker) {
-        self.defer.defer(waker);
+        if self.core.borrow().is_none() {
+            // If there is no core, then the worker is currently in a block_in_place. In this case,
+            // we cannot use the defer queue as we aren't really in the current runtime.
+            waker.wake_by_ref();
+        } else {
+            self.defer.defer(waker);
+        }
     }
 
     #[allow(dead_code)]
