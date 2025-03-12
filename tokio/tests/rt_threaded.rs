@@ -667,7 +667,7 @@ fn yield_now_in_block_in_place() {
 
 #[test]
 fn mutex_in_block_in_place() {
-    const N: usize = 128;
+    const BUDGET: usize = 128;
 
     let rt = runtime::Builder::new_multi_thread()
         .worker_threads(1)
