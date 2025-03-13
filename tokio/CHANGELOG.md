@@ -2,7 +2,7 @@
 
 ### Fixed
 
-- rt: skip defer queue in `block_in_place` context (#7216)
+- rt: skip defer queue in `block_in_place` context ([#7216])
 
 [#7216]: https://github.com/tokio-rs/tokio/pull/7216
 
