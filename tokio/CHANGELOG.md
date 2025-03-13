@@ -1,3 +1,11 @@
+# 1.44.1 (March 13th, 2025)
+
+### Fixed
+
+- rt: skip defer queue in `block_in_place` context (#7216)
+
+[#7216]: https://github.com/tokio-rs/tokio/pull/7216
+
 # 1.44.0 (March 7th, 2025)
 
 This release changes the `from_std` method on sockets to panic if a blocking
