@@ -131,4 +131,12 @@ impl<S: AsyncRead> AsyncRead for SinkWriter<S> {
     ) -> Poll<io::Result<()>> {
         self.project().inner.poll_read(cx, buf)
     }
+
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        self.project().inner.poll_read_exact(cx, buf)
+    }
 }
