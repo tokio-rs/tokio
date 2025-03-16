@@ -60,7 +60,7 @@ impl<T: 'static> Shared<T> {
 
     /// Inserts several tasks that have been linked together into the queue.
     ///
-    /// The provided head and tail may be be the same task. In this case, a
+    /// The provided head and tail may be the same task. In this case, a
     /// single task is inserted.
     #[inline]
     unsafe fn push_batch_inner<L>(
