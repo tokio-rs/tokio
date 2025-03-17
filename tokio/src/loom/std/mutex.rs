@@ -33,12 +33,4 @@ impl<T> Mutex<T> {
             Err(TryLockError::WouldBlock) => None,
         }
     }
-
-    #[inline]
-    pub(crate) fn get_mut(&mut self) -> &mut T {
-        match self.0.get_mut() {
-            Ok(val) => val,
-            Err(p_err) => p_err.into_inner(),
-        }
-    }
 }

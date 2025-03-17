@@ -71,7 +71,6 @@ impl FastRand {
     #[cfg(any(
         feature = "macros",
         feature = "rt-multi-thread",
-        feature = "time",
         all(feature = "sync", feature = "rt")
     ))]
     pub(crate) fn fastrand_n(&mut self, n: u32) -> u32 {

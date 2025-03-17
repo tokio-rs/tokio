@@ -1317,11 +1317,6 @@ impl Context {
     fn shared(&self) -> &Shared {
         &self.handle.shared
     }
-
-    #[cfg_attr(not(feature = "time"), allow(dead_code))]
-    pub(crate) fn get_worker_index(&self) -> usize {
-        self.index
-    }
 }
 
 impl Core {
