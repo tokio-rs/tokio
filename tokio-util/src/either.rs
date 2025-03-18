@@ -104,6 +104,14 @@ where
     ) -> Poll<Result<()>> {
         delegate_call!(self.poll_read(cx, buf))
     }
+
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        delegate_call!(self.poll_read_exact(cx, buf))
+    }
 }
 
 impl<L, R> AsyncBufRead for Either<L, R>

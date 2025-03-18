@@ -81,6 +81,14 @@ where
     ) -> Poll<Result<(), io::Error>> {
         self.project().reader.poll_read(cx, buf)
     }
+
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        self.project().reader.poll_read_exact(cx, buf)
+    }
 }
 
 impl<R, W> AsyncWrite for Join<R, W>
