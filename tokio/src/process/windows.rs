@@ -66,15 +66,59 @@ struct Waiting {
 unsafe impl Sync for Waiting {}
 unsafe impl Send for Waiting {}
 
+struct DroppableChild {
+    child: Option<StdChild>,
+}
+
+impl Drop for DroppableChild {
+    fn drop(&mut self) {
+        if let Some(child) = &mut self.child {
+            drop(child.kill());
+        }
+    }
+}
+
+impl DroppableChild {
+    pub(crate) fn new(child: StdChild) -> DroppableChild {
+        return DroppableChild { child: Some(child) };
+    }
+
+    pub(crate) fn take_stdin(&mut self) -> Option<std::process::ChildStdin> {
+        self.child
+            .as_mut()
+            .expect("child has gone away")
+            .stdin
+            .take()
+    }
+    pub(crate) fn take_stdout(&mut self) -> Option<std::process::ChildStdout> {
+        self.child
+            .as_mut()
+            .expect("child has gone away")
+            .stdout
+            .take()
+    }
+    pub(crate) fn take_stderr(&mut self) -> Option<std::process::ChildStderr> {
+        self.child
+            .as_mut()
+            .expect("child has gone away")
+            .stderr
+            .take()
+    }
+
+    pub(crate) fn take(mut self) -> StdChild {
+        self.child.take().expect("child has gone away")
+    }
+}
+
 pub(crate) fn spawn_child(cmd: &mut StdCommand) -> io::Result<SpawnedChild> {
-    let mut child = cmd.spawn()?;
-    let stdin = child.stdin.take().map(stdio).transpose()?;
-    let stdout = child.stdout.take().map(stdio).transpose()?;
-    let stderr = child.stderr.take().map(stdio).transpose()?;
+    let mut child = DroppableChild::new(cmd.spawn()?);
+    let stdin = child.take_stdin().map(stdio).transpose()?;
+    let stdout = child.take_stdout().map(stdio).transpose()?;
+    let stderr = child.take_stderr().map(stdio).transpose()?;
 
     Ok(SpawnedChild {
         child: Child {
-            child,
+            child: child.take(),
             waiting: None,
         },
         stdin,

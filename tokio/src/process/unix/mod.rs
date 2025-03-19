@@ -106,7 +106,7 @@ impl OrphanQueue<StdChild> for GlobalOrphanQueue {
 pub(crate) enum Child {
     SignalReaper(Reaper<StdChild, GlobalOrphanQueue, Signal>),
     #[cfg(all(target_os = "linux", feature = "rt"))]
-    PidfdReaper(pidfd_reaper::PidfdReaper<StdChild, GlobalOrphanQueue>),
+    PidfdReaper(pidfd_reaper::PidfdReaper<ChildDropGuard, GlobalOrphanQueue>),
 }
 
 impl fmt::Debug for Child {
@@ -115,21 +115,97 @@ impl fmt::Debug for Child {
     }
 }
 
+pub(crate) struct ChildDropGuard {
+    child: Option<StdChild>,
+    kill_on_drop: bool,
+}
+
+impl Drop for ChildDropGuard {
+    fn drop(&mut self) {
+        if let Some(child) = &mut self.child {
+            if self.kill_on_drop {
+                drop(child.kill());
+            }
+        }
+    }
+}
+
+impl ChildDropGuard {
+    pub(crate) fn new(child: StdChild) -> ChildDropGuard {
+        ChildDropGuard {
+            child: Some(child),
+            kill_on_drop: true,
+        }
+    }
+
+    pub(crate) fn extract(mut self) -> StdChild {
+        self.child.take().unwrap()
+    }
+
+    pub(crate) fn take_stdin(&mut self) -> Option<std::process::ChildStdin> {
+        self.child
+            .as_mut()
+            .expect("child has gone away")
+            .stdin
+            .take()
+    }
+    pub(crate) fn take_stdout(&mut self) -> Option<std::process::ChildStdout> {
+        self.child
+            .as_mut()
+            .expect("child has gone away")
+            .stdout
+            .take()
+    }
+    pub(crate) fn take_stderr(&mut self) -> Option<std::process::ChildStderr> {
+        self.child
+            .as_mut()
+            .expect("child has gone away")
+            .stderr
+            .take()
+    }
+
+    #[cfg(all(target_os = "linux", feature = "rt"))]
+    pub(crate) fn dont_kill_on_drop(&mut self) {
+        self.kill_on_drop = false;
+    }
+
+    #[cfg(all(target_os = "linux", feature = "rt"))]
+    pub(crate) fn inner_mut(&mut self) -> &mut StdChild {
+        self.child.as_mut().expect("child has gone away")
+    }
+}
+
+impl Wait for ChildDropGuard {
+    fn id(&self) -> u32 {
+        self.child.as_ref().expect("child has gone away").id()
+    }
+    fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
+        self.child.as_mut().expect("child has gone away").try_wait()
+    }
+}
+
+impl OrphanQueue<ChildDropGuard> for GlobalOrphanQueue {
+    fn push_orphan(&self, orphan: ChildDropGuard) {
+        get_orphan_queue().push_orphan(orphan.extract());
+    }
+}
+
 pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<SpawnedChild> {
-    let mut child = cmd.spawn()?;
-    let stdin = child.stdin.take().map(stdio).transpose()?;
-    let stdout = child.stdout.take().map(stdio).transpose()?;
-    let stderr = child.stderr.take().map(stdio).transpose()?;
+    let mut child = ChildDropGuard::new(cmd.spawn()?);
+    let stdin = child.take_stdin().map(stdio).transpose()?;
+    let stdout = child.take_stdout().map(stdio).transpose()?;
+    let stderr = child.take_stderr().map(stdio).transpose()?;
 
     #[cfg(all(target_os = "linux", feature = "rt"))]
     match pidfd_reaper::PidfdReaper::new(child, GlobalOrphanQueue) {
-        Ok(pidfd_reaper) => {
+        Ok(mut pidfd_reaper) => {
+            pidfd_reaper.inner_mut().dont_kill_on_drop();
             return Ok(SpawnedChild {
                 child: Child::PidfdReaper(pidfd_reaper),
                 stdin,
                 stdout,
                 stderr,
-            })
+            });
         }
         Err((Some(err), _child)) => return Err(err),
         Err((None, child_returned)) => child = child_returned,
@@ -138,7 +214,7 @@ pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<Spawned
     let signal = signal(SignalKind::child())?;
 
     Ok(SpawnedChild {
-        child: Child::SignalReaper(Reaper::new(child, GlobalOrphanQueue, signal)),
+        child: Child::SignalReaper(Reaper::new(child.extract(), GlobalOrphanQueue, signal)),
         stdin,
         stdout,
         stderr,
@@ -158,7 +234,7 @@ impl Child {
         match self {
             Self::SignalReaper(signal_reaper) => signal_reaper.inner_mut(),
             #[cfg(all(target_os = "linux", feature = "rt"))]
-            Self::PidfdReaper(pidfd_reaper) => pidfd_reaper.inner_mut(),
+            Self::PidfdReaper(pidfd_reaper) => pidfd_reaper.inner_mut().inner_mut(),
         }
     }
 
