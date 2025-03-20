@@ -1,7 +1,6 @@
-//! An asynchronously awaitable `CancellationToken`.
+//! An asynchronously awaitable `CancellationTokenWithReason`.
 //! The token allows to signal a cancellation request to one or more tasks.
 pub(crate) mod guard;
-pub(super) mod tree_node;
 
 use crate::loom::sync::Arc;
 use crate::util::MaybeDangling;
@@ -9,34 +8,36 @@ use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use guard::DropGuard;
+use guard::DropGuardWithReason;
 use pin_project_lite::pin_project;
+
+use super::cancellation_token::tree_node;
 
 /// A token which can be used to signal a cancellation request to one or more
 /// tasks.
 ///
-/// Tasks can call [`CancellationToken::cancelled()`] in order to
+/// Tasks can call [`CancellationTokenWithReason::cancelled()`] in order to
 /// obtain a Future which will be resolved when cancellation is requested.
 ///
-/// Cancellation can be requested through the [`CancellationToken::cancel`] method.
+/// Cancellation can be requested through the [`CancellationTokenWithReason::cancel`] method.
 ///
 /// # Examples
 ///
 /// ```no_run
 /// use tokio::select;
-/// use tokio_util::sync::CancellationToken;
+/// use tokio_util::sync::CancellationTokenWithReason;
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let token = CancellationToken::new();
+///     let token = CancellationTokenWithReason::new();
 ///     let cloned_token = token.clone();
 ///
 ///     let join_handle = tokio::spawn(async move {
 ///         // Wait for either cancellation or a very long time
 ///         select! {
-///             _ = cloned_token.cancelled() => {
+///             cancel_value = cloned_token.cancelled() => {
 ///                 // The token was cancelled
-///                 5
+///                 cancel_value
 ///             }
 ///             _ = tokio::time::sleep(std::time::Duration::from_secs(9999)) => {
 ///                 99
@@ -46,38 +47,38 @@ use pin_project_lite::pin_project;
 ///
 ///     tokio::spawn(async move {
 ///         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-///         token.cancel();
+///         token.cancel(5);
 ///     });
 ///
 ///     assert_eq!(5, join_handle.await.unwrap());
 /// }
 /// ```
-pub struct CancellationToken {
-    inner: Arc<tree_node::TreeNode<()>>,
+pub struct CancellationTokenWithReason<T> {
+    inner: Arc<tree_node::TreeNode<T>>,
 }
 
-impl std::panic::UnwindSafe for CancellationToken {}
-impl std::panic::RefUnwindSafe for CancellationToken {}
+impl<T> std::panic::UnwindSafe for CancellationTokenWithReason<T> {}
+impl<T> std::panic::RefUnwindSafe for CancellationTokenWithReason<T> {}
 
 pin_project! {
-    /// A Future that is resolved once the corresponding [`CancellationToken`]
+    /// A Future that is resolved once the corresponding [`CancellationTokenWithReason`]
     /// is cancelled.
     #[must_use = "futures do nothing unless polled"]
-    pub struct WaitForCancellationFuture<'a> {
-        cancellation_token: &'a CancellationToken,
+    pub struct WaitForCancellationWithReasonFuture<'a, T> {
+        cancellation_token: &'a CancellationTokenWithReason<T>,
         #[pin]
         future: tokio::sync::futures::Notified<'a>,
     }
 }
 
 pin_project! {
-    /// A Future that is resolved once the corresponding [`CancellationToken`]
+    /// A Future that is resolved once the corresponding [`CancellationTokenWithReason`]
     /// is cancelled.
     ///
     /// This is the counterpart to [`WaitForCancellationFuture`] that takes
-    /// [`CancellationToken`] by value instead of using a reference.
+    /// [`CancellationTokenWithReason`] by value instead of using a reference.
     #[must_use = "futures do nothing unless polled"]
-    pub struct WaitForCancellationFutureOwned {
+    pub struct WaitForCancellationWithReasonFutureOwned<T> {
         // This field internally has a reference to the cancellation token, but camouflages
         // the relationship with `'static`. To avoid Undefined Behavior, we must ensure
         // that the reference is only used while the cancellation token is still alive. To
@@ -95,53 +96,62 @@ pin_project! {
         // for more info.
         #[pin]
         future: MaybeDangling<tokio::sync::futures::Notified<'static>>,
-        cancellation_token: CancellationToken,
+        cancellation_token: CancellationTokenWithReason<T>,
     }
 }
 
-// ===== impl CancellationToken =====
+// ===== impl CancellationTokenWithReason =====
 
-impl core::fmt::Debug for CancellationToken {
+impl<T: core::fmt::Debug> core::fmt::Debug for CancellationTokenWithReason<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("CancellationToken")
-            .field("is_cancelled", &self.is_cancelled())
-            .finish()
+        tree_node::with_cancelled(&self.inner, |cancel| {
+            f.debug_struct("CancellationTokenWithReason")
+                .field("cancelled", cancel)
+                .finish()
+        })
     }
 }
 
-impl Clone for CancellationToken {
-    /// Creates a clone of the `CancellationToken` which will get cancelled
+impl<T> Clone for CancellationTokenWithReason<T> {
+    /// Creates a clone of the `CancellationTokenWithReason` which will get cancelled
     /// whenever the current token gets cancelled, and vice versa.
     fn clone(&self) -> Self {
         tree_node::increase_handle_refcount(&self.inner);
-        CancellationToken {
+        CancellationTokenWithReason {
             inner: self.inner.clone(),
         }
     }
 }
 
-impl Drop for CancellationToken {
+impl<T> Drop for CancellationTokenWithReason<T> {
     fn drop(&mut self) {
         tree_node::decrease_handle_refcount(&self.inner);
     }
 }
 
-impl Default for CancellationToken {
-    fn default() -> CancellationToken {
-        CancellationToken::new()
+impl<T> Default for CancellationTokenWithReason<T> {
+    fn default() -> CancellationTokenWithReason<T> {
+        CancellationTokenWithReason::new()
     }
 }
 
-impl CancellationToken {
-    /// Creates a new `CancellationToken` in the non-cancelled state.
-    pub fn new() -> CancellationToken {
-        CancellationToken {
+impl<T> CancellationTokenWithReason<T> {
+    /// Creates a new `CancellationTokenWithReason` in the non-cancelled state.
+    pub fn new() -> CancellationTokenWithReason<T> {
+        CancellationTokenWithReason {
             inner: Arc::new(tree_node::TreeNode::new()),
         }
     }
 
-    /// Creates a `CancellationToken` which will get cancelled whenever the
-    /// current token gets cancelled. Unlike a cloned `CancellationToken`,
+    /// Returns `true` if the `CancellationTokenWithReason` is cancelled.
+    pub fn is_cancelled(&self) -> bool {
+        tree_node::is_cancelled(&self.inner)
+    }
+}
+
+impl<T: Clone> CancellationTokenWithReason<T> {
+    /// Creates a `CancellationTokenWithReason` which will get cancelled whenever the
+    /// current token gets cancelled. Unlike a cloned `CancellationTokenWithReason`,
     /// cancelling a child token does not cancel the parent token.
     ///
     /// If the current token is already cancelled, the child token will get
@@ -151,19 +161,19 @@ impl CancellationToken {
     ///
     /// ```no_run
     /// use tokio::select;
-    /// use tokio_util::sync::CancellationToken;
+    /// use tokio_util::sync::CancellationTokenWithReason;
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let token = CancellationToken::new();
+    ///     let token = CancellationTokenWithReason::new();
     ///     let child_token = token.child_token();
     ///
     ///     let join_handle = tokio::spawn(async move {
     ///         // Wait for either cancellation or a very long time
     ///         select! {
-    ///             _ = child_token.cancelled() => {
+    ///             cancel_value = child_token.cancelled() => {
     ///                 // The token was cancelled
-    ///                 5
+    ///                 cancel_value
     ///             }
     ///             _ = tokio::time::sleep(std::time::Duration::from_secs(9999)) => {
     ///                 99
@@ -173,19 +183,19 @@ impl CancellationToken {
     ///
     ///     tokio::spawn(async move {
     ///         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    ///         token.cancel();
+    ///         token.cancel(5);
     ///     });
     ///
     ///     assert_eq!(5, join_handle.await.unwrap());
     /// }
     /// ```
-    pub fn child_token(&self) -> CancellationToken {
-        CancellationToken {
+    pub fn child_token(&self) -> CancellationTokenWithReason<T> {
+        CancellationTokenWithReason {
             inner: tree_node::child_node(&self.inner),
         }
     }
 
-    /// Cancel the [`CancellationToken`] and all child tokens which had been
+    /// Cancel the [`CancellationTokenWithReason`] and all child tokens which had been
     /// derived from it.
     ///
     /// This will wake up all tasks which are waiting for cancellation.
@@ -195,13 +205,13 @@ impl CancellationToken {
     /// receive `true` from `is_cancelled` on one child node, and then receive
     /// `false` from `is_cancelled` on another child node. However, once the
     /// call to `cancel` returns, all child nodes have been fully cancelled.
-    pub fn cancel(&self) {
-        tree_node::cancel(&self.inner, ());
+    pub fn cancel(&self, reason: T) {
+        tree_node::cancel(&self.inner, reason);
     }
 
-    /// Returns `true` if the `CancellationToken` is cancelled.
-    pub fn is_cancelled(&self) -> bool {
-        tree_node::is_cancelled(&self.inner)
+    /// Returns `Some(reason)` if the `CancellationTokenWithReason` is cancelled.
+    pub fn get_cancelled(&self) -> Option<T> {
+        tree_node::with_cancelled(&self.inner, Clone::clone)
     }
 
     /// Returns a `Future` that gets fulfilled when cancellation is requested.
@@ -212,8 +222,8 @@ impl CancellationToken {
     /// # Cancel safety
     ///
     /// This method is cancel safe.
-    pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
-        WaitForCancellationFuture {
+    pub fn cancelled(&self) -> WaitForCancellationWithReasonFuture<'_, T> {
+        WaitForCancellationWithReasonFuture {
             cancellation_token: self,
             future: self.inner.notified(),
         }
@@ -230,97 +240,41 @@ impl CancellationToken {
     /// # Cancel safety
     ///
     /// This method is cancel safe.
-    pub fn cancelled_owned(self) -> WaitForCancellationFutureOwned {
-        WaitForCancellationFutureOwned::new(self)
+    pub fn cancelled_owned(self) -> WaitForCancellationWithReasonFutureOwned<T>
+    where
+        T: 'static,
+    {
+        WaitForCancellationWithReasonFutureOwned::new(self)
     }
 
     /// Creates a `DropGuard` for this token.
     ///
     /// Returned guard will cancel this token (and all its children) on drop
     /// unless disarmed.
-    pub fn drop_guard(self) -> DropGuard {
-        DropGuard { inner: Some(self) }
-    }
-
-    /// Runs a future to completion and returns its result wrapped inside of an `Option`
-    /// unless the `CancellationToken` is cancelled. In that case the function returns
-    /// `None` and the future gets dropped.
-    ///
-    /// # Cancel safety
-    ///
-    /// This method is only cancel safe if `fut` is cancel safe.
-    pub async fn run_until_cancelled<F>(&self, fut: F) -> Option<F::Output>
-    where
-        F: Future,
-    {
-        pin_project! {
-            /// A Future that is resolved once the corresponding [`CancellationToken`]
-            /// is cancelled or a given Future gets resolved. It is biased towards the
-            /// Future completion.
-            #[must_use = "futures do nothing unless polled"]
-            struct RunUntilCancelledFuture<'a, F: Future> {
-                #[pin]
-                cancellation: WaitForCancellationFuture<'a>,
-                #[pin]
-                future: F,
-            }
+    pub fn drop_guard(self, reason: T) -> DropGuardWithReason<T> {
+        DropGuardWithReason {
+            inner: Some((self, reason)),
         }
-
-        impl<'a, F: Future> Future for RunUntilCancelledFuture<'a, F> {
-            type Output = Option<F::Output>;
-
-            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                let this = self.project();
-                if let Poll::Ready(res) = this.future.poll(cx) {
-                    Poll::Ready(Some(res))
-                } else if this.cancellation.poll(cx).is_ready() {
-                    Poll::Ready(None)
-                } else {
-                    Poll::Pending
-                }
-            }
-        }
-
-        RunUntilCancelledFuture {
-            cancellation: self.cancelled(),
-            future: fut,
-        }
-        .await
-    }
-
-    /// Runs a future to completion and returns its result wrapped inside of an `Option`
-    /// unless the `CancellationToken` is cancelled. In that case the function returns
-    /// `None` and the future gets dropped.
-    ///
-    /// The function takes self by value and returns a future that owns the token.
-    ///
-    /// # Cancel safety
-    ///
-    /// This method is only cancel safe if `fut` is cancel safe.
-    pub async fn run_until_cancelled_owned<F>(self, fut: F) -> Option<F::Output>
-    where
-        F: Future,
-    {
-        self.run_until_cancelled(fut).await
     }
 }
 
 // ===== impl WaitForCancellationFuture =====
 
-impl<'a> core::fmt::Debug for WaitForCancellationFuture<'a> {
+impl<'a, T> core::fmt::Debug for WaitForCancellationWithReasonFuture<'a, T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("WaitForCancellationFuture").finish()
+        f.debug_struct("WaitForCancellationWithReasonFuture")
+            .finish()
     }
 }
 
-impl<'a> Future for WaitForCancellationFuture<'a> {
-    type Output = ();
+impl<'a, T: Clone> Future for WaitForCancellationWithReasonFuture<'a, T> {
+    type Output = T;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<T> {
         let mut this = self.project();
         loop {
-            if this.cancellation_token.is_cancelled() {
-                return Poll::Ready(());
+            if let Some(cancel) = this.cancellation_token.get_cancelled() {
+                return Poll::Ready(cancel);
             }
 
             // No wakeups can be lost here because there is always a call to
@@ -338,15 +292,16 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
 
 // ===== impl WaitForCancellationFutureOwned =====
 
-impl core::fmt::Debug for WaitForCancellationFutureOwned {
+impl<T> core::fmt::Debug for WaitForCancellationWithReasonFutureOwned<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("WaitForCancellationFutureOwned").finish()
+        f.debug_struct("WaitForCancellationWithReasonFutureOwned<T>")
+            .finish()
     }
 }
 
-impl WaitForCancellationFutureOwned {
-    fn new(cancellation_token: CancellationToken) -> Self {
-        WaitForCancellationFutureOwned {
+impl<T: 'static> WaitForCancellationWithReasonFutureOwned<T> {
+    fn new(cancellation_token: CancellationTokenWithReason<T>) -> Self {
+        WaitForCancellationWithReasonFutureOwned {
             // cancellation_token holds a heap allocation and is guaranteed to have a
             // stable deref, thus it would be ok to move the cancellation_token while
             // the future holds a reference to it.
@@ -363,7 +318,7 @@ impl WaitForCancellationFutureOwned {
     /// The returned future must be destroyed before the cancellation token is
     /// destroyed.
     unsafe fn new_future(
-        cancellation_token: &CancellationToken,
+        cancellation_token: &CancellationTokenWithReason<T>,
     ) -> tokio::sync::futures::Notified<'static> {
         let inner_ptr = Arc::as_ptr(&cancellation_token.inner);
         // SAFETY: The `Arc::as_ptr` method guarantees that `inner_ptr` remains
@@ -373,15 +328,15 @@ impl WaitForCancellationFutureOwned {
     }
 }
 
-impl Future for WaitForCancellationFutureOwned {
-    type Output = ();
+impl<T: 'static + Clone> Future for WaitForCancellationWithReasonFutureOwned<T> {
+    type Output = T;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<T> {
         let mut this = self.project();
 
         loop {
-            if this.cancellation_token.is_cancelled() {
-                return Poll::Ready(());
+            if let Some(cancel) = this.cancellation_token.get_cancelled() {
+                return Poll::Ready(cancel);
             }
 
             // No wakeups can be lost here because there is always a call to
