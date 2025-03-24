@@ -443,6 +443,10 @@ impl Handle {
     }
 }
 
+impl std::panic::UnwindSafe for Handle {}
+
+impl std::panic::RefUnwindSafe for Handle {}
+
 cfg_taskdump! {
     impl Handle {
         /// Captures a snapshot of the runtime's state.
