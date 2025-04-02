@@ -171,6 +171,8 @@ features = ["full", "test-util"]
 allowed_external_types = [
    "bytes::buf::buf_impl::Buf",
    "bytes::buf::buf_mut::BufMut",
-
    "tokio_macros::*",
 ]
+
+[lints]
+workspace = true

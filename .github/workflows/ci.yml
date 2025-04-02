@@ -177,7 +177,7 @@ jobs:
         run: |
           set -euxo pipefail
           RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run --workspace --exclude tokio-macros --exclude tests-build --all-features --tests
-  
+
   test-integration-tests-per-feature:
     needs: basics
     name: Run integration tests for each feature
@@ -455,10 +455,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check semver
+      - name: Check `tokio` semver
         uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           rust-toolchain: ${{ env.rust_stable }}
+          package: tokio
+          release-type: minor
+      - name: Check semver for rest of the workspace
+        if: ${{ !startsWith(github.event.pull_request.base.ref, 'tokio-1.') }}
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          rust-toolchain: ${{ env.rust_stable }}
+          exclude: tokio
           release-type: minor
 
   cross-check:
@@ -689,7 +697,14 @@ jobs:
           toolchain: ${{ env.rust_min }}
       - uses: Swatinem/rust-cache@v2
       - name: "check --workspace --all-features"
-        run: cargo check --workspace --all-features
+        run: |
+          if [[ "${{ github.event.pull_request.base.ref }}" =~ ^tokio-1\..* ]]; then
+            # Only check `tokio` crate as the PR is backporting to an earlier tokio release.
+            cargo check -p tokio --all-features
+          else
+            # Check all crates in the workspace
+            cargo check --workspace --all-features
+          fi
         env:
           RUSTFLAGS: "" # remove -Dwarnings
 
@@ -927,10 +942,10 @@ jobs:
           targets: ${{ matrix.target }}
 
       # Install dependencies
-      - name: Install cargo-hack, wasmtime, and cargo-wasi
+      - name: Install cargo-hack, wasmtime
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-hack,wasmtime,cargo-wasi
+          tool: cargo-hack,wasmtime
 
       - uses: Swatinem/rust-cache@v2
       - name: WASI test tokio full
@@ -956,9 +971,12 @@ jobs:
 
       - name: test tests-integration --features wasi-rt
         # TODO: this should become: `cargo hack wasi test --each-feature`
-        run: cargo wasi test --test rt_yield --features wasi-rt
+        run: cargo test --target ${{ matrix.target }} --test rt_yield --features wasi-rt
         if: matrix.target == 'wasm32-wasip1'
         working-directory: tests-integration
+        env:
+          CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
+          RUSTFLAGS: -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: test tests-integration --features wasi-threads-rt
         run: cargo test --target ${{ matrix.target }} --features wasi-threads-rt
@@ -980,7 +998,7 @@ jobs:
         rust:
           # `check-external-types` requires a specific Rust nightly version. See
           # the README for details: https://github.com/awslabs/cargo-check-external-types
-          - nightly-2023-10-21
+          - nightly-2024-06-30
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ matrix.rust }}
@@ -991,7 +1009,7 @@ jobs:
       - name: Install cargo-check-external-types
         uses: taiki-e/cache-cargo-install-action@v1
         with:
-          tool: cargo-check-external-types@0.1.10
+          tool: cargo-check-external-types@0.1.13
       - name: check-external-types
         run: cargo check-external-types --all-features
         working-directory: tokio
@@ -1051,11 +1069,11 @@ jobs:
       - name: Make sure dictionary words are sorted and unique
         run: |
           # `sed` removes the first line (number of words) and
-          # the last line (new line). 
-          # 
+          # the last line (new line).
+          #
           # `sort` makes sure everything in between is sorted
           # and contains no duplicates.
-          # 
+          #
           # Since `sort` is sensitive to locale, we set it
           # using LC_ALL to en_US.UTF8 to be consistent in different
           # environments.

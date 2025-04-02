@@ -94,3 +94,6 @@ path = "named-pipe-multi-client.rs"
 [[example]]
 name = "dump"
 path = "dump.rs"
+
+[lints]
+workspace = true
