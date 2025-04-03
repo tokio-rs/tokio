@@ -1,5 +1,4 @@
 use crate::runtime::scheduler::multi_thread::{queue, Stats};
-use crate::runtime::task::{self, Schedule, Task, TaskHarnessScheduleHooks};
 
 use std::cell::RefCell;
 use std::thread;
@@ -270,24 +269,5 @@ fn stress2() {
         num_pop += inject.borrow_mut().drain(..).count();
 
         assert_eq!(num_pop, NUM_TASKS);
-    }
-}
-
-#[allow(dead_code)]
-struct Runtime;
-
-impl Schedule for Runtime {
-    fn release(&self, _task: &Task<Self>) -> Option<Task<Self>> {
-        None
-    }
-
-    fn schedule(&self, _task: task::Notified<Self>) {
-        unreachable!();
-    }
-
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: None,
-        }
     }
 }
