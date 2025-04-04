@@ -85,6 +85,20 @@ comment on [#7172].
 [#7186]: https://github.com/tokio-rs/tokio/pull/7186
 [#7192]: https://github.com/tokio-rs/tokio/pull/7192
 
+# 1.43.1 (April 2nd, 2025)
+
+This release fixes a soundness issue in the broadcast channel. The channel
+accepts values that are `Send` but `!Sync`. Previously, the channel called
+`clone()` on these values without synchronizing. This release fixes the channel
+by synchronizing calls to `.clone()` (Thanks Austin Bonander for finding and
+reporting the issue).
+
+### Fixed
+
+- sync: synchronize `clone()` call in broadcast channel ([#7232])
+
+[#7232]: https://github.com/tokio-rs/tokio/pull/7232
+
 # 1.43.0 (Jan 8th, 2025)
 
 ### Added
@@ -389,6 +403,20 @@ Yanked. Please use 1.39.1 instead.
 [#6696]: https://github.com/tokio-rs/tokio/pull/6696
 [#6709]: https://github.com/tokio-rs/tokio/pull/6709
 [#6710]: https://github.com/tokio-rs/tokio/pull/6710
+
+# 1.38.2 (April 2nd, 2025)
+
+This release fixes a soundness issue in the broadcast channel. The channel
+accepts values that are `Send` but `!Sync`. Previously, the channel called
+`clone()` on these values without synchronizing. This release fixes the channel
+by synchronizing calls to `.clone()` (Thanks Austin Bonander for finding and
+reporting the issue).
+
+### Fixed
+
+- sync: synchronize `clone()` call in broadcast channel ([#7232])
+
+[#7232]: https://github.com/tokio-rs/tokio/pull/7232
 
 # 1.38.1 (July 16th, 2024)
 
