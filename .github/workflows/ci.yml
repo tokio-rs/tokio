@@ -460,10 +460,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check semver
+      - name: Check `tokio` semver
         uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           rust-toolchain: ${{ env.rust_stable }}
+          package: tokio
+          release-type: minor
+      - name: Check semver for rest of the workspace
+        if: ${{ !startsWith(github.event.pull_request.base.ref, 'tokio-1.') }}
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          rust-toolchain: ${{ env.rust_stable }}
+          exclude: tokio
           release-type: minor
 
   cross-check:
@@ -694,7 +702,14 @@ jobs:
           toolchain: ${{ env.rust_min }}
       - uses: Swatinem/rust-cache@v2
       - name: "check --workspace --all-features"
-        run: cargo check --workspace --all-features
+        run: |
+          if [[ "${{ github.event.pull_request.base.ref }}" =~ ^tokio-1\..* ]]; then
+            # Only check `tokio` crate as the PR is backporting to an earlier tokio release.
+            cargo check -p tokio --all-features
+          else
+            # Check all crates in the workspace
+            cargo check --workspace --all-features
+          fi
         env:
           RUSTFLAGS: "" # remove -Dwarnings
 
@@ -993,7 +1008,7 @@ jobs:
       - name: Install cargo-hack, wasmtime, and cargo-wasi
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-hack,wasmtime,cargo-wasi
+          tool: cargo-hack,wasmtime
 
       - uses: Swatinem/rust-cache@v2
       - name: WASI test tokio full
@@ -1019,9 +1034,12 @@ jobs:
 
       - name: test tests-integration --features wasi-rt
         # TODO: this should become: `cargo hack wasi test --each-feature`
-        run: cargo wasi test --test rt_yield --features wasi-rt
+        run: cargo test --target ${{ matrix.target }} --test rt_yield --features wasi-rt
         if: matrix.target == 'wasm32-wasip1'
         working-directory: tests-integration
+        env:
+          CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
+          RUSTFLAGS: -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: test tests-integration --features wasi-threads-rt
         run: cargo test --target ${{ matrix.target }} --features wasi-threads-rt
