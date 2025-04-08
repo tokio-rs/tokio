@@ -215,6 +215,14 @@ impl AsyncRead for ChildStdio {
     ) -> Poll<io::Result<()>> {
         Pin::new(&mut self.io).poll_read(cx, buf)
     }
+
+    fn poll_read_exact(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.io).poll_read_exact(cx, buf)
+    }
 }
 
 impl AsyncWrite for ChildStdio {
