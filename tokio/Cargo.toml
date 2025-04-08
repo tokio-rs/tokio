@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.44.1"
+version = "1.44.2"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -147,7 +147,7 @@ rand = "0.8.0"
 wasm-bindgen-test = "0.3.0"
 
 [target.'cfg(target_os = "freebsd")'.dev-dependencies]
-mio-aio = { version = "0.9.0", features = ["tokio"] }
+mio-aio = { version = "1", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.7", features = ["futures", "checkpoint"] }
