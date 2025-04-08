@@ -1,4 +1,4 @@
-# 1.44.2 (April 4, 2025)
+# 1.44.2 (April 5th, 2025)
 
 This release fixes a soundness issue in the broadcast channel. The channel
 accepts values that are `Send` but `!Sync`. Previously, the channel called
