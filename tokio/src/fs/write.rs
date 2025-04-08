@@ -25,7 +25,7 @@ use std::{io, path::Path};
 /// ```
 pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Result<()> {
     let path = path.as_ref().to_owned();
-    let contents = contents.as_ref().to_owned();
+    let contents = crate::util::as_ref::upgrade(contents);
 
     asyncify(move || std::fs::write(path, contents)).await
 }
