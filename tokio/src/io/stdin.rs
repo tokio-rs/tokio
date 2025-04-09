@@ -1,7 +1,7 @@
 use crate::io::blocking::Blocking;
 use crate::io::{AsyncRead, ReadBuf};
 
-use std::io;
+use std::io::{self, IsTerminal};
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
@@ -94,5 +94,15 @@ impl AsyncRead for Stdin {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         Pin::new(&mut self.std).poll_read(cx, buf)
+    }
+}
+
+impl Stdin {
+    /// Returns true if the descriptor/handle refers to a terminal/tty.
+    pub fn is_terminal(&self) -> bool {
+        self.std
+            .inner()
+            .map(|stdin| stdin.is_terminal())
+            .unwrap_or_default()
     }
 }
