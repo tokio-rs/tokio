@@ -66,8 +66,11 @@ struct Waiting {
 unsafe impl Sync for Waiting {}
 unsafe impl Send for Waiting {}
 
-pub(crate) fn spawn_child(cmd: &mut StdCommand) -> io::Result<SpawnedChild> {
-    let mut child = cmd.spawn()?;
+pub(crate) fn spawn_child_with(
+    cmd: &mut StdCommand,
+    with: impl Fn(&mut StdCommand) -> io::Result<StdChild>,
+) -> io::Result<SpawnedChild> {
+    let mut child = with(cmd)?;
     let stdin = child.stdin.take().map(stdio).transpose()?;
     let stdout = child.stdout.take().map(stdio).transpose()?;
     let stderr = child.stderr.take().map(stdio).transpose()?;

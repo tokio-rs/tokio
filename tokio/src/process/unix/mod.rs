@@ -44,7 +44,7 @@ use std::future::Future;
 use std::io;
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 use std::pin::Pin;
-use std::process::{Child as StdChild, ExitStatus, Stdio};
+use std::process::{Child as StdChild, Command as StdCommand, ExitStatus, Stdio};
 use std::task::Context;
 use std::task::Poll;
 
@@ -115,8 +115,11 @@ impl fmt::Debug for Child {
     }
 }
 
-pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<SpawnedChild> {
-    let mut child = cmd.spawn()?;
+pub(crate) fn spawn_child_with(
+    cmd: &mut StdCommand,
+    with: impl Fn(&mut StdCommand) -> io::Result<StdChild>,
+) -> io::Result<SpawnedChild> {
+    let mut child = with(cmd)?;
     let stdin = child.stdin.take().map(stdio).transpose()?;
     let stdout = child.stdout.take().map(stdio).transpose()?;
     let stderr = child.stderr.take().map(stdio).transpose()?;
