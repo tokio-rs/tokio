@@ -249,7 +249,7 @@ use std::future::Future;
 use std::io;
 use std::path::Path;
 use std::pin::Pin;
-use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
+use std::process::{Child as StdChild, Command as StdCommand, ExitStatus, Output, Stdio};
 use std::task::{ready, Context, Poll};
 
 #[cfg(unix)]
@@ -860,8 +860,90 @@ impl Command {
     /// On Unix platforms this method will fail with `std::io::ErrorKind::WouldBlock`
     /// if the system process limit is reached (which includes other applications
     /// running on the system).
+    #[inline]
     pub fn spawn(&mut self) -> io::Result<Child> {
-        imp::spawn_child(&mut self.std).map(|spawned_child| Child {
+        self.spawn_with_inner(StdCommand::spawn)
+    }
+
+    /// Executes the command as a child process with a custom spawning function,
+    /// returning a handle to it.
+    ///
+    /// This is identical to [`Self::spawn`] in every aspect except the spawn:
+    /// here, it is customizable through the `with` parameter instead of
+    /// defaulting to the usual spawn. In fact, [`Self::spawn`] is just
+    /// [`Self::spawn_with`] with [`StdCommand::spawn`].
+    ///
+    /// This is useful mostly under Windows for now, since the platform exposes
+    /// special APIs to configure child processes when spawning them with various
+    /// attributes that customize the exact behavior of the spawn operation.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```no_run
+    /// # async fn test() { // allow using await
+    /// use std::process::Stdio;
+    ///
+    /// let output = tokio::process::Command::new("ls")
+    ///         .stdin(Stdio::null())
+    ///         .stdout(Stdio::piped())
+    ///         .stderr(Stdio::piped())
+    ///         .spawn_with(std::process::Command::spawn)
+    ///         .unwrap()
+    ///         .wait_with_output()
+    ///         .await
+    ///         .unwrap();
+    /// # }
+    /// ```
+    ///
+    /// Actually customizing the spawn under Windows:
+    ///
+    /// ```ignore
+    /// # #[cfg(windows)]   // Windows-only nightly APIs are used here.
+    /// # async fn test() { // Allow using await.
+    /// use std::os::windows::io::AsRawHandle;
+    /// use std::os::windows::process::{CommandExt, ProcThreadAttributeList};
+    /// use std::process::Stdio;
+    /// use tokio::process::Command;
+    ///
+    /// let parent = Command::new("cmd").spawn().unwrap();
+    /// let parent_process_handle = parent.as_raw_handle();
+    ///
+    /// const PROC_THREAD_ATTRIBUTE_PARENT_PROCESS: usize = 0x00020000;
+    /// let mut attribute_list = ProcThreadAttributeList::build()
+    ///     .attribute(PROC_THREAD_ATTRIBUTE_PARENT_PROCESS, &parent_process_handle)
+    ///     .finish()
+    ///     .unwrap();
+    ///
+    /// let output = Command::new("ls")
+    ///         .stdin(Stdio::null())
+    ///         .stdout(Stdio::piped())
+    ///         .stderr(Stdio::piped())
+    ///         .spawn_with(|cmd| cmd.spawn_with_attributes(&attribute_list))
+    ///         .unwrap()
+    ///         .wait_with_output()
+    ///         .await
+    ///         .unwrap();
+    /// # }
+    /// ```
+    #[cfg(tokio_unstable)]
+    #[inline]
+    pub fn spawn_with(
+        &mut self,
+        with: impl Fn(&mut StdCommand) -> io::Result<StdChild>,
+    ) -> io::Result<Child> {
+        self.spawn_with_inner(with)
+    }
+
+    /// Small indirection for the implementation of [`Self::spawn`] and
+    /// [`Self::spawn_with`] to use: [`Self::spawn`] cannot depend directly on
+    /// on [`Self::spawn_with`] since it is behind `tokio_unstable`.
+    fn spawn_with_inner(
+        &mut self,
+        with: impl Fn(&mut StdCommand) -> io::Result<StdChild>,
+    ) -> io::Result<Child> {
+        imp::spawn_child_with(&mut self.std, with).map(|spawned_child| Child {
             child: FusedChild::Child(ChildDropGuard {
                 inner: spawned_child.child,
                 kill_on_drop: self.kill_on_drop,
