@@ -41,6 +41,10 @@ name = "connect-tcp"
 path = "connect-tcp.rs"
 
 [[example]]
+name = "connect-udp"
+path = "connect-udp.rs"
+
+[[example]]
 name = "echo-tcp"
 path = "echo-tcp.rs"
 
