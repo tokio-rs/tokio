@@ -11,7 +11,7 @@
 //!
 //! This in another terminal
 //!
-//!     cargo run --example echo
+//!     cargo run --example echo-tcp
 //!
 //! And finally this in another terminal
 //!

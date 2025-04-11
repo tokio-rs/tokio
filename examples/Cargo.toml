@@ -37,12 +37,12 @@ name = "connect"
 path = "connect.rs"
 
 [[example]]
-name = "echo-udp"
-path = "echo-udp.rs"
+name = "echo-tcp"
+path = "echo-tcp.rs"
 
 [[example]]
-name = "echo"
-path = "echo.rs"
+name = "echo-udp"
+path = "echo-udp.rs"
 
 [[example]]
 name = "hello_world"
