@@ -103,12 +103,7 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
     /// A map of the [`AbortHandle`]s of the tasks spawned on this `JoinMap`,
-    /// indexed by their keys and task IDs.
-    ///
-    /// The [`Key`] type contains both the task's `K`-typed key provided when
-    /// spawning tasks, and the task's IDs. The IDs are stored here to resolve
-    /// hash collisions when looking up tasks based on their pre-computed hash
-    /// (as stored in the `hashes_by_task` map).
+    /// indexed by their keys.
     tasks_by_key: HashTable<(K, AbortHandle)>,
 
     /// A map from task IDs to the hash of the key associated with that task.
@@ -402,7 +397,7 @@ where
 
     fn insert(&mut self, key: K, abort: AbortHandle) {
         let hash_builder = self.hashes_by_task.hasher();
-        let hash = self.hash(&key);
+        let hash = hash_one(hash_builder, &key);
         let id = abort.id();
 
         // Insert the new key into the map of tasks by keys.
@@ -651,7 +646,7 @@ where
     /// [`join_next`]: fn@Self::join_next
     /// [task ID]: tokio::task::Id
     pub fn contains_task(&self, task: &Id) -> bool {
-        self.get_by_id(task).is_some()
+        self.hashes_by_task.contains_key(task)
     }
 
     /// Reserves capacity for at least `additional` more tasks to be spawned
@@ -740,23 +735,14 @@ where
     }
 
     /// Look up a task in the map by its key, returning the key and abort handle.
-    fn get_by_key<'map, Q: ?Sized>(&'map self, key: &Q) -> Option<(&'map K, &'map AbortHandle)>
+    fn get_by_key<'map, Q: ?Sized>(&'map self, key: &Q) -> Option<&'map (K, AbortHandle)>
     where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
-        let hash = self.hash(key);
-        self.tasks_by_key
-            .find(hash, |(k, _)| k.borrow() == key)
-            .map(|(key, abort)| (key, abort))
-    }
-
-    /// Look up a task in the map by its task ID, returning the key and abort handle.
-    fn get_by_id<'map>(&'map self, id: &Id) -> Option<(&'map K, &'map AbortHandle)> {
-        let hash = self.hashes_by_task.get(id)?;
-        self.tasks_by_key
-            .find(*hash, |(_, abort)| abort.id() == *id)
-            .map(|(key, abort)| (key, abort))
+        let hash_builder = self.hashes_by_task.hasher();
+        let hash = hash_one(hash_builder, key);
+        self.tasks_by_key.find(hash, |(k, _)| k.borrow() == key)
     }
 
     /// Remove a task from the map by ID, returning the key for that task.
@@ -768,23 +754,12 @@ where
         let entry = self
             .tasks_by_key
             .find_entry(hash, |(_, abort)| abort.id() == id);
-        let (key, handle) = match entry {
+        let (key, _) = match entry {
             Ok(entry) => entry.remove().0,
             _ => return None,
         };
-        debug_assert_eq!(id, handle.id());
         self.hashes_by_task.remove(&id);
         Some(key)
-    }
-
-    /// Returns the hash for a given key.
-    #[inline]
-    fn hash<Q: ?Sized>(&self, key: &Q) -> u64
-    where
-        Q: Hash,
-    {
-        let hash_builder = self.hashes_by_task.hasher();
-        hash_one(hash_builder, key)
     }
 }
 
