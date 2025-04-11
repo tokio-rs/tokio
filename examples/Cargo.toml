@@ -33,10 +33,6 @@ name = "chat"
 path = "chat.rs"
 
 [[example]]
-name = "connect"
-path = "connect.rs"
-
-[[example]]
 name = "connect-tcp"
 path = "connect-tcp.rs"
 
