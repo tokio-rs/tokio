@@ -112,7 +112,7 @@ pub struct JoinMap<K, V, S = RandomState> {
     /// spawning tasks, and the task's IDs. The IDs are stored here to resolve
     /// hash collisions when looking up tasks based on their pre-computed hash
     /// (as stored in the `hashes_by_task` map).
-    tasks_by_key: HashTable<(Key<K>, AbortHandle)>,
+    tasks_by_key: HashTable<(K, AbortHandle)>,
 
     /// A map from task IDs to the hash of the key associated with that task.
     ///
@@ -126,21 +126,6 @@ pub struct JoinMap<K, V, S = RandomState> {
     /// The [`JoinSet`] that awaits the completion of tasks spawned on this
     /// `JoinMap`.
     tasks: JoinSet<V>,
-}
-
-/// A [`JoinMap`] key.
-///
-/// This holds both a `K`-typed key (the actual key as seen by the user), _and_
-/// a task ID, so that hash collisions between `K`-typed keys can be resolved
-/// using either `K`'s `Eq` impl *or* by checking the task IDs.
-///
-/// This allows looking up a task using either an actual key (such as when the
-/// user queries the map with a key), *or* using a task ID and a hash (such as
-/// when removing completed tasks from the map).
-#[derive(Debug)]
-struct Key<K> {
-    key: K,
-    id: Id,
 }
 
 impl<K, V> JoinMap<K, V> {
@@ -422,27 +407,25 @@ where
     fn insert(&mut self, key: K, abort: AbortHandle) {
         let hash = self.hash(&key);
         let id = abort.id();
-        let map_key = Key { id, key };
 
         // Insert the new key into the map of tasks by keys.
         let entry = self.tasks_by_key.entry(
             hash,
-            |(k, _)| k.key == map_key.key,
+            |(k, _)| *k == key,
             |(k, _)| hash_one(&self.hash_builder, k),
         );
         match entry {
             Entry::Occupied(occ) => {
                 // There was a previous task spawned with the same key! Cancel
                 // that task, and remove its ID from the map of hashes by task IDs.
-                let (Key { id: prev_id, .. }, abort) =
-                    std::mem::replace(occ.into_mut(), (map_key, abort));
+                let (_, abort) = std::mem::replace(occ.into_mut(), (key, abort));
                 abort.abort();
 
-                let _prev_hash = self.hashes_by_task.remove(&prev_id);
+                let _prev_hash = self.hashes_by_task.remove(&abort.id());
                 debug_assert_eq!(Some(hash), _prev_hash);
             }
             Entry::Vacant(vac) => {
-                vac.insert((map_key, abort));
+                vac.insert((key, abort));
             }
         };
 
@@ -630,7 +613,7 @@ where
         // Note: this method iterates over the tasks and keys *without* removing
         // any entries, so that the keys from aborted tasks can still be
         // returned when calling `join_next` in the future.
-        for (Key { ref key, .. }, task) in &self.tasks_by_key {
+        for (key, task) in &self.tasks_by_key {
             if predicate(key) {
                 task.abort();
             }
@@ -759,22 +742,22 @@ where
     }
 
     /// Look up a task in the map by its key, returning the key and abort handle.
-    fn get_by_key<'map, Q: ?Sized>(&'map self, key: &Q) -> Option<(&'map Key<K>, &'map AbortHandle)>
+    fn get_by_key<'map, Q: ?Sized>(&'map self, key: &Q) -> Option<(&'map K, &'map AbortHandle)>
     where
         Q: Hash + Eq,
         K: Borrow<Q>,
     {
         let hash = self.hash(key);
         self.tasks_by_key
-            .find(hash, |(k, _)| k.key.borrow() == key)
+            .find(hash, |(k, _)| k.borrow() == key)
             .map(|(key, abort)| (key, abort))
     }
 
     /// Look up a task in the map by its task ID, returning the key and abort handle.
-    fn get_by_id<'map>(&'map self, id: &Id) -> Option<(&'map Key<K>, &'map AbortHandle)> {
+    fn get_by_id<'map>(&'map self, id: &Id) -> Option<(&'map K, &'map AbortHandle)> {
         let hash = self.hashes_by_task.get(id)?;
         self.tasks_by_key
-            .find(*hash, |(k, _)| &k.id == id)
+            .find(*hash, |(_, abort)| abort.id() == *id)
             .map(|(key, abort)| (key, abort))
     }
 
@@ -784,12 +767,13 @@ where
         let hash = self.hashes_by_task.remove(&id)?;
 
         // Remove the entry for that hash.
-        let entry = self.tasks_by_key.find_entry(hash, |(k, _)| k.id == id);
-        let (Key { id: _key_id, key }, handle) = match entry {
+        let entry = self
+            .tasks_by_key
+            .find_entry(hash, |(_, abort)| abort.id() == id);
+        let (key, handle) = match entry {
             Ok(entry) => entry.remove().0,
             _ => return None,
         };
-        debug_assert_eq!(_key_id, id);
         debug_assert_eq!(id, handle.id());
         self.hashes_by_task.remove(&id);
         Some(key)
@@ -847,11 +831,11 @@ impl<K: fmt::Debug, V, S> fmt::Debug for JoinMap<K, V, S> {
         // printing the key and task ID pairs, without format the `Key` struct
         // itself or the `AbortHandle`, which would just format the task's ID
         // again.
-        struct KeySet<'a, K: fmt::Debug>(&'a HashTable<(Key<K>, AbortHandle)>);
+        struct KeySet<'a, K: fmt::Debug>(&'a HashTable<(K, AbortHandle)>);
         impl<K: fmt::Debug> fmt::Debug for KeySet<'_, K> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.debug_map()
-                    .entries(self.0.iter().map(|(Key { key, id }, _)| (key, id)))
+                    .entries(self.0.iter().map(|(key, abort)| (key, abort.id())))
                     .finish()
             }
         }
@@ -872,31 +856,10 @@ impl<K, V> Default for JoinMap<K, V> {
     }
 }
 
-// === impl Key ===
-
-impl<K: Hash> Hash for Key<K> {
-    // Don't include the task ID in the hash.
-    #[inline]
-    fn hash<H: Hasher>(&self, hasher: &mut H) {
-        self.key.hash(hasher);
-    }
-}
-
-// Because we override `Hash` for this type, we must also override the
-// `PartialEq` impl, so that all instances with the same hash are equal.
-impl<K: PartialEq> PartialEq for Key<K> {
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.key == other.key
-    }
-}
-
-impl<K: Eq> Eq for Key<K> {}
-
 /// An iterator over the keys of a [`JoinMap`].
 #[derive(Debug, Clone)]
 pub struct JoinMapKeys<'a, K, V> {
-    iter: hashbrown::hash_table::Iter<'a, (Key<K>, AbortHandle)>,
+    iter: hashbrown::hash_table::Iter<'a, (K, AbortHandle)>,
     /// To make it easier to change `JoinMap` in the future, keep V as a generic
     /// parameter.
     _value: PhantomData<&'a V>,
@@ -906,7 +869,7 @@ impl<'a, K, V> Iterator for JoinMapKeys<'a, K, V> {
     type Item = &'a K;
 
     fn next(&mut self) -> Option<&'a K> {
-        self.iter.next().map(|key| &key.0.key)
+        self.iter.next().map(|(key, _)| key)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
