@@ -1,5 +1,5 @@
-use hashbrown::hash_map::RawEntryMut;
-use hashbrown::HashMap;
+use hashbrown::hash_table::Entry;
+use hashbrown::{HashMap, HashTable};
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::fmt;
@@ -102,6 +102,9 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// [contains]: fn@Self::contains_key
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
+    /// The hasher to use with the following hashtables.
+    hash_builder: S,
+
     /// A map of the [`AbortHandle`]s of the tasks spawned on this `JoinMap`,
     /// indexed by their keys and task IDs.
     ///
@@ -109,7 +112,7 @@ pub struct JoinMap<K, V, S = RandomState> {
     /// spawning tasks, and the task's IDs. The IDs are stored here to resolve
     /// hash collisions when looking up tasks based on their pre-computed hash
     /// (as stored in the `hashes_by_task` map).
-    tasks_by_key: HashMap<Key<K>, AbortHandle, S>,
+    tasks_by_key: HashTable<(Key<K>, AbortHandle)>,
 
     /// A map from task IDs to the hash of the key associated with that task.
     ///
@@ -226,7 +229,8 @@ impl<K, V, S: Clone> JoinMap<K, V, S> {
     #[must_use]
     pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
         Self {
-            tasks_by_key: HashMap::with_capacity_and_hasher(capacity, hash_builder.clone()),
+            hash_builder: hash_builder.clone(),
+            tasks_by_key: HashTable::with_capacity(capacity),
             hashes_by_task: HashMap::with_capacity_and_hasher(capacity, hash_builder),
             tasks: JoinSet::new(),
         }
@@ -421,21 +425,24 @@ where
         let map_key = Key { id, key };
 
         // Insert the new key into the map of tasks by keys.
-        let entry = self
-            .tasks_by_key
-            .raw_entry_mut()
-            .from_hash(hash, |k| k.key == map_key.key);
+        let entry = self.tasks_by_key.entry(
+            hash,
+            |(k, _)| k.key == map_key.key,
+            |(k, _)| hash_one(&self.hash_builder, k),
+        );
         match entry {
-            RawEntryMut::Occupied(mut occ) => {
+            Entry::Occupied(occ) => {
                 // There was a previous task spawned with the same key! Cancel
                 // that task, and remove its ID from the map of hashes by task IDs.
-                let Key { id: prev_id, .. } = occ.insert_key(map_key);
-                occ.insert(abort).abort();
+                let (Key { id: prev_id, .. }, abort) =
+                    std::mem::replace(occ.into_mut(), (map_key, abort));
+                abort.abort();
+
                 let _prev_hash = self.hashes_by_task.remove(&prev_id);
                 debug_assert_eq!(Some(hash), _prev_hash);
             }
-            RawEntryMut::Vacant(vac) => {
-                vac.insert(map_key, abort);
+            Entry::Vacant(vac) => {
+                vac.insert((map_key, abort));
             }
         };
 
@@ -638,7 +645,7 @@ where
     /// [`join_next`]: fn@Self::join_next
     pub fn keys(&self) -> JoinMapKeys<'_, K, V> {
         JoinMapKeys {
-            iter: self.tasks_by_key.keys(),
+            iter: self.tasks_by_key.iter(),
             _value: PhantomData,
         }
     }
@@ -690,7 +697,8 @@ where
     /// ```
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        self.tasks_by_key.reserve(additional);
+        self.tasks_by_key
+            .reserve(additional, |(k, _)| hash_one(&self.hash_builder, k));
         self.hashes_by_task.reserve(additional);
     }
 
@@ -716,7 +724,8 @@ where
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.hashes_by_task.shrink_to_fit();
-        self.tasks_by_key.shrink_to_fit();
+        self.tasks_by_key
+            .shrink_to_fit(|(k, _)| hash_one(&self.hash_builder, k));
     }
 
     /// Shrinks the capacity of the map with a lower limit. It will drop
@@ -745,7 +754,8 @@ where
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.hashes_by_task.shrink_to(min_capacity);
-        self.tasks_by_key.shrink_to(min_capacity)
+        self.tasks_by_key
+            .shrink_to(min_capacity, |(k, _)| hash_one(&self.hash_builder, k))
     }
 
     /// Look up a task in the map by its key, returning the key and abort handle.
@@ -756,16 +766,16 @@ where
     {
         let hash = self.hash(key);
         self.tasks_by_key
-            .raw_entry()
-            .from_hash(hash, |k| k.key.borrow() == key)
+            .find(hash, |(k, _)| k.key.borrow() == key)
+            .map(|(key, abort)| (key, abort))
     }
 
     /// Look up a task in the map by its task ID, returning the key and abort handle.
     fn get_by_id<'map>(&'map self, id: &Id) -> Option<(&'map Key<K>, &'map AbortHandle)> {
         let hash = self.hashes_by_task.get(id)?;
         self.tasks_by_key
-            .raw_entry()
-            .from_hash(*hash, |k| &k.id == id)
+            .find(*hash, |(k, _)| &k.id == id)
+            .map(|(key, abort)| (key, abort))
     }
 
     /// Remove a task from the map by ID, returning the key for that task.
@@ -774,12 +784,9 @@ where
         let hash = self.hashes_by_task.remove(&id)?;
 
         // Remove the entry for that hash.
-        let entry = self
-            .tasks_by_key
-            .raw_entry_mut()
-            .from_hash(hash, |k| k.id == id);
+        let entry = self.tasks_by_key.find_entry(hash, |(k, _)| k.id == id);
         let (Key { id: _key_id, key }, handle) = match entry {
-            RawEntryMut::Occupied(entry) => entry.remove_entry(),
+            Ok(entry) => entry.remove().0,
             _ => return None,
         };
         debug_assert_eq!(_key_id, id);
@@ -794,10 +801,19 @@ where
     where
         Q: Hash,
     {
-        let mut hasher = self.tasks_by_key.hasher().build_hasher();
-        key.hash(&mut hasher);
-        hasher.finish()
+        hash_one(&self.hash_builder, key)
     }
+}
+
+/// Returns the hash for a given key.
+#[inline]
+fn hash_one<S: BuildHasher, Q: ?Sized>(hash_builder: &S, key: &Q) -> u64
+where
+    Q: Hash,
+{
+    let mut hasher = hash_builder.build_hasher();
+    key.hash(&mut hasher);
+    hasher.finish()
 }
 
 impl<K, V, S> JoinMap<K, V, S>
@@ -831,11 +847,11 @@ impl<K: fmt::Debug, V, S> fmt::Debug for JoinMap<K, V, S> {
         // printing the key and task ID pairs, without format the `Key` struct
         // itself or the `AbortHandle`, which would just format the task's ID
         // again.
-        struct KeySet<'a, K: fmt::Debug, S>(&'a HashMap<Key<K>, AbortHandle, S>);
-        impl<K: fmt::Debug, S> fmt::Debug for KeySet<'_, K, S> {
+        struct KeySet<'a, K: fmt::Debug>(&'a HashTable<(Key<K>, AbortHandle)>);
+        impl<K: fmt::Debug> fmt::Debug for KeySet<'_, K> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.debug_map()
-                    .entries(self.0.keys().map(|Key { key, id }| (key, id)))
+                    .entries(self.0.iter().map(|(Key { key, id }, _)| (key, id)))
                     .finish()
             }
         }
@@ -880,7 +896,7 @@ impl<K: Eq> Eq for Key<K> {}
 /// An iterator over the keys of a [`JoinMap`].
 #[derive(Debug, Clone)]
 pub struct JoinMapKeys<'a, K, V> {
-    iter: hashbrown::hash_map::Keys<'a, Key<K>, AbortHandle>,
+    iter: hashbrown::hash_table::Iter<'a, (Key<K>, AbortHandle)>,
     /// To make it easier to change `JoinMap` in the future, keep V as a generic
     /// parameter.
     _value: PhantomData<&'a V>,
@@ -890,7 +906,7 @@ impl<'a, K, V> Iterator for JoinMapKeys<'a, K, V> {
     type Item = &'a K;
 
     fn next(&mut self) -> Option<&'a K> {
-        self.iter.next().map(|key| &key.key)
+        self.iter.next().map(|key| &key.0.key)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
