@@ -102,9 +102,6 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// [contains]: fn@Self::contains_key
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
-    /// The hasher to use with the following hashtables.
-    hash_builder: S,
-
     /// A map of the [`AbortHandle`]s of the tasks spawned on this `JoinMap`,
     /// indexed by their keys and task IDs.
     ///
@@ -164,7 +161,7 @@ impl<K, V> JoinMap<K, V> {
     }
 }
 
-impl<K, V, S: Clone> JoinMap<K, V, S> {
+impl<K, V, S> JoinMap<K, V, S> {
     /// Creates an empty `JoinMap` which will use the given hash builder to hash
     /// keys.
     ///
@@ -214,7 +211,6 @@ impl<K, V, S: Clone> JoinMap<K, V, S> {
     #[must_use]
     pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
         Self {
-            hash_builder: hash_builder.clone(),
             tasks_by_key: HashTable::with_capacity(capacity),
             hashes_by_task: HashMap::with_capacity_and_hasher(capacity, hash_builder),
             tasks: JoinSet::new(),
@@ -405,15 +401,14 @@ where
     }
 
     fn insert(&mut self, key: K, abort: AbortHandle) {
+        let hash_builder = self.hashes_by_task.hasher();
         let hash = self.hash(&key);
         let id = abort.id();
 
         // Insert the new key into the map of tasks by keys.
-        let entry = self.tasks_by_key.entry(
-            hash,
-            |(k, _)| *k == key,
-            |(k, _)| hash_one(&self.hash_builder, k),
-        );
+        let entry =
+            self.tasks_by_key
+                .entry(hash, |(k, _)| *k == key, |(k, _)| hash_one(hash_builder, k));
         match entry {
             Entry::Occupied(occ) => {
                 // There was a previous task spawned with the same key! Cancel
@@ -680,8 +675,9 @@ where
     /// ```
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
+        let hash_builder = self.hashes_by_task.hasher();
         self.tasks_by_key
-            .reserve(additional, |(k, _)| hash_one(&self.hash_builder, k));
+            .reserve(additional, |(k, _)| hash_one(hash_builder, k));
         self.hashes_by_task.reserve(additional);
     }
 
@@ -707,8 +703,9 @@ where
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.hashes_by_task.shrink_to_fit();
+        let hash_builder = self.hashes_by_task.hasher();
         self.tasks_by_key
-            .shrink_to_fit(|(k, _)| hash_one(&self.hash_builder, k));
+            .shrink_to_fit(|(k, _)| hash_one(hash_builder, k));
     }
 
     /// Shrinks the capacity of the map with a lower limit. It will drop
@@ -737,8 +734,9 @@ where
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.hashes_by_task.shrink_to(min_capacity);
+        let hash_builder = self.hashes_by_task.hasher();
         self.tasks_by_key
-            .shrink_to(min_capacity, |(k, _)| hash_one(&self.hash_builder, k))
+            .shrink_to(min_capacity, |(k, _)| hash_one(hash_builder, k))
     }
 
     /// Look up a task in the map by its key, returning the key and abort handle.
@@ -785,7 +783,8 @@ where
     where
         Q: Hash,
     {
-        hash_one(&self.hash_builder, key)
+        let hash_builder = self.hashes_by_task.hasher();
+        hash_one(hash_builder, key)
     }
 }
 
