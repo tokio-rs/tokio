@@ -849,7 +849,7 @@ pub trait StreamExt: Stream {
     ///     })
     ///     .await;
     /// assert!(result.is_some());
-    /// assert_eq!(Some(&3), result)
+    /// assert_eq!(Some(&2), result)
     ///
     /// # }
     /// ```
