@@ -833,7 +833,6 @@ pub trait StreamExt: Stream {
     /// An empty stream returns `None`.
     ///
     /// Basic usage:
-    ///
     /// ```rust
     /// # #[tokio::main]
     /// # async fn main() {
@@ -854,8 +853,7 @@ pub trait StreamExt: Stream {
     /// ```
     ///
     /// When it can't find, it returns `None`
-    ///
-    /// /// ```rust
+    /// ```rust
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
