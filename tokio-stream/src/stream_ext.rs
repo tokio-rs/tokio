@@ -19,6 +19,9 @@ pub use filter::Filter;
 mod filter_map;
 pub use filter_map::FilterMap;
 
+mod find;
+use find::FindFuture;
+
 mod fold;
 use fold::FoldFuture;
 
@@ -809,6 +812,54 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Chain::new(self, other)
+    }
+
+    /// Try to find an element of the stream matches a predicate.
+    ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn find<F>(&mut self, f: F) -> Self::Item;
+    /// ```
+    ///
+    /// `find()` takes a closure that returns `Option<Self::Item>`. It applies
+    /// this closure to each element of the stream, when the first of them return
+    /// `Some(item)`, then so does `Some(element)`. If they all return `None`,
+    /// it returns `None`.
+    ///
+    /// `find()` is short-circuiting; in other words, it will stop processing
+    /// as soon as it finds a `Some(item)`.
+    ///
+    /// An empty stream returns `None`.
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// let a = [1, 2, 3];
+    /// let result = stream::iter(&a)
+    ///     .find(|x| {
+    ///         if x > &1 {
+    ///             return Some(x);
+    ///         }
+    ///         return None;
+    ///     })
+    ///     .await;
+    /// assert!(result.is_some());
+    /// assert_eq!(Some(&3), result)
+    ///
+    /// # }
+    /// ```
+    /// ```
+    fn find<F>(&mut self, f: F) -> FindFuture<'_, Self, F>
+    where
+        Self: Unpin,
+        F: FnMut(Self::Item) -> Option<Self::Item>,
+    {
+        FindFuture::new(self, f)
     }
 
     /// A combinator that applies a function to every element in a stream
