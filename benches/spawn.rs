@@ -10,10 +10,21 @@ async fn work() -> usize {
     black_box(val)
 }
 
-fn basic_scheduler_spawn(c: &mut Criterion) {
-    let runtime = tokio::runtime::Builder::new_current_thread()
+fn single_rt() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_current_thread()
         .build()
-        .unwrap();
+        .unwrap()
+}
+
+fn multi_rt() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap()
+}
+
+fn basic_scheduler_spawn(c: &mut Criterion) {
+    let runtime = single_rt();
 
     c.bench_function("basic_scheduler_spawn", |b| {
         b.iter(|| {
@@ -26,9 +37,7 @@ fn basic_scheduler_spawn(c: &mut Criterion) {
 }
 
 fn basic_scheduler_spawn10(c: &mut Criterion) {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap();
+    let runtime = single_rt();
 
     c.bench_function("basic_scheduler_spawn10", |b| {
         b.iter(|| {
@@ -46,10 +55,8 @@ fn basic_scheduler_spawn10(c: &mut Criterion) {
 }
 
 fn threaded_scheduler_spawn(c: &mut Criterion) {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .build()
-        .unwrap();
+    let runtime = multi_rt();
+
     c.bench_function("threaded_scheduler_spawn", |b| {
         b.iter(|| {
             runtime.block_on(async {
@@ -61,10 +68,8 @@ fn threaded_scheduler_spawn(c: &mut Criterion) {
 }
 
 fn threaded_scheduler_spawn10(c: &mut Criterion) {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .build()
-        .unwrap();
+    let runtime = multi_rt();
+
     c.bench_function("threaded_scheduler_spawn10", |b| {
         b.iter(|| {
             runtime.block_on(async {
