@@ -834,7 +834,7 @@ pub trait StreamExt: Stream {
     ///
     /// Basic usage:
     ///
-    /// ```
+    /// ```rust
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -850,9 +850,27 @@ pub trait StreamExt: Stream {
     ///     .await;
     /// assert!(result.is_some());
     /// assert_eq!(Some(&2), result)
-    ///
     /// # }
     /// ```
+    ///
+    /// When it can't find, it returns `None`
+    ///
+    /// /// ```rust
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// let a = [1, 2, 3];
+    /// let result = stream::iter(&a)
+    ///     .find(|x| {
+    ///         if x > &3 {
+    ///             return Some(x);
+    ///         }
+    ///         return None;
+    ///     })
+    ///     .await;
+    /// assert!(result.is_none());
+    /// # }
     /// ```
     fn find<F>(&mut self, f: F) -> FindFuture<'_, Self, F>
     where
