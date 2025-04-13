@@ -19,6 +19,9 @@ pub use filter::Filter;
 mod filter_map;
 pub use filter_map::FilterMap;
 
+mod find;
+use find::FindFuture;
+
 mod fold;
 use fold::FoldFuture;
 
@@ -809,6 +812,61 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         Chain::new(self, other)
+    }
+
+    /// Attempts to find the first element in the stream that satisfies a given
+    /// predicate.
+    ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn find<F>(&mut self, f: F) -> Some(Self::Item);
+    /// ```
+    ///
+    /// `find()` takes a closure that returns `true` or `false`. It applies
+    /// this closure to each element of the stream. When the closure returns
+    /// `true` for an `item`, so `Some(item)` is returned by `find()`.
+    /// If `false` is returned for every item, `find()` returns `None`.
+    ///
+    /// `find()` is short-circuiting; in other words, it will stop processing
+    /// as soon as the closure returns `true`.
+    ///
+    /// An empty stream returns `None`.
+    ///
+    /// Basic usage:
+    /// ```rust
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// let a = [1, 2, 3];
+    /// let result = stream::iter(a)
+    ///     .find(|&x| x > 1)
+    ///     .await;
+    /// assert!(result.is_some());
+    /// assert_eq!(Some(2), result)
+    /// # }
+    /// ```
+    ///
+    /// When it can't find, it returns `None`
+    /// ```rust
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// let a = [1, 2, 3];
+    /// let result = stream::iter(a)
+    ///     .find(|&x| x > 3)
+    ///     .await;
+    /// assert!(result.is_none());
+    /// # }
+    /// ```
+    fn find<F>(&mut self, f: F) -> FindFuture<'_, Self, F>
+    where
+        Self: Unpin,
+        F: FnMut(&Self::Item) -> bool,
+    {
+        FindFuture::new(self, f)
     }
 
     /// A combinator that applies a function to every element in a stream
