@@ -469,16 +469,33 @@ where
     ///
     /// [`tokio::select!`]: tokio::select
     pub async fn join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
-        let (res, id) = match self.tasks.join_next_with_id().await {
-            Some(Ok((id, output))) => (Ok(output), id),
-            Some(Err(e)) => {
-                let id = e.id();
-                (Err(e), id)
-            }
-            None => return None,
-        };
-        let key = self.remove_by_id(id)?;
-        Some((key, res))
+        loop {
+            let (res, id) = match self.tasks.join_next_with_id().await {
+                Some(Ok((id, output))) => (Ok(output), id),
+                Some(Err(e)) => {
+                    let id = e.id();
+                    (Err(e), id)
+                }
+                None => return None,
+            };
+
+            // Absence of id indicates there was a duplicate entry for the related key,
+            // and the old entry was evicted for the other. Proceed to await for the
+            // the next task.
+            //
+            // Context:
+            // Tasks can't be evicted "yet" from a JoinSet by id/hash; you can only abort.
+            // If multiple tasks were spawned with same key, the prior task for that key
+            // is removed from both hashes_by_task and tasks_by_key, but only aborted in the
+            // JoinSet. It however needs to be discarded, so to differentiate, check if its
+            // id exists in the map.
+            let key = match self.remove_by_id(id) {
+                Some(key) => key,
+                None => continue,
+            };
+
+            break Some((key, res));
+        }
     }
 
     /// Aborts all tasks and waits for them to finish shutting down.

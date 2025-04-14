@@ -133,6 +133,24 @@ async fn test_keys() {
     assert!(keys.is_empty());
 }
 
+#[tokio::test]
+async fn test_duplicated_keys() {
+    let mut map = JoinMap::new();
+    map.spawn("1", async { 1 });
+    map.spawn("2", async { 2 });
+    map.spawn("1", async { 11 });
+    map.spawn("3", async { 3 });
+
+    let (key, res) = map.join_next().await.unwrap();
+    assert_eq!((key, res.unwrap()), ("2", 2));
+
+    let (key, res) = map.join_next().await.unwrap();
+    assert_eq!((key, res.unwrap()), ("1", 11));
+
+    let (key, res) = map.join_next().await.unwrap();
+    assert_eq!((key, res.unwrap()), ("3", 3));
+}
+
 #[tokio::test(start_paused = true)]
 async fn abort_by_key() {
     let mut map = JoinMap::new();
