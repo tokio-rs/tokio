@@ -469,16 +469,19 @@ where
     ///
     /// [`tokio::select!`]: tokio::select
     pub async fn join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
-        let (res, id) = match self.tasks.join_next_with_id().await {
-            Some(Ok((id, output))) => (Ok(output), id),
-            Some(Err(e)) => {
-                let id = e.id();
-                (Err(e), id)
+        loop {
+            let (res, id) = match self.tasks.join_next_with_id().await {
+                Some(Ok((id, output))) => (Ok(output), id),
+                Some(Err(e)) => {
+                    let id = e.id();
+                    (Err(e), id)
+                }
+                None => return None,
+            };
+            if let Some(key) = self.remove_by_id(id) {
+                break Some((key, res));
             }
-            None => return None,
-        };
-        let key = self.remove_by_id(id)?;
-        Some((key, res))
+        }
     }
 
     /// Aborts all tasks and waits for them to finish shutting down.

@@ -297,3 +297,16 @@ async fn abort_all() {
         assert!(was_seen);
     }
 }
+
+#[tokio::test]
+async fn duplicate_keys() {
+    let mut map = JoinMap::new();
+    map.spawn(1, async { 1 });
+    map.spawn(1, async { 2 });
+
+    assert_eq!(map.len(), 1);
+
+    let (key, res) = map.join_next().await.unwrap();
+    assert_eq!(key, 1);
+    assert_eq!(res.unwrap(), 2);
+}
