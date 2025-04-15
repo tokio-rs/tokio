@@ -15,10 +15,12 @@
 
 #![warn(rust_2018_idioms)]
 
-use futures::StreamExt;
-use tokio::io;
+use tokio::io::{stdin, stdout};
+use tokio::net::UdpSocket;
 use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite};
 
+use bytes::Bytes;
+use futures::{Sink, SinkExt, Stream, StreamExt};
 use std::env;
 use std::error::Error;
 use std::net::SocketAddr;
@@ -32,67 +34,58 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("this program requires at least one argument")?;
     let addr = addr.parse::<SocketAddr>()?;
 
-    let stdin = FramedRead::new(io::stdin(), BytesCodec::new());
+    let stdin = FramedRead::new(stdin(), BytesCodec::new());
     let stdin = stdin.map(|i| i.map(|bytes| bytes.freeze()));
-    let stdout = FramedWrite::new(io::stdout(), BytesCodec::new());
+    let stdout = FramedWrite::new(stdout(), BytesCodec::new());
 
-    udp::connect(&addr, stdin, stdout).await?;
+    connect(&addr, stdin, stdout).await?;
 
     Ok(())
 }
 
-mod udp {
-    use bytes::Bytes;
-    use futures::{Sink, SinkExt, Stream, StreamExt};
-    use std::error::Error;
-    use std::io;
-    use std::net::SocketAddr;
-    use tokio::net::UdpSocket;
+pub async fn connect(
+    addr: &SocketAddr,
+    stdin: impl Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
+    stdout: impl Sink<Bytes, Error = std::io::Error> + Unpin,
+) -> Result<(), Box<dyn Error>> {
+    // We'll bind our UDP socket to a local IP/port, but for now we
+    // basically let the OS pick both of those.
+    let bind_addr = if addr.ip().is_ipv4() {
+        "0.0.0.0:0"
+    } else {
+        "[::]:0"
+    };
 
-    pub async fn connect(
-        addr: &SocketAddr,
-        stdin: impl Stream<Item = Result<Bytes, io::Error>> + Unpin,
-        stdout: impl Sink<Bytes, Error = io::Error> + Unpin,
-    ) -> Result<(), Box<dyn Error>> {
-        // We'll bind our UDP socket to a local IP/port, but for now we
-        // basically let the OS pick both of those.
-        let bind_addr = if addr.ip().is_ipv4() {
-            "0.0.0.0:0"
-        } else {
-            "[::]:0"
-        };
+    let socket = UdpSocket::bind(&bind_addr).await?;
+    socket.connect(addr).await?;
 
-        let socket = UdpSocket::bind(&bind_addr).await?;
-        socket.connect(addr).await?;
+    tokio::try_join!(send(stdin, &socket), recv(stdout, &socket))?;
 
-        tokio::try_join!(send(stdin, &socket), recv(stdout, &socket))?;
+    Ok(())
+}
 
-        Ok(())
+async fn send(
+    mut stdin: impl Stream<Item = Result<Bytes, std::io::Error>> + Unpin,
+    writer: &UdpSocket,
+) -> Result<(), std::io::Error> {
+    while let Some(item) = stdin.next().await {
+        let buf = item?;
+        writer.send(&buf[..]).await?;
     }
 
-    async fn send(
-        mut stdin: impl Stream<Item = Result<Bytes, io::Error>> + Unpin,
-        writer: &UdpSocket,
-    ) -> Result<(), io::Error> {
-        while let Some(item) = stdin.next().await {
-            let buf = item?;
-            writer.send(&buf[..]).await?;
-        }
+    Ok(())
+}
 
-        Ok(())
-    }
+async fn recv(
+    mut stdout: impl Sink<Bytes, Error = std::io::Error> + Unpin,
+    reader: &UdpSocket,
+) -> Result<(), std::io::Error> {
+    loop {
+        let mut buf = vec![0; 1024];
+        let n = reader.recv(&mut buf[..]).await?;
 
-    async fn recv(
-        mut stdout: impl Sink<Bytes, Error = io::Error> + Unpin,
-        reader: &UdpSocket,
-    ) -> Result<(), io::Error> {
-        loop {
-            let mut buf = vec![0; 1024];
-            let n = reader.recv(&mut buf[..]).await?;
-
-            if n > 0 {
-                stdout.send(Bytes::from(buf)).await?;
-            }
+        if n > 0 {
+            stdout.send(Bytes::from(buf)).await?;
         }
     }
 }
