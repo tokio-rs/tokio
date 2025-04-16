@@ -70,7 +70,7 @@ macro_rules! cfg_time {
     }
 }
 
-#[cfg(feature = "rt")]
+#[allow(unused_macros)]
 macro_rules! cfg_join_map {
     ($($item:item)*) => {
         $(
