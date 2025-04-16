@@ -437,7 +437,16 @@ impl Builder {
     /// - writing to [`Stdout`] or [`Stderr`]
     /// - reading from [`Stdin`]
     ///
-    /// Unlike the [`worker_threads`], they are not always active and will exit
+    /// # Queue Behavior
+    ///
+    /// When a blocking task is submitted, it will be inserted into a queue. If available, one of
+    /// the idle threads will be notified to run the task. Otherwise, if the threshold set by this
+    /// method has not been reached, a new thread will be spawned. If no idle thread is available
+    /// and no more threads are allowed to be spawned, the task will remain in the queue until one
+    /// of the busy threads pick it up. Note that since the queue does not apply any backpressure,
+    /// it could potentially grow unbounded.
+    ///
+    /// Unlike the [`worker_threads`], the blocking threads are not always active and will exit
     /// if left idle for too long. You can change this timeout duration with [`thread_keep_alive`].
     ///
     /// It's recommended to not set this limit too low in order to avoid hanging on operations
