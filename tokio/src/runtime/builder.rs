@@ -114,8 +114,6 @@ pub struct Builder {
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(super) event_interval: u32,
 
-    pub(super) local_queue_capacity: usize,
-
     /// When true, the multi-threade scheduler LIFO slot should not be used.
     ///
     /// This option should only be exposed as unstable.
@@ -222,8 +220,6 @@ pub(crate) enum Kind {
     CurrentThread,
     #[cfg(feature = "rt-multi-thread")]
     MultiThread,
-    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-    MultiThreadAlt,
 }
 
 impl Builder {
@@ -253,26 +249,6 @@ impl Builder {
     pub fn new_multi_thread() -> Builder {
         // The number `61` is fairly arbitrary. I believe this value was copied from golang.
         Builder::new(Kind::MultiThread, 61)
-    }
-
-    cfg_unstable! {
-        /// Returns a new builder with the alternate multi thread scheduler
-        /// selected.
-        ///
-        /// The alternate multi threaded scheduler is an in-progress
-        /// candidate to replace the existing multi threaded scheduler. It
-        /// currently does not scale as well to 16+ processors.
-        ///
-        /// This runtime flavor is currently **not considered production
-        /// ready**.
-        ///
-        /// Configuration methods can be chained on the return value.
-        #[cfg(feature = "rt-multi-thread")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
-        pub fn new_multi_thread_alt() -> Builder {
-            // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-            Builder::new(Kind::MultiThreadAlt, 61)
-        }
     }
 
     /// Returns a new runtime builder initialized with default configuration
@@ -325,12 +301,6 @@ impl Builder {
             // as parameters.
             global_queue_interval: None,
             event_interval,
-
-            #[cfg(not(loom))]
-            local_queue_capacity: 256,
-
-            #[cfg(loom)]
-            local_queue_capacity: 4,
 
             seed_generator: RngSeedGenerator::new(RngSeed::new()),
 
@@ -920,8 +890,6 @@ impl Builder {
             Kind::CurrentThread => self.build_current_thread_runtime(),
             #[cfg(feature = "rt-multi-thread")]
             Kind::MultiThread => self.build_threaded_runtime(),
-            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-            Kind::MultiThreadAlt => self.build_alt_threaded_runtime(),
         }
     }
 
@@ -962,8 +930,6 @@ impl Builder {
                 Kind::CurrentThread => true,
                 #[cfg(feature = "rt-multi-thread")]
                 Kind::MultiThread => false,
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Kind::MultiThreadAlt => false,
             },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
@@ -1451,14 +1417,6 @@ impl Builder {
         }
     }
 
-    cfg_loom! {
-        pub(crate) fn local_queue_capacity(&mut self, value: usize) -> &mut Self {
-            assert!(value.is_power_of_two());
-            self.local_queue_capacity = value;
-            self
-        }
-    }
-
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
         use crate::runtime::runtime::Scheduler;
 
@@ -1525,7 +1483,6 @@ impl Builder {
                 after_termination: self.after_termination.clone(),
                 global_queue_interval: self.global_queue_interval,
                 event_interval: self.event_interval,
-                local_queue_capacity: self.local_queue_capacity,
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
@@ -1679,7 +1636,6 @@ cfg_rt_multi_thread! {
                     after_termination: self.after_termination.clone(),
                     global_queue_interval: self.global_queue_interval,
                     event_interval: self.event_interval,
-                    local_queue_capacity: self.local_queue_capacity,
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
@@ -1695,54 +1651,6 @@ cfg_rt_multi_thread! {
             launch.launch();
 
             Ok(Runtime::from_parts(Scheduler::MultiThread(scheduler), handle, blocking_pool))
-        }
-
-        cfg_unstable! {
-            fn build_alt_threaded_runtime(&mut self) -> io::Result<Runtime> {
-                use crate::loom::sys::num_cpus;
-                use crate::runtime::{Config, runtime::Scheduler};
-                use crate::runtime::scheduler::MultiThreadAlt;
-
-                let worker_threads = self.worker_threads.unwrap_or_else(num_cpus);
-                let (driver, driver_handle) = driver::Driver::new(self.get_cfg(worker_threads))?;
-
-                // Create the blocking pool
-                let blocking_pool =
-                    blocking::create_blocking_pool(self, self.max_blocking_threads + worker_threads);
-                let blocking_spawner = blocking_pool.spawner().clone();
-
-                // Generate a rng seed for this runtime.
-                let seed_generator_1 = self.seed_generator.next_generator();
-                let seed_generator_2 = self.seed_generator.next_generator();
-
-                let (scheduler, handle) = MultiThreadAlt::new(
-                    worker_threads,
-                    driver,
-                    driver_handle,
-                    blocking_spawner,
-                    seed_generator_2,
-                    Config {
-                        before_park: self.before_park.clone(),
-                        after_unpark: self.after_unpark.clone(),
-                        before_spawn: self.before_spawn.clone(),
-                        after_termination: self.after_termination.clone(),
-                        #[cfg(tokio_unstable)]
-                        before_poll: self.before_poll.clone(),
-                        #[cfg(tokio_unstable)]
-                        after_poll: self.after_poll.clone(),
-                        global_queue_interval: self.global_queue_interval,
-                        event_interval: self.event_interval,
-                        local_queue_capacity: self.local_queue_capacity,
-                        #[cfg(tokio_unstable)]
-                        unhandled_panic: self.unhandled_panic.clone(),
-                        disable_lifo_slot: self.disable_lifo_slot,
-                        seed_generator: seed_generator_1,
-                        metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
-                    },
-                );
-
-                Ok(Runtime::from_parts(Scheduler::MultiThreadAlt(scheduler), handle, blocking_pool))
-            }
         }
     }
 }
