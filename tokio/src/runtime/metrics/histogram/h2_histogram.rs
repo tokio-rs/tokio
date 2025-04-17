@@ -174,8 +174,8 @@ impl LogHistogramBuilder {
     /// less than this will be truncated.
     ///
     /// # Panics
-    /// - `max_error` < 0
-    /// - `max_error` > 1
+    /// - `max_error` <= 0
+    /// - `max_error` >= 1
     pub fn max_error(mut self, max_error: f64) -> Self {
         assert!(max_error > 0.0, "max_error must be greater than 0");
         assert!(max_error < 1.0, "max_error must be less than 1");
