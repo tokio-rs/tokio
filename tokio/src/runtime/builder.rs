@@ -437,6 +437,14 @@ impl Builder {
     /// - writing to [`Stdout`] or [`Stderr`]
     /// - reading from [`Stdin`]
     ///
+    /// Unlike the [`worker_threads`], they are not always active and will exit
+    /// if left idle for too long. You can change this timeout duration with [`thread_keep_alive`].
+    ///
+    /// It's recommended to not set this limit too low in order to avoid hanging on operations
+    /// requiring [`spawn_blocking`].
+    ///
+    /// The default value is 512.
+    ///
     /// # Queue Behavior
     ///
     /// When a blocking task is submitted, it will be inserted into a queue. If available, one of
@@ -445,14 +453,6 @@ impl Builder {
     /// and no more threads are allowed to be spawned, the task will remain in the queue until one
     /// of the busy threads pick it up. Note that since the queue does not apply any backpressure,
     /// it could potentially grow unbounded.
-    ///
-    /// Unlike the [`worker_threads`], the blocking threads are not always active and will exit
-    /// if left idle for too long. You can change this timeout duration with [`thread_keep_alive`].
-    ///
-    /// It's recommended to not set this limit too low in order to avoid hanging on operations
-    /// requiring [`spawn_blocking`].
-    ///
-    /// The default value is 512.
     ///
     /// # Panics
     ///
