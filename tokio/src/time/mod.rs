@@ -101,6 +101,9 @@ pub use interval::{interval, interval_at, Interval, MissedTickBehavior};
 mod sleep;
 pub use sleep::{sleep, sleep_until, Sleep};
 
+mod timed;
+pub use timed::{timed, Timed};
+
 mod timeout;
 #[doc(inline)]
 pub use timeout::{timeout, timeout_at, Timeout};

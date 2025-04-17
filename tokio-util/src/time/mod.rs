@@ -10,7 +10,7 @@
 
 use std::future::Future;
 use std::time::Duration;
-use tokio::time::Timeout;
+use tokio::time::{Timed, Timeout};
 
 mod wheel;
 
@@ -42,6 +42,36 @@ pub trait FutureExt: Future {
         Self: Sized,
     {
         tokio::time::timeout(timeout, self)
+    }
+
+    /// A wrapper around [`tokio::time::Timed`], with the advantage that it is easier to write
+    /// fluent call chains.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    ///     /// use tokio::{sync::oneshot, time::Duration};
+    /// use tokio_util::time::FutureExt;
+    /// use tokio::sync::oneshot;
+    /// use tokio::time::Duration;
+    ///
+    /// # async fn dox() {
+    /// let (tx, rx) = oneshot::channel::<()>();
+    ///
+    /// tokio::task::spawn(async move {
+    ///     tokio::time::sleep(Duration::from_millis(5)).await;
+    ///     tx.send(()).unwrap();
+    /// });
+    ///
+    /// let (res, duration) = rx.timed().await;
+    /// println!("Received {res:?} after {duration:?}");
+    /// # }
+    /// ```
+    fn timed(self) -> Timed<Self>
+    where
+        Self: Sized,
+    {
+        tokio::time::timed(self)
     }
 }
 
