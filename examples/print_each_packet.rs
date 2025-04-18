@@ -13,9 +13,9 @@
 //!
 //! and in another terminal you can run:
 //!
-//!     cargo run --example connect 127.0.0.1:8080
+//!     cargo run --example connect-tcp 127.0.0.1:8080
 //!
-//! Each line you type in to the `connect` terminal should be written to terminal!
+//! Each line you type in to the `connect-tcp` terminal should be written to terminal!
 //!
 //! Minimal js example:
 //!
