@@ -28,11 +28,9 @@ pub(crate) struct WorkerMetrics {
     /// Thread id of worker thread.
     thread_id: Mutex<Option<ThreadId>>,
 
-    #[cfg(tokio_unstable)]
     ///  Number of times the worker parked.
     pub(crate) park_count: MetricAtomicU64,
 
-    #[cfg(tokio_unstable)]
     ///  Number of times the worker parked and unparked.
     pub(crate) park_unpark_count: MetricAtomicU64,
 
