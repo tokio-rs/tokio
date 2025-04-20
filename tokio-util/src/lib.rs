@@ -18,6 +18,11 @@
 //! semantic versioning policy, especially with regard to breaking changes.
 //!
 //! [`tokio`]: https://docs.rs/tokio
+//!
+//! See the [`compat`](crate::compat::Compat) module for interoperability between
+//! [`tokio::io`] and [`futures::io`] traits.
+//! [`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/
+//! [`futures::io`]: https://docs.rs/futures/latest/futures/io/
 
 #[macro_use]
 mod cfg;
