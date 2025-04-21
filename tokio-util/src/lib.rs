@@ -19,10 +19,15 @@
 //!
 //! [`tokio`]: https://docs.rs/tokio
 //!
-//! See the [`compat`](crate::compat::Compat) module for interoperability between
-//! [`tokio::io`] and [`futures::io`] traits.
-//! [`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/
-//! [`futures::io`]: https://docs.rs/futures/latest/futures/io/
+//! Useful modules:
+//!
+//! - [`compat`]: Interoperability between [`tokio::io`] and [`futures::io`] traits.
+//!
+//! [`tokio`]: https://docs.rs/tokio
+//! [`compat`]: crate::compat
+//! [`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/index.html
+//! [`futures::io`]: https://docs.rs/futures/latest/futures/io/index.html
+
 
 #[macro_use]
 mod cfg;

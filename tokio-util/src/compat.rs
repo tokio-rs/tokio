@@ -1,23 +1,24 @@
-//! Compatibility between the `tokio::io` and `futures-io` versions of the
-//! `AsyncRead` and `AsyncWrite` traits.
-
 //! ## Bridging Tokio and Futures I/O with `compat()`
 //!
 //! The [`compat()`](TokioAsyncReadCompatExt::compat) function provides a compatibility layer
 //! that allows types implementing [`tokio::io::AsyncRead`] or [`tokio::io::AsyncWrite`]
-//! to be used as their [`futures::io::AsyncRead`] or [`futures::io::AsyncWrite`] counterparts — and vice versa.
+//! to be used as their
+//! [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html)
+//! or
+//! [`futures::io::AsyncWrite`](https://docs.rs/futures/latest/futures/io/trait.AsyncWrite.html)
+//! counterparts — and vice versa.
 //!
 //! This is especially useful when working with libraries that expect I/O types from one ecosystem
 //! (usually `futures`) but you’re using types from the other (usually `tokio`).
 //!
 //! ## Compatibility Overview
 //!
-//! | If the inner type implements...       | Then `Compat<T>` implements...            |
-//! |--------------------------------------|-------------------------------------------|
-//! | [`tokio::io::AsyncRead`]             | [`futures::io::AsyncRead`]                |
-//! | [`futures::io::AsyncRead`]           | [`tokio::io::AsyncRead`]                  |
-//! | [`tokio::io::AsyncWrite`]            | [`futures::io::AsyncWrite`]               |
-//! | [`futures::io::AsyncWrite`]          | [`tokio::io::AsyncWrite`]                 |
+//! | If the inner type implements...                                     | Then `Compat<T>` implements...                          |
+//! |----------------------------------------------------------------------|----------------------------------------------------------|
+//! | [`tokio::io::AsyncRead`]                                            | [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html) |
+//! | [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html) | [`tokio::io::AsyncRead`]                                 |
+//! | [`tokio::io::AsyncWrite`]                                           | [`futures::io::AsyncWrite`](https://docs.rs/futures/latest/futures/io/trait.AsyncWrite.html) |
+//! | [`futures::io::AsyncWrite`](https://docs.rs/futures/latest/futures/io/trait.AsyncWrite.html) | [`tokio::io::AsyncWrite`]                                 |
 //!
 //! ## Feature Flag
 //!
@@ -30,7 +31,8 @@
 //! ## Example 1: Tokio → Futures (`AsyncRead`)
 //!
 //! This example demonstrates sending data over a [`tokio::net::TcpStream`] and using
-//! [`futures::io::AsyncReadExt::read`] to read it after adapting the stream via `compat()`.
+//! [`read`](https://docs.rs/futures/latest/futures/io/trait.AsyncReadExt.html#method.read)
+//! from the `futures` crate to read it after adapting the stream via `compat()`.
 //!
 //! ```no_run
 //! use tokio::net::{TcpListener, TcpStream};
@@ -61,22 +63,27 @@
 //!
 //! ## Example 2: Futures → Tokio (`AsyncRead`)
 //!
-//! The reverse is also possible: you can take a [`futures::io::AsyncRead`] (e.g. a cursor)
-//! and adapt it to be used with [`tokio::io::AsyncReadExt::read_to_end`].
+//! The reverse is also possible: you can take a
+//! [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html)
+//! (e.g. a cursor) and adapt it to be used with
+//! [`tokio::io::AsyncReadExt::read_to_end`].
 //!
-//! ```no_run
+//! ```
 //! use futures::io::Cursor;
 //! use tokio_util::compat::FuturesAsyncReadCompatExt;
 //! use tokio::io::AsyncReadExt;
 //!
-//! #[tokio::main]
-//! async fn main() -> std::io::Result<()> {
-//!     let reader = Cursor::new(b"Hello from futures");
-//!     let mut compat_reader = reader.compat();
-//!     let mut buf = Vec::new();
-//!     compat_reader.read_to_end(&mut buf).await?;
-//!     println!("Received: {}", String::from_utf8_lossy(&buf));
-//!     Ok(())
+//! fn main() {
+//!     let future = async {
+//!         let reader = Cursor::new(b"Hello from futures");
+//!         let mut compat_reader = reader.compat();
+//!         let mut buf = Vec::new();
+//!         compat_reader.read_to_end(&mut buf).await.unwrap();
+//!         assert_eq!(&buf, b"Hello from futures");
+//!     };
+//!
+//!     // Run the future inside a Tokio runtime
+//!     tokio::runtime::Runtime::new().unwrap().block_on(future);
 //! }
 //! ```
 //!
@@ -88,11 +95,12 @@
 //!
 //! ## See Also
 //!
-//! - [`Compat`](Compat) type
-//! - [`TokioAsyncReadCompatExt`](TokioAsyncReadCompatExt)
-//! - [`FuturesAsyncReadCompatExt`](FuturesAsyncReadCompatExt)
-//! - [`tokio::io` module](tokio::io)
-//! - [`futures::io` module](futures::io)
+//! - [`Compat`] type
+//! - [`TokioAsyncReadCompatExt`]
+//! - [`FuturesAsyncReadCompatExt`]
+//! - [`tokio::io` module](https://docs.rs/tokio/latest/tokio/io/)
+//! - [`futures::io` module](https://docs.rs/futures/latest/futures/io/)
+
 
 use pin_project_lite::pin_project;
 use std::io;
