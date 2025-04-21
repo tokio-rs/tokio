@@ -23,7 +23,6 @@
 //!
 //! - [`compat`]: Interoperability between [`tokio::io`] and [`futures::io`] traits.
 //!
-//! [`tokio`]: https://docs.rs/tokio
 //! [`compat`]: crate::compat
 //! [`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/index.html
 //! [`futures::io`]: https://docs.rs/futures/latest/futures/io/index.html
