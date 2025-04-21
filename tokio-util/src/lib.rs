@@ -21,7 +21,7 @@
 //!
 //! Useful modules:
 //!
-//! - [`compat`]: Interoperability between [`tokio::io`] and [`futures::io`] traits.
+//! - [`compat`]: Inter-convertibility between [`tokio::io`] and [`futures::io`] traits.
 //!
 //! [`compat`]: crate::compat
 //! [`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/index.html

@@ -9,7 +9,7 @@
 //! counterparts — and vice versa.
 //!
 //! This is especially useful when working with libraries that expect I/O types from one ecosystem
-//! (usually `futures`) but you’re using types from the other (usually `tokio`).
+//! (usually `futures`) but you are using types from the other (usually `tokio`).
 //!
 //! ## Compatibility Overview
 //!
@@ -28,7 +28,7 @@
 //! tokio-util = { version = "...", features = ["compat"] }
 //! ```
 //!
-//! ## Example 1: Tokio → Futures (`AsyncRead`)
+//! ## Example 1: Tokio -> Futures (`AsyncRead`)
 //!
 //! This example demonstrates sending data over a [`tokio::net::TcpStream`] and using
 //! [`read`](https://docs.rs/futures/latest/futures/io/trait.AsyncReadExt.html#method.read)
@@ -61,7 +61,7 @@
 //! }
 //! ```
 //!
-//! ## Example 2: Futures → Tokio (`AsyncRead`)
+//! ## Example 2: Futures -> Tokio (`AsyncRead`)
 //!
 //! The reverse is also possible: you can take a
 //! [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html)
