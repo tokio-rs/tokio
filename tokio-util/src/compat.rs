@@ -101,7 +101,6 @@
 //! - [`tokio::io` module](https://docs.rs/tokio/latest/tokio/io/)
 //! - [`futures::io` module](https://docs.rs/futures/latest/futures/io/)
 
-
 use pin_project_lite::pin_project;
 use std::io;
 use std::pin::Pin;

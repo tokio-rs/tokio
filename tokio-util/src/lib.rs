@@ -27,7 +27,6 @@
 //! [`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/index.html
 //! [`futures::io`]: https://docs.rs/futures/latest/futures/io/index.html
 
-
 #[macro_use]
 mod cfg;
 
