@@ -1,7 +1,7 @@
 //! ## Bridging Tokio and Futures I/O with `compat()`
 //!
 //! The [`compat()`](TokioAsyncReadCompatExt::compat) function provides a compatibility layer
-//! that allows types implementing [`tokio::io::AsyncRead`] or [`tokio::io::AsyncWrite`]
+//! that allows types implementing [`tokio::io::AsyncRead`](https://docs.rs/tokio/latest/tokio/io/trait.AsyncRead.html) or [`tokio::io::AsyncWrite`](https://docs.rs/tokio/latest/tokio/io/trait.AsyncWrite.html)
 //! to be used as their
 //! [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html)
 //! or
@@ -13,13 +13,12 @@
 //!
 //! ## Compatibility Overview
 //!
-//! | If the inner type implements...                                     | Then `Compat<T>` implements...                          |
-//! |----------------------------------------------------------------------|----------------------------------------------------------|
-//! | [`tokio::io::AsyncRead`]                                            | [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html) |
-//! | [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html) | [`tokio::io::AsyncRead`]                                 |
-//! | [`tokio::io::AsyncWrite`]                                           | [`futures::io::AsyncWrite`](https://docs.rs/futures/latest/futures/io/trait.AsyncWrite.html) |
-//! | [`futures::io::AsyncWrite`](https://docs.rs/futures/latest/futures/io/trait.AsyncWrite.html) | [`tokio::io::AsyncWrite`]                                 |
-//!
+//! | Inner Type Implements...                                                                 | `Compat<T>` Implements...                                                           |
+//! |------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+//! | [`tokio::io::AsyncRead`](https://docs.rs/tokio/latest/tokio/io/trait.AsyncRead.html)     | [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html) |
+//! | [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html) | [`tokio::io::AsyncRead`](https://docs.rs/tokio/latest/tokio/io/trait.AsyncRead.html)     |
+//! | [`tokio::io::AsyncWrite`](https://docs.rs/tokio/latest/tokio/io/trait.AsyncWrite.html)   | [`futures::io::AsyncWrite`](https://docs.rs/futures/latest/futures/io/trait.AsyncWrite.html) |
+//! | [`futures::io::AsyncWrite`](https://docs.rs/futures/latest/futures/io/trait.AsyncWrite.html) | [`tokio::io::AsyncWrite`](https://docs.rs/tokio/latest/tokio/io/trait.AsyncWrite.html)   |
 //! ## Feature Flag
 //!
 //! This functionality is available through the `compat` feature flag:
@@ -66,7 +65,7 @@
 //! The reverse is also possible: you can take a
 //! [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html)
 //! (e.g. a cursor) and adapt it to be used with
-//! [`tokio::io::AsyncReadExt::read_to_end`].
+//! [`tokio::io::AsyncReadExt::read_to_end`](https://docs.rs/tokio/latest/tokio/io/trait.AsyncReadExt.html#method.read_to_end).
 //!
 //! ```
 //! use futures::io::Cursor;
