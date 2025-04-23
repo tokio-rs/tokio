@@ -12,9 +12,9 @@
 //!
 //! and next in another windows run:
 //!
-//!     cargo run --example connect 127.0.0.1:8080
+//!     cargo run --example connect-tcp 127.0.0.1:8080
 //!
-//! In the `connect` window you can type in commands where when you hit enter
+//! In the `connect-tcp` window you can type in commands where when you hit enter
 //! you'll get a response from the server for that command. An example session
 //! is:
 //!

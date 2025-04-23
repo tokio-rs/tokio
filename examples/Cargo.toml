@@ -33,16 +33,20 @@ name = "chat"
 path = "chat.rs"
 
 [[example]]
-name = "connect"
-path = "connect.rs"
+name = "connect-tcp"
+path = "connect-tcp.rs"
+
+[[example]]
+name = "connect-udp"
+path = "connect-udp.rs"
+
+[[example]]
+name = "echo-tcp"
+path = "echo-tcp.rs"
 
 [[example]]
 name = "echo-udp"
 path = "echo-udp.rs"
-
-[[example]]
-name = "echo"
-path = "echo.rs"
 
 [[example]]
 name = "hello_world"

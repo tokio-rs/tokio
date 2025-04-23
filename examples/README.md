@@ -10,7 +10,7 @@ cargo run --example $name
 ```
 
 A good starting point for the examples would be [`hello_world`](hello_world.rs)
-and [`echo`](echo.rs). Additionally [the tokio website][tokioweb] contains
+and [`echo-tcp`](echo-tcp.rs). Additionally [the tokio website][tokioweb] contains
 additional guides for some of the examples.
 
 For a larger "real world" example, see the [`mini-redis`][redis] repository.
