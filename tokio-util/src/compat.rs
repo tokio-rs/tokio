@@ -1,3 +1,5 @@
+//! Compatibility between the `tokio::io` and `futures-io` versions of the
+//! `AsyncRead` and `AsyncWrite` traits.
 //! ## Bridging Tokio and Futures I/O with `compat()`
 //!
 //! The [`compat()`](TokioAsyncReadCompatExt::compat) function provides a compatibility layer
