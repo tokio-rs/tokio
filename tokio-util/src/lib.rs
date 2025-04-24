@@ -17,14 +17,11 @@
 //! [`tokio`] crate. However, `tokio-util` _will_ respect Rust's
 //! semantic versioning policy, especially with regard to breaking changes.
 //!
-//! [`tokio`]: https://docs.rs/tokio
-//!
 //! Useful modules:
 //!
 //! - [`compat`]: Inter-convertibility between [`tokio::io`] and [`futures::io`] traits.
 //!
 //! [`compat`]: crate::compat
-//! [`tokio::io`]: https://docs.rs/tokio/latest/tokio/io/index.html
 //! [`futures::io`]: https://docs.rs/futures/latest/futures/io/index.html
 
 #[macro_use]
