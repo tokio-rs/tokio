@@ -17,7 +17,7 @@
 //!
 //! | Inner Type Implements...                                                                 | `Compat<T>` Implements...                                                           |
 //! |------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
-//! | [`tokio::io::AsyncRead`])     | [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html) |
+//! | [`tokio::io::AsyncRead`]     | [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html) |
 //! | [`futures::io::AsyncRead`](https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html) | [`tokio::io::AsyncRead`]     |
 //! | [`tokio::io::AsyncWrite`]   | [`futures::io::AsyncWrite`](https://docs.rs/futures/latest/futures/io/trait.AsyncWrite.html) |
 //! | [`futures::io::AsyncWrite`](https://docs.rs/futures/latest/futures/io/trait.AsyncWrite.html) | [`tokio::io::AsyncWrite`]   |
@@ -99,8 +99,8 @@
 //! - [`Compat`] type
 //! - [`TokioAsyncReadCompatExt`]
 //! - [`FuturesAsyncReadCompatExt`]
-//! - [`tokio::io` module](https://docs.rs/tokio/latest/tokio/io/)
-//! - [`futures::io` module](https://docs.rs/futures/latest/futures/io/)
+//! - [`tokio::io`]
+//! - [`futures::io`](https://docs.rs/futures/latest/futures/io/)
 
 use pin_project_lite::pin_project;
 use std::io;
