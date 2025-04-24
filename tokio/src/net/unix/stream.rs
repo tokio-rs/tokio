@@ -848,7 +848,7 @@ impl UnixStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    /// #   if cfg!(miri) { return } // No `socket` in miri.
+    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
     ///     let dir = tempfile::tempdir().unwrap();
     ///     let bind_path = dir.path().join("bind_path");
     ///

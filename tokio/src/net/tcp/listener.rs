@@ -89,7 +89,7 @@ impl TcpListener {
         ///
         /// #[tokio::main]
         /// async fn main() -> io::Result<()> {
-        /// #   if cfg!(miri) { return } // No `socket` in miri.
+        /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
         ///     let listener = TcpListener::bind("127.0.0.1:2345").await?;
         ///
         ///     // use the listener
