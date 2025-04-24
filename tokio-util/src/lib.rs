@@ -16,13 +16,6 @@
 //! This crate is not versioned in lockstep with the core
 //! [`tokio`] crate. However, `tokio-util` _will_ respect Rust's
 //! semantic versioning policy, especially with regard to breaking changes.
-//!
-//! Useful modules:
-//!
-//! - [`compat`]: Inter-convertibility between [`tokio::io`] and [`futures::io`] traits.
-//!
-//! [`compat`]: crate::compat
-//! [`futures::io`]: https://docs.rs/futures/latest/futures/io/index.html
 
 #[macro_use]
 mod cfg;
