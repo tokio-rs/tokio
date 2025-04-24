@@ -554,6 +554,9 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
             rustflags: --cfg tokio_taskdump
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
+            rustflags: --cfg tokio_taskdump
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
@@ -597,6 +600,9 @@ jobs:
             os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
+            rustflags: --cfg tokio_taskdump
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
             rustflags: --cfg tokio_taskdump
     steps:
       - uses: actions/checkout@v4
