@@ -407,7 +407,6 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
-    /// # if cfg!(miri) { return } // Miri reports error when main thread terminated without waiting all remaining threads.
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
@@ -415,6 +414,7 @@ impl Runtime {
     /// use std::time::Duration;
     ///
     /// fn main() {
+    /// #  if cfg!(miri) { return } // Miri reports error when main thread terminated without waiting all remaining threads.
     ///    let runtime = Runtime::new().unwrap();
     ///
     ///    runtime.block_on(async move {

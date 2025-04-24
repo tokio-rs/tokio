@@ -1,3 +1,21 @@
+# 0.7.15 (April 23rd, 2025)
+
+### Fixed
+
+- task: properly handle removed entries in `JoinMap` ([#7264])
+
+### Updated
+
+- deps: update hashbrown to 0.15 ([#7219])
+
+### Documented
+
+- task: explicitly state that `TaskTracker` does not abort tasks on Drop ([#7223])
+
+[#7219]: https://github.com/tokio-rs/tokio/pull/7219
+[#7223]: https://github.com/tokio-rs/tokio/pull/7223
+[#7264]: https://github.com/tokio-rs/tokio/pull/7264
+
 # 0.7.14 (March 12th, 2025)
 
 ### Added

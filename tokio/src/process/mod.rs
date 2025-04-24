@@ -810,7 +810,6 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// # if cfg!(miri) { return } // No `pidfd_spawnp` in miri.
     /// use tokio::process::Command;
     ///
     /// async fn run_ls() -> std::process::ExitStatus {
@@ -1347,7 +1346,6 @@ impl Child {
     /// This function is cancel safe.
     ///
     /// ```
-    /// # if cfg!(miri) { return } // No `pidfd_spawnp` in miri.
     /// # #[cfg(not(unix))]fn main(){}
     /// # #[cfg(unix)]
     /// use tokio::io::AsyncWriteExt;
@@ -1359,6 +1357,7 @@ impl Child {
     /// # #[cfg(unix)]
     /// #[tokio::main]
     /// async fn main() {
+    /// #   if cfg!(miri) { return; } // No `pidfd_spawnp` in miri.
     ///     let mut child = Command::new("cat")
     ///         .stdin(Stdio::piped())
     ///         .spawn()
