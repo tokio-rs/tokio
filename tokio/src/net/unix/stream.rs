@@ -840,7 +840,6 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use std::error::Error;
     /// use std::io::Read;
     /// use tokio::net::UnixListener;
@@ -849,6 +848,7 @@ impl UnixStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// #   if cfg!(miri) { return } // No `socket` in miri.
     ///     let dir = tempfile::tempdir().unwrap();
     ///     let bind_path = dir.path().join("bind_path");
     ///

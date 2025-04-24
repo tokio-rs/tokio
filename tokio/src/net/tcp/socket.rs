@@ -743,12 +743,12 @@ impl TcpSocket {
     /// # Examples
     ///
     /// ```
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::TcpSocket;
     /// use socket2::{Domain, Socket, Type};
     ///
     /// #[tokio::main]
     /// async fn main() -> std::io::Result<()> {
+    /// #   if cfg!(miri) { return } // No `socket` in miri.
     ///     let socket2_socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
     ///     socket2_socket.set_nonblocking(true)?;
     ///
