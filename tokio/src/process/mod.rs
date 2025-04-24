@@ -1357,7 +1357,7 @@ impl Child {
     /// # #[cfg(unix)]
     /// #[tokio::main]
     /// async fn main() {
-    /// #   if cfg!(miri) { return Ok(()); } // No `pidfd_spawnp` in miri.
+    /// #   if cfg!(miri) { return; } // No `pidfd_spawnp` in miri.
     ///     let mut child = Command::new("cat")
     ///         .stdin(Stdio::piped())
     ///         .spawn()
