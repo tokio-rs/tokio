@@ -70,29 +70,19 @@ const LOCAL_QUEUE_CAPACITY: usize = 4;
 
 const MASK: usize = LOCAL_QUEUE_CAPACITY - 1;
 
-// Constructing the fixed size array directly is very awkward. The only way to
-// do it is to repeat `UnsafeCell::new(MaybeUninit::uninit())` 256 times, as
-// the contents are not Copy. The trick with defining a const doesn't work for
-// generic types.
-fn make_fixed_size<T>(buffer: Box<[T]>) -> Box<[T; LOCAL_QUEUE_CAPACITY]> {
-    assert_eq!(buffer.len(), LOCAL_QUEUE_CAPACITY);
-
-    // safety: We check that the length is correct.
-    unsafe { Box::from_raw(Box::into_raw(buffer).cast()) }
+// Constructing the fixed size array directly is very awkward.
+// we kind of need to do some type shananigans so we get what we want
+fn make_unsafe_uninit<T>() -> Box<[UnsafeCell<MaybeUninit<T>>; LOCAL_QUEUE_CAPACITY]>{
+    let b : Box<[MaybeUninit<T>]>= Box::new_uninit_slice(LOCAL_QUEUE_CAPACITY);
+    unsafe{Box::from_raw( Box::into_raw(b).cast())}
 }
 
 /// Create a new local run-queue
 pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
-    let mut buffer = Vec::with_capacity(LOCAL_QUEUE_CAPACITY);
-
-    for _ in 0..LOCAL_QUEUE_CAPACITY {
-        buffer.push(UnsafeCell::new(MaybeUninit::uninit()));
-    }
-
     let inner = Arc::new(Inner {
         head: AtomicUnsignedLong::new(0),
         tail: AtomicUnsignedShort::new(0),
-        buffer: make_fixed_size(buffer.into_boxed_slice()),
+        buffer: make_unsafe_uninit(),
     });
 
     let local = Local {
