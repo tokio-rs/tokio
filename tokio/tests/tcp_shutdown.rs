@@ -52,3 +52,22 @@ async fn shutdown_after_tcp_reset() {
 
     handle.await.unwrap();
 }
+
+#[tokio::test]
+async fn shutdown_multiple_calls() {
+    let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
+    let addr = assert_ok!(srv.local_addr());
+
+    let handle = tokio::spawn(async move {
+        let mut stream = assert_ok!(TcpStream::connect(&addr).await);
+        assert_ok!(AsyncWriteExt::shutdown(&mut stream).await);
+        assert_ok!(AsyncWriteExt::shutdown(&mut stream).await);
+        assert_ok!(AsyncWriteExt::shutdown(&mut stream).await);
+    });
+
+    let (mut stream, _) = assert_ok!(srv.accept().await);
+    sleep(Duration::from_millis(1)).await;
+    assert_ok!(AsyncWriteExt::shutdown(&mut stream).await);
+
+    handle.await.unwrap();
+}
