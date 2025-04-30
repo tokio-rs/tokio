@@ -14,11 +14,9 @@ pub(crate) struct MetricsBatch {
     /// Instant at which work last resumed (continued after park).
     processing_scheduled_tasks_started_at: Instant,
 
-    #[cfg(tokio_unstable)]
     /// Number of times the worker parked.
     park_count: u64,
 
-    #[cfg(tokio_unstable)]
     /// Number of times the worker parked and unparked.
     park_unpark_count: u64,
 
@@ -80,6 +78,8 @@ impl MetricsBatch {
                 MetricsBatch {
                     busy_duration_total: 0,
                     processing_scheduled_tasks_started_at: now,
+                    park_count: 0,
+                    park_unpark_count: 0,
                 }
             }
         },
@@ -120,7 +120,12 @@ impl MetricsBatch {
     cfg_metrics_variant! {
         stable: {
             #[inline(always)]
-            fn submit_unstable(&mut self, _worker: &WorkerMetrics, _mean_poll_time: u64) {}
+            fn submit_unstable(&mut self, worker: &WorkerMetrics, _mean_poll_time: u64) {
+                worker.park_count.store(self.park_count, Relaxed);
+                worker
+                    .park_unpark_count
+                    .store(self.park_unpark_count, Relaxed);
+            }
         },
         unstable: {
             #[inline(always)]
@@ -153,7 +158,10 @@ impl MetricsBatch {
     cfg_metrics_variant! {
         stable: {
             /// The worker is about to park.
-            pub(crate) fn about_to_park(&mut self) {}
+            pub(crate) fn about_to_park(&mut self) {
+                self.park_count += 1;
+                self.park_unpark_count += 1;
+            }
         },
         unstable: {
             /// The worker is about to park.
@@ -171,18 +179,9 @@ impl MetricsBatch {
             }
         }
     }
-
-    cfg_metrics_variant! {
-        stable: {
-            /// The worker was unparked.
-            pub(crate) fn unparked(&mut self) {}
-        },
-        unstable: {
-            /// The worker was unparked.
-            pub(crate) fn unparked(&mut self) {
-                self.park_unpark_count += 1;
-            }
-        }
+    /// The worker was unparked.
+    pub(crate) fn unparked(&mut self) {
+        self.park_unpark_count += 1;
     }
 
     /// Start processing a batch of tasks
