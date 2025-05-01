@@ -290,27 +290,37 @@ async fn windows_handle() {
 }
 
 #[tokio::test]
-async fn test_pos_update_at_read(){
+async fn pos_update_at_read() -> std::io::Result<()> {
+    // Create and write to a std file
     let mut std_file = OpenOptions::new()
         .write(true)
         .read(true)
         .create(true)
         .open("test_pos.txt")?;
-    write!(&mut std_file, "123456789abcdefghijklmnopwrstu")?;
+
+    std_file.write_all(b"123456789abcdefghijklmnopwrstu")?;
     std_file.seek(SeekFrom::Start(8))?;
+
+    // Convert to async file
     let mut file = File::from_std(std_file);
-    let pos_std = file.seek(SeekFrom::Current(0)).await?;
-    println!(
-        "position after `from_std` from a pre-seeked(8 bytes) std file: {}",
-        pos_std
-    );
+
+    // Confirm initial position
+    let pos_after_from_std = file.seek(SeekFrom::Current(0)).await?;
+    println!("position after `from_std`: {}", pos_after_from_std);
+
+    // Read 4 bytes and check position
     let mut buf = vec![0u8; 4];
-    let n = file.read(&mut buf).await?;
-    let pos_read = file.seek(SeekFrom::Current(0)).await?;
-    println!("current position after reading 4 bytes : {}", pos_read);
-    let n_write = file.write(b"vwxyz").await?;
-    file.seek(SeekFrom::Current(0)).await?;
-    println!("write {} bytes to the file", n_write);
-    let pos = file.seek(SeekFrom::Current(0)).await?;
-    println!("current position after read & write : {}", pos);
+    file.read(&mut buf).await?;
+
+    let pos_after_read = file.seek(SeekFrom::Current(0)).await?;
+    println!("position after reading 4 bytes: {}", pos_after_read);
+
+    // Write 5 bytes and check final position
+    let bytes_written = file.write(b"vwxyz").await?;
+    let pos_after_write = file.seek(SeekFrom::Current(0)).await?;
+
+    println!("wrote {} bytes", bytes_written);
+    println!("final position after read & write: {}", pos_after_write);
+
+    Ok(())
 }
