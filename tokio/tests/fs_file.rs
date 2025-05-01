@@ -8,6 +8,7 @@ use tempfile::NamedTempFile;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 use tokio_test::task;
+use std::fs::OpenOptions;
 
 const HELLO: &[u8] = b"hello world...";
 
@@ -286,4 +287,30 @@ async fn windows_handle() {
 
     let file = File::create(tempfile.path()).await.unwrap();
     assert!(file.as_raw_handle() as u64 > 0);
+}
+
+#[tokio::test]
+async fn test_pos_update_at_read(){
+    let mut std_file = OpenOptions::new()
+        .write(true)
+        .read(true)
+        .create(true)
+        .open("test_pos.txt")?;
+    write!(&mut std_file, "123456789abcdefghijklmnopwrstu")?;
+    std_file.seek(SeekFrom::Start(8))?;
+    let mut file = File::from_std(std_file);
+    let pos_std = file.seek(SeekFrom::Current(0)).await?;
+    println!(
+        "position after `from_std` from a pre-seeked(8 bytes) std file: {}",
+        pos_std
+    );
+    let mut buf = vec![0u8; 4];
+    let n = file.read(&mut buf).await?;
+    let pos_read = file.seek(SeekFrom::Current(0)).await?;
+    println!("current position after reading 4 bytes : {}", pos_read);
+    let n_write = file.write(b"vwxyz").await?;
+    file.seek(SeekFrom::Current(0)).await?;
+    println!("write {} bytes to the file", n_write);
+    let pos = file.seek(SeekFrom::Current(0)).await?;
+    println!("current position after read & write : {}", pos);
 }

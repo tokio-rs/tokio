@@ -590,14 +590,13 @@ impl AsyncRead for File {
 
         let me = self.get_mut();
         let inner = me.inner.get_mut();
-
         loop {
             match inner.state {
                 State::Idle(ref mut buf_cell) => {
                     let mut buf = buf_cell.take().unwrap();
-
                     if !buf.is_empty() || dst.remaining() == 0 {
-                        buf.copy_to(dst);
+                        let copied = buf.copy_to(dst);
+                        inner.pos += copied as u64;
                         *buf_cell = Some(buf);
                         return Poll::Ready(Ok(()));
                     }
@@ -617,9 +616,10 @@ impl AsyncRead for File {
                     let (op, mut buf) = ready!(Pin::new(rx).poll(cx))?;
 
                     match op {
-                        Operation::Read(Ok(_)) => {
+                        Operation::Read(Ok(n)) => {
                             buf.copy_to(dst);
                             inner.state = State::Idle(Some(buf));
+                            inner.pos += n as u64;
                             return Poll::Ready(Ok(()));
                         }
                         Operation::Read(Err(e)) => {
