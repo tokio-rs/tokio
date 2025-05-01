@@ -106,7 +106,7 @@ tracing = { version = "0.1.29", default-features = false, features = ["std"], op
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
 [target.'cfg(tokio_taskdump)'.dependencies]
-backtrace = { version = "0.3.58" }
+backtrace = { version = "0.3.74" }
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.168", optional = true }
