@@ -2,13 +2,13 @@
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
 
 use futures::future::FutureExt;
+use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io::IoSlice;
 use tempfile::NamedTempFile;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 use tokio_test::task;
-use std::fs::OpenOptions;
 
 const HELLO: &[u8] = b"hello world...";
 
@@ -291,36 +291,36 @@ async fn windows_handle() {
 
 #[tokio::test]
 async fn pos_update_at_read() -> std::io::Result<()> {
-    // Create and write to a std file
+    // Create and seed the file
     let mut std_file = OpenOptions::new()
         .write(true)
         .read(true)
         .create(true)
+        .truncate(true)
         .open("test_pos.txt")?;
 
     std_file.write_all(b"123456789abcdefghijklmnopwrstu")?;
     std_file.seek(SeekFrom::Start(8))?;
 
-    // Convert to async file
+    // Wrap with Tokio's async file
     let mut file = File::from_std(std_file);
 
-    // Confirm initial position
-    let pos_after_from_std = file.seek(SeekFrom::Current(0)).await?;
-    println!("position after `from_std`: {}", pos_after_from_std);
+    let pos_after_wrap = file.seek(SeekFrom::Current(0)).await?;
+    assert_eq!(pos_after_wrap, 8);
 
-    // Read 4 bytes and check position
+    // Read 4 bytes
     let mut buf = vec![0u8; 4];
-    file.read(&mut buf).await?;
+    _ = file.read(&mut buf).await?;
 
     let pos_after_read = file.seek(SeekFrom::Current(0)).await?;
-    println!("position after reading 4 bytes: {}", pos_after_read);
+    assert_eq!(pos_after_read, 12);
 
-    // Write 5 bytes and check final position
+    // Write 5 bytes
     let bytes_written = file.write(b"vwxyz").await?;
-    let pos_after_write = file.seek(SeekFrom::Current(0)).await?;
+    assert_eq!(bytes_written, 5);
 
-    println!("wrote {} bytes", bytes_written);
-    println!("final position after read & write: {}", pos_after_write);
+    let pos_after_write = file.seek(SeekFrom::Current(0)).await?;
+    assert_eq!(pos_after_write, 17);
 
     Ok(())
 }
