@@ -842,7 +842,7 @@ jobs:
           toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
       - name: build --cfg loom
-        run: cargo test --no-run --lib --release --features full
+        run: cargo test --no-run --lib --features full
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
