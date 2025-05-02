@@ -5,7 +5,7 @@ use std::ptr::NonNull;
 use std::sync::Arc;
 
 /// A factory which produces new [`TaskHookHarness`] objects for tasks which either have been
-/// spawned in "detached mode" via [`tokio::task::spawn_with_hooks`], or which were spawned from outside the runtime or
+/// spawned in "detached mode" via [`crate::task::spawn_with_hooks`], or which were spawned from outside the runtime or
 /// from another context where no [`TaskHookHarness`] was present.
 pub trait TaskHookHarnessFactory {
     /// Create a new [`TaskHookHarness`] object which the runtime will attach to a given task.
