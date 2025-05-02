@@ -845,7 +845,7 @@ jobs:
         run: cargo test --no-run --lib --release --features full
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings -Cdebug
+          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings -Cdebug-assertions
 
   check-readme:
     name: Check README
