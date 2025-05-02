@@ -215,8 +215,8 @@ impl RawTask {
     /// Safety: mutual exclusion is required to call this function.
     pub(crate) fn poll(self) {
         #[cfg(tokio_unstable)]
-        self.trailer().hooks.with_mut(|ptr| unsafe {
-            let _guard = ptr.as_mut().and_then(|x| {
+        let _guard = self.trailer().hooks.with_mut(|ptr| unsafe {
+            ptr.as_mut().and_then(|x| {
                 x.as_mut().map(|x| {
                     let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                         x.before_poll(&mut BeforeTaskPollContext {
@@ -228,12 +228,9 @@ impl RawTask {
                         (&mut **x) as *mut (dyn TaskHookHarness + Send + Sync + 'static),
                     ))
                 })
-            });
-
-            let vtable = self.header().vtable;
-            (vtable.poll)(self.ptr);
+            })
         });
-        #[cfg(not(tokio_unstable))]
+
         unsafe {
             let vtable = self.header().vtable;
             (vtable.poll)(self.ptr);
