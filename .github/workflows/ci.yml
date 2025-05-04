@@ -556,7 +556,6 @@ jobs:
             rustflags: --cfg tokio_taskdump
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
-            rustflags: --cfg tokio_taskdump
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
@@ -603,7 +602,6 @@ jobs:
             rustflags: --cfg tokio_taskdump
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
-            rustflags: --cfg tokio_taskdump
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
