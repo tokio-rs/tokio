@@ -1,5 +1,110 @@
 //! Compatibility between the `tokio::io` and `futures-io` versions of the
 //! `AsyncRead` and `AsyncWrite` traits.
+//!
+//! ## Bridging Tokio and Futures I/O with `compat()`
+//!
+//! The [`compat()`] function provides a compatibility layer that allows types implementing
+//! [`tokio::io::AsyncRead`] or [`tokio::io::AsyncWrite`] to be used as their
+//! [`futures::io::AsyncRead`] or [`futures::io::AsyncWrite`] counterparts — and vice versa.
+//!
+//! This is especially useful when working with libraries that expect I/O types from one ecosystem
+//! (usually `futures`) but you are using types from the other (usually `tokio`).
+//!
+//! ## Compatibility Overview
+//!
+//! | Inner Type Implements...    | `Compat<T>` Implements...   |
+//! |-----------------------------|-----------------------------|
+//! | [`tokio::io::AsyncRead`]    | [`futures::io::AsyncRead`]  |
+//! | [`futures::io::AsyncRead`]  | [`tokio::io::AsyncRead`]    |
+//! | [`tokio::io::AsyncWrite`]   | [`futures::io::AsyncWrite`] |
+//! | [`futures::io::AsyncWrite`] | [`tokio::io::AsyncWrite`]   |
+//!
+//! ## Feature Flag
+//!
+//! This functionality is available through the `compat` feature flag:
+//!
+//! ```toml
+//! tokio-util = { version = "...", features = ["compat"] }
+//! ```
+//!
+//! ## Example 1: Tokio -> Futures (`AsyncRead`)
+//!
+//! This example demonstrates sending data over a [`tokio::net::TcpStream`] and using
+//! [`futures::io::AsyncReadExt::read`] from the `futures` crate to read it after adapting the
+//! stream via [`compat()`].
+//!
+//! ```no_run
+//! use tokio::net::{TcpListener, TcpStream};
+//! use tokio::io::AsyncWriteExt;
+//! use tokio_util::compat::TokioAsyncReadCompatExt;
+//! use futures::io::AsyncReadExt;
+//!
+//! #[tokio::main]
+//! async fn main() -> std::io::Result<()> {
+//!     let listener = TcpListener::bind("127.0.0.1:8081").await?;
+//!
+//!     tokio::spawn(async {
+//!         let mut client = TcpStream::connect("127.0.0.1:8081").await.unwrap();
+//!         client.write_all(b"Hello World").await.unwrap();
+//!     });
+//!
+//!     let (stream, _) = listener.accept().await?;
+//!
+//!     // Adapt `tokio::TcpStream` to be used with `futures::io::AsyncReadExt`
+//!     let mut compat_stream = stream.compat();
+//!     let mut buffer = [0; 20];
+//!     let n = compat_stream.read(&mut buffer).await?;
+//!     println!("Received: {}", String::from_utf8_lossy(&buffer[..n]));
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Example 2: Futures -> Tokio (`AsyncRead`)
+//!
+//! The reverse is also possible: you can take a [`futures::io::AsyncRead`] (e.g. a cursor) and
+//! adapt it to be used with [`tokio::io::AsyncReadExt::read_to_end`]
+//!
+//! ```
+//! use futures::io::Cursor;
+//! use tokio_util::compat::FuturesAsyncReadCompatExt;
+//! use tokio::io::AsyncReadExt;
+//!
+//! fn main() {
+//!     let future = async {
+//!         let reader = Cursor::new(b"Hello from futures");
+//!         let mut compat_reader = reader.compat();
+//!         let mut buf = Vec::new();
+//!         compat_reader.read_to_end(&mut buf).await.unwrap();
+//!         assert_eq!(&buf, b"Hello from futures");
+//!     };
+//!
+//!     // Run the future inside a Tokio runtime
+//!     tokio::runtime::Runtime::new().unwrap().block_on(future);
+//! }
+//! ```
+//!
+//! ## Common Use Cases
+//!
+//! - Using `tokio` sockets with `async-tungstenite`, `async-compression`, or `futures-rs`-based
+//!   libraries.
+//! - Bridging I/O interfaces between mixed-ecosystem libraries.
+//! - Avoiding rewrites or duplication of I/O code in async environments.
+//!
+//! ## See Also
+//!
+//! - [`Compat`] type
+//! - [`TokioAsyncReadCompatExt`]
+//! - [`FuturesAsyncReadCompatExt`]
+//! - [`tokio::io`]
+//! - [`futures::io`]
+//!
+//! [`futures::io`]: https://docs.rs/futures/latest/futures/io/
+//! [`futures::io::AsyncRead`]: https://docs.rs/futures/latest/futures/io/trait.AsyncRead.html
+//! [`futures::io::AsyncWrite`]: https://docs.rs/futures/latest/futures/io/trait.AsyncWrite.html
+//! [`futures::io::AsyncReadExt::read`]: https://docs.rs/futures/latest/futures/io/trait.AsyncReadExt.html#method.read
+//! [`compat()`]: TokioAsyncReadCompatExt::compat
+
 use pin_project_lite::pin_project;
 use std::io;
 use std::pin::Pin;
