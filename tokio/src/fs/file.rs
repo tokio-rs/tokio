@@ -744,11 +744,10 @@ impl AsyncWrite for File {
                         None
                     };
 
-                    let n = buf.copy_from(src, me.max_buf_size);
+                    _ = buf.copy_from(src, me.max_buf_size);
                     let std = me.std.clone();
 
                     let blocking_task_join_handle = spawn_mandatory_blocking(move || {
-                        // std::thread::sleep(std::time::Duration::from_millis(220000));
                         let n = buf.len();
                         let res = if let Some(seek) = seek {
                             (&*std)
@@ -824,10 +823,11 @@ impl AsyncWrite for File {
                         None
                     };
 
-                    let n = buf.copy_from_bufs(bufs, me.max_buf_size);
+                    _ = buf.copy_from_bufs(bufs, me.max_buf_size);
                     let std = me.std.clone();
 
                     let blocking_task_join_handle = spawn_mandatory_blocking(move || {
+                        let n = buf.len();
                         let res = if let Some(seek) = seek {
                             (&*std)
                                 .seek(seek)
