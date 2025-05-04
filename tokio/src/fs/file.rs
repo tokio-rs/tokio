@@ -113,7 +113,7 @@ enum State {
 #[derive(Debug)]
 enum Operation {
     Read(io::Result<usize>),
-    Write(io::Result<()>),
+    Write(io::Result<usize>),
     Seek(io::Result<u64>),
 }
 
@@ -596,6 +596,7 @@ impl AsyncRead for File {
                     let mut buf = buf_cell.take().unwrap();
                     if !buf.is_empty() || dst.remaining() == 0 {
                         let copied = buf.copy_to(dst);
+                        // Update position based on bytes copied into the user's buffer
                         inner.pos += copied as u64;
                         *buf_cell = Some(buf);
                         return Poll::Ready(Ok(()));
@@ -619,6 +620,7 @@ impl AsyncRead for File {
                         Operation::Read(Ok(n)) => {
                             buf.copy_to(dst);
                             inner.state = State::Idle(Some(buf));
+                            // Update position by `n` bytes returned from the read operation
                             inner.pos += n as u64;
                             return Poll::Ready(Ok(()));
                         }
@@ -628,7 +630,7 @@ impl AsyncRead for File {
                             inner.state = State::Idle(Some(buf));
                             return Poll::Ready(Err(e));
                         }
-                        Operation::Write(Ok(())) => {
+                        Operation::Write(Ok(_)) => {
                             assert!(buf.is_empty());
                             inner.state = State::Idle(Some(buf));
                             continue;
@@ -746,10 +748,15 @@ impl AsyncWrite for File {
                     let std = me.std.clone();
 
                     let blocking_task_join_handle = spawn_mandatory_blocking(move || {
+                        // std::thread::sleep(std::time::Duration::from_millis(220000));
+                        let n = buf.len();
                         let res = if let Some(seek) = seek {
-                            (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
+                            (&*std)
+                                .seek(seek)
+                                .and_then(|_| buf.write_to(&mut &*std))
+                                .map(|_| n)
                         } else {
-                            buf.write_to(&mut &*std)
+                            buf.write_to(&mut &*std).map(|_| n)
                         };
 
                         (Operation::Write(res), buf)
@@ -759,10 +766,9 @@ impl AsyncWrite for File {
                     })?;
 
                     inner.state = State::Busy(blocking_task_join_handle);
-
-                    return Poll::Ready(Ok(n));
                 }
                 State::Busy(ref mut rx) => {
+                    println!("state busy reached");
                     let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
                     inner.state = State::Idle(Some(buf));
 
@@ -774,10 +780,15 @@ impl AsyncWrite for File {
                             continue;
                         }
                         Operation::Write(res) => {
-                            // If the previous write was successful, continue.
+                            // If the previous write was successful, Update position & return
                             // Otherwise, error.
-                            res?;
-                            continue;
+                            match res {
+                                Ok(n) => {
+                                    inner.pos += n as u64;
+                                    return Poll::Ready(Ok(n));
+                                }
+                                Err(e) => return Poll::Ready(Err(e)),
+                            }
                         }
                         Operation::Seek(_) => {
                             // Ignore the seek
@@ -818,9 +829,12 @@ impl AsyncWrite for File {
 
                     let blocking_task_join_handle = spawn_mandatory_blocking(move || {
                         let res = if let Some(seek) = seek {
-                            (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
+                            (&*std)
+                                .seek(seek)
+                                .and_then(|_| buf.write_to(&mut &*std))
+                                .map(|_| n)
                         } else {
-                            buf.write_to(&mut &*std)
+                            buf.write_to(&mut &*std).map(|_| n)
                         };
 
                         (Operation::Write(res), buf)
@@ -830,8 +844,6 @@ impl AsyncWrite for File {
                     })?;
 
                     inner.state = State::Busy(blocking_task_join_handle);
-
-                    return Poll::Ready(Ok(n));
                 }
                 State::Busy(ref mut rx) => {
                     let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
@@ -845,10 +857,15 @@ impl AsyncWrite for File {
                             continue;
                         }
                         Operation::Write(res) => {
-                            // If the previous write was successful, continue.
+                            // If the previous write was successful, Update position and return
                             // Otherwise, error.
-                            res?;
-                            continue;
+                            match res {
+                                Ok(n) => {
+                                    inner.pos += n as u64;
+                                    return Poll::Ready(Ok(n));
+                                }
+                                Err(e) => return Poll::Ready(Err(e)),
+                            }
                         }
                         Operation::Seek(_) => {
                             // Ignore the seek
@@ -973,7 +990,7 @@ impl Inner {
 
         match op {
             Operation::Read(_) => Poll::Ready(Ok(())),
-            Operation::Write(res) => Poll::Ready(res),
+            Operation::Write(_) => Poll::Ready(Ok(())),
             Operation::Seek(_) => Poll::Ready(Ok(())),
         }
     }

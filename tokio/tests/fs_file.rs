@@ -290,11 +290,10 @@ async fn windows_handle() {
 }
 
 #[tokio::test]
-async fn pos_update_at_read() -> std::io::Result<()> {
-    // Create and seed the file
+async fn pos_update_at_read_and_write() -> std::io::Result<()> {
     let mut std_file = OpenOptions::new()
-        .write(true)
         .read(true)
+        .write(true)
         .create(true)
         .truncate(true)
         .open("test_pos.txt")?;
@@ -302,25 +301,46 @@ async fn pos_update_at_read() -> std::io::Result<()> {
     std_file.write_all(b"123456789abcdefghijklmnopwrstu")?;
     std_file.seek(SeekFrom::Start(8))?;
 
-    // Wrap with Tokio's async file
     let mut file = File::from_std(std_file);
 
-    let pos_after_wrap = file.seek(SeekFrom::Current(0)).await?;
-    assert_eq!(pos_after_wrap, 8);
+    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 8);
 
-    // Read 4 bytes
-    let mut buf = vec![0u8; 4];
-    _ = file.read(&mut buf).await?;
+    let mut buf = [0u8; 4];
+    file.read_exact(&mut buf).await?;
+    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 12);
 
-    let pos_after_read = file.seek(SeekFrom::Current(0)).await?;
-    assert_eq!(pos_after_read, 12);
+    file.write_all(b"vwxyz").await?;
+    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 17);
 
-    // Write 5 bytes
-    let bytes_written = file.write(b"vwxyz").await?;
+    Ok(())
+}
+#[tokio::test]
+async fn pos_update_after_write_vectored() -> std::io::Result<()> {
+    // Create and seed the file
+    let mut std_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("test_pos_vectored.txt")?;
+    std_file.write_all(b"123456789abcdefghijklmnopwrstu")?;
+    std_file.seek(SeekFrom::Start(8))?;
+
+    let mut file = File::from_std(std_file);
+
+    // Confirm initial position
+    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 8);
+
+    // Read 4 bytes → position should move to 12
+    let mut buf = [0u8; 4];
+    file.read_exact(&mut buf).await?;
+    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 12);
+
+    // Write 5 bytes via vectored I/O → position should move to 17
+    let bufs = [IoSlice::new(b"XY"), IoSlice::new(b"ZZZ")];
+    let bytes_written = file.write_vectored(&bufs).await?;
     assert_eq!(bytes_written, 5);
-
-    let pos_after_write = file.seek(SeekFrom::Current(0)).await?;
-    assert_eq!(pos_after_write, 17);
+    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 17);
 
     Ok(())
 }
