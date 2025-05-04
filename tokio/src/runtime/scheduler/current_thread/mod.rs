@@ -462,10 +462,12 @@ impl Handle {
                 parent
                     .map(|parent| {
                         if let Ok(r) = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                            parent.on_child_spawn(&mut OnChildTaskSpawnContext {
-                                id,
-                                _phantom: Default::default(),
-                            })
+                            parent
+                                .on_child_spawn(&mut OnChildTaskSpawnContext {
+                                    id,
+                                    _phantom: Default::default(),
+                                })
+                                .hooks
                         })) {
                             r
                         } else {
@@ -479,10 +481,12 @@ impl Handle {
             .or_else(|| {
                 if let Some(hooks) = me.hooks_factory_ref() {
                     if let Ok(r) = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                        hooks.on_top_level_spawn(&mut OnTopLevelTaskSpawnContext {
-                            id,
-                            _phantom: Default::default(),
-                        })
+                        hooks
+                            .on_top_level_spawn(&mut OnTopLevelTaskSpawnContext {
+                                id,
+                                _phantom: Default::default(),
+                            })
+                            .hooks
                     })) {
                         r
                     } else {
@@ -533,10 +537,12 @@ impl Handle {
                 parent
                     .map(|parent| {
                         if let Ok(r) = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                            parent.on_child_spawn(&mut OnChildTaskSpawnContext {
-                                id,
-                                _phantom: Default::default(),
-                            })
+                            parent
+                                .on_child_spawn(&mut OnChildTaskSpawnContext {
+                                    id,
+                                    _phantom: Default::default(),
+                                })
+                                .hooks
                         })) {
                             r
                         } else {
@@ -550,10 +556,12 @@ impl Handle {
             .or_else(|| {
                 if let Some(hooks) = me.hooks_factory_ref() {
                     if let Ok(r) = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                        hooks.on_top_level_spawn(&mut OnTopLevelTaskSpawnContext {
-                            id,
-                            _phantom: Default::default(),
-                        })
+                        hooks
+                            .on_top_level_spawn(&mut OnTopLevelTaskSpawnContext {
+                                id,
+                                _phantom: Default::default(),
+                            })
+                            .hooks
                     })) {
                         r
                     } else {

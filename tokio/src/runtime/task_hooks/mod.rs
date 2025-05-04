@@ -8,11 +8,9 @@ use std::sync::Arc;
 /// spawned in "detached mode" via [`crate::task::spawn_with_hooks`], or which were spawned from outside the runtime or
 /// from another context where no [`TaskHookHarness`] was present.
 pub trait TaskHookHarnessFactory {
-    /// Create a new [`TaskHookHarness`] object which the runtime will attach to a given task.
-    fn on_top_level_spawn(
-        &self,
-        ctx: &mut OnTopLevelTaskSpawnContext<'_>,
-    ) -> Option<Box<dyn TaskHookHarness + Send + Sync + 'static>>;
+    /// Runs a hook which may produce a new [`TaskHookHarness`] object which the runtime will attach to a given task.
+    fn on_top_level_spawn(&self, ctx: &mut OnTopLevelTaskSpawnContext<'_>)
+        -> OnTopLevelSpawnAction;
 }
 
 /// Trait for user-provided "harness" objects which are attached to tasks and provide hook
@@ -20,24 +18,27 @@ pub trait TaskHookHarnessFactory {
 #[allow(unused_variables)]
 pub trait TaskHookHarness {
     /// Pre-poll task hook which runs arbitrary user logic.
-    fn before_poll(&mut self, ctx: &mut BeforeTaskPollContext<'_>) {}
+    fn before_poll(&mut self, ctx: &mut BeforeTaskPollContext<'_>) -> BeforeTaskPollAction {
+        BeforeTaskPollAction::default()
+    }
 
     /// Post-poll task hook which runs arbitrary user logic.
-    fn after_poll(&mut self, ctx: &mut AfterTaskPollContext<'_>) {}
+    fn after_poll(&mut self, ctx: &mut AfterTaskPollContext<'_>) -> AfterTaskPollAction {
+        AfterTaskPollAction::default()
+    }
 
     /// Task hook which runs when this task spawns a child, unless that child is explicitly spawned
     /// detached from the parent.
     ///
     /// This hook creates a harness for the child, or detaches the child from any instrumentation.
-    fn on_child_spawn(
-        &mut self,
-        ctx: &mut OnChildTaskSpawnContext<'_>,
-    ) -> Option<Box<dyn TaskHookHarness + Send + Sync + 'static>> {
-        None
+    fn on_child_spawn(&mut self, ctx: &mut OnChildTaskSpawnContext<'_>) -> OnChildSpawnAction {
+        OnChildSpawnAction::default()
     }
 
     /// Task hook which runs on task termination.
-    fn on_task_terminate(&mut self, ctx: &mut OnTaskTerminateContext<'_>) {}
+    fn on_task_terminate(&mut self, ctx: &mut OnTaskTerminateContext<'_>) -> OnTaskTerminateAction {
+        OnTaskTerminateAction::default()
+    }
 }
 
 pub(crate) type OptionalTaskHooksFactory =
@@ -97,3 +98,59 @@ pub struct BeforeTaskPollContext<'a> {
 pub struct AfterTaskPollContext<'a> {
     pub(crate) _phantom: PhantomData<&'a ()>,
 }
+
+#[derive(Default)]
+#[allow(missing_debug_implementations, missing_docs)]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[non_exhaustive]
+pub struct OnTopLevelSpawnAction {
+    pub(crate) hooks: Option<Box<dyn TaskHookHarness + Send + Sync + 'static>>,
+}
+
+impl OnTopLevelSpawnAction {
+    /// Pass in a set of task hooks for the task.
+    pub fn set_hooks<T>(&mut self, hooks: T) -> &mut Self
+    where
+        T: TaskHookHarness + Send + Sync + 'static,
+    {
+        self.hooks = Some(Box::new(hooks));
+        self
+    }
+}
+
+#[derive(Default)]
+#[allow(missing_debug_implementations, missing_docs)]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[non_exhaustive]
+pub struct OnChildSpawnAction {
+    pub(crate) hooks: Option<Box<dyn TaskHookHarness + Send + Sync + 'static>>,
+}
+
+impl OnChildSpawnAction {
+    /// Pass in a set of task hooks for the child task.
+    pub fn set_hooks<T>(&mut self, hooks: T) -> &mut Self
+    where
+        T: TaskHookHarness + Send + Sync + 'static,
+    {
+        self.hooks = Some(Box::new(hooks));
+        self
+    }
+}
+
+#[derive(Default)]
+#[allow(missing_debug_implementations, missing_docs)]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[non_exhaustive]
+pub struct OnTaskTerminateAction {}
+
+#[derive(Default)]
+#[allow(missing_debug_implementations, missing_docs)]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[non_exhaustive]
+pub struct BeforeTaskPollAction {}
+
+#[derive(Default)]
+#[allow(missing_debug_implementations, missing_docs)]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[non_exhaustive]
+pub struct AfterTaskPollAction {}

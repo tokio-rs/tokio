@@ -9,8 +9,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::runtime;
 use tokio::runtime::{
-    AfterTaskPollContext, BeforeTaskPollContext, OnChildTaskSpawnContext, OnTaskTerminateContext,
-    OnTopLevelTaskSpawnContext, TaskHookHarness, TaskHookHarnessFactory,
+    AfterTaskPollAction, AfterTaskPollContext, BeforeTaskPollAction, BeforeTaskPollContext,
+    OnChildSpawnAction, OnChildTaskSpawnContext, OnTaskTerminateAction, OnTaskTerminateContext,
+    OnTopLevelSpawnAction, OnTopLevelTaskSpawnContext, TaskHookHarness, TaskHookHarnessFactory,
 };
 
 #[test]
@@ -83,9 +84,10 @@ fn run_runtime_default_factory(mut builder: runtime::Builder) {
         fn on_top_level_spawn(
             &self,
             _ctx: &mut OnTopLevelTaskSpawnContext<'_>,
-        ) -> Option<Box<dyn TaskHookHarness + Send + Sync + 'static>> {
+        ) -> OnTopLevelSpawnAction {
             self.counter.fetch_add(1, Ordering::SeqCst);
-            None
+
+            Default::default()
         }
     }
 
@@ -138,25 +140,30 @@ fn run_parent_child_chaining(mut builder: runtime::Builder) {
         fn on_top_level_spawn(
             &self,
             _ctx: &mut OnTopLevelTaskSpawnContext<'_>,
-        ) -> Option<Box<dyn TaskHookHarness + Send + Sync + 'static>> {
+        ) -> OnTopLevelSpawnAction {
             self.parent_spawns.fetch_add(1, Ordering::SeqCst);
 
-            Some(Box::new(TestHooks {
+            let mut a = OnTopLevelSpawnAction::default();
+
+            a.set_hooks(TestHooks {
                 spawns: self.child_spawns.clone(),
-            }))
+            });
+
+            a
         }
     }
 
     impl TaskHookHarness for TestHooks {
-        fn on_child_spawn(
-            &mut self,
-            _ctx: &mut OnChildTaskSpawnContext<'_>,
-        ) -> Option<Box<dyn TaskHookHarness + Send + Sync + 'static>> {
+        fn on_child_spawn(&mut self, _ctx: &mut OnChildTaskSpawnContext<'_>) -> OnChildSpawnAction {
             self.spawns.fetch_add(1, Ordering::SeqCst);
 
-            Some(Box::new(Self {
+            let mut a = OnChildSpawnAction::default();
+
+            a.set_hooks(Self {
                 spawns: self.spawns.clone(),
-            }))
+            });
+
+            a
         }
     }
 
@@ -195,16 +202,22 @@ fn run_before_poll(mut builder: runtime::Builder) {
         fn on_top_level_spawn(
             &self,
             _ctx: &mut OnTopLevelTaskSpawnContext<'_>,
-        ) -> Option<Box<dyn TaskHookHarness + Send + Sync + 'static>> {
-            Some(Box::new(TestHooks {
+        ) -> OnTopLevelSpawnAction {
+            let mut a = OnTopLevelSpawnAction::default();
+
+            a.set_hooks(TestHooks {
                 polls: self.polls.clone(),
-            }))
+            });
+
+            a
         }
     }
 
     impl TaskHookHarness for TestHooks {
-        fn before_poll(&mut self, _ctx: &mut BeforeTaskPollContext<'_>) {
+        fn before_poll(&mut self, _ctx: &mut BeforeTaskPollContext<'_>) -> BeforeTaskPollAction {
             self.polls.fetch_add(1, Ordering::SeqCst);
+
+            Default::default()
         }
     }
 
@@ -240,16 +253,22 @@ fn run_after_poll(mut builder: runtime::Builder) {
         fn on_top_level_spawn(
             &self,
             _ctx: &mut OnTopLevelTaskSpawnContext<'_>,
-        ) -> Option<Box<dyn TaskHookHarness + Send + Sync + 'static>> {
-            Some(Box::new(TestHooks {
+        ) -> OnTopLevelSpawnAction {
+            let mut a = OnTopLevelSpawnAction::default();
+
+            a.set_hooks(TestHooks {
                 polls: self.polls.clone(),
-            }))
+            });
+
+            a
         }
     }
 
     impl TaskHookHarness for TestHooks {
-        fn after_poll(&mut self, _ctx: &mut AfterTaskPollContext<'_>) {
+        fn after_poll(&mut self, _ctx: &mut AfterTaskPollContext<'_>) -> AfterTaskPollAction {
             self.polls.fetch_add(1, Ordering::SeqCst);
+
+            Default::default()
         }
     }
 
@@ -285,16 +304,25 @@ fn run_terminate(mut builder: runtime::Builder) {
         fn on_top_level_spawn(
             &self,
             _ctx: &mut OnTopLevelTaskSpawnContext<'_>,
-        ) -> Option<Box<dyn TaskHookHarness + Send + Sync + 'static>> {
-            Some(Box::new(TestHooks {
+        ) -> OnTopLevelSpawnAction {
+            let mut a = OnTopLevelSpawnAction::default();
+
+            a.set_hooks(TestHooks {
                 terminations: self.terminations.clone(),
-            }))
+            });
+
+            a
         }
     }
 
     impl TaskHookHarness for TestHooks {
-        fn on_task_terminate(&mut self, _ctx: &mut OnTaskTerminateContext<'_>) {
+        fn on_task_terminate(
+            &mut self,
+            _ctx: &mut OnTaskTerminateContext<'_>,
+        ) -> OnTaskTerminateAction {
             self.terminations.fetch_add(1, Ordering::SeqCst);
+
+            Default::default()
         }
     }
 
@@ -327,17 +355,23 @@ fn run_hook_switching(mut builder: runtime::Builder) {
         fn on_top_level_spawn(
             &self,
             _ctx: &mut OnTopLevelTaskSpawnContext<'_>,
-        ) -> Option<Box<dyn TaskHookHarness + Send + Sync + 'static>> {
-            Some(Box::new(TestHooks {
+        ) -> OnTopLevelSpawnAction {
+            let mut a = OnTopLevelSpawnAction::default();
+
+            a.set_hooks(TestHooks {
                 id: self.next_id.fetch_add(1, Ordering::SeqCst),
                 flag: self.flag.clone(),
-            }))
+            });
+
+            a
         }
     }
 
     impl TaskHookHarness for TestHooks {
-        fn before_poll(&mut self, _ctx: &mut BeforeTaskPollContext<'_>) {
+        fn before_poll(&mut self, _ctx: &mut BeforeTaskPollContext<'_>) -> BeforeTaskPollAction {
             self.flag.store(self.id, Ordering::SeqCst);
+
+            Default::default()
         }
     }
 
@@ -371,17 +405,20 @@ fn run_override(mut builder: runtime::Builder) {
     }
 
     impl TaskHookHarness for TestHooks {
-        fn before_poll(&mut self, _ctx: &mut BeforeTaskPollContext<'_>) {
+        fn before_poll(&mut self, _ctx: &mut BeforeTaskPollContext<'_>) -> BeforeTaskPollAction {
             self.counter.fetch_add(1, Ordering::SeqCst);
+
+            Default::default()
         }
 
-        fn on_child_spawn(
-            &mut self,
-            _ctx: &mut OnChildTaskSpawnContext<'_>,
-        ) -> Option<Box<dyn TaskHookHarness + Send + Sync + 'static>> {
-            Some(Box::new(Self {
+        fn on_child_spawn(&mut self, _ctx: &mut OnChildTaskSpawnContext<'_>) -> OnChildSpawnAction {
+            let mut a = OnChildSpawnAction::default();
+
+            a.set_hooks(Self {
                 counter: self.counter.clone(),
-            }))
+            });
+
+            a
         }
     }
 
@@ -389,9 +426,10 @@ fn run_override(mut builder: runtime::Builder) {
         fn on_top_level_spawn(
             &self,
             _ctx: &mut OnTopLevelTaskSpawnContext<'_>,
-        ) -> Option<Box<dyn TaskHookHarness + Send + Sync + 'static>> {
+        ) -> OnTopLevelSpawnAction {
             self.counter.fetch_add(1, Ordering::SeqCst);
-            None
+
+            Default::default()
         }
     }
 
