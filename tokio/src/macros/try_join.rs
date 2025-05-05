@@ -30,6 +30,25 @@ macro_rules! doc {
         ///
         /// [`tokio::spawn`]: crate::spawn
         ///
+        /// # Fairness
+        ///
+        /// By default, `try_join!`'s generated future rotates which
+        /// contained future is polled first whenever it is woken.
+        ///
+        /// This behavior can be overridden by adding `biased;` to the beginning of the
+        /// macro usage. See the examples for details. This will cause `try_join` to poll
+        /// the futures in the order they appear from top to bottom.
+        ///
+        /// You may want this if your futures may interact in a way where known polling order is significant.
+        ///
+        /// But there is an important caveat to this mode. It becomes your responsibility
+        /// to ensure that the polling order of your futures is fair. If for example you
+        /// are joining a stream and a shutdown future, and the stream has a
+        /// huge volume of messages that takes a long time to finish processing per poll, you should
+        /// place the shutdown future earlier in the `try_join!` list to ensure that it is
+        /// always polled, and will not be delayed due to the stream future taking a long time to return
+        /// `Poll::Pending`.
+        ///
         /// # Examples
         ///
         /// Basic `try_join` with two branches.
@@ -100,6 +119,37 @@ macro_rules! doc {
         ///     }
         /// }
         /// ```
+        ///  Using the `biased;` mode to control polling order.
+        ///
+        /// ```
+        /// async fn do_stuff_async() -> Result<(), &'static str> {
+        ///     // async work
+        /// # Ok(())
+        /// }
+        ///
+        /// async fn more_async_work() -> Result<(), &'static str> {
+        ///     // more here
+        /// # Ok(())
+        /// }
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let res = tokio::try_join!(
+        ///         //do_stuff_async() will always be polled first when woken
+        ///         biased;
+        ///         do_stuff_async(),
+        ///         more_async_work());
+        ///
+        ///     match res {
+        ///          Ok((first, second)) => {
+        ///              // do something with the values
+        ///          }
+        ///          Err(err) => {
+        ///             println!("processing failed; error = {}", err);
+        ///          }
+        ///     }
+        /// }
+        /// ```
         #[macro_export]
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
         $try_join
@@ -114,6 +164,10 @@ doc! {macro_rules! try_join {
 #[cfg(not(doc))]
 doc! {macro_rules! try_join {
     (@ {
+        // Whether to rotate which future is polled first every poll,
+        // by incrementing a skip counter
+        rotate_poll_order=$rotate_poll_order:literal;
+
         // One `_` for each branch in the `try_join!` macro. This is not used once
         // normalization is complete.
         ( $($count:tt)* )
@@ -142,13 +196,18 @@ doc! {macro_rules! try_join {
         // <https://internals.rust-lang.org/t/surprising-soundness-trouble-around-pollfn/17484>
         let mut futures = &mut futures;
 
-        // Each time the future created by poll_fn is polled, a different future will be polled first
+        // Each time the future created by poll_fn is polled,
+        // if not running in biased mode,
+        // a different future will be polled first
         // to ensure every future passed to join! gets a chance to make progress even if
         // one of the futures consumes the whole budget.
         //
         // This is number of futures that will be skipped in the first loop
         // iteration the next time.
+        //
+        // If running in biased mode, this value will always be 0.
         let mut skip_next_time: u32 = 0;
+        let rotate_skip = $rotate_poll_order;
 
         poll_fn(move |cx| {
             const COUNT: u32 = $($total)*;
@@ -160,7 +219,10 @@ doc! {macro_rules! try_join {
             // The number of futures that will be skipped in the first loop iteration
             let mut skip = skip_next_time;
 
-            skip_next_time = if skip + 1 == COUNT { 0 } else { skip + 1 };
+            // only change skip index if we are not in biased mode, aka rotate_poll_order == true
+            if rotate_skip {
+                skip_next_time = if skip + 1 == COUNT { 0 } else { skip + 1 };
+            }
 
             // This loop runs twice and the first `skip` futures
             // are not polled in the first iteration.
@@ -216,14 +278,17 @@ doc! {macro_rules! try_join {
 
     // ===== Normalize =====
 
-    (@ { ( $($s:tt)* ) ( $($n:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
-      $crate::try_join!(@{ ($($s)* _) ($($n)* + 1) $($t)* ($($s)*) $e, } $($r)*)
+    (@ { rotate_poll_order=$rotate_poll_order:literal; ( $($s:tt)* ) ( $($n:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
+      $crate::try_join!(@{ rotate_poll_order=$rotate_poll_order; ($($s)* _) ($($n)* + 1) $($t)* ($($s)*) $e, } $($r)*)
     };
 
     // ===== Entry point =====
+    ( biased; $($e:expr),+ $(,)?) => {
+        $crate::try_join!(@{ rotate_poll_order=false; () (0) } $($e,)*)
+    };
 
     ( $($e:expr),+ $(,)?) => {
-        $crate::try_join!(@{ () (0) } $($e,)*)
+        $crate::try_join!(@{ rotate_poll_order=true; () (0) } $($e,)*)
     };
 
     () => { async { Ok(()) }.await }

@@ -155,6 +155,37 @@ async fn a_different_future_is_polled_first_every_time_poll_fn_is_polled() {
 }
 
 #[tokio::test]
+async fn futures_are_polled_in_order_in_biased_mode() {
+    let poll_order = Arc::new(std::sync::Mutex::new(vec![]));
+
+    let fut = |x, poll_order: Arc<std::sync::Mutex<Vec<i32>>>| async move {
+        for _ in 0..4 {
+            {
+                let mut guard = poll_order.lock().unwrap();
+
+                guard.push(x);
+            }
+
+            tokio::task::yield_now().await;
+        }
+    };
+
+    tokio::join!(
+        biased;
+        fut(1, Arc::clone(&poll_order)),
+        fut(2, Arc::clone(&poll_order)),
+        fut(3, Arc::clone(&poll_order)),
+    );
+
+    // Each time the future created by join! is polled, it should start
+    // by polling a different future first.
+    assert_eq!(
+        vec![1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3],
+        *poll_order.lock().unwrap()
+    );
+}
+
+#[tokio::test]
 #[allow(clippy::unit_cmp)]
 async fn empty_join() {
     assert_eq!(tokio::join!(), ());
