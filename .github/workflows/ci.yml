@@ -1,8 +1,8 @@
 on:
   push:
-    branches: ["master", "tokio-*.x"]
+    branches: [ "master", "tokio-*.x" ]
   pull_request:
-    branches: ["master", "tokio-*.x"]
+    branches: [ "master", "tokio-*.x" ]
 
 name: CI
 
@@ -107,7 +107,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -139,7 +139,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -169,7 +169,7 @@ jobs:
       - name: Install Rust ${{ env.rust_nightly }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_nightly }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -197,7 +197,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-hack
         uses: taiki-e/install-action@v2
         with:
@@ -237,7 +237,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
 
       - name: Enable parking_lot send_guard feature
         # Inserts the line "plsend = ["parking_lot/send_guard"]" right after [features]
@@ -256,7 +256,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: 1.82
+          toolchain: 1.82
 
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
@@ -295,7 +295,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -329,7 +329,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -363,7 +363,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -846,10 +846,10 @@ jobs:
           toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
       - name: build --cfg loom
-        run: cargo test --no-run --lib --features full
+        run: cargo test --no-run --lib --release --features full
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings -Cdebug-assertions
 
   check-readme:
     name: Check README

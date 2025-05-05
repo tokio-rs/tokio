@@ -1,5 +1,4 @@
 use crate::runtime::scheduler::multi_thread::{queue, Stats};
-
 use std::cell::RefCell;
 use std::thread;
 use std::time::Duration;

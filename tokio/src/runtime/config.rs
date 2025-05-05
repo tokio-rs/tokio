@@ -2,7 +2,10 @@
     any(not(all(tokio_unstable, feature = "full")), target_family = "wasm"),
     allow(dead_code)
 )]
-use crate::runtime::{Callback, TaskCallback};
+
+use crate::runtime::Callback;
+#[cfg(tokio_unstable)]
+use crate::runtime::OptionalTaskHooksFactory;
 use crate::util::RngSeedGenerator;
 
 pub(crate) struct Config {
@@ -18,19 +21,9 @@ pub(crate) struct Config {
     /// Callback for a worker unparking itself
     pub(crate) after_unpark: Option<Callback>,
 
-    /// To run before each task is spawned.
-    pub(crate) before_spawn: Option<TaskCallback>,
-
-    /// To run after each task is terminated.
-    pub(crate) after_termination: Option<TaskCallback>,
-
-    /// To run before each poll
+    /// Called on task spawn to generate the attached task hook harness.
     #[cfg(tokio_unstable)]
-    pub(crate) before_poll: Option<TaskCallback>,
-
-    /// To run after each poll
-    #[cfg(tokio_unstable)]
-    pub(crate) after_poll: Option<TaskCallback>,
+    pub(crate) task_hook_factory: OptionalTaskHooksFactory,
 
     /// The multi-threaded scheduler includes a per-worker LIFO slot used to
     /// store the last scheduled task. This can improve certain usage patterns,

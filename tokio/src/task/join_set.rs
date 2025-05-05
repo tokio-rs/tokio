@@ -641,9 +641,13 @@ where
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 impl<'a, T: 'static> Builder<'a, T> {
     /// Assigns a name to the task which will be spawned.
-    pub fn name(self, name: &'a str) -> Self {
-        let builder = self.builder.name(name);
-        Self { builder, ..self }
+    pub fn name(mut self, name: &'a str) -> Self {
+        self.builder.name(name);
+
+        Self {
+            builder: self.builder,
+            ..self
+        }
     }
 
     /// Spawn the provided task with this builder's settings and store it in the

@@ -1,8 +1,7 @@
-use crate::runtime::task::{
-    self, unowned, Id, JoinHandle, OwnedTasks, Schedule, Task, TaskHarnessScheduleHooks,
-};
+use crate::runtime::task::{self, unowned, Id, JoinHandle, OwnedTasks, Schedule, Task};
 use crate::runtime::tests::NoopSchedule;
-
+#[cfg(tokio_unstable)]
+use crate::runtime::{OptionalTaskHooksFactory, OptionalTaskHooksFactoryRef};
 use std::collections::VecDeque;
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -447,9 +446,13 @@ impl Schedule for Runtime {
         self.0.core.try_lock().unwrap().queue.push_back(task);
     }
 
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: None,
-        }
+    #[cfg(tokio_unstable)]
+    fn hooks_factory(&self) -> OptionalTaskHooksFactory {
+        None
+    }
+
+    #[cfg(tokio_unstable)]
+    fn hooks_factory_ref(&self) -> OptionalTaskHooksFactoryRef<'_> {
+        None
     }
 }

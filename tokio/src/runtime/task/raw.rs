@@ -1,7 +1,12 @@
 use crate::future::Future;
+#[cfg(tokio_unstable)]
+use crate::runtime::context::set_task_hooks;
 use crate::runtime::task::core::{Core, Trailer};
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
-
+#[cfg(tokio_unstable)]
+use crate::runtime::{BeforeTaskPollContext, OptionalTaskHooks, TaskHookHarness};
+#[cfg(tokio_unstable)]
+use std::panic;
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
 
@@ -157,12 +162,24 @@ const fn get_id_offset(
 }
 
 impl RawTask {
-    pub(super) fn new<T, S>(task: T, scheduler: S, id: Id) -> RawTask
+    pub(super) fn new<T, S>(
+        task: T,
+        scheduler: S,
+        id: Id,
+        #[cfg(tokio_unstable)] hooks: OptionalTaskHooks,
+    ) -> RawTask
     where
         T: Future,
         S: Schedule,
     {
-        let ptr = Box::into_raw(Cell::<_, S>::new(task, scheduler, State::new(), id));
+        let ptr = Box::into_raw(Cell::<_, S>::new(
+            task,
+            scheduler,
+            State::new(),
+            id,
+            #[cfg(tokio_unstable)]
+            hooks,
+        ));
         let ptr = unsafe { NonNull::new_unchecked(ptr.cast()) };
 
         RawTask { ptr }
@@ -197,8 +214,27 @@ impl RawTask {
 
     /// Safety: mutual exclusion is required to call this function.
     pub(crate) fn poll(self) {
-        let vtable = self.header().vtable;
-        unsafe { (vtable.poll)(self.ptr) }
+        #[cfg(tokio_unstable)]
+        let _guard = self.trailer().hooks.with_mut(|ptr| unsafe {
+            ptr.as_mut().and_then(|x| {
+                x.as_mut().map(|x| {
+                    let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                        x.before_poll(&mut BeforeTaskPollContext {
+                            _phantom: Default::default(),
+                        })
+                    }));
+
+                    set_task_hooks(NonNull::new(
+                        (&mut **x) as *mut (dyn TaskHookHarness + Send + Sync + 'static),
+                    ))
+                })
+            })
+        });
+
+        unsafe {
+            let vtable = self.header().vtable;
+            (vtable.poll)(self.ptr);
+        }
     }
 
     pub(super) fn schedule(self) {

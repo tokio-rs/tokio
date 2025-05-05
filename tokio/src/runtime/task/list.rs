@@ -13,9 +13,10 @@ use crate::util::linked_list::{Link, LinkedList};
 use crate::util::sharded_list;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
+#[cfg(tokio_unstable)]
+use crate::runtime::OptionalTaskHooks;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
-
 // The id from the module below is used to verify whether a given task is stored
 // in this OwnedTasks, or some other task. The counter starts at one so we can
 // use `None` for tasks not owned by any list.
@@ -91,13 +92,20 @@ impl<S: 'static> OwnedTasks<S> {
         task: T,
         scheduler: S,
         id: super::Id,
+        #[cfg(tokio_unstable)] hooks: OptionalTaskHooks,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            #[cfg(tokio_unstable)]
+            hooks,
+        );
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
@@ -111,13 +119,20 @@ impl<S: 'static> OwnedTasks<S> {
         task: T,
         scheduler: S,
         id: super::Id,
+        #[cfg(tokio_unstable)] parent: OptionalTaskHooks,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            #[cfg(tokio_unstable)]
+            parent,
+        );
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
@@ -258,12 +273,16 @@ impl<S: 'static> LocalOwnedTasks<S> {
         task: T,
         scheduler: S,
         id: super::Id,
+        #[cfg(tokio_unstable)] parent: OptionalTaskHooks,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
+        #[cfg(tokio_unstable)]
+        let (task, notified, join) = super::new_task(task, scheduler, id, parent);
+        #[cfg(not(tokio_unstable))]
         let (task, notified, join) = super::new_task(task, scheduler, id);
 
         unsafe {
