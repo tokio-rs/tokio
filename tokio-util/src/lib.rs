@@ -16,8 +16,6 @@
 //! This crate is not versioned in lockstep with the core
 //! [`tokio`] crate. However, `tokio-util` _will_ respect Rust's
 //! semantic versioning policy, especially with regard to breaking changes.
-//!
-//! [`tokio`]: https://docs.rs/tokio
 
 #[macro_use]
 mod cfg;

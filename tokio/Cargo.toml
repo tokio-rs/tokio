@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.44.1"
+version = "1.44.2"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -131,7 +131,7 @@ features = [
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 futures = { version = "0.3.0", features = ["async-await"] }
-mockall = "0.11.1"
+mockall = "0.13.0"
 async-stream = "0.3"
 futures-concurrency = "7.6.3"
 
@@ -147,7 +147,7 @@ rand = "0.8.0"
 wasm-bindgen-test = "0.3.0"
 
 [target.'cfg(target_os = "freebsd")'.dev-dependencies]
-mio-aio = { version = "0.9.0", features = ["tokio"] }
+mio-aio = { version = "1", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.7", features = ["futures", "checkpoint"] }

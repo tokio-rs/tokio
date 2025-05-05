@@ -475,10 +475,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check semver
+      - name: Check `tokio` semver
         uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           rust-toolchain: ${{ env.rust_stable }}
+          package: tokio
+          release-type: minor
+      - name: Check semver for rest of the workspace
+        if: ${{ !startsWith(github.event.pull_request.base.ref, 'tokio-1.') }}
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          rust-toolchain: ${{ env.rust_stable }}
+          exclude: tokio
           release-type: minor
 
   cross-check:
@@ -546,6 +554,8 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
             rustflags: --cfg tokio_taskdump
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
@@ -590,6 +600,8 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
             rustflags: --cfg tokio_taskdump
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
@@ -718,7 +730,14 @@ jobs:
           toolchain: ${{ env.rust_min }}
       - uses: Swatinem/rust-cache@v2
       - name: "check --workspace --all-features"
-        run: cargo check --workspace --all-features
+        run: |
+          if [[ "${{ github.event.pull_request.base.ref }}" =~ ^tokio-1\..* ]]; then
+            # Only check `tokio` crate as the PR is backporting to an earlier tokio release.
+            cargo check -p tokio --all-features
+          else
+            # Check all crates in the workspace
+            cargo check --workspace --all-features
+          fi
         env:
           RUSTFLAGS: "" # remove -Dwarnings
 
@@ -1014,7 +1033,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       # Install dependencies
-      - name: Install cargo-hack, wasmtime, and cargo-wasi
+      - name: Install cargo-hack, wasmtime
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-hack,wasmtime

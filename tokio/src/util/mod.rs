@@ -2,6 +2,9 @@ cfg_io_driver! {
     pub(crate) mod bit;
 }
 
+#[cfg(feature = "fs")]
+pub(crate) mod as_ref;
+
 #[cfg(feature = "rt")]
 pub(crate) mod atomic_cell;
 
@@ -80,6 +83,9 @@ cfg_rt_multi_thread! {
 }
 
 pub(crate) mod trace;
+
+#[cfg(feature = "fs")]
+pub(crate) mod typeid;
 
 pub(crate) mod error;
 

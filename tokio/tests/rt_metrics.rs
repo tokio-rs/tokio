@@ -4,6 +4,7 @@
 use std::sync::mpsc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
+use tokio::time;
 
 #[test]
 fn num_workers() {
@@ -123,6 +124,64 @@ fn worker_total_busy_duration() {
     for i in 0..metrics.num_workers() {
         assert!(zero < metrics.worker_total_busy_duration(i));
     }
+}
+
+#[test]
+fn worker_park_count() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+    rt.block_on(async {
+        time::sleep(Duration::from_millis(1)).await;
+    });
+    drop(rt);
+    assert!(1 <= metrics.worker_park_count(0));
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+    rt.block_on(async {
+        time::sleep(Duration::from_millis(1)).await;
+    });
+    drop(rt);
+    assert!(1 <= metrics.worker_park_count(0));
+    assert!(1 <= metrics.worker_park_count(1));
+}
+
+#[test]
+fn worker_park_unpark_count() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+    rt.block_on(rt.spawn(async {})).unwrap();
+    drop(rt);
+    assert!(2 <= metrics.worker_park_unpark_count(0));
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+
+    // Wait for workers to be parked after runtime startup.
+    for _ in 0..100 {
+        if 1 <= metrics.worker_park_unpark_count(0) && 1 <= metrics.worker_park_unpark_count(1) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert_eq!(1, metrics.worker_park_unpark_count(0));
+    assert_eq!(1, metrics.worker_park_unpark_count(1));
+
+    // Spawn a task to unpark and then park a worker.
+    rt.block_on(rt.spawn(async {})).unwrap();
+    for _ in 0..100 {
+        if 3 <= metrics.worker_park_unpark_count(0) || 3 <= metrics.worker_park_unpark_count(1) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert!(3 <= metrics.worker_park_unpark_count(0) || 3 <= metrics.worker_park_unpark_count(1));
+
+    // Both threads unpark for runtime shutdown.
+    drop(rt);
+    assert_eq!(0, metrics.worker_park_unpark_count(0) % 2);
+    assert_eq!(0, metrics.worker_park_unpark_count(1) % 2);
+    assert!(4 <= metrics.worker_park_unpark_count(0) || 4 <= metrics.worker_park_unpark_count(1));
 }
 
 fn try_block_threaded(rt: &Runtime) -> Result<Vec<mpsc::Sender<()>>, mpsc::RecvTimeoutError> {
