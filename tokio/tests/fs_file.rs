@@ -290,7 +290,7 @@ async fn windows_handle() {
 }
 
 #[tokio::test]
-async fn pos_update_at_read_and_write() -> std::io::Result<()> {
+async fn verify_pos_update_at_read_and_write() -> std::io::Result<()> {
     let mut std_file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -303,19 +303,19 @@ async fn pos_update_at_read_and_write() -> std::io::Result<()> {
 
     let mut file = File::from_std(std_file);
 
-    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 8);
+    assert_eq!(file.stream_position().await?, 8);
 
     let mut buf = [0u8; 4];
     file.read_exact(&mut buf).await?;
-    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 12);
+    assert_eq!(file.stream_position().await?, 12);
 
     file.write_all(b"vwxyz").await?;
-    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 17);
+    assert_eq!(file.stream_position().await?, 17);
 
     Ok(())
 }
 #[tokio::test]
-async fn pos_update_after_write_vectored() -> std::io::Result<()> {
+async fn verify_pos_update_after_write_vectored() -> std::io::Result<()> {
     // Create and seed the file
     let mut std_file = OpenOptions::new()
         .read(true)
@@ -329,18 +329,18 @@ async fn pos_update_after_write_vectored() -> std::io::Result<()> {
     let mut file = File::from_std(std_file);
 
     // Confirm initial position
-    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 8);
+    assert_eq!(file.stream_position().await?, 8);
 
     // Read 4 bytes → position should move to 12
     let mut buf = [0u8; 4];
     file.read_exact(&mut buf).await?;
-    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 12);
+    assert_eq!(file.stream_position().await?, 12);
 
     // Write 5 bytes via vectored I/O → position should move to 17
     let bufs = [IoSlice::new(b"XY"), IoSlice::new(b"ZZZ")];
     let bytes_written = file.write_vectored(&bufs).await?;
     assert_eq!(bytes_written, 5);
-    assert_eq!(file.seek(SeekFrom::Current(0)).await?, 17);
+    assert_eq!(file.stream_position().await?, 17);
 
     Ok(())
 }
