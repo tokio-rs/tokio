@@ -767,7 +767,6 @@ impl AsyncWrite for File {
                     inner.state = State::Busy(blocking_task_join_handle);
                 }
                 State::Busy(ref mut rx) => {
-                    println!("state busy reached");
                     let (op, buf) = ready!(Pin::new(rx).poll(cx))?;
                     inner.state = State::Idle(Some(buf));
 
