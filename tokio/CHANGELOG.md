@@ -1,3 +1,30 @@
+# 1.45.0 (May 5th, 2025)
+
+### Added
+
+- metrics: stabilize `worker_total_busy_duration`, `worker_park_count`, and
+  `worker_unpark_count` ([#6899], [#7276])
+- process: add `Command::spawn_with` ([#7249])
+
+### Changed
+
+- io: do not require `Unpin` for some trait impls ([#7204])
+- rt: mark `runtime::Handle` as unwind safe ([#7230])
+- time: revert internal sharding implementation ([#7226])
+
+### Unstable
+
+- rt: remove alt multi-threaded runtime ([#7275])
+
+[#6899]: https://github.com/tokio-rs/tokio/pull/6899
+[#7276]: https://github.com/tokio-rs/tokio/pull/7276
+[#7249]: https://github.com/tokio-rs/tokio/pull/7249
+[#7204]: https://github.com/tokio-rs/tokio/pull/7204
+[#7230]: https://github.com/tokio-rs/tokio/pull/7230
+[#7226]: https://github.com/tokio-rs/tokio/pull/7226
+[#7275]: https://github.com/tokio-rs/tokio/pull/7275
+
+
 # 1.44.2 (April 5th, 2025)
 
 This release fixes a soundness issue in the broadcast channel. The channel
