@@ -345,8 +345,6 @@ fn write_with_buffer_larger_than_max() {
 
     let mut rem = &data[..];
 
-    let mut first = true;
-
     while !rem.is_empty() {
         let mut task = task::spawn(file.write(rem));
 
