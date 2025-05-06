@@ -290,7 +290,7 @@ async fn windows_handle() {
 }
 
 #[tokio::test]
-async fn verify_pos_update_at_read_and_write() -> std::io::Result<()> {
+async fn verify_pos_update_after_read_and_write() -> std::io::Result<()> {
     let mut std_file = OpenOptions::new()
         .read(true)
         .write(true)
