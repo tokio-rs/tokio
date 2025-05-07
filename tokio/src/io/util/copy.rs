@@ -266,7 +266,7 @@ cfg_io_util! {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W) -> io::Result<u64>
+    pub async fn copy<'a, R, W>(reader: &'a mut R, writer: &'a mut W, buf_size: Option<usize>) -> io::Result<u64>
     where
         R: AsyncRead + Unpin + ?Sized,
         W: AsyncWrite + Unpin + ?Sized,
@@ -274,7 +274,7 @@ cfg_io_util! {
         Copy {
             reader,
             writer,
-            buf: CopyBuffer::new(super::DEFAULT_BUF_SIZE)
+            buf: CopyBuffer::new(buf_size.unwrap_or(super::DEFAULT_BUF_SIZE))
         }.await
     }
 }
