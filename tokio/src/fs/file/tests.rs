@@ -989,7 +989,7 @@ fn busy_file_seek_error() {
     assert_ready_err!(t.poll());
 }
 #[test]
-fn write_error_pos_changed() {
+fn write_error_pos_unchanged() {
     let mut file = MockFile::default();
     let mut seq = Sequence::new();
     file.expect_inner_write()
