@@ -257,11 +257,11 @@ doc! {macro_rules! try_join {
                         Ready(Ok(($({
                             // Extract the future for this branch from the tuple.
                             let ( $($skip,)* fut, .. ) = &mut futures;
-        
+
                             // Safety: future is stored on the stack above
                             // and never moved.
                             let mut fut = unsafe { Pin::new_unchecked(fut) };
-        
+
                             fut
                                 .take_output()
                                 .expect("expected completed future")
@@ -299,11 +299,11 @@ doc! {macro_rules! try_join {
                     Ready(Ok(($({
                         // Extract the future for this branch from the tuple.
                         let ( $($skip,)* fut, .. ) = &mut futures;
-    
+
                         // Safety: future is stored on the stack above
                         // and never moved.
                         let mut fut = unsafe { Pin::new_unchecked(fut) };
-    
+
                         fut
                             .take_output()
                             .expect("expected completed future")
