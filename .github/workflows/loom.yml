@@ -17,7 +17,7 @@ env:
   LOOM_MAX_BRANCHES: 10000
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
-  rust_stable: stable
+  rust_stable: beta
 
 permissions:
   contents: read
