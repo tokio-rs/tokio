@@ -105,7 +105,7 @@ macro_rules! doc {
 
 #[cfg(doc)]
 doc! {macro_rules! join {
-    ($($future:expr),*) => { unimplemented!() }
+    ($(biased;)? $($future:expr),*) => { unimplemented!() }
 }}
 
 #[cfg(not(doc))]
@@ -150,38 +150,75 @@ doc! {macro_rules! join {
         // one of the futures consumes the whole budget.
         //
         // This is number of futures that will be skipped in the first loop
-        // iteration the next time.
+        // iteration the next time poll.
         //
-        // If running in biased mode, this value will always be 0.
+        // If running in biased mode, this variable will be optimized out since we don't pass
+        // it to the poll_fn.
         let mut skip_next_time: u32 = 0;
-        let rotate_skip = $rotate_poll_order;
 
-        poll_fn(move |cx| {
-            const COUNT: u32 = $($total)*;
+        match $rotate_poll_order {
+            true => poll_fn(move |cx| {
+                const COUNT: u32 = $($total)*;
+                let mut is_pending = false;
+                let mut to_run = COUNT;
 
-            let mut is_pending = false;
-
-            let mut to_run = COUNT;
-
-            // The number of futures that will be skipped in the first loop iteration.
-            let mut skip = skip_next_time;
-
-            // only change skip index if we are not in biased mode, aka rotate_poll_order == true
-            if rotate_skip {
+                // The number of futures that will be skipped in the first loop iteration.
+                let mut skip = skip_next_time;
+                // Upkeep for next poll, rotate first polled future
                 skip_next_time = if skip + 1 == COUNT { 0 } else { skip + 1 };
-            }
 
-            // This loop runs twice and the first `skip` futures
-            // are not polled in the first iteration.
-            loop {
-            $(
-                if skip == 0 {
-                    if to_run == 0 {
-                        // Every future has been polled
-                        break;
+                // This loop runs twice and the first `skip` futures
+                // are not polled in the first iteration.
+                loop {
+                    $(
+                        if skip == 0 {
+                            if to_run == 0 {
+                                // Every future has been polled
+                                break;
+                            }
+                            to_run -= 1;
+
+                            // Extract the future for this branch from the tuple.
+                            let ( $($skip,)* fut, .. ) = &mut *futures;
+
+                            // Safety: future is stored on the stack above
+                            // and never moved.
+                            let mut fut = unsafe { Pin::new_unchecked(fut) };
+
+                            // Try polling
+                            if fut.poll(cx).is_pending() {
+                                is_pending = true;
+                            }
+                        } else {
+                            // Future skipped, one less future to skip in the next iteration
+                            skip -= 1;
+                        }
+                    )*
                     }
-                    to_run -= 1;
 
+                    if is_pending {
+                        Pending
+                    } else {
+                        Ready(($({
+                            // Extract the future for this branch from the tuple.
+                            let ( $($skip,)* fut, .. ) = &mut futures;
+
+                            // Safety: future is stored on the stack above
+                            // and never moved.
+                            let mut fut = unsafe { Pin::new_unchecked(fut) };
+
+                            fut.take_output().expect("expected completed future")
+                        },)*))
+                    }
+            }).await,
+            // don't rotate the poll order so no skipping
+            false => poll_fn(move |cx| {
+                const COUNT: u32 = $($total)*;
+                let mut is_pending = false;
+                let mut to_run = COUNT;
+
+                // no loop since we don't skip the first time through
+                $(
                     // Extract the future for this branch from the tuple.
                     let ( $($skip,)* fut, .. ) = &mut *futures;
 
@@ -193,28 +230,24 @@ doc! {macro_rules! join {
                     if fut.poll(cx).is_pending() {
                         is_pending = true;
                     }
+                )*
+
+                if is_pending {
+                    Pending
                 } else {
-                    // Future skipped, one less future to skip in the next iteration
-                    skip -= 1;
+                    Ready(($({
+                        // Extract the future for this branch from the tuple.
+                        let ( $($skip,)* fut, .. ) = &mut futures;
+
+                        // Safety: future is stored on the stack above
+                        // and never moved.
+                        let mut fut = unsafe { Pin::new_unchecked(fut) };
+
+                        fut.take_output().expect("expected completed future")
+                    },)*))
                 }
-            )*
-            }
-
-            if is_pending {
-                Pending
-            } else {
-                Ready(($({
-                    // Extract the future for this branch from the tuple.
-                    let ( $($skip,)* fut, .. ) = &mut futures;
-
-                    // Safety: future is stored on the stack above
-                    // and never moved.
-                    let mut fut = unsafe { Pin::new_unchecked(fut) };
-
-                    fut.take_output().expect("expected completed future")
-                },)*))
-            }
-        }).await
+            }).await
+        }
     }};
 
     // ===== Normalize =====
@@ -231,6 +264,8 @@ doc! {macro_rules! join {
     ( $($e:expr),+ $(,)?) => {
         $crate::join!(@{ rotate_poll_order=true; () (0) } $($e,)*)
     };
+
+    (biased;) => { async {}.await };
 
     () => { async {}.await }
 }}
