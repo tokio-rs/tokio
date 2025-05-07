@@ -505,7 +505,6 @@ fn incomplete_read_followed_by_flush() {
         .returning(|_| Ok(FOO.len()));
 
     let mut file = File::from_std(file);
-
     let mut buf = [0; 32];
 
     let mut t = task::spawn(file.read(&mut buf));
@@ -988,4 +987,111 @@ fn busy_file_seek_error() {
     assert_pending!(t.poll());
     pool::run_one();
     assert_ready_err!(t.poll());
+}
+#[test]
+fn write_error_pos_changed() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .with(eq(HELLO))
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    file.expect_inner_seek()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(0));
+
+    file.expect_inner_write()
+        .once()
+        .with(eq(HELLO))
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(HELLO.len()));
+    file.expect_inner_seek()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(HELLO.len() as u64));
+
+    let mut file = crate::io::BufReader::new(File::from_std(file));
+    {
+        let mut t = task::spawn(file.write(HELLO));
+        assert_pending!(t.poll());
+        pool::run_one();
+        assert_ready_err!(t.poll());
+        let mut t = task::spawn(file.stream_position());
+        assert_pending!(t.poll());
+        pool::run_one();
+        assert_pos_poll_result(t.poll(), 0);
+    }
+    {
+        let mut t = task::spawn(file.write(HELLO));
+        assert_pending!(t.poll());
+        pool::run_one();
+        assert_ready_ok!(t.poll());
+        let mut t = task::spawn(file.stream_position());
+        assert_pending!(t.poll());
+        pool::run_one();
+        assert_pos_poll_result(t.poll(), HELLO.len() as u64);
+    }
+}
+
+#[test]
+fn read_error_pos_unchanged() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    file.expect_inner_seek()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(0));
+
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf: &mut [u8]| {
+            buf[..HELLO.len()].copy_from_slice(HELLO);
+            Ok(HELLO.len())
+        });
+    file.expect_inner_seek()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(HELLO.len() as u64));
+
+    let mut file = crate::io::BufReader::new(File::from_std(file));
+    {
+        let mut buf = [0u8; HELLO.len()];
+        let mut t = task::spawn(file.read_exact(&mut buf));
+        assert_pending!(t.poll());
+        pool::run_one();
+        assert_ready_err!(t.poll());
+
+        let mut t = task::spawn(file.stream_position());
+        assert_pending!(t.poll());
+        pool::run_one();
+        assert_pos_poll_result(t.poll(), 0);
+    }
+    {
+        let mut buf = [0u8; HELLO.len()];
+        let mut t = task::spawn(file.read_exact(&mut buf));
+        assert_pending!(t.poll());
+        pool::run_one();
+        assert_ready_ok!(t.poll());
+        let mut t = task::spawn(file.stream_position());
+        assert_pending!(t.poll());
+        pool::run_one();
+        assert_pos_poll_result(t.poll(), HELLO.len() as u64);
+    }
+}
+fn assert_pos_poll_result(result: Poll<io::Result<u64>>, expected_pos: u64) {
+    match result {
+        Poll::Ready(Ok(pos)) => {
+            assert_eq!(pos, expected_pos);
+        }
+        Poll::Ready(Err(e)) => panic!("stream position error:{e}"),
+        Poll::Pending => panic!("stream_position pending"),
+    }
 }

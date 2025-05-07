@@ -344,3 +344,27 @@ async fn verify_pos_update_after_write_vectored() -> std::io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn pos_update_in_read_eof_error() -> std::io::Result<()> {
+    let file_path = "read_eof_error.txt";
+
+    let mut std_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(file_path)?;
+    std_file.write_all(b"12345")?;
+    std_file.seek(SeekFrom::Start(3))?;
+
+    let mut file = File::from_std(std_file);
+
+    assert_eq!(file.stream_position().await?, 3);
+
+    let mut buf = [0u8; 4];
+    let result = file.read_exact(&mut buf).await;
+    assert!(result.is_err());
+    assert_eq!(file.stream_position().await?, 5);
+    Ok(())
+}
