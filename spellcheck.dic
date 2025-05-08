@@ -1,4 +1,4 @@
-302
+306
 &
 +
 <
@@ -70,6 +70,9 @@ connectionless
 coroutines
 cpu
 cpus
+cqe
+CQE
+cqe's
 customizable
 Customizable
 datagram
@@ -287,6 +290,7 @@ unsets
 Unsets
 unsynchronized
 untrusted
+uring
 usecases
 Valgrind
 Varghese

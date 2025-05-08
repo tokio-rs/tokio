@@ -350,6 +350,40 @@ jobs:
           # the unstable cfg to RustDoc
           RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_taskdump
 
+  test-unstable-uring:
+    name: test tokio full --cfg tokio_unstable_uring
+    needs: basics
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+            toolchain: ${{ env.rust_stable }}
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - uses: Swatinem/rust-cache@v2
+      # Run `tokio` with "unstable" and "taskdump" cfg flags.
+      - name: test tokio full --cfg tokio_unstable_uring
+        run: |
+          set -euxo pipefail
+          cargo nextest run --all-features
+          cargo test --doc --all-features
+        working-directory: tokio
+        env:
+          RUSTFLAGS: --cfg tokio_unstable_uring -Dwarnings
+          # in order to run doctests for unstable features, we must also pass
+          # the unstable cfg to RustDoc
+          RUSTDOCFLAGS: --cfg tokio_unstable_uring
+
   check-unstable-mt-counters:
     name: check tokio full --internal-mt-counters
     needs: basics
@@ -702,7 +736,7 @@ jobs:
           # Try with unstable feature flags
           - { name: "--unstable", rustflags: "--cfg tokio_unstable -Dwarnings" }
           # Try with unstable and taskdump feature flags
-          - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump" }
+          - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump --cfg tokio_unstable_uring" }
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_nightly }}
@@ -765,7 +799,7 @@ jobs:
           cargo hack check --all-features --ignore-private
       - name: "check --all-features --unstable -Z minimal-versions"
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump --cfg tokio_unstable_uring -Dwarnings
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
           # from determining minimal versions based on dev-dependencies.
@@ -817,8 +851,8 @@ jobs:
         run:
           - os: windows-latest
           - os: ubuntu-latest
-            RUSTFLAGS: --cfg tokio_taskdump
-            RUSTDOCFLAGS: --cfg tokio_taskdump
+            RUSTFLAGS: --cfg tokio_taskdump --cfg tokio_unstable_uring
+            RUSTDOCFLAGS: --cfg tokio_taskdump --cfg tokio_unstable_uring
 
     steps:
       - uses: actions/checkout@v4
