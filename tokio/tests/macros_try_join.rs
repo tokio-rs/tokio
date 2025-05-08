@@ -1,7 +1,7 @@
 #![cfg(feature = "macros")]
 #![allow(clippy::disallowed_names)]
 
-use std::sync::Arc;
+use std::{convert::Infallible, sync::Arc};
 
 use tokio::sync::{oneshot, Semaphore};
 use tokio_test::{assert_pending, assert_ready, task};
@@ -171,13 +171,15 @@ async fn a_different_future_is_polled_first_every_time_poll_fn_is_polled() {
 
             tokio::task::yield_now().await;
         }
+        Ok::<(), Infallible>(())
     };
 
-    tokio::join!(
+    tokio::try_join!(
         fut(1, Arc::clone(&poll_order)),
         fut(2, Arc::clone(&poll_order)),
         fut(3, Arc::clone(&poll_order)),
-    );
+    )
+    .unwrap();
 
     // Each time the future created by join! is polled, it should start
     // by polling a different future first.
@@ -201,14 +203,16 @@ async fn futures_are_polled_in_order_in_biased_mode() {
 
             tokio::task::yield_now().await;
         }
+        Ok::<(), Infallible>(())
     };
 
-    tokio::join!(
+    tokio::try_join!(
         biased;
         fut(1, Arc::clone(&poll_order)),
         fut(2, Arc::clone(&poll_order)),
         fut(3, Arc::clone(&poll_order)),
-    );
+    )
+    .unwrap();
 
     // Each time the future created by join! is polled, it should start
     // by polling in the order as declared in the macro inputs.
@@ -228,14 +232,14 @@ fn try_join_size_biased() {
         let ready = future::ready(ok(0i32));
         tokio::try_join!(biased; ready)
     };
-    assert_eq!(mem::size_of_val(&fut), 32);
+    assert_eq!(mem::size_of_val(&fut), 24);
 
     let fut = async {
         let ready1 = future::ready(ok(0i32));
         let ready2 = future::ready(ok(0i32));
         tokio::try_join!(biased; ready1, ready2)
     };
-    assert_eq!(mem::size_of_val(&fut), 48);
+    assert_eq!(mem::size_of_val(&fut), 40);
 }
 
 #[tokio::test]

@@ -203,14 +203,14 @@ fn join_size_biased() {
         let ready = future::ready(0i32);
         tokio::join!(biased; ready)
     };
-    assert_eq!(mem::size_of_val(&fut), 32);
+    assert_eq!(mem::size_of_val(&fut), 24);
 
     let fut = async {
         let ready1 = future::ready(0i32);
         let ready2 = future::ready(0i32);
         tokio::join!(biased; ready1, ready2)
     };
-    assert_eq!(mem::size_of_val(&fut), 48);
+    assert_eq!(mem::size_of_val(&fut), 40);
 }
 
 #[tokio::test]
