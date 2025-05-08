@@ -727,3 +727,17 @@ macro_rules! cfg_tokio_unstable_uring {
         )*
     };
 }
+
+macro_rules! cfg_not_tokio_unstable_uring {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(
+                tokio_unstable_uring,
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            )))]
+            $item
+        )*
+    };
+}

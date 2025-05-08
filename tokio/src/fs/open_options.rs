@@ -1,7 +1,13 @@
-use crate::fs::{asyncify, File};
+use crate::fs::File;
 
 use std::io;
 use std::path::Path;
+
+cfg_tokio_unstable_uring! {
+    mod uring_open_options;
+    use uring_open_options::UringOpenOptions;
+    use crate::runtime::driver::op::Op;
+}
 
 #[cfg(test)]
 mod mock_open_options;
@@ -10,8 +16,12 @@ use mock_open_options::MockOpenOptions as StdOpenOptions;
 #[cfg(not(test))]
 use std::fs::OpenOptions as StdOpenOptions;
 
-#[cfg(unix)]
-use std::os::unix::fs::OpenOptionsExt;
+cfg_not_tokio_unstable_uring! {
+    #[cfg(unix)]
+        use std::os::unix::fs::OpenOptionsExt;
+        use crate::fs::asyncify;
+}
+
 #[cfg(windows)]
 use std::os::windows::fs::OpenOptionsExt;
 
@@ -79,7 +89,22 @@ use std::os::windows::fs::OpenOptionsExt;
 /// }
 /// ```
 #[derive(Clone, Debug)]
-pub struct OpenOptions(StdOpenOptions);
+pub struct OpenOptions(
+    #[cfg(not(all(
+        tokio_unstable_uring,
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    )))]
+    StdOpenOptions,
+    #[cfg(all(
+        tokio_unstable_uring,
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    pub(crate) UringOpenOptions,
+);
 
 impl OpenOptions {
     /// Creates a blank new set of options ready for configuration.
@@ -99,7 +124,22 @@ impl OpenOptions {
     /// let future = options.read(true).open("foo.txt");
     /// ```
     pub fn new() -> OpenOptions {
-        OpenOptions(StdOpenOptions::new())
+        OpenOptions(
+            #[cfg(not(all(
+                tokio_unstable_uring,
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            )))]
+            StdOpenOptions::new(),
+            #[cfg(all(
+                tokio_unstable_uring,
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            ))]
+            UringOpenOptions::new(),
+        )
     }
 
     /// Sets the option for read access.
@@ -386,17 +426,35 @@ impl OpenOptions {
     /// [`Other`]: std::io::ErrorKind::Other
     /// [`PermissionDenied`]: std::io::ErrorKind::PermissionDenied
     pub async fn open(&self, path: impl AsRef<Path>) -> io::Result<File> {
-        let path = path.as_ref().to_owned();
-        let opts = self.0.clone();
-
-        let std = asyncify(move || opts.open(path)).await?;
-        Ok(File::from_std(std))
+        self.open_inner(path).await
     }
 
-    /// Returns a mutable reference to the underlying `std::fs::OpenOptions`
-    #[cfg(any(windows, unix))]
-    pub(super) fn as_inner_mut(&mut self) -> &mut StdOpenOptions {
-        &mut self.0
+    cfg_not_tokio_unstable_uring! {
+        async fn open_inner(&self, path: impl AsRef<Path>) -> io::Result<File> {
+            let path = path.as_ref().to_owned();
+            let opts = self.0.clone();
+
+            let std = asyncify(move || opts.open(path)).await?;
+            Ok(File::from_std(std))
+        }
+
+        /// Returns a mutable reference to the underlying `std::fs::OpenOptions`
+        #[cfg(any(windows, unix))]
+        pub(super) fn as_inner_mut(&mut self) -> &mut StdOpenOptions {
+            &mut self.0
+        }
+    }
+
+    cfg_tokio_unstable_uring! {
+        async fn open_inner(&self, path: impl AsRef<Path>) -> io::Result<File> {
+            Op::open(path.as_ref(), self)?.await
+        }
+
+        /// Returns a mutable reference to the underlying `std::fs::OpenOptions`
+        #[cfg(any(windows, unix))]
+        pub(super) fn as_inner_mut(&mut self) -> &mut UringOpenOptions {
+            &mut self.0
+        }
     }
 }
 
@@ -649,9 +707,23 @@ cfg_windows! {
     }
 }
 
-impl From<StdOpenOptions> for OpenOptions {
-    fn from(options: StdOpenOptions) -> OpenOptions {
-        OpenOptions(options)
+cfg_not_tokio_unstable_uring! {
+    impl From<StdOpenOptions> for OpenOptions {
+        fn from(options: StdOpenOptions) -> OpenOptions {
+            OpenOptions(options)
+        }
+    }
+}
+
+cfg_tokio_unstable_uring! {
+    impl From<StdOpenOptions> for OpenOptions {
+        fn from(_options: StdOpenOptions) -> OpenOptions {
+            // It's not straitforward to convert from std's OpenOptions to io_uring's one.
+            // * https://github.com/rust-lang/rust/issues/74943
+            // * https://github.com/rust-lang/rust/issues/76801
+
+            panic!("Conversion from std's OpenOptions to io_uring's one is not supported")
+        }
     }
 }
 
