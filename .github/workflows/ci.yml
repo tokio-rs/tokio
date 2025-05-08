@@ -2,7 +2,8 @@ on:
   push:
     branches: ["master", "tokio-*.x"]
   pull_request:
-    branches: ["master", "tokio-*.x"]
+    # Temporarily commented out to run CI
+    #branches: ["master", "tokio-*.x"]
 
 name: CI
 
