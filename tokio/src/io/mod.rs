@@ -214,11 +214,11 @@ pub use self::read_buf::ReadBuf;
 #[doc(no_inline)]
 pub use std::io::{Error, ErrorKind, Result, SeekFrom};
 
-cfg_io_driver_impl! {
+cfg_io_driver_impl_or_uring! {
     pub(crate) mod interest;
     pub(crate) mod ready;
 
-    cfg_net! {
+    cfg_net_or_uring! {
         pub use interest::Interest;
         pub use ready::Ready;
     }

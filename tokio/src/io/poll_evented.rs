@@ -9,7 +9,7 @@ use std::ops::Deref;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::task::ready;
 
-cfg_io_driver! {
+cfg_io_driver_or_uring! {
     /// Associates an I/O resource that implements the [`std::io::Read`] and/or
     /// [`std::io::Write`] traits with the reactor that drives it.
     ///

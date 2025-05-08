@@ -9,7 +9,7 @@ use std::io;
 use std::sync::Arc;
 use std::task::{ready, Context, Poll};
 
-cfg_io_driver! {
+cfg_io_driver_impl_or_uring! {
     /// Associates an I/O resource with the reactor instance that drives it.
     ///
     /// A registration represents an I/O resource registered with a Reactor such
