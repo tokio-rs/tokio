@@ -3,6 +3,11 @@ cfg_macros! {
 
     pub use std::future::poll_fn;
 
+    // Used with `join!` and `try_join!`
+    pub use crate::macros::join::Rotator;
+    // Used with `join!` and `try_join!`
+    pub use crate::macros::join::BiasedRotator;
+
     #[doc(hidden)]
     pub fn thread_rng_n(n: u32) -> u32 {
         crate::runtime::context::thread_rng_n(n)
@@ -23,6 +28,8 @@ cfg_macros! {
             Poll::Ready(())
         }
     }
+
+
 }
 
 pub use std::future::{Future, IntoFuture};
