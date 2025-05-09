@@ -88,10 +88,10 @@ macro_rules! doc {
         /// #[tokio::main]
         /// async fn main() {
         ///     let (first, second) = tokio::join!(
-        ///         // do_stuff_async() will always be polled first when woken
         ///         biased;
         ///         do_stuff_async(),
-        ///         more_async_work());
+        ///         more_async_work()
+        ///     );
         ///
         ///     // do something with the values
         /// }
@@ -224,3 +224,34 @@ doc! {macro_rules! join {
 
     () => { async {}.await }
 }}
+
+#[derive(Default, Debug)]
+/// Rotates by one every [`Self::num_skip`] call up to COUNT - 1.
+pub struct Rotator<const COUNT: u32> {
+    next: u32,
+}
+
+impl<const COUNT: u32> Rotator<COUNT> {
+    /// Rotates by one every [`Self::num_skip`] call up to COUNT - 1
+    #[inline]
+    pub fn num_skip(&mut self) -> u32 {
+        let num_skip = self.next;
+        self.next += 1;
+        if self.next == COUNT {
+            self.next = 0;
+        }
+        num_skip
+    }
+}
+
+/// [`Self::num_skip`] always returns 0.
+#[derive(Default, Debug)]
+pub struct BiasedRotator {}
+
+impl BiasedRotator {
+    /// Always returns 0
+    #[inline]
+    pub fn num_skip(&mut self) -> u32 {
+        0
+    }
+}

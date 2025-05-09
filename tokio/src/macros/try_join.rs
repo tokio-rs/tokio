@@ -135,10 +135,10 @@ macro_rules! doc {
         /// #[tokio::main]
         /// async fn main() {
         ///     let res = tokio::try_join!(
-        ///         //do_stuff_async() will always be polled first when woken
         ///         biased;
         ///         do_stuff_async(),
-        ///         more_async_work());
+        ///         more_async_work()
+        ///     );
         ///
         ///     match res {
         ///          Ok((first, second)) => {
@@ -215,53 +215,53 @@ doc! {macro_rules! try_join {
             // This loop runs twice and the first `skip` futures
             // are not polled in the first iteration.
             loop {
-                $(
-                    if skip == 0 {
-                        if to_run == 0 {
-                            // Every future has been polled
-                            break;
-                        }
-                        to_run -= 1;
-
-                        // Extract the future for this branch from the tuple.
-                        let ( $($skip,)* fut, .. ) = &mut *futures;
-
-                        // Safety: future is stored on the stack above
-                        // and never moved.
-                        let mut fut = unsafe { Pin::new_unchecked(fut) };
-
-                        // Try polling
-                        if fut.as_mut().poll(cx).is_pending() {
-                            is_pending = true;
-                        } else if fut.as_mut().output_mut().expect("expected completed future").is_err() {
-                            return Ready(Err(fut.take_output().expect("expected completed future").err().unwrap()))
-                        }
-                    } else {
-                        // Future skipped, one less future to skip in the next iteration
-                        skip -= 1;
+            $(
+                if skip == 0 {
+                    if to_run == 0 {
+                        // Every future has been polled
+                        break;
                     }
-                )*
-                }
+                    to_run -= 1;
 
-                if is_pending {
-                    Pending
+                    // Extract the future for this branch from the tuple.
+                    let ( $($skip,)* fut, .. ) = &mut *futures;
+
+                    // Safety: future is stored on the stack above
+                    // and never moved.
+                    let mut fut = unsafe { Pin::new_unchecked(fut) };
+
+                    // Try polling
+                    if fut.as_mut().poll(cx).is_pending() {
+                        is_pending = true;
+                    } else if fut.as_mut().output_mut().expect("expected completed future").is_err() {
+                        return Ready(Err(fut.take_output().expect("expected completed future").err().unwrap()))
+                    }
                 } else {
-                    Ready(Ok(($({
-                        // Extract the future for this branch from the tuple.
-                        let ( $($skip,)* fut, .. ) = &mut futures;
-
-                        // Safety: future is stored on the stack above
-                        // and never moved.
-                        let mut fut = unsafe { Pin::new_unchecked(fut) };
-
-                        fut
-                            .take_output()
-                            .expect("expected completed future")
-                            .ok()
-                            .expect("expected Ok(_)")
-                    },)*)))
+                    // Future skipped, one less future to skip in the next iteration
+                    skip -= 1;
                 }
-            }).await
+            )*
+            }
+
+            if is_pending {
+                Pending
+            } else {
+                Ready(Ok(($({
+                    // Extract the future for this branch from the tuple.
+                    let ( $($skip,)* fut, .. ) = &mut futures;
+
+                    // Safety: future is stored on the stack above
+                    // and never moved.
+                    let mut fut = unsafe { Pin::new_unchecked(fut) };
+
+                    fut
+                        .take_output()
+                        .expect("expected completed future")
+                        .ok()
+                        .expect("expected Ok(_)")
+                },)*)))
+            }
+        }).await
     }};
 
     // ===== Normalize =====
