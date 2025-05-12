@@ -69,7 +69,7 @@ use std::{marker::PhantomPinned, pin::Pin, ptr::NonNull};
 
 type TimerResult = Result<(), crate::time::error::Error>;
 
-const STATE_DEREGISTERED: u64 = u64::MAX;
+pub(in crate::runtime::time) const STATE_DEREGISTERED: u64 = u64::MAX;
 const STATE_PENDING_FIRE: u64 = STATE_DEREGISTERED - 1;
 const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 /// The largest safe integer to use for ticks.
@@ -273,7 +273,7 @@ impl StateCell {
     /// ordering, but is conservative - if it returns false, the timer is
     /// definitely _not_ registered.
     pub(super) fn might_be_registered(&self) -> bool {
-        self.state.load(Ordering::Relaxed) != u64::MAX
+        self.state.load(Ordering::Relaxed) != STATE_DEREGISTERED
     }
 }
 
@@ -612,7 +612,7 @@ impl TimerHandle {
         match self.inner.as_ref().state.mark_pending(not_after) {
             Ok(()) => {
                 // mark this as being on the pending queue in cached_when
-                self.inner.as_ref().set_cached_when(u64::MAX);
+                self.inner.as_ref().set_cached_when(STATE_DEREGISTERED);
                 Ok(())
             }
             Err(tick) => {
