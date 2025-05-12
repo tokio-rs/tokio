@@ -7,6 +7,7 @@ use self::level::Level;
 
 use std::{array, ptr::NonNull};
 
+use super::entry::STATE_DEREGISTERED;
 use super::EntryList;
 
 /// Timing wheel implementation.
@@ -117,7 +118,7 @@ impl Wheel {
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
             let when = item.as_ref().cached_when();
-            if when == u64::MAX {
+            if when == STATE_DEREGISTERED {
                 self.pending.remove(item);
             } else {
                 debug_assert!(
