@@ -57,8 +57,6 @@ error[E0277]: the `?` operator can only be used in an async block that returns `
 39 | async fn question_mark_operator_with_invalid_option() -> Option<()> {
 40 |     None?;
    |         ^ cannot use the `?` operator in an async block that returns `()`
-   |
-   = help: the trait `FromResidual<Option<Infallible>>` is not implemented for `()`
 
 error[E0308]: mismatched types
   --> tests/fail/macros_type_mismatch.rs:40:5
@@ -87,8 +85,6 @@ error[E0277]: the `?` operator can only be used in an async block that returns `
 56 | async fn question_mark_operator_with_invalid_result() -> Result<(), ()> {
 57 |     Ok(())?;
    |           ^ cannot use the `?` operator in an async block that returns `()`
-   |
-   = help: the trait `FromResidual<Result<Infallible, _>>` is not implemented for `()`
 
 error[E0308]: mismatched types
   --> tests/fail/macros_type_mismatch.rs:57:5
