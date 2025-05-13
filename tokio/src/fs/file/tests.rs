@@ -976,3 +976,56 @@ fn busy_file_seek_error() {
     let mut t = task::spawn(file.seek(SeekFrom::Start(0)));
     assert_ready_err!(t.poll());
 }
+
+// issue 2 Demonstration
+#[test]
+fn open_write_old() {
+    let mut file = MockFile::default();
+    file.expect_inner_write()
+        .once()
+        .with(eq(HELLO))
+        .returning(|buf| Ok(buf.len()));
+
+    let mut file = File::from_std(file);
+
+    let mut t = task::spawn(file.write(HELLO));
+
+    assert_eq!(0, pool::len());
+
+    // This poll returns Ready even though the queued blocking write task hasn't run yet.`pool::run_one();` here
+    // This is the async contract violation we're fixing.
+    assert_ready_ok!(t.poll());
+
+    assert_eq!(1, pool::len());
+
+    pool::run_one();
+
+    assert!(!t.is_woken());
+
+    let mut t = task::spawn(file.flush());
+    assert_ready_ok!(t.poll());
+}
+#[test]
+fn open_write_new() {
+    let mut file = MockFile::default();
+    file.expect_inner_write()
+        .once()
+        .with(eq(HELLO))
+        .returning(|buf| Ok(buf.len()));
+
+    let mut file = File::from_std(file);
+
+    let mut t = task::spawn(file.write(HELLO));
+
+    // In the fixed code, this returns Pending because spawn_blocking hasn't completed yet.
+    // This assertion fails in the old (broken) code, because it incorrectly returns Ready too early.
+    assert_pending!(t.poll());
+    // running spawn task
+    pool::run_one();
+    assert!(t.is_woken());
+    // after spawn task is run - in the sequential polling iteration, ˝the poll status is set to ready
+    assert_ready_ok!(t.poll());
+
+    let mut t = task::spawn(file.flush());
+    assert_ready_ok!(t.poll());
+}
