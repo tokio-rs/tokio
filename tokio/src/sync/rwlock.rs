@@ -1,4 +1,4 @@
-use crate::sync::batch_semaphore::{Semaphore, TryAcquireError};
+use crate::sync::batch_semaphore::{Semaphore, TryAcquireError,TryUpgradeError};
 use crate::sync::mutex::TryLockError;
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;
@@ -1054,6 +1054,39 @@ impl<T: ?Sized> RwLock<T> {
 
         Ok(guard)
     }
+
+    pub fn try_upgrade<'a>(&'a self,reader:RwLockReadGuard<'a,T>) -> Result<RwLockWriteGuard<'a, T>, RwLockReadGuard<'a,T>> {
+        match self.s.try_upgrade(self.mr as usize - 1) {
+            Ok(permit) => permit,
+            Err(TryUpgradeError::Used) => return Err(reader),
+            Err(TryUpgradeError::Closed) => unreachable!(),
+        }
+
+        //readers permit already acounted for by upgrade
+        std::mem::forget(reader);
+
+        let guard = RwLockWriteGuard {
+            permits_acquired: self.mr,
+            s: &self.s,
+            data: self.c.get(),
+            marker: marker::PhantomData,
+            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            resource_span: self.resource_span.clone(),
+        };
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        self.resource_span.in_scope(|| {
+            tracing::trace!(
+            target: "runtime::resource::state_update",
+            write_locked = true,
+            write_locked.op = "override",
+            )
+        });
+
+        Ok(guard)
+    }
+
+
 
     /// Returns a mutable reference to the underlying data.
     ///

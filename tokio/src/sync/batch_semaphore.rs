@@ -58,6 +58,21 @@ pub enum TryAcquireError {
     /// The semaphore has no available permits.
     NoPermits,
 }
+
+/// Error returned from the [`Semaphore::try_reacquire`] function.
+///
+/// [`Semaphore::try_acquire`]: crate::sync::Semaphore::try_acquire
+#[derive(Debug, PartialEq, Eq)]
+pub enum TryUpgradeError {
+    /// The semaphore has been [closed] and cannot issue new permits.
+    ///
+    /// [closed]: crate::sync::Semaphore::close
+    Closed,
+
+    /// The semaphore has changed
+    Used,
+}
+
 /// Error returned from the [`Semaphore::acquire`] function.
 ///
 /// An `acquire` operation can only fail if the semaphore has been
@@ -292,6 +307,36 @@ impl Semaphore {
                 Err(actual) => curr = actual,
             }
         }
+    }
+
+    pub(crate) fn try_upgrade(&self, num_permits: usize) -> Result<(), TryUpgradeError> {
+        assert!(
+            num_permits <= Self::MAX_PERMITS,
+            "a semaphore may not have more than MAX_PERMITS permits ({})",
+            Self::MAX_PERMITS
+        );
+        let num_permits = num_permits << Self::PERMIT_SHIFT;
+
+        let curr = self.permits.load(Acquire);
+        
+        
+        // Has the semaphore closed?
+        if curr & Self::CLOSED == Self::CLOSED {
+            return Err(TryUpgradeError::Closed);
+        }
+
+        // Are there enough permits remaining?
+        if curr < num_permits{
+            return Err(TryUpgradeError::Used);
+        }
+
+        match self.permits.compare_exchange(curr, 0, AcqRel, Acquire) {
+            Ok(_) => {
+                return Ok(());
+            }
+            Err(_actual) => return Err(TryUpgradeError::Used),
+        }
+    
     }
 
     pub(crate) fn acquire(&self, num_permits: usize) -> Acquire<'_> {
