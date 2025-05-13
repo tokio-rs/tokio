@@ -1584,6 +1584,14 @@ impl AsyncRead for ChildStdout {
     ) -> Poll<io::Result<()>> {
         Pin::new(&mut self.inner).poll_read(cx, buf)
     }
+
+    fn poll_read_exact(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_read_exact(cx, buf)
+    }
 }
 
 impl AsyncRead for ChildStderr {
@@ -1593,6 +1601,14 @@ impl AsyncRead for ChildStderr {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         Pin::new(&mut self.inner).poll_read(cx, buf)
+    }
+
+    fn poll_read_exact(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_read_exact(cx, buf)
     }
 }
 
