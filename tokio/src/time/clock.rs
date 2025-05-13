@@ -251,7 +251,6 @@ cfg_test_util! {
             let mut inner = self.inner.lock();
 
             if !inner.enable_pausing {
-                drop(inner); // avoid poisoning the lock
                 return Err("`time::pause()` requires the `current_thread` Tokio runtime. \
                         This is the default Runtime used by `#[tokio::test].");
             }
