@@ -69,3 +69,14 @@ macro_rules! cfg_time {
         )*
     }
 }
+
+#[allow(unused_macros)]
+macro_rules! cfg_join_map {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "join-map")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "join-map")))]
+            $item
+        )*
+    }
+}
