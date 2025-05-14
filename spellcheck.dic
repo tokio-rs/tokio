@@ -206,6 +206,7 @@ recv's
 refactors
 refcount
 refcounting
+registered_when
 repo
 repr
 representable
@@ -301,4 +302,3 @@ Wakers
 wakeup
 wakeups
 workstealing
-registered_when
