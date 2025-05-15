@@ -13,10 +13,10 @@ fn compile_fail_full() {
     t.pass("tests/pass/macros_main_loop.rs");
 
     #[cfg(feature = "full")]
-    t.compile_fail("tests/fail/macros_invalid_input.rs");
+    t.pass("tests/pass/macros_dead_code.rs");
 
     #[cfg(feature = "full")]
-    t.compile_fail("tests/fail/macros_dead_code.rs");
+    t.compile_fail("tests/fail/macros_invalid_input.rs");
 
     #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_type_mismatch.rs");

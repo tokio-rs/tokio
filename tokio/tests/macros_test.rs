@@ -24,11 +24,19 @@ async fn unused_braces_test() { assert_eq!(1 + 1, 2) }
 #[std::prelude::v1::test]
 fn trait_method() {
     trait A {
+        fn _new() -> Self;
         fn f(self);
 
         fn g(self);
     }
+
     impl A for () {
+        #[tokio::main]
+        async fn _new() {
+            let v: Self = ();
+            v
+        }
+
         #[tokio::main]
         async fn f(self) {
             self.g()
