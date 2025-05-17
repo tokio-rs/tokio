@@ -32,6 +32,8 @@ pub(crate) enum State {
 }
 
 pub(crate) struct Op<T: Send + 'static> {
+    // Handle to the runtime
+    handle: Handle,
     // State of this Op
     state: State,
     // Per operation data.
@@ -45,7 +47,9 @@ impl<T: Send + 'static> Op<T> {
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     #[allow(dead_code)]
     pub(crate) unsafe fn new(entry: Entry, data: T) -> Self {
+        let handle = Handle::current();
         Self {
+            handle,
             data: Some(data),
             state: State::Initialize(Some(entry)),
         }
@@ -62,8 +66,9 @@ impl<T: Send + 'static> Drop for Op<T> {
             State::Complete => (),
             // We will cancel this Op.
             State::Polled(index) => {
-                let handle = Handle::current();
-                handle.inner.driver().io().cancel_op(self, index);
+                let data = self.take_data();
+                let handle = &mut self.handle;
+                handle.inner.driver().io().cancel_op(index, data);
             }
             // This Op has not been polled yet.
             // We don't need to do anything here.
@@ -103,8 +108,8 @@ impl<T: Completable + Send> Future for Op<T> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
-        let handle = Handle::current();
-        let driver = &handle.inner.driver().io();
+        let handle = &mut this.handle;
+        let driver = handle.inner.driver().io();
 
         match &mut this.state {
             State::Initialize(entry_opt) => {
@@ -138,6 +143,8 @@ impl<T: Completable + Send> Future for Op<T> {
                         ctx.remove_op(*idx);
 
                         this.state = State::Complete;
+
+                        drop(ctx);
 
                         let data = this
                             .take_data()

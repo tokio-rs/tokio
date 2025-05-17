@@ -2,7 +2,7 @@ use io_uring::{squeue::Entry, IoUring};
 use mio::unix::SourceFd;
 use slab::Slab;
 
-use crate::runtime::driver::op::{Lifecycle, Op};
+use crate::runtime::driver::op::Lifecycle;
 use crate::{io::Interest, loom::sync::Mutex};
 
 use super::{Handle, TOKEN_URING};
@@ -166,7 +166,7 @@ impl Handle {
         Ok(index)
     }
 
-    pub(crate) fn cancel_op<T: Send + 'static>(&self, op: &mut Op<T>, index: usize) {
+    pub(crate) fn cancel_op<T: Send + 'static>(&self, index: usize, data: Option<T>) {
         let mut guard = self.get_uring().lock();
         let ctx = &mut *guard;
         let ops = &mut ctx.ops;
@@ -178,7 +178,7 @@ impl Handle {
         // This Op will be cancelled. Here, we don't remove the lifecycle from the slab to keep
         // uring data alive until the operation completes.
 
-        match mem::replace(lifecycle, Lifecycle::Cancelled(Box::new(op.take_data()))) {
+        match mem::replace(lifecycle, Lifecycle::Cancelled(Box::new(data))) {
             Lifecycle::Submitted | Lifecycle::Waiting(_) => (),
             // The driver saw the completion, but it was never polled.
             Lifecycle::Completed(_) => (),
