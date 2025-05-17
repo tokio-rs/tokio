@@ -96,7 +96,9 @@ pub(crate) trait Completable {
     fn complete(self, cqe: CqeResult) -> io::Result<Self::Output>;
 }
 
-impl<T: Completable + Unpin + Send> Future for Op<T> {
+impl<T: Send + 'static> Unpin for Op<T> {}
+
+impl<T: Completable + Send> Future for Op<T> {
     type Output = io::Result<T::Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
