@@ -391,12 +391,15 @@ impl<T> Local<T> {
 }
 
 impl<T> Steal<T> {
-    fn len(&self) -> usize {
+    /// Returns the number of entries in the queue
+    pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.0.head.load(Acquire));
         let tail = self.0.tail.load(Acquire);
         len(head, tail)
     }
 
+    /// Return true if the queue is empty,
+    /// false if there are any entries in the queue
     pub(crate) fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -552,14 +555,6 @@ impl<T> Steal<T> {
                     prev_packed = actual;
                 }
             }
-        }
-    }
-}
-
-cfg_unstable_metrics! {
-    impl<T> Steal<T> {
-        pub(crate) fn len(&self) -> usize {
-            self.0.len() as _
         }
     }
 }
