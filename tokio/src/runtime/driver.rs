@@ -84,7 +84,7 @@ impl Handle {
         self.io.unpark();
     }
 
-    cfg_io_driver! {
+    cfg_io_driver_or_uring! {
         #[track_caller]
         pub(crate) fn io(&self) -> &crate::runtime::io::Handle {
             self.io
@@ -121,7 +121,7 @@ impl Handle {
 
 // ===== io driver =====
 
-cfg_io_driver! {
+cfg_io_driver_impl_or_uring! {
     pub(crate) type IoDriver = crate::runtime::io::Driver;
 
     #[derive(Debug)]
@@ -196,7 +196,7 @@ cfg_io_driver! {
     }
 }
 
-cfg_not_io_driver! {
+cfg_not_io_driver_impl_or_uring! {
     pub(crate) type IoHandle = UnparkThread;
 
     #[derive(Debug)]
@@ -226,6 +226,13 @@ cfg_not_io_driver! {
             false
         }
     }
+    cfg_io_driver_or_uring! {
+        impl IoHandle {
+            pub(crate) fn as_ref(&self) -> Option<&crate::runtime::io::Handle> {
+                todo!()
+            }
+        }
+    }
 }
 
 // ===== signal driver =====
@@ -244,7 +251,7 @@ cfg_signal_internal_and_unix! {
 cfg_not_signal_internal! {
     pub(crate) type SignalHandle = ();
 
-    cfg_io_driver! {
+    cfg_io_driver_impl_or_uring! {
         type SignalDriver = IoDriver;
 
         fn create_signal_driver(io_driver: IoDriver, _io_handle: &crate::runtime::io::Handle) -> io::Result<(SignalDriver, SignalHandle)> {
@@ -264,7 +271,7 @@ cfg_process_driver! {
 }
 
 cfg_not_process_driver! {
-    cfg_io_driver! {
+    cfg_io_driver_impl_or_uring! {
         type ProcessDriver = SignalDriver;
 
         fn create_process_driver(signal_driver: SignalDriver) -> ProcessDriver {
@@ -346,4 +353,8 @@ cfg_not_time! {
     ) -> (TimeDriver, TimeHandle) {
         (io_stack, ())
     }
+}
+
+cfg_tokio_unstable_uring! {
+    pub(crate) mod op;
 }

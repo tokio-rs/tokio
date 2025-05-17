@@ -1,4 +1,4 @@
-cfg_io_driver! {
+cfg_io_driver_impl_or_uring! {
     pub(crate) mod bit;
 }
 
@@ -96,7 +96,7 @@ pub(crate) mod markers;
 
 pub(crate) mod cacheline;
 
-cfg_io_driver_impl! {
+cfg_io_driver_impl_or_uring! {
     pub(crate) mod ptr_expose;
 }
 
