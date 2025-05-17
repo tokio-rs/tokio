@@ -91,9 +91,6 @@ pub(super) enum Tick {
 
 const TOKEN_WAKEUP: mio::Token = mio::Token(0);
 const TOKEN_SIGNAL: mio::Token = mio::Token(1);
-cfg_tokio_unstable_uring! {
-    pub(crate) const TOKEN_URING: mio::Token = mio::Token(2);
-}
 
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
@@ -201,17 +198,6 @@ impl Driver {
                 TOKEN_SIGNAL => {
                     self.signal_ready = true;
                 }
-                #[cfg(all(
-                    tokio_unstable_uring,
-                    feature = "rt",
-                    feature = "fs",
-                    target_os = "linux",
-                ))]
-                TOKEN_URING => {
-                    let mut guard = handle.get_uring().lock();
-                    let ctx = &mut *guard;
-                    ctx.dispatch_completions();
-                }
                 _ => {
                     let ready = Ready::from_mio(event);
                     let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
@@ -228,6 +214,18 @@ impl Driver {
                     ready_count += 1;
                 }
             };
+        }
+
+        #[cfg(all(
+            tokio_unstable_uring,
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        {
+            let mut guard = handle.get_uring().lock();
+            let ctx = &mut *guard;
+            ctx.dispatch_completions();
         }
 
         handle.metrics.incr_ready_count_by(ready_count);

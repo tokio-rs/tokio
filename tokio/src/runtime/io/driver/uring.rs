@@ -5,7 +5,7 @@ use slab::Slab;
 use crate::runtime::driver::op::Lifecycle;
 use crate::{io::Interest, loom::sync::Mutex};
 
-use super::{Handle, TOKEN_URING};
+use super::{Handle, TOKEN_WAKEUP};
 
 use std::os::fd::AsRawFd;
 use std::{io, mem, task::Waker};
@@ -128,7 +128,7 @@ impl Handle {
         let uringfd = self.get_uring().lock().uring.as_raw_fd();
         let mut source = SourceFd(&uringfd);
         self.registry
-            .register(&mut source, TOKEN_URING, interest.to_mio())
+            .register(&mut source, TOKEN_WAKEUP, interest.to_mio())
     }
 
     pub(crate) fn get_uring(&self) -> &Mutex<UringContext> {
