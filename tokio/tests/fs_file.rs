@@ -2,6 +2,7 @@
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
 
 use futures::future::FutureExt;
+use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io::IoSlice;
 use tempfile::NamedTempFile;
@@ -286,4 +287,84 @@ async fn windows_handle() {
 
     let file = File::create(tempfile.path()).await.unwrap();
     assert!(file.as_raw_handle() as u64 > 0);
+}
+
+#[tokio::test]
+async fn verify_pos_update_after_read_and_write() -> std::io::Result<()> {
+    let mut std_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("test_pos.txt")?;
+
+    std_file.write_all(b"123456789abcdefghijklmnopwrstu")?;
+    std_file.seek(SeekFrom::Start(8))?;
+
+    let mut file = File::from_std(std_file);
+
+    assert_eq!(file.stream_position().await?, 8);
+
+    let mut buf = [0u8; 4];
+    file.read_exact(&mut buf).await?;
+    assert_eq!(file.stream_position().await?, 12);
+
+    file.write_all(b"vwxyz").await?;
+    assert_eq!(file.stream_position().await?, 17);
+
+    Ok(())
+}
+#[tokio::test]
+async fn verify_pos_update_after_write_vectored() -> std::io::Result<()> {
+    // Create and seed the file
+    let mut std_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("test_pos_vectored.txt")?;
+    std_file.write_all(b"123456789abcdefghijklmnopwrstu")?;
+    std_file.seek(SeekFrom::Start(8))?;
+
+    let mut file = File::from_std(std_file);
+
+    // Confirm initial position
+    assert_eq!(file.stream_position().await?, 8);
+
+    // Read 4 bytes → position should move to 12
+    let mut buf = [0u8; 4];
+    file.read_exact(&mut buf).await?;
+    assert_eq!(file.stream_position().await?, 12);
+
+    // Write 5 bytes via vectored I/O → position should move to 17
+    let bufs = [IoSlice::new(b"XY"), IoSlice::new(b"ZZZ")];
+    let bytes_written = file.write_vectored(&bufs).await?;
+    assert_eq!(bytes_written, 5);
+    assert_eq!(file.stream_position().await?, 17);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn pos_update_in_read_eof_error() -> std::io::Result<()> {
+    let file_path = "read_eof_error.txt";
+
+    let mut std_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(file_path)?;
+    std_file.write_all(b"12345")?;
+    std_file.seek(SeekFrom::Start(3))?;
+
+    let mut file = File::from_std(std_file);
+
+    assert_eq!(file.stream_position().await?, 3);
+
+    let mut buf = [0u8; 4];
+    let result = file.read_exact(&mut buf).await;
+    assert!(result.is_err());
+    assert_eq!(file.stream_position().await?, 5);
+    Ok(())
 }
