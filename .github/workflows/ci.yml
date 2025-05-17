@@ -736,7 +736,9 @@ jobs:
           # Try with unstable feature flags
           - { name: "--unstable", rustflags: "--cfg tokio_unstable -Dwarnings" }
           # Try with unstable and taskdump feature flags
-          - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump --cfg tokio_unstable_uring" }
+          - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump" }
+          - { name: "--tokio_unstable_uring", rustflags: "-Dwarnings --cfg tokio_unstable_uring" }
+          - { name: "--unstable --taskdump --tokio_unstable_uring", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump --cfg tokio_unstable_uring" }
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_nightly }}
