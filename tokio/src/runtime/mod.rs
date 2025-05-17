@@ -327,7 +327,7 @@ mod driver;
 
 pub(crate) mod scheduler;
 
-cfg_io_driver_or_uring! {
+cfg_io_driver_impl! {
     pub(crate) mod io;
 }
 

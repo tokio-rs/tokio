@@ -120,29 +120,11 @@ macro_rules! cfg_io_driver {
                 feature = "net",
                 all(unix, feature = "process"),
                 all(unix, feature = "signal"),
-            ))]
-            #[cfg_attr(docsrs, doc(cfg(any(
-                feature = "net",
-                all(unix, feature = "process"),
-                all(unix, feature = "signal"),
-            ))))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_io_driver_or_uring {
-    ($($item:item)*) => {
-        $(
-            #[cfg(any(
-                feature = "net",
-                all(unix, feature = "process"),
-                all(unix, feature = "signal"),
                 all(
                     tokio_unstable_uring,
                     feature = "rt",
                     feature = "fs",
-                    target_os = "linux",
+                    target_os = "linux"
                 )
             ))]
             #[cfg_attr(docsrs, doc(cfg(any(
@@ -153,7 +135,7 @@ macro_rules! cfg_io_driver_or_uring {
                     tokio_unstable_uring,
                     feature = "rt",
                     feature = "fs",
-                    target_os = "linux",
+                    target_os = "linux"
                 )
             ))))]
             $item
@@ -168,6 +150,12 @@ macro_rules! cfg_io_driver_impl {
                 feature = "net",
                 all(unix, feature = "process"),
                 all(unix, feature = "signal"),
+                all(
+                    tokio_unstable_uring,
+                    feature = "rt",
+                    feature = "fs",
+                    target_os = "linux"
+                )
             ))]
             $item
         )*
@@ -181,43 +169,11 @@ macro_rules! cfg_not_io_driver {
                 feature = "net",
                 all(unix, feature = "process"),
                 all(unix, feature = "signal"),
-            )))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_io_driver_impl_or_uring {
-    ( $( $item:item )* ) => {
-        $(
-            #[cfg(any(
-                feature = "net",
-                all(unix, feature = "process"),
-                all(unix, feature = "signal"),
                 all(
                     tokio_unstable_uring,
                     feature = "rt",
                     feature = "fs",
-                    target_os = "linux",
-                )
-            ))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_not_io_driver_impl_or_uring {
-    ( $( $item:item )* ) => {
-        $(
-            #[cfg(not(any(
-                feature = "net",
-                all(unix, feature = "process"),
-                all(unix, feature = "signal"),
-                all(
-                    tokio_unstable_uring,
-                    feature = "rt",
-                    feature = "fs",
-                    target_os = "linux",
+                    target_os = "linux"
                 )
             )))]
             $item
