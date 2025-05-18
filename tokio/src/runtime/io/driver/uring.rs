@@ -168,7 +168,7 @@ impl Handle {
 
     // TODO: Remove this annotation when operations are actually supported
     #[allow(unused_variables, unreachable_code)]
-    pub(crate) fn cancel_op<T: Cancellable + Send + 'static>(&self, index: usize, data: Option<T>) {
+    pub(crate) fn cancel_op<T: Cancellable>(&self, index: usize, data: Option<T>) {
         let mut guard = self.get_uring().lock();
         let ctx = &mut *guard;
         let ops = &mut ctx.ops;

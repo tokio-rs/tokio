@@ -34,7 +34,7 @@ pub(crate) enum State {
     Complete,
 }
 
-pub(crate) struct Op<T: Cancellable + Send + 'static> {
+pub(crate) struct Op<T: Cancellable> {
     // Handle to the runtime
     handle: Handle,
     // State of this Op
@@ -43,7 +43,7 @@ pub(crate) struct Op<T: Cancellable + Send + 'static> {
     data: Option<T>,
 }
 
-impl<T: Cancellable + Send + 'static> Op<T> {
+impl<T: Cancellable> Op<T> {
     /// # Safety
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
@@ -62,7 +62,7 @@ impl<T: Cancellable + Send + 'static> Op<T> {
     }
 }
 
-impl<T: Cancellable + Send + 'static> Drop for Op<T> {
+impl<T: Cancellable> Drop for Op<T> {
     fn drop(&mut self) {
         match self.state {
             // We've already dropped this Op.
@@ -109,7 +109,7 @@ pub(crate) trait Cancellable {
     fn cancell(self) -> CancelData;
 }
 
-impl<T: Cancellable + Send + 'static> Unpin for Op<T> {}
+impl<T: Cancellable> Unpin for Op<T> {}
 
 impl<T: Cancellable + Completable + Send> Future for Op<T> {
     type Output = io::Result<T::Output>;
