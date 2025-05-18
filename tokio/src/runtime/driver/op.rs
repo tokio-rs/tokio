@@ -9,6 +9,9 @@ use std::task::Waker;
 use std::{io, mem};
 
 #[derive(Debug)]
+pub(crate) enum CancelData {}
+
+#[derive(Debug)]
 pub(crate) enum Lifecycle {
     /// The operation has been submitted to uring and is currently in-flight
     Submitted,
@@ -18,7 +21,7 @@ pub(crate) enum Lifecycle {
 
     /// The submitter no longer has interest in the operation result. The state
     /// must be passed to the driver and held until the operation completes.
-    Cancelled(#[allow(unused)] Box<dyn std::any::Any + Send + 'static>),
+    Cancelled(CancelData),
 
     /// The operation has completed with a single cqe result
     Completed(io_uring::cqueue::Entry),
@@ -31,7 +34,7 @@ pub(crate) enum State {
     Complete,
 }
 
-pub(crate) struct Op<T: Send + 'static> {
+pub(crate) struct Op<T: Cancellable + Send + 'static> {
     // Handle to the runtime
     handle: Handle,
     // State of this Op
@@ -40,7 +43,7 @@ pub(crate) struct Op<T: Send + 'static> {
     data: Option<T>,
 }
 
-impl<T: Send + 'static> Op<T> {
+impl<T: Cancellable + Send + 'static> Op<T> {
     /// # Safety
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
@@ -59,7 +62,7 @@ impl<T: Send + 'static> Op<T> {
     }
 }
 
-impl<T: Send + 'static> Drop for Op<T> {
+impl<T: Cancellable + Send + 'static> Drop for Op<T> {
     fn drop(&mut self) {
         match self.state {
             // We've already dropped this Op.
@@ -101,9 +104,14 @@ pub(crate) trait Completable {
     fn complete(self, cqe: CqeResult) -> io::Result<Self::Output>;
 }
 
-impl<T: Send + 'static> Unpin for Op<T> {}
+/// Extracts the `CancelData` needed to safely cancel an in-flight io_uring operation.
+pub(crate) trait Cancellable {
+    fn cancell(self) -> CancelData;
+}
 
-impl<T: Completable + Send> Future for Op<T> {
+impl<T: Cancellable + Send + 'static> Unpin for Op<T> {}
+
+impl<T: Cancellable + Completable + Send> Future for Op<T> {
     type Output = io::Result<T::Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
