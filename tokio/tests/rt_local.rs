@@ -73,6 +73,24 @@ fn test_spawn_local_from_guard() {
 }
 
 #[test]
+fn test_spawn_from_guard_other_thread() {
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    std::thread::spawn(move || {
+        let rt = rt();
+        let handle = rt.handle().clone();
+
+        tx.send(handle).unwrap();
+    });
+
+    let handle = rx.recv().unwrap();
+
+    let _guard = handle.enter();
+
+    spawn(async {});
+}
+
+#[test]
 #[should_panic]
 fn test_spawn_local_from_guard_other_thread() {
     let (tx, rx) = std::sync::mpsc::channel();
