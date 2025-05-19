@@ -87,7 +87,7 @@ fn test_spawn_from_guard_other_thread() {
 
     let _guard = handle.enter();
 
-    spawn(async {});
+    tokio::spawn(async {});
 }
 
 #[test]
@@ -112,6 +112,6 @@ fn test_spawn_local_from_guard_other_thread() {
 fn rt() -> tokio::runtime::LocalRuntime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .build_local(&LocalOptions::default())
+        .build_local(LocalOptions::default())
         .unwrap()
 }
