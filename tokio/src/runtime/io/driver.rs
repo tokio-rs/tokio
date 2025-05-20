@@ -2,7 +2,7 @@
 cfg_signal_internal_and_unix! {
     mod signal;
 }
-cfg_tokio_unstable_uring! {
+cfg_tokio_uring! {
     mod uring;
     use uring::UringContext;
 }
@@ -50,12 +50,7 @@ pub(crate) struct Handle {
 
     pub(crate) metrics: IoDriverMetrics,
 
-    #[cfg(all(
-        tokio_unstable_uring,
-        feature = "rt",
-        feature = "fs",
-        target_os = "linux",
-    ))]
+    #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
     pub(crate) uring_context: Mutex<UringContext>,
 }
 
@@ -124,21 +119,11 @@ impl Driver {
             #[cfg(not(target_os = "wasi"))]
             waker,
             metrics: IoDriverMetrics::default(),
-            #[cfg(all(
-                tokio_unstable_uring,
-                feature = "rt",
-                feature = "fs",
-                target_os = "linux",
-            ))]
+            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
             uring_context: Mutex::new(UringContext::new()),
         };
 
-        #[cfg(all(
-            tokio_unstable_uring,
-            feature = "rt",
-            feature = "fs",
-            target_os = "linux",
-        ))]
+        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
         {
             handle.add_uring_source(Interest::READABLE)?;
         }
@@ -216,12 +201,7 @@ impl Driver {
             };
         }
 
-        #[cfg(all(
-            tokio_unstable_uring,
-            feature = "rt",
-            feature = "fs",
-            target_os = "linux",
-        ))]
+        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
         {
             let mut guard = handle.get_uring().lock();
             let ctx = &mut *guard;

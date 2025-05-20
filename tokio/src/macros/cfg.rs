@@ -121,7 +121,7 @@ macro_rules! cfg_io_driver {
                 all(unix, feature = "process"),
                 all(unix, feature = "signal"),
                 all(
-                    tokio_unstable_uring,
+                    tokio_uring,
                     feature = "rt",
                     feature = "fs",
                     target_os = "linux"
@@ -132,7 +132,7 @@ macro_rules! cfg_io_driver {
                 all(unix, feature = "process"),
                 all(unix, feature = "signal"),
                 all(
-                    tokio_unstable_uring,
+                    tokio_uring,
                     feature = "rt",
                     feature = "fs",
                     target_os = "linux"
@@ -151,7 +151,7 @@ macro_rules! cfg_io_driver_impl {
                 all(unix, feature = "process"),
                 all(unix, feature = "signal"),
                 all(
-                    tokio_unstable_uring,
+                    tokio_uring,
                     feature = "rt",
                     feature = "fs",
                     target_os = "linux"
@@ -170,7 +170,7 @@ macro_rules! cfg_not_io_driver {
                 all(unix, feature = "process"),
                 all(unix, feature = "signal"),
                 all(
-                    tokio_unstable_uring,
+                    tokio_uring,
                     feature = "rt",
                     feature = "fs",
                     target_os = "linux"
@@ -309,7 +309,7 @@ macro_rules! cfg_net_or_uring {
             #[cfg(any(
                 feature = "net",
                 all(
-                    tokio_unstable_uring,
+                    tokio_uring,
                     feature = "rt",
                     feature = "fs",
                     target_os = "linux",
@@ -320,7 +320,7 @@ macro_rules! cfg_net_or_uring {
                 doc(cfg(any(
                     feature = "net",
                     all(
-                        tokio_unstable_uring,
+                        tokio_uring,
                         feature = "rt",
                         feature = "fs",
                         target_os = "linux",
@@ -670,11 +670,11 @@ macro_rules! cfg_metrics_variant {
     }
 }
 
-macro_rules! cfg_tokio_unstable_uring {
+macro_rules! cfg_tokio_uring {
     ($($item:item)*) => {
         $(
             #[cfg(all(
-                tokio_unstable_uring,
+                tokio_uring,
                 feature = "rt",
                 feature = "fs",
                 target_os = "linux",

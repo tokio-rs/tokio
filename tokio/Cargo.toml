@@ -103,7 +103,7 @@ socket2 = { version = "0.5.5", optional = true, features = ["all"] }
 [target.'cfg(tokio_unstable)'.dependencies]
 tracing = { version = "0.1.29", default-features = false, features = ["std"], optional = true } # Not in full
 
-[target.'cfg(all(tokio_unstable_uring, target_os = "linux"))'.dependencies]
+[target.'cfg(all(tokio_uring, target_os = "linux"))'.dependencies]
 io-uring = { version = "0.7.6", default-features = false }
 libc = { version = "0.2.168" }
 mio = { version = "1.0.1", default-features = false, features = ["os-poll", "os-ext"] }
