@@ -73,7 +73,27 @@ fn test_spawn_local_from_guard() {
 }
 
 #[test]
-#[should_panic]
+#[cfg_attr(target_family = "wasm", ignore)] // threads not supported
+fn test_spawn_from_guard_other_thread() {
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    std::thread::spawn(move || {
+        let rt = rt();
+        let handle = rt.handle().clone();
+
+        tx.send(handle).unwrap();
+    });
+
+    let handle = rx.recv().unwrap();
+
+    let _guard = handle.enter();
+
+    tokio::spawn(async {});
+}
+
+#[test]
+#[should_panic = "Local tasks can only be spawned on a LocalRuntime from the thread the runtime was created on"]
+#[cfg_attr(target_family = "wasm", ignore)] // threads not supported
 fn test_spawn_local_from_guard_other_thread() {
     let (tx, rx) = std::sync::mpsc::channel();
 
@@ -94,6 +114,6 @@ fn test_spawn_local_from_guard_other_thread() {
 fn rt() -> tokio::runtime::LocalRuntime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .build_local(&LocalOptions::default())
+        .build_local(LocalOptions::default())
         .unwrap()
 }
