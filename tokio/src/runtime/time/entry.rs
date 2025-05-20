@@ -44,7 +44,7 @@
 //! We do, however, also need to track what the expiration time was when we
 //! originally registered the timer; this is used to locate the right linked
 //! list when the timer is being cancelled.
-//! This is referred to as the "registered_when" internally.
+//! This is referred to as the `registered_when` internally.
 //!
 //! There is of course a race condition between timer reset and timer
 //! expiration. If the driver fails to observe the updated expiration time, it
