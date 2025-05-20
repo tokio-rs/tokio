@@ -338,9 +338,11 @@ pub(crate) struct TimerShared {
     /// [`STATE_DEREGISTERED`] means it is not registered.
     ///
     /// Generally owned by the driver, but is accessed by the entry when not
-    /// registered, but we only need [`Ordering::Relaxed`],
-    /// please check out the module-level documentation for
-    /// the safety explanation.
+    /// registered.
+    ///
+    /// We use relaxed ordering for both loading and storing since this value
+    /// is only accessed either when holding the driver lock or through mutable
+    /// references to [`TimerEntry`].
     registered_when: AtomicU64,
 
     /// Current state. This records whether the timer entry is currently under
