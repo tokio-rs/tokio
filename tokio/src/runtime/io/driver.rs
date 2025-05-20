@@ -176,29 +176,25 @@ impl Driver {
         for event in events.iter() {
             let token = event.token();
 
-            match token {
-                TOKEN_WAKEUP => {
-                    // Nothing to do, the event is used to unblock the I/O driver
-                }
-                TOKEN_SIGNAL => {
-                    self.signal_ready = true;
-                }
-                _ => {
-                    let ready = Ready::from_mio(event);
-                    let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
+            if token == TOKEN_WAKEUP {
+                // Nothing to do, the event is used to unblock the I/O driver
+            } else if token == TOKEN_SIGNAL {
+                self.signal_ready = true;
+            } else {
+                let ready = Ready::from_mio(event);
+                let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
 
-                    // Safety: we ensure that the pointers used as tokens are not freed
-                    // until they are both deregistered from mio **and** we know the I/O
-                    // driver is not concurrently polling. The I/O driver holds ownership of
-                    // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
-                    let io: &ScheduledIo = unsafe { &*ptr };
+                // Safety: we ensure that the pointers used as tokens are not freed
+                // until they are both deregistered from mio **and** we know the I/O
+                // driver is not concurrently polling. The I/O driver holds ownership of
+                // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
+                let io: &ScheduledIo = unsafe { &*ptr };
 
-                    io.set_readiness(Tick::Set, |curr| curr | ready);
-                    io.wake(ready);
+                io.set_readiness(Tick::Set, |curr| curr | ready);
+                io.wake(ready);
 
-                    ready_count += 1;
-                }
-            };
+                ready_count += 1;
+            }
         }
 
         #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
