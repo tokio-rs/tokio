@@ -32,7 +32,7 @@ macro_rules! doc {
         ///
         /// [`tokio::spawn`]: crate::spawn
         ///
-        /// # Fairness
+        /// # Poll Ordering
         ///
         /// By default, `join!`'s generated future rotates which contained
         /// future is polled first whenever it is woken.
@@ -44,12 +44,11 @@ macro_rules! doc {
         /// You may want this if your futures may interact in a way where known polling order is significant.
         ///
         /// But there is an important caveat to this mode. It becomes your responsibility
-        /// to ensure that the polling order of your futures is fair. If for example you
-        /// are joining a stream and a shutdown future, and the stream has a
-        /// huge volume of messages that takes a long time to finish processing per poll, you should
+        /// to ensure that the polling order of your futures is reasonable. If for example you
+        /// are joining a long-running server future with a shutdown future, and you want to make
+        /// sure that no new requests are dispatched following a shutdown, you should
         /// place the shutdown future earlier in the `join!` list to ensure that it is
-        /// always polled, and will not be delayed due to the stream future taking a long time to return
-        /// `Poll::Pending`.
+        /// always polled first.
         ///
         /// # Examples
         ///
@@ -225,8 +224,8 @@ doc! {macro_rules! join {
     () => { async {}.await }
 }}
 
-#[derive(Default, Debug)]
 /// Rotates by one every [`Self::num_skip`] call up to COUNT - 1.
+#[derive(Default, Debug)]
 pub struct Rotator<const COUNT: u32> {
     next: u32,
 }
