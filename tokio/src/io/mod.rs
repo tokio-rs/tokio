@@ -218,7 +218,7 @@ cfg_io_driver_impl! {
     pub(crate) mod interest;
     pub(crate) mod ready;
 
-    cfg_net! {
+    cfg_net_or_uring! {
         pub use interest::Interest;
         pub use ready::Ready;
     }

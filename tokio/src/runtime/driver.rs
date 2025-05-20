@@ -347,3 +347,7 @@ cfg_not_time! {
         (io_stack, ())
     }
 }
+
+cfg_tokio_uring! {
+    pub(crate) mod op;
+}
