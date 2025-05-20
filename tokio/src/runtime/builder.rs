@@ -895,34 +895,37 @@ impl Builder {
         }
     }
 
-    /// Creates the configured `LocalRuntime`.
+    /// Creates the configured [`LocalRuntime`].
     ///
-    /// The returned `LocalRuntime` instance is ready to spawn tasks.
+    /// The returned [`LocalRuntime`] instance is ready to spawn tasks.
     ///
     /// # Panics
-    /// This will panic if `current_thread` is not the selected runtime flavor.
-    /// All other runtime flavors are unsupported by [`LocalRuntime`].
     ///
-    /// [`LocalRuntime`]: [crate::runtime::LocalRuntime]
+    /// This will panic if the runtime is configured with [`new_multi_thread()`].
+    ///
+    /// [`new_multi_thread()`]: Builder::new_multi_thread
     ///
     /// # Examples
     ///
     /// ```
-    /// use tokio::runtime::Builder;
+    /// use tokio::runtime::{Builder, LocalOptions};
     ///
-    /// let rt  = Builder::new_current_thread().build_local(&mut Default::default()).unwrap();
+    /// let rt = Builder::new_current_thread()
+    ///     .build_local(LocalOptions::default())
+    ///     .unwrap();
     ///
-    /// rt.block_on(async {
+    /// rt.spawn_local(async {
     ///     println!("Hello from the Tokio runtime");
     /// });
     /// ```
     #[allow(unused_variables, unreachable_patterns)]
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
-    pub fn build_local(&mut self, options: &LocalOptions) -> io::Result<LocalRuntime> {
+    pub fn build_local(&mut self, options: LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
-            _ => panic!("Only current_thread is supported when building a local runtime"),
+            #[cfg(feature = "rt-multi-thread")]
+            Kind::MultiThread => panic!("multi_thread is not supported for LocalRuntime"),
         }
     }
 

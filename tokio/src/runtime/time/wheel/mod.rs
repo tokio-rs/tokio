@@ -7,6 +7,7 @@ use self::level::Level;
 
 use std::{array, ptr::NonNull};
 
+use super::entry::STATE_DEREGISTERED;
 use super::EntryList;
 
 /// Timing wheel implementation.
@@ -116,8 +117,8 @@ impl Wheel {
     /// Removes `item` from the timing wheel.
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
-            let when = item.as_ref().cached_when();
-            if when == u64::MAX {
+            let when = item.as_ref().registered_when();
+            if when == STATE_DEREGISTERED {
                 self.pending.remove(item);
             } else {
                 debug_assert!(
@@ -230,11 +231,11 @@ impl Wheel {
 
         while let Some(item) = entries.pop_back() {
             if expiration.level == 0 {
-                debug_assert_eq!(unsafe { item.cached_when() }, expiration.deadline);
+                debug_assert_eq!(unsafe { item.registered_when() }, expiration.deadline);
             }
 
             // Try to expire the entry; this is cheap (doesn't synchronize) if
-            // the timer is not expired, and updates cached_when.
+            // the timer is not expired, and updates registered_when.
             match unsafe { item.mark_pending(expiration.deadline) } {
                 Ok(()) => {
                     // Item was expired

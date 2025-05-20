@@ -92,10 +92,10 @@ pub(crate) struct Driver {
 /// Timer state shared between `Driver`, `Handle`, and `Registration`.
 struct Inner {
     // The state is split like this so `Handle` can access `is_shutdown` without locking the mutex
-    pub(super) state: Mutex<InnerState>,
+    state: Mutex<InnerState>,
 
     /// True if the driver is being shutdown.
-    pub(super) is_shutdown: AtomicBool,
+    is_shutdown: AtomicBool,
 
     // When `true`, a call to `park_timeout` should immediately return and time
     // should not advance. One reason for this to be `true` is if the task
@@ -171,7 +171,7 @@ impl Driver {
 
     fn park_internal(&mut self, rt_handle: &driver::Handle, limit: Option<Duration>) {
         let handle = rt_handle.time();
-        let mut lock = handle.inner.state.lock();
+        let mut lock = handle.inner.lock();
 
         assert!(!handle.is_shutdown());
 
