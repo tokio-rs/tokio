@@ -73,6 +73,7 @@ fn test_spawn_local_from_guard() {
 }
 
 #[test]
+#[cfg_attr(target_family = "wasm", ignore)] // threads not supported
 fn test_spawn_from_guard_other_thread() {
     let (tx, rx) = std::sync::mpsc::channel();
 
@@ -91,7 +92,8 @@ fn test_spawn_from_guard_other_thread() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "Local tasks can only be spawned on a LocalRuntime from the thread the runtime was created on"]
+#[cfg_attr(target_family = "wasm", ignore)] // threads not supported
 fn test_spawn_local_from_guard_other_thread() {
     let (tx, rx) = std::sync::mpsc::channel();
 
