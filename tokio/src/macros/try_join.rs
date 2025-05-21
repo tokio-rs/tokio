@@ -30,7 +30,7 @@ macro_rules! doc {
         ///
         /// [`tokio::spawn`]: crate::spawn
         ///
-        /// # Poll Ordering
+        /// # Fairness
         ///
         /// By default, `try_join!`'s generated future rotates which
         /// contained future is polled first whenever it is woken.
@@ -42,11 +42,12 @@ macro_rules! doc {
         /// You may want this if your futures may interact in a way where known polling order is significant.
         ///
         /// But there is an important caveat to this mode. It becomes your responsibility
-        /// to ensure that the polling order of your futures is reasonable. If for example you
-        /// are joining a long-running server future with a shutdown future, and you want to make
-        /// sure that no new requests are dispatched following a shutdown, you should
-        /// place the shutdown future earlier in the `try_join!` list to ensure that it is
-        /// always polled first.
+        /// to ensure that the polling order of your futures is fair. If for example you
+        /// are joining a stream and a shutdown future, and the stream has a
+        /// huge volume of messages that takes a long time to finish processing per poll, you should
+        /// place the shutdown future earlier in the `join!` list to ensure that it is
+        /// always polled, and will not be delayed due to the stream future taking a long time to return
+        /// `Poll::Pending`.
         ///
         /// # Examples
         ///
