@@ -176,4 +176,12 @@ impl<W: AsyncRead, F> AsyncRead for InspectWriter<W, F> {
     ) -> Poll<std::io::Result<()>> {
         self.project().writer.poll_read(cx, buf)
     }
+
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        self.project().writer.poll_read_exact(cx, buf)
+    }
 }
