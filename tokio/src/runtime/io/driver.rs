@@ -5,6 +5,7 @@ cfg_signal_internal_and_unix! {
 cfg_tokio_uring! {
     mod uring;
     use uring::UringContext;
+    use crate::loom::sync::atomic::AtomicUsize;
 }
 
 use crate::io::interest::Interest;
@@ -52,6 +53,9 @@ pub(crate) struct Handle {
 
     #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
     pub(crate) uring_context: Mutex<UringContext>,
+
+    #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
+    pub(crate) uring_state: AtomicUsize,
 }
 
 #[derive(Debug)]
@@ -121,12 +125,9 @@ impl Driver {
             metrics: IoDriverMetrics::default(),
             #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
             uring_context: Mutex::new(UringContext::new()),
+            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
+            uring_state: AtomicUsize::new(0),
         };
-
-        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
-        {
-            handle.add_uring_source(Interest::READABLE)?;
-        }
 
         Ok((driver, handle))
     }
