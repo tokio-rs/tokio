@@ -36,43 +36,8 @@ impl State {
     }
 }
 
-/// A wrapper around `IoUring` that lazily initializes it.
-struct LazyUring {
-    inner: Option<IoUring>,
-}
-
-impl LazyUring {
-    fn new() -> Self {
-        Self { inner: None }
-    }
-
-    /// Perform `io_uring_setup` system call.
-    ///
-    /// If the machine doesn't support io_uring, then this will return an
-    /// `ENOSYS` error. This returns `true` if the ring was initialized,
-    /// and `false` if it was already initialized.
-    fn initialize(&mut self) -> io::Result<bool> {
-        if self.inner.is_some() {
-            // Already initialized
-            return Ok(false);
-        }
-
-        self.inner.replace(IoUring::new(DEFAULT_RING_SIZE)?);
-
-        Ok(true)
-    }
-
-    fn as_mut(&mut self) -> Option<&mut IoUring> {
-        self.inner.as_mut()
-    }
-
-    fn as_ref(&self) -> Option<&IoUring> {
-        self.inner.as_ref()
-    }
-}
-
 pub(crate) struct UringContext {
-    uring: LazyUring,
+    pub(crate) uring: Option<io_uring::IoUring>,
     pub(crate) ops: slab::Slab<Lifecycle>,
 }
 
@@ -80,7 +45,7 @@ impl UringContext {
     pub(crate) fn new() -> Self {
         Self {
             ops: Slab::new(),
-            uring: LazyUring::new(),
+            uring: None,
         }
     }
 
@@ -92,18 +57,32 @@ impl UringContext {
         self.uring.as_mut().expect("io_uring not initialized")
     }
 
+    /// Perform `io_uring_setup` system call.
+    ///
+    /// If the machine doesn't support io_uring, then this will return an
+    /// `ENOSYS` error. This returns `true` if the ring was initialized,
+    /// and `false` if it was already initialized.
     pub(crate) fn initialize(&mut self) -> io::Result<bool> {
-        self.uring.initialize()
+        if self.uring.is_some() {
+            // Already initialized
+            return Ok(false);
+        }
+
+        self.uring.replace(IoUring::new(DEFAULT_RING_SIZE)?);
+
+        Ok(true)
     }
 
     pub(crate) fn dispatch_completions(&mut self) {
         let ops = &mut self.ops;
-        let Some(mut cq) = self.uring.inner.take() else {
+        let Some(mut uring) = self.uring.take() else {
             // Uring is not initialized yet.
             return;
         };
 
-        for cqe in cq.completion() {
+        let cq = uring.completion();
+
+        for cqe in cq {
             let idx = cqe.user_data() as usize;
 
             match ops.get_mut(idx) {
@@ -125,7 +104,7 @@ impl UringContext {
             }
         }
 
-        self.uring.inner.replace(cq);
+        self.uring.replace(uring);
 
         // `cq`'s drop gets called here, updating the latest head pointer
     }
@@ -158,7 +137,7 @@ impl UringContext {
 /// Drop the driver, cancelling any in-progress ops and waiting for them to terminate.
 impl Drop for UringContext {
     fn drop(&mut self) {
-        if self.uring.inner.is_none() {
+        if self.uring.is_none() {
             // Uring is not initialized or not Initialized.
             return;
         }
@@ -188,7 +167,7 @@ impl Drop for UringContext {
         }
 
         while !cancel_ops.is_empty() {
-            // Wait until at least one completion is Initialized.
+            // Wait until at least one completion is available.
             self.ring_mut()
                 .submit_and_wait(1)
                 .expect("Internal error when dropping driver");
@@ -220,17 +199,17 @@ impl Handle {
         self.add_uring_source(Interest::READABLE)?;
         let mut guard = self.get_uring().lock();
         if guard.initialize()? {
-            self.set_state(State::Initialized);
+            self.set_uring_state(State::Initialized);
         }
 
         Ok(())
     }
 
-    fn set_state(&self, state: State) {
+    fn set_uring_state(&self, state: State) {
         self.uring_state.store(state.as_usize(), Ordering::Relaxed);
     }
 
-    fn get_state(&self) -> State {
+    fn get_uring_state(&self) -> State {
         State::from_usize(self.uring_state.load(Ordering::Relaxed))
     }
 
@@ -239,12 +218,12 @@ impl Handle {
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> io::Result<usize> {
-        match self.get_state() {
+        match self.get_uring_state() {
             // This is the first uring operation, so we need to initialize it.
             State::Uninitialized => {
                 self.initialize_uring().map_err(|e| {
                     if e.raw_os_error() == Some(libc::ENOSYS) {
-                        self.set_state(State::Unsupported);
+                        self.set_uring_state(State::Unsupported);
                     }
                     e
                 })?;
