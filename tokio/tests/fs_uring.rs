@@ -1,9 +1,4 @@
-#![cfg(all(
-    tokio_unstable_uring,
-    feature = "rt",
-    feature = "fs",
-    target_os = "linux",
-))]
+#![cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
 
 use std::sync::mpsc;
 

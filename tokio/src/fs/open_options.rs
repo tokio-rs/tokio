@@ -3,7 +3,7 @@ use crate::fs::File;
 use std::io;
 use std::path::Path;
 
-cfg_tokio_unstable_uring! {
+cfg_tokio_uring! {
     mod uring_open_options;
     use uring_open_options::UringOpenOptions;
     use crate::runtime::driver::op::Op;
@@ -16,7 +16,7 @@ use mock_open_options::MockOpenOptions as StdOpenOptions;
 #[cfg(not(test))]
 use std::fs::OpenOptions as StdOpenOptions;
 
-cfg_not_tokio_unstable_uring! {
+cfg_not_tokio_uring! {
     #[cfg(unix)]
         use std::os::unix::fs::OpenOptionsExt;
         use crate::fs::asyncify;
@@ -90,20 +90,10 @@ use std::os::windows::fs::OpenOptionsExt;
 /// ```
 #[derive(Clone, Debug)]
 pub struct OpenOptions(
-    #[cfg(not(all(
-        tokio_unstable_uring,
-        feature = "rt",
-        feature = "fs",
-        target_os = "linux",
-    )))]
+    #[cfg(not(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",)))]
     StdOpenOptions,
-    #[cfg(all(
-        tokio_unstable_uring,
-        feature = "rt",
-        feature = "fs",
-        target_os = "linux",
-    ))]
-    pub(crate) UringOpenOptions,
+    #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
+    pub(crate)  UringOpenOptions,
 );
 
 impl OpenOptions {
@@ -125,19 +115,9 @@ impl OpenOptions {
     /// ```
     pub fn new() -> OpenOptions {
         OpenOptions(
-            #[cfg(not(all(
-                tokio_unstable_uring,
-                feature = "rt",
-                feature = "fs",
-                target_os = "linux",
-            )))]
+            #[cfg(not(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",)))]
             StdOpenOptions::new(),
-            #[cfg(all(
-                tokio_unstable_uring,
-                feature = "rt",
-                feature = "fs",
-                target_os = "linux",
-            ))]
+            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
             UringOpenOptions::new(),
         )
     }
@@ -429,7 +409,7 @@ impl OpenOptions {
         self.open_inner(path).await
     }
 
-    cfg_not_tokio_unstable_uring! {
+    cfg_not_tokio_uring! {
         async fn open_inner(&self, path: impl AsRef<Path>) -> io::Result<File> {
             let path = path.as_ref().to_owned();
             let opts = self.0.clone();
@@ -445,7 +425,7 @@ impl OpenOptions {
         }
     }
 
-    cfg_tokio_unstable_uring! {
+    cfg_tokio_uring! {
         async fn open_inner(&self, path: impl AsRef<Path>) -> io::Result<File> {
             Op::open(path.as_ref(), self)?.await
         }
@@ -707,7 +687,7 @@ cfg_windows! {
     }
 }
 
-cfg_not_tokio_unstable_uring! {
+cfg_not_tokio_uring! {
     impl From<StdOpenOptions> for OpenOptions {
         fn from(options: StdOpenOptions) -> OpenOptions {
             OpenOptions(options)
@@ -715,7 +695,7 @@ cfg_not_tokio_unstable_uring! {
     }
 }
 
-cfg_tokio_unstable_uring! {
+cfg_tokio_uring! {
     impl From<StdOpenOptions> for OpenOptions {
         fn from(_options: StdOpenOptions) -> OpenOptions {
             // It's not straitforward to convert from std's OpenOptions to io_uring's one.

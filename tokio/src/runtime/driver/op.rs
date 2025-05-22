@@ -9,6 +9,9 @@ use std::task::Waker;
 use std::{io, mem};
 
 #[derive(Debug)]
+pub(crate) enum CancelData {}
+
+#[derive(Debug)]
 pub(crate) enum Lifecycle {
     /// The operation has been submitted to uring and is currently in-flight
     Submitted,
@@ -18,7 +21,7 @@ pub(crate) enum Lifecycle {
 
     /// The submitter no longer has interest in the operation result. The state
     /// must be passed to the driver and held until the operation completes.
-    Cancelled(#[allow(unused)] Box<dyn std::any::Any + Send + 'static>),
+    Cancelled(CancelData),
 
     /// The operation has completed with a single cqe result
     Completed(io_uring::cqueue::Entry),
@@ -31,21 +34,25 @@ pub(crate) enum State {
     Complete,
 }
 
-pub(crate) struct Op<T: Send + 'static> {
+pub(crate) struct Op<T: Cancellable> {
+    // Handle to the runtime
+    handle: Handle,
     // State of this Op
     state: State,
     // Per operation data.
     data: Option<T>,
 }
 
-impl<T: Send + 'static> Op<T> {
+impl<T: Cancellable> Op<T> {
     /// # Safety
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     #[allow(dead_code)]
     pub(crate) unsafe fn new(entry: Entry, data: T) -> Self {
+        let handle = Handle::current();
         Self {
+            handle,
             data: Some(data),
             state: State::Initialize(Some(entry)),
         }
@@ -55,15 +62,16 @@ impl<T: Send + 'static> Op<T> {
     }
 }
 
-impl<T: Send + 'static> Drop for Op<T> {
+impl<T: Cancellable> Drop for Op<T> {
     fn drop(&mut self) {
         match self.state {
             // We've already dropped this Op.
             State::Complete => (),
             // We will cancel this Op.
             State::Polled(index) => {
-                let handle = Handle::current();
-                handle.inner.driver().io().cancel_op(self, index);
+                let data = self.take_data();
+                let handle = &mut self.handle;
+                handle.inner.driver().io().cancel_op(index, data);
             }
             // This Op has not been polled yet.
             // We don't need to do anything here.
@@ -96,13 +104,20 @@ pub(crate) trait Completable {
     fn complete(self, cqe: CqeResult) -> io::Result<Self::Output>;
 }
 
-impl<T: Completable + Unpin + Send> Future for Op<T> {
+/// Extracts the `CancelData` needed to safely cancel an in-flight io_uring operation.
+pub(crate) trait Cancellable {
+    fn cancell(self) -> CancelData;
+}
+
+impl<T: Cancellable> Unpin for Op<T> {}
+
+impl<T: Cancellable + Completable + Send> Future for Op<T> {
     type Output = io::Result<T::Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
-        let handle = Handle::current();
-        let driver = &handle.inner.driver().io();
+        let handle = &mut this.handle;
+        let driver = handle.inner.driver().io();
 
         match &mut this.state {
             State::Initialize(entry_opt) => {
@@ -136,6 +151,8 @@ impl<T: Completable + Unpin + Send> Future for Op<T> {
                         ctx.remove_op(*idx);
 
                         this.state = State::Complete;
+
+                        drop(ctx);
 
                         let data = this
                             .take_data()

@@ -2,10 +2,10 @@ use io_uring::{squeue::Entry, IoUring};
 use mio::unix::SourceFd;
 use slab::Slab;
 
-use crate::runtime::driver::op::{Lifecycle, Op};
+use crate::runtime::driver::op::{Cancellable, Lifecycle};
 use crate::{io::Interest, loom::sync::Mutex};
 
-use super::{Handle, TOKEN_URING};
+use super::{Handle, TOKEN_WAKEUP};
 
 use std::os::fd::AsRawFd;
 use std::{io, mem, task::Waker};
@@ -128,7 +128,7 @@ impl Handle {
         let uringfd = self.get_uring().lock().uring.as_raw_fd();
         let mut source = SourceFd(&uringfd);
         self.registry
-            .register(&mut source, TOKEN_URING, interest.to_mio())
+            .register(&mut source, TOKEN_WAKEUP, interest.to_mio())
     }
 
     pub(crate) fn get_uring(&self) -> &Mutex<UringContext> {
@@ -166,7 +166,9 @@ impl Handle {
         Ok(index)
     }
 
-    pub(crate) fn cancel_op<T: Send + 'static>(&self, op: &mut Op<T>, index: usize) {
+    // TODO: Remove this annotation when operations are actually supported
+    #[allow(unused_variables, unreachable_code)]
+    pub(crate) fn cancel_op<T: Cancellable>(&self, index: usize, data: Option<T>) {
         let mut guard = self.get_uring().lock();
         let ctx = &mut *guard;
         let ops = &mut ctx.ops;
@@ -178,7 +180,8 @@ impl Handle {
         // This Op will be cancelled. Here, we don't remove the lifecycle from the slab to keep
         // uring data alive until the operation completes.
 
-        match mem::replace(lifecycle, Lifecycle::Cancelled(Box::new(op.take_data()))) {
+        let cancell_data = data.expect("Data should be present").cancell();
+        match mem::replace(lifecycle, Lifecycle::Cancelled(cancell_data)) {
             Lifecycle::Submitted | Lifecycle::Waiting(_) => (),
             // The driver saw the completion, but it was never polled.
             Lifecycle::Completed(_) => (),

@@ -21,7 +21,7 @@ use std::io::Read as StdRead;
 fn rt(worker_threads: usize) -> Runtime {
     if worker_threads == 1 {
         let mut builder = Builder::new_current_thread();
-        #[cfg(tokio_unstable_uring)]
+        #[cfg(tokio_uring)]
         {
             builder.enable_uring();
         }
@@ -29,7 +29,7 @@ fn rt(worker_threads: usize) -> Runtime {
     } else {
         let mut builder = Builder::new_multi_thread();
         builder.worker_threads(worker_threads);
-        #[cfg(tokio_unstable_uring)]
+        #[cfg(tokio_uring)]
         {
             builder.enable_uring();
         }

@@ -2,7 +2,7 @@
 cfg_signal_internal_and_unix! {
     mod signal;
 }
-cfg_tokio_unstable_uring! {
+cfg_tokio_uring! {
     mod uring;
     use uring::UringContext;
 }
@@ -50,12 +50,7 @@ pub(crate) struct Handle {
 
     pub(crate) metrics: IoDriverMetrics,
 
-    #[cfg(all(
-        tokio_unstable_uring,
-        feature = "rt",
-        feature = "fs",
-        target_os = "linux",
-    ))]
+    #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
     pub(crate) uring_context: Mutex<UringContext>,
 }
 
@@ -91,9 +86,6 @@ pub(super) enum Tick {
 
 const TOKEN_WAKEUP: mio::Token = mio::Token(0);
 const TOKEN_SIGNAL: mio::Token = mio::Token(1);
-cfg_tokio_unstable_uring! {
-    pub(crate) const TOKEN_URING: mio::Token = mio::Token(2);
-}
 
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
@@ -127,21 +119,11 @@ impl Driver {
             #[cfg(not(target_os = "wasi"))]
             waker,
             metrics: IoDriverMetrics::default(),
-            #[cfg(all(
-                tokio_unstable_uring,
-                feature = "rt",
-                feature = "fs",
-                target_os = "linux",
-            ))]
+            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
             uring_context: Mutex::new(UringContext::new()),
         };
 
-        #[cfg(all(
-            tokio_unstable_uring,
-            feature = "rt",
-            feature = "fs",
-            target_os = "linux",
-        ))]
+        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
         {
             handle.add_uring_source(Interest::READABLE)?;
         }
@@ -194,40 +176,32 @@ impl Driver {
         for event in events.iter() {
             let token = event.token();
 
-            match token {
-                TOKEN_WAKEUP => {
-                    // Nothing to do, the event is used to unblock the I/O driver
-                }
-                TOKEN_SIGNAL => {
-                    self.signal_ready = true;
-                }
-                #[cfg(all(
-                    tokio_unstable_uring,
-                    feature = "rt",
-                    feature = "fs",
-                    target_os = "linux",
-                ))]
-                TOKEN_URING => {
-                    let mut guard = handle.get_uring().lock();
-                    let ctx = &mut *guard;
-                    ctx.dispatch_completions();
-                }
-                _ => {
-                    let ready = Ready::from_mio(event);
-                    let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
+            if token == TOKEN_WAKEUP {
+                // Nothing to do, the event is used to unblock the I/O driver
+            } else if token == TOKEN_SIGNAL {
+                self.signal_ready = true;
+            } else {
+                let ready = Ready::from_mio(event);
+                let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
 
-                    // Safety: we ensure that the pointers used as tokens are not freed
-                    // until they are both deregistered from mio **and** we know the I/O
-                    // driver is not concurrently polling. The I/O driver holds ownership of
-                    // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
-                    let io: &ScheduledIo = unsafe { &*ptr };
+                // Safety: we ensure that the pointers used as tokens are not freed
+                // until they are both deregistered from mio **and** we know the I/O
+                // driver is not concurrently polling. The I/O driver holds ownership of
+                // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
+                let io: &ScheduledIo = unsafe { &*ptr };
 
-                    io.set_readiness(Tick::Set, |curr| curr | ready);
-                    io.wake(ready);
+                io.set_readiness(Tick::Set, |curr| curr | ready);
+                io.wake(ready);
 
-                    ready_count += 1;
-                }
-            };
+                ready_count += 1;
+            }
+        }
+
+        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
+        {
+            let mut guard = handle.get_uring().lock();
+            let ctx = &mut *guard;
+            ctx.dispatch_completions();
         }
 
         handle.metrics.incr_ready_count_by(ready_count);

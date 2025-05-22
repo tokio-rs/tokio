@@ -1,7 +1,7 @@
 use super::utils::cstr;
 use crate::{
     fs::OpenOptions,
-    runtime::driver::op::{Completable, CqeResult, Op},
+    runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op},
 };
 use io_uring::{opcode, types};
 use std::{ffi::CString, io, os::fd::FromRawFd, path::Path};
@@ -17,6 +17,12 @@ impl Completable for Open {
         let fd = cqe.result? as i32;
         let file = unsafe { crate::fs::File::from_raw_fd(fd) };
         Ok(file)
+    }
+}
+
+impl Cancellable for Open {
+    fn cancell(self) -> CancelData {
+        todo!()
     }
 }
 
