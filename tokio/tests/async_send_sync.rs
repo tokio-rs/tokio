@@ -760,3 +760,11 @@ mod unix_asyncfd {
     async_assert_fn!(AsyncFd<ImplsFd<NN>>::writable(_): !Send & !Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<NN>>::writable_mut(_): !Send & !Sync & !Unpin);
 }
+
+#[cfg(tokio_unstable)]
+mod unstable {
+    use super::*;
+
+    assert_value!(tokio::runtime::LocalRuntime: !Send & !Sync & Unpin);
+    assert_value!(tokio::runtime::LocalOptions: !Send & !Sync & Unpin);
+}
