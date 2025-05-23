@@ -63,7 +63,6 @@ use crate::sync::AtomicWaker;
 use crate::time::Instant;
 use crate::util::linked_list;
 
-use std::cell::UnsafeCell as StdUnsafeCell;
 use std::task::{Context, Poll, Waker};
 use std::{marker::PhantomPinned, pin::Pin, ptr::NonNull};
 
@@ -291,9 +290,8 @@ pub(crate) struct TimerEntry {
     /// therefore other references can exist to it while mutable references to
     /// Entry exist.
     ///
-    /// This is manipulated only under the inner mutex. TODO: Can we use loom
-    /// cells for this?
-    inner: StdUnsafeCell<Option<TimerShared>>,
+    /// This is manipulated only under the inner mutex.
+    inner: Option<TimerShared>,
     /// Deadline for the timer. This is used to register on the first
     /// poll, as we can't register prior to being pinned.
     deadline: Instant,
@@ -479,26 +477,22 @@ impl TimerEntry {
 
         Self {
             driver: handle,
-            inner: StdUnsafeCell::new(None),
+            inner: None,
             deadline,
             registered: false,
             _m: std::marker::PhantomPinned,
         }
     }
 
-    fn is_inner_init(&self) -> bool {
-        unsafe { &*self.inner.get() }.is_some()
+    fn inner(&self) -> Option<&TimerShared> {
+        self.inner.as_ref()
     }
 
-    // This lazy initialization is for performance purposes.
-    fn inner(&self) -> &TimerShared {
-        let inner = unsafe { &*self.inner.get() };
-        if inner.is_none() {
-            unsafe {
-                *self.inner.get() = Some(TimerShared::new());
-            }
+    fn init_inner(&mut self) {
+        match self.inner {
+            Some(_) => {}
+            None => self.inner = Some(TimerShared::new()),
         }
-        return inner.as_ref().unwrap();
     }
 
     pub(crate) fn deadline(&self) -> Instant {
@@ -506,15 +500,20 @@ impl TimerEntry {
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
-        self.is_inner_init() && !self.inner().state.might_be_registered() && self.registered
+        let Some(inner) = self.inner() else {
+            return false;
+        };
+
+        !inner.state.might_be_registered() && self.registered
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.
     pub(crate) fn cancel(self: Pin<&mut Self>) {
         // Avoid calling the `clear_entry` method, because it has not been initialized yet.
-        if !self.is_inner_init() {
+        let Some(inner) = self.inner() else {
             return;
-        }
+        };
+
         // We need to perform an acq/rel fence with the driver thread, and the
         // simplest way to do so is to grab the driver lock.
         //
@@ -537,7 +536,7 @@ impl TimerEntry {
         // driver did so far and happens-before everything the driver does in
         // the future. While we have the lock held, we also go ahead and
         // deregister the entry if necessary.
-        unsafe { self.driver().clear_entry(NonNull::from(self.inner())) };
+        unsafe { self.driver().clear_entry(NonNull::from(inner)) };
     }
 
     pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant, reregister: bool) {
@@ -545,16 +544,24 @@ impl TimerEntry {
         this.deadline = new_time;
         this.registered = reregister;
 
-        let tick = self.driver().time_source().deadline_to_tick(new_time);
+        let tick = this.driver().time_source().deadline_to_tick(new_time);
+        let inner = match this.inner() {
+            Some(inner) => inner,
+            None => {
+                this.init_inner();
+                this.inner()
+                    .expect("inner should already be initialized by `this.init_inner()`")
+            }
+        };
 
-        if self.inner().extend_expiration(tick).is_ok() {
+        if inner.extend_expiration(tick).is_ok() {
             return;
         }
 
         if reregister {
             unsafe {
-                self.driver()
-                    .reregister(&self.driver.driver().io, tick, self.inner().into());
+                this.driver()
+                    .reregister(&this.driver.driver().io, tick, inner.into());
             }
         }
     }
@@ -574,7 +581,10 @@ impl TimerEntry {
             self.as_mut().reset(deadline, true);
         }
 
-        self.inner().state.poll(cx.waker())
+        let inner = self
+            .inner()
+            .expect("inner should already be initialized by `self.reset()`");
+        inner.state.poll(cx.waker())
     }
 
     pub(crate) fn driver(&self) -> &super::Handle {
