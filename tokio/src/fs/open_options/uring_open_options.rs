@@ -1,5 +1,10 @@
 use std::io;
 
+#[cfg(test)]
+use super::mock_open_options::MockOpenOptions as StdOpenOptions;
+#[cfg(not(test))]
+use std::fs::OpenOptions as StdOpenOptions;
+
 #[derive(Debug, Clone)]
 pub(crate) struct UringOpenOptions {
     pub(crate) read: bool,
@@ -99,5 +104,19 @@ impl UringOpenOptions {
             (true, true, false) => libc::O_CREAT | libc::O_TRUNC,
             (_, _, true) => libc::O_CREAT | libc::O_EXCL,
         })
+    }
+}
+
+impl From<UringOpenOptions> for StdOpenOptions {
+    fn from(value: UringOpenOptions) -> Self {
+        let mut std = StdOpenOptions::new();
+
+        std.read(value.read);
+        std.write(value.write);
+        std.append(value.append);
+        std.create(value.create);
+        std.create_new(value.create_new);
+
+        std
     }
 }

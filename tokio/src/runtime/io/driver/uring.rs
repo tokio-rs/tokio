@@ -8,14 +8,14 @@ use crate::{io::Interest, loom::sync::Mutex};
 
 use super::{Handle, TOKEN_WAKEUP};
 
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, RawFd};
 use std::{io, mem, task::Waker};
 
 const DEFAULT_RING_SIZE: u32 = 256;
 
 #[repr(usize)]
 #[derive(Debug, PartialEq, Eq)]
-enum State {
+pub(crate) enum State {
     Uninitialized = 0,
     Initialized = 1,
     Unsupported = 2,
@@ -182,10 +182,8 @@ impl Drop for UringContext {
 
 impl Handle {
     // TODO: this should be delayed.
-    #[allow(dead_code)]
-    fn add_uring_source(&self, interest: Interest) -> io::Result<()> {
+    fn add_uring_source(&self, uringfd: RawFd, interest: Interest) -> io::Result<()> {
         // setup for io_uring
-        let uringfd = self.get_uring().lock().ring().as_raw_fd();
         let mut source = SourceFd(&uringfd);
         self.registry
             .register(&mut source, TOKEN_WAKEUP, interest.to_mio())
@@ -196,9 +194,9 @@ impl Handle {
     }
 
     fn initialize_uring(&self) -> io::Result<()> {
-        self.add_uring_source(Interest::READABLE)?;
         let mut guard = self.get_uring().lock();
         if guard.initialize()? {
+            self.add_uring_source(guard.ring().as_raw_fd(), Interest::READABLE)?;
             self.set_uring_state(State::Initialized);
         }
 
@@ -209,8 +207,25 @@ impl Handle {
         self.uring_state.store(state.as_usize(), Ordering::Relaxed);
     }
 
-    fn get_uring_state(&self) -> State {
+    pub(crate) fn get_uring_state(&self) -> State {
         State::from_usize(self.uring_state.load(Ordering::Relaxed))
+    }
+
+    pub(crate) fn uring_available_or_init(&self) -> bool {
+        match self.get_uring_state() {
+            State::Uninitialized => {
+                if let Err(e) = self.initialize_uring() {
+                    if e.raw_os_error() == Some(libc::ENOSYS) {
+                        self.set_uring_state(State::Unsupported);
+                    }
+                    return false;
+                }
+            }
+            State::Unsupported => return false,
+            _ => {}
+        }
+
+        true
     }
 
     /// # Safety
