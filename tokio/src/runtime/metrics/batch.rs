@@ -295,8 +295,7 @@ fn now() -> Option<Instant> {
         target_arch = "wasm32",
         target_os = "unknown",
         target_vendor = "unknown"
-    )) && cfg!(not(feature = "time"))
-    {
+    )) {
         None
     } else {
         Some(Instant::now())
