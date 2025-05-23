@@ -288,10 +288,15 @@ pub(crate) fn duration_as_u64(dur: Duration) -> u64 {
     u64::try_from(dur.as_nanos()).unwrap_or(u64::MAX)
 }
 
-/// Gate time metrics as platforms like `WASM` do not typically support [`std::time`]
+/// Gate unsupported time metrics for `wasm32-unknown-unknown`
 /// <https://github.com/tokio-rs/tokio/issues/7319>
 fn now() -> Option<Instant> {
-    if cfg!(target_family = "wasm") && !cfg!(feature = "time") {
+    if cfg!(all(
+        target_arch = "wasm32",
+        target_os = "unknown",
+        target_vendor = "unknown"
+    )) && cfg!(not(feature = "time"))
+    {
         None
     } else {
         Some(Instant::now())
