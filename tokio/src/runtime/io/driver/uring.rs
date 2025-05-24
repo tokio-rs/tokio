@@ -15,7 +15,7 @@ const DEFAULT_RING_SIZE: u32 = 256;
 
 #[repr(usize)]
 #[derive(Debug, PartialEq, Eq)]
-enum State {
+pub(crate) enum State {
     Uninitialized = 0,
     Initialized = 1,
     Unsupported = 2,
