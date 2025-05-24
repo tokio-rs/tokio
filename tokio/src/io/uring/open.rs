@@ -21,7 +21,7 @@ impl Completable for Open {
 }
 
 impl Cancellable for Open {
-    fn cancell(self) -> CancelData {
+    fn cancel(self) -> CancelData {
         todo!()
     }
 }

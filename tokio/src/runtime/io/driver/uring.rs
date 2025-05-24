@@ -60,11 +60,10 @@ impl UringContext {
     /// Perform `io_uring_setup` system call.
     ///
     /// If the machine doesn't support io_uring, then this will return an
-    /// `ENOSYS` error. This returns `true` if the ring was initialized,
-    /// and `false` if it was already initialized.
-    pub(crate) fn initialize(&mut self) -> io::Result<bool> {
+    /// `ENOSYS` error.
+    pub(crate) fn try_init(&mut self) -> io::Result<bool> {
         if self.uring.is_some() {
-            // Already initialized
+            // Already initialized.
             return Ok(false);
         }
 
@@ -181,75 +180,70 @@ impl Drop for UringContext {
 }
 
 impl Handle {
-    // TODO: this should be delayed.
-    fn add_uring_source(&self, uringfd: RawFd, interest: Interest) -> io::Result<()> {
-        // setup for io_uring
+    #[allow(dead_code)]
+    fn add_uring_source(&self, uringfd: RawFd) -> io::Result<()> {
         let mut source = SourceFd(&uringfd);
         self.registry
-            .register(&mut source, TOKEN_WAKEUP, interest.to_mio())
+            .register(&mut source, TOKEN_WAKEUP, Interest::READABLE.to_mio())
     }
 
     pub(crate) fn get_uring(&self) -> &Mutex<UringContext> {
         &self.uring_context
     }
 
-    fn initialize_uring(&self) -> io::Result<()> {
+    fn set_uring_state(&self, state: State) {
+        self.uring_state.store(state.as_usize(), Ordering::Release);
+    }
+
+    /// Check if the io_uring context is initialized. If not, it will try to initialize it.
+    pub(crate) fn check_and_init(&self) -> io::Result<bool> {
+        match State::from_usize(self.uring_state.load(Ordering::Acquire)) {
+            State::Uninitialized => match self.try_init() {
+                Ok(()) => {
+                    self.set_uring_state(State::Initialized);
+                    Ok(true)
+                }
+                // If the system doesn't support io_uring, we set the state to Unsupported.
+                Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => {
+                    self.set_uring_state(State::Unsupported);
+                    Ok(false)
+                }
+                // For other system errors, we just return it.
+                Err(e) => Err(e),
+            },
+            State::Unsupported => Ok(false),
+            State::Initialized => Ok(true),
+        }
+    }
+
+    /// Initialize the io_uring context if it hasn't been initialized yet.
+    fn try_init(&self) -> io::Result<()> {
         let mut guard = self.get_uring().lock();
-        if guard.initialize()? {
-            self.add_uring_source(guard.ring().as_raw_fd(), Interest::READABLE)?;
-            self.set_uring_state(State::Initialized);
+        if guard.try_init()? {
+            self.add_uring_source(guard.ring().as_raw_fd())?;
         }
 
         Ok(())
     }
 
-    fn set_uring_state(&self, state: State) {
-        self.uring_state.store(state.as_usize(), Ordering::Relaxed);
-    }
-
-    pub(crate) fn get_uring_state(&self) -> State {
-        State::from_usize(self.uring_state.load(Ordering::Relaxed))
-    }
-
-    pub(crate) fn uring_available_or_init(&self) -> bool {
-        match self.get_uring_state() {
-            State::Uninitialized => {
-                if let Err(e) = self.initialize_uring() {
-                    if e.raw_os_error() == Some(libc::ENOSYS) {
-                        self.set_uring_state(State::Unsupported);
-                    }
-                    return false;
-                }
-            }
-            State::Unsupported => return false,
-            _ => {}
-        }
-
-        true
-    }
-
+    /// Register an operation with the io_uring.
+    ///
+    /// If this is the first io_uring operation, it will also initialize the io_uring context.
+    /// If io_uring isn't supported, this function returns an ENOSYS error, so the caller can
+    /// perform custom handling, such as falling back to an alternative mechanism.
+    ///
     /// # Safety
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> io::Result<usize> {
-        match self.get_uring_state() {
-            // This is the first uring operation, so we need to initialize it.
-            State::Uninitialized => {
-                self.initialize_uring().map_err(|e| {
-                    if e.raw_os_error() == Some(libc::ENOSYS) {
-                        self.set_uring_state(State::Unsupported);
-                    }
-                    e
-                })?;
-            }
-            State::Unsupported => {
-                return Err(io::Error::from_raw_os_error(libc::ENOSYS));
-            }
-            _ => {}
+        // Fist, check if the uring is initialized. Callers can use
+        // Note: Maybe this check can be removed if upstream callers consistently use `check_and_init`.
+        if !self.check_and_init()? {
+            return Err(io::Error::from_raw_os_error(libc::ENOSYS));
         }
 
-        // Uring is initialized
+        // Uring is initialized.
 
         let mut guard = self.get_uring().lock();
         let ctx = &mut *guard;
@@ -291,7 +285,7 @@ impl Handle {
         // This Op will be cancelled. Here, we don't remove the lifecycle from the slab to keep
         // uring data alive until the operation completes.
 
-        let cancell_data = data.expect("Data should be present").cancell();
+        let cancell_data = data.expect("Data should be present").cancel();
         match mem::replace(lifecycle, Lifecycle::Cancelled(cancell_data)) {
             Lifecycle::Submitted | Lifecycle::Waiting(_) => (),
             // The driver saw the completion, but it was never polled.

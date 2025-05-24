@@ -461,7 +461,7 @@ impl OpenOptions {
                 let handle = crate::runtime::Handle::current();
                 let driver_handle = handle.inner.driver().io();
 
-                if driver_handle.uring_available_or_init() {
+                if driver_handle.check_and_init()? {
                     Op::open(path.as_ref(), opts)?.await
                 } else {
                     let opts = opts.clone().into();

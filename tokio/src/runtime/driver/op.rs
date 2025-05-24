@@ -106,7 +106,7 @@ pub(crate) trait Completable {
 
 /// Extracts the `CancelData` needed to safely cancel an in-flight io_uring operation.
 pub(crate) trait Cancellable {
-    fn cancell(self) -> CancelData;
+    fn cancel(self) -> CancelData;
 }
 
 impl<T: Cancellable> Unpin for Op<T> {}
