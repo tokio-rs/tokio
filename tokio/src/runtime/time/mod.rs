@@ -246,7 +246,6 @@ impl Driver {
 }
 
 impl Handle {
-    /// Runs timer related logic, and returns the next wakeup time
     pub(self) fn process(&self, clock: &Clock) {
         let now = self.time_source().now(clock);
 

@@ -62,9 +62,7 @@ fn single_timer() {
         let time = handle.inner.driver().time();
         let clock = handle.inner.driver().clock();
 
-        // This may or may not return Some (depending on how it races with the
-        // thread). If it does return None, however, the timer should complete
-        // synchronously.
+        // advance 2s
         time.process_at_time(time.time_source().now(clock) + 2_000_000_000);
 
         jh.join().unwrap();
@@ -170,7 +168,6 @@ fn reset_future() {
 
         let handle = handle.inner.driver().time();
 
-        // This may or may not return a wakeup time.
         handle.process_at_time(
             handle
                 .time_source()
