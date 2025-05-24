@@ -57,7 +57,8 @@ impl UringContext {
         self.uring.as_mut().expect("io_uring not initialized")
     }
 
-    /// Perform `io_uring_setup` system call.
+    /// Perform `io_uring_setup` system call, and Returns true if this
+    /// actually initialized the io_uring.
     ///
     /// If the machine doesn't support io_uring, then this will return an
     /// `ENOSYS` error.
