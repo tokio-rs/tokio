@@ -500,8 +500,10 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 ///
 /// # Panics
 ///
-/// This will panic if `capacity` is equal to `0` or larger
-/// than `usize::MAX / 2`.
+/// This will panic if `capacity` is equal to `0`.
+///
+/// This pre-allocates space for `capacity` messages. Allocation failure may result in a panic or
+/// [an allocation failure](std::alloc::handle_alloc_error).
 #[track_caller]
 pub fn channel<T: Clone>(capacity: usize) -> (Sender<T>, Receiver<T>) {
     // SAFETY: In the line below we are creating one extra receiver, so there will be 1 in total.
