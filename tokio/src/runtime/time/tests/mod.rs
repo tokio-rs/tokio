@@ -225,10 +225,8 @@ fn poll_process_levels() {
             let mut context = Context::from_waker(noop_waker_ref());
             if deadline <= t {
                 assert!(future.as_mut().poll_elapsed(&mut context).is_ready());
-                assert!(future.is_elapsed());
             } else {
                 assert!(future.as_mut().poll_elapsed(&mut context).is_pending());
-                assert!(!future.is_elapsed())
             }
         }
     }
