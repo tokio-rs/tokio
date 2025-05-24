@@ -511,7 +511,29 @@ impl TimerEntry {
             return false;
         };
 
-        !inner.state.might_be_registered() && self.registered
+        // Is this timer still in the timer wheel?
+        let deregistered = !inner.might_be_registered();
+
+        // Once the timer has expired,
+        // it will be taken out of the wheel and be fired.
+        //
+        // So if we have already registered the timer into the wheel,
+        // but now it is not in the wheel, it means that it has been
+        // fired.
+        //
+        // +--------------+-----------------+----------+
+        // | deregistered | self.registered |  output  |
+        // +--------------+-----------------+----------+
+        // |     true     |      false      |  false   | <- never been registered
+        // +--------------+-----------------+----------+
+        // |     false    |      false      |  false   | <- never been registered
+        // +--------------+-----------------+----------+
+        // |     true     |      true       |  true    | <- registered into the wheel,
+        // |              |                 |          |    and then taken out of the wheel.
+        // +--------------+-----------------+----------+
+        // |     false    |      true       |  false   | <- still registered in the wheel
+        // +--------------+-----------------+----------+
+        deregistered && self.registered
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.
