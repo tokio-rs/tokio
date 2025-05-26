@@ -1231,6 +1231,13 @@ cfg_io_util! {
         /// It is considered an error if not all bytes could be written due to
         /// I/O errors or EOF being reached.
         ///
+        /// # Cancel safety
+        ///
+        /// This method is cancellation safe in the sense that if it is used as
+        /// the event in a [`tokio::select!`](crate::select) statement and some
+        /// other branch completes first, then it is guaranteed that no intermediately
+        /// buffered content got flushed.
+        ///
         /// # Examples
         ///
         /// ```no_run
