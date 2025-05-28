@@ -376,7 +376,6 @@ impl LocalRuntime {
     }
 }
 
-#[allow(clippy::single_match)] // there are comments in the error branch, so we don't want if-let
 impl Drop for LocalRuntime {
     fn drop(&mut self) {
         if let LocalRuntimeScheduler::CurrentThread(current_thread) = &mut self.scheduler {
