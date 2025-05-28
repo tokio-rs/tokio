@@ -2,8 +2,8 @@
 #![cfg(feature = "full")]
 
 use futures::{
-    FutureExt,
     future::{pending, ready},
+    FutureExt,
 };
 
 use tokio::runtime;
