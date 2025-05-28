@@ -147,7 +147,7 @@ tempfile = "3.1.0"
 proptest = "1"
 
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dev-dependencies]
-rand = "0.8.0"
+rand = "0.9"
 
 [target.'cfg(all(target_family = "wasm", not(target_os = "wasi")))'.dev-dependencies]
 wasm-bindgen-test = "0.3.0"
