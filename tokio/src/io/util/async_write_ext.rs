@@ -1239,9 +1239,6 @@ cfg_io_util! {
         /// However, it is guaranteed that the buffer is advanced by the amount
         /// of bytes that have been partially flushed.
         ///
-        /// The same can be said in the case where the `flush` results in an error
-        /// after polling the future to completion.
-        ///
         /// # Examples
         ///
         /// ```no_run
