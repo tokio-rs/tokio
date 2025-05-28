@@ -20,10 +20,11 @@ categories = ["asynchronous", "development-tools::testing"]
 tokio = { version = "1.2.0", path = "../tokio", features = ["rt", "sync", "time", "test-util"] }
 tokio-stream = { version = "0.1.1", path = "../tokio-stream" }
 futures-core = "0.3.0"
+futures-sink = "0.3.0"
 
 [dev-dependencies]
 tokio = { version = "1.2.0", path = "../tokio", features = ["full"] }
-futures-util = "0.3.0"
+futures-util = { version = "0.3.0", features = ["sink"] }
 
 [package.metadata.docs.rs]
 all-features = true
