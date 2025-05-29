@@ -17,28 +17,36 @@ use tokio_test::{assert_pending, assert_ready, task};
 #[maybe_tokio_test]
 async fn sync_one_lit_expr_comma() {
     let foo = tokio::join!(async { 1 },);
+    assert_eq!(foo, (1,));
 
+    let foo = tokio::join!(biased; async { 1 },);
     assert_eq!(foo, (1,));
 }
 
 #[maybe_tokio_test]
 async fn sync_one_lit_expr_no_comma() {
     let foo = tokio::join!(async { 1 });
+    assert_eq!(foo, (1,));
 
+    let foo = tokio::join!(biased; async { 1 });
     assert_eq!(foo, (1,));
 }
 
 #[maybe_tokio_test]
 async fn sync_two_lit_expr_comma() {
     let foo = tokio::join!(async { 1 }, async { 2 },);
+    assert_eq!(foo, (1, 2));
 
+    let foo = tokio::join!(biased; async { 1 }, async { 2 },);
     assert_eq!(foo, (1, 2));
 }
 
 #[maybe_tokio_test]
 async fn sync_two_lit_expr_no_comma() {
     let foo = tokio::join!(async { 1 }, async { 2 });
+    assert_eq!(foo, (1, 2));
 
+    let foo = tokio::join!(biased; async { 1 }, async { 2 });
     assert_eq!(foo, (1, 2));
 }
 
@@ -155,9 +163,61 @@ async fn a_different_future_is_polled_first_every_time_poll_fn_is_polled() {
 }
 
 #[tokio::test]
+async fn futures_are_polled_in_order_in_biased_mode() {
+    let poll_order = Arc::new(std::sync::Mutex::new(vec![]));
+
+    let fut = |x, poll_order: Arc<std::sync::Mutex<Vec<i32>>>| async move {
+        for _ in 0..4 {
+            {
+                let mut guard = poll_order.lock().unwrap();
+
+                guard.push(x);
+            }
+
+            tokio::task::yield_now().await;
+        }
+    };
+
+    tokio::join!(
+        biased;
+        fut(1, Arc::clone(&poll_order)),
+        fut(2, Arc::clone(&poll_order)),
+        fut(3, Arc::clone(&poll_order)),
+    );
+
+    // Each time the future created by join! is polled, it should start
+    // by polling in the order as declared in the macro inputs.
+    assert_eq!(
+        vec![1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3],
+        *poll_order.lock().unwrap()
+    );
+}
+
+#[test]
+#[cfg(target_pointer_width = "64")]
+fn join_size_biased() {
+    use futures::future;
+    use std::mem;
+
+    let fut = async {
+        let ready = future::ready(0i32);
+        tokio::join!(biased; ready)
+    };
+    assert_eq!(mem::size_of_val(&fut), 24);
+
+    let fut = async {
+        let ready1 = future::ready(0i32);
+        let ready2 = future::ready(0i32);
+        tokio::join!(biased; ready1, ready2)
+    };
+    assert_eq!(mem::size_of_val(&fut), 40);
+}
+
+#[tokio::test]
 #[allow(clippy::unit_cmp)]
 async fn empty_join() {
     assert_eq!(tokio::join!(), ());
+    assert_eq!(tokio::join!(biased;), ());
 }
 
 #[tokio::test]
