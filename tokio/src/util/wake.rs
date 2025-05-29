@@ -1,8 +1,6 @@
 use crate::loom::sync::Arc;
 
-use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
-use std::ops::Deref;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
 /// Simplified waking interface based on Arcs.
@@ -14,30 +12,45 @@ pub(crate) trait Wake: Send + Sync + Sized + 'static {
     fn wake_by_ref(arc_self: &Arc<Self>);
 }
 
-/// A `Waker` that is only valid for a given lifetime.
-#[derive(Debug)]
-pub(crate) struct WakerRef<'a> {
-    waker: ManuallyDrop<Waker>,
-    _p: PhantomData<&'a ()>,
-}
+cfg_rt! {
+    use std::marker::PhantomData;
+    use std::ops::Deref;
 
-impl Deref for WakerRef<'_> {
-    type Target = Waker;
+    /// A `Waker` that is only valid for a given lifetime.
+    #[derive(Debug)]
+    pub(crate) struct WakerRef<'a> {
+        waker: ManuallyDrop<Waker>,
+        _p: PhantomData<&'a ()>,
+    }
 
-    fn deref(&self) -> &Waker {
-        &self.waker
+    impl Deref for WakerRef<'_> {
+        type Target = Waker;
+
+        fn deref(&self) -> &Waker {
+            &self.waker
+        }
+    }
+
+    /// Creates a reference to a `Waker` from a reference to `Arc<impl Wake>`.
+    pub(crate) fn waker_ref<W: Wake>(wake: &Arc<W>) -> WakerRef<'_> {
+        let ptr = Arc::as_ptr(wake).cast::<()>();
+
+        let waker = unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) };
+
+        WakerRef {
+            waker: ManuallyDrop::new(waker),
+            _p: PhantomData,
+        }
     }
 }
 
-/// Creates a reference to a `Waker` from a reference to `Arc<impl Wake>`.
-pub(crate) fn waker_ref<W: Wake>(wake: &Arc<W>) -> WakerRef<'_> {
-    let ptr = Arc::as_ptr(wake).cast::<()>();
-
-    let waker = unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) };
-
-    WakerRef {
-        waker: ManuallyDrop::new(waker),
-        _p: PhantomData,
+/// Creates a waker from a `Arc<impl Wake>`.
+pub(crate) fn waker<W: Wake>(wake: Arc<W>) -> Waker {
+    unsafe {
+        Waker::from_raw(RawWaker::new(
+            Arc::into_raw(wake).cast(),
+            waker_vtable::<W>(),
+        ))
     }
 }
 

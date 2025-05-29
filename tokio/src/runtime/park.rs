@@ -2,6 +2,7 @@
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
+use crate::util::{waker, Wake};
 
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
@@ -226,7 +227,7 @@ use crate::loom::thread::AccessError;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::task::{RawWaker, RawWakerVTable, Waker};
+use std::task::Waker;
 
 /// Blocks the current thread using a condition variable.
 #[derive(Debug)]
@@ -292,48 +293,18 @@ impl CachedParkThread {
 
 impl UnparkThread {
     pub(crate) fn into_waker(self) -> Waker {
-        unsafe {
-            let raw = unparker_to_raw_waker(self.inner);
-            Waker::from_raw(raw)
-        }
+        waker(self.inner)
     }
 }
 
-impl Inner {
-    #[allow(clippy::wrong_self_convention)]
-    fn into_raw(this: Arc<Inner>) -> *const () {
-        Arc::into_raw(this) as *const ()
+impl Wake for Inner {
+    fn wake(arc_self: Arc<Self>) {
+        arc_self.unpark();
     }
 
-    unsafe fn from_raw(ptr: *const ()) -> Arc<Inner> {
-        Arc::from_raw(ptr as *const Inner)
+    fn wake_by_ref(arc_self: &Arc<Self>) {
+        arc_self.unpark();
     }
-}
-
-unsafe fn unparker_to_raw_waker(unparker: Arc<Inner>) -> RawWaker {
-    RawWaker::new(
-        Inner::into_raw(unparker),
-        &RawWakerVTable::new(clone, wake, wake_by_ref, drop_waker),
-    )
-}
-
-unsafe fn clone(raw: *const ()) -> RawWaker {
-    Arc::increment_strong_count(raw as *const Inner);
-    unparker_to_raw_waker(Inner::from_raw(raw))
-}
-
-unsafe fn drop_waker(raw: *const ()) {
-    drop(Inner::from_raw(raw));
-}
-
-unsafe fn wake(raw: *const ()) {
-    let unparker = Inner::from_raw(raw);
-    unparker.unpark();
-}
-
-unsafe fn wake_by_ref(raw: *const ()) {
-    let raw = raw as *const Inner;
-    (*raw).unpark();
 }
 
 #[cfg(loom)]

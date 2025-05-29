@@ -63,7 +63,7 @@ use crate::sync::AtomicWaker;
 use crate::time::Instant;
 use crate::util::linked_list;
 
-use std::cell::UnsafeCell as StdUnsafeCell;
+use pin_project_lite::pin_project;
 use std::task::{Context, Poll, Waker};
 use std::{marker::PhantomPinned, pin::Pin, ptr::NonNull};
 
@@ -277,30 +277,36 @@ impl StateCell {
     }
 }
 
-/// A timer entry.
-///
-/// This is the handle to a timer that is controlled by the requester of the
-/// timer. As this participates in intrusive data structures, it must be pinned
-/// before polling.
-#[derive(Debug)]
-pub(crate) struct TimerEntry {
-    /// Arc reference to the runtime handle. We can only free the driver after
-    /// deregistering everything from their respective timer wheels.
-    driver: scheduler::Handle,
-    /// Shared inner structure; this is part of an intrusive linked list, and
-    /// therefore other references can exist to it while mutable references to
-    /// Entry exist.
-    ///
-    /// This is manipulated only under the inner mutex. TODO: Can we use loom
-    /// cells for this?
-    inner: StdUnsafeCell<Option<TimerShared>>,
-    /// Deadline for the timer. This is used to register on the first
-    /// poll, as we can't register prior to being pinned.
-    deadline: Instant,
-    /// Whether the deadline has been registered.
-    registered: bool,
-    /// Ensure the type is !Unpin
-    _m: std::marker::PhantomPinned,
+pin_project! {
+    // A timer entry.
+    //
+    // This is the handle to a timer that is controlled by the requester of the
+    // timer. As this participates in intrusive data structures, it must be pinned
+    // before polling.
+    #[derive(Debug)]
+    pub(crate) struct TimerEntry {
+        // Arc reference to the runtime handle. We can only free the driver after
+        // deregistering everything from their respective timer wheels.
+        driver: scheduler::Handle,
+        // Shared inner structure; this is part of an intrusive linked list, and
+        // therefore other references can exist to it while mutable references to
+        // Entry exist.
+        //
+        // This is manipulated only under the inner mutex.
+        #[pin]
+        inner: Option<TimerShared>,
+        // Deadline for the timer. This is used to register on the first
+        // poll, as we can't register prior to being pinned.
+        deadline: Instant,
+        // Whether the deadline has been registered.
+        registered: bool,
+    }
+
+    impl PinnedDrop for TimerEntry {
+        fn drop(this: Pin<&mut Self>) {
+            this.cancel();
+        }
+    }
 }
 
 unsafe impl Send for TimerEntry {}
@@ -479,26 +485,21 @@ impl TimerEntry {
 
         Self {
             driver: handle,
-            inner: StdUnsafeCell::new(None),
+            inner: None,
             deadline,
             registered: false,
-            _m: std::marker::PhantomPinned,
         }
     }
 
-    fn is_inner_init(&self) -> bool {
-        unsafe { &*self.inner.get() }.is_some()
+    fn inner(&self) -> Option<&TimerShared> {
+        self.inner.as_ref()
     }
 
-    // This lazy initialization is for performance purposes.
-    fn inner(&self) -> &TimerShared {
-        let inner = unsafe { &*self.inner.get() };
-        if inner.is_none() {
-            unsafe {
-                *self.inner.get() = Some(TimerShared::new());
-            }
+    fn init_inner(self: Pin<&mut Self>) {
+        match self.inner {
+            Some(_) => {}
+            None => self.project().inner.set(Some(TimerShared::new())),
         }
-        return inner.as_ref().unwrap();
     }
 
     pub(crate) fn deadline(&self) -> Instant {
@@ -506,15 +507,42 @@ impl TimerEntry {
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
-        self.is_inner_init() && !self.inner().state.might_be_registered() && self.registered
+        let Some(inner) = self.inner() else {
+            return false;
+        };
+
+        // Is this timer still in the timer wheel?
+        let deregistered = !inner.might_be_registered();
+
+        // Once the timer has expired,
+        // it will be taken out of the wheel and be fired.
+        //
+        // So if we have already registered the timer into the wheel,
+        // but now it is not in the wheel, it means that it has been
+        // fired.
+        //
+        // +--------------+-----------------+----------+
+        // | deregistered | self.registered |  output  |
+        // +--------------+-----------------+----------+
+        // |     true     |      false      |  false   | <- never been registered
+        // +--------------+-----------------+----------+
+        // |     false    |      false      |  false   | <- never been registered
+        // +--------------+-----------------+----------+
+        // |     true     |      true       |  true    | <- registered into the wheel,
+        // |              |                 |          |    and then taken out of the wheel.
+        // +--------------+-----------------+----------+
+        // |     false    |      true       |  false   | <- still registered in the wheel
+        // +--------------+-----------------+----------+
+        deregistered && self.registered
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.
     pub(crate) fn cancel(self: Pin<&mut Self>) {
         // Avoid calling the `clear_entry` method, because it has not been initialized yet.
-        if !self.is_inner_init() {
+        let Some(inner) = self.inner() else {
             return;
-        }
+        };
+
         // We need to perform an acq/rel fence with the driver thread, and the
         // simplest way to do so is to grab the driver lock.
         //
@@ -537,24 +565,32 @@ impl TimerEntry {
         // driver did so far and happens-before everything the driver does in
         // the future. While we have the lock held, we also go ahead and
         // deregister the entry if necessary.
-        unsafe { self.driver().clear_entry(NonNull::from(self.inner())) };
+        unsafe { self.driver().clear_entry(NonNull::from(inner)) };
     }
 
     pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant, reregister: bool) {
-        let this = unsafe { self.as_mut().get_unchecked_mut() };
-        this.deadline = new_time;
-        this.registered = reregister;
+        let this = self.as_mut().project();
+        *this.deadline = new_time;
+        *this.registered = reregister;
 
         let tick = self.driver().time_source().deadline_to_tick(new_time);
+        let inner = match self.inner() {
+            Some(inner) => inner,
+            None => {
+                self.as_mut().init_inner();
+                self.inner()
+                    .expect("inner should already be initialized by `this.init_inner()`")
+            }
+        };
 
-        if self.inner().extend_expiration(tick).is_ok() {
+        if inner.extend_expiration(tick).is_ok() {
             return;
         }
 
         if reregister {
             unsafe {
                 self.driver()
-                    .reregister(&self.driver.driver().io, tick, self.inner().into());
+                    .reregister(&self.driver.driver().io, tick, inner.into());
             }
         }
     }
@@ -574,7 +610,10 @@ impl TimerEntry {
             self.as_mut().reset(deadline, true);
         }
 
-        self.inner().state.poll(cx.waker())
+        let inner = self
+            .inner()
+            .expect("inner should already be initialized by `self.reset()`");
+        inner.state.poll(cx.waker())
     }
 
     pub(crate) fn driver(&self) -> &super::Handle {
@@ -644,11 +683,5 @@ impl TimerHandle {
     /// the entry must not be in any wheel linked lists.
     pub(super) unsafe fn fire(self, completed_state: TimerResult) -> Option<Waker> {
         self.inner.as_ref().state.fire(completed_state)
-    }
-}
-
-impl Drop for TimerEntry {
-    fn drop(&mut self) {
-        unsafe { Pin::new_unchecked(self) }.as_mut().cancel();
     }
 }

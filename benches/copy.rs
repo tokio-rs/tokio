@@ -77,7 +77,7 @@ impl SlowHddWriter {
     ) -> std::task::Poll<Result<usize, std::io::Error>> {
         let service_res = self.as_mut().service_write(cx);
 
-        if service_res.is_pending() && self.blocking_rng.gen_bool(PROBABILITY_FLUSH_WAIT) {
+        if service_res.is_pending() && self.blocking_rng.random_bool(PROBABILITY_FLUSH_WAIT) {
             return Poll::Pending;
         }
         let available = self.buffer_size - self.buffer_used;
