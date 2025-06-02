@@ -124,7 +124,7 @@
 //! ```
 
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::atomic::{fence, AtomicUsize};
 use crate::loom::sync::Arc;
 #[cfg(all(tokio_unstable, feature = "tracing"))]
 use crate::util::trace;
@@ -133,7 +133,7 @@ use std::fmt;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
-use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed};
+use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::{ready, Context, Poll, Waker};
 
@@ -1273,6 +1273,12 @@ impl<T> Inner<T> {
         }
 
         if prev.is_rx_task_set() {
+            // We need an explicit Acquire fence here because
+            // the successful CAS in `State::set_complete` uses Release
+            // ordering only, but we need to synchronize with the
+            // receiver's memory operations.
+            fence(Acquire);
+
             // TODO: Consume waker?
             unsafe {
                 self.rx_task.with_task(Waker::wake_by_ref);
@@ -1485,10 +1491,12 @@ impl State {
             if State(state).is_closed() {
                 break;
             }
-            // TODO: This could be `Release`, followed by an `Acquire` fence *if*
-            // the `RX_TASK_SET` flag is set. However, `loom` does not support
-            // fences yet.
-            match cell.compare_exchange_weak(state, state | VALUE_SENT, AcqRel, Acquire) {
+
+            // We only need `Release` ordering on success for the
+            // compare_exchange because this method doesn't need to
+            // observe any values that might have been
+            // written by the receiver.
+            match cell.compare_exchange_weak(state, state | VALUE_SENT, Release, Acquire) {
                 Ok(_) => break,
                 Err(actual) => state = actual,
             }
