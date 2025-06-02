@@ -133,7 +133,7 @@ use std::fmt;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
-use std::sync::atomic::Ordering::{self, AcqRel, Acquire};
+use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed};
 use std::task::Poll::{Pending, Ready};
 use std::task::{ready, Context, Poll, Waker};
 
@@ -1427,8 +1427,6 @@ impl<T> Drop for Inner<T> {
 
 impl<T: fmt::Debug> fmt::Debug for Inner<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use std::sync::atomic::Ordering::Relaxed;
-
         fmt.debug_struct("Inner")
             .field("state", &State::load(&self.state, Relaxed))
             .finish()
@@ -1482,7 +1480,7 @@ impl State {
         // `poll_recv` or `try_recv` call is occurring concurrently, both
         // threads may try to access the `UnsafeCell` if we were to set the
         // `VALUE_SENT` bit on a closed channel.
-        let mut state = cell.load(Ordering::Relaxed);
+        let mut state = cell.load(Relaxed);
         loop {
             if State(state).is_closed() {
                 break;
@@ -1490,12 +1488,7 @@ impl State {
             // TODO: This could be `Release`, followed by an `Acquire` fence *if*
             // the `RX_TASK_SET` flag is set. However, `loom` does not support
             // fences yet.
-            match cell.compare_exchange_weak(
-                state,
-                state | VALUE_SENT,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            ) {
+            match cell.compare_exchange_weak(state, state | VALUE_SENT, AcqRel, Acquire) {
                 Ok(_) => break,
                 Err(actual) => state = actual,
             }
