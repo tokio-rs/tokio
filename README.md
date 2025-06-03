@@ -39,7 +39,7 @@ level, it provides a few major components:
 
 * A multithreaded, work-stealing based task [scheduler].
 * A reactor backed by the operating system's event queue (epoll, kqueue,
-  IOCP, etc...).
+  IOCP, etc.).
 * Asynchronous [TCP and UDP][net] sockets.
 
 These components provide the runtime components necessary for building

@@ -11,8 +11,8 @@ test-util = ["tokio/test-util"]
 [dependencies]
 tokio = { version = "1.5.0", path = "../tokio", features = ["full"] }
 criterion = "0.5.1"
-rand = "0.8"
-rand_chacha = "0.3"
+rand = "0.9"
+rand_chacha = "0.9"
 
 [dev-dependencies]
 tokio-util = { version = "0.7.0", path = "../tokio-util", features = ["full"] }
