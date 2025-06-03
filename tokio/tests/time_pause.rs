@@ -289,6 +289,20 @@ async fn exact_1ms_advance() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn advance_duration_max() {
+    let now = Instant::now();
+
+    let dur = Duration::from_millis(1);
+    time::advance(dur).await;
+    assert_eq!(now.elapsed(), dur);
+
+    let now = Instant::now();
+    time::advance(Duration::MAX).await;
+    // magic number from `tokio::time::Instant::far_future()`
+    assert_eq!(now.elapsed(), Duration::from_secs(86400 * 365 * 30));
+}
+
+#[tokio::test(start_paused = true)]
 async fn advance_once_with_timer() {
     let mut sleep = task::spawn(time::sleep(Duration::from_millis(1)));
     assert_pending!(sleep.poll());
