@@ -469,7 +469,7 @@ async fn anon_pipe_simple_send() -> io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
+#[cfg_attr(miri, ignore)] // No `pidfd_spawnp` in miri.
 async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
     use tokio::process::Command;
 
@@ -520,7 +520,6 @@ async fn anon_pipe_from_owned_fd() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn anon_pipe_into_nonblocking_fd() -> std::io::Result<()> {
     let (tx, rx) = pipe::pipe()?;
 
@@ -534,7 +533,6 @@ async fn anon_pipe_into_nonblocking_fd() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn anon_pipe_into_blocking_fd() -> std::io::Result<()> {
     let (tx, rx) = pipe::pipe()?;
 
