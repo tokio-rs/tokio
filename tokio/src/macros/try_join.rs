@@ -19,7 +19,7 @@ macro_rules! doc {
         /// The supplied futures are stored inline and do not require allocating a
         /// `Vec`.
         ///
-        /// ### Runtime characteristics
+        /// ## Runtime characteristics
         ///
         /// By running all async expressions on the current task, the expressions are
         /// able to run **concurrently** but not in **parallel**. This means all
@@ -30,7 +30,7 @@ macro_rules! doc {
         ///
         /// [`tokio::spawn`]: crate::spawn
         ///
-        /// # Fairness
+        /// ## Fairness
         ///
         /// By default, `try_join!`'s generated future rotates which
         /// contained future is polled first whenever it is woken.
@@ -119,7 +119,7 @@ macro_rules! doc {
         ///     }
         /// }
         /// ```
-        ///  Using the `biased;` mode to control polling order.
+        /// Using the `biased;` mode to control polling order.
         ///
         /// ```
         /// async fn do_stuff_async() -> Result<(), &'static str> {
@@ -198,11 +198,9 @@ doc! {macro_rules! try_join {
 
         const COUNT: u32 = $($total)*;
 
-        // Each time the future created by poll_fn is polled,
-        // if not running in biased mode,
-        // a different future will be polled first
-        // to ensure every future passed to join! gets a chance to make progress even if
-        // one of the futures consumes the whole budget.
+        // Each time the future created by poll_fn is polled, if not using biased mode,
+        // a different future is polled first to ensure every future passed to try_join!
+        // can make progress even if one of the futures consumes the whole budget.
         let mut rotator = <$rotator>::default();
 
         poll_fn(move |cx| {

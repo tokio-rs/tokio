@@ -21,7 +21,7 @@ macro_rules! doc {
         /// The supplied futures are stored inline and do not require allocating a
         /// `Vec`.
         ///
-        /// ### Fairness
+        /// ## Runtime characteristics
         ///
         /// By running all async expressions on the current task, the expressions are
         /// able to run **concurrently** but not in **parallel**. This means all
@@ -32,7 +32,7 @@ macro_rules! doc {
         ///
         /// [`tokio::spawn`]: crate::spawn
         ///
-        /// # Poll Ordering
+        /// ## Fairness
         ///
         /// By default, `join!`'s generated future rotates which contained
         /// future is polled first whenever it is woken.
@@ -74,7 +74,7 @@ macro_rules! doc {
         /// }
         /// ```
         ///
-        ///  Using the `biased;` mode to control polling order.
+        /// Using the `biased;` mode to control polling order.
         ///
         /// ```
         /// async fn do_stuff_async() {
@@ -145,11 +145,9 @@ doc! {macro_rules! join {
 
         const COUNT: u32 = $($total)*;
 
-        // Each time the future created by poll_fn is polled,
-        // if not running in biased mode,
-        // a different future will be polled first
-        // to ensure every future passed to join! gets a chance to make progress even if
-        // one of the futures consumes the whole budget.
+        // Each time the future created by poll_fn is polled, if not using biased mode,
+        // a different future is polled first to ensure every future passed to join!
+        // can make progress even if one of the futures consumes the whole budget.
         let mut rotator = <$rotator>::default();
 
         poll_fn(move |cx| {
@@ -225,14 +223,14 @@ doc! {macro_rules! join {
     () => { async {}.await }
 }}
 
-/// Rotates by one every [`Self::num_skip`] call up to COUNT - 1.
+/// Rotates by one each [`Self::num_skip`] call up to COUNT - 1.
 #[derive(Default, Debug)]
 pub struct Rotator<const COUNT: u32> {
     next: u32,
 }
 
 impl<const COUNT: u32> Rotator<COUNT> {
-    /// Rotates by one every [`Self::num_skip`] call up to COUNT - 1
+    /// Rotates by one each [`Self::num_skip`] call up to COUNT - 1
     #[inline]
     pub fn num_skip(&mut self) -> u32 {
         let num_skip = self.next;
@@ -249,7 +247,7 @@ impl<const COUNT: u32> Rotator<COUNT> {
 pub struct BiasedRotator {}
 
 impl BiasedRotator {
-    /// Always returns 0
+    /// Always returns 0.
     #[inline]
     pub fn num_skip(&mut self) -> u32 {
         0
