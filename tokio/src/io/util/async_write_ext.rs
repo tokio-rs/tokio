@@ -1233,11 +1233,12 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// If `flush` is used as the event in a [`tokio::select!`](crate::select)
-        /// statement and some other branch completes first, then the data in the
-        /// buffered data in this `AsyncWrite` may have been partially flushed.
-        /// However, it is guaranteed that the buffer is advanced by the amount
-        /// of bytes that have been partially flushed.
+        /// This method is cancel safe. If `flush` is used as the event in
+        /// a [`tokio::select!`](crate::select) statement and some other
+        /// branch completes first, then the data in the buffered data in
+        /// this `AsyncWrite` may have been partially flushed. However, it is
+        /// guaranteed that the buffer is advanced by the amount of bytes that
+        /// have been partially flushed.
         ///
         /// # Examples
         ///
