@@ -115,6 +115,15 @@ impl<T: AsyncRead> AsyncRead for ReadHalf<T> {
     ) -> Poll<io::Result<()>> {
         self.inner.with_lock(|stream| stream.poll_read(cx, buf))
     }
+
+    fn poll_read_exact(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        self.inner
+            .with_lock(|stream| stream.poll_read_exact(cx, buf))
+    }
 }
 
 impl<T: AsyncWrite> AsyncWrite for WriteHalf<T> {
