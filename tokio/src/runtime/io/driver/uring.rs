@@ -138,7 +138,7 @@ impl UringContext {
 impl Drop for UringContext {
     fn drop(&mut self) {
         if self.uring.is_none() {
-            // Uring is not initialized or not Initialized.
+            // Uring is not initialized or not supported.
             return;
         }
 
