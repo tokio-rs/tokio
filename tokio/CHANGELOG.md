@@ -4,6 +4,12 @@ This fixes a regression on the wasm32-unknown-unknown target, where code that
 previously did not panic due to calls to `Instant::now()` started failing. This
 is due to the stabilization of the first time-based metric.
 
+### Added
+
+- process: Implement `TryFrom<std::process::Child>` for `tokio::process::Child` ([#7388])
+
+[#7388]: https://github.com/tokio-rs/tokio/pull/7388
+
 ### Fixed
 
 - Disable time-based metrics on wasm32-unknown-unknown ([#7322])
