@@ -10,6 +10,7 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
 use crate::util::WakeList;
+use std::sync::Arc;
 
 use std::future::Future;
 use std::marker::PhantomPinned;
@@ -374,6 +375,12 @@ impl Drop for NotifyWaitersList<'_> {
     }
 }
 
+#[derive(Debug)]
+enum NotifyRef<'a> {
+    Owned(Arc<Notify>),
+    Ref(&'a Notify),
+}
+
 /// Future returned from [`Notify::notified()`].
 ///
 /// This future is fused, so once it has completed, any future calls to poll
@@ -382,7 +389,7 @@ impl Drop for NotifyWaitersList<'_> {
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Notified<'a> {
     /// The `Notify` being received on.
-    notify: &'a Notify,
+    notify: NotifyRef<'a>,
 
     /// The current state of the receiving process.
     state: State,
@@ -534,7 +541,44 @@ impl Notify {
         // was called and store that in the future.
         let state = self.state.load(SeqCst);
         Notified {
-            notify: self,
+            notify: NotifyRef::Ref(&self),
+            state: State::Init,
+            notify_waiters_calls: get_num_notify_waiters_calls(state),
+            waiter: Waiter::new(),
+        }
+    }
+
+    /// Unlike [`Self::notified`] which returns a future tied to the `Notify`'s lifetime, `notified_owned`
+    /// creates a self-contained future that owns its notification state, making it safe to move
+    /// between threads.
+    ///
+    /// Can be useful when using [`Self::notify_waiters`] to register all waiters beforehand and send them to different tasks.
+    ///
+    /// # Usage Example
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Notify;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///   let notify = Arc::new(Notify::new());
+    ///   // register all waiters, in this case 1
+    ///   let notified = notify.notified_owned();
+    ///
+    ///   // spawn the taks waiting for the notification
+    ///   tokio::spawn(async move {
+    ///     notified.await; // Waits for the notification
+    ///     println!("Notified!");
+    ///  });
+    ///
+    ///  notify.notify_waiters(); // Sends a notification
+    /// }
+    /// ```
+    pub fn notified_owned(self: &Arc<Self>) -> Notified<'static> {
+        let state = self.state.load(SeqCst);
+        Notified {
+            notify: NotifyRef::Owned(Arc::clone(self)),
             state: State::Init,
             notify_waiters_calls: get_num_notify_waiters_calls(state),
             waiter: Waiter::new(),
@@ -917,17 +961,18 @@ impl Notified<'_> {
         unsafe {
             // Safety: `notify`, `state` and `notify_waiters_calls` are `Unpin`.
 
-            is_unpin::<&Notify>();
+            is_unpin::<NotifyRef<'_>>();
             is_unpin::<State>();
             is_unpin::<usize>();
 
             let me = self.get_unchecked_mut();
-            (
-                me.notify,
-                &mut me.state,
-                &me.notify_waiters_calls,
-                &me.waiter,
-            )
+
+            let notify = match &me.notify {
+                NotifyRef::Ref(notify) => notify,
+                NotifyRef::Owned(notify) => notify.as_ref(),
+            };
+
+            (notify, &mut me.state, &me.notify_waiters_calls, &me.waiter)
         }
     }
 
