@@ -541,7 +541,7 @@ impl Notify {
         // was called and store that in the future.
         let state = self.state.load(SeqCst);
         Notified {
-            notify: NotifyRef::Ref(&self),
+            notify: NotifyRef::Ref(self),
             state: State::Init,
             notify_waiters_calls: get_num_notify_waiters_calls(state),
             waiter: Waiter::new(),
