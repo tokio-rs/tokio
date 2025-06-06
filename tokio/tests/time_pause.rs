@@ -300,6 +300,44 @@ async fn advance_duration_max() {
     time::advance(Duration::MAX).await;
     // magic number from `tokio::time::Instant::far_future()`
     assert_eq!(now.elapsed(), Duration::from_secs(86400 * 365 * 30));
+
+    // then we need to test if the timer wheel is still working correctly
+
+    // hit the first level of wheel
+    let mut sleep = task::spawn(time::sleep(Duration::from_millis(1)));
+    assert_pending!(sleep.poll());
+    time::advance(Duration::from_millis(1)).await;
+    assert!(sleep.is_woken());
+
+    // hit the second level of wheel
+    let mut sleep = task::spawn(time::sleep(Duration::from_millis(65)));
+    assert_pending!(sleep.poll());
+    time::advance(Duration::from_millis(65)).await;
+    assert!(sleep.is_woken());
+
+    // hit the third level of wheel
+    let mut sleep = task::spawn(time::sleep(Duration::from_secs(5)));
+    assert_pending!(sleep.poll());
+    time::advance(Duration::from_secs(5)).await;
+    assert!(sleep.is_woken());
+
+    // hit the fourth level of wheel
+    let mut sleep = task::spawn(time::sleep(Duration::from_secs(60 * 5)));
+    assert_pending!(sleep.poll());
+    time::advance(Duration::from_secs(60 * 5)).await;
+    assert!(sleep.is_woken());
+
+    // hit the fifth level of wheel
+    let mut sleep = task::spawn(time::sleep(Duration::from_secs(60 * 60 * 5)));
+    assert_pending!(sleep.poll());
+    time::advance(Duration::from_secs(60 * 60 * 5)).await;
+    assert!(sleep.is_woken());
+
+    // hit the sixth level of wheel
+    let mut sleep = task::spawn(time::sleep(Duration::from_secs(60 * 60 * 24 * 13)));
+    assert_pending!(sleep.poll());
+    time::advance(Duration::from_secs(60 * 60 * 24 * 13)).await;
+    assert!(sleep.is_woken());
 }
 
 #[tokio::test(start_paused = true)]
