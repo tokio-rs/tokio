@@ -394,7 +394,7 @@ impl<T> Steal<T> {
     /// Returns the number of entries in the queue
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.0.head.load(Acquire));
-        let tail = self.0.tail.load(Acquire);
+        let tail = self.0.tail.load(Relaxed);
         len(head, tail)
     }
 
