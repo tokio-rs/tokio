@@ -1854,6 +1854,58 @@ impl<T> OwnedPermit<T> {
         chan.semaphore().add_permit();
         Sender { chan }
     }
+
+    /// Returns `true` if permits belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel::<()>(2);
+    ///
+    ///     let permit1 = tx.clone().reserve_owned().await.unwrap();
+    ///     let permit2 = tx.clone().reserve_owned().await.unwrap();
+    ///     assert!(permit1.same_channel(&permit2));
+    ///
+    ///     let (tx2, rx2) = mpsc::channel::<()>(1);
+    ///
+    ///     let permit3 = tx2.clone().reserve_owned().await.unwrap();
+    ///     assert!(!permit3.same_channel(&permit2));
+    /// }
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        self.chan
+            .as_ref()
+            .zip(other.chan.as_ref())
+            .is_some_and(|(a, b)| a.same_channel(b))
+    }
+
+    /// Returns `true` if this permit belongs to the same channel as the given [`Sender`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = mpsc::channel::<()>(1);
+    ///
+    ///     let permit = tx.clone().reserve_owned().await.unwrap();
+    ///     assert!(permit.same_channel_as_sender(&tx));
+    ///
+    ///     let (tx2, rx2) = mpsc::channel::<()>(1);
+    ///     assert!(!permit.same_channel_as_sender(&tx2));
+    /// }
+    /// ```
+    pub fn same_channel_as_sender(&self, sender: &Sender<T>) -> bool {
+        self.chan
+            .as_ref()
+            .is_some_and(|chan| chan.same_channel(&sender.chan))
+    }
 }
 
 impl<T> Drop for OwnedPermit<T> {
