@@ -5,7 +5,6 @@
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::runtime::driver::{self, Driver};
-use crate::util::TryLock;
 
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
@@ -43,7 +42,7 @@ const NOTIFIED: usize = 3;
 /// Shared across multiple Parker handles
 struct Shared {
     /// Shared driver. Only one thread at a time can use this
-    driver: TryLock<Driver>,
+    driver: Mutex<Driver>,
 }
 
 impl Parker {
@@ -54,7 +53,7 @@ impl Parker {
                 mutex: Mutex::new(()),
                 condvar: Condvar::new(),
                 shared: Arc::new(Shared {
-                    driver: TryLock::new(driver),
+                    driver: Mutex::new(driver),
                 }),
             }),
         }
