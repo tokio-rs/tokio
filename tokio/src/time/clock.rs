@@ -285,13 +285,19 @@ cfg_test_util! {
         }
 
         pub(crate) fn advance(&self, duration: Duration) -> Result<(), &'static str> {
+            // Retrieve `far_future` before acquiring the mutex to prevent deadlock,
+            // as `Instant::far_future()` also acquires a mutex internally.
+            let far_future = Instant::far_future().into_std();
             let mut inner = self.inner.lock();
 
             if inner.unfrozen.is_some() {
                 return Err("time is not frozen");
             }
 
-            inner.base += duration;
+            inner.base = inner
+                .base
+                .checked_add(duration)
+                .unwrap_or(far_future);
             Ok(())
         }
 
