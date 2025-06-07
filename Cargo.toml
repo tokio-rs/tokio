@@ -31,3 +31,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(tokio_unstable)',
   'cfg(tokio_uring)',
 ] }
+
+[patch.crates-io]
+# TODO: Consume a release of `socket2` that contains <https://github.com/rust-lang/socket2/pull/545>.
+socket2 = { git = "https://github.com/erichdongubler-contrib/socket2", rev = "d4ed5f73ddb051ac700e1b7ee66a72905a86a05e" }
