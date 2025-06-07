@@ -1,4 +1,5 @@
 use crate::loom::sync::Arc;
+use crate::loom::thread;
 
 use std::mem::ManuallyDrop;
 use std::task::{RawWaker, RawWakerVTable, Waker};
@@ -82,4 +83,14 @@ unsafe fn wake_by_ref_arc_raw<T: Wake>(data: *const ()) {
 
 unsafe fn drop_arc_raw<T: Wake>(data: *const ()) {
     drop(Arc::<T>::from_raw(data.cast()));
+}
+
+impl Wake for thread::Thread {
+    fn wake(arc_self: Arc<Self>) {
+        arc_self.unpark();
+    }
+
+    fn wake_by_ref(arc_self: &Arc<Self>) {
+        arc_self.unpark();
+    }
 }

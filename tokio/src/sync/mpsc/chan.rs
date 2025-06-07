@@ -2,11 +2,12 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
-use crate::runtime::park::CachedParkThread;
+use crate::loom::thread;
 use crate::sync::mpsc::error::TryRecvError;
 use crate::sync::mpsc::{bounded, list, unbounded};
 use crate::sync::notify::Notify;
 use crate::util::cacheline::CachePadded;
+use crate::util::waker;
 
 use std::fmt;
 use std::panic;
@@ -457,14 +458,13 @@ impl<T, S: Semaphore> Rx<T, S> {
             self.inner.rx_waker.wake();
 
             // Park the thread until the problematic send has completed.
-            let mut park = CachedParkThread::new();
-            let waker = park.waker().unwrap();
+            let waker = waker(Arc::new(thread::current()));
             loop {
                 self.inner.rx_waker.register_by_ref(&waker);
                 // It is possible that the problematic send has now completed,
                 // so we have to check for messages again.
                 try_recv!();
-                park.park();
+                thread::park();
             }
         })
     }

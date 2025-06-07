@@ -80,6 +80,11 @@ pub(crate) mod sys {
 }
 
 pub(crate) mod thread {
+    use crate::time::Duration;
     pub use loom::lazy_static::AccessError;
     pub use loom::thread::*;
+    pub fn park_timeout(_dur: Duration) {
+        // TODO: timeout
+        park();
+    }
 }
