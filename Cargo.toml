@@ -30,4 +30,5 @@ unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(tokio_taskdump)',
   'cfg(tokio_unstable)',
   'cfg(tokio_uring)',
+  'cfg(target_os, values("cygwin"))',
 ] }
