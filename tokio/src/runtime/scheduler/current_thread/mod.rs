@@ -202,20 +202,17 @@ impl CurrentThread {
                     let notified = self.notify.notified();
                     pin!(notified);
 
-                    if let Some(out) = blocking
-                        .block_on(poll_fn(|cx| {
-                            if notified.as_mut().poll(cx).is_ready() {
-                                return Ready(None);
-                            }
+                    if let Some(out) = blocking.block_on(poll_fn(|cx| {
+                        if notified.as_mut().poll(cx).is_ready() {
+                            return Ready(None);
+                        }
 
-                            if let Ready(out) = future.as_mut().poll(cx) {
-                                return Ready(Some(out));
-                            }
+                        if let Ready(out) = future.as_mut().poll(cx) {
+                            return Ready(Some(out));
+                        }
 
-                            Pending
-                        }))
-                        .expect("Failed to `Enter::block_on`")
-                    {
+                        Pending
+                    })) {
                         return out;
                     }
                 }
