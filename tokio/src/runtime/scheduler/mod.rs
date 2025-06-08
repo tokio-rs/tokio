@@ -33,12 +33,6 @@ pub(crate) enum Handle {
 
     #[cfg(feature = "rt-multi-thread")]
     MultiThread(Arc<multi_thread::Handle>),
-
-    // TODO: This is to avoid triggering "dead code" warnings many other places
-    // in the codebase. Remove this during a later cleanup
-    #[cfg(not(feature = "rt"))]
-    #[allow(dead_code)]
-    Disabled,
 }
 
 #[cfg(feature = "rt")]
@@ -47,22 +41,6 @@ pub(super) enum Context {
 
     #[cfg(feature = "rt-multi-thread")]
     MultiThread(multi_thread::Context),
-}
-
-impl Handle {
-    #[cfg_attr(not(feature = "full"), allow(dead_code))]
-    pub(crate) fn driver(&self) -> &driver::Handle {
-        match *self {
-            #[cfg(feature = "rt")]
-            Handle::CurrentThread(ref h) => &h.driver,
-
-            #[cfg(feature = "rt-multi-thread")]
-            Handle::MultiThread(ref h) => &h.driver,
-
-            #[cfg(not(feature = "rt"))]
-            Handle::Disabled => unreachable!(),
-        }
-    }
 }
 
 cfg_rt! {
@@ -86,6 +64,16 @@ cfg_rt! {
     }
 
     impl Handle {
+        #[cfg_attr(not(feature = "full"), allow(dead_code))]
+        pub(crate) fn driver(&self) -> &driver::Handle {
+            match *self {
+                Handle::CurrentThread(ref h) => &h.driver,
+
+                #[cfg(feature = "rt-multi-thread")]
+                Handle::MultiThread(ref h) => &h.driver,
+            }
+        }
+
         #[track_caller]
         pub(crate) fn current() -> Handle {
             match context::with_current(Clone::clone) {
@@ -266,6 +254,12 @@ cfg_not_rt! {
         feature = "time",
     ))]
     impl Handle {
+        #[cfg_attr(not(feature = "full"), allow(dead_code))]
+        #[track_caller]
+        pub(crate) fn driver(&self) -> &driver::Handle {
+            unreachable!("Handle::driver() is only available when the runtime is enabled");
+        }
+
         #[track_caller]
         pub(crate) fn current() -> Handle {
             panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
