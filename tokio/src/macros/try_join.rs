@@ -45,7 +45,7 @@ macro_rules! doc {
         /// to ensure that the polling order of your futures is fair. If for example you
         /// are joining a stream and a shutdown future, and the stream has a
         /// huge volume of messages that takes a long time to finish processing per poll, you should
-        /// place the shutdown future earlier in the `join!` list to ensure that it is
+        /// place the shutdown future earlier in the `try_join!` list to ensure that it is
         /// always polled, and will not be delayed due to the stream future taking a long time to return
         /// `Poll::Pending`.
         ///
