@@ -230,7 +230,7 @@ impl Handle {
     /// Register an operation with the io_uring.
     ///
     /// If this is the first io_uring operation, it will also initialize the io_uring context.
-    /// If io_uring isn't supported, this function returns an ENOSYS error, so the caller can
+    /// If io_uring isn't supported, this function returns an `ENOSYS` error, so the caller can
     /// perform custom handling, such as falling back to an alternative mechanism.
     ///
     /// # Safety
