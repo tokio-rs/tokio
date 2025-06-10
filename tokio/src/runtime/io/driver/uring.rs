@@ -238,7 +238,6 @@ impl Handle {
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> io::Result<usize> {
-        // Fist, check if the uring is initialized. Callers can use
         // Note: Maybe this check can be removed if upstream callers consistently use `check_and_init`.
         if !self.check_and_init()? {
             return Err(io::Error::from_raw_os_error(libc::ENOSYS));
