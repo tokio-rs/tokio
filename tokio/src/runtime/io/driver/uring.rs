@@ -286,8 +286,8 @@ impl Handle {
         // This Op will be cancelled. Here, we don't remove the lifecycle from the slab to keep
         // uring data alive until the operation completes.
 
-        let cancell_data = data.expect("Data should be present").cancel();
-        match mem::replace(lifecycle, Lifecycle::Cancelled(cancell_data)) {
+        let cancel_data = data.expect("Data should be present").cancel();
+        match mem::replace(lifecycle, Lifecycle::Cancelled(cancel_data)) {
             Lifecycle::Submitted | Lifecycle::Waiting(_) => (),
             // The driver saw the completion, but it was never polled.
             Lifecycle::Completed(_) => (),
