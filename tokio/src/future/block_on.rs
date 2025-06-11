@@ -9,14 +9,13 @@ cfg_rt! {
             thread while the thread is being used to drive asynchronous \
             tasks."
         );
-        e.block_on(f).unwrap()
+        e.block_on(f)
     }
 }
 
 cfg_not_rt! {
     #[track_caller]
     pub(crate) fn block_on<F: Future>(f: F) -> F::Output {
-        let mut park = crate::runtime::park::CachedParkThread::new();
-        park.block_on(f).unwrap()
+        crate::runtime::park::block_on(f)
     }
 }

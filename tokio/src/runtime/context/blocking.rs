@@ -1,7 +1,9 @@
 use super::{EnterRuntime, CONTEXT};
 
-use crate::loom::thread::AccessError;
+use crate::loom::sync::Arc;
+use crate::loom::thread;
 use crate::util::markers::NotSendOrSync;
+use crate::util::waker;
 
 use std::marker::PhantomData;
 use std::time::Duration;
@@ -56,14 +58,11 @@ impl BlockingRegionGuard {
 
     /// Blocks the thread on the specified future, returning the value with
     /// which that future completes.
-    pub(crate) fn block_on<F>(&mut self, f: F) -> Result<F::Output, AccessError>
+    pub(crate) fn block_on<F>(&mut self, f: F) -> F::Output
     where
         F: std::future::Future,
     {
-        use crate::runtime::park::CachedParkThread;
-
-        let mut park = CachedParkThread::new();
-        park.block_on(f)
+        crate::runtime::park::block_on(f)
     }
 
     /// Blocks the thread on the specified future for **at most** `timeout`
@@ -74,13 +73,11 @@ impl BlockingRegionGuard {
     where
         F: std::future::Future,
     {
-        use crate::runtime::park::CachedParkThread;
         use std::task::Context;
         use std::task::Poll::Ready;
         use std::time::Instant;
 
-        let mut park = CachedParkThread::new();
-        let waker = park.waker().map_err(|_| ())?;
+        let waker = waker(Arc::new(thread::current()));
         let mut cx = Context::from_waker(&waker);
 
         pin!(f);
@@ -97,7 +94,7 @@ impl BlockingRegionGuard {
                 return Err(());
             }
 
-            park.park_timeout(when - now);
+            thread::park_timeout(when - now);
         }
     }
 }

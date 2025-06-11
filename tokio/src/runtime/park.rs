@@ -2,7 +2,6 @@
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
-use crate::util::{waker, Wake};
 
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
@@ -28,10 +27,6 @@ struct Inner {
 const EMPTY: usize = 0;
 const PARKED: usize = 1;
 const NOTIFIED: usize = 2;
-
-tokio_thread_local! {
-    static CURRENT_PARKER: ParkThread = ParkThread::new();
-}
 
 // Bit of a hack, but it is only for loom
 #[cfg(loom)]
@@ -223,87 +218,26 @@ impl UnparkThread {
     }
 }
 
-use crate::loom::thread::AccessError;
+use crate::loom::thread;
+use crate::util::waker;
 use std::future::Future;
-use std::marker::PhantomData;
-use std::rc::Rc;
-use std::task::Waker;
 
-/// Blocks the current thread using a condition variable.
-#[derive(Debug)]
-pub(crate) struct CachedParkThread {
-    _anchor: PhantomData<Rc<()>>,
-}
+/// Blocks the current thread by parking it.
+pub(crate) fn block_on<F: Future>(f: F) -> F::Output {
+    use std::task::Context;
+    use std::task::Poll::Ready;
 
-impl CachedParkThread {
-    /// Creates a new `ParkThread` handle for the current thread.
-    ///
-    /// This type cannot be moved to other threads, so it should be created on
-    /// the thread that the caller intends to park.
-    pub(crate) fn new() -> CachedParkThread {
-        CachedParkThread {
-            _anchor: PhantomData,
+    let waker = waker(Arc::new(thread::current()));
+    let mut cx = Context::from_waker(&waker);
+
+    pin!(f);
+
+    loop {
+        if let Ready(v) = crate::task::coop::budget(|| f.as_mut().poll(&mut cx)) {
+            return v;
         }
-    }
 
-    pub(crate) fn waker(&self) -> Result<Waker, AccessError> {
-        self.unpark().map(UnparkThread::into_waker)
-    }
-
-    fn unpark(&self) -> Result<UnparkThread, AccessError> {
-        self.with_current(ParkThread::unpark)
-    }
-
-    pub(crate) fn park(&mut self) {
-        self.with_current(|park_thread| park_thread.inner.park())
-            .unwrap();
-    }
-
-    pub(crate) fn park_timeout(&mut self, duration: Duration) {
-        self.with_current(|park_thread| park_thread.inner.park_timeout(duration))
-            .unwrap();
-    }
-
-    /// Gets a reference to the `ParkThread` handle for this thread.
-    fn with_current<F, R>(&self, f: F) -> Result<R, AccessError>
-    where
-        F: FnOnce(&ParkThread) -> R,
-    {
-        CURRENT_PARKER.try_with(|inner| f(inner))
-    }
-
-    pub(crate) fn block_on<F: Future>(&mut self, f: F) -> Result<F::Output, AccessError> {
-        use std::task::Context;
-        use std::task::Poll::Ready;
-
-        let waker = self.waker()?;
-        let mut cx = Context::from_waker(&waker);
-
-        pin!(f);
-
-        loop {
-            if let Ready(v) = crate::task::coop::budget(|| f.as_mut().poll(&mut cx)) {
-                return Ok(v);
-            }
-
-            self.park();
-        }
-    }
-}
-
-impl UnparkThread {
-    pub(crate) fn into_waker(self) -> Waker {
-        waker(self.inner)
-    }
-}
-
-impl Wake for Inner {
-    fn wake(arc_self: Arc<Self>) {
-        arc_self.unpark();
-    }
-
-    fn wake_by_ref(arc_self: &Arc<Self>) {
-        arc_self.unpark();
+        thread::park();
     }
 }
 
