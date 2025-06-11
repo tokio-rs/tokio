@@ -4,13 +4,17 @@ use crate::util::linked_list::{self, LinkedList};
 
 use std::io;
 use std::ptr::NonNull;
-use std::sync::atomic::Ordering::{Acquire, Release};
+use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
 
 // Kind of arbitrary, but buffering 16 `ScheduledIo`s doesn't seem like much
 const NOTIFY_AFTER: usize = 16;
 
 pub(super) struct RegistrationSet {
+    /// Safety: This counter may not always reflect the
+    /// latest number of registrations pending release.
+    /// Do not use this value to index into the [`Synced::pending_release`]
+    /// vector as it could lead to out-of-bounds access.
     num_pending_release: AtomicUsize,
 }
 
@@ -49,8 +53,18 @@ impl RegistrationSet {
     }
 
     /// Returns `true` if there are registrations that need to be released
+    ///
+    /// Note that this function may not always reflect the latest length,
+    /// but changes from other threads won't take too long to become
+    /// visible to the current thread.
+    /// This is because this function is always called
+    /// after locking the [`Driver`].
+    ///
+    /// [`Driver`]: crate::runtime::driver::Driver
     pub(super) fn needs_release(&self) -> bool {
-        self.num_pending_release.load(Acquire) != 0
+        // We only need `Relaxed` here because we are not going to use this value
+        // to index into the `pending_release` vector.
+        self.num_pending_release.load(Relaxed) != 0
     }
 
     pub(super) fn allocate(&self, synced: &mut Synced) -> io::Result<Arc<ScheduledIo>> {
@@ -75,7 +89,9 @@ impl RegistrationSet {
         synced.pending_release.push(registration.clone());
 
         let len = synced.pending_release.len();
-        self.num_pending_release.store(len, Release);
+        // We only need `Relaxed` here because we are not going to use this value
+        // to index into the `pending_release` vector.
+        self.num_pending_release.store(len, Relaxed);
 
         len == NOTIFY_AFTER
     }
@@ -109,7 +125,9 @@ impl RegistrationSet {
             unsafe { self.remove(synced, &io) }
         }
 
-        self.num_pending_release.store(0, Release);
+        // We only need `Relaxed` here because we are not going to use this value
+        // to index into the `pending_release` vector.
+        self.num_pending_release.store(0, Relaxed);
     }
 
     // This function is marked as unsafe, because the caller must make sure that
