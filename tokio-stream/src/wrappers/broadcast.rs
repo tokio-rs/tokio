@@ -92,6 +92,10 @@ impl<T: 'static + Clone + Send> Stream for BroadcastStream<T> {
         }
     }
 
+    /// Returns the estimated number of items ready to be received.
+    ///
+    /// The returned lower bound is updated on each poll of the stream.  
+    /// Before the first `poll_next()` call, it reflects the channel state at construction time.
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.len, None)
     }
