@@ -39,7 +39,7 @@ level, it provides a few major components:
 
 * A multithreaded, work-stealing based task [scheduler].
 * A reactor backed by the operating system's event queue (epoll, kqueue,
-  IOCP, etc...).
+  IOCP, etc.).
 * Asynchronous [TCP and UDP][net] sockets.
 
 These components provide the runtime components necessary for building
@@ -56,7 +56,7 @@ Make sure you activated the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.45.0", features = ["full"] }
+tokio = { version = "1.45.1", features = ["full"] }
 ```
 Then, on your main.rs:
 

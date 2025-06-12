@@ -471,7 +471,6 @@ impl Runtime {
     }
 }
 
-#[allow(clippy::single_match)] // there are comments in the error branch, so we don't want if-let
 impl Drop for Runtime {
     fn drop(&mut self) {
         match &mut self.scheduler {

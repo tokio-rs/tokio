@@ -1,4 +1,4 @@
-307
+306
 &
 +
 <
@@ -104,7 +104,6 @@ DNS
 DoS
 dwOpenMode
 endian
-ENOSYS
 enqueue
 enqueued
 EntryInner

@@ -138,7 +138,7 @@ impl UringContext {
 impl Drop for UringContext {
     fn drop(&mut self) {
         if self.uring.is_none() {
-            // Uring is not initialized or not Initialized.
+            // Uring is not initialized or not supported.
             return;
         }
 
@@ -230,7 +230,7 @@ impl Handle {
     /// Register an operation with the io_uring.
     ///
     /// If this is the first io_uring operation, it will also initialize the io_uring context.
-    /// If io_uring isn't supported, this function returns an ENOSYS error, so the caller can
+    /// If io_uring isn't supported, this function returns an `ENOSYS` error, so the caller can
     /// perform custom handling, such as falling back to an alternative mechanism.
     ///
     /// # Safety
@@ -238,7 +238,6 @@ impl Handle {
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> io::Result<usize> {
-        // Fist, check if the uring is initialized. Callers can use
         // Note: Maybe this check can be removed if upstream callers consistently use `check_and_init`.
         if !self.check_and_init()? {
             return Err(io::Error::from_raw_os_error(libc::ENOSYS));
@@ -286,8 +285,8 @@ impl Handle {
         // This Op will be cancelled. Here, we don't remove the lifecycle from the slab to keep
         // uring data alive until the operation completes.
 
-        let cancell_data = data.expect("Data should be present").cancel();
-        match mem::replace(lifecycle, Lifecycle::Cancelled(cancell_data)) {
+        let cancel_data = data.expect("Data should be present").cancel();
+        match mem::replace(lifecycle, Lifecycle::Cancelled(cancel_data)) {
             Lifecycle::Submitted | Lifecycle::Waiting(_) => (),
             // The driver saw the completion, but it was never polled.
             Lifecycle::Completed(_) => (),

@@ -916,6 +916,8 @@ impl Future for LocalSet {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+        let _no_blocking = crate::runtime::context::disallow_block_in_place();
+
         // Register the waker before starting to work
         self.context.shared.waker.register_by_ref(cx.waker());
 
@@ -948,6 +950,8 @@ impl Default for LocalSet {
 impl Drop for LocalSet {
     fn drop(&mut self) {
         self.with_if_possible(|| {
+            let _no_blocking = crate::runtime::context::disallow_block_in_place();
+
             // Shut down all tasks in the LocalOwnedTasks and close it to
             // prevent new tasks from ever being added.
             unsafe {

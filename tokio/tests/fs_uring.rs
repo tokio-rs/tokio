@@ -79,7 +79,7 @@ fn process_many_files(rt: Runtime) {
         for _ in 0..NUM_FILES {
             let mut tmp = NamedTempFile::new().unwrap();
             let mut data = vec![0u8; FILE_SIZE];
-            rand::thread_rng().fill(&mut data[..]);
+            rand::rng().fill(&mut data[..]);
             tmp.write_all(&data).unwrap();
             tmp.flush().unwrap();
             let path = tmp.path().to_path_buf();
