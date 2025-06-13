@@ -6,6 +6,7 @@ use crate::{
 use io_uring::{opcode, types};
 use std::{ffi::CString, io, os::fd::FromRawFd, path::Path};
 
+#[derive(Debug)]
 pub(crate) struct Open {
     #[allow(dead_code)]
     path: CString,
@@ -22,7 +23,7 @@ impl Completable for Open {
 
 impl Cancellable for Open {
     fn cancel(self) -> CancelData {
-        todo!()
+        CancelData::Open(self)
     }
 }
 
