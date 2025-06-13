@@ -90,6 +90,7 @@ cfg_rt! {
 // the outer future against the cooperating budget.
 
 use crate::runtime::context;
+use std::marker::PhantomData;
 
 /// Opaque type tracking the amount of "work" a task may still do before
 /// yielding back to the scheduler.
@@ -256,9 +257,16 @@ cfg_coop! {
     /// Value returned by the [`poll_proceed`](poll_proceed) method.
     #[derive(Debug)]
     #[must_use]
-    pub struct RestoreOnPending(Cell<Budget>);
+    pub struct RestoreOnPending(Cell<Budget>, PhantomData<*mut ()>);
 
     impl RestoreOnPending {
+        fn new(budget: Budget) -> Self {
+            RestoreOnPending(
+                Cell::new(budget),
+                PhantomData,
+            )
+        }
+
         /// Signals that the task that obtained this `RestoreOnPending` was able to make
         /// progress. This prevents the task budget from being restored to the value
         /// it had prior to obtaining this instance when it is dropped.
@@ -370,7 +378,7 @@ cfg_coop! {
             let decrement = budget.decrement();
 
             if decrement.success {
-                let restore = RestoreOnPending(Cell::new(cell.get()));
+                let restore = RestoreOnPending::new(cell.get());
                 cell.set(budget);
 
                 // avoid double counting
@@ -383,7 +391,7 @@ cfg_coop! {
                 register_waker(cx);
                 Poll::Pending
             }
-        }).unwrap_or(Poll::Ready(RestoreOnPending(Cell::new(Budget::unconstrained()))))
+        }).unwrap_or(Poll::Ready(RestoreOnPending::new(Budget::unconstrained())))
     }
 
     /// Returns `Poll::Ready` if the current task has budget to consume, and `Poll::Pending` otherwise.
