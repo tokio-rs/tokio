@@ -87,6 +87,8 @@ impl<T: 'static + Clone + Send> Stream for BroadcastStream<T> {
             Ok(item) => Poll::Ready(Some(Ok(item))),
             Err(RecvError::Closed) => Poll::Ready(None),
             Err(RecvError::Lagged(n)) => {
+                // Adjust the estimated length to account for skipped messages.
+                self.len = self.len.saturating_sub(n as usize);
                 Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n))))
             }
         }
@@ -94,8 +96,10 @@ impl<T: 'static + Clone + Send> Stream for BroadcastStream<T> {
 
     /// Returns the estimated number of items ready to be received.
     ///
-    /// The returned lower bound is updated on each poll of the stream.  
+    /// The returned lower bound is updated on each poll of the stream.
     /// Before the first `poll_next()` call, it reflects the channel state at construction time.
+    /// If the stream has lagged behind, the lower bound may temporarily overestimate the
+    /// remaining messages. After polling, it is adjusted to account for dropped messages.
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.len, None)
     }
