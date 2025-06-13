@@ -298,40 +298,67 @@ cfg_coop! {
     ///
     /// # Examples
     ///
-    /// This example shows a `Future` implementation that uses `poll_proceed` to participate in
-    /// cooperative scheduling. If the work to be done consists of polling another future, consider
-    /// using the higher-level [`cooperative`](cooperative) function instead.
+    /// This example shows a simple countdown latch that uses `poll_proceed` to participate in
+    /// cooperative scheduling.
     ///
-    /// ```ignore
-    /// use std::future::Future;
+    /// ```
+    /// use std::future::{Future};
     /// use std::pin::Pin;
-    /// use std::task::{ready, Context, Poll};
+    /// use std::task::{ready, Context, Poll, Waker};
+    /// use tokio::task::coop;
     ///
-    /// impl<T> Future for CooperativeFuture<T> {
+    /// struct CountdownLatch<T> {
+    ///     counter: usize,
+    ///     value: Option<T>,
+    ///     waker: Option<Waker>
+    /// }
+    ///
+    /// impl<T> CountdownLatch<T> {
+    ///     fn new(value: T, count: usize) -> Self {
+    ///         CountdownLatch {
+    ///             counter: count,
+    ///             value: Some(value),
+    ///             waker: None
+    ///         }
+    ///     }
+    ///     fn count_down(&mut self) {
+    ///         if self.counter <= 0 {
+    ///             return;
+    ///         }
+    ///
+    ///         self.counter -= 1;
+    ///         if self.counter == 0 {
+    ///             if let Some(w) = std::mem::replace(&mut self.waker, None) {
+    ///                 w.wake();
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// impl<T> Future for CountdownLatch<T> {
     ///    type Output = T;
     ///
     ///    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     ///        // `poll_proceed` checks with the runtime if this task is still allowed to proceed
     ///        // with performing work.
-    ///        // If not, `Pending` is returned and `ready!` ensure this
-    ///        // function returns.
+    ///        // If not, `Pending` is returned and `ready!` ensures this function returns.
     ///        // If we are allowed to proceed, coop now represents the budget consumption
-    ///        let coop = ready!(tokio::task::coop::poll_proceed(cx));
+    ///        let coop = ready!(coop::poll_proceed(cx));
     ///
-    ///        // Here we try to do some work
-    ///        // If for some reason that's not possible and we exit the function with `Pending`
-    ///        // the drop of `coop` will ensure the consumed budget is restored freeing it up
-    ///        // for use elsewhere.
-    ///        let ret : Poll<T> = ...;
-    ///
-    ///        // If the value we will return is `Ready(_)` the task did perform some actual work
-    ///        // and the task budget consumption needs to be committed. We do that by calling
-    ///        // `made_progress`. It is essential that this call is made because otherwise the
-    ///        // the budget will be restored and the task may keep running indefinitely.
-    ///        if ret.is_ready() {
-    ///            coop.made_progress();
+    ///        // Next we check if the latch is ready to release its value
+    ///        if self.counter == 0 {
+    ///             let t = std::mem::replace(&mut self.value, None);
+    ///             // The latch made progress so call `made_progress` to ensure the budget
+    ///             // is not reverted.
+    ///             coop.made_progress();
+    ///             Poll::Ready(t.unwrap())
+    ///        } else {
+    ///             // If the latch is not ready so return pending and simply drop `coop`.
+    ///             // This will restore the budget making it available again to perform any
+    ///             // other work.
+    ///             self.waker = Some(cx.waker().clone());
+    ///             Poll::Pending
     ///        }
-    ///        ret
     ///     }
     /// }
     /// ```
