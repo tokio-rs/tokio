@@ -38,6 +38,7 @@ use std::task::{ready, Context, Poll};
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub struct BroadcastStream<T> {
     inner: ReusableBoxFuture<'static, (Result<T, RecvError>, Receiver<T>)>,
+    len: usize,
 }
 
 /// An error returned from the inner stream of a [`BroadcastStream`].
@@ -68,8 +69,10 @@ async fn make_future<T: Clone>(mut rx: Receiver<T>) -> (Result<T, RecvError>, Re
 impl<T: 'static + Clone + Send> BroadcastStream<T> {
     /// Create a new `BroadcastStream`.
     pub fn new(rx: Receiver<T>) -> Self {
+        let len = rx.len();
         Self {
             inner: ReusableBoxFuture::new(make_future(rx)),
+            len,
         }
     }
 }
@@ -78,14 +81,27 @@ impl<T: 'static + Clone + Send> Stream for BroadcastStream<T> {
     type Item = Result<T, BroadcastStreamRecvError>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let (result, rx) = ready!(self.inner.poll(cx));
+        self.len = rx.len();
         self.inner.set(make_future(rx));
         match result {
             Ok(item) => Poll::Ready(Some(Ok(item))),
             Err(RecvError::Closed) => Poll::Ready(None),
             Err(RecvError::Lagged(n)) => {
+                // Adjust the estimated length to account for skipped messages.
+                self.len = self.len.saturating_sub(n as usize);
                 Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n))))
             }
         }
+    }
+
+    /// Returns the estimated number of items ready to be received.
+    ///
+    /// The returned lower bound is updated on each poll of the stream.
+    /// Before the first `poll_next()` call, it reflects the channel state at construction time.
+    /// If the stream has lagged behind, the lower bound may temporarily overestimate the
+    /// remaining messages. After polling, it is adjusted to account for dropped messages.
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, None)
     }
 }
 
