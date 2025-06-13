@@ -90,7 +90,6 @@ cfg_rt! {
 // the outer future against the cooperating budget.
 
 use crate::runtime::context;
-use std::marker::PhantomData;
 
 /// Opaque type tracking the amount of "work" a task may still do before
 /// yielding back to the scheduler.
@@ -251,6 +250,7 @@ cfg_coop! {
     use pin_project_lite::pin_project;
     use std::cell::Cell;
     use std::future::Future;
+    use std::marker::PhantomData;
     use std::pin::Pin;
     use std::task::{ready, Context, Poll};
 
