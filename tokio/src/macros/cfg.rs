@@ -683,3 +683,17 @@ macro_rules! cfg_tokio_uring {
         )*
     };
 }
+
+macro_rules! cfg_not_tokio_uring {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(
+                tokio_uring,
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            )))]
+            $item
+        )*
+    };
+}

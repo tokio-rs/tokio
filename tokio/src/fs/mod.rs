@@ -237,6 +237,9 @@ pub use self::metadata::metadata;
 
 mod open_options;
 pub use self::open_options::OpenOptions;
+cfg_tokio_uring! {
+    pub(crate) use self::open_options::UringOpenOptions;
+}
 
 mod read;
 pub use self::read::read;
