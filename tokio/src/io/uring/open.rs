@@ -8,6 +8,8 @@ use std::{ffi::CString, io, os::fd::FromRawFd, path::Path};
 
 #[derive(Debug)]
 pub(crate) struct Open {
+    /// This field will be read by the kernel during the operation, so we
+    /// need to ensure it is valid for the entire duration of the operation.
     #[allow(dead_code)]
     path: CString,
 }

@@ -265,6 +265,11 @@ impl Handle {
             submit_or_remove(ctx)?;
         }
 
+        // Ensure that the completion queue is not full before submitting the entry.
+        while ctx.ring_mut().completion().is_full() {
+            ctx.dispatch_completions();
+        }
+
         // Note: For now, we submit the entry immediately without utilizing batching.
         submit_or_remove(ctx)?;
 
