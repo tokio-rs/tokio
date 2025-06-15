@@ -11,10 +11,6 @@ use std::sync::Arc;
 const NOTIFY_AFTER: usize = 16;
 
 pub(super) struct RegistrationSet {
-    /// Safety: This counter may not always reflect the
-    /// latest number of registrations pending release.
-    /// Do not use this value to index into the [`Synced::pending_release`]
-    /// vector as it could lead to out-of-bounds access.
     num_pending_release: AtomicUsize,
 }
 
@@ -53,17 +49,40 @@ impl RegistrationSet {
     }
 
     /// Returns `true` if there are registrations that need to be released
-    ///
-    /// Note that this function may not always reflect the latest length,
-    /// but changes from other threads won't take too long to become
-    /// visible to the current thread.
-    /// This is because this function is always called
-    /// after locking the [`Driver`].
-    ///
-    /// [`Driver`]: crate::runtime::driver::Driver
     pub(super) fn needs_release(&self) -> bool {
-        // We only need `Relaxed` here because we are not going to use this value
-        // to index into the `pending_release` vector.
+        // `Relaxed` is sufficient here because:
+        //   - This method is only called with the I/O driver locked.
+        //   - AND the method `Self::release` is also only called
+        //     with the I/O driver locked.
+        //
+        // So there are three possibilities to get `0` here:
+        //   1. `num_pending_release` was never changed,
+        //     which means that `0` is the initial value
+        //     that was assigned in `Self::new`.
+        //   2. There was a call to `Self::release` that happens-before this call.
+        //   3. There was a call to `Self::deregister`, but its increment of
+        //     `num_pending_release` is not yet visible to this thread.
+        //
+        // For (1), apparently, nothing need to be synchronized.
+        // For (2), `0` is absolutely latest value, so no need to worry about it.
+        // For (3), this doesn't cause use-after-free, because
+        //   - It is impossible to call this method concurrently with the driver
+        //     lock held.
+        //   - AND `0` means the caller will not call `Self::release`, so nothing
+        //     will be free.
+        //
+        // To recap, it is impossible to return `true` but nothing is pending release.
+        //
+        // There are only one possibility to get `> 0` here:
+        //   1. There was a call to `Self::deregister` that appears in this call.
+        //
+        // For (1), this doesn't cause use-after-free, because
+        //   - It is already deregistered out of the mio.
+        //   - AND this call is sequenced-before polling the mio.
+        //
+        // To recap, it is impossible to return `false` but there are pending releases,
+        // but this is harmless, and the `Self::deregister` will notify the driver
+        // if there are too many pending releases.
         self.num_pending_release.load(Relaxed) != 0
     }
 
@@ -89,8 +108,14 @@ impl RegistrationSet {
         synced.pending_release.push(registration.clone());
 
         let len = synced.pending_release.len();
-        // We only need `Relaxed` here because we are not going to use this value
-        // to index into the `pending_release` vector.
+        // `Relaxed` is sufficient because this will become
+        // the side-effect of unlocking the `Synced`, and
+        // `Self::release` will always observe this store.
+        //
+        // The `Self::needs_release` might observe the old value,
+        // but it is harmless, please checkout the comment
+        // in `Self::needs_release` for detailed explanation
+        // if you are interested.
         self.num_pending_release.store(len, Relaxed);
 
         len == NOTIFY_AFTER
@@ -125,8 +150,20 @@ impl RegistrationSet {
             unsafe { self.remove(synced, &io) }
         }
 
-        // We only need `Relaxed` here because we are not going to use this value
-        // to index into the `pending_release` vector.
+        // `Relaxed` is sufficient here because this method is only called
+        // with both the I/O driver and `Synced` locked.
+        //
+        // With the I/O driver locked, the next call to
+        // method `Self::needs_release` will observe this store
+        // or other stores (Self::deregister) that follow this store
+        // in modification order.
+        //
+        // If `Self::needs_release` observes this store, apparently,
+        // the driver will not release anything.
+        //
+        // If `Self::needs_release` observes a stores that follows this store
+        // in modification order, this is harmless, please checkout the comment
+        // in `Self::needs_release` for detailed explanation if you are interested.
         self.num_pending_release.store(0, Relaxed);
     }
 
