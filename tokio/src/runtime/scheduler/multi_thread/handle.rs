@@ -1,6 +1,7 @@
 use crate::future::Future;
 use crate::loom::sync::Arc;
 use crate::runtime::scheduler::multi_thread::worker;
+use crate::runtime::task::{Notified, Task, TaskHarnessScheduleHooks};
 use crate::runtime::{
     blocking, driver,
     task::{self, JoinHandle},
@@ -63,6 +64,26 @@ impl Handle {
         me.schedule_option_task_without_yield(notified);
 
         handle
+    }
+}
+
+impl task::Schedule for Arc<Handle> {
+    fn release(&self, task: &Task<Self>) -> Option<Task<Self>> {
+        self.shared.owned.remove(task)
+    }
+
+    fn schedule(&self, task: Notified<Self>) {
+        self.schedule_task(task, false);
+    }
+
+    fn hooks(&self) -> TaskHarnessScheduleHooks {
+        TaskHarnessScheduleHooks {
+            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
+        }
+    }
+
+    fn yield_now(&self, task: Notified<Self>) {
+        self.schedule_task(task, true);
     }
 }
 

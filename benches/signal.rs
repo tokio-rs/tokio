@@ -1,5 +1,4 @@
 //! Benchmark the delay in propagating OS signals to any listeners.
-#![cfg(unix)]
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::future::Future;
