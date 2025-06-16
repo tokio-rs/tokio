@@ -220,6 +220,24 @@ rt_test! {
         assert_eq!(answer, 42);
     }
 
+    #[test]
+    fn thread_park_ok() {
+        use core::task::Poll;
+        let rt = rt();
+        let mut exit = false;
+        rt.handle().block_on(core::future::poll_fn(move |cx| {
+            if exit {
+                return Poll::Ready(());
+            }
+            cx.waker().wake_by_ref();
+            // Verify that consuming the park token does not result in a hang.
+            std::thread::current().unpark();
+            std::thread::park();
+            exit = true;
+            Poll::Pending
+        }));
+    }
+
     // ==== net ======
 
     #[test]
