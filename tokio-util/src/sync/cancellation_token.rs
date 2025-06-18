@@ -1,6 +1,7 @@
 //! An asynchronously awaitable `CancellationToken`.
 //! The token allows to signal a cancellation request to one or more tasks.
 pub(crate) mod guard;
+pub(crate) mod guard_ref;
 mod tree_node;
 
 use crate::loom::sync::Arc;
@@ -10,6 +11,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use guard::DropGuard;
+use guard_ref::DropGuardRef;
 use pin_project_lite::pin_project;
 
 /// A token which can be used to signal a cancellation request to one or more
@@ -240,6 +242,14 @@ impl CancellationToken {
     /// unless disarmed.
     pub fn drop_guard(self) -> DropGuard {
         DropGuard { inner: Some(self) }
+    }
+
+    /// Creates a `DropGuardRef` for this token.
+    ///
+    /// Returned guard will cancel this token (and all its children) on drop
+    /// unless disarmed.
+    pub fn drop_guard_ref(&self) -> DropGuardRef<'_> {
+        DropGuardRef { inner: Some(self) }
     }
 
     /// Runs a future to completion and returns its result wrapped inside of an `Option`
