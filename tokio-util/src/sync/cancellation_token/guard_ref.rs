@@ -5,7 +5,6 @@ use crate::sync::CancellationToken;
 ///
 /// This is a `ref` version of [`DropGuard`]
 ///
-///
 /// [`drop_guard_ref`]: CancellationToken::drop_guard_ref
 /// [`DropGuard`]: super::DropGuard
 #[derive(Debug)]
