@@ -57,7 +57,7 @@ impl RegistrationSet {
         // `Relaxed` is sufficient here because:
         //   - This method is only called with the I/O driver locked.
         //   - AND the method `Self::release` is also only called
-        //     with the both I/O driver and `Synced` locked.
+        //     with both I/O driver and `Synced` locked.
         //
         // So there are three possibilities to get `0` here:
         //   1. `num_pending_release` was never changed,
