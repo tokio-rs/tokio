@@ -43,18 +43,18 @@ use crate::loom::sync::{Arc, Mutex, MutexGuard};
 /// A node of the cancellation tree structure
 ///
 /// The actual data it holds is wrapped inside a mutex for synchronization.
-pub(crate) struct TreeNode {
-    inner: Mutex<Inner>,
+pub(crate) struct TreeNode<T> {
+    inner: Mutex<Inner<T>>,
     waker: tokio::sync::Notify,
 }
-impl TreeNode {
+impl<T> TreeNode<T> {
     pub(crate) fn new() -> Self {
         Self {
             inner: Mutex::new(Inner {
                 parent: None,
                 parent_idx: 0,
                 children: vec![],
-                is_cancelled: false,
+                is_cancelled: None,
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
@@ -70,33 +70,38 @@ impl TreeNode {
 ///
 /// This struct exists so that the data of the node can be wrapped
 /// in a Mutex.
-struct Inner {
-    parent: Option<Arc<TreeNode>>,
+struct Inner<T> {
+    parent: Option<Arc<TreeNode<T>>>,
     parent_idx: usize,
-    children: Vec<Arc<TreeNode>>,
-    is_cancelled: bool,
+    children: Vec<Arc<TreeNode<T>>>,
+    is_cancelled: Option<T>,
     num_handles: usize,
 }
 
 /// Returns whether or not the node is cancelled
-pub(crate) fn is_cancelled(node: &Arc<TreeNode>) -> bool {
-    node.inner.lock().unwrap().is_cancelled
+pub(crate) fn is_cancelled<T>(node: &Arc<TreeNode<T>>) -> bool {
+    node.inner.lock().unwrap().is_cancelled.is_some()
+}
+
+/// Returns whether or not the node is cancelled
+pub(crate) fn with_cancelled<T, R>(node: &Arc<TreeNode<T>>, f: impl FnOnce(&Option<T>) -> R) -> R {
+    f(&node.inner.lock().unwrap().is_cancelled)
 }
 
 /// Creates a child node
-pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
+pub(crate) fn child_node<T: Clone>(parent: &Arc<TreeNode<T>>) -> Arc<TreeNode<T>> {
     let mut locked_parent = parent.inner.lock().unwrap();
 
     // Do not register as child if we are already cancelled.
     // Cancelled trees can never be uncancelled and therefore
     // need no connection to parents or children any more.
-    if locked_parent.is_cancelled {
+    if let Some(reason) = &locked_parent.is_cancelled {
         return Arc::new(TreeNode {
             inner: Mutex::new(Inner {
                 parent: None,
                 parent_idx: 0,
                 children: vec![],
-                is_cancelled: true,
+                is_cancelled: Some(reason.clone()),
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
@@ -108,7 +113,7 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
             parent: Some(parent.clone()),
             parent_idx: locked_parent.children.len(),
             children: vec![],
-            is_cancelled: false,
+            is_cancelled: None,
             num_handles: 1,
         }),
         waker: tokio::sync::Notify::new(),
@@ -122,7 +127,7 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
 /// Disconnects the given parent from all of its children.
 ///
 /// Takes a reference to [Inner] to make sure the parent is already locked.
-fn disconnect_children(node: &mut Inner) {
+fn disconnect_children<T>(node: &mut Inner<T>) {
     for child in std::mem::take(&mut node.children) {
         let mut locked_child = child.inner.lock().unwrap();
         locked_child.parent_idx = 0;
@@ -147,9 +152,9 @@ fn disconnect_children(node: &mut Inner) {
 ///
 /// The locked child and optionally its locked parent, if a parent exists, get passed
 /// to the `func` argument via (node, None) or (node, Some(parent)).
-fn with_locked_node_and_parent<F, Ret>(node: &Arc<TreeNode>, func: F) -> Ret
+fn with_locked_node_and_parent<T, F, Ret>(node: &Arc<TreeNode<T>>, func: F) -> Ret
 where
-    F: FnOnce(MutexGuard<'_, Inner>, Option<MutexGuard<'_, Inner>>) -> Ret,
+    F: FnOnce(MutexGuard<'_, Inner<T>>, Option<MutexGuard<'_, Inner<T>>>) -> Ret,
 {
     use std::sync::TryLockError;
 
@@ -199,7 +204,7 @@ where
 /// otherwise there is a potential for a deadlock as invariant #2 would be violated.
 ///
 /// To acquire the locks for node and parent, use [`with_locked_node_and_parent`].
-fn move_children_to_parent(node: &mut Inner, parent: &mut Inner) {
+fn move_children_to_parent<T>(node: &mut Inner<T>, parent: &mut Inner<T>) {
     // Pre-allocate in the parent, for performance
     parent.children.reserve(node.children.len());
 
@@ -217,7 +222,7 @@ fn move_children_to_parent(node: &mut Inner, parent: &mut Inner) {
 ///
 /// `parent` MUST be the parent of `node`.
 /// To acquire the locks for node and parent, use [`with_locked_node_and_parent`].
-fn remove_child(parent: &mut Inner, mut node: MutexGuard<'_, Inner>) {
+fn remove_child<T>(parent: &mut Inner<T>, mut node: MutexGuard<'_, Inner<T>>) {
     // Query the position from where to remove a node
     let pos = node.parent_idx;
     node.parent = None;
@@ -246,7 +251,7 @@ fn remove_child(parent: &mut Inner, mut node: MutexGuard<'_, Inner>) {
 }
 
 /// Increases the reference count of handles.
-pub(crate) fn increase_handle_refcount(node: &Arc<TreeNode>) {
+pub(crate) fn increase_handle_refcount<T>(node: &Arc<TreeNode<T>>) {
     let mut locked_node = node.inner.lock().unwrap();
 
     // Once no handles are left over, the node gets detached from the tree.
@@ -260,7 +265,7 @@ pub(crate) fn increase_handle_refcount(node: &Arc<TreeNode>) {
 ///
 /// Once no handle is left, we can remove the node from the
 /// tree and connect its parent directly to its children.
-pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
+pub(crate) fn decrease_handle_refcount<T>(node: &Arc<TreeNode<T>>) {
     let num_handles = {
         let mut locked_node = node.inner.lock().unwrap();
         locked_node.num_handles -= 1;
@@ -294,10 +299,10 @@ pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
 }
 
 /// Cancels a node and its children.
-pub(crate) fn cancel(node: &Arc<TreeNode>) {
+pub(crate) fn cancel<T: Clone>(node: &Arc<TreeNode<T>>, reason: T) {
     let mut locked_node = node.inner.lock().unwrap();
 
-    if locked_node.is_cancelled {
+    if locked_node.is_cancelled.is_some() {
         return;
     }
 
@@ -313,7 +318,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         locked_child.parent_idx = 0;
 
         // If child is already cancelled, detaching is enough
-        if locked_child.is_cancelled {
+        if locked_child.is_cancelled.is_some() {
             continue;
         }
 
@@ -328,7 +333,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
             locked_grandchild.parent_idx = 0;
 
             // If grandchild is already cancelled, detaching is enough
-            if locked_grandchild.is_cancelled {
+            if locked_grandchild.is_cancelled.is_some() {
                 continue;
             }
 
@@ -336,7 +341,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
             // Otherwise, just cancel them right away, no need for another iteration.
             if locked_grandchild.children.is_empty() {
                 // Cancel the grandchild
-                locked_grandchild.is_cancelled = true;
+                locked_grandchild.is_cancelled = Some(reason.clone());
                 locked_grandchild.children = Vec::new();
                 drop(locked_grandchild);
                 grandchild.waker.notify_waiters();
@@ -350,7 +355,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         }
 
         // Cancel the child
-        locked_child.is_cancelled = true;
+        locked_child.is_cancelled = Some(reason.clone());
         locked_child.children = Vec::new();
         drop(locked_child);
         child.waker.notify_waiters();
@@ -360,7 +365,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
     }
 
     // Cancel the node itself.
-    locked_node.is_cancelled = true;
+    locked_node.is_cancelled = Some(reason);
     locked_node.children = Vec::new();
     drop(locked_node);
     node.waker.notify_waiters();
