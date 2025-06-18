@@ -52,7 +52,7 @@ impl RegistrationSet {
     ///
     // This method doesn't use `_driver` directly, but it is passed
     // to ensure that the caller holds the I/O driver lock,
-    // which make the safety more clear.
+    // which makes the safety more clear.
     pub(super) fn needs_release(&self, _driver: &mut Driver) -> bool {
         // `Relaxed` is sufficient here because:
         //   - This method is only called with the I/O driver locked.
@@ -148,7 +148,7 @@ impl RegistrationSet {
 
     // This method doesn't use `_driver` directly, but it is passed
     // to ensure that the caller holds the I/O driver lock,
-    // which make the safety more clear.
+    // which makes the safety more clear.
     pub(super) fn release(&self, synced: &mut Synced, _driver: &mut Driver) {
         let pending = std::mem::take(&mut synced.pending_release);
 
