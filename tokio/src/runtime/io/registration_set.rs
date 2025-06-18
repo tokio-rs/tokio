@@ -1,5 +1,5 @@
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::runtime::io::ScheduledIo;
+use crate::runtime::io::{Driver, ScheduledIo};
 use crate::util::linked_list::{self, LinkedList};
 
 use std::io;
@@ -49,11 +49,15 @@ impl RegistrationSet {
     }
 
     /// Returns `true` if there are registrations that need to be released
-    pub(super) fn needs_release(&self) -> bool {
+    ///
+    // This method doesn't use `_driver` directly, but it is passed
+    // to ensure that the caller holds the I/O driver lock,
+    // which make the safety more clear.
+    pub(super) fn needs_release(&self, _driver: &mut Driver) -> bool {
         // `Relaxed` is sufficient here because:
         //   - This method is only called with the I/O driver locked.
         //   - AND the method `Self::release` is also only called
-        //     with the I/O driver locked.
+        //     with the both I/O driver and `Synced` locked.
         //
         // So there are three possibilities to get `0` here:
         //   1. `num_pending_release` was never changed,
@@ -142,7 +146,10 @@ impl RegistrationSet {
         ret
     }
 
-    pub(super) fn release(&self, synced: &mut Synced) {
+    // This method doesn't use `_driver` directly, but it is passed
+    // to ensure that the caller holds the I/O driver lock,
+    // which make the safety more clear.
+    pub(super) fn release(&self, synced: &mut Synced, _driver: &mut Driver) {
         let pending = std::mem::take(&mut synced.pending_release);
 
         for io in pending {

@@ -155,7 +155,7 @@ impl Driver {
     fn turn(&mut self, handle: &Handle, max_wait: Option<Duration>) {
         debug_assert!(!handle.registrations.is_shutdown(&handle.synced.lock()));
 
-        handle.release_pending_registrations();
+        handle.release_pending_registrations(self);
 
         let events = &mut self.events;
 
@@ -280,9 +280,9 @@ impl Handle {
         Ok(())
     }
 
-    fn release_pending_registrations(&self) {
-        if self.registrations.needs_release() {
-            self.registrations.release(&mut self.synced.lock());
+    fn release_pending_registrations(&self, driver: &mut Driver) {
+        if self.registrations.needs_release(driver) {
+            self.registrations.release(&mut self.synced.lock(), driver);
         }
     }
 }
