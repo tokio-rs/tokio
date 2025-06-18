@@ -56,7 +56,7 @@ impl RegistrationSet {
     pub(super) fn needs_release(&self, _driver: &mut Driver) -> bool {
         // `Relaxed` is sufficient here because:
         //   - This method is only called with the I/O driver locked.
-        //   - AND the method `Self::release` is also only called
+        //   - AND the method `Self::release` is always called
         //     with both I/O driver and `Synced` locked.
         //
         // So there are three possibilities to get `0` here:
