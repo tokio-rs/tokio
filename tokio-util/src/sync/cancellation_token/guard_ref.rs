@@ -1,9 +1,12 @@
 use crate::sync::CancellationToken;
 
 /// A wrapper for cancellation token which automatically cancels
-/// it on drop. It is created using `drop_guard_ref` method on the `CancellationToken`.
+/// it on drop. It is created using [`drop_guard_ref`] method on the [`CancellationToken`].
 ///
-/// This is a `ref` version of `DropGuard`
+/// This is a borrowed version of [`DropGuard`].
+///
+/// [`drop_guard_ref`]: CancellationToken::drop_guard_ref
+/// [`DropGuard`]: super::DropGuard
 #[derive(Debug)]
 pub struct DropGuardRef<'a> {
     pub(super) inner: Option<&'a CancellationToken>,
