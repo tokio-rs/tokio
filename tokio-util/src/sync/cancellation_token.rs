@@ -1,4 +1,4 @@
-//! An asynchronously awaitable `CancellationToken`.
+//! An asynchronously awaitable [`CancellationToken`].
 //! The token allows to signal a cancellation request to one or more tasks.
 pub(crate) mod guard;
 pub(crate) mod guard_ref;
@@ -112,7 +112,7 @@ impl core::fmt::Debug for CancellationToken {
 }
 
 impl Clone for CancellationToken {
-    /// Creates a clone of the `CancellationToken` which will get cancelled
+    /// Creates a clone of the [`CancellationToken`] which will get cancelled
     /// whenever the current token gets cancelled, and vice versa.
     fn clone(&self) -> Self {
         tree_node::increase_handle_refcount(&self.inner);
@@ -135,15 +135,15 @@ impl Default for CancellationToken {
 }
 
 impl CancellationToken {
-    /// Creates a new `CancellationToken` in the non-cancelled state.
+    /// Creates a new [`CancellationToken`] in the non-cancelled state.
     pub fn new() -> CancellationToken {
         CancellationToken {
             inner: Arc::new(tree_node::TreeNode::new()),
         }
     }
 
-    /// Creates a `CancellationToken` which will get cancelled whenever the
-    /// current token gets cancelled. Unlike a cloned `CancellationToken`,
+    /// Creates a [`CancellationToken`] which will get cancelled whenever the
+    /// current token gets cancelled. Unlike a cloned [`CancellationToken`],
     /// cancelling a child token does not cancel the parent token.
     ///
     /// If the current token is already cancelled, the child token will get
@@ -206,12 +206,18 @@ impl CancellationToken {
         tree_node::is_cancelled(&self.inner)
     }
 
-    /// Returns a `Future` that gets fulfilled when cancellation is requested.
+    /// Returns a [`Future`] that gets fulfilled when cancellation is requested.
+    ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn cancelled(&self);
+    /// ```
     ///
     /// The future will complete immediately if the token is already cancelled
     /// when this method is called.
     ///
-    /// # Cancel safety
+    /// # Cancellation safety
     ///
     /// This method is cancel safe.
     pub fn cancelled(&self) -> WaitForCancellationFuture<'_> {
@@ -221,7 +227,13 @@ impl CancellationToken {
         }
     }
 
-    /// Returns a `Future` that gets fulfilled when cancellation is requested.
+    /// Returns a [`Future`] that gets fulfilled when cancellation is requested.
+    ///
+    /// Equivalent to:
+    ///
+    /// ```ignore
+    /// async fn cancelled_owned(self);
+    /// ```
     ///
     /// The future will complete immediately if the token is already cancelled
     /// when this method is called.
@@ -229,14 +241,14 @@ impl CancellationToken {
     /// The function takes self by value and returns a future that owns the
     /// token.
     ///
-    /// # Cancel safety
+    /// # Cancellation safety
     ///
     /// This method is cancel safe.
     pub fn cancelled_owned(self) -> WaitForCancellationFutureOwned {
         WaitForCancellationFutureOwned::new(self)
     }
 
-    /// Creates a `DropGuard` for this token.
+    /// Creates a [`DropGuard`] for this token.
     ///
     /// Returned guard will cancel this token (and all its children) on drop
     /// unless disarmed.
@@ -244,7 +256,7 @@ impl CancellationToken {
         DropGuard { inner: Some(self) }
     }
 
-    /// Creates a `DropGuardRef` for this token.
+    /// Creates a [`DropGuardRef`] for this token.
     ///
     /// Returned guard will cancel this token (and all its children) on drop
     /// unless disarmed.
@@ -253,10 +265,10 @@ impl CancellationToken {
     }
 
     /// Runs a future to completion and returns its result wrapped inside of an `Option`
-    /// unless the `CancellationToken` is cancelled. In that case the function returns
+    /// unless the [`CancellationToken`] is cancelled. In that case the function returns
     /// `None` and the future gets dropped.
     ///
-    /// # Cancel safety
+    /// # Cancellation safety
     ///
     /// This method is only cancel safe if `fut` is cancel safe.
     pub async fn run_until_cancelled<F>(&self, fut: F) -> Option<F::Output>
@@ -299,12 +311,12 @@ impl CancellationToken {
     }
 
     /// Runs a future to completion and returns its result wrapped inside of an `Option`
-    /// unless the `CancellationToken` is cancelled. In that case the function returns
+    /// unless the [`CancellationToken`] is cancelled. In that case the function returns
     /// `None` and the future gets dropped.
     ///
     /// The function takes self by value and returns a future that owns the token.
     ///
-    /// # Cancel safety
+    /// # Cancellation safety
     ///
     /// This method is only cancel safe if `fut` is cancel safe.
     pub async fn run_until_cancelled_owned<F>(self, fut: F) -> Option<F::Output>
