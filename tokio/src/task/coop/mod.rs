@@ -254,7 +254,7 @@ cfg_coop! {
     use std::pin::Pin;
     use std::task::{ready, Context, Poll};
 
-    /// Value returned by the [`poll_proceed`](poll_proceed) method.
+    /// Value returned by the [`poll_proceed`] method.
     #[derive(Debug)]
     #[must_use]
     pub struct RestoreOnPending(Cell<Budget>, PhantomData<*mut ()>);
@@ -288,25 +288,25 @@ cfg_coop! {
         }
     }
 
-    /// Decrements the task budget and returns `Poll::Pending` if the budget is depleted.
+    /// Decrements the task budget and returns [`Poll::Pending`] if the budget is depleted.
     /// This indicates that the task should yield to the scheduler. Otherwise, returns
-    /// `RestoreOnPending` which can be used to commit the budget consumption.
+    /// [`RestoreOnPending`] which can be used to commit the budget consumption.
     ///
-    /// The returned [`RestoreOnPending`](RestoreOnPending) will revert the budget to its former
-    /// value when dropped unless [`RestoreOnPending::made_progress`](RestoreOnPending::made_progress)
+    /// The returned [`RestoreOnPending`] will revert the budget to its former
+    /// value when dropped unless [`RestoreOnPending::made_progress`]
     /// is called. It is the caller's responsibility to do so when it _was_ able to
-    /// make progress after the call to `poll_pending`.
+    /// make progress after the call to [`poll_proceed`].
     /// Restoring the budget automatically ensures the task can try to make progress in some other
     /// way.
     ///
-    /// Note that `RestoreOnPending` restores the budget **as it was before `poll_proceed`**.
-    /// Therefore, if the budget is _further_ adjusted between when `poll_proceed` returns and
-    /// `RestoreOnPending` is dropped, those adjustments are erased unless the caller indicates
+    /// Note that [`RestoreOnPending`] restores the budget **as it was before [`poll_proceed`]**.
+    /// Therefore, if the budget is _further_ adjusted between when [`poll_proceed`] returns and
+    /// [`RestoreOnPending`] is dropped, those adjustments are erased unless the caller indicates
     /// that progress was made.
     ///
     /// # Examples
     ///
-    /// This example shows a simple countdown latch that uses `poll_proceed` to participate in
+    /// This example shows a simple countdown latch that uses [`poll_proceed`] to participate in
     /// cooperative scheduling.
     ///
     /// ```
@@ -336,7 +336,7 @@ cfg_coop! {
     ///
     ///         self.counter -= 1;
     ///         if self.counter == 0 {
-    ///             if let Some(w) = std::mem::replace(&mut self.waker, None) {
+    ///             if let Some(w) = self.waker.take() {
     ///                 w.wake();
     ///             }
     ///         }
@@ -358,7 +358,7 @@ cfg_coop! {
     ///
     ///           // Next we check if the latch is ready to release its value
     ///           if this.counter == 0 {
-    ///                let t = std::mem::replace(&mut this.value, None);
+    ///                let t = this.value.take();
     ///                // The latch made progress so call `made_progress` to ensure the budget
     ///                // is not reverted.
     ///                coop.made_progress();
@@ -466,13 +466,7 @@ cfg_coop! {
     }
 
     pin_project! {
-        /// Future wrapper to ensure cooperative scheduling.
-        ///
-        /// When being polled `poll_proceed` is called before the inner future is polled to check
-        /// if the inner future has exceeded its budget. If the inner future resolves, this will
-        /// automatically call `RestoreOnPending::made_progress` before resolving this future with
-        /// the result of the inner one. If polling the inner future is pending, polling this future
-        /// type will also return a `Poll::Pending`.
+        /// Future wrapper to ensure cooperative scheduling created by [`cooperative`].
         #[must_use = "futures do nothing unless polled"]
         pub struct Coop<F: Future> {
             #[pin]
@@ -495,9 +489,40 @@ cfg_coop! {
         }
     }
 
-    /// Run a future with a budget constraint for cooperative scheduling.
-    /// If the future exceeds its budget while being polled, control is yielded back to the
-    /// runtime.
+    /// Creates a wrapper future that makes the inner future cooperate with the Tokio scheduler.
+    ///
+    /// When polled, the wrapper will first call [`poll_proceed`] to consume task budget, and
+    /// immediately yield if the budget has been depleted. If budget was available, the inner future
+    /// is polled. The budget consumption will be made final using [`RestoreOnPending::made_progress`]
+    /// if the inner future resolves to its final value.
+    ///
+    /// # Examples
+    ///
+    /// When you call `recv` on the `Receiver` of a [`tokio::sync::mpsc`](crate::sync::mpsc)
+    /// channel, task budget will automatically be consumed when the next value is returned.
+    /// This makes tasks that use Tokio mpsc channels automatically cooperative.
+    ///
+    /// If you're using `futures::channel::mpsc` instead, automatic task budget consumption will
+    /// not happen. This example shows how can use `cooperative` to make `futures::channel::mpsc`
+    /// channels cooperate with the scheduler in the same way Tokio channels do.
+    ///
+    /// ```
+    /// use tokio::task::coop::cooperative;
+    /// use futures_channel::mpsc::Receiver;
+    /// use futures_util::stream::StreamExt;
+    ///
+    /// async fn receive_next<T>(receiver: &mut Receiver<T>) -> Option<T>
+    /// where
+    ///     T: Unpin,
+    /// {
+    ///     // Use `StreamExt::next` to obtain a `Future` that resolves to the next value
+    ///     let recv_future = receiver.next();
+    ///     // Wrap it an a cooperative wrapper
+    ///     let coop_future = cooperative(recv_future);
+    ///     // And await
+    ///     coop_future.await
+    /// }
+
     #[inline]
     pub fn cooperative<F: Future>(fut: F) -> Coop<F> {
         Coop { fut }
