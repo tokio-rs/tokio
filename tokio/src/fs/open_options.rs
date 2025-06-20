@@ -489,8 +489,6 @@ impl OpenOptions {
     pub(super) fn as_inner_mut(&mut self) -> &mut StdOpenOptions {
         match &mut self.inner {
             Kind::Std(ref mut opts) => opts,
-            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
-            Kind::Uring(_) => panic!("Should not be called on UringOpenOptions"),
         }
     }
 }
