@@ -30,6 +30,7 @@ pub(crate) const DEFAULT_MAX_BUF_SIZE: usize = 2 * 1024 * 1024;
 enum State<T> {
     Idle(Option<Buf>),
     Busy(sys::Blocking<(io::Result<usize>, Buf, T)>),
+    Shutdown,
 }
 
 cfg_io_blocking! {
@@ -73,11 +74,18 @@ where
                     let mut inner = self.inner.take().unwrap();
 
                     let max_buf_size = cmp::min(dst.remaining(), DEFAULT_MAX_BUF_SIZE);
-                    self.state = State::Busy(sys::run(move || {
+
+                    let rx = sys::run(move || {
                         // SAFETY: the requirements are satisfied by `Blocking::new`.
                         let res = unsafe { buf.read_from(&mut inner, max_buf_size) };
                         (res, buf, inner)
-                    }));
+                    });
+
+                    self.state = if let Some(rx) = rx {
+                        State::Busy(rx)
+                    } else {
+                        State::Shutdown
+                    };
                 }
                 State::Busy(ref mut rx) => {
                     let (res, mut buf, inner) = ready!(Pin::new(rx).poll(cx))?;
@@ -96,6 +104,9 @@ where
                             return Poll::Ready(Err(e));
                         }
                     }
+                }
+                State::Shutdown => {
+                    return Poll::Ready(Err(gone()));
                 }
             }
         }
@@ -121,12 +132,19 @@ where
                     let n = buf.copy_from(src, DEFAULT_MAX_BUF_SIZE);
                     let mut inner = self.inner.take().unwrap();
 
-                    self.state = State::Busy(sys::run(move || {
+                    let rx = sys::run(move || {
                         let n = buf.len();
                         let res = buf.write_to(&mut inner).map(|()| n);
 
                         (res, buf, inner)
-                    }));
+                    });
+
+                    self.state = if let Some(rx) = rx {
+                        State::Busy(rx)
+                    } else {
+                        State::Shutdown
+                    };
+
                     self.need_flush = true;
 
                     return Poll::Ready(Ok(n));
@@ -138,6 +156,9 @@ where
 
                     // If error, return
                     res?;
+                }
+                State::Shutdown => {
+                    return Poll::Ready(Err(gone()));
                 }
             }
         }
@@ -153,10 +174,16 @@ where
                         let buf = buf_cell.take().unwrap();
                         let mut inner = self.inner.take().unwrap();
 
-                        self.state = State::Busy(sys::run(move || {
+                        let rx = sys::run(move || {
                             let res = inner.flush().map(|()| 0);
                             (res, buf, inner)
-                        }));
+                        });
+
+                        self.state = if let Some(rx) = rx {
+                            State::Busy(rx)
+                        } else {
+                            State::Shutdown
+                        };
 
                         self.need_flush = false;
                     } else {
@@ -170,6 +197,9 @@ where
 
                     // If error, return
                     res?;
+                }
+                State::Shutdown => {
+                    return Poll::Ready(Err(gone()));
                 }
             }
         }
@@ -303,4 +333,11 @@ cfg_fs! {
             max_buf_size - rem
         }
     }
+}
+
+fn gone() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::Other,
+        crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
+    )
 }
