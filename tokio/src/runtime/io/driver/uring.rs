@@ -15,7 +15,7 @@ const DEFAULT_RING_SIZE: u32 = 256;
 
 #[repr(usize)]
 #[derive(Debug, PartialEq, Eq)]
-enum State {
+pub(crate) enum State {
     Uninitialized = 0,
     Initialized = 1,
     Unsupported = 2,
@@ -263,6 +263,11 @@ impl Handle {
         while unsafe { ctx.ring_mut().submission().push(&entry).is_err() } {
             // If the submission queue is full, flush it to the kernel
             submit_or_remove(ctx)?;
+        }
+
+        // Ensure that the completion queue is not full before submitting the entry.
+        while ctx.ring_mut().completion().is_full() {
+            ctx.dispatch_completions();
         }
 
         // Note: For now, we submit the entry immediately without utilizing batching.
