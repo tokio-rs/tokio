@@ -489,10 +489,7 @@ impl Future for Readiness<'_> {
                     // other threads that acquire the same Mutex.
                     let waker = unsafe { &mut (*waiter.get()).waker };
                     let old = waker.replace(cx.waker().clone());
-                    debug_assert!(
-                        old.is_none(),
-                        "waker should be None at the first poll"
-                    );
+                    debug_assert!(old.is_none(), "waker should be None at the first poll");
 
                     // Insert the waiter into the linked list
                     //
