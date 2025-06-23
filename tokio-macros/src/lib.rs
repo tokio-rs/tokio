@@ -82,7 +82,7 @@ use proc_macro::TokenStream;
 ///
 /// To use the [local runtime], the macro can be configured using
 ///
-/// ```
+/// ```no_run
 /// #[tokio::main(flavor = "local")]
 /// # async fn main() {}
 /// ```
@@ -148,7 +148,7 @@ use proc_macro::TokenStream;
 /// The [local runtime] is similar to the current-thread runtime but
 /// supports [`task::spawn_local`](../tokio/task/fn.spawn_local.html).
 ///
-/// ```rust
+/// ```no_run
 /// #[tokio::main(flavor = "local")]
 /// async fn main() {
 ///     println!("Hello world");
@@ -157,7 +157,7 @@ use proc_macro::TokenStream;
 ///
 /// Equivalent code not using `#[tokio::main]`
 ///
-/// ```rust
+/// ```no_run
 /// fn main() {
 ///     tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
