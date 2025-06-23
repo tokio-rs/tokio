@@ -440,6 +440,9 @@ impl OpenOptions {
     /// To enable `io_uring`, you need to specify the `--cfg tokio_uring` flag
     /// at compile time and set the `Builder::enable_io_uring` runtime option.
     ///
+    /// Support for `io_uring` is currently experimental, so its behavior may
+    /// change or it may be removed in future versions.
+    ///
     /// # Examples
     ///
     /// ```no_run
