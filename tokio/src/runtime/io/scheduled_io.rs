@@ -165,7 +165,7 @@ enum State {
 //
 // | shutdown | driver tick | readiness |
 // |----------+-------------+-----------|
-// |   1 bit  |   15 bit    |  16 bits  |
+// |   1 bit  |   15 bits   |  16 bits  |
 
 const READINESS: bit::Pack = bit::Pack::least_significant(16);
 
