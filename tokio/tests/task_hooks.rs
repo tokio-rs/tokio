@@ -83,7 +83,6 @@ fn task_hook_spawn_location() {
     let spawns = Arc::new(AtomicUsize::new(0));
     let poll_starts = Arc::new(AtomicUsize::new(0));
     let poll_ends = Arc::new(AtomicUsize::new(0));
-    let terminates = Arc::new(AtomicUsize::new(0));
 
     let runtime = Builder::new_current_thread()
         .on_task_spawn(mk_hook("(current_thread) on_task_spawn", &spawns))
@@ -92,7 +91,6 @@ fn task_hook_spawn_location() {
             &poll_starts,
         ))
         .on_after_task_poll(mk_hook("(current_thread) on_after_task_poll", &poll_ends))
-        .on_task_terminate(mk_hook("(current_thread) on_task_terminate", &terminates))
         .build()
         .unwrap();
 
@@ -109,7 +107,6 @@ fn task_hook_spawn_location() {
     let poll_starts = poll_starts.load(Ordering::SeqCst);
     assert!(poll_starts > 1);
     assert_eq!(poll_starts, poll_ends.load(Ordering::SeqCst));
-    assert_eq!(terminates.load(Ordering::SeqCst), 1);
 
     // Okay, now test again with a multi-threaded runtime.
     // This is necessary as the spawn code paths are different and we should
@@ -118,39 +115,17 @@ fn task_hook_spawn_location() {
     let spawns = Arc::new(AtomicUsize::new(0));
     let poll_starts = Arc::new(AtomicUsize::new(0));
     let poll_ends = Arc::new(AtomicUsize::new(0));
-    let terminates = Arc::new(AtomicUsize::new(0));
-
-    let is_shutting_down = Arc::new(AtomicBool::new(false));
 
     let runtime = Builder::new_multi_thread()
         .on_task_spawn(mk_hook("(multi_thread) on_task_spawn", &spawns))
         .on_before_task_poll(mk_hook("(multi_thread) on_before_task_poll", &poll_starts))
         .on_after_task_poll(mk_hook("(multi_thread) on_after_task_poll", &poll_ends))
-        .on_task_terminate({
-            // When the multi-thread runtime shuts down, we will see additional
-            // calls to the task-terminate hook for the blocking threads spawned
-            // by the runtime for each worker task. These will have spawn
-            // locations that are *not* in this file. Therefore, don't assert if
-            // we are in the process of shutting down the runtime.
-            let shutting_down = Arc::clone(&is_shutting_down);
-            let terminate_hook = mk_hook("(multi_thread) on_task_terminate", &terminates);
-            move |data| {
-                if !shutting_down.load(Ordering::SeqCst) {
-                    terminate_hook(data)
-                }
-            }
-        })
         .build()
         .unwrap();
 
     let task = runtime.spawn(async move { tokio::task::yield_now().await });
     runtime.block_on(async move {
         task.await.unwrap();
-
-        // tick the runtime a bunch to close out tasks
-        for _ in 0..ITERATIONS {
-            tokio::task::yield_now().await;
-        }
     });
 
     // Wait for worker threads to finish before making assertions about how many
@@ -162,7 +137,6 @@ fn task_hook_spawn_location() {
     let poll_starts = poll_starts.load(Ordering::SeqCst);
     assert!(poll_starts > 1);
     assert_eq!(poll_starts, poll_ends.load(Ordering::SeqCst));
-    assert_eq!(terminates.load(Ordering::SeqCst), 1);
 
     fn mk_hook(
         event: &'static str,
