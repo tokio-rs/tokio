@@ -42,7 +42,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///     tokio::spawn(async move { second_cl.set(10) });
 ///
 ///     let res = arc.get(); // returns None
-///     
 ///     arc.wait().await; // lets wait until the value is set
 ///
 ///     println!("{:?}", arc.get());
@@ -53,38 +52,21 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// initialized once on first use, but need no further changes. The `SetOnce`
 /// in Tokio allows the initialization procedure to be asynchronous.
 ///
-/// # Examples
+/// # Example
 ///
 /// ```
-/// use tokio::sync::SetOnce;
+/// use tokio::sync::{SetOnce, SetError};
 ///
 ///
 /// static ONCE: SetOnce<u32> = SetOnce::const_new();
 ///
 /// #[tokio::main]
-/// async fn main() {
-///     let result = ONCE.set(2).await;
-///     assert_eq!(*result, 2);
-/// }
-/// ```
+/// async fn main() -> Result<(), SetError<u32>> {
+///     ONCE.set(2)?;
+///     let result = ONCE.get();
+///     assert_eq!(result, Some(&2));
 ///
-/// It is often useful to write a wrapper method for accessing the value.
-///
-/// ```
-/// use tokio::sync::SetOnce;
-///
-/// static ONCE: SetOnce<u32> = SetOnce::const_new();
-///
-/// fn get_global_integer() -> &'static u32 {
-///    ONCE.set(2);
-///    ONCE.get().unwrap()
-/// }
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let result = get_global_integer();
-///     
-///     assert_eq!(*result, 2);
+///     Ok(())
 /// }
 /// ```
 pub struct SetOnce<T> {
@@ -124,11 +106,14 @@ impl<T: Eq> Eq for SetOnce<T> {}
 impl<T> Drop for SetOnce<T> {
     fn drop(&mut self) {
         if self.initialized() {
+            // SAFETY: We're inside the drop implementation of SetOnce
+            // AND we're also initalized. This is the best way to ensure
+            // out data gets dropped
             unsafe {
                 let _ = self.value.with_mut(|ptr| ptr::read(ptr).assume_init());
             }
-
-            *self.value_set.get_mut() = false;
+            // no need to set the flag to false as this set once is being
+            // dropped
         }
     }
 }
@@ -166,20 +151,21 @@ impl<T> SetOnce<T> {
     /// # Example
     ///
     /// ```
-    /// use tokio::sync::SetOnce;
+    /// use tokio::sync::{SetOnce, SetError};
     ///
     /// static ONCE: SetOnce<u32> = SetOnce::const_new();
     ///
-    /// fn get_global_integer() -> &'static u32 {
-    ///     ONCE.set(2);
-    ///     ONCE.get().unwrap();
+    /// fn get_global_integer() -> Result<Option<&'static u32>, SetError<u32>> {
+    ///     ONCE.set(2)?;
+    ///     Ok(ONCE.get())
     /// }
     ///
     /// #[tokio::main]
-    /// async fn main() {
-    ///     let result = get_global_integer();
+    /// async fn main() -> Result<(), SetError<u32>> {
+    ///     let result = get_global_integer()?;
     ///
-    ///     assert_eq!(*result, 2);
+    ///     assert_eq!(result, Some(&2));
+    ///     Ok(())
     /// }
     /// ```
     ///
@@ -221,14 +207,15 @@ impl<T> SetOnce<T> {
     ///
     /// static ONCE: SetOnce<u32> = SetOnce::const_new_with(1);
     ///
-    /// fn get_global_integer() -> &'static u32 {
-    ///     ONCE.get().unwrap();
+    /// fn get_global_integer() -> Option<&'static u32> {
+    ///     ONCE.get()
     /// }
     ///
     /// #[tokio::main]
     /// async fn main() {
     ///     let result = get_global_integer();
-    ///     assert_eq!(*result, 1);
+    ///
+    ///     assert_eq!(result, Some(&1));
     /// }
     /// ```
     ///
@@ -246,8 +233,8 @@ impl<T> SetOnce<T> {
     /// Returns `true` if the `SetOnce` currently contains a value, and `false`
     /// otherwise.
     pub fn initialized(&self) -> bool {
-        // Using acquire ordering so any threads that read a true from this
-        // atomic is able to read the value.
+        // Using acquire ordering so we're able to read/catch any writes that
+        // are done with `Ordering::Release`
         self.value_set.load(Ordering::Acquire)
     }
 
@@ -315,32 +302,26 @@ impl<T> SetOnce<T> {
     /// Returns `None` if the cell is empty.
     pub fn into_inner(mut self) -> Option<T> {
         if self.initialized() {
-            // SAFETY: The SetOnce is initialized, we can assume the value is
-            // initialized and return that, when we return the value we give the
-            // drop handler to someone else and drop is called automatically
-            //
-            // We set the value_set as value as we just took the value out
-            // and the drop implementation will do nothing.
+            // Since we have taken ownership of self, its drop implementation
+            // will be called by the end of this function, to prevent a double
+            // free we will set the value_set to false so that the drop
+            // implementation does not try to drop the value again.
             *self.value_set.get_mut() = false;
+
+            // SAFETY: The SetOnce is currently initialized, we can assume the
+            // value is initialized and return that, when we return the value
+            // we give the drop handler to the return scope.
             Some(unsafe { self.value.with_mut(|ptr| ptr::read(ptr).assume_init()) })
         } else {
             None
         }
-        // the drop of self is called here again but it doesn't do anything since
-        // if we dont return early then value is not initalized.
-    }
-
-    /// Takes ownership of the current value, leaving the cell empty.  Returns
-    /// `None` if the cell is empty.
-    pub fn take(&mut self) -> Option<T> {
-        std::mem::take(self).into_inner()
     }
 
     /// Waits until the `SetOnce` has been initialized. Once the `SetOnce` is
     /// initialized the wakers are notified and the Future returned from this
     /// function completes.
     ///
-    /// If this function is called after the `SetOnce` is initalized then
+    /// If this function is called after the `SetOnce` is initialized then
     /// empty future is returned which completes immediately.
     pub async fn wait(&self) {
         if !self.initialized() {
