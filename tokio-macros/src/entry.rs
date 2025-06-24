@@ -180,12 +180,6 @@ impl Configuration {
 
         let flavor = self.flavor.unwrap_or(self.default_flavor);
 
-        if flavor == F::Local && !cfg!(tokio_unstable) {
-            let msg = "The local runtime flavor is only available when `tokio_unstable` is set."
-                .to_string();
-            return Err(syn::Error::new(Span::call_site(), msg));
-        }
-
         let worker_threads = match (flavor, self.worker_threads) {
             (F::CurrentThread | F::Local, Some((_, worker_threads_span))) => {
                 let msg = format!(
@@ -427,7 +421,13 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         },
     };
 
+    let mut checks = vec![];
+
     let build = if let RuntimeFlavor::Local = config.flavor {
+        checks.push(quote! {
+            #[cfg(not(tokio_unstable))]
+            compile_error!("The local runtime flavor is only available when `tokio_unstable` is set.");
+        });
         quote_spanned! {last_stmt_start_span=> build_local(Default::default())}
     } else {
         quote_spanned! {last_stmt_start_span=> build()}
@@ -457,6 +457,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     let last_block = quote_spanned! {last_stmt_end_span=>
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
         {
+            #(#checks)*
             return #rt
                 .enable_all()
                 .#build
