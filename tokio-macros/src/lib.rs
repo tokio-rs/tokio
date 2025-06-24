@@ -86,6 +86,8 @@ use proc_macro::TokenStream;
 /// # #[cfg(tokio_unstable)]
 /// #[tokio::main(flavor = "local")]
 /// # async fn main() {}
+/// # #[cfg(not(tokio_unstable))]
+/// # fn main() {}
 /// ```
 ///
 /// # Function arguments
@@ -155,6 +157,8 @@ use proc_macro::TokenStream;
 /// async fn main() {
 ///     println!("Hello world");
 /// }
+/// # #[cfg(not(tokio_unstable))]
+/// # fn main() {}
 /// ```
 ///
 /// Equivalent code not using `#[tokio::main]`
@@ -170,6 +174,8 @@ use proc_macro::TokenStream;
 ///             println!("Hello world");
 ///         })
 /// }
+/// # #[cfg(not(tokio_unstable))]
+/// # fn main() {}
 /// ```
 ///
 ///
