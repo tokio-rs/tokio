@@ -97,7 +97,13 @@ fn task_hook_spawn_location() {
         .unwrap();
 
     let task = runtime.spawn(async move { tokio::task::yield_now().await });
-    runtime.block_on(async move { task.await.unwrap() });
+    runtime.block_on(async move {
+        task.await.unwrap();
+        // tick the runtime a bunch to close out tasks
+        for _ in 0..ITERATIONS {
+            tokio::task::yield_now().await;
+        }
+    });
 
     assert_eq!(spawns.load(Ordering::SeqCst), 1);
     let poll_starts = poll_starts.load(Ordering::SeqCst);
@@ -140,6 +146,11 @@ fn task_hook_spawn_location() {
     let task = runtime.spawn(async move { tokio::task::yield_now().await });
     runtime.block_on(async move {
         task.await.unwrap();
+
+        // tick the runtime a bunch to close out tasks
+        for _ in 0..ITERATIONS {
+            tokio::task::yield_now().await;
+        }
     });
 
     // Wait for worker threads to finish before making assertions about how many
