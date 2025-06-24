@@ -18,11 +18,7 @@ impl RuntimeFlavor {
         match s {
             "current_thread" => Ok(RuntimeFlavor::CurrentThread),
             "multi_thread" => Ok(RuntimeFlavor::Threaded),
-            "local" => if cfg!(tokio_unstable) {
-                Ok(RuntimeFlavor::Local)
-            } else {
-                Err("The local runtime flavor is only available when `tokio_unstable` is set.".to_string())
-            }
+            "local" => Ok(RuntimeFlavor::Local),
             "single_thread" => Err("The single threaded runtime flavor is called `current_thread`.".to_string()),
             "basic_scheduler" => Err("The `basic_scheduler` runtime flavor has been renamed to `current_thread`.".to_string()),
             "threaded_scheduler" => Err("The `threaded_scheduler` runtime flavor has been renamed to `multi_thread`.".to_string()),
@@ -183,6 +179,13 @@ impl Configuration {
         use RuntimeFlavor as F;
 
         let flavor = self.flavor.unwrap_or(self.default_flavor);
+
+        if flavor == F::Local && !cfg!(tokio_unstable) {
+            let msg = "The local runtime flavor is only available when `tokio_unstable` is set."
+                .to_string();
+            return Err(syn::Error::new(Span::call_site(), msg));
+        }
+
         let worker_threads = match (flavor, self.worker_threads) {
             (F::CurrentThread | F::Local, Some((_, worker_threads_span))) => {
                 let msg = format!(
