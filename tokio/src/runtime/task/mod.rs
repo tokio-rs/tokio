@@ -245,7 +245,7 @@ unsafe impl<S> Sync for Task<S> {}
 pub(crate) struct Notified<S: 'static>(Task<S>);
 
 impl<S> Notified<S> {
-    #[cfg(tokio_unstable)]
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
     #[inline]
     pub(crate) fn task_meta<'task, 'meta>(&'task self) -> crate::runtime::TaskMeta<'meta> {
         self.0.task_meta()
