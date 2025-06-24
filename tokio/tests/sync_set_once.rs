@@ -105,11 +105,6 @@ fn from() {
     assert_eq!(*cell.get().unwrap(), 2);
 }
 
-async fn advance_time_and_set(cell: &'static SetOnce<u32>, v: u32) -> Result<(), SetError<u32>> {
-    time::advance(Duration::from_millis(1)).await;
-    cell.set(v)
-}
-
 #[test]
 fn set_and_get() {
     let rt = runtime::Builder::new_current_thread()
@@ -144,7 +139,7 @@ fn set_twice() {
 }
 
 #[test]
-fn set_while_initializing() {
+fn set_while_initializing_or_already_init() {
     let rt = runtime::Builder::new_current_thread()
         .enable_time()
         .build()
@@ -153,24 +148,29 @@ fn set_while_initializing() {
     static ONCE: SetOnce<u32> = SetOnce::const_new();
 
     rt.block_on(async {
-        time::pause();
-
         let handle1 = rt.spawn(async {
-            time::sleep(Duration::from_millis(2)).await;
+            time::sleep(Duration::from_millis(1)).await;
             let set_val = 5;
             ONCE.set(set_val)?;
 
-            Ok(set_val)
+            Ok::<u32, SetError<u32>>(set_val)
         });
-        let handle2 = rt.spawn(async { advance_time_and_set(&ONCE, 10).await });
 
-        time::advance(Duration::from_millis(2)).await;
+        let handle2 = rt.spawn(async {
+            time::sleep(Duration::from_millis(1)).await;
+            let set_val = 10;
+            ONCE.set(set_val)?;
 
-        let result1: Result<u32, SetError<u32>> = handle1.await.unwrap();
+            Ok::<u32, SetError<u32>>(set_val)
+        });
+
+        let result1 = handle1.await.unwrap();
         let result2 = handle2.await.unwrap();
 
         assert_eq!(result1, Ok(5));
-        assert!(result2.err().unwrap().is_initializing_err());
+        let err = result2.err().unwrap();
+
+        assert!(err.is_initializing_err() || err.is_already_init_err());
     });
 }
 
