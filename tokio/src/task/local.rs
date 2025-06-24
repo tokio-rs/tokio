@@ -1010,10 +1010,12 @@ impl Context {
         // Safety: called from the thread that owns the `LocalSet`
         let (handle, notified) = {
             self.shared.local_state.assert_called_from_owner_thread();
-            self.shared
-                .local_state
-                .owned
-                .bind(future, self.shared.clone(), id)
+            self.shared.local_state.owned.bind(
+                future,
+                self.shared.clone(),
+                id,
+                std::panic::Location::caller(),
+            )
         };
 
         if let Some(notified) = notified {

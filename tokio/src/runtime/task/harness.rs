@@ -371,6 +371,7 @@ where
             let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 f(&TaskMeta {
                     id: self.core().task_id,
+                    spawned_at: self.core().spawned_at,
                     _phantom: Default::default(),
                 })
             }));

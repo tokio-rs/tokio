@@ -2,7 +2,7 @@
 #![cfg(all(feature = "full", tokio_unstable, target_has_atomic = "64"))]
 
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use tokio::runtime::Builder;
@@ -72,4 +72,103 @@ fn terminate_task_hook_fires() {
     });
 
     assert_eq!(TASKS, count.load(Ordering::SeqCst));
+}
+
+/// Assert that the spawn task hook is provided with the correct spawn
+/// location.
+#[test]
+fn task_hook_spawn_location() {
+    // Test that the correct spawn location is provided to the task hooks on a
+    // current thread runtime.
+    let spawns = Arc::new(AtomicUsize::new(0));
+    let poll_starts = Arc::new(AtomicUsize::new(0));
+    let poll_ends = Arc::new(AtomicUsize::new(0));
+    let terminates = Arc::new(AtomicUsize::new(0));
+
+    let runtime = Builder::new_current_thread()
+        .on_task_spawn(mk_hook("(current_thread) on_task_spawn", &spawns))
+        .on_before_task_poll(mk_hook(
+            "(current_thread) on_before_task_poll",
+            &poll_starts,
+        ))
+        .on_after_task_poll(mk_hook("(current_thread) on_after_task_poll", &poll_ends))
+        .on_task_terminate(mk_hook("(current_thread) on_task_terminate", &terminates))
+        .build()
+        .unwrap();
+
+    let task = runtime.spawn(async move { tokio::task::yield_now().await });
+    runtime.block_on(async move { task.await.unwrap() });
+
+    assert_eq!(spawns.load(Ordering::SeqCst), 1);
+    let poll_starts = poll_starts.load(Ordering::SeqCst);
+    assert!(poll_starts > 1);
+    assert_eq!(poll_starts, poll_ends.load(Ordering::SeqCst));
+    assert_eq!(terminates.load(Ordering::SeqCst), 1);
+
+    // Okay, now test again with a multi-threaded runtime.
+    // This is necessary as the spawn code paths are different and we should
+    // ensure that `#[track_caller]` is passed through correctly for both
+    // runtimes.
+    let spawns = Arc::new(AtomicUsize::new(0));
+    let poll_starts = Arc::new(AtomicUsize::new(0));
+    let poll_ends = Arc::new(AtomicUsize::new(0));
+    let terminates = Arc::new(AtomicUsize::new(0));
+
+    let is_shutting_down = Arc::new(AtomicBool::new(false));
+
+    let runtime = Builder::new_multi_thread()
+        .on_task_spawn(mk_hook("(multi_thread) on_task_spawn", &spawns))
+        .on_before_task_poll(mk_hook("(multi_thread) on_before_task_poll", &poll_starts))
+        .on_after_task_poll(mk_hook("(multi_thread) on_after_task_poll", &poll_ends))
+        .on_task_terminate({
+            // When the multi-thread runtime shuts down, we will see additional
+            // calls to the task-terminate hook for the blocking threads spawned
+            // by the runtime for each worker task. These will have spawn
+            // locations that are *not* in this file. Therefore, don't assert if
+            // we are in the process of shutting down the runtime.
+            let shutting_down = Arc::clone(&is_shutting_down);
+            let terminate_hook = mk_hook("(multi_thread) on_task_terminate", &terminates);
+            move |data| {
+                if !shutting_down.load(Ordering::SeqCst) {
+                    terminate_hook(data)
+                }
+            }
+        })
+        .build()
+        .unwrap();
+
+    let task = runtime.spawn(async move { tokio::task::yield_now().await });
+    runtime.block_on(async move {
+        task.await.unwrap();
+    });
+
+    // Wait for worker threads to finish before making assertions about how many
+    // callbacks we've seen, to ensure we don't race with a worker thread.
+    is_shutting_down.store(true, Ordering::SeqCst);
+    runtime.shutdown_timeout(std::time::Duration::from_secs(60));
+
+    assert_eq!(spawns.load(Ordering::SeqCst), 1);
+    let poll_starts = poll_starts.load(Ordering::SeqCst);
+    assert!(poll_starts > 1);
+    assert_eq!(poll_starts, poll_ends.load(Ordering::SeqCst));
+    assert_eq!(terminates.load(Ordering::SeqCst), 1);
+
+    fn mk_hook(
+        event: &'static str,
+        count: &Arc<AtomicUsize>,
+    ) -> impl Fn(&tokio::runtime::TaskMeta<'_>) {
+        let count = Arc::clone(&count);
+        move |data| {
+            eprintln!("{event} ({:?}): {:?}", data.id(), data.spawned_at());
+            // Assert that the spawn location is in this file.
+            // Don't make assertions about line number/column here, as these
+            // may change as new code is added to the test file...
+            assert_eq!(
+                data.spawned_at().file(),
+                file!(),
+                "incorrect spawn location in {event} hook",
+            );
+            count.fetch_add(1, Ordering::SeqCst);
+        }
+    }
 }
