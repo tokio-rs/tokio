@@ -126,12 +126,12 @@ fn task_hook_spawn_location() {
     let task = runtime.spawn(async move { tokio::task::yield_now().await });
     runtime.block_on(async move {
         task.await.unwrap();
-    });
 
-    // Wait for worker threads to finish before making assertions about how many
-    // callbacks we've seen, to ensure we don't race with a worker thread.
-    is_shutting_down.store(true, Ordering::SeqCst);
-    runtime.shutdown_timeout(std::time::Duration::from_secs(60));
+        // tick the runtime a bunch to close out tasks
+        for _ in 0..ITERATIONS {
+            tokio::task::yield_now().await;
+        }
+    });
 
     assert_eq!(spawns.load(Ordering::SeqCst), 1);
     let poll_starts = poll_starts.load(Ordering::SeqCst);
