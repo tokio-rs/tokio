@@ -2,7 +2,7 @@
 #![cfg(all(feature = "full", tokio_unstable, target_has_atomic = "64"))]
 
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use tokio::runtime::Builder;
