@@ -79,7 +79,7 @@ cfg_net! {
     /// accessing the `RawFd`/`RawSocket` using [`AsRawFd`]/[`AsRawSocket`] and
     /// setting the option with a crate like [`socket2`].
     ///
-    /// [`RawFd`]: https://doc.rust-lang.org/std/os/unix/io/type.RawFd.html
+    /// [`RawFd`]: https://doc.rust-lang.org/std/os/fd/type.RawFd.html
     /// [`RawSocket`]: https://doc.rust-lang.org/std/os/windows/io/type.RawSocket.html
     /// [`AsRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
     /// [`AsRawSocket`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html

@@ -71,12 +71,12 @@ name = "sync_semaphore"
 path = "sync_semaphore.rs"
 harness = false
 
-[[target.'cfg(unix)'.bench]]
+[[bench]]
 name = "signal"
 path = "signal.rs"
 harness = false
 
-[[target.'cfg(unix)'.bench]]
+[[bench]]
 name = "fs"
 path = "fs.rs"
 harness = false

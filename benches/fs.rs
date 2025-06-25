@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 use tokio_stream::StreamExt;
 
 use tokio::fs::File;
