@@ -133,6 +133,10 @@ fn task_hook_spawn_location() {
         }
     });
 
+    // Give the runtime to shut down so that we see all the expected calls to
+    // the task hooks.
+    runtime.shutdown_timeout(std::time::Duration::from_secs(60));
+
     assert_eq!(spawns.load(Ordering::SeqCst), 1);
     let poll_starts = poll_starts.load(Ordering::SeqCst);
     assert!(poll_starts > 1);
