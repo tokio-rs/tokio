@@ -74,23 +74,27 @@ fn terminate_task_hook_fires() {
     assert_eq!(TASKS, count.load(Ordering::SeqCst));
 }
 
-/// Assert that the spawn task hook is provided with the correct spawn
-/// location.
+/// Test that the correct spawn location is provided to the task hooks on a
+/// current thread runtime.
 #[test]
-fn task_hook_spawn_location() {
-    // Test that the correct spawn location is provided to the task hooks on a
-    // current thread runtime.
+fn task_hook_spawn_location_current_thread() {
     let spawns = Arc::new(AtomicUsize::new(0));
     let poll_starts = Arc::new(AtomicUsize::new(0));
     let poll_ends = Arc::new(AtomicUsize::new(0));
 
     let runtime = Builder::new_current_thread()
-        .on_task_spawn(mk_hook("(current_thread) on_task_spawn", &spawns))
-        .on_before_task_poll(mk_hook(
+        .on_task_spawn(mk_spawn_location_hook(
+            "(current_thread) on_task_spawn",
+            &spawns,
+        ))
+        .on_before_task_poll(mk_spawn_location_hook(
             "(current_thread) on_before_task_poll",
             &poll_starts,
         ))
-        .on_after_task_poll(mk_hook("(current_thread) on_after_task_poll", &poll_ends))
+        .on_after_task_poll(mk_spawn_location_hook(
+            "(current_thread) on_after_task_poll",
+            &poll_ends,
+        ))
         .build()
         .unwrap();
 
@@ -107,19 +111,37 @@ fn task_hook_spawn_location() {
     let poll_starts = poll_starts.load(Ordering::SeqCst);
     assert!(poll_starts > 1);
     assert_eq!(poll_starts, poll_ends.load(Ordering::SeqCst));
+}
 
-    // Okay, now test again with a multi-threaded runtime.
-    // This is necessary as the spawn code paths are different and we should
-    // ensure that `#[track_caller]` is passed through correctly for both
-    // runtimes.
+/// Test that the correct spawn location is provided to the task hooks on a
+/// multi-thread runtime.
+///
+/// Testing this separately is necessary as the spawn code paths are different
+/// and we should ensure that `#[track_caller]` is passed through correctly
+/// for both runtimes.
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not support multi-threaded runtime"
+)]
+#[test]
+fn task_hook_spawn_location_multi_thread() {
     let spawns = Arc::new(AtomicUsize::new(0));
     let poll_starts = Arc::new(AtomicUsize::new(0));
     let poll_ends = Arc::new(AtomicUsize::new(0));
 
     let runtime = Builder::new_multi_thread()
-        .on_task_spawn(mk_hook("(multi_thread) on_task_spawn", &spawns))
-        .on_before_task_poll(mk_hook("(multi_thread) on_before_task_poll", &poll_starts))
-        .on_after_task_poll(mk_hook("(multi_thread) on_after_task_poll", &poll_ends))
+        .on_task_spawn(mk_spawn_location_hook(
+            "(multi_thread) on_task_spawn",
+            &spawns,
+        ))
+        .on_before_task_poll(mk_spawn_location_hook(
+            "(multi_thread) on_before_task_poll",
+            &poll_starts,
+        ))
+        .on_after_task_poll(mk_spawn_location_hook(
+            "(multi_thread) on_after_task_poll",
+            &poll_ends,
+        ))
         .build()
         .unwrap();
 
@@ -141,23 +163,23 @@ fn task_hook_spawn_location() {
     let poll_starts = poll_starts.load(Ordering::SeqCst);
     assert!(poll_starts > 1);
     assert_eq!(poll_starts, poll_ends.load(Ordering::SeqCst));
+}
 
-    fn mk_hook(
-        event: &'static str,
-        count: &Arc<AtomicUsize>,
-    ) -> impl Fn(&tokio::runtime::TaskMeta<'_>) {
-        let count = Arc::clone(&count);
-        move |data| {
-            eprintln!("{event} ({:?}): {:?}", data.id(), data.spawned_at());
-            // Assert that the spawn location is in this file.
-            // Don't make assertions about line number/column here, as these
-            // may change as new code is added to the test file...
-            assert_eq!(
-                data.spawned_at().file(),
-                file!(),
-                "incorrect spawn location in {event} hook",
-            );
-            count.fetch_add(1, Ordering::SeqCst);
-        }
+fn mk_spawn_location_hook(
+    event: &'static str,
+    count: &Arc<AtomicUsize>,
+) -> impl Fn(&tokio::runtime::TaskMeta<'_>) {
+    let count = Arc::clone(&count);
+    move |data| {
+        eprintln!("{event} ({:?}): {:?}", data.id(), data.spawned_at());
+        // Assert that the spawn location is in this file.
+        // Don't make assertions about line number/column here, as these
+        // may change as new code is added to the test file...
+        assert_eq!(
+            data.spawned_at().file(),
+            file!(),
+            "incorrect spawn location in {event} hook",
+        );
+        count.fetch_add(1, Ordering::SeqCst);
     }
 }
