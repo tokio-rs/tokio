@@ -10,8 +10,8 @@ use tempfile::NamedTempFile;
 use tokio::{
     fs::OpenOptions,
     runtime::{Builder, Runtime},
-    task::JoinSet,
 };
+use tokio_util::task::TaskTracker;
 
 fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
     Box::new(move || {
@@ -85,15 +85,16 @@ fn open_many_files() {
         let (_tmp_files, paths): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(NUM_FILES);
 
         rt.block_on(async move {
-            let mut set = JoinSet::new();
+            let tracker = TaskTracker::new();
 
             for i in 0..10_000 {
                 let path = paths.get(i % NUM_FILES).unwrap().clone();
-                set.spawn(async move {
+                tracker.spawn(async move {
                     let _file = OpenOptions::new().read(true).open(path).await.unwrap();
                 });
             }
-            while let Some(Ok(_)) = set.join_next().await {}
+            tracker.close();
+            tracker.wait().await;
         });
     }
 
