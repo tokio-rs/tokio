@@ -52,6 +52,13 @@ pub(crate) struct Inner<T: 'static> {
     /// Only updated by producer thread but read by many threads.
     tail: AtomicUnsignedShort,
 
+    /// When a task is scheduled from a worker, it is stored in this slot. The
+    /// worker will check this slot for a task **before** checking the run
+    /// queue. This effectively results in the **last** scheduled task to be run
+    /// next (LIFO). This is an optimization for improving locality which
+    /// benefits message passing patterns and helps to reduce latency.
+    lifo: task::AtomicNotified<T>,
+
     /// Elements
     buffer: Box<[UnsafeCell<MaybeUninit<task::Notified<T>>>; LOCAL_QUEUE_CAPACITY]>,
 }
@@ -92,6 +99,7 @@ pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
     let inner = Arc::new(Inner {
         head: AtomicUnsignedLong::new(0),
         tail: AtomicUnsignedShort::new(0),
+        lifo: task::AtomicNotified::empty(),
         buffer: make_fixed_size(buffer.into_boxed_slice()),
     });
 
@@ -110,7 +118,9 @@ impl<T> Local<T> {
         let (_, head) = unpack(self.inner.head.load(Acquire));
         // safety: this is the **only** thread that updates this cell.
         let tail = unsafe { self.inner.tail.unsync_load() };
-        len(head, tail)
+        // XXX(eliza): the `is_some` here might be racy? do we need to pack a
+        // LIFO-presence bit into one of the atomics?
+        len(head, tail) + (self.inner.lifo.is_some() as usize)
     }
 
     /// How many tasks can be pushed into the queue
@@ -387,6 +397,18 @@ impl<T> Local<T> {
         };
 
         Some(self.inner.buffer[idx].with(|ptr| unsafe { ptr::read(ptr).assume_init() }))
+    }
+
+    /// Pushes a task to the LIFO slot, returning the task previously in the
+    /// LIFO slot (if there was one).
+    pub(crate) fn push_lifo(&self, task: task::Notified<T>) -> Option<task::Notified<T>> {
+        self.inner.lifo.swap(Some(task))
+    }
+
+    /// Pops the task currently held in the LIFO slot, if there is one;
+    /// otherwise, returns `None`.
+    pub(crate) fn pop_lifo(&self) -> Option<task::Notified<T>> {
+        self.inner.lifo.take()
     }
 }
 
