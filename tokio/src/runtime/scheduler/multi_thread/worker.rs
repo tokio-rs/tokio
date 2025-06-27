@@ -106,7 +106,7 @@ struct Core {
     /// queue. This effectively results in the **last** scheduled task to be run
     /// next (LIFO). This is an optimization for improving locality which
     /// benefits message passing patterns and helps to reduce latency.
-    lifo_slot: Option<Notified>,
+    lifo_slot: task::AtomicNotified<Arc<Handle>>,
 
     /// When `true`, locally scheduled tasks go to the LIFO slot. When `false`,
     /// they go to the back of the `run_queue`.
@@ -257,7 +257,7 @@ pub(super) fn create(
 
         cores.push(Box::new(Core {
             tick: 0,
-            lifo_slot: None,
+            lifo_slot: task::AtomicNotified::empty(),
             lifo_enabled: !config.disable_lifo_slot,
             run_queue,
             is_searching: false,
@@ -1084,17 +1084,15 @@ impl Handle {
             true
         } else {
             // Push to the LIFO slot
-            let prev = core.lifo_slot.take();
-            let ret = prev.is_some();
+            let prev = core.lifo_slot.swap(Some(task));
 
             if let Some(prev) = prev {
                 core.run_queue
                     .push_back_or_overflow(prev, self, &mut core.stats);
+                true
+            } else {
+                false
             }
-
-            core.lifo_slot = Some(task);
-
-            ret
         };
 
         // Only notify if not currently parked. If `park` is `None`, then the
