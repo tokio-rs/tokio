@@ -53,6 +53,7 @@ pub(crate) use wake_list::WakeList;
     feature = "sync",
     feature = "signal",
     feature = "time",
+    fuzzing,
 ))]
 pub(crate) mod linked_list;
 
