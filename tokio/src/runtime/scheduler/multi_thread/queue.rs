@@ -408,6 +408,7 @@ impl<T> Local<T> {
     /// Pops the task currently held in the LIFO slot, if there is one;
     /// otherwise, returns `None`.
     pub(crate) fn pop_lifo(&self) -> Option<task::Notified<T>> {
+        // LIFO-suction!
         self.inner.lifo.take()
     }
 }

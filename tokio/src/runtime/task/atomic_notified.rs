@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire};
 
 /// An atomic cell which can contain a pointer to a [`Notified`] task.
 ///
-/// This is similar to the [`crate::util::AtomicCell`] type, but specialized to
+/// This is similar to the `crate::util::AtomicCell` type, but specialized to
 /// hold a task pointer --- this type "remembers" the task's scheduler generic
 /// when a task is stored in the cell, so that the pointer can be turned back
 /// into a [`Notified`] task with the correct generic type when it is retrieved.
