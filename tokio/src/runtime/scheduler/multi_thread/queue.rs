@@ -451,6 +451,12 @@ impl<T> Steal<T> {
         // tasks in `dst`.
         let mut n = self.steal_into2(dst, dst_tail);
 
+        // Ooh, there's another task just sitting there? Grab that one, too!
+        let lifo = self.0.lifo.take();
+        if lifo.is_some() {
+            n += 1;
+        }
+
         if n == 0 {
             // No tasks were stolen
             return None;
@@ -462,22 +468,31 @@ impl<T> Steal<T> {
         // We are returning a task here
         n -= 1;
 
-        let ret_pos = dst_tail.wrapping_add(n);
-        let ret_idx = ret_pos as usize & MASK;
+        let ret = if lifo.is_some() {
+            // If we took the task from the LIFO slot, just return it as the
+            // next task to run, rather than messing around with the buffer.
+            lifo
+        } else {
+            // The LIFO slot was was empty, so take the last task we squirted
+            // into `dst` instead.
+            let ret_pos = dst_tail.wrapping_add(n);
+            let ret_idx = ret_pos as usize & MASK;
 
-        // safety: the value was written as part of `steal_into2` and not
-        // exposed to stealers, so no other thread can access it.
-        let ret = dst.inner.buffer[ret_idx].with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) });
+            // safety: the value was written as part of `steal_into2` and not
+            // exposed to stealers, so no other thread can access it.
+            let task = dst.inner.buffer[ret_idx].with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) });
+            Some(task)
+        };
 
         if n == 0 {
             // The `dst` queue is empty, but a single task was stolen
-            return Some(ret);
+            return ret;
         }
 
         // Make the stolen items available to consumers
         dst.inner.tail.store(dst_tail.wrapping_add(n), Release);
 
-        Some(ret)
+        ret
     }
 
     // Steal tasks from `self`, placing them into `dst`. Returns the number of
