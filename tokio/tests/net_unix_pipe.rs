@@ -68,7 +68,7 @@ async fn fifo_simple_send() -> io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn fifo_simple_send_sender_first() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
@@ -134,7 +134,7 @@ async fn fifo_multiple_writes() -> io::Result<()> {
 /// Checks behavior of a resilient reader (Receiver in O_RDWR access mode)
 /// with writers sequentially opening and closing a FIFO.
 #[tokio::test]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn fifo_resilient_reader() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
