@@ -545,7 +545,11 @@ impl Future for Readiness<'_> {
                     let tick = TICK.unpack(curr) as u8;
 
                     // Safety: We don't need to acquire the lock here because
-                    // the `waiter.interest` never changes.
+                    //   1. `State::Done`` means `waiter` is no longer shared,
+                    //      this means no concurrent access to `waiter` can happen
+                    //      at this point.
+                    //   2. `waiter.interest` is never changed, this means
+                    //      no side effects need to be synchronized by the lock.
                     let interest = unsafe { (*waiter.get()).interest };
                     // The readiness state could have been cleared in the meantime,
                     // but we allow the returned ready set to be empty.
