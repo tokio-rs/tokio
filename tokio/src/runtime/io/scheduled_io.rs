@@ -490,9 +490,9 @@ impl Future for Readiness<'_> {
                     // Not ready even after locked, insert into list...
 
                     // Safety: Since the `waiter` is not in the intrusive list yet,
-                    // so we have exclusive access to it,
-                    // and the Mutex ensures this modification is visible to
-                    // other threads that acquire the same Mutex.
+                    // so we have exclusive access to it. The Mutex ensures
+                    // that this modification is visible to other threads that
+                    // acquire the same Mutex.
                     let waker = unsafe { &mut (*waiter.get()).waker };
                     let old = waker.replace(cx.waker().clone());
                     debug_assert!(old.is_none(), "waker should be None at the first poll");
@@ -513,10 +513,9 @@ impl Future for Readiness<'_> {
 
                     let waiters = scheduled_io.waiters.lock();
 
-                    // Safety: With the lock held, we have exclusive
-                    // access to the waiter,
-                    // in other words, `ScheduledIo::wake()` cannot access
-                    // the waiter concurrently.
+                    // Safety: With the lock held, we have exclusive access to
+                    // the waiter. In other words, `ScheduledIo::wake()`
+                    // cannot access the waiter concurrently.
                     let w = unsafe { &mut *waiter.get() };
 
                     if w.is_ready {
