@@ -431,6 +431,12 @@ impl Future for Readiness<'_> {
 
         let (scheduled_io, state, waiter) = {
             // Safety: `Self` is `!Unpin`
+            //
+            // While we could use `pin_project!` to remove
+            // this unsafe block, there are already unsafe blocks here,
+            // so it wouldn't significantly ease the mental burden
+            // and would actually complicate the code.
+            // That's why we didn't use it.
             let me = unsafe { self.get_unchecked_mut() };
             (me.scheduled_io, &mut me.state, &me.waiter)
         };
