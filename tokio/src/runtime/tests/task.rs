@@ -58,6 +58,7 @@ fn create_drop1() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
         Location::caller(),
     );
     drop(notified);
@@ -76,6 +77,7 @@ fn create_drop2() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
         Location::caller(),
     );
     drop(join);
@@ -94,6 +96,7 @@ fn drop_abort_handle1() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
         Location::caller(),
     );
     let abort = join.abort_handle();
@@ -115,6 +118,7 @@ fn drop_abort_handle2() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
         Location::caller(),
     );
     let abort = join.abort_handle();
@@ -136,6 +140,7 @@ fn drop_abort_handle_clone() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
         Location::caller(),
     );
     let abort = join.abort_handle();
@@ -161,6 +166,7 @@ fn create_shutdown1() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
         Location::caller(),
     );
     drop(join);
@@ -179,6 +185,7 @@ fn create_shutdown2() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
         Location::caller(),
     );
     handle.assert_not_dropped();
@@ -189,7 +196,13 @@ fn create_shutdown2() {
 
 #[test]
 fn unowned_poll() {
-    let (task, _) = unowned(async {}, NoopSchedule, Id::next(), Location::caller());
+    let (task, _) = unowned(
+        async {},
+        NoopSchedule,
+        Id::next(),
+        #[cfg(tokio_unstable)]
+        Location::caller(),
+    );
     task.run();
 }
 
@@ -399,10 +412,13 @@ impl Runtime {
         T: 'static + Send + Future,
         T::Output: 'static + Send,
     {
-        let (handle, notified) =
-            self.0
-                .owned
-                .bind(future, self.clone(), Id::next(), Location::caller());
+        let (handle, notified) = self.0.owned.bind(
+            future,
+            self.clone(),
+            Id::next(),
+            #[cfg(tokio_unstable)]
+            Location::caller(),
+        );
 
         if let Some(notified) = notified {
             self.schedule(notified);
