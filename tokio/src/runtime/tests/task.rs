@@ -5,6 +5,7 @@ use crate::runtime::tests::NoopSchedule;
 
 use std::collections::VecDeque;
 use std::future::Future;
+#[cfg(tokio_unstable)]
 use std::panic::Location;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
