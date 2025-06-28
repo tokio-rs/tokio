@@ -31,8 +31,11 @@ mod noop_scheduler {
 mod unowned_wrapper {
     use crate::runtime::task::{Id, JoinHandle, Notified};
     use crate::runtime::tests::NoopSchedule;
+    #[cfg(tokio_unstable)]
+    use std::panic::Location;
 
     #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[track_caller]
     pub(crate) fn unowned<T>(task: T) -> (Notified<NoopSchedule>, JoinHandle<T::Output>)
     where
         T: std::future::Future + Send + 'static,
@@ -41,17 +44,30 @@ mod unowned_wrapper {
         use tracing::Instrument;
         let span = tracing::trace_span!("test_span");
         let task = task.instrument(span);
-        let (task, handle) = crate::runtime::task::unowned(task, NoopSchedule, Id::next());
+        let (task, handle) = crate::runtime::task::unowned(
+            task,
+            NoopSchedule,
+            Id::next(),
+            #[cfg(tokio_unstable)]
+            Location::caller(),
+        );
         (task.into_notified(), handle)
     }
 
     #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+    #[track_caller]
     pub(crate) fn unowned<T>(task: T) -> (Notified<NoopSchedule>, JoinHandle<T::Output>)
     where
         T: std::future::Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (task, handle) = crate::runtime::task::unowned(task, NoopSchedule, Id::next());
+        let (task, handle) = crate::runtime::task::unowned(
+            task,
+            NoopSchedule,
+            Id::next(),
+            #[cfg(tokio_unstable)]
+            Location::caller(),
+        );
         (task.into_notified(), handle)
     }
 }

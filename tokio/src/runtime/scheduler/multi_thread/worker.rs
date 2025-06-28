@@ -568,7 +568,7 @@ impl Context {
 
     fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
         #[cfg(tokio_unstable)]
-        let task_id = task.task_id();
+        let task_meta = task.task_meta();
 
         let task = self.worker.handle.shared.owned.assert_owner(task);
 
@@ -592,12 +592,15 @@ impl Context {
             // Unlike the poll time above, poll start callback is attached to the task id,
             // so it is tightly associated with the actual poll invocation.
             #[cfg(tokio_unstable)]
-            self.worker.handle.task_hooks.poll_start_callback(task_id);
+            self.worker
+                .handle
+                .task_hooks
+                .poll_start_callback(&task_meta);
 
             task.run();
 
             #[cfg(tokio_unstable)]
-            self.worker.handle.task_hooks.poll_stop_callback(task_id);
+            self.worker.handle.task_hooks.poll_stop_callback(&task_meta);
 
             let mut lifo_polls = 0;
 
@@ -663,15 +666,18 @@ impl Context {
                 let task = self.worker.handle.shared.owned.assert_owner(task);
 
                 #[cfg(tokio_unstable)]
-                let task_id = task.task_id();
+                let task_meta = task.task_meta();
 
                 #[cfg(tokio_unstable)]
-                self.worker.handle.task_hooks.poll_start_callback(task_id);
+                self.worker
+                    .handle
+                    .task_hooks
+                    .poll_start_callback(&task_meta);
 
                 task.run();
 
                 #[cfg(tokio_unstable)]
-                self.worker.handle.task_hooks.poll_stop_callback(task_id);
+                self.worker.handle.task_hooks.poll_stop_callback(&task_meta);
             }
         })
     }

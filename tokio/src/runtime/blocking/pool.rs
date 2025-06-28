@@ -379,7 +379,13 @@ impl Spawner {
         let fut =
             blocking_task::<F, BlockingTask<F>>(BlockingTask::new(func), spawn_meta, id.as_u64());
 
-        let (task, handle) = task::unowned(fut, BlockingSchedule::new(rt), id);
+        let (task, handle) = task::unowned(
+            fut,
+            BlockingSchedule::new(rt),
+            id,
+            #[cfg(tokio_unstable)]
+            std::panic::Location::caller(),
+        );
 
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
         (handle, spawned)

@@ -5,6 +5,8 @@ use crate::runtime::tests::NoopSchedule;
 
 use std::collections::VecDeque;
 use std::future::Future;
+#[cfg(tokio_unstable)]
+use std::panic::Location;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -57,6 +59,8 @@ fn create_drop1() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
+        Location::caller(),
     );
     drop(notified);
     handle.assert_not_dropped();
@@ -74,6 +78,8 @@ fn create_drop2() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
+        Location::caller(),
     );
     drop(join);
     handle.assert_not_dropped();
@@ -91,6 +97,8 @@ fn drop_abort_handle1() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
+        Location::caller(),
     );
     let abort = join.abort_handle();
     drop(join);
@@ -111,6 +119,8 @@ fn drop_abort_handle2() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
+        Location::caller(),
     );
     let abort = join.abort_handle();
     drop(notified);
@@ -131,6 +141,8 @@ fn drop_abort_handle_clone() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
+        Location::caller(),
     );
     let abort = join.abort_handle();
     let abort_clone = abort.clone();
@@ -155,6 +167,8 @@ fn create_shutdown1() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
+        Location::caller(),
     );
     drop(join);
     handle.assert_not_dropped();
@@ -172,6 +186,8 @@ fn create_shutdown2() {
         },
         NoopSchedule,
         Id::next(),
+        #[cfg(tokio_unstable)]
+        Location::caller(),
     );
     handle.assert_not_dropped();
     notified.shutdown();
@@ -181,7 +197,13 @@ fn create_shutdown2() {
 
 #[test]
 fn unowned_poll() {
-    let (task, _) = unowned(async {}, NoopSchedule, Id::next());
+    let (task, _) = unowned(
+        async {},
+        NoopSchedule,
+        Id::next(),
+        #[cfg(tokio_unstable)]
+        Location::caller(),
+    );
     task.run();
 }
 
@@ -385,12 +407,19 @@ struct Core {
 static CURRENT: Mutex<Option<Runtime>> = Mutex::new(None);
 
 impl Runtime {
+    #[track_caller]
     fn spawn<T>(&self, future: T) -> JoinHandle<T::Output>
     where
         T: 'static + Send + Future,
         T::Output: 'static + Send,
     {
-        let (handle, notified) = self.0.owned.bind(future, self.clone(), Id::next());
+        let (handle, notified) = self.0.owned.bind(
+            future,
+            self.clone(),
+            Id::next(),
+            #[cfg(tokio_unstable)]
+            Location::caller(),
+        );
 
         if let Some(notified) = notified {
             self.schedule(notified);
