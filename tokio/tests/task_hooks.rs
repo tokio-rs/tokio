@@ -159,10 +159,10 @@ fn task_hook_spawn_location_multi_thread() {
     // the task hooks.
     runtime.shutdown_timeout(std::time::Duration::from_secs(60));
 
-    assert_eq!(spawns.load(Ordering::SeqCst), 1);
-    let poll_starts = poll_starts.load(Ordering::SeqCst);
+    assert_eq!(spawns.fetch_add(0, Ordering::SeqCst), 1);
+    let poll_starts = poll_starts.fetch_add(0, Ordering::SeqCst);
     assert!(poll_starts > 1);
-    assert_eq!(poll_starts, poll_ends.load(Ordering::SeqCst));
+    assert_eq!(poll_starts, poll_ends.fetch_add(0, Ordering::SeqCst));
 }
 
 fn mk_spawn_location_hook(
