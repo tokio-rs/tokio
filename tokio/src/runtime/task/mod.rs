@@ -226,6 +226,7 @@ use crate::util::sharded_list;
 
 use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
+#[cfg(tokio_unstable)]
 use std::panic::Location;
 use std::ptr::NonNull;
 use std::{fmt, mem};
@@ -327,6 +328,7 @@ cfg_rt! {
         task: T,
         scheduler: S,
         id: Id,
+        #[cfg(tokio_unstable)]
         spawned_at: &'static Location<'static>,
     ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
     where
@@ -334,7 +336,12 @@ cfg_rt! {
         T: Future + 'static,
         T::Output: 'static,
     {
-        let raw = RawTask::new::<T, S>(task, scheduler, id, spawned_at);
+        let raw = RawTask::new::<T, S>(
+            task,
+            scheduler,
+            id,
+            #[cfg(tokio_unstable)] spawned_at,
+        );
         let task = Task {
             raw,
             _p: PhantomData,
@@ -352,13 +359,22 @@ cfg_rt! {
     /// only when the task is not going to be stored in an `OwnedTasks` list.
     ///
     /// Currently only blocking tasks use this method.
-    pub(crate) fn unowned<T, S>(task: T, scheduler: S, id: Id, spawned_at: &'static Location<'static>) -> (UnownedTask<S>, JoinHandle<T::Output>)
+    pub(crate) fn unowned<T, S>(
+        task: T,
+        scheduler: S,
+        id: Id,
+        #[cfg(tokio_unstable)] spawned_at: &'static Location<'static>,
+    ) -> (UnownedTask<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Send + Future + 'static,
         T::Output: Send + 'static,
     {
-        let (task, notified, join) = new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = new_task(
+            task,
+            scheduler, id,
+            #[cfg(tokio_unstable)] spawned_at,
+        );
 
         // This transfers the ref-count of task and notified into an UnownedTask.
         // This is valid because an UnownedTask holds two ref-counts.

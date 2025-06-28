@@ -58,7 +58,13 @@ impl Handle {
         T::Output: Send + 'static,
     {
         let spawned_at = Location::caller();
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
+        let (handle, notified) = me.shared.owned.bind(
+            future,
+            me.clone(),
+            id,
+            #[cfg(tokio_unstable)]
+            spawned_at,
+        );
 
         me.task_hooks.spawn(&TaskMeta {
             id,

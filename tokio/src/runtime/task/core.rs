@@ -18,6 +18,7 @@ use crate::runtime::task::{Id, Schedule, TaskHarnessScheduleHooks};
 use crate::util::linked_list;
 
 use std::num::NonZeroU64;
+#[cfg(tokio_unstable)]
 use std::panic::Location;
 use std::pin::Pin;
 use std::ptr::NonNull;
@@ -146,6 +147,7 @@ pub(super) struct Core<T: Future, S> {
     ///
     /// This is used for populating the `TaskMeta` passed to the task runtime
     /// hooks.
+    #[cfg(tokio_unstable)]
     pub(super) spawned_at: &'static Location<'static>,
 
     /// Either the future or the output.
@@ -220,7 +222,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         scheduler: S,
         state: State,
         task_id: Id,
-        spawned_at: &'static Location<'static>,
+        #[cfg(tokio_unstable)] spawned_at: &'static Location<'static>,
     ) -> Box<Cell<T, S>> {
         // Separated into a non-generic function to reduce LLVM codegen
         fn new_header(
@@ -255,6 +257,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                     stage: UnsafeCell::new(Stage::Running(future)),
                 },
                 task_id,
+                #[cfg(tokio_unstable)]
                 spawned_at,
             },
         });
@@ -267,7 +270,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 trailer: &Trailer,
                 scheduler: &S,
                 task_id: &Id,
-                spawn_location: &&'static Location<'static>,
+                #[cfg(tokio_unstable)] spawn_location: &&'static Location<'static>,
             ) {
                 let trailer_addr = trailer as *const Trailer as usize;
                 let trailer_ptr = unsafe { Header::get_trailer(NonNull::from(header)) };
@@ -281,11 +284,14 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 let id_ptr = unsafe { Header::get_id_ptr(NonNull::from(header)) };
                 assert_eq!(id_addr, id_ptr.as_ptr() as usize);
 
-                let spawn_location_addr =
-                    spawn_location as *const &'static Location<'static> as usize;
-                let spawn_location_ptr =
-                    unsafe { Header::get_spawn_location_ptr(NonNull::from(header)) };
-                assert_eq!(spawn_location_addr, spawn_location_ptr.as_ptr() as usize);
+                #[cfg(tokio_unstable)]
+                {
+                    let spawn_location_addr =
+                        spawn_location as *const &'static Location<'static> as usize;
+                    let spawn_location_ptr =
+                        unsafe { Header::get_spawn_location_ptr(NonNull::from(header)) };
+                    assert_eq!(spawn_location_addr, spawn_location_ptr.as_ptr() as usize);
+                }
             }
             unsafe {
                 check(
@@ -293,6 +299,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                     &result.trailer,
                     &result.core.scheduler,
                     &result.core.task_id,
+                    #[cfg(tokio_unstable)]
                     &result.core.spawned_at,
                 );
             }
@@ -483,6 +490,7 @@ impl Header {
     /// # Safety
     ///
     /// The provided raw pointer must point at the header of a task.
+    #[cfg(tokio_unstable)]
     pub(super) unsafe fn get_spawn_location_ptr(
         me: NonNull<Header>,
     ) -> NonNull<&'static Location<'static>> {
@@ -501,6 +509,7 @@ impl Header {
     /// # Safety
     ///
     /// The provided raw pointer must point at the header of a task.
+    #[cfg(tokio_unstable)]
     pub(super) unsafe fn get_spawn_location(me: NonNull<Header>) -> &'static Location<'static> {
         let ptr = Header::get_spawn_location_ptr(me).as_ptr();
         *ptr

@@ -1014,6 +1014,7 @@ impl Context {
                 future,
                 self.shared.clone(),
                 id,
+                #[cfg(tokio_unstable)]
                 std::panic::Location::caller(),
             )
         };

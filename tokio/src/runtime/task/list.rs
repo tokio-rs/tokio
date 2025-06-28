@@ -15,6 +15,7 @@ use crate::util::sharded_list;
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
+#[cfg(tokio_unstable)]
 use std::panic::Location;
 
 // The id from the module below is used to verify whether a given task is stored
@@ -92,14 +93,20 @@ impl<S: 'static> OwnedTasks<S> {
         task: T,
         scheduler: S,
         id: super::Id,
-        spawned_at: &'static Location<'static>,
+        #[cfg(tokio_unstable)] spawned_at: &'static Location<'static>,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            #[cfg(tokio_unstable)]
+            spawned_at,
+        );
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
@@ -113,14 +120,20 @@ impl<S: 'static> OwnedTasks<S> {
         task: T,
         scheduler: S,
         id: super::Id,
-        spawned_at: &'static Location<'static>,
+        #[cfg(tokio_unstable)] spawned_at: &'static Location<'static>,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            #[cfg(tokio_unstable)]
+            spawned_at,
+        );
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
@@ -261,14 +274,20 @@ impl<S: 'static> LocalOwnedTasks<S> {
         task: T,
         scheduler: S,
         id: super::Id,
-        spawned_at: &'static Location<'static>,
+        #[cfg(tokio_unstable)] spawned_at: &'static Location<'static>,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            #[cfg(tokio_unstable)]
+            spawned_at,
+        );
 
         unsafe {
             // safety: We just created the task, so we have exclusive access
