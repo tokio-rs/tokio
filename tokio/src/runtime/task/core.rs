@@ -142,7 +142,7 @@ pub(super) struct Core<T: Future, S> {
     /// The task's ID, used for populating `JoinError`s.
     pub(super) task_id: Id,
 
-    /// The source code location where the task was spawned./
+    /// The source code location where the task was spawned.
     ///
     /// This is used for populating the `TaskMeta` passed to the task runtime
     /// hooks.
@@ -495,7 +495,8 @@ impl Header {
         NonNull::new_unchecked(spawned_at)
     }
 
-    /// Gets the id of the task containing this `Header`.
+    /// Gets the source code location where the task containing
+    /// this `Header` was spawned
     ///
     /// # Safety
     ///
