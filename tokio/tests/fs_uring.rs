@@ -5,6 +5,7 @@
 use futures::future::FutureExt;
 use std::sync::mpsc;
 use std::task::Poll;
+use std::time::Duration;
 use std::{future::poll_fn, path::PathBuf};
 use tempfile::NamedTempFile;
 use tokio::{
@@ -44,8 +45,8 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
         let (tx, rx) = mpsc::channel();
         let (done_tx, done_rx) = mpsc::channel();
 
-        rt.spawn(async {
-            let (_tmp, path) = create_tmp_files(1);
+        let (_tmp, path) = create_tmp_files(1);
+        rt.spawn(async move {
             let path = path[0].clone();
 
             // spawning a bunch of uring operations.
@@ -64,7 +65,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
 
         std::thread::spawn(move || {
             let rt: Runtime = rx.recv().unwrap();
-            rt.shutdown_background();
+            rt.shutdown_timeout(Duration::from_millis(300));
             done_tx.send(()).unwrap();
         });
 
