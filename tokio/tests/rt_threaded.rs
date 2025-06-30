@@ -692,6 +692,77 @@ fn mutex_in_block_in_place() {
     })
 }
 
+// Tests that when a task is notified by another task and is placed in the LIFO
+// slot, and then the notifying task blocks the runtime, the notified task will
+// be stolen by another worker thread.
+//
+// Integration test for: https://github.com/tokio-rs/tokio/issues/4941
+#[test]
+fn lifo_stealable() {
+    use std::time::Duration;
+
+    let (unblock_tx, unblock_rx) = tokio::sync::oneshot::channel();
+    let (task_started_tx, task_started_rx) = tokio::sync::oneshot::channel();
+    let (block_thread_tx, block_thread_rx) = mpsc::channel::<()>();
+    let rt = runtime::Builder::new_multi_thread()
+        // Make sure there are enough workers that one can be parked running the
+        // I/O driver and another can be parked running the timer wheel and
+        // there's still at least one worker free to steal the blocked task.
+        .worker_threads(4)
+        .enable_time()
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        // Keep the runtime busy so that the workers that might steal the
+        // blocked task don't all park themselves forever.
+        let churn = tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_millis(64)).await;
+            }
+        });
+
+        let blocked_task_joined = tokio::spawn(async move {
+            println!("[LIFO] task started");
+            task_started_tx.send(()).unwrap();
+            println!("[LIFO] task waiting for wakeup...");
+            unblock_rx.await.unwrap();
+            println!("[LIFO] task running after wakeup");
+        });
+
+        // Wait for the blocked task to have been polled once and have yielded
+        // before we spawn the task that will notify it.
+        task_started_rx.await.unwrap();
+        println!("[main] LIFO slot task start acked!");
+
+        // Now, spawn a task that will notify the blocked task before going
+        // blocking forever.
+        tokio::spawn(async move {
+            println!("[blocker] sending wakeup");
+            unblock_tx.send(()).unwrap();
+
+            println!("[blocker] blocking the worker thread...");
+            // Block the worker thread indefinitely by waiting for a message on
+            // a blocking channel. Using a channel rather than e.g. `loop {}`
+            // allows us to terminate the task cleanly when the test finishes.
+            let _ = block_thread_rx.recv();
+            println!("[blocker] done");
+        });
+
+        println!("[main] blocker task spawned");
+
+        let result = tokio::time::timeout(Duration::from_secs(30), blocked_task_joined).await;
+        println!("[main] result: {result:?}");
+        // Before possibly panicking, make sure that we wake up the blocked task
+        // so that it doesn't stop the runtime from shutting down.
+        block_thread_tx.send(()).unwrap();
+        churn.abort();
+        result
+            .expect("task in LIFO slot should complete within 30 seconds")
+            .expect("task in LIFO slot should not panic");
+    })
+}
+
 // Testing the tuning logic is tricky as it is inherently timing based, and more
 // of a heuristic than an exact behavior. This test checks that the interval
 // changes over time based on load factors. There are no assertions, completion
