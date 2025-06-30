@@ -116,11 +116,10 @@ impl<T> Local<T> {
     /// Returns the number of entries in the queue
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.inner.head.load(Acquire));
+        let lifo = self.inner.lifo.is_some() as usize;
         // safety: this is the **only** thread that updates this cell.
         let tail = unsafe { self.inner.tail.unsync_load() };
-        // XXX(eliza): the `is_some` here might be racy? do we need to pack a
-        // LIFO-presence bit into one of the atomics?
-        len(head, tail) + (self.inner.lifo.is_some() as usize)
+        len(head, tail) + lifo
     }
 
     /// How many tasks can be pushed into the queue
@@ -418,7 +417,8 @@ impl<T> Steal<T> {
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.0.head.load(Acquire));
         let tail = self.0.tail.load(Acquire);
-        len(head, tail)
+        let lifo = self.0.lifo.is_some() as usize;
+        len(head, tail) + lifo
     }
 
     /// Return true if the queue is empty,
