@@ -3,7 +3,9 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex};
 #[cfg(tokio_unstable)]
 use crate::runtime;
-use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task, TaskHarnessScheduleHooks};
+use crate::runtime::task::{
+    self, JoinHandle, LocalOwnedTasks, SpawnLocation, Task, TaskHarnessScheduleHooks,
+};
 use crate::runtime::{context, ThreadId, BOX_FUTURE_THRESHOLD};
 use crate::sync::AtomicWaker;
 use crate::util::trace::SpawnMeta;
@@ -1010,10 +1012,12 @@ impl Context {
         // Safety: called from the thread that owns the `LocalSet`
         let (handle, notified) = {
             self.shared.local_state.assert_called_from_owner_thread();
-            self.shared
-                .local_state
-                .owned
-                .bind(future, self.shared.clone(), id)
+            self.shared.local_state.owned.bind(
+                future,
+                self.shared.clone(),
+                id,
+                SpawnLocation::capture(),
+            )
         };
 
         if let Some(notified) = notified {

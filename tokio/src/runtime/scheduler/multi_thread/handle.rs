@@ -10,6 +10,7 @@ use crate::runtime::{
 use crate::util::RngSeedGenerator;
 
 use std::fmt;
+use std::panic::Location;
 
 mod metrics;
 
@@ -37,6 +38,7 @@ pub(crate) struct Handle {
 
 impl Handle {
     /// Spawns a future onto the thread pool
+    #[track_caller]
     pub(crate) fn spawn<F>(me: &Arc<Self>, future: F, id: task::Id) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
@@ -49,15 +51,21 @@ impl Handle {
         self.close();
     }
 
+    #[track_caller]
     pub(super) fn bind_new_task<T>(me: &Arc<Self>, future: T, id: task::Id) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
+        let spawned_at = Location::caller();
+        let (handle, notified) = me
+            .shared
+            .owned
+            .bind(future, me.clone(), id, spawned_at.into());
 
         me.task_hooks.spawn(&TaskMeta {
             id,
+            spawned_at,
             _phantom: Default::default(),
         });
 

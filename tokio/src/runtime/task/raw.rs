@@ -1,7 +1,8 @@
 use crate::future::Future;
 use crate::runtime::task::core::{Core, Trailer};
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
-
+#[cfg(tokio_unstable)]
+use std::panic::Location;
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
 
@@ -41,6 +42,10 @@ pub(super) struct Vtable {
 
     /// The number of bytes that the `id` field is offset from the header.
     pub(super) id_offset: usize,
+
+    /// The number of bytes that the `spawned_at` field is offset from the header.
+    #[cfg(tokio_unstable)]
+    pub(super) spawn_location_offset: usize,
 }
 
 /// Get the vtable for the requested `T` and `S` generics.
@@ -56,6 +61,8 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
         trailer_offset: OffsetHelper::<T, S>::TRAILER_OFFSET,
         scheduler_offset: OffsetHelper::<T, S>::SCHEDULER_OFFSET,
         id_offset: OffsetHelper::<T, S>::ID_OFFSET,
+        #[cfg(tokio_unstable)]
+        spawn_location_offset: OffsetHelper::<T, S>::SPAWN_LOCATION_OFFSET,
     }
 }
 
@@ -88,6 +95,16 @@ impl<T: Future, S: Schedule> OffsetHelper<T, S> {
         std::mem::align_of::<Core<T, S>>(),
         std::mem::size_of::<S>(),
         std::mem::align_of::<Id>(),
+    );
+
+    #[cfg(tokio_unstable)]
+    const SPAWN_LOCATION_OFFSET: usize = get_spawn_location_offset(
+        std::mem::size_of::<Header>(),
+        std::mem::align_of::<Core<T, S>>(),
+        std::mem::size_of::<S>(),
+        std::mem::align_of::<Id>(),
+        std::mem::size_of::<Id>(),
+        std::mem::align_of::<&'static Location<'static>>(),
     );
 }
 
@@ -156,13 +173,50 @@ const fn get_id_offset(
     offset
 }
 
+/// Compute the offset of the `&'static Location<'static>` field in `Cell<T, S>`
+/// using the `#[repr(C)]` algorithm.
+///
+/// Pseudo-code for the `#[repr(C)]` algorithm can be found here:
+/// <https://doc.rust-lang.org/reference/type-layout.html#reprc-structs>
+#[cfg(tokio_unstable)]
+const fn get_spawn_location_offset(
+    header_size: usize,
+    core_align: usize,
+    scheduler_size: usize,
+    id_align: usize,
+    id_size: usize,
+    spawn_location_align: usize,
+) -> usize {
+    let mut offset = get_id_offset(header_size, core_align, scheduler_size, id_align);
+    offset += id_size;
+
+    let spawn_location_misalign = offset % spawn_location_align;
+    if spawn_location_misalign > 0 {
+        offset += spawn_location_align - spawn_location_misalign;
+    }
+
+    offset
+}
+
 impl RawTask {
-    pub(super) fn new<T, S>(task: T, scheduler: S, id: Id) -> RawTask
+    pub(super) fn new<T, S>(
+        task: T,
+        scheduler: S,
+        id: Id,
+        _spawned_at: super::SpawnLocation,
+    ) -> RawTask
     where
         T: Future,
         S: Schedule,
     {
-        let ptr = Box::into_raw(Cell::<_, S>::new(task, scheduler, State::new(), id));
+        let ptr = Box::into_raw(Cell::<_, S>::new(
+            task,
+            scheduler,
+            State::new(),
+            id,
+            #[cfg(tokio_unstable)]
+            _spawned_at.0,
+        ));
         let ptr = unsafe { NonNull::new_unchecked(ptr.cast()) };
 
         RawTask { ptr }
