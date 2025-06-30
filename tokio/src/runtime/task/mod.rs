@@ -228,6 +228,7 @@ use crate::util::sharded_list;
 
 use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
+use std::panic::Location;
 use std::ptr::NonNull;
 use std::{fmt, mem};
 
@@ -656,7 +657,8 @@ mod spawn_location {
 
 impl SpawnLocation {
     #[track_caller]
+    #[inline]
     pub(crate) fn capture() -> Self {
-        Self::from(std::panic::Location::caller())
+        Self::from(Location::caller())
     }
 }
