@@ -3,7 +3,7 @@ use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
 use crate::runtime::task::{
-    self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task, TaskHarnessScheduleHooks,
+    self, JoinHandle, OwnedTasks, Schedule, Task, TaskHarnessScheduleHooks,
 };
 use crate::runtime::{
     blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
@@ -457,10 +457,10 @@ impl Handle {
         F::Output: Send + 'static,
     {
         let spawned_at = Location::caller();
-        let (handle, notified) =
-            me.shared
-                .owned
-                .bind(future, me.clone(), id, SpawnLocation::new(spawned_at));
+        let (handle, notified) = me
+            .shared
+            .owned
+            .bind(future, me.clone(), id, spawned_at.into());
 
         me.task_hooks.spawn(&TaskMeta {
             id,
