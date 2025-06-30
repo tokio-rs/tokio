@@ -2,16 +2,15 @@ use crate::future::Future;
 use crate::loom::sync::Arc;
 use crate::runtime::scheduler::multi_thread::worker;
 use crate::runtime::task::{Notified, Task, TaskHarnessScheduleHooks};
-#[cfg(tokio_unstable)]
-use crate::runtime::TaskMeta;
 use crate::runtime::{
     blocking, driver,
     task::{self, JoinHandle},
-    TaskHooks,
+    TaskHooks, TaskMeta,
 };
 use crate::util::RngSeedGenerator;
 
 use std::fmt;
+use std::panic::Location;
 
 mod metrics;
 
@@ -58,13 +57,15 @@ impl Handle {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let spawned_at = task::SpawnLocation::capture();
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
+        let spawned_at = Location::caller();
+        let (handle, notified) = me
+            .shared
+            .owned
+            .bind(future, me.clone(), id, spawned_at.into());
 
-        #[cfg(tokio_unstable)]
         me.task_hooks.spawn(&TaskMeta {
             id,
-            spawned_at: spawned_at.0,
+            spawned_at,
             _phantom: Default::default(),
         });
 

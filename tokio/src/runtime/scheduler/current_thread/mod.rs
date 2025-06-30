@@ -3,12 +3,10 @@ use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
 use crate::runtime::task::{
-    self, JoinHandle, OwnedTasks, Schedule, Task, TaskHarnessScheduleHooks,
+    self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task, TaskHarnessScheduleHooks,
 };
-#[cfg(tokio_unstable)]
-use crate::runtime::TaskMeta;
 use crate::runtime::{
-    blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, WorkerMetrics,
+    blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
 };
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
@@ -17,6 +15,7 @@ use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
+use std::panic::Location;
 use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
@@ -457,13 +456,15 @@ impl Handle {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let spawned_at = crate::runtime::task::SpawnLocation::capture();
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
+        let spawned_at = Location::caller();
+        let (handle, notified) =
+            me.shared
+                .owned
+                .bind(future, me.clone(), id, SpawnLocation::new(spawned_at));
 
-        #[cfg(tokio_unstable)]
         me.task_hooks.spawn(&TaskMeta {
             id,
-            spawned_at: spawned_at.0,
+            spawned_at,
             _phantom: Default::default(),
         });
 
@@ -490,16 +491,15 @@ impl Handle {
         F: crate::future::Future + 'static,
         F::Output: 'static,
     {
-        let spawned_at = crate::runtime::task::SpawnLocation::capture();
-        let (handle, notified) = me
-            .shared
-            .owned
-            .bind_local(future, me.clone(), id, spawned_at);
+        let spawned_at = Location::caller();
+        let (handle, notified) =
+            me.shared
+                .owned
+                .bind_local(future, me.clone(), id, spawned_at.into());
 
-        #[cfg(tokio_unstable)]
         me.task_hooks.spawn(&TaskMeta {
             id,
-            spawned_at: spawned_at.0,
+            spawned_at,
             _phantom: Default::default(),
         });
 

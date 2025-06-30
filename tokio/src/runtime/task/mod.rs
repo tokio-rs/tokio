@@ -621,29 +621,28 @@ unsafe impl<S> sharded_list::ShardedListItem for Task<S> {
 /// when `tokio_unstable` is not enabled.
 #[cfg(tokio_unstable)]
 mod spawn_location {
+
     use std::panic::Location;
 
     #[derive(Copy, Clone)]
     pub(crate) struct SpawnLocation(pub &'static Location<'static>);
 
-    impl SpawnLocation {
-        #[track_caller]
-        #[inline]
-        pub(crate) fn capture() -> Self {
-            Self(Location::caller())
+    impl From<&'static Location<'static>> for SpawnLocation {
+        fn from(location: &'static Location<'static>) -> Self {
+            Self(location)
         }
     }
 }
 
 #[cfg(not(tokio_unstable))]
 mod spawn_location {
+    use std::panic::Location;
+
     #[derive(Copy, Clone)]
     pub(crate) struct SpawnLocation();
 
-    impl SpawnLocation {
-        #[track_caller]
-        #[inline]
-        pub(crate) fn capture() -> Self {
+    impl From<&'static Location<'static>> for SpawnLocation {
+        fn from(_: &'static Location<'static>) -> Self {
             Self()
         }
     }
@@ -652,5 +651,12 @@ mod spawn_location {
     #[test]
     fn spawn_location_is_zero_sized() {
         assert_eq!(std::mem::size_of::<SpawnLocation>(), 0);
+    }
+}
+
+impl SpawnLocation {
+    #[track_caller]
+    pub(crate) fn capture() -> Self {
+        Self::from(std::panic::Location::caller())
     }
 }
