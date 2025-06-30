@@ -203,8 +203,7 @@ impl RawTask {
         task: T,
         scheduler: S,
         id: Id,
-
-        #[cfg(tokio_unstable)] spawned_at: &'static Location<'static>,
+        _spawned_at: super::SpawnLocation,
     ) -> RawTask
     where
         T: Future,
@@ -216,7 +215,7 @@ impl RawTask {
             State::new(),
             id,
             #[cfg(tokio_unstable)]
-            spawned_at,
+            _spawned_at.0,
         ));
         let ptr = unsafe { NonNull::new_unchecked(ptr.cast()) };
 

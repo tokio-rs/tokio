@@ -1,5 +1,6 @@
 use crate::runtime::task::{
-    self, unowned, Id, JoinHandle, OwnedTasks, Schedule, Task, TaskHarnessScheduleHooks,
+    self, unowned, Id, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task,
+    TaskHarnessScheduleHooks,
 };
 use crate::runtime::tests::NoopSchedule;
 
@@ -59,8 +60,7 @@ fn create_drop1() {
         },
         NoopSchedule,
         Id::next(),
-        #[cfg(tokio_unstable)]
-        Location::caller(),
+        SpawnLocation::capture(),
     );
     drop(notified);
     handle.assert_not_dropped();
@@ -78,8 +78,7 @@ fn create_drop2() {
         },
         NoopSchedule,
         Id::next(),
-        #[cfg(tokio_unstable)]
-        Location::caller(),
+        SpawnLocation::capture(),
     );
     drop(join);
     handle.assert_not_dropped();
@@ -97,8 +96,7 @@ fn drop_abort_handle1() {
         },
         NoopSchedule,
         Id::next(),
-        #[cfg(tokio_unstable)]
-        Location::caller(),
+        SpawnLocation::capture(),
     );
     let abort = join.abort_handle();
     drop(join);
@@ -119,8 +117,7 @@ fn drop_abort_handle2() {
         },
         NoopSchedule,
         Id::next(),
-        #[cfg(tokio_unstable)]
-        Location::caller(),
+        SpawnLocation::capture(),
     );
     let abort = join.abort_handle();
     drop(notified);
@@ -141,8 +138,7 @@ fn drop_abort_handle_clone() {
         },
         NoopSchedule,
         Id::next(),
-        #[cfg(tokio_unstable)]
-        Location::caller(),
+        SpawnLocation::capture(),
     );
     let abort = join.abort_handle();
     let abort_clone = abort.clone();
@@ -167,8 +163,7 @@ fn create_shutdown1() {
         },
         NoopSchedule,
         Id::next(),
-        #[cfg(tokio_unstable)]
-        Location::caller(),
+        SpawnLocation::capture(),
     );
     drop(join);
     handle.assert_not_dropped();
@@ -186,8 +181,7 @@ fn create_shutdown2() {
         },
         NoopSchedule,
         Id::next(),
-        #[cfg(tokio_unstable)]
-        Location::caller(),
+        SpawnLocation::capture(),
     );
     handle.assert_not_dropped();
     notified.shutdown();
@@ -197,13 +191,7 @@ fn create_shutdown2() {
 
 #[test]
 fn unowned_poll() {
-    let (task, _) = unowned(
-        async {},
-        NoopSchedule,
-        Id::next(),
-        #[cfg(tokio_unstable)]
-        Location::caller(),
-    );
+    let (task, _) = unowned(async {}, NoopSchedule, Id::next(), SpawnLocation::capture());
     task.run();
 }
 
@@ -413,13 +401,10 @@ impl Runtime {
         T: 'static + Send + Future,
         T::Output: 'static + Send,
     {
-        let (handle, notified) = self.0.owned.bind(
-            future,
-            self.clone(),
-            Id::next(),
-            #[cfg(tokio_unstable)]
-            Location::caller(),
-        );
+        let (handle, notified) =
+            self.0
+                .owned
+                .bind(future, self.clone(), Id::next(), SpawnLocation::capture());
 
         if let Some(notified) = notified {
             self.schedule(notified);

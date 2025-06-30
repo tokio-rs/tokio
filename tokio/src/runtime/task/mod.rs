@@ -216,6 +216,8 @@ use self::state::State;
 
 mod waker;
 
+pub(crate) use self::spawn_location::SpawnLocation;
+
 cfg_taskdump! {
     pub(crate) mod trace;
 }
@@ -226,8 +228,6 @@ use crate::util::sharded_list;
 
 use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
-#[cfg(tokio_unstable)]
-use std::panic::Location;
 use std::ptr::NonNull;
 use std::{fmt, mem};
 
@@ -328,8 +328,7 @@ cfg_rt! {
         task: T,
         scheduler: S,
         id: Id,
-        #[cfg(tokio_unstable)]
-        spawned_at: &'static Location<'static>,
+        spawned_at: SpawnLocation,
     ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
@@ -340,7 +339,7 @@ cfg_rt! {
             task,
             scheduler,
             id,
-            #[cfg(tokio_unstable)] spawned_at,
+            spawned_at,
         );
         let task = Task {
             raw,
@@ -363,7 +362,7 @@ cfg_rt! {
         task: T,
         scheduler: S,
         id: Id,
-        #[cfg(tokio_unstable)] spawned_at: &'static Location<'static>,
+        spawned_at: SpawnLocation,
     ) -> (UnownedTask<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
@@ -372,8 +371,9 @@ cfg_rt! {
     {
         let (task, notified, join) = new_task(
             task,
-            scheduler, id,
-            #[cfg(tokio_unstable)] spawned_at,
+            scheduler,
+            id,
+            spawned_at,
         );
 
         // This transfers the ref-count of task and notified into an UnownedTask.
@@ -614,5 +614,43 @@ unsafe impl<S> sharded_list::ShardedListItem for Task<S> {
         // SAFETY: The caller guarantees that `target` points at a valid task.
         let task_id = unsafe { Header::get_id(target) };
         task_id.0.get() as usize
+    }
+}
+
+/// Wrapper around [`std::panic::Location`] that's conditionally compiled out
+/// when `tokio_unstable` is not enabled.
+#[cfg(tokio_unstable)]
+mod spawn_location {
+    use std::panic::Location;
+
+    #[derive(Copy, Clone)]
+    pub(crate) struct SpawnLocation(pub &'static Location<'static>);
+
+    impl SpawnLocation {
+        #[track_caller]
+        #[inline]
+        pub(crate) fn capture() -> Self {
+            Self(Location::caller())
+        }
+    }
+}
+
+#[cfg(not(tokio_unstable))]
+mod spawn_location {
+    #[derive(Copy, Clone)]
+    pub(crate) struct SpawnLocation();
+
+    impl SpawnLocation {
+        #[track_caller]
+        #[inline]
+        pub(crate) fn capture() -> Self {
+            Self()
+        }
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn spawn_location_is_zero_sized() {
+        assert_eq!(std::mem::size_of::<SpawnLocation>(), 0);
     }
 }

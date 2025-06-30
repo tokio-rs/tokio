@@ -3,7 +3,9 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex};
 #[cfg(tokio_unstable)]
 use crate::runtime;
-use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task, TaskHarnessScheduleHooks};
+use crate::runtime::task::{
+    self, JoinHandle, LocalOwnedTasks, SpawnLocation, Task, TaskHarnessScheduleHooks,
+};
 use crate::runtime::{context, ThreadId, BOX_FUTURE_THRESHOLD};
 use crate::sync::AtomicWaker;
 use crate::util::trace::SpawnMeta;
@@ -1014,8 +1016,7 @@ impl Context {
                 future,
                 self.shared.clone(),
                 id,
-                #[cfg(tokio_unstable)]
-                std::panic::Location::caller(),
+                SpawnLocation::capture(),
             )
         };
 

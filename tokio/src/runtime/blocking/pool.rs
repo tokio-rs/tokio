@@ -383,8 +383,7 @@ impl Spawner {
             fut,
             BlockingSchedule::new(rt),
             id,
-            #[cfg(tokio_unstable)]
-            std::panic::Location::caller(),
+            task::SpawnLocation::capture(),
         );
 
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
