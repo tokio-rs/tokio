@@ -454,26 +454,26 @@ impl<T> Steal<T> {
 
         // Ooh, there's another task just sitting there? Grab that one, too!
         let lifo = self.0.lifo.take();
-        if lifo.is_some() {
-            n += 1;
-        }
 
-        if n == 0 {
+        if n == 0 && lifo.is_none() {
             // No tasks were stolen
             return None;
         }
 
-        dst_stats.incr_steal_count(n as u16);
+        // If we also grabbed the task from the LIFO slot, include that in the
+        // steal count as well.
+        dst_stats.incr_steal_count(n as u16 + lifo.is_some() as u16);
         dst_stats.incr_steal_operations();
-
-        // We are returning a task here
-        n -= 1;
 
         let ret = if lifo.is_some() {
             // If we took the task from the LIFO slot, just return it as the
-            // next task to run, rather than messing around with the buffer.
+            // next task to run, rather than messing around with tasks from the
+            // queue.
             lifo
         } else {
+            // We are returning a task from the queue here.
+            n -= 1;
+
             // The LIFO slot was was empty, so take the last task we squirted
             // into `dst` instead.
             let ret_pos = dst_tail.wrapping_add(n);
