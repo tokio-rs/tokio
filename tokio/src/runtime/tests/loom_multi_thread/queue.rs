@@ -108,7 +108,7 @@ fn basic_lifo() {
                 local.push_back_or_overflow(prev, &inject, &mut stats);
             }
 
-            while local.pop().or_else(|| local.pop()).is_some() {
+            while local.pop_lifo().or_else(|| local.pop()).is_some() {
                 n += 1;
             }
         }
@@ -239,7 +239,7 @@ fn multi_stealer_lifo() {
 
         let mut n = 0;
 
-        while local.pop().is_some() {
+        while local.pop_lifo().or_else(|| local.pop()).is_some() {
             n += 1;
         }
 
