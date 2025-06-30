@@ -159,6 +159,10 @@ fn task_hook_spawn_location_multi_thread() {
     // the task hooks.
     runtime.shutdown_timeout(std::time::Duration::from_secs(60));
 
+    // Note: we "read" the counters using `fetch_add(0, SeqCst)` rather than
+    // `load(SeqCst)` because read-write-modify operations are guaranteed to
+    // observe the latest value, while the load is not.
+    // This avoids a race that may cause test flakiness.
     assert_eq!(spawns.fetch_add(0, Ordering::SeqCst), 1);
     let poll_starts = poll_starts.fetch_add(0, Ordering::SeqCst);
     assert!(poll_starts > 1);
