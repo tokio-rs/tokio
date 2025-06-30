@@ -15,6 +15,7 @@ use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
+use std::panic::Location;
 use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
@@ -445,6 +446,7 @@ impl Context {
 
 impl Handle {
     /// Spawns a future onto the `CurrentThread` scheduler
+    #[track_caller]
     pub(crate) fn spawn<F>(
         me: &Arc<Self>,
         future: F,
@@ -454,10 +456,15 @@ impl Handle {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id);
+        let spawned_at = Location::caller();
+        let (handle, notified) = me
+            .shared
+            .owned
+            .bind(future, me.clone(), id, spawned_at.into());
 
         me.task_hooks.spawn(&TaskMeta {
             id,
+            spawned_at,
             _phantom: Default::default(),
         });
 
@@ -474,6 +481,7 @@ impl Handle {
     /// This should only be used when this is a `LocalRuntime` or in another case where the runtime
     /// provably cannot be driven from or moved to different threads from the one on which the task
     /// is spawned.
+    #[track_caller]
     pub(crate) unsafe fn spawn_local<F>(
         me: &Arc<Self>,
         future: F,
@@ -483,10 +491,15 @@ impl Handle {
         F: crate::future::Future + 'static,
         F::Output: 'static,
     {
-        let (handle, notified) = me.shared.owned.bind_local(future, me.clone(), id);
+        let spawned_at = Location::caller();
+        let (handle, notified) =
+            me.shared
+                .owned
+                .bind_local(future, me.clone(), id, spawned_at.into());
 
         me.task_hooks.spawn(&TaskMeta {
             id,
+            spawned_at,
             _phantom: Default::default(),
         });
 
@@ -771,16 +784,16 @@ impl CoreGuard<'_> {
                     let task = context.handle.shared.owned.assert_owner(task);
 
                     #[cfg(tokio_unstable)]
-                    let task_id = task.task_id();
+                    let task_meta = task.task_meta();
 
                     let (c, ()) = context.run_task(core, || {
                         #[cfg(tokio_unstable)]
-                        context.handle.task_hooks.poll_start_callback(task_id);
+                        context.handle.task_hooks.poll_start_callback(&task_meta);
 
                         task.run();
 
                         #[cfg(tokio_unstable)]
-                        context.handle.task_hooks.poll_stop_callback(task_id);
+                        context.handle.task_hooks.poll_stop_callback(&task_meta);
                     });
 
                     core = c;
