@@ -31,8 +31,6 @@ mod noop_scheduler {
 mod unowned_wrapper {
     use crate::runtime::task::{Id, JoinHandle, Notified, SpawnLocation};
     use crate::runtime::tests::NoopSchedule;
-    #[cfg(tokio_unstable)]
-    use std::panic::Location;
 
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     #[track_caller]
