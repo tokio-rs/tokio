@@ -323,7 +323,7 @@ pub(crate) mod context;
 
 pub(crate) mod park;
 
-pub(crate) mod driver;
+mod driver;
 
 pub(crate) mod scheduler;
 

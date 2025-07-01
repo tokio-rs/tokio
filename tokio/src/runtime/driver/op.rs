@@ -1,4 +1,3 @@
-use crate::io::uring::open::Open;
 use crate::runtime::Handle;
 use io_uring::cqueue;
 use io_uring::squeue::Entry;
@@ -9,11 +8,8 @@ use std::task::Poll;
 use std::task::Waker;
 use std::{io, mem};
 
-#[allow(dead_code)]
 #[derive(Debug)]
-pub(crate) enum CancelData {
-    Open(Open),
-}
+pub(crate) enum CancelData {}
 
 #[derive(Debug)]
 pub(crate) enum Lifecycle {
@@ -25,7 +21,6 @@ pub(crate) enum Lifecycle {
 
     /// The submitter no longer has interest in the operation result. The state
     /// must be passed to the driver and held until the operation completes.
-    #[allow(dead_code)]
     Cancelled(CancelData),
 
     /// The operation has completed with a single cqe result
