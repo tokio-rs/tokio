@@ -120,7 +120,7 @@ pub fn pipe() -> io::Result<(Sender, Receiver)> {
 /// ```
 #[derive(Clone, Debug)]
 pub struct OpenOptions {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     read_write: bool,
     unchecked: bool,
 }
@@ -131,7 +131,7 @@ impl OpenOptions {
     /// All options are initially set to `false`.
     pub fn new() -> OpenOptions {
         OpenOptions {
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "android"))]
             read_write: false,
             unchecked: false,
         }
@@ -168,8 +168,8 @@ impl OpenOptions {
     ///     .read_write(true)
     ///     .open_receiver("path/to/a/fifo");
     /// ```
-    #[cfg(target_os = "linux")]
-    #[cfg_attr(docsrs, doc(cfg(target_os = "linux")))]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg_attr(docsrs, doc(cfg(any(target_os = "linux", target_os = "android"))))]
     pub fn read_write(&mut self, value: bool) -> &mut Self {
         self.read_write = value;
         self
@@ -264,7 +264,7 @@ impl OpenOptions {
             .write(pipe_end == PipeEnd::Sender)
             .custom_flags(libc::O_NONBLOCK);
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if self.read_write {
             options.read(true).write(true);
         }
