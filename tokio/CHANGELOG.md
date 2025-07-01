@@ -27,7 +27,7 @@
   ([#7417])
 - runtime: removed borrow from `LocalOptions` parameter to
   `runtime::Builder::build_local` ([#7346])
-  
+
 ## Documented
 
 - io: clarify behavior of seeking when `start_seek` is not used ([#7366])
