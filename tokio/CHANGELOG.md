@@ -2,7 +2,7 @@
 
 ### Fixed
 
-- net: fixed `TcpStream::shutdown` incorrectly returning an error on macOS 
+- net: fixed `TcpStream::shutdown` incorrectly returning an error on macOS
   ([#7290])
 
 ## Added
@@ -17,10 +17,10 @@
 
 ## Changed
 
-- runtime: eliminate unnecessary lfence while operating on `queue::Local<T>` 
+- runtime: eliminate unnecessary lfence while operating on `queue::Local<T>`
   ([#7340])
 - task: disallow blocking in `LocalSet::{poll,drop}` ([#7372])
-  
+
 ## Unstable
 
 - runtime: add `TaskMeta::spawn_location` tracking where a task was spawned
@@ -36,7 +36,7 @@
 - net: fix broken link of `RawFd` in `TcpSocket` docs ([#7416])
 - net: update `AsRawFd` doc link to current Rust stdlib location ([#7429])
 - readme: fix double period in reactor description ([#7363])
-- runtime: add doc note that `on_*_task_poll` is unstable ([#7311]) 
+- runtime: add doc note that `on_*_task_poll` is unstable ([#7311])
 - sync: update broadcast docs on allocation failure ([#7352])
 - time: add a missing panic scenario of `time::advance` ([#7394])
 
