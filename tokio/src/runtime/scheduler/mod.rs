@@ -117,6 +117,7 @@ cfg_rt! {
             }
         }
 
+        #[track_caller]
         pub(crate) fn spawn<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
@@ -136,6 +137,7 @@ cfg_rt! {
         /// This should only be called in `LocalRuntime` if the runtime has been verified to be owned
         /// by the current thread.
         #[allow(irrefutable_let_patterns)]
+        #[track_caller]
         pub(crate) unsafe fn spawn_local<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
         where
             F: Future + 'static,

@@ -216,6 +216,8 @@ use self::state::State;
 
 mod waker;
 
+pub(crate) use self::spawn_location::SpawnLocation;
+
 cfg_taskdump! {
     pub(crate) mod trace;
 }
@@ -226,6 +228,7 @@ use crate::util::sharded_list;
 
 use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
+use std::panic::Location;
 use std::ptr::NonNull;
 use std::{fmt, mem};
 
@@ -243,6 +246,14 @@ unsafe impl<S> Sync for Task<S> {}
 #[repr(transparent)]
 pub(crate) struct Notified<S: 'static>(Task<S>);
 
+impl<S> Notified<S> {
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    #[inline]
+    pub(crate) fn task_meta<'task, 'meta>(&'task self) -> crate::runtime::TaskMeta<'meta> {
+        self.0.task_meta()
+    }
+}
+
 // safety: This type cannot be used to touch the task without first verifying
 // that the value is on a thread where it is safe to poll the task.
 unsafe impl<S: Schedule> Send for Notified<S> {}
@@ -258,8 +269,9 @@ pub(crate) struct LocalNotified<S: 'static> {
 
 impl<S> LocalNotified<S> {
     #[cfg(tokio_unstable)]
-    pub(crate) fn task_id(&self) -> Id {
-        self.task.id()
+    #[inline]
+    pub(crate) fn task_meta<'task, 'meta>(&'task self) -> crate::runtime::TaskMeta<'meta> {
+        self.task.task_meta()
     }
 }
 
@@ -317,13 +329,19 @@ cfg_rt! {
         task: T,
         scheduler: S,
         id: Id,
+        spawned_at: SpawnLocation,
     ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let raw = RawTask::new::<T, S>(task, scheduler, id);
+        let raw = RawTask::new::<T, S>(
+            task,
+            scheduler,
+            id,
+            spawned_at,
+        );
         let task = Task {
             raw,
             _p: PhantomData,
@@ -341,13 +359,23 @@ cfg_rt! {
     /// only when the task is not going to be stored in an `OwnedTasks` list.
     ///
     /// Currently only blocking tasks use this method.
-    pub(crate) fn unowned<T, S>(task: T, scheduler: S, id: Id) -> (UnownedTask<S>, JoinHandle<T::Output>)
+    pub(crate) fn unowned<T, S>(
+        task: T,
+        scheduler: S,
+        id: Id,
+        spawned_at: SpawnLocation,
+    ) -> (UnownedTask<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
         T: Send + Future + 'static,
         T::Output: Send + 'static,
     {
-        let (task, notified, join) = new_task(task, scheduler, id);
+        let (task, notified, join) = new_task(
+            task,
+            scheduler,
+            id,
+            spawned_at,
+        );
 
         // This transfers the ref-count of task and notified into an UnownedTask.
         // This is valid because an UnownedTask holds two ref-counts.
@@ -401,6 +429,24 @@ impl<S: 'static> Task<S> {
     pub(crate) fn id(&self) -> crate::task::Id {
         // Safety: The header pointer is valid.
         unsafe { Header::get_id(self.raw.header_ptr()) }
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn spawned_at(&self) -> &'static Location<'static> {
+        // Safety: The header pointer is valid.
+        unsafe { Header::get_spawn_location(self.raw.header_ptr()) }
+    }
+
+    // Explicit `'task` and `'meta` lifetimes are necessary here, as otherwise,
+    // the compiler infers the lifetimes to be the same, and considers the task
+    // to be borrowed for the lifetime of the returned `TaskMeta`.
+    #[cfg(tokio_unstable)]
+    pub(crate) fn task_meta<'task, 'meta>(&'task self) -> crate::runtime::TaskMeta<'meta> {
+        crate::runtime::TaskMeta {
+            id: self.id(),
+            spawned_at: self.spawned_at(),
+            _phantom: PhantomData,
+        }
     }
 
     cfg_taskdump! {
@@ -569,5 +615,50 @@ unsafe impl<S> sharded_list::ShardedListItem for Task<S> {
         // SAFETY: The caller guarantees that `target` points at a valid task.
         let task_id = unsafe { Header::get_id(target) };
         task_id.0.get() as usize
+    }
+}
+
+/// Wrapper around [`std::panic::Location`] that's conditionally compiled out
+/// when `tokio_unstable` is not enabled.
+#[cfg(tokio_unstable)]
+mod spawn_location {
+
+    use std::panic::Location;
+
+    #[derive(Copy, Clone)]
+    pub(crate) struct SpawnLocation(pub &'static Location<'static>);
+
+    impl From<&'static Location<'static>> for SpawnLocation {
+        fn from(location: &'static Location<'static>) -> Self {
+            Self(location)
+        }
+    }
+}
+
+#[cfg(not(tokio_unstable))]
+mod spawn_location {
+    use std::panic::Location;
+
+    #[derive(Copy, Clone)]
+    pub(crate) struct SpawnLocation();
+
+    impl From<&'static Location<'static>> for SpawnLocation {
+        fn from(_: &'static Location<'static>) -> Self {
+            Self()
+        }
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn spawn_location_is_zero_sized() {
+        assert_eq!(std::mem::size_of::<SpawnLocation>(), 0);
+    }
+}
+
+impl SpawnLocation {
+    #[track_caller]
+    #[inline]
+    pub(crate) fn capture() -> Self {
+        Self::from(Location::caller())
     }
 }
