@@ -2,7 +2,7 @@ on:
   push:
     branches: ["master", "tokio-*.x"]
   pull_request:
-    # branches: ["master", "tokio-*.x"]
+    branches: ["master", "tokio-*.x"]
 
 name: CI
 
