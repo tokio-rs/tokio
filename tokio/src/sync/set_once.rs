@@ -1,10 +1,11 @@
 use super::{Notify, SetError};
-use crate::loom::cell::UnsafeCell;
+use crate::{loom::cell::UnsafeCell, pin};
 use std::fmt;
 use std::mem::MaybeUninit;
 use std::ops::Drop;
 use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 
 // This file contains an implementation of an SetOnce. The value of SetOnce
 // can only be modified once during initialization.
@@ -73,6 +74,9 @@ pub struct SetOnce<T> {
     value_set: AtomicBool,
     value: UnsafeCell<MaybeUninit<T>>,
     notify: Notify,
+    // we lock the mutex inside set to ensure
+    // only one caller of set can run at a time
+    lock: Mutex<()>,
 }
 
 impl<T> Default for SetOnce<T> {
@@ -105,13 +109,11 @@ impl<T: Eq> Eq for SetOnce<T> {}
 
 impl<T> Drop for SetOnce<T> {
     fn drop(&mut self) {
-        if self.initialized() {
+        if *self.value_set.get_mut() {
             // SAFETY: We're inside the drop implementation of SetOnce
             // AND we're also initalized. This is the best way to ensure
             // out data gets dropped
-            unsafe {
-                let _ = self.value.with_mut(|ptr| ptr::read(ptr).assume_init());
-            }
+            unsafe { self.value.with_mut(|ptr| ptr::drop_in_place(ptr as *mut T)) }
             // no need to set the flag to false as this set once is being
             // dropped
         }
@@ -124,6 +126,7 @@ impl<T> From<T> for SetOnce<T> {
             value_set: AtomicBool::new(true),
             value: UnsafeCell::new(MaybeUninit::new(value)),
             notify: Notify::new(),
+            lock: Mutex::new(()),
         }
     }
 }
@@ -135,6 +138,7 @@ impl<T> SetOnce<T> {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(MaybeUninit::uninit()),
             notify: Notify::new(),
+            lock: Mutex::new(()),
         }
     }
 
@@ -177,6 +181,7 @@ impl<T> SetOnce<T> {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(MaybeUninit::uninit()),
             notify: Notify::const_new(),
+            lock: Mutex::new(()),
         }
     }
 
@@ -227,6 +232,7 @@ impl<T> SetOnce<T> {
             value_set: AtomicBool::new(true),
             value: UnsafeCell::new(MaybeUninit::new(value)),
             notify: Notify::const_new(),
+            lock: Mutex::new(()),
         }
     }
 
@@ -257,6 +263,9 @@ impl<T> SetOnce<T> {
     // called only when the value_set AtomicBool is flipped from FALSE to TRUE
     // meaning that the value is being set from uinitialized to initialized via
     // this function
+    //
+    // The caller also has to ensure writes on `value` are syncronized with a
+    // external lock to prevent mutliple set_value calls at the same time.
     unsafe fn set_value(&self, value: T) {
         unsafe {
             self.value.with_mut(|ptr| (*ptr).as_mut_ptr().write(value));
@@ -282,19 +291,30 @@ impl<T> SetOnce<T> {
             return Err(SetError::AlreadyInitializedError(value));
         }
 
-        // Using release ordering so any threads that read a true from this
-        // atomic is able to read the value we just stored.
-        if !self.value_set.swap(true, Ordering::Release) {
-            // SAFETY: We are swapping the value_set AtomicBool from FALSE to
-            // TRUE with it being previously false and followed by that we are
-            // initializing the unsafe Cell field with the value
-            unsafe {
-                self.set_value(value);
-            }
+        // SAFETY: lock the mutex to ensure only one caller of set
+        // can run at a time.
+        match self.lock.lock() {
+            Ok(_) => {
+                // Using release ordering so any threads that read a true from this
+                // atomic is able to read the value we just stored.
+                if !self.value_set.swap(true, Ordering::Release) {
+                    // SAFETY: We are swapping the value_set AtomicBool from FALSE to
+                    // TRUE with it being previously false and followed by that we are
+                    // initializing the unsafe Cell field with the value
+                    unsafe {
+                        self.set_value(value);
+                    }
 
-            Ok(())
-        } else {
-            Err(SetError::InitializingError(value))
+                    Ok(())
+                } else {
+                    Err(SetError::AlreadyInitializedError(value))
+                }
+            }
+            Err(_) => {
+                // If we failed to lock the mutex, it means some other task is
+                // trying to set the value, so we return an error.
+                Err(SetError::InitializingError(value))
+            }
         }
     }
 
@@ -317,16 +337,45 @@ impl<T> SetOnce<T> {
         }
     }
 
-    /// Waits until the `SetOnce` has been initialized. Once the `SetOnce` is
-    /// initialized the wakers are notified and the Future returned from this
-    /// function completes.
+    /// Waits until set is called. The future returned will keep blocking until
+    /// the `SetOnce` is initialized.
     ///
-    /// If this function is called after the `SetOnce` is initialized then
-    /// empty future is returned which completes immediately.
-    pub async fn wait(&self) {
-        if !self.initialized() {
-            let _ = self.notify.notified().await;
+    /// If the `SetOnce` is already initialized, it will return the value
+    // immediately.
+    ///
+    /// # Panics
+    ///
+    /// If the `SetOnce` is not initialized after waiting, it will panic. To
+    /// avoid this, use `get_wait()` which returns an `Option<&T>` instead of
+    /// `&T`.
+    pub async fn wait(&self) -> &T {
+        match self.get_wait().await {
+            Some(val) => val,
+            _ => panic!("SetOnce::wait called but the SetOnce is not initialized"),
         }
+    }
+
+    /// Waits until set is called.
+    ///
+    /// If the state failed to initalize it will return `None`.
+    pub async fn get_wait(&self) -> Option<&T> {
+        let notify_fut = self.notify.notified();
+        pin!(notify_fut);
+
+        if self.value_set.load(Ordering::Acquire) {
+            // SAFETY: the state is initialized
+            return Some(unsafe { self.get_unchecked() });
+        }
+        // wait until the value is set
+        (&mut notify_fut).await;
+
+        // look at the state again
+        if self.value_set.load(Ordering::Acquire) {
+            // SAFETY: the state is initialized
+            return Some(unsafe { self.get_unchecked() });
+        }
+
+        None
     }
 }
 
