@@ -465,7 +465,7 @@ impl<T> Steal<T> {
         dst_stats.incr_steal_count(n as u16 + lifo.is_some() as u16);
         dst_stats.incr_steal_operations();
 
-        let ret = if lifo.is_some() {
+        let ret = if let Some(lifo) = lifo {
             // If we took the task from the LIFO slot, just return it as the
             // next task to run, rather than messing around with tasks from the
             // queue.
@@ -481,8 +481,7 @@ impl<T> Steal<T> {
 
             // safety: the value was written as part of `steal_into2` and not
             // exposed to stealers, so no other thread can access it.
-            let task = dst.inner.buffer[ret_idx].with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) });
-            Some(task)
+            dst.inner.buffer[ret_idx].with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) })
         };
 
         if n == 0 {
