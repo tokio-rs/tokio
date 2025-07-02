@@ -9,7 +9,7 @@
 - sync: `mpsc::OwnedPermit::{same_channel, same_channel_as_sender}` methods ([#7389])
 - macros: `biased` option for `join!` and `try_join!`, similar to `select!` ([#7307])
 - net: support for cygwin ([#7393])
-- net: support `pope::OpenOptions::read_write` on Android ([#7426])
+- net: support `pipe::OpenOptions::read_write` on Android ([#7426])
 - net: add `Clone` implementation for `net::unix::SocketAddr` ([#7422])
 
 ## Changed
