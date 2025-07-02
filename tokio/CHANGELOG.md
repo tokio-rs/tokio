@@ -1,32 +1,26 @@
-# 1.46.0 (July 1st, 2025)
+# 1.46.0 (July 2nd, 2025)
 
 ### Fixed
 
-- net: fixed `TcpStream::shutdown` incorrectly returning an error on macOS
-  ([#7290])
+- net: fixed `TcpStream::shutdown` incorrectly returning an error on macOS ([#7290])
 
 ## Added
 
-- sync: `mpsc::OwnedPermit::{same_channel, same_channel_as_sender}` methods
-  ([#7389])
-- macros: `biased` option for `join!` and `try_join!`, similar to `select!`
-  ([#7307])
+- sync: `mpsc::OwnedPermit::{same_channel, same_channel_as_sender}` methods ([#7389])
+- macros: `biased` option for `join!` and `try_join!`, similar to `select!` ([#7307])
 - net: support for cygwin ([#7393])
 - net: support `pope::OpenOptions::read_write` on Android ([#7426])
 - net: add `Clone` implementation for `net::unix::SocketAddr` ([#7422])
 
 ## Changed
 
-- runtime: eliminate unnecessary lfence while operating on `queue::Local<T>`
-  ([#7340])
+- runtime: eliminate unnecessary lfence while operating on `queue::Local<T>` ([#7340])
 - task: disallow blocking in `LocalSet::{poll,drop}` ([#7372])
 
 ## Unstable
 
-- runtime: add `TaskMeta::spawn_location` tracking where a task was spawned
-  ([#7417])
-- runtime: removed borrow from `LocalOptions` parameter to
-  `runtime::Builder::build_local` ([#7346])
+- runtime: add `TaskMeta::spawn_location` tracking where a task was spawned ([#7417])
+- runtime: removed borrow from `LocalOptions` parameter to `runtime::Builder::build_local` ([#7346])
 
 ## Documented
 
