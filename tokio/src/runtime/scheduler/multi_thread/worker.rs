@@ -1082,14 +1082,15 @@ impl Handle {
             true
         } else {
             // Push to the LIFO slot
-            let prev = core.run_queue.push_lifo(task);
-
-            if let Some(prev) = prev {
-                core.run_queue
-                    .push_back_or_overflow(prev, self, &mut core.stats);
-                true
-            } else {
-                false
+            match core.run_queue.push_lifo(task) {
+                Some(prev) => {
+                    // There was a previous task in the LIFO slot which needs
+                    // to be pushed to the back of the run queue.
+                    core.run_queue
+                        .push_back_or_overflow(prev, self, &mut core.stats);
+                    true
+                }
+                None => false,
             }
         };
 
