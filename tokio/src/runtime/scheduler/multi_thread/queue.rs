@@ -486,13 +486,13 @@ impl<T> Steal<T> {
 
         if n == 0 {
             // The `dst` queue is empty, but a single task was stolen
-            return ret;
+            return Some(ret);
         }
 
         // Make the stolen items available to consumers
         dst.inner.tail.store(dst_tail.wrapping_add(n), Release);
 
-        ret
+        Some(ret)
     }
 
     // Steal tasks from `self`, placing them into `dst`. Returns the number of
