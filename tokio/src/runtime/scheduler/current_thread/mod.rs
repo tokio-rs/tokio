@@ -3,7 +3,7 @@ use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
 use crate::runtime::task::{
-    self, JoinHandle, OwnedTasks, Schedule, Task, TaskHarnessScheduleHooks,
+    self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task, TaskHarnessScheduleHooks,
 };
 use crate::runtime::{
     blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
@@ -15,7 +15,6 @@ use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
-use std::panic::Location;
 use std::sync::atomic::Ordering::{AcqRel, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
@@ -451,16 +450,13 @@ impl Handle {
         me: &Arc<Self>,
         future: F,
         id: crate::runtime::task::Id,
+        spawned_at: SpawnLocation,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let spawned_at = Location::caller();
-        let (handle, notified) = me
-            .shared
-            .owned
-            .bind(future, me.clone(), id, spawned_at.into());
+        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
 
         me.task_hooks.spawn(&TaskMeta {
             id,
@@ -486,16 +482,16 @@ impl Handle {
         me: &Arc<Self>,
         future: F,
         id: crate::runtime::task::Id,
+        spawned_at: SpawnLocation,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + 'static,
         F::Output: 'static,
     {
-        let spawned_at = Location::caller();
-        let (handle, notified) =
-            me.shared
-                .owned
-                .bind_local(future, me.clone(), id, spawned_at.into());
+        let (handle, notified) = me
+            .shared
+            .owned
+            .bind_local(future, me.clone(), id, spawned_at);
 
         me.task_hooks.spawn(&TaskMeta {
             id,

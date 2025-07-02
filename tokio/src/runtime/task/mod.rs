@@ -444,7 +444,7 @@ impl<S: 'static> Task<S> {
     pub(crate) fn task_meta<'task, 'meta>(&'task self) -> crate::runtime::TaskMeta<'meta> {
         crate::runtime::TaskMeta {
             id: self.id(),
-            spawned_at: self.spawned_at(),
+            spawned_at: self.spawned_at().into(),
             _phantom: PhantomData,
         }
     }
