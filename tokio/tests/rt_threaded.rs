@@ -701,9 +701,25 @@ fn mutex_in_block_in_place() {
 fn lifo_stealable() {
     use std::time::Duration;
 
-    let (unblock_tx, unblock_rx) = tokio::sync::oneshot::channel();
-    let (task_started_tx, task_started_rx) = tokio::sync::oneshot::channel();
+    // This test constructs a scenario where a task (the "blocker task")
+    // notifies another task (the "victim task") and then blocks that worker
+    // thread indefinitely. The victim task is placed in the worker's LIFO
+    // slot, and will only run to completion if another worker steals it from
+    // the LIFO slot, as the current worker remains blocked running the blocker
+    // task.
+    //
+    // To make the blocker task block its worker thread without yielding, we use
+    // a `std::sync` blocking channel, so that we can eventually unblock it when
+    // the test completes.
     let (block_thread_tx, block_thread_rx) = mpsc::channel::<()>();
+    // We use this channel to wait until the victim task has started running. If
+    // we just spawned the victim task and then immediately blocked the worker
+    // thread, it would be in the global inject queue, rather than in the
+    // worker's LIFO slot.
+    let (task_started_tx, task_started_rx) = tokio::sync::oneshot::channel();
+    // Finally, this channel is used by the blocker task to wake up the victim
+    // task, so that it is placed in the worker's LIFO slot.
+    let (notify_tx, notify_rx) = tokio::sync::oneshot::channel();
     let rt = runtime::Builder::new_multi_thread()
         // Make sure there are enough workers that one can be parked running the
         // I/O driver and another can be parked running the timer wheel and
@@ -716,44 +732,63 @@ fn lifo_stealable() {
     rt.block_on(async {
         // Keep the runtime busy so that the workers that might steal the
         // blocked task don't all park themselves forever.
+        //
+        // Since this task will always be woken by whichever worker is holding
+        // the time driver, rather than a worker that's executing tasks, it
+        // shouldn't ever kick the victim task out of its worker's LIFO slot.
         let churn = tokio::spawn(async move {
             loop {
                 tokio::time::sleep(Duration::from_millis(64)).await;
             }
         });
 
-        let blocked_task_joined = tokio::spawn(async move {
-            println!("[LIFO] task started");
+        let victim_task_joined = tokio::spawn(async move {
+            println!("[victim] task started");
             task_started_tx.send(()).unwrap();
-            println!("[LIFO] task waiting for wakeup...");
-            unblock_rx.await.unwrap();
-            println!("[LIFO] task running after wakeup");
+            println!("[victim] task waiting for wakeup...");
+            notify_rx.await.unwrap();
+            println!("[victim] task running after wakeup");
         });
 
-        // Wait for the blocked task to have been polled once and have yielded
-        // before we spawn the task that will notify it.
+        // Wait for the victim task to have been polled once and have yielded
+        // before we spawn the task that will notify it. This ensures that it
+        // will be placed in the LIFO slot of the same worker thread as the
+        // blocker task, rather than on the global injector queue.
         task_started_rx.await.unwrap();
-        println!("[main] LIFO slot task start acked!");
+        println!("[main] victim slot task start acked!");
 
-        // Now, spawn a task that will notify the blocked task before going
+        // Now, spawn a task that will notify the victim task before going
         // blocking forever.
         tokio::spawn(async move {
             println!("[blocker] sending wakeup");
-            unblock_tx.send(()).unwrap();
+            notify_tx.send(()).unwrap();
 
             println!("[blocker] blocking the worker thread...");
             // Block the worker thread indefinitely by waiting for a message on
-            // a blocking channel. Using a channel rather than e.g. `loop {}`
-            // allows us to terminate the task cleanly when the test finishes.
+            // a blocking channel. Since we just notified the victim task, it
+            // went into the current worker thread's LIFO slot, and will only
+            // be able to complete if another worker thread successfully steals
+            // it from the LIFO slot.
+            //
+            // Using a channel rather than e.g. `loop {}` allows us to terminate
+            // the task cleanly when the test finishes.
             let _ = block_thread_rx.recv();
             println!("[blocker] done");
         });
 
         println!("[main] blocker task spawned");
 
-        let result = tokio::time::timeout(Duration::from_secs(30), blocked_task_joined).await;
+        // Wait for the victim task to join. If it does, then it has been stolen
+        // by another worker thread successfully.
+        //
+        // The 30-second timeout is chosen arbitrarily: its purpose is to ensure
+        // that the failure mode for this test is a panic, rather than hanging
+        // indefinitely. 30 seconds should be plenty of time for the task to be
+        // stolen, if it's going to work.
+        let result = tokio::time::timeout(Duration::from_secs(30), victim_task_joined).await;
         println!("[main] result: {result:?}");
-        // Before possibly panicking, make sure that we wake up the blocked task
+
+        // Before possibly panicking, make sure that we wake up the blocker task
         // so that it doesn't stop the runtime from shutting down.
         block_thread_tx.send(()).unwrap();
         churn.abort();
