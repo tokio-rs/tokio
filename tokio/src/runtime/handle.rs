@@ -329,7 +329,7 @@ impl Handle {
     }
 
     #[track_caller]
-    pub(crate) fn spawn_named<F>(&self, future: F, _meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
+    pub(crate) fn spawn_named<F>(&self, future: F, meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -344,8 +344,8 @@ impl Handle {
         ))]
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task", _meta, id.as_u64());
-        self.inner.spawn(future, id)
+        let future = crate::util::trace::task(future, "task", meta, id.as_u64());
+        self.inner.spawn(future, id, meta.spawned_at)
     }
 
     #[track_caller]
@@ -353,7 +353,7 @@ impl Handle {
     pub(crate) unsafe fn spawn_local_named<F>(
         &self,
         future: F,
-        _meta: SpawnMeta<'_>,
+        meta: SpawnMeta<'_>,
     ) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -369,8 +369,8 @@ impl Handle {
         ))]
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task", _meta, id.as_u64());
-        self.inner.spawn_local(future, id)
+        let future = crate::util::trace::task(future, "task", meta, id.as_u64());
+        self.inner.spawn_local(future, id, meta.spawned_at)
     }
 
     /// Returns the flavor of the current `Runtime`.
