@@ -1,6 +1,20 @@
+# 1.46.1 (July 4th, 2025)
+
+This release fixes incorrect spawn locations in runtime task hooks for tasks
+spawned using `tokio::spawn` rather than `Runtime::spawn`. This issue only
+effected the spawn location in `TaskMeta::spawned_at`, and did not effect task
+locations in Tracing events.
+
+## Unstable
+
+- runtime: add `TaskMeta::spawn_location` tracking where a task was spawned
+  ([#7440])
+
+[#7440]: https://github.com/tokio-rs/tokio/pull/7440
+
 # 1.46.0 (July 2nd, 2025)
 
-### Fixed
+## Fixed
 
 - net: fixed `TcpStream::shutdown` incorrectly returning an error on macOS ([#7290])
 
