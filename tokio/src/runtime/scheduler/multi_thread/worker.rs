@@ -1076,28 +1076,23 @@ impl Handle {
         // task must always be pushed to the back of the queue, enabling other
         // tasks to be executed. If **not** a yield, then there is more
         // flexibility and the task may go to the front of the queue.
-        let should_notify = if is_yield || !core.lifo_enabled {
+        if is_yield || !core.lifo_enabled {
             core.run_queue
                 .push_back_or_overflow(task, self, &mut core.stats);
-            true
         } else {
             // Push to the LIFO slot
-            match core.run_queue.push_lifo(task) {
-                Some(prev) => {
-                    // There was a previous task in the LIFO slot which needs
-                    // to be pushed to the back of the run queue.
-                    core.run_queue
-                        .push_back_or_overflow(prev, self, &mut core.stats);
-                    true
-                }
-                None => false,
+            if let Some(prev) = core.run_queue.push_lifo(task) {
+                // There was a previous task in the LIFO slot which needs
+                // to be pushed to the back of the run queue.
+                core.run_queue
+                    .push_back_or_overflow(prev, self, &mut core.stats);
             }
         };
 
         // Only notify if not currently parked. If `park` is `None`, then the
         // scheduling is from a resource driver. As notifications often come in
         // batches, the notification is delayed until the park is complete.
-        if should_notify && core.park.is_some() {
+        if core.park.is_some() {
             self.notify_parked_local();
         }
     }
