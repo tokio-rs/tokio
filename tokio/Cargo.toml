@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.46.0"
+version = "1.46.1"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Tokio Contributors <team@tokio.rs>"]

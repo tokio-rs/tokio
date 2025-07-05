@@ -1,7 +1,5 @@
-use std::marker::PhantomData;
-use std::panic::Location;
-
 use super::Config;
+use std::marker::PhantomData;
 
 impl TaskHooks {
     pub(crate) fn spawn(&self, meta: &TaskMeta<'_>) {
@@ -62,7 +60,8 @@ pub struct TaskMeta<'a> {
     /// The opaque ID of the task.
     pub(crate) id: super::task::Id,
     /// The location where the task was spawned.
-    pub(crate) spawned_at: &'static Location<'static>,
+    #[cfg_attr(not(tokio_unstable), allow(unreachable_pub, dead_code))]
+    pub(crate) spawned_at: crate::runtime::task::SpawnLocation,
     pub(crate) _phantom: PhantomData<&'a ()>,
 }
 
@@ -74,9 +73,9 @@ impl<'a> TaskMeta<'a> {
     }
 
     /// Return the source code location where the task was spawned.
-    #[cfg_attr(not(tokio_unstable), allow(unreachable_pub, dead_code))]
-    pub fn spawned_at(&self) -> &'static Location<'static> {
-        self.spawned_at
+    #[cfg(tokio_unstable)]
+    pub fn spawned_at(&self) -> &'static std::panic::Location<'static> {
+        self.spawned_at.0
     }
 }
 

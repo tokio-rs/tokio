@@ -414,7 +414,7 @@ cfg_rt! {
                 let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
                 // safety: we have verified that this is a `LocalRuntime` owned by the current thread
-                unsafe { handle.spawn_local(task, id) }
+                unsafe { handle.spawn_local(task, id, meta.spawned_at) }
             } else {
                 match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
                     None => panic!("`spawn_local` called from outside of a `task::LocalSet` or LocalRuntime"),
