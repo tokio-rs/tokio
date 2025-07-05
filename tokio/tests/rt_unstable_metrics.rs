@@ -642,9 +642,13 @@ fn worker_local_queue_depth() {
             });
 
             // Bump the next-run spawn
-            tokio::spawn(async {});
+            let nop = tokio::spawn(async {});
 
+            // Wait until we're sure the other worker is blocked.
             rx1.recv().unwrap();
+            // Make sure the no-op task has terminated so that it doesn't end up
+            // in the LIFO slot and throw off our counts.
+            let _ = nop.await;
 
             // Spawn some tasks
             for _ in 0..100 {
