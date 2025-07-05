@@ -330,7 +330,7 @@ async fn duplicate_keys2() {
         biased;
         res = map.join_next() => match res {
             Some((_key, res)) => panic!("Task {res:?} exited."),
-            None => panic!("Phantom task completeion."),
+            None => panic!("Phantom task completion."),
         },
         () = tokio::task::yield_now() => {},
     }

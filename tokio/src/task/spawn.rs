@@ -199,7 +199,7 @@ cfg_rt! {
         let id = task::Id::next();
         let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
-        match context::with_current(|handle| handle.spawn(task, id)) {
+        match context::with_current(|handle| handle.spawn(task, id, meta.spawned_at)) {
             Ok(join_handle) => join_handle,
             Err(e) => panic!("{}", e),
         }
