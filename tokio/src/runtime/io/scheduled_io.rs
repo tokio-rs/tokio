@@ -490,7 +490,7 @@ impl Future for Readiness<'_> {
                     // Not ready even after locked, insert into list...
 
                     // Safety: Since the `waiter` is not in the intrusive list yet,
-                    // so we have exclusive access to it. The Mutex ensures
+                    // we have exclusive access to it. The Mutex ensures
                     // that this modification is visible to other threads that
                     // acquire the same Mutex.
                     let waker = unsafe { &mut (*waiter.get()).waker };
