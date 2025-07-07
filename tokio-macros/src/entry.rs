@@ -422,12 +422,14 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     };
 
     let mut checks = vec![];
+    let mut attrs = vec![];
 
     let build = if let RuntimeFlavor::Local = config.flavor {
         checks.push(quote! {
             #[cfg(not(tokio_unstable))]
             compile_error!("The local runtime flavor is only available when `tokio_unstable` is set.");
         });
+        attrs.push(quote! { #[cfg(tokio_unstable)] });
         quote_spanned! {last_stmt_start_span=> build_local(Default::default())}
     } else {
         quote_spanned! {last_stmt_start_span=> build()}
@@ -455,14 +457,20 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     let body_ident = quote! { body };
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
     let last_block = quote_spanned! {last_stmt_end_span=>
+        #(#checks)*
+        #(#attrs)*
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
         {
-            #(#checks)*
             return #rt
                 .enable_all()
                 .#build
                 .expect("Failed building the Runtime")
                 .block_on(#body_ident);
+        }
+
+        #[allow(unreachable_code)]
+        {
+            panic!("fell through checks")
         }
     };
 
