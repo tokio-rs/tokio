@@ -1,5 +1,26 @@
 #![allow(unused_macros)]
 
+/// Allows specifying arbitrary combinations of features and config flags,
+/// which are also propagated to `docsrs` config.
+///
+/// Each contained item will have the annotations applied
+///
+/// ## Example usage:
+/// ```no-compile
+/// feature! {
+/// #![any(
+///     feature = "process",
+///     feature = "sync",
+///     feature = "rt",
+///     tokio_unstable
+/// )]
+///     /// docs
+///     pub struct MyStruct {};
+///     /// docs
+///     pub struct AnotherStruct {};
+/// }
+/// ```
+///
 macro_rules! feature {
     (
         #![$meta:meta]
