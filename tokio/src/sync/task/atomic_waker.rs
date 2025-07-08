@@ -316,11 +316,11 @@ impl AtomicWaker {
         // memory the `AtomicWaker` is associated with.
         match self.state.fetch_or(WAKING, AcqRel) {
             WAITING => {
-                // The waking lock has been acquired.
+                // SAFETY: the waking lock has been acquired.
                 let waker = unsafe { self.waker.with_mut(|t| (*t).take()) };
 
-                // Release the lock
-                self.state.fetch_and(!WAKING, Release);
+                // Release the lock.
+                self.state.store(WAITING, Release);
 
                 waker
             }
