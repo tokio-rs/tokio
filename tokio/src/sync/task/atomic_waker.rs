@@ -320,7 +320,7 @@ impl AtomicWaker {
                 let waker = unsafe { self.waker.with_mut(|t| (*t).take()) };
 
                 // Release the lock.
-                self.state.store(WAITING, Release);
+                self.state.swap(WAITING, Release);
 
                 waker
             }
