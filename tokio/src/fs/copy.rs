@@ -17,7 +17,6 @@ use std::path::Path;
 /// # Ok(())
 /// # }
 /// ```
-
 pub async fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<u64, std::io::Error> {
     let from = from.as_ref().to_owned();
     let to = to.as_ref().to_owned();
