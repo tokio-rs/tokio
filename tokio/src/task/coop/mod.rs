@@ -508,8 +508,8 @@ cfg_coop! {
     ///
     /// ```
     /// use tokio::task::coop::cooperative;
-    /// use futures_channel::mpsc::Receiver;
-    /// use futures_util::stream::StreamExt;
+    /// use futures::channel::mpsc::Receiver;
+    /// use futures::stream::StreamExt;
     ///
     /// async fn receive_next<T>(receiver: &mut Receiver<T>) -> Option<T>
     /// where

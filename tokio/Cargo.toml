@@ -137,8 +137,6 @@ features = [
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
 futures = { version = "0.3.0", features = ["async-await"] }
-futures-channel = "0.3.0"
-futures-util = "0.3.0"
 mockall = "0.13.0"
 async-stream = "0.3"
 futures-concurrency = "7.6.3"
