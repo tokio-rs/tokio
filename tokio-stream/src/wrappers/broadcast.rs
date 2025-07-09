@@ -53,7 +53,7 @@ pub enum BroadcastStreamRecvError {
 impl fmt::Display for BroadcastStreamRecvError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BroadcastStreamRecvError::Lagged(amt) => write!(f, "channel lagged by {}", amt),
+            BroadcastStreamRecvError::Lagged(amt) => write!(f, "channel lagged by {amt}"),
         }
     }
 }

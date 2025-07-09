@@ -1273,10 +1273,7 @@ impl<T> Receiver<T> {
                                 match (*ptr).waker {
                                     Some(ref w) if w.will_wake(waker) => {}
                                     _ => {
-                                        old_waker = std::mem::replace(
-                                            &mut (*ptr).waker,
-                                            Some(waker.clone()),
-                                        );
+                                        old_waker = (*ptr).waker.replace(waker.clone());
                                     }
                                 }
 

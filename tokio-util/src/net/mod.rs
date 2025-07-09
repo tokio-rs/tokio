@@ -40,7 +40,7 @@ impl Listener for tokio::net::TcpListener {
     }
 
     fn local_addr(&self) -> Result<Self::Addr> {
-        self.local_addr().map(Into::into)
+        self.local_addr()
     }
 }
 

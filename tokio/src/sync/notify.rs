@@ -1109,7 +1109,7 @@ impl Notified<'_> {
                                         None => true,
                                     };
                                     if should_update {
-                                        old_waker = std::mem::replace(&mut *v, Some(waker.clone()));
+                                        old_waker = (*v).replace(waker.clone());
                                     }
                                 }
                             });
