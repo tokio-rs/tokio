@@ -521,7 +521,6 @@ cfg_coop! {
     ///     // And await
     ///     coop_future.await
     /// }
-
     #[inline]
     pub fn cooperative<F: Future>(fut: F) -> Coop<F> {
         Coop { fut }
