@@ -1,13 +1,19 @@
-use super::{Notify, SetError};
+use super::Notify;
+
 use crate::{
-    loom::{cell::UnsafeCell, sync::Mutex},
+    loom::{
+        cell::UnsafeCell,
+        sync::{atomic::AtomicBool, Mutex},
+    },
     pin,
 };
+
+use std::error::Error;
 use std::fmt;
 use std::mem::MaybeUninit;
 use std::ops::Drop;
 use std::ptr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 
 // This file contains an implementation of an SetOnce. The value of SetOnce
 // can only be modified once during initialization.
@@ -276,9 +282,6 @@ impl<T> SetOnce<T> {
         // Using release ordering so any threads that read a true from this
         // atomic is able to read the value we just stored.
         self.value_set.store(true, Ordering::Release);
-
-        // notify the waiting wakers that the value is set
-        self.notify.notify_waiters();
     }
 
     /// Sets the value of the `SetOnce` to the given value if the `SetOnce` is
@@ -301,11 +304,21 @@ impl<T> SetOnce<T> {
         // can run at a time.
         let guard = self.lock.lock();
 
+        if self.initialized() {
+            // If the value is already set, we return an error
+            drop(guard);
+
+            return Err(SetError::AlreadyInitializedError(value));
+        }
+
         unsafe {
             self.set_value(value);
         }
 
         drop(guard);
+
+        // notify the waiting wakers that the value is set
+        self.notify.notify_waiters();
 
         Ok(())
     }
@@ -313,12 +326,14 @@ impl<T> SetOnce<T> {
     /// Takes the value from the cell, destroying the cell in the process.
     /// Returns `None` if the cell is empty.
     pub fn into_inner(mut self) -> Option<T> {
-        if self.initialized() {
+        let value_set = self.value_set.get_mut();
+
+        if *value_set {
             // Since we have taken ownership of self, its drop implementation
             // will be called by the end of this function, to prevent a double
             // free we will set the value_set to false so that the drop
             // implementation does not try to drop the value again.
-            *self.value_set.get_mut() = false;
+            *value_set = false;
 
             // SAFETY: The SetOnce is currently initialized, we can assume the
             // value is initialized and return that, when we return the value
@@ -344,10 +359,15 @@ impl<T> SetOnce<T> {
         let notify_fut = self.notify.notified();
         pin!(notify_fut);
 
+        // take the lock because we're reading value_set
+        let guard = self.lock.lock();
+
         if self.value_set.load(Ordering::Acquire) {
             // SAFETY: the state is initialized
             return unsafe { self.get_unchecked() };
         }
+
+        drop(guard);
 
         // wait until the value is set
         (&mut notify_fut).await;
@@ -369,3 +389,24 @@ unsafe impl<T: Sync + Send> Sync for SetOnce<T> {}
 // and atomic operations on `value_set`, so as long as T itself is Send
 // it's safe to send it to another thread
 unsafe impl<T: Send> Send for SetOnce<T> {}
+
+/// Errors that can be returned from [`SetOnce::set`].
+///
+/// [`SetOnce::set`]: crate::sync::SetOnce::set
+#[derive(Debug, PartialEq, Eq)]
+pub enum SetError<T> {
+    /// The cell was already initialized when [`SetOnce::set`] was called.
+    ///
+    /// [`SetOnce::set`]: crate::sync::OnceCell::set
+    AlreadyInitializedError(T),
+}
+
+impl<T> fmt::Display for SetError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SetError::AlreadyInitializedError(_) => write!(f, "AlreadyInitializedError"),
+        }
+    }
+}
+
+impl<T: fmt::Debug> Error for SetError<T> {}

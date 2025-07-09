@@ -5,8 +5,7 @@ use std::mem;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tokio::runtime;
-use tokio::sync::SetError;
-use tokio::sync::SetOnce;
+use tokio::sync::{SetOnce, SetOnceError as SetError};
 use tokio::time;
 
 #[test]
@@ -122,6 +121,22 @@ fn set_and_get() {
 }
 
 #[test]
+fn set_and_wait() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
+
+    static ONCE: SetOnce<u32> = SetOnce::const_new();
+
+    rt.block_on(async {
+        let _ = rt.spawn(async { ONCE.set(5) }).await;
+        let value = ONCE.wait().await;
+        assert_eq!(*value, 5);
+    });
+}
+
+#[test]
 fn get_uninit() {
     static ONCE: SetOnce<u32> = SetOnce::const_new();
     let uninit = ONCE.get();
@@ -135,7 +150,7 @@ fn set_twice() {
     let first = ONCE.set(5);
     assert_eq!(first, Ok(()));
     let second = ONCE.set(6);
-    assert!(second.err().unwrap().is_already_init_err());
+    assert!(second.is_err());
 }
 
 #[test]
@@ -168,9 +183,8 @@ fn set_while_initializing_or_already_init() {
         let result2 = handle2.await.unwrap();
 
         assert_eq!(result1, Ok(5));
-        let err = result2.err().unwrap();
 
-        assert!(err.is_initializing_err() || err.is_already_init_err());
+        assert!(result2.is_err());
     });
 }
 
@@ -210,10 +224,6 @@ fn is_some_initializing() {
 
         tokio::spawn(async { ONCE.set(20) });
 
-        ONCE.wait().await;
-
-        let res = ONCE.get();
-
-        assert_eq!(res, Some(20).as_ref());
+        assert_eq!(*ONCE.wait().await, 20);
     });
 }

@@ -489,7 +489,7 @@ cfg_sync! {
     pub use self::once_cell::{OnceCell, SetError};
 
     mod set_once;
-    pub use self::set_once::{SetOnce};
+    pub use self::set_once::{SetOnce, SetError as SetOnceError};
 
     pub mod watch;
 }
