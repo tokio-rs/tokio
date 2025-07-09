@@ -513,12 +513,10 @@ cfg_coop! {
     /// use futures::stream::StreamExt;
     ///
     /// async fn receive_next<T>(receiver: &mut Receiver<T>) -> Option<T>
-    /// where
-    ///     T: Unpin,
     /// {
     ///     // Use `StreamExt::next` to obtain a `Future` that resolves to the next value
     ///     let recv_future = receiver.next();
-    ///     // Wrap it an a cooperative wrapper
+    ///     // Wrap it a cooperative wrapper
     ///     let coop_future = cooperative(recv_future);
     ///     // And await
     ///     coop_future.await
