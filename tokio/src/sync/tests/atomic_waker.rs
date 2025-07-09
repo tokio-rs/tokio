@@ -40,6 +40,7 @@ fn wake_without_register() {
 }
 
 #[test]
+#[cfg_attr(target_family = "wasm", ignore)] // threads not supported
 fn failed_wake_synchronizes() {
     for _ in 0..1000 {
         failed_wake_synchronizes_inner();
