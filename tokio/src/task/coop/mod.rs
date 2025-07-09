@@ -502,9 +502,10 @@ cfg_coop! {
     /// channel, task budget will automatically be consumed when the next value is returned.
     /// This makes tasks that use Tokio mpsc channels automatically cooperative.
     ///
-    /// If you're using `futures::channel::mpsc` instead, automatic task budget consumption will
-    /// not happen. This example shows how can use `cooperative` to make `futures::channel::mpsc`
-    /// channels cooperate with the scheduler in the same way Tokio channels do.
+    /// If you're using [`futures::channel::mpsc`](https://docs.rs/futures/latest/futures/channel/mpsc/index.html)
+    /// instead, automatic task budget consumption will not happen. This example shows how can use
+    /// `cooperative` to make `futures::channel::mpsc` channels cooperate with the scheduler in the
+    /// same way Tokio channels do.
     ///
     /// ```
     /// use tokio::task::coop::cooperative;
