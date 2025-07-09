@@ -343,35 +343,37 @@ cfg_coop! {
     ///     }
     /// }
     ///
-    /// impl<T> Future for CountdownLatch<T> where T: Unpin {
-    ///       type Output = T;
+    /// impl<T> Future for CountdownLatch<T> {
+    ///     type Output = T;
     ///
-    ///       fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-    ///           // `poll_proceed` checks with the runtime if this task is still allowed to proceed
-    ///           // with performing work.
-    ///           // If not, `Pending` is returned and `ready!` ensures this function returns.
-    ///           // If we are allowed to proceed, coop now represents the budget consumption
-    ///           let coop = ready!(coop::poll_proceed(cx));
+    ///     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    ///         // `poll_proceed` checks with the runtime if this task is still allowed to proceed
+    ///         // with performing work.
+    ///         // If not, `Pending` is returned and `ready!` ensures this function returns.
+    ///         // If we are allowed to proceed, coop now represents the budget consumption
+    ///         let coop = ready!(coop::poll_proceed(cx));
     ///
-    ///           // Get a mutable reference to the unpinned CountdownLatch
-    ///           let this = Pin::get_mut(self);
+    ///         // Get a mutable reference to the CountdownLatch
+    ///         let this = Pin::get_mut(self);
     ///
-    ///           // Next we check if the latch is ready to release its value
-    ///           if this.counter == 0 {
-    ///                let t = this.value.take();
-    ///                // The latch made progress so call `made_progress` to ensure the budget
-    ///                // is not reverted.
-    ///                coop.made_progress();
-    ///                Poll::Ready(t.unwrap())
-    ///           } else {
-    ///                // If the latch is not ready so return pending and simply drop `coop`.
-    ///                // This will restore the budget making it available again to perform any
-    ///                // other work.
-    ///                this.waker = Some(cx.waker().clone());
-    ///                Poll::Pending
-    ///           }
-    ///        }
-    ///    }
+    ///         // Next we check if the latch is ready to release its value
+    ///         if this.counter == 0 {
+    ///             let t = this.value.take();
+    ///             // The latch made progress so call `made_progress` to ensure the budget
+    ///             // is not reverted.
+    ///             coop.made_progress();
+    ///             Poll::Ready(t.unwrap())
+    ///         } else {
+    ///             // If the latch is not ready so return pending and simply drop `coop`.
+    ///             // This will restore the budget making it available again to perform any
+    ///             // other work.
+    ///             this.waker = Some(cx.waker().clone());
+    ///             Poll::Pending
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// impl<T> Unpin for CountdownLatch<T> {}
     /// ```
     #[inline]
     pub fn poll_proceed(cx: &mut Context<'_>) -> Poll<RestoreOnPending> {
