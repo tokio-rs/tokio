@@ -289,7 +289,10 @@ impl Handle {
         match mem::replace(lifecycle, Lifecycle::Cancelled(cancel_data)) {
             Lifecycle::Submitted | Lifecycle::Waiting(_) => (),
             // The driver saw the completion, but it was never polled.
-            Lifecycle::Completed(_) => (),
+            Lifecycle::Completed(_) => {
+                // We can safely remove the entry from the slab, as it has already been completed.
+                ops.remove(index);
+            }
             prev => panic!("Unexpected state: {:?}", prev),
         };
     }
