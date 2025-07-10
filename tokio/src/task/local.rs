@@ -328,7 +328,7 @@ cfg_rt! {
     ///
     /// This is possible when either using one of these types
     /// explicitly, or (with `tokio_unstable`) by opting to use the
-    /// `"local"` runtime flavor in [`tokio::main`]:
+    /// `"local"` runtime flavor in `tokio::main`:
     ///
     /// ```ignore
     /// #[tokio::main(flavor = "local")]
