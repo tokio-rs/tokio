@@ -117,7 +117,8 @@ impl<T: Eq> Eq for SetOnce<T> {}
 
 impl<T> Drop for SetOnce<T> {
     fn drop(&mut self) {
-        if *self.value_set.get_mut() {
+        // TODO: Use get_mut()
+        if self.value_set.load(Ordering::Relaxed) {
             // SAFETY: We're inside the drop implementation of SetOnce
             // AND we're also initalized. This is the best way to ensure
             // out data gets dropped
@@ -325,15 +326,16 @@ impl<T> SetOnce<T> {
 
     /// Takes the value from the cell, destroying the cell in the process.
     /// Returns `None` if the cell is empty.
-    pub fn into_inner(mut self) -> Option<T> {
-        let value_set = self.value_set.get_mut();
+    pub fn into_inner(self) -> Option<T> {
+        // TODO: Use get_mut()
+        let value_set = self.value_set.load(Ordering::Relaxed);
 
-        if *value_set {
+        if value_set {
             // Since we have taken ownership of self, its drop implementation
             // will be called by the end of this function, to prevent a double
             // free we will set the value_set to false so that the drop
             // implementation does not try to drop the value again.
-            *value_set = false;
+            self.value_set.store(false, Ordering::Relaxed);
 
             // SAFETY: The SetOnce is currently initialized, we can assume the
             // value is initialized and return that, when we return the value
@@ -356,25 +358,22 @@ impl<T> SetOnce<T> {
     /// avoid this, use `get_wait()` which returns an `Option<&T>` instead of
     /// `&T`.
     pub async fn wait(&self) -> &T {
-        let notify_fut = self.notify.notified();
-        pin!(notify_fut);
+        loop {
+            let notify_fut = self.notify.notified();
+            pin!(notify_fut);
+            // take the lock because we're reading value_set
+            let guard = self.lock.lock();
 
-        // take the lock because we're reading value_set
-        let guard = self.lock.lock();
+            if self.value_set.load(Ordering::Relaxed) {
+                // SAFETY: the state is initialized
+                return unsafe { self.get_unchecked() };
+            }
 
-        if self.value_set.load(Ordering::Acquire) {
-            // SAFETY: the state is initialized
-            return unsafe { self.get_unchecked() };
+            drop(guard);
+
+            // wait until the value is set
+            (&mut notify_fut).await;
         }
-
-        drop(guard);
-
-        // wait until the value is set
-        (&mut notify_fut).await;
-
-        // SAFETY: Its not possible for the state to initialize after
-        // waker is notified
-        unsafe { self.get_unchecked() }
     }
 }
 
