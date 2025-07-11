@@ -177,7 +177,7 @@ mod block_in_place_cases {
             Ok(()) => {}
             Err(err) if err.is_panic() => std::panic::resume_unwind(err.into_panic()),
             Err(err) if err.is_cancelled() => panic!("task cancelled"),
-            Err(err) => panic!("{:?}", err),
+            Err(err) => panic!("{err:?}"),
         }
     }
 

@@ -1,6 +1,5 @@
-use std::marker::PhantomData;
-
 use super::Config;
+use std::marker::PhantomData;
 
 impl TaskHooks {
     pub(crate) fn spawn(&self, meta: &TaskMeta<'_>) {
@@ -23,23 +22,17 @@ impl TaskHooks {
 
     #[cfg(tokio_unstable)]
     #[inline]
-    pub(crate) fn poll_start_callback(&self, id: super::task::Id) {
+    pub(crate) fn poll_start_callback(&self, meta: &TaskMeta<'_>) {
         if let Some(poll_start) = &self.before_poll_callback {
-            (poll_start)(&TaskMeta {
-                id,
-                _phantom: std::marker::PhantomData,
-            })
+            (poll_start)(meta);
         }
     }
 
     #[cfg(tokio_unstable)]
     #[inline]
-    pub(crate) fn poll_stop_callback(&self, id: super::task::Id) {
+    pub(crate) fn poll_stop_callback(&self, meta: &TaskMeta<'_>) {
         if let Some(poll_stop) = &self.after_poll_callback {
-            (poll_stop)(&TaskMeta {
-                id,
-                _phantom: std::marker::PhantomData,
-            })
+            (poll_stop)(meta);
         }
     }
 }
@@ -66,6 +59,9 @@ pub(crate) struct TaskHooks {
 pub struct TaskMeta<'a> {
     /// The opaque ID of the task.
     pub(crate) id: super::task::Id,
+    /// The location where the task was spawned.
+    #[cfg_attr(not(tokio_unstable), allow(unreachable_pub, dead_code))]
+    pub(crate) spawned_at: crate::runtime::task::SpawnLocation,
     pub(crate) _phantom: PhantomData<&'a ()>,
 }
 
@@ -74,6 +70,12 @@ impl<'a> TaskMeta<'a> {
     #[cfg_attr(not(tokio_unstable), allow(unreachable_pub, dead_code))]
     pub fn id(&self) -> super::task::Id {
         self.id
+    }
+
+    /// Return the source code location where the task was spawned.
+    #[cfg(tokio_unstable)]
+    pub fn spawned_at(&self) -> &'static std::panic::Location<'static> {
+        self.spawned_at.0
     }
 }
 
