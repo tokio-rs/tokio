@@ -514,8 +514,7 @@ cfg_coop! {
     /// use futures::channel::mpsc::Receiver;
     /// use futures::stream::StreamExt;
     ///
-    /// async fn receive_next<T>(receiver: &mut Receiver<T>) -> Option<T>
-    /// {
+    /// async fn receive_next<T>(receiver: &mut Receiver<T>) -> Option<T> {
     ///     // Use `StreamExt::next` to obtain a `Future` that resolves to the next value
     ///     let recv_future = receiver.next();
     ///     // Wrap it a cooperative wrapper
