@@ -24,7 +24,7 @@ use std::sync::atomic::Ordering;
 //      Some(&T)
 //
 // The value cannot be changed after set() is called. Subsequent calls to set()
-// will return a `SetError`
+// will return a `SetOnceError`
 
 /// A thread-safe cell that can be written to only once.
 /// A `SetOnce` is inspired from python's
@@ -64,13 +64,13 @@ use std::sync::atomic::Ordering;
 /// # Example
 ///
 /// ```
-/// use tokio::sync::{SetOnce, SetError};
+/// use tokio::sync::{SetOnce, SetOnceError};
 ///
 ///
 /// static ONCE: SetOnce<u32> = SetOnce::const_new();
 ///
 /// #[tokio::main]
-/// async fn main() -> Result<(), SetError<u32>> {
+/// async fn main() -> Result<(), SetOnceError<u32>> {
 ///     ONCE.set(2)?;
 ///     let result = ONCE.get();
 ///     assert_eq!(result, Some(&2));
@@ -164,17 +164,17 @@ impl<T> SetOnce<T> {
     /// # Example
     ///
     /// ```
-    /// use tokio::sync::{SetOnce, SetError};
+    /// use tokio::sync::{SetOnce, SetOnceError};
     ///
     /// static ONCE: SetOnce<u32> = SetOnce::const_new();
     ///
-    /// fn get_global_integer() -> Result<Option<&'static u32>, SetError<u32>> {
+    /// fn get_global_integer() -> Result<Option<&'static u32>, SetOnceError<u32>> {
     ///     ONCE.set(2)?;
     ///     Ok(ONCE.get())
     /// }
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<(), SetError<u32>> {
+    /// async fn main() -> Result<(), SetOnceError<u32>> {
     ///     let result = get_global_integer()?;
     ///
     ///     assert_eq!(result, Some(&2));
@@ -268,37 +268,16 @@ impl<T> SetOnce<T> {
         }
     }
 
-    // SAFETY: The caller of this function needs to ensure that this function is
-    // called only when the value_set AtomicBool is flipped from FALSE to TRUE
-    // meaning that the value is being set from uinitialized to initialized via
-    // this function
-    //
-    // The caller also has to ensure writes on `value` are syncronized with a
-    // external lock to prevent mutliple set_value calls at the same time.
-    unsafe fn set_value(&self, value: T) {
-        unsafe {
-            self.value.with_mut(|ptr| (*ptr).as_mut_ptr().write(value));
-        }
-
-        // Using release ordering so any threads that read a true from this
-        // atomic is able to read the value we just stored.
-        self.value_set.store(true, Ordering::Release);
-    }
-
     /// Sets the value of the `SetOnce` to the given value if the `SetOnce` is
     /// empty.
     ///
     /// If the `SetOnce` already has a value, this call will fail with an
-    /// [`SetError::AlreadyInitializedError`].
+    /// [`SetOnceError::AlreadyInitializedError`].
     ///
-    /// If the `SetOnce` is empty, but some other task is currently trying to
-    /// set the value, this call will fail with [`SetError::InitializingError`].
-    ///
-    /// [`SetError::AlreadyInitializedError`]: crate::sync::SetError::AlreadyInitializedError
-    /// [`SetError::InitializingError`]: crate::sync::SetError::InitializingError
-    pub fn set(&self, value: T) -> Result<(), SetError<T>> {
+    /// [`SetOnceError::AlreadyInitializedError`]: crate::sync::SetOnceError::AlreadyInitializedError
+    pub fn set(&self, value: T) -> Result<(), SetOnceError<T>> {
         if self.initialized() {
-            return Err(SetError::AlreadyInitializedError(value));
+            return Err(SetOnceError::AlreadyInitializedError(value));
         }
 
         // SAFETY: lock the mutex to ensure only one caller of set
@@ -309,12 +288,18 @@ impl<T> SetOnce<T> {
             // If the value is already set, we return an error
             drop(guard);
 
-            return Err(SetError::AlreadyInitializedError(value));
+            return Err(SetOnceError::AlreadyInitializedError(value));
         }
 
+        // SAFETY: We have locked the mutex and checked if the value is
+        // initalized or not, so we can safely write to the value
         unsafe {
-            self.set_value(value);
+            self.value.with_mut(|ptr| (*ptr).as_mut_ptr().write(value));
         }
+
+        // Using release ordering so any threads that read a true from this
+        // atomic is able to read the value we just stored.
+        self.value_set.store(true, Ordering::Release);
 
         drop(guard);
 
@@ -393,19 +378,19 @@ unsafe impl<T: Send> Send for SetOnce<T> {}
 ///
 /// [`SetOnce::set`]: crate::sync::SetOnce::set
 #[derive(Debug, PartialEq, Eq)]
-pub enum SetError<T> {
+pub enum SetOnceError<T> {
     /// The cell was already initialized when [`SetOnce::set`] was called.
     ///
     /// [`SetOnce::set`]: crate::sync::OnceCell::set
     AlreadyInitializedError(T),
 }
 
-impl<T> fmt::Display for SetError<T> {
+impl<T> fmt::Display for SetOnceError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SetError::AlreadyInitializedError(_) => write!(f, "AlreadyInitializedError"),
+            Self::AlreadyInitializedError(_) => write!(f, "AlreadyInitializedError"),
         }
     }
 }
 
-impl<T: fmt::Debug> Error for SetError<T> {}
+impl<T: fmt::Debug> Error for SetOnceError<T> {}
