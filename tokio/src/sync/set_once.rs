@@ -337,11 +337,11 @@ impl<T> SetOnce<T> {
     /// If the `SetOnce` is already initialized, it will return the value
     /// immediately.
     ///
-    /// # Panics
+    /// # Note
     ///
-    /// If the `SetOnce` is not initialized after waiting, it will panic. To
-    /// avoid this, use `get_wait()` which returns an `Option<&T>` instead of
-    /// `&T`.
+    /// This will keep waiting until the `SetOnce` is initialized, so it
+    /// should be used with care to avoid blocking the current task
+    /// indefinitely.
     pub async fn wait(&self) -> &T {
         loop {
             let notify_fut = self.notify.notified();
@@ -396,7 +396,7 @@ impl<T> fmt::Display for SetOnceError<T> {
 
 impl<T: fmt::Debug> Error for SetOnceError<T> {}
 
-impl From<T> for SetOnceError<T> {
+impl<T> From<T> for SetOnceError<T> {
     fn from(val: T) -> Self {
         SetOnceError { val }
     }
