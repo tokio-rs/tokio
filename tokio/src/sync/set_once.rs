@@ -357,7 +357,7 @@ impl<T> SetOnce<T> {
             drop(guard);
 
             // wait until the value is set
-            (&mut notify_fut).await;
+            notify_fut.await;
         }
     }
 }
