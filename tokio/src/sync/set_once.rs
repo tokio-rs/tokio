@@ -274,11 +274,7 @@ impl<T> SetOnce<T> {
     /// If the `SetOnce` already has a value, this call will fail with an
     /// [`SetOnceError::AlreadyInitializedError`].
     ///
-    /// If the `SetOnce` is empty, but some other task is currently trying to
-    /// set the value, this call will fail with [`SetOnceError::InitializingError`].
-    ///
     /// [`SetOnceError::AlreadyInitializedError`]: crate::sync::SetOnceError::AlreadyInitializedError
-    /// [`SetOnceError::InitializingError`]: crate::sync::SetOnceError::InitializingError
     pub fn set(&self, value: T) -> Result<(), SetOnceError<T>> {
         if self.initialized() {
             return Err(SetOnceError::AlreadyInitializedError(value));
