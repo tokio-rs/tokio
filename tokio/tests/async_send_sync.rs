@@ -454,6 +454,7 @@ assert_value!(tokio::task::JoinSet<NN>: !Send & !Sync & Unpin);
 assert_value!(tokio::task::JoinSet<YN>: Send & Sync & Unpin);
 assert_value!(tokio::task::JoinSet<YY>: Send & Sync & Unpin);
 assert_value!(tokio::task::LocalSet: !Send & !Sync & Unpin);
+assert_value!(tokio::task::coop::RestoreOnPending: !Send & !Sync & Unpin);
 async_assert_fn!(tokio::sync::Barrier::wait(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::sync::Mutex<NN>::lock(_): !Send & !Sync & !Unpin);
 async_assert_fn!(tokio::sync::Mutex<NN>::lock_owned(_): !Send & !Sync & !Unpin);
