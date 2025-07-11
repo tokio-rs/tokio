@@ -272,12 +272,12 @@ impl<T> SetOnce<T> {
     /// empty.
     ///
     /// If the `SetOnce` already has a value, this call will fail with an
-    /// [`SetOnceError::AlreadyInitializedError`].
+    /// [`SetOnceError`].
     ///
-    /// [`SetOnceError::AlreadyInitializedError`]: crate::sync::SetOnceError::AlreadyInitializedError
+    /// [`SetOnceError`]: crate::sync::SetOnceError
     pub fn set(&self, value: T) -> Result<(), SetOnceError<T>> {
         if self.initialized() {
-            return Err(SetOnceError::AlreadyInitializedError(value));
+            return Err(SetOnceError::from(value));
         }
 
         // SAFETY: lock the mutex to ensure only one caller of set
@@ -288,7 +288,7 @@ impl<T> SetOnce<T> {
             // If the value is already set, we return an error
             drop(guard);
 
-            return Err(SetOnceError::AlreadyInitializedError(value));
+            return Err(SetOnceError::from(value));
         }
 
         // SAFETY: We have locked the mutex and checked if the value is
@@ -337,11 +337,11 @@ impl<T> SetOnce<T> {
     /// If the `SetOnce` is already initialized, it will return the value
     /// immediately.
     ///
-    /// # Panics
+    /// # Note
     ///
-    /// If the `SetOnce` is not initialized after waiting, it will panic. To
-    /// avoid this, use `get_wait()` which returns an `Option<&T>` instead of
-    /// `&T`.
+    /// This will keep waiting until the `SetOnce` is initialized, so it
+    /// should be used with care to avoid blocking the current task
+    /// indefinitely.
     pub async fn wait(&self) -> &T {
         loop {
             let notify_fut = self.notify.notified();
@@ -357,7 +357,7 @@ impl<T> SetOnce<T> {
             drop(guard);
 
             // wait until the value is set
-            (&mut notify_fut).await;
+            notify_fut.await;
         }
     }
 }
@@ -374,23 +374,30 @@ unsafe impl<T: Sync + Send> Sync for SetOnce<T> {}
 // it's safe to send it to another thread
 unsafe impl<T: Send> Send for SetOnce<T> {}
 
-/// Errors that can be returned from [`SetOnce::set`].
+/// Error that can be returned from [`SetOnce::set`].
+///
+/// This error means that the `SetOnce` was already initialized when
+/// set was called
 ///
 /// [`SetOnce::set`]: crate::sync::SetOnce::set
 #[derive(Debug, PartialEq, Eq)]
-pub enum SetOnceError<T> {
+pub struct SetOnceError<T> {
     /// The cell was already initialized when [`SetOnce::set`] was called.
     ///
     /// [`SetOnce::set`]: crate::sync::OnceCell::set
-    AlreadyInitializedError(T),
+    val: T,
 }
 
 impl<T> fmt::Display for SetOnceError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::AlreadyInitializedError(_) => write!(f, "AlreadyInitializedError"),
-        }
+        write!(f, "AlreadyInitializedError")
     }
 }
 
 impl<T: fmt::Debug> Error for SetOnceError<T> {}
+
+impl<T> From<T> for SetOnceError<T> {
+    fn from(val: T) -> Self {
+        SetOnceError { val }
+    }
+}
