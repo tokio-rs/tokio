@@ -338,6 +338,10 @@ impl Builder {
             all(unix, feature = "signal")
         ))]
         self.enable_io();
+
+        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
+        self.enable_io_uring();
+
         #[cfg(feature = "time")]
         self.enable_time();
 
@@ -1573,6 +1577,31 @@ cfg_time! {
         /// ```
         pub fn enable_time(&mut self) -> &mut Self {
             self.enable_time = true;
+            self
+        }
+    }
+}
+
+cfg_tokio_uring! {
+    impl Builder {
+        /// Enables the tokio's io_uring driver.
+        ///
+        /// Doing this enables using io_uring operations on the runtime.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_io_uring()
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        #[cfg_attr(docsrs, doc(cfg(tokio_uring)))]
+        pub fn enable_io_uring(&mut self) -> &mut Self {
+            // Currently, the uring flag is equivalent to `enable_io`.
+            self.enable_io = true;
             self
         }
     }

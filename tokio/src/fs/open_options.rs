@@ -3,6 +3,12 @@ use crate::fs::{asyncify, File};
 use std::io;
 use std::path::Path;
 
+cfg_tokio_uring! {
+    mod uring_open_options;
+    pub(crate) use uring_open_options::UringOpenOptions;
+    use crate::runtime::driver::op::Op;
+}
+
 #[cfg(test)]
 mod mock_open_options;
 #[cfg(test)]
@@ -79,7 +85,16 @@ use std::os::windows::fs::OpenOptionsExt;
 /// }
 /// ```
 #[derive(Clone, Debug)]
-pub struct OpenOptions(StdOpenOptions);
+pub struct OpenOptions {
+    inner: Kind,
+}
+
+#[derive(Debug, Clone)]
+enum Kind {
+    Std(StdOpenOptions),
+    #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+    Uring(UringOpenOptions),
+}
 
 impl OpenOptions {
     /// Creates a blank new set of options ready for configuration.
@@ -99,7 +114,12 @@ impl OpenOptions {
     /// let future = options.read(true).open("foo.txt");
     /// ```
     pub fn new() -> OpenOptions {
-        OpenOptions(StdOpenOptions::new())
+        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+        let inner = Kind::Uring(UringOpenOptions::new());
+        #[cfg(not(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux")))]
+        let inner = Kind::Std(StdOpenOptions::new());
+
+        OpenOptions { inner }
     }
 
     /// Sets the option for read access.
@@ -128,7 +148,15 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn read(&mut self, read: bool) -> &mut OpenOptions {
-        self.0.read(read);
+        match &mut self.inner {
+            Kind::Std(opts) => {
+                opts.read(read);
+            }
+            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            Kind::Uring(opts) => {
+                opts.read(read);
+            }
+        }
         self
     }
 
@@ -158,7 +186,15 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn write(&mut self, write: bool) -> &mut OpenOptions {
-        self.0.write(write);
+        match &mut self.inner {
+            Kind::Std(opts) => {
+                opts.write(write);
+            }
+            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            Kind::Uring(opts) => {
+                opts.write(write);
+            }
+        }
         self
     }
 
@@ -217,7 +253,15 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn append(&mut self, append: bool) -> &mut OpenOptions {
-        self.0.append(append);
+        match &mut self.inner {
+            Kind::Std(opts) => {
+                opts.append(append);
+            }
+            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            Kind::Uring(opts) => {
+                opts.append(append);
+            }
+        }
         self
     }
 
@@ -250,7 +294,15 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn truncate(&mut self, truncate: bool) -> &mut OpenOptions {
-        self.0.truncate(truncate);
+        match &mut self.inner {
+            Kind::Std(opts) => {
+                opts.truncate(truncate);
+            }
+            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            Kind::Uring(opts) => {
+                opts.truncate(truncate);
+            }
+        }
         self
     }
 
@@ -286,7 +338,15 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn create(&mut self, create: bool) -> &mut OpenOptions {
-        self.0.create(create);
+        match &mut self.inner {
+            Kind::Std(opts) => {
+                opts.create(create);
+            }
+            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            Kind::Uring(opts) => {
+                opts.create(create);
+            }
+        }
         self
     }
 
@@ -329,7 +389,15 @@ impl OpenOptions {
     /// }
     /// ```
     pub fn create_new(&mut self, create_new: bool) -> &mut OpenOptions {
-        self.0.create_new(create_new);
+        match &mut self.inner {
+            Kind::Std(opts) => {
+                opts.create_new(create_new);
+            }
+            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            Kind::Uring(opts) => {
+                opts.create_new(create_new);
+            }
+        }
         self
     }
 
@@ -366,6 +434,15 @@ impl OpenOptions {
     ///   open files, too long filename, too many symbolic links in the
     ///   specified path (Unix-like systems only), etc.
     ///
+    /// # io_uring support
+    ///
+    /// On Linux, you can also use `io_uring` for executing system calls.
+    /// To enable `io_uring`, you need to specify the `--cfg tokio_uring` flag
+    /// at compile time and set the `Builder::enable_io_uring` runtime option.
+    ///
+    /// Support for `io_uring` is currently experimental, so its behavior may
+    /// change or it may be removed in future versions.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -386,17 +463,36 @@ impl OpenOptions {
     /// [`Other`]: std::io::ErrorKind::Other
     /// [`PermissionDenied`]: std::io::ErrorKind::PermissionDenied
     pub async fn open(&self, path: impl AsRef<Path>) -> io::Result<File> {
+        match &self.inner {
+            Kind::Std(opts) => Self::std_open(opts, path).await,
+            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            Kind::Uring(opts) => {
+                let handle = crate::runtime::Handle::current();
+                let driver_handle = handle.inner.driver().io();
+
+                if driver_handle.check_and_init()? {
+                    Op::open(path.as_ref(), opts)?.await
+                } else {
+                    let opts = opts.clone().into();
+                    Self::std_open(&opts, path).await
+                }
+            }
+        }
+    }
+
+    async fn std_open(opts: &StdOpenOptions, path: impl AsRef<Path>) -> io::Result<File> {
         let path = path.as_ref().to_owned();
-        let opts = self.0.clone();
+        let opts = opts.clone();
 
         let std = asyncify(move || opts.open(path)).await?;
         Ok(File::from_std(std))
     }
 
-    /// Returns a mutable reference to the underlying `std::fs::OpenOptions`
-    #[cfg(any(windows, unix))]
+    #[cfg(windows)]
     pub(super) fn as_inner_mut(&mut self) -> &mut StdOpenOptions {
-        &mut self.0
+        match &mut self.inner {
+            Kind::Std(ref mut opts) => opts,
+        }
     }
 }
 
@@ -428,7 +524,15 @@ feature! {
         /// }
         /// ```
         pub fn mode(&mut self, mode: u32) -> &mut OpenOptions {
-            self.as_inner_mut().mode(mode);
+            match &mut self.inner {
+                Kind::Std(opts) => {
+                    opts.mode(mode);
+                }
+                #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+                Kind::Uring(opts) => {
+                    opts.mode(mode);
+                }
+            }
             self
         }
 
@@ -459,7 +563,15 @@ feature! {
         /// }
         /// ```
         pub fn custom_flags(&mut self, flags: i32) -> &mut OpenOptions {
-            self.as_inner_mut().custom_flags(flags);
+            match &mut self.inner {
+                Kind::Std(opts) => {
+                    opts.custom_flags(flags);
+                }
+                #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+                Kind::Uring(opts) => {
+                    opts.custom_flags(flags);
+                }
+            }
             self
         }
     }
@@ -651,7 +763,13 @@ cfg_windows! {
 
 impl From<StdOpenOptions> for OpenOptions {
     fn from(options: StdOpenOptions) -> OpenOptions {
-        OpenOptions(options)
+        OpenOptions {
+            inner: Kind::Std(options),
+            // TODO: Add support for converting `StdOpenOptions` to `UringOpenOptions`
+            // if user enables the `--cfg tokio_uring`. It is blocked by:
+            // * https://github.com/rust-lang/rust/issues/74943
+            // * https://github.com/rust-lang/rust/issues/76801
+        }
     }
 }
 

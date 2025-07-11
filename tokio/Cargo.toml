@@ -136,6 +136,7 @@ features = [
 [dev-dependencies]
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
+tokio-util = { version = "0.7", path = "../tokio-util", features = ["rt"] }
 futures = { version = "0.3.0", features = ["async-await"] }
 mockall = "0.13.0"
 async-stream = "0.3"
