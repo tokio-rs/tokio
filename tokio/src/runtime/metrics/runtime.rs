@@ -342,6 +342,225 @@ impl RuntimeMetrics {
                 .worker_metrics(worker)
                 .thread_id()
         }
+
+        /// Renamed to [`RuntimeMetrics::global_queue_depth`]
+        #[deprecated = "Renamed to global_queue_depth"]
+        #[doc(hidden)]
+        pub fn injection_queue_depth(&self) -> usize {
+            self.handle.inner.injection_queue_depth()
+        }
+
+        /// Returns the number of tasks currently scheduled in the given worker's
+        /// local queue.
+        ///
+        /// Tasks that are spawned or notified from within a runtime thread are
+        /// scheduled using that worker's local queue. This metric returns the
+        /// **current** number of tasks pending in the worker's local queue. As
+        /// such, the returned value may increase or decrease as new tasks are
+        /// scheduled and processed.
+        ///
+        /// # Arguments
+        ///
+        /// `worker` is the index of the worker being queried. The given value must
+        /// be between 0 and `num_workers()`. The index uniquely identifies a single
+        /// worker and will continue to identify the worker throughout the lifetime
+        /// of the runtime instance.
+        ///
+        /// # Panics
+        ///
+        /// The method panics when `worker` represents an invalid worker, i.e. is
+        /// greater than or equal to `num_workers()`.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let metrics = Handle::current().metrics();
+        ///
+        ///     let n = metrics.worker_local_queue_depth(0);
+        ///     println!("{} tasks currently pending in worker 0's local queue", n);
+        /// }
+        /// ```
+        pub fn worker_local_queue_depth(&self, worker: usize) -> usize {
+            self.handle.inner.worker_local_queue_depth(worker)
+        }
+
+        /// Returns `true` if the runtime is tracking the distribution of task poll
+        /// times.
+        ///
+        /// Task poll times are not instrumented by default as doing so requires
+        /// calling [`Instant::now()`] twice per task poll. The feature is enabled
+        /// by calling [`enable_metrics_poll_time_histogram()`] when building the
+        /// runtime.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::{self, Handle};
+        ///
+        /// fn main() {
+        ///     runtime::Builder::new_current_thread()
+        ///         .enable_metrics_poll_time_histogram()
+        ///         .build()
+        ///         .unwrap()
+        ///         .block_on(async {
+        ///             let metrics = Handle::current().metrics();
+        ///             let enabled = metrics.poll_time_histogram_enabled();
+        ///
+        ///             println!("Tracking task poll time distribution: {:?}", enabled);
+        ///         });
+        /// }
+        /// ```
+        ///
+        /// [`enable_metrics_poll_time_histogram()`]: crate::runtime::Builder::enable_metrics_poll_time_histogram
+        /// [`Instant::now()`]: std::time::Instant::now
+        pub fn poll_time_histogram_enabled(&self) -> bool {
+            self.handle
+                .inner
+                .worker_metrics(0)
+                .poll_count_histogram
+                .is_some()
+        }
+
+        #[deprecated(note = "Renamed to `poll_time_histogram_enabled`")]
+        #[doc(hidden)]
+        pub fn poll_count_histogram_enabled(&self) -> bool {
+            self.poll_time_histogram_enabled()
+        }
+
+        /// Returns the number of histogram buckets tracking the distribution of
+        /// task poll times.
+        ///
+        /// This value is configured by calling
+        /// [`metrics_poll_time_histogram_configuration()`] when building the runtime.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::{self, Handle};
+        ///
+        /// fn main() {
+        ///     runtime::Builder::new_current_thread()
+        ///         .enable_metrics_poll_time_histogram()
+        ///         .build()
+        ///         .unwrap()
+        ///         .block_on(async {
+        ///             let metrics = Handle::current().metrics();
+        ///             let buckets = metrics.poll_time_histogram_num_buckets();
+        ///
+        ///             println!("Histogram buckets: {:?}", buckets);
+        ///         });
+        /// }
+        /// ```
+        ///
+        /// [`metrics_poll_time_histogram_configuration()`]:
+        ///     crate::runtime::Builder::metrics_poll_time_histogram_configuration
+        pub fn poll_time_histogram_num_buckets(&self) -> usize {
+            self.handle
+                .inner
+                .worker_metrics(0)
+                .poll_count_histogram
+                .as_ref()
+                .map(|histogram| histogram.num_buckets())
+                .unwrap_or_default()
+        }
+
+        /// Deprecated. Use [`poll_time_histogram_num_buckets()`] instead.
+        ///
+        /// [`poll_time_histogram_num_buckets()`]: Self::poll_time_histogram_num_buckets
+        #[doc(hidden)]
+        #[deprecated(note = "renamed to `poll_time_histogram_num_buckets`.")]
+        pub fn poll_count_histogram_num_buckets(&self) -> usize {
+            self.poll_time_histogram_num_buckets()
+        }
+
+        /// Returns the range of task poll times tracked by the given bucket.
+        ///
+        /// This value is configured by calling
+        /// [`metrics_poll_time_histogram_configuration()`] when building the runtime.
+        ///
+        /// # Panics
+        ///
+        /// The method panics if `bucket` represents an invalid bucket index, i.e.
+        /// is greater than or equal to `poll_time_histogram_num_buckets()`.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::{self, Handle};
+        ///
+        /// fn main() {
+        ///     runtime::Builder::new_current_thread()
+        ///         .enable_metrics_poll_time_histogram()
+        ///         .build()
+        ///         .unwrap()
+        ///         .block_on(async {
+        ///             let metrics = Handle::current().metrics();
+        ///             let buckets = metrics.poll_time_histogram_num_buckets();
+        ///
+        ///             for i in 0..buckets {
+        ///                 let range = metrics.poll_time_histogram_bucket_range(i);
+        ///                 println!("Histogram bucket {} range: {:?}", i, range);
+        ///             }
+        ///         });
+        /// }
+        /// ```
+        ///
+        /// [`metrics_poll_time_histogram_configuration()`]:
+        ///     crate::runtime::Builder::metrics_poll_time_histogram_configuration
+        #[track_caller]
+        pub fn poll_time_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
+            self.handle
+                .inner
+                .worker_metrics(0)
+                .poll_count_histogram
+                .as_ref()
+                .map(|histogram| {
+                    let range = histogram.bucket_range(bucket);
+                    std::ops::Range {
+                        start: Duration::from_nanos(range.start),
+                        end: Duration::from_nanos(range.end),
+                    }
+                })
+                .unwrap_or_default()
+        }
+
+        /// Deprecated. Use [`poll_time_histogram_bucket_range()`] instead.
+        ///
+        /// [`poll_time_histogram_bucket_range()`]: Self::poll_time_histogram_bucket_range
+        #[track_caller]
+        #[doc(hidden)]
+        #[deprecated(note = "renamed to `poll_time_histogram_bucket_range`")]
+        pub fn poll_count_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
+            self.poll_time_histogram_bucket_range(bucket)
+        }
+
+        /// Returns the number of tasks currently scheduled in the blocking
+        /// thread pool, spawned using `spawn_blocking`.
+        ///
+        /// This metric returns the **current** number of tasks pending in
+        /// blocking thread pool. As such, the returned value may increase
+        /// or decrease as new tasks are scheduled and processed.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let metrics = Handle::current().metrics();
+        ///
+        ///     let n = metrics.blocking_queue_depth();
+        ///     println!("{} tasks currently pending in the blocking thread pool", n);
+        /// }
+        /// ```
+        pub fn blocking_queue_depth(&self) -> usize {
+            self.handle.inner.blocking_queue_depth()
+        }
     }
 
     feature! {
@@ -686,211 +905,7 @@ impl RuntimeMetrics {
                 .overflow_count
                 .load(Relaxed)
         }
-    }
 
-    cfg_unstable_metrics! {
-
-        /// Renamed to [`RuntimeMetrics::global_queue_depth`]
-        #[deprecated = "Renamed to global_queue_depth"]
-        #[doc(hidden)]
-        pub fn injection_queue_depth(&self) -> usize {
-            self.handle.inner.injection_queue_depth()
-        }
-
-        /// Returns the number of tasks currently scheduled in the given worker's
-        /// local queue.
-        ///
-        /// Tasks that are spawned or notified from within a runtime thread are
-        /// scheduled using that worker's local queue. This metric returns the
-        /// **current** number of tasks pending in the worker's local queue. As
-        /// such, the returned value may increase or decrease as new tasks are
-        /// scheduled and processed.
-        ///
-        /// # Arguments
-        ///
-        /// `worker` is the index of the worker being queried. The given value must
-        /// be between 0 and `num_workers()`. The index uniquely identifies a single
-        /// worker and will continue to identify the worker throughout the lifetime
-        /// of the runtime instance.
-        ///
-        /// # Panics
-        ///
-        /// The method panics when `worker` represents an invalid worker, i.e. is
-        /// greater than or equal to `num_workers()`.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::Handle;
-        ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
-        ///
-        ///     let n = metrics.worker_local_queue_depth(0);
-        ///     println!("{} tasks currently pending in worker 0's local queue", n);
-        /// }
-        /// ```
-        pub fn worker_local_queue_depth(&self, worker: usize) -> usize {
-            self.handle.inner.worker_local_queue_depth(worker)
-        }
-
-        /// Returns `true` if the runtime is tracking the distribution of task poll
-        /// times.
-        ///
-        /// Task poll times are not instrumented by default as doing so requires
-        /// calling [`Instant::now()`] twice per task poll. The feature is enabled
-        /// by calling [`enable_metrics_poll_time_histogram()`] when building the
-        /// runtime.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::{self, Handle};
-        ///
-        /// fn main() {
-        ///     runtime::Builder::new_current_thread()
-        ///         .enable_metrics_poll_time_histogram()
-        ///         .build()
-        ///         .unwrap()
-        ///         .block_on(async {
-        ///             let metrics = Handle::current().metrics();
-        ///             let enabled = metrics.poll_time_histogram_enabled();
-        ///
-        ///             println!("Tracking task poll time distribution: {:?}", enabled);
-        ///         });
-        /// }
-        /// ```
-        ///
-        /// [`enable_metrics_poll_time_histogram()`]: crate::runtime::Builder::enable_metrics_poll_time_histogram
-        /// [`Instant::now()`]: std::time::Instant::now
-        pub fn poll_time_histogram_enabled(&self) -> bool {
-            self.handle
-                .inner
-                .worker_metrics(0)
-                .poll_count_histogram
-                .is_some()
-        }
-
-        #[deprecated(note = "Renamed to `poll_time_histogram_enabled`")]
-        #[doc(hidden)]
-        pub fn poll_count_histogram_enabled(&self) -> bool {
-            self.poll_time_histogram_enabled()
-        }
-
-        /// Returns the number of histogram buckets tracking the distribution of
-        /// task poll times.
-        ///
-        /// This value is configured by calling
-        /// [`metrics_poll_time_histogram_configuration()`] when building the runtime.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::{self, Handle};
-        ///
-        /// fn main() {
-        ///     runtime::Builder::new_current_thread()
-        ///         .enable_metrics_poll_time_histogram()
-        ///         .build()
-        ///         .unwrap()
-        ///         .block_on(async {
-        ///             let metrics = Handle::current().metrics();
-        ///             let buckets = metrics.poll_time_histogram_num_buckets();
-        ///
-        ///             println!("Histogram buckets: {:?}", buckets);
-        ///         });
-        /// }
-        /// ```
-        ///
-        /// [`metrics_poll_time_histogram_configuration()`]:
-        ///     crate::runtime::Builder::metrics_poll_time_histogram_configuration
-        pub fn poll_time_histogram_num_buckets(&self) -> usize {
-            self.handle
-                .inner
-                .worker_metrics(0)
-                .poll_count_histogram
-                .as_ref()
-                .map(|histogram| histogram.num_buckets())
-                .unwrap_or_default()
-        }
-
-        /// Deprecated. Use [`poll_time_histogram_num_buckets()`] instead.
-        ///
-        /// [`poll_time_histogram_num_buckets()`]: Self::poll_time_histogram_num_buckets
-        #[doc(hidden)]
-        #[deprecated(note = "renamed to `poll_time_histogram_num_buckets`.")]
-        pub fn poll_count_histogram_num_buckets(&self) -> usize {
-            self.poll_time_histogram_num_buckets()
-        }
-
-        /// Returns the range of task poll times tracked by the given bucket.
-        ///
-        /// This value is configured by calling
-        /// [`metrics_poll_time_histogram_configuration()`] when building the runtime.
-        ///
-        /// # Panics
-        ///
-        /// The method panics if `bucket` represents an invalid bucket index, i.e.
-        /// is greater than or equal to `poll_time_histogram_num_buckets()`.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::{self, Handle};
-        ///
-        /// fn main() {
-        ///     runtime::Builder::new_current_thread()
-        ///         .enable_metrics_poll_time_histogram()
-        ///         .build()
-        ///         .unwrap()
-        ///         .block_on(async {
-        ///             let metrics = Handle::current().metrics();
-        ///             let buckets = metrics.poll_time_histogram_num_buckets();
-        ///
-        ///             for i in 0..buckets {
-        ///                 let range = metrics.poll_time_histogram_bucket_range(i);
-        ///                 println!("Histogram bucket {} range: {:?}", i, range);
-        ///             }
-        ///         });
-        /// }
-        /// ```
-        ///
-        /// [`metrics_poll_time_histogram_configuration()`]:
-        ///     crate::runtime::Builder::metrics_poll_time_histogram_configuration
-        #[track_caller]
-        pub fn poll_time_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
-            self.handle
-                .inner
-                .worker_metrics(0)
-                .poll_count_histogram
-                .as_ref()
-                .map(|histogram| {
-                    let range = histogram.bucket_range(bucket);
-                    std::ops::Range {
-                        start: Duration::from_nanos(range.start),
-                        end: Duration::from_nanos(range.end),
-                    }
-                })
-                .unwrap_or_default()
-        }
-
-        /// Deprecated. Use [`poll_time_histogram_bucket_range()`] instead.
-        ///
-        /// [`poll_time_histogram_bucket_range()`]: Self::poll_time_histogram_bucket_range
-        #[track_caller]
-        #[doc(hidden)]
-        #[deprecated(note = "renamed to `poll_time_histogram_bucket_range`")]
-        pub fn poll_count_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
-            self.poll_time_histogram_bucket_range(bucket)
-        }
-    }
-
-    feature! {
-    #![all(
-        tokio_unstable,
-        target_has_atomic = "64"
-    )]
         /// Returns the number of times the given worker polled tasks with a poll
         /// duration within the given bucket's range.
         ///
@@ -1001,32 +1016,6 @@ impl RuntimeMetrics {
                 .mean_poll_time
                 .load(Relaxed);
             Duration::from_nanos(nanos)
-        }
-    }
-
-    cfg_unstable_metrics! {
-        /// Returns the number of tasks currently scheduled in the blocking
-        /// thread pool, spawned using `spawn_blocking`.
-        ///
-        /// This metric returns the **current** number of tasks pending in
-        /// blocking thread pool. As such, the returned value may increase
-        /// or decrease as new tasks are scheduled and processed.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::Handle;
-        ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
-        ///
-        ///     let n = metrics.blocking_queue_depth();
-        ///     println!("{} tasks currently pending in the blocking thread pool", n);
-        /// }
-        /// ```
-        pub fn blocking_queue_depth(&self) -> usize {
-            self.handle.inner.blocking_queue_depth()
         }
     }
 
