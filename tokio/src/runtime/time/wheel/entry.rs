@@ -1,7 +1,6 @@
 use crate::loom::sync::atomic::{AtomicU8, Ordering::*};
 use crate::loom::sync::{Arc, Mutex};
 use crate::{sync::AtomicWaker, util::linked_list};
-use std::marker::PhantomPinned;
 use std::ptr::NonNull;
 use std::sync::mpsc::Sender;
 use std::task::Waker;
@@ -16,12 +15,14 @@ const STATE_UNREGISTERED: u8 = 0;
 const STATE_REGISTERED: u8 = 2;
 
 /// The entry is in the pending queue of the timer wheel,
-/// and not in any wheel level.
+/// and not in any wheel level, which means that
+/// the entry is reached its deadline and waiting to be woken up.
 const STATE_PENDING: u8 = 3;
 
 /// The waker has been called, and the entry is no longer in the timer wheel
-/// (both each wheel level and the pending queue).
-const STATE_FIRED: u8 = 4;/// The entry in the timer wheel.
+/// (both each wheel level and the pending queue), which means that
+/// the entry is reached its deadline and woken up.
+const STATE_WOKEN_UP: u8 = 4;
 
 #[derive(Debug)]
 struct Inner {
@@ -32,13 +33,11 @@ struct Inner {
     waker: AtomicWaker,
 
     /// The mpsc channel used to cancel the entry.
-    // Since the race is very unlikely, we use `Mutex` here
+    // Since the contention is very unlikely, we use `Mutex` here
     // for lower complexity.
     cancel_tx: Mutex<Option<Sender<Handle>>>,
 
     state: AtomicU8,
-
-    _pin: PhantomPinned,
 }
 
 /// The entry in the timer wheel.
@@ -47,8 +46,6 @@ pub(crate) struct Entry {
     pointers: linked_list::Pointers<Entry>,
 
     inner: Arc<Inner>,
-
-    _pin: PhantomPinned,
 }
 
 generate_addr_of_methods! {
@@ -78,8 +75,10 @@ unsafe impl linked_list::Link for Entry {
     }
 }
 
-/// Another version of [`Handle`] which doesn't [`Arc::clone`]
-/// the [`Inner`], this is used for intrusive linked list.
+/// Raw handle used by the intrusive linked list.
+// It makes no sense to `Arc::clone()` the `Inner`
+// while operating on the linked list,
+// so we only use a raw pointer here.
 pub(crate) struct RawHandle {
     ptr: NonNull<Entry>,
 }
@@ -105,8 +104,18 @@ pub(crate) struct Handle {
     inner: Arc<Inner>,
 }
 
-/// Safety: [`Inner`] is protected by atomic variables and [`Mutex`],
+/// Safety:
+///
+/// 1. [`Self::inner`] is clearly [`Send`].
+/// 2. AND caller guarantees that the [`Self::drop_entry`] is only called
+///    when the entry is no longer in the timer wheel and still valid.
 unsafe impl Send for Handle {}
+
+/// Safety:
+///
+/// 1. [`Self::inner`] is clearly [`Sync`].
+/// 2. AND caller guarantees that the [`Self::drop_entry`] is only called
+///    when the entry is no longer in the timer wheel and still valid.
 unsafe impl Sync for Handle {}
 
 impl Handle {
@@ -116,15 +125,14 @@ impl Handle {
             waker: AtomicWaker::new(),
             cancel_tx: Mutex::new(None),
             state: AtomicU8::new(STATE_UNREGISTERED),
-            _pin: PhantomPinned,
         });
         inner.waker.register_by_ref(waker);
 
         let ptr = Box::into_raw(Box::new(Entry {
             pointers: linked_list::Pointers::new(),
             inner: Arc::clone(&inner),
-            _pin: PhantomPinned,
         }));
+        // Safety: `Box::into_raw` always returns a valid pointer
         let ptr = unsafe { NonNull::new_unchecked(ptr) };
 
         Handle { ptr, inner }
@@ -136,7 +144,7 @@ impl Handle {
     ///
     /// Panics if the entry is not transitioned to the pending state.
     pub(crate) fn wake(&self) {
-        let old = self.inner.state.swap(STATE_FIRED, SeqCst);
+        let old = self.inner.state.swap(STATE_WOKEN_UP, SeqCst);
         assert!(old == STATE_PENDING);
         self.inner.waker.wake();
     }
@@ -147,7 +155,7 @@ impl Handle {
     ///
     /// Panics if the entry is not in the unregistered state.
     pub(crate) fn wake_unregistered(&self) {
-        let old = self.inner.state.swap(STATE_FIRED, SeqCst);
+        let old = self.inner.state.swap(STATE_WOKEN_UP, SeqCst);
         assert!(old == STATE_UNREGISTERED);
         self.inner.waker.wake();
     }
@@ -213,8 +221,8 @@ impl Handle {
         self.inner.state.fetch_or(0, SeqCst) == STATE_PENDING
     }
 
-    pub(crate) fn is_fired(&self) -> bool {
-        self.inner.state.fetch_or(0, SeqCst) == STATE_FIRED
+    pub(crate) fn is_woken_up(&self) -> bool {
+        self.inner.state.fetch_or(0, SeqCst) == STATE_WOKEN_UP
     }
 
     pub(crate) fn as_raw(&self) -> RawHandle {

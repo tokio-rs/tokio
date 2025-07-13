@@ -88,10 +88,10 @@ impl Wheel {
         hdl: EntryHandle,
         cancel_tx: mpsc::Sender<EntryHandle>,
     ) -> bool {
-        // Safety: the associated entry must be valid.
         let deadline = hdl.deadline();
 
         if deadline <= self.elapsed {
+            // Safety: caller guarantees that the entry is valid.
             unsafe {
                 hdl.drop_entry();
             }
@@ -125,26 +125,28 @@ impl Wheel {
     /// * The associated entry is valid.
     /// * AND the entry is already registered in the wheel.
     pub(crate) unsafe fn remove(&mut self, hdl: EntryHandle) {
-        unsafe {
-            if hdl.is_pending() {
-                self.pending.remove(hdl.as_entry_ptr());
-                unsafe {
-                    hdl.drop_entry();
-                }
-            } else {
-                let deadline = hdl.deadline();
-                debug_assert!(
-                    self.elapsed <= deadline,
-                    "elapsed={}; deadline={}",
-                    self.elapsed,
-                    deadline
-                );
+        if hdl.is_pending() {
+            self.pending.remove(hdl.as_entry_ptr());
+            // Safety: the entry is still valid as it was just popped
+            // from the pending list.
+            unsafe {
+                hdl.drop_entry();
+            }
+        } else {
+            let deadline = hdl.deadline();
+            debug_assert!(
+                self.elapsed <= deadline,
+                "elapsed={}; deadline={}",
+                self.elapsed,
+                deadline
+            );
 
-                let level = self.level_for(deadline);
-                self.levels[level].remove_entry(hdl.clone());
-                unsafe {
-                    hdl.drop_entry();
-                }
+            let level = self.level_for(deadline);
+            self.levels[level].remove_entry(hdl.clone());
+            // Safety: the entry is still valid as it was just popped
+            // from the pending list.
+            unsafe {
+                hdl.drop_entry();
             }
         }
     }
@@ -153,7 +155,11 @@ impl Wheel {
     pub(crate) fn poll(&mut self, now: u64) -> Option<EntryHandle> {
         loop {
             if let Some(raw_hdl) = self.pending.pop_back() {
+                // Safety: the entry is still valid as it was just popped
+                // from the pending list.
                 let hdl = unsafe { raw_hdl.upgrade() };
+                // Safety: the entry is still valid as it was just popped
+                // from the pending list.
                 unsafe {
                     hdl.drop_entry();
                 }
@@ -178,8 +184,15 @@ impl Wheel {
         }
 
         self.pending.pop_back().map(|raw_hdl| {
-            // Safety: the handle is valid as it was just popped from the pending list.
-            unsafe { raw_hdl.upgrade() }
+            // Safety: the entry is still valid as it was just popped
+            // from the pending list.
+            let hdl = unsafe { raw_hdl.upgrade() };
+            // Safety: the entry is still valid as it was just popped
+            // from the pending list.
+            unsafe {
+                hdl.drop_entry();
+            }
+            hdl
         })
     }
 
@@ -247,6 +260,8 @@ impl Wheel {
         let mut entries = self.take_entries(expiration);
 
         while let Some(raw_hdl) = entries.pop_back() {
+            // Safety: the entry is still valid as it was just popped
+            // from the list
             let hdl = unsafe { raw_hdl.upgrade() };
 
             if expiration.level == 0 {
@@ -255,7 +270,7 @@ impl Wheel {
 
             // Try to expire the entry; this is cheap (doesn't synchronize) if
             // the timer is not expired, and updates registered_when.
-            match unsafe { hdl.transition_to_pending(expiration.deadline) } {
+            match hdl.transition_to_pending(expiration.deadline) {
                 Ok(()) => {
                     // Item was expired
                     self.pending.push_front(hdl.as_raw());
