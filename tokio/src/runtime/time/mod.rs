@@ -6,6 +6,8 @@
 
 //! Time driver.
 
+mod timer;
+
 mod handle;
 pub(crate) use self::handle::Handle;
 
