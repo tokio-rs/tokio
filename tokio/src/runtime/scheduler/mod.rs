@@ -24,6 +24,8 @@ cfg_rt_multi_thread! {
     pub(crate) use multi_thread::MultiThread;
 }
 
+mod util;
+
 use crate::runtime::driver;
 
 #[derive(Debug, Clone)]

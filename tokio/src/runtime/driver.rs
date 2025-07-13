@@ -113,6 +113,13 @@ impl Handle {
                 .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
         }
 
+        pub(crate) fn with_time<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(Option<&crate::runtime::time::Handle>) -> R,
+        {
+            f(self.time.as_ref())
+        }
+
         pub(crate) fn clock(&self) -> &Clock {
             &self.clock
         }
