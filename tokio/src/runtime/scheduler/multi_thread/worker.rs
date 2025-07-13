@@ -63,6 +63,7 @@ use crate::runtime::scheduler::multi_thread::{
 };
 use crate::runtime::scheduler::{inject, Defer, Lock};
 use crate::runtime::task::OwnedTasks;
+use crate::runtime::time::{EntryHandle, Wheel};
 use crate::runtime::{blocking, driver, scheduler, task, Config, SchedulerMetrics, WorkerMetrics};
 use crate::runtime::{context, TaskHooks};
 use crate::task::coop;
@@ -73,6 +74,7 @@ use std::cell::RefCell;
 use std::task::Waker;
 use std::thread;
 use std::time::Duration;
+use std::sync::mpsc;
 
 mod metrics;
 
@@ -114,6 +116,15 @@ struct Core {
 
     /// The worker-local run queue.
     run_queue: queue::Local<Arc<Handle>>,
+
+    /// Worker local timer wheel
+    wheel: Wheel,
+
+    /// Channel for sending timers that need to be cancelled
+    timer_cancel_tx: mpsc::Sender<EntryHandle>,
+
+    /// Channel for receiving timers that need to be cancelled
+    timer_cancel_rx: mpsc::Receiver<EntryHandle>,
 
     /// True if the worker is currently searching for more work. Searching
     /// involves attempting to steal from other workers.
@@ -193,6 +204,11 @@ pub(crate) struct Synced {
 
     /// Synchronized state for `Inject`.
     pub(crate) inject: inject::Synced,
+
+    /// Timers pending to be registered.
+    /// This is used to register a timer but the [`Core`]
+    /// is not available in the current thread.
+    inject_timers: Vec<EntryHandle>,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -254,12 +270,17 @@ pub(super) fn create(
         let unpark = park.unpark();
         let metrics = WorkerMetrics::from_config(&config);
         let stats = Stats::new(&metrics);
+        let wheel = Wheel::new();
+        let (timer_cancel_tx, timer_cancel_rx) = mpsc::channel();
 
         cores.push(Box::new(Core {
             tick: 0,
             lifo_slot: None,
             lifo_enabled: !config.disable_lifo_slot,
             run_queue,
+            wheel,
+            timer_cancel_tx,
+            timer_cancel_rx,
             is_searching: false,
             is_shutdown: false,
             is_traced: false,
@@ -287,6 +308,7 @@ pub(super) fn create(
             synced: Mutex::new(Synced {
                 idle: idle_synced,
                 inject: inject_synced,
+                inject_timers: vec![],
             }),
             shutdown_cores: Mutex::new(vec![]),
             trace_status: TraceStatus::new(remotes_len),
@@ -793,6 +815,29 @@ impl Context {
             self.defer.defer(waker);
         }
     }
+
+    fn with_core<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(Option<&mut Core>) -> R,
+    {
+        match self.core.borrow_mut().as_mut() {
+            Some(core) => f(Some(core)),
+            None => f(None),
+        }
+    }
+
+    pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(Option<(&mut Wheel, mpsc::Sender<EntryHandle>)>) -> R,
+    {
+        self.with_core(|core| {
+            if let Some(core) = core {
+                f(Some((&mut core.wheel, core.timer_cancel_tx.clone())))
+            } else {
+                f(None)
+            }
+        })
+    }
 }
 
 impl Core {
@@ -1129,6 +1174,15 @@ impl Handle {
         unsafe {
             self.shared.inject.push(&mut synced.inject, task);
         }
+    }
+
+    /// Push a timer handle from the remote thread.
+    pub(crate) fn push_remote_timer(&self, hdl: EntryHandle) {
+        {
+            let mut synced = self.shared.synced.lock();
+            synced.inject_timers.push(hdl);
+        }
+        self.notify_parked_remote();
     }
 
     pub(super) fn close(&self) {
