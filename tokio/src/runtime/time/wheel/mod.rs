@@ -4,7 +4,6 @@ use self::level::Level;
 
 mod entry;
 use entry::EntryList;
-pub(crate) use entry::Entry;
 pub(crate) use entry::Handle as EntryHandle;
 
 use std::{array, sync::mpsc};
