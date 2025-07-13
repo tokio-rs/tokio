@@ -222,7 +222,7 @@ impl Wheel {
 
     /// Returns the tick at which this timer wheel next needs to perform some
     /// processing, or None if there are no timers registered.
-    pub(super) fn next_expiration_time(&self) -> Option<u64> {
+    pub(crate) fn next_expiration_time(&self) -> Option<u64> {
         self.next_expiration().map(|ex| ex.deadline)
     }
 
