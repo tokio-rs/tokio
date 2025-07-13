@@ -461,7 +461,7 @@ impl Context {
 
     fn park_internal(
         &self,
-        #[cfg_attr(not(feature = "time"), allow(unused_mut))] mut core: Box<Core>,
+        core: Box<Core>,
         handle: &Handle,
         driver: &mut Driver,
         duration: Option<Duration>,
@@ -469,7 +469,11 @@ impl Context {
         debug_assert!(core.driver.is_none());
 
         #[cfg(feature = "time")]
-        let (duration, maybe_advance_duration) = {
+        let (core, duration, maybe_advance_duration) = {
+            // declare as mutable to avoid compiler warning,
+            // otherwise the compiler will complain that the `core` parameter does not need to be mutable
+            // if the 'time' feature is not enabled.
+            let mut core = core;
             util::time::remove_cancelled_timers(&mut core.wheel, &core.timer_cancel_rx);
             let should_yield = util::time::insert_inject_timers(
                 &mut core.wheel,
@@ -478,7 +482,7 @@ impl Context {
             );
             let next_timer = util::time::next_expiration_time(&core.wheel, &handle.driver);
             if should_yield {
-                (Some(Duration::from_millis(0)), None)
+                (core, Some(Duration::from_millis(0)), None)
             } else {
                 let dur = match (next_timer, duration) {
                     (Some(next_timer), Some(park_duration)) => Some(next_timer.min(park_duration)),
@@ -487,9 +491,9 @@ impl Context {
                     (None, None) => None,
                 };
                 if util::time::pre_auto_advance(&handle.driver, dur) {
-                    (Some(Duration::ZERO), dur)
+                    (core, Some(Duration::ZERO), dur)
                 } else {
-                    (dur, None)
+                    (core, dur, None)
                 }
             }
         };
