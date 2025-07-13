@@ -6,10 +6,6 @@
 
 //! Time driver.
 
-mod entry;
-pub(crate) use entry::TimerEntry;
-use entry::{EntryList, TimerHandle, TimerShared, MAX_SAFE_MILLIS_DURATION};
-
 mod handle;
 pub(crate) use self::handle::Handle;
 
