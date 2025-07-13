@@ -120,7 +120,7 @@ impl Level {
 
     pub(crate) unsafe fn add_entry(&mut self, hdl: EntryHandle) {
         // Safety: the associated entry must be valid.
-        let deadline = unsafe { hdl.deadline() };
+        let deadline = hdl.deadline();
         let slot = slot_for(deadline, self.level);
 
         self.slot[slot].push_front(hdl.as_raw());
@@ -129,9 +129,7 @@ impl Level {
     }
 
     pub(crate) unsafe fn remove_entry(&mut self, hdl: EntryHandle) {
-        // Safety: the associated entry must be valid.
-        let deadline = unsafe { hdl.deadline() };
-        let slot = slot_for(deadline, self.level);
+        let slot = slot_for(hdl.deadline(), self.level);
 
         unsafe { self.slot[slot].remove(hdl.as_entry_ptr()) };
         if self.slot[slot].is_empty() {
