@@ -1,10 +1,11 @@
 use crate::loom::sync::atomic::AtomicBool;
-use crate::loom::sync::Arc;
+use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
 use crate::runtime::task::{
     self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task, TaskHarnessScheduleHooks,
 };
+use crate::runtime::time::{EntryHandle, Wheel};
 use crate::runtime::{
     blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
 };
@@ -16,6 +17,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
 use std::sync::atomic::Ordering::{AcqRel, Release};
+use std::sync::mpsc;
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
 use std::thread::ThreadId;
@@ -62,6 +64,15 @@ struct Core {
     /// Current tick
     tick: u32,
 
+    /// Worker local timer wheel
+    wheel: Wheel,
+
+    /// Channel for sending timers that need to be cancelled
+    timer_cancel_tx: mpsc::Sender<EntryHandle>,
+
+    /// Channel for receiving timers that need to be cancelled
+    timer_cancel_rx: mpsc::Receiver<EntryHandle>,
+
     /// Runtime driver
     ///
     /// The driver is removed before starting to park the thread
@@ -82,6 +93,11 @@ struct Core {
 struct Shared {
     /// Remote run queue
     inject: Inject<Arc<Handle>>,
+
+    /// Timers pending to be registered.
+    /// This is used to register a timer but the [`Core`]
+    /// is not available in the current thread.
+    inject_timers: Mutex<Vec<EntryHandle>>,
 
     /// Collection of all active tasks spawned onto this executor.
     owned: OwnedTasks<Arc<Handle>>,
@@ -152,6 +168,7 @@ impl CurrentThread {
             },
             shared: Shared {
                 inject: Inject::new(),
+                inject_timers: Mutex::new(Vec::new()),
                 owned: OwnedTasks::new(1),
                 woken: AtomicBool::new(false),
                 config,
@@ -164,9 +181,13 @@ impl CurrentThread {
             local_tid,
         });
 
+        let (timer_cancel_tx, timer_cancel_rx) = mpsc::channel();
         let core = AtomicCell::new(Some(Box::new(Core {
             tasks: VecDeque::with_capacity(INITIAL_CAPACITY),
             tick: 0,
+            wheel: Wheel::new(),
+            timer_cancel_tx,
+            timer_cancel_rx,
             driver: Some(driver),
             metrics: MetricsBatch::new(&handle.shared.worker_metrics),
             global_queue_interval,
@@ -439,6 +460,27 @@ impl Context {
     pub(crate) fn defer(&self, waker: &Waker) {
         self.defer.defer(waker);
     }
+
+    fn with_core<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(Option<&mut Core>) -> R,
+    {
+        let mut core = self.core.borrow_mut();
+        f(core.as_mut().map(|c| c.as_mut()))
+    }
+
+    pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(Option<(&mut Wheel, mpsc::Sender<EntryHandle>)>) -> R,
+    {
+        self.with_core(|maybe_core| {
+            if let Some(core) = maybe_core {
+                f(Some((&mut core.wheel, core.timer_cancel_tx.clone())))
+            } else {
+                f(None)
+            }
+        })
+    }
 }
 
 // ===== impl Handle =====
@@ -583,6 +625,15 @@ impl Handle {
     pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
         assert_eq!(0, worker);
         &self.shared.worker_metrics
+    }
+
+    /// Push a timer handle from the remote thread.
+    pub(crate) fn push_remote_timer(&self, entry: EntryHandle) {
+        {
+            let mut inject_timers = self.shared.inject_timers.lock();
+            inject_timers.push(entry);
+        }
+        self.driver.unpark();
     }
 }
 
