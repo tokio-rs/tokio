@@ -1,7 +1,10 @@
 cfg_not_wasi! {
+    use std::time::Duration;
+}
+
+cfg_not_wasip1! {
     use crate::net::{to_socket_addrs, ToSocketAddrs};
     use std::future::poll_fn;
-    use std::time::Duration;
 }
 
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
@@ -73,7 +76,7 @@ cfg_net! {
 }
 
 impl TcpStream {
-    cfg_not_wasi! {
+    cfg_not_wasip1! {
         /// Opens a TCP connection to a remote host.
         ///
         /// `addr` is an address of the remote host. Anything which implements the
