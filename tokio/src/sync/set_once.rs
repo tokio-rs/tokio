@@ -1,12 +1,7 @@
 use super::Notify;
 
-use crate::{
-    loom::{
-        cell::UnsafeCell,
-        sync::{atomic::AtomicBool, Mutex},
-    },
-    pin,
-};
+use crate::loom::sync::{atomic::AtomicBool, Mutex};
+use crate::{loom::cell::UnsafeCell, pin};
 
 use std::error::Error;
 use std::fmt;
@@ -19,18 +14,16 @@ use std::sync::atomic::Ordering;
 // can only be modified once during initialization.
 //
 //  1. When `value_set` is false, the `value` is not initialized and wait()
-//      future will keep on waiting
+//      future will keep on waiting.
 //  2. When `value_set` is true, the wait() future completes, get() will return
 //      Some(&T)
 //
 // The value cannot be changed after set() is called. Subsequent calls to set()
-// will return a `SetOnceError`
+// will return a `SetOnceError`.
 
-/// A thread-safe cell that can be written to only once.
-/// A `SetOnce` is inspired from python's
-/// [`asyncio.Event`](https://docs.python.org/3/library/asyncio-sync.html#asyncio.Event)
-/// type. It can be used to wait until the value of the `SetOnce` is set like
-/// a "Event" mechanism
+/// A thread-safe cell that can be written to only once. A `SetOnce`
+/// is inspired from python's [`asyncio.Event`] type. It can be used to wait
+/// until the value of the `SetOnce` is set like a "Event" mechanism.
 ///
 /// # Example
 ///
@@ -78,6 +71,8 @@ use std::sync::atomic::Ordering;
 ///     Ok(())
 /// }
 /// ```
+///
+/// [`asyncio.Event`]: https://docs.python.org/3/library/asyncio-event.html
 pub struct SetOnce<T> {
     value_set: AtomicBool,
     value: UnsafeCell<MaybeUninit<T>>,
@@ -119,12 +114,9 @@ impl<T> Drop for SetOnce<T> {
     fn drop(&mut self) {
         // TODO: Use get_mut()
         if self.value_set.load(Ordering::Relaxed) {
-            // SAFETY: We're inside the drop implementation of SetOnce
-            // AND we're also initalized. This is the best way to ensure
-            // out data gets dropped
+            // SAFETY: If the value_set is true, then the value is initialized
+            // then there is a value to be dropped and this is safe
             unsafe { self.value.with_mut(|ptr| ptr::drop_in_place(ptr as *mut T)) }
-            // no need to set the flag to false as this set once is being
-            // dropped
         }
     }
 }
@@ -262,6 +254,8 @@ impl<T> SetOnce<T> {
     /// `None` if the `SetOnce` is empty.
     pub fn get(&self) -> Option<&T> {
         if self.initialized() {
+            // SAFETY: the SetOnce is initialized, so we can safely
+            // call get_unchecked and return the value
             Some(unsafe { self.get_unchecked() })
         } else {
             None

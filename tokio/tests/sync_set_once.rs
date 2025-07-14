@@ -2,99 +2,84 @@
 #![cfg(feature = "full")]
 
 use std::mem;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{
+    atomic::{AtomicU32, Ordering},
+    Arc,
+};
 use std::time::Duration;
 use tokio::runtime;
 use tokio::sync::{SetOnce, SetOnceError as SetError};
 use tokio::time;
 
+struct Foo {
+    pub drops: Arc<AtomicU32>,
+}
+
+impl Foo {
+    pub fn new(drops: Arc<AtomicU32>) -> Self {
+        Foo { drops }
+    }
+}
+
+impl Drop for Foo {
+    fn drop(&mut self) {
+        self.drops.fetch_add(1, Ordering::Release);
+    }
+}
+
 #[test]
 fn drop_cell() {
-    static NUM_DROPS: AtomicU32 = AtomicU32::new(0);
+    let drops = Arc::new(AtomicU32::new(0));
 
-    struct Foo {}
-
-    let fooer = Foo {};
-
-    impl Drop for Foo {
-        fn drop(&mut self) {
-            NUM_DROPS.fetch_add(1, Ordering::Release);
-        }
-    }
+    let fooer = Foo::new(Arc::clone(&drops));
 
     {
         let once_cell = SetOnce::new();
         let prev = once_cell.set(fooer);
         assert!(prev.is_ok())
     }
-    assert!(NUM_DROPS.load(Ordering::Acquire) == 1);
+    assert!(drops.load(Ordering::Acquire) == 1);
 }
 
 #[test]
 fn drop_cell_new_with() {
-    static NUM_DROPS: AtomicU32 = AtomicU32::new(0);
-
-    struct Foo {}
-
-    let fooer = Foo {};
-
-    impl Drop for Foo {
-        fn drop(&mut self) {
-            NUM_DROPS.fetch_add(1, Ordering::Release);
-        }
-    }
+    let drops = Arc::new(AtomicU32::new(0));
+    let fooer = Foo::new(Arc::clone(&drops));
 
     {
         let once_cell = SetOnce::new_with(Some(fooer));
         assert!(once_cell.initialized());
     }
-    assert!(NUM_DROPS.load(Ordering::Acquire) == 1);
+
+    assert!(drops.load(Ordering::Acquire) == 1);
 }
 
 #[test]
 fn drop_into_inner() {
-    static NUM_DROPS: AtomicU32 = AtomicU32::new(0);
-
-    struct Foo {}
-
-    let fooer = Foo {};
-
-    impl Drop for Foo {
-        fn drop(&mut self) {
-            NUM_DROPS.fetch_add(1, Ordering::Release);
-        }
-    }
+    let drops = Arc::new(AtomicU32::new(0));
+    let fooer = Foo::new(Arc::clone(&drops));
 
     let once_cell = SetOnce::new();
     assert!(once_cell.set(fooer).is_ok());
-    let fooer = once_cell.into_inner();
-    let count = NUM_DROPS.load(Ordering::Acquire);
+    let val = once_cell.into_inner();
+    let count = drops.load(Ordering::Acquire);
     assert!(count == 0);
-    drop(fooer);
-    let count = NUM_DROPS.load(Ordering::Acquire);
+    drop(val);
+    let count = drops.load(Ordering::Acquire);
     assert!(count == 1);
 }
 
 #[test]
 fn drop_into_inner_new_with() {
-    static NUM_DROPS: AtomicU32 = AtomicU32::new(0);
-
-    struct Foo {}
-
-    let fooer = Foo {};
-
-    impl Drop for Foo {
-        fn drop(&mut self) {
-            NUM_DROPS.fetch_add(1, Ordering::Release);
-        }
-    }
+    let drops = Arc::new(AtomicU32::new(0));
+    let fooer = Foo::new(Arc::clone(&drops));
 
     let once_cell = SetOnce::new_with(Some(fooer));
     let fooer = once_cell.into_inner();
-    let count = NUM_DROPS.load(Ordering::Acquire);
+    let count = drops.load(Ordering::Acquire);
     assert!(count == 0);
     mem::drop(fooer);
-    let count = NUM_DROPS.load(Ordering::Acquire);
+    let count = drops.load(Ordering::Acquire);
     assert!(count == 1);
 }
 
@@ -212,16 +197,11 @@ fn is_none_initializing() {
 
 #[test]
 fn is_some_initializing() {
-    let rt = runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .unwrap();
+    let rt = runtime::Builder::new_current_thread().build().unwrap();
 
     static ONCE: SetOnce<u32> = SetOnce::const_new();
 
     rt.block_on(async {
-        time::pause();
-
         tokio::spawn(async { ONCE.set(20) });
 
         assert_eq!(*ONCE.wait().await, 20);
