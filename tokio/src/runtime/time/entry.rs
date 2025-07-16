@@ -59,6 +59,7 @@ use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::atomic::Ordering;
 
 use crate::runtime::scheduler;
+use crate::runtime::time;
 use crate::sync::AtomicWaker;
 use crate::time::Instant;
 use crate::util::linked_list;
@@ -285,9 +286,6 @@ pin_project! {
     // before polling.
     #[derive(Debug)]
     pub(crate) struct TimerEntry {
-        // Arc reference to the runtime handle. We can only free the driver after
-        // deregistering everything from their respective timer wheels.
-        driver: scheduler::Handle,
         // Shared inner structure; this is part of an intrusive linked list, and
         // therefore other references can exist to it while mutable references to
         // Entry exist.
@@ -340,6 +338,10 @@ pub(crate) struct TimerShared {
     /// Only accessed under the entry lock.
     pointers: linked_list::Pointers<TimerShared>,
 
+    // Arc reference to the runtime handle. We can only free the driver after
+    // deregistering everything from their respective timer wheels.
+    driver: scheduler::Handle,
+
     /// The time when the [`TimerEntry`] was registered into the Wheel,
     /// [`STATE_DEREGISTERED`] means it is not registered.
     ///
@@ -385,6 +387,7 @@ generate_addr_of_methods! {
 impl TimerShared {
     pub(super) fn new() -> Self {
         Self {
+            driver: scheduler::Handle::current(),
             registered_when: AtomicU64::new(0),
             pointers: linked_list::Pointers::new(),
             state: StateCell::default(),
@@ -453,6 +456,10 @@ impl TimerShared {
     pub(super) fn might_be_registered(&self) -> bool {
         self.state.might_be_registered()
     }
+
+    fn driver(&self) -> &time::Handle {
+        self.driver.driver().time()
+    }
 }
 
 unsafe impl linked_list::Link for TimerShared {
@@ -479,12 +486,8 @@ unsafe impl linked_list::Link for TimerShared {
 
 impl TimerEntry {
     #[track_caller]
-    pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
-        // Panic if the time driver is not enabled
-        let _ = handle.driver().time();
-
+    pub(crate) fn new(deadline: Instant) -> Self {
         Self {
-            driver: handle,
             inner: None,
             deadline,
             registered: false,
@@ -565,7 +568,7 @@ impl TimerEntry {
         // driver did so far and happens-before everything the driver does in
         // the future. While we have the lock held, we also go ahead and
         // deregister the entry if necessary.
-        unsafe { self.driver().clear_entry(NonNull::from(inner)) };
+        unsafe { inner.driver().clear_entry(NonNull::from(inner)) };
     }
 
     pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant, reregister: bool) {
@@ -573,7 +576,6 @@ impl TimerEntry {
         *this.deadline = new_time;
         *this.registered = reregister;
 
-        let tick = self.driver().time_source().deadline_to_tick(new_time);
         let inner = match self.inner() {
             Some(inner) => inner,
             None => {
@@ -582,6 +584,7 @@ impl TimerEntry {
                     .expect("inner should already be initialized by `this.init_inner()`")
             }
         };
+        let tick = inner.driver().time_source().deadline_to_tick(new_time);
 
         if inner.extend_expiration(tick).is_ok() {
             return;
@@ -589,8 +592,8 @@ impl TimerEntry {
 
         if reregister {
             unsafe {
-                self.driver()
-                    .reregister(&self.driver.driver().io, tick, inner.into());
+                inner.driver()
+                    .reregister(&inner.driver.driver().io, tick, inner.into());
             }
         }
     }
@@ -599,11 +602,13 @@ impl TimerEntry {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), super::Error>> {
-        assert!(
-            !self.driver().is_shutdown(),
-            "{}",
-            crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR
-        );
+        scheduler::Handle::with_current(|hdl| {
+            assert!(
+                !hdl.driver().time().is_shutdown(),
+                "{}",
+                crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR
+            );
+        });
 
         if !self.registered {
             let deadline = self.deadline;
@@ -614,15 +619,6 @@ impl TimerEntry {
             .inner()
             .expect("inner should already be initialized by `self.reset()`");
         inner.state.poll(cx.waker())
-    }
-
-    pub(crate) fn driver(&self) -> &super::Handle {
-        self.driver.driver().time()
-    }
-
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(crate) fn clock(&self) -> &super::Clock {
-        self.driver.driver().clock()
     }
 }
 

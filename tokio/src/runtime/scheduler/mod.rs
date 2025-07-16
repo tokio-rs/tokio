@@ -94,6 +94,21 @@ cfg_rt! {
             }
         }
 
+        /// # Panics
+        ///
+        /// Panics if the current [`Context`] is not available
+        /// in the current thread.
+        #[track_caller]
+        pub(crate) fn with_current<F, R>(f: F) -> R
+        where
+            F: FnOnce(&Handle) -> R,
+        {
+            match context::with_current(|hdl| f(hdl)) {
+                Ok(ret) => ret,
+                Err(e) => panic!("{e}"),
+            }
+        }
+
         pub(crate) fn blocking_spawner(&self) -> &blocking::Spawner {
             match_flavor!(self, Handle(h) => &h.blocking_spawner)
         }

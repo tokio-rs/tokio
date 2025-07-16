@@ -7,6 +7,7 @@ use std::future::Future;
 use std::panic::Location;
 use std::pin::Pin;
 use std::task::{self, ready, Poll};
+use crate::runtime::scheduler;
 
 /// Waits until `deadline` is reached.
 ///
@@ -244,6 +245,7 @@ cfg_not_trace! {
     }
 }
 
+
 impl Sleep {
     #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
     #[track_caller]
@@ -251,9 +253,16 @@ impl Sleep {
         deadline: Instant,
         location: Option<&'static Location<'static>>,
     ) -> Sleep {
-        use crate::runtime::scheduler;
-        let handle = scheduler::Handle::current();
-        let entry = TimerEntry::new(handle, deadline);
+        // ensure both scheduler handle and time driver are available,
+        // otherwise panic
+        let is_time_enabled = scheduler::Handle::with_current(|hdl| {
+            hdl.driver().time.is_some()
+        });
+        assert!(
+            is_time_enabled,
+            "A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers."
+        );
+        let entry = TimerEntry::new(deadline);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
             let handle = scheduler::Handle::current();
@@ -380,11 +389,14 @@ impl Sleep {
                 tracing::trace_span!("runtime.resource.async_op.poll");
 
             let duration = {
-                let clock = me.entry.clock();
-                let time_source = me.entry.driver().time_source();
-                let now = time_source.now(clock);
-                let deadline_tick = time_source.deadline_to_tick(deadline);
-                deadline_tick.saturating_sub(now)
+                scheduler::Handle::with_current(|hdl| {
+                    let driver = hdl.driver();
+                    let clock = driver.clock();
+                    let time_source = driver.time().time_source();
+                    let now = time_source.now(clock);
+                    let deadline_tick = time_source.deadline_to_tick(deadline);
+                    deadline_tick.saturating_sub(now)
+                })
             };
 
             tracing::trace!(
