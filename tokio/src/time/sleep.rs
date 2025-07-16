@@ -2,12 +2,12 @@ use crate::runtime::time::TimerEntry;
 use crate::time::{error::Error, Duration, Instant};
 use crate::util::trace;
 
+use crate::runtime::scheduler;
 use pin_project_lite::pin_project;
 use std::future::Future;
 use std::panic::Location;
 use std::pin::Pin;
 use std::task::{self, ready, Poll};
-use crate::runtime::scheduler;
 
 /// Waits until `deadline` is reached.
 ///
@@ -245,7 +245,6 @@ cfg_not_trace! {
     }
 }
 
-
 impl Sleep {
     #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
     #[track_caller]
@@ -255,9 +254,7 @@ impl Sleep {
     ) -> Sleep {
         // ensure both scheduler handle and time driver are available,
         // otherwise panic
-        let is_time_enabled = scheduler::Handle::with_current(|hdl| {
-            hdl.driver().time.is_some()
-        });
+        let is_time_enabled = scheduler::Handle::with_current(|hdl| hdl.driver().time.is_some());
         assert!(
             is_time_enabled,
             "A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers."

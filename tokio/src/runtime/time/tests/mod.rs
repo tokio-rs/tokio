@@ -1,6 +1,6 @@
 #![cfg(not(target_os = "wasi"))]
 
-use std::{task::Context, time::Duration, future::poll_fn};
+use std::{future::poll_fn, task::Context, time::Duration};
 
 #[cfg(not(loom))]
 use futures::task::noop_waker_ref;
@@ -37,9 +37,8 @@ fn single_timer() {
         rt.block_on(async move {
             let handle_ = handle.clone();
             let jh = handle.spawn(async move {
-                let entry = TimerEntry::new(
-                    handle_.inner.driver().clock().now() + Duration::from_secs(1),
-                );
+                let entry =
+                    TimerEntry::new(handle_.inner.driver().clock().now() + Duration::from_secs(1));
                 pin!(entry);
 
                 poll_fn(|cx| entry.as_mut().poll_elapsed(cx)).await.unwrap();
@@ -55,7 +54,6 @@ fn single_timer() {
 
             jh.await.unwrap();
         });
-
     })
 }
 
@@ -68,9 +66,8 @@ fn drop_timer() {
         rt.block_on(async move {
             let handle_ = handle.clone();
             let jh = handle.spawn(async move {
-                let entry = TimerEntry::new(
-                    handle_.inner.driver().clock().now() + Duration::from_secs(1),
-                );
+                let entry =
+                    TimerEntry::new(handle_.inner.driver().clock().now() + Duration::from_secs(1));
                 pin!(entry);
 
                 let _ = entry
@@ -91,7 +88,6 @@ fn drop_timer() {
 
             jh.await.unwrap();
         });
-
     })
 }
 
@@ -104,9 +100,8 @@ fn change_waker() {
         rt.block_on(async move {
             let handle_ = handle.clone();
             let jh = handle.spawn(async move {
-                let entry = TimerEntry::new(
-                    handle_.inner.driver().clock().now() + Duration::from_secs(1),
-                );
+                let entry =
+                    TimerEntry::new(handle_.inner.driver().clock().now() + Duration::from_secs(1));
                 pin!(entry);
 
                 let _ = entry
@@ -126,7 +121,6 @@ fn change_waker() {
 
             jh.await.unwrap();
         });
-
     })
 }
 
@@ -180,7 +174,6 @@ fn reset_future() {
 
             assert!(finished_early.load(Ordering::Relaxed));
         });
-
     })
 }
 
@@ -227,7 +220,6 @@ fn poll_process_levels() {
             }
         }
     });
-
 }
 
 #[test]
@@ -239,9 +231,7 @@ fn poll_process_levels_targeted() {
     let handle = rt.handle();
 
     rt.block_on(async move {
-        let e1 = TimerEntry::new(
-            handle.inner.driver().clock().now() + Duration::from_millis(193),
-        );
+        let e1 = TimerEntry::new(handle.inner.driver().clock().now() + Duration::from_millis(193));
         pin!(e1);
 
         let handle = handle.inner.driver().time();
