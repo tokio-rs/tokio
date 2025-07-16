@@ -94,20 +94,21 @@ cfg_rt! {
             }
         }
 
-        cfg_time! {
-            /// # Panics
-            ///
-            /// Panics if the current [`Context`] is not available
-            /// in the current thread.
-            #[track_caller]
-            pub(crate) fn with_current<F, R>(f: F) -> R
-            where
-                F: FnOnce(&Handle) -> R,
-            {
-                match context::with_current(|hdl| f(hdl)) {
-                    Ok(ret) => ret,
-                    Err(e) => panic!("{e}"),
-                }
+        /// # Panics
+        ///
+        /// Panics if the current [`Context`] is not available
+        /// in the current thread.
+        // remove this `allow(dead_code)` when this method
+        // is used by other other modules except the `time`.
+        #[cfg_attr(not(feature = "time"), allow(dead_code))]
+        #[track_caller]
+        pub(crate) fn with_current<F, R>(f: F) -> R
+        where
+            F: FnOnce(&Handle) -> R,
+        {
+            match context::with_current(|hdl| f(hdl)) {
+                Ok(ret) => ret,
+                Err(e) => panic!("{e}"),
             }
         }
 
@@ -288,5 +289,14 @@ cfg_not_rt! {
         pub(crate) fn current() -> Handle {
             panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
         }
+
+        #[track_caller]
+        pub(crate) fn with_current<F, R>(_f: F) -> R
+        where
+            F: FnOnce(&Handle) -> R,
+        {
+            panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
+        }
+
     }
 }
