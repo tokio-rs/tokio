@@ -7,7 +7,6 @@ use futures::task::noop_waker_ref;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Arc;
-use crate::loom::thread;
 use crate::task::yield_now;
 
 use super::TimerEntry;
@@ -152,7 +151,7 @@ fn reset_future() {
                 finished_early_.store(true, Ordering::Relaxed);
             });
 
-            thread::yield_now();
+            yield_now().await;
 
             let handle = handle.inner.driver().time();
 
