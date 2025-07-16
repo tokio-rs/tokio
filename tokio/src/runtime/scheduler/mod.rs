@@ -290,6 +290,9 @@ cfg_not_rt! {
             panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
         }
 
+        // remove this `allow(dead_code)` when this method
+        // is used by other other modules except the `time`.
+        #[cfg_attr(not(feature = "time"), allow(dead_code))]
         #[track_caller]
         pub(crate) fn with_current<F, R>(_f: F) -> R
         where
