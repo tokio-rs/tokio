@@ -28,25 +28,32 @@ use std::sync::atomic::Ordering;
 /// # Example
 ///
 /// ```
-/// use tokio::sync::SetOnce;
+/// use tokio::sync::{SetOnce, SetOnceError};
 /// use std::sync::Arc;
 ///
 /// #[tokio::main]
-/// async fn main() {
+/// async fn main() -> Result<(), SetOnceError<u32>> {
 ///     let once = SetOnce::new();
 ///
 ///     let arc = Arc::new(once);
 ///     let first_cl = Arc::clone(&arc);
 ///     let second_cl = Arc::clone(&arc);
 ///
-///     tokio::spawn(async move { first_cl.set(20) });
+///     // set the value inside a task
+///     tokio::spawn(async move { first_cl.set(20) }).await.unwrap()?;
 ///
-///     tokio::spawn(async move { second_cl.set(10) });
+///     // wait inside task to not block the main thread
+///     tokio::spawn(async move {
+///         // wait inside async context for the value to be set
+///         assert_eq!(*second_cl.wait().await, 20);
+///     }).await.unwrap();
 ///
-///     let res = arc.get(); // sometimes returns None
-///     arc.wait().await; // lets wait until the value is set
+///     // subsequent set calls will fail
+///     assert!(arc.set(30).is_err());
 ///
 ///     println!("{:?}", arc.get());
+///
+///     Ok(())
 /// }
 /// ```
 ///
@@ -59,14 +66,19 @@ use std::sync::atomic::Ordering;
 /// ```
 /// use tokio::sync::{SetOnce, SetOnceError};
 ///
-///
 /// static ONCE: SetOnce<u32> = SetOnce::const_new();
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), SetOnceError<u32>> {
-///     ONCE.set(2)?;
-///     let result = ONCE.get();
-///     assert_eq!(result, Some(&2));
+///
+///     // set the value inside a task somewhere...
+///     tokio::spawn(async move { ONCE.set(20) });
+///
+///     // checking with .get doesn't block main thread
+///     println!("{:?}", ONCE.get());
+///
+///     // wait until the value is set, blocks the thread
+///     println!("{:?}", ONCE.wait().await);
 ///
 ///     Ok(())
 /// }
