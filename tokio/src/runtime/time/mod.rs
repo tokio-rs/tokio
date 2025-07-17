@@ -90,7 +90,7 @@ pub(crate) struct Driver {
 }
 
 /// Timer state shared between `Driver`, `Handle`, and `Registration`.
-struct Inner {
+pub(crate) struct Inner {
     // The state is split like this so `Handle` can access `is_shutdown` without locking the mutex
     state: Mutex<InnerState>,
 
@@ -108,12 +108,12 @@ struct Inner {
 }
 
 /// Time state shared which must be protected by a `Mutex`
-struct InnerState {
+pub(crate) struct InnerState {
     /// The earliest time at which we promise to wake up without unparking.
-    next_wake: Option<NonZeroU64>,
+    pub(crate) next_wake: Option<NonZeroU64>,
 
     /// Timer wheel.
-    wheel: wheel::Wheel,
+    pub(crate) wheel: wheel::Wheel,
 }
 
 // ===== impl Driver =====
@@ -389,7 +389,7 @@ impl Handle {
 
 impl Inner {
     /// Locks the driver's inner structure
-    pub(super) fn lock(&self) -> crate::loom::sync::MutexGuard<'_, InnerState> {
+    pub(crate) fn lock(&self) -> crate::loom::sync::MutexGuard<'_, InnerState> {
         self.state.lock()
     }
 

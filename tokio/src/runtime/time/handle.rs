@@ -3,8 +3,8 @@ use std::fmt;
 
 /// Handle to time driver instance.
 pub(crate) struct Handle {
-    pub(super) time_source: TimeSource,
-    pub(super) inner: super::Inner,
+    pub(crate) time_source: TimeSource,
+    pub(crate) inner: super::Inner,
 }
 
 impl Handle {

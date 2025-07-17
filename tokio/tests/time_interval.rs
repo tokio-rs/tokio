@@ -475,3 +475,26 @@ async fn interval_doesnt_panic_max_duration_when_polling() {
     let mut timer = task::spawn(time::interval(Duration::MAX));
     assert_ready!(timer.enter(|cx, mut timer| timer.poll_tick(cx)));
 }
+
+#[tokio::test(start_paused = true)]
+async fn advance_stable_simulates_logical_time() {
+    use std::sync::{Arc, Mutex};
+    let sleeps = Arc::new(Mutex::new(Vec::new()));
+
+    for ms in (0..100).map(|x| x * 10) {
+        let sleeps = sleeps.clone();
+        tokio::spawn(async move {
+            time::sleep(Duration::from_millis(ms)).await;
+            sleeps.lock().unwrap().push(ms);
+            if ms % 100 == 0 {
+                time::sleep(Duration::from_millis(5)).await;
+                sleeps.lock().unwrap().push(ms + 5);
+            }
+        });
+    }
+
+    time::advance_stable(Duration::from_millis(500)).await;
+
+    assert_eq!(sleeps.lock().unwrap().len(), 56);
+    assert!(sleeps.lock().unwrap().is_sorted());
+}

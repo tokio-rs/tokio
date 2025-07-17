@@ -218,6 +218,58 @@ cfg_test_util! {
         crate::task::yield_now().await;
     }
 
+    pub async fn advance_stable(mut duration: Duration) {
+        use crate::runtime::scheduler;
+
+        crate::task::yield_now().await;
+
+        let handle = scheduler::Handle::current();
+        let driver = handle.driver();
+        let time = driver.time();
+
+        while duration > Duration::from_millis(0) {
+
+            let lock = time.inner.lock();
+            let next_wake = lock.wheel.next_expiration_time();
+            drop(lock);
+
+            use std::num::NonZeroU64;
+
+            let next_wake =
+                next_wake.map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
+
+            match next_wake {
+                Some(when) => {
+                    with_clock(|maybe_clock| {
+                        let clock = match maybe_clock {
+                            Some(clock) => clock,
+                            None => return Err("time cannot be frozen from outside the Tokio runtime"),
+                        };
+
+                        let now = time.time_source.now(clock);
+
+                        let mut timeout = time
+                            .time_source
+                            .tick_to_duration(when.get().saturating_sub(now));
+
+                        let advance_by = std::cmp::min(timeout, duration);
+                        duration -= advance_by;
+
+                        clock.advance(advance_by)
+                    });
+
+                    // The first yield drivers the timers into the task queue.
+                    crate::task::yield_now().await;
+                    // The second yield runs these pending tasks.
+                    crate::task::yield_now().await;
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+    }
+
     /// Returns the current instant, factoring in frozen time.
     pub(crate) fn now() -> Instant {
         if !DID_PAUSE_CLOCK.load(Ordering::Acquire) {
