@@ -46,11 +46,6 @@ impl From<Kind> for Error {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Elapsed(());
 
-#[derive(Debug)]
-pub(crate) enum InsertError {
-    Elapsed,
-}
-
 // ===== impl Error =====
 
 impl Error {
