@@ -704,3 +704,27 @@ macro_rules! cfg_tokio_uring {
         )*
     };
 }
+
+macro_rules! cfg_rt_and_time{
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(
+                feature = "rt",
+                feature = "time",
+            ))]
+            $item
+        )*
+    };
+}
+
+macro_rules! cfg_rt_or_time{
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(
+                feature = "rt",
+                feature = "time",
+            ))]
+            $item
+        )*
+    };
+}
