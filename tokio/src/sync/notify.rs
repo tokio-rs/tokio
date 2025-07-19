@@ -7,7 +7,7 @@
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::{Arc, Mutex};
+use crate::loom::sync::Mutex;
 use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
 use crate::util::WakeList;
 
@@ -17,6 +17,7 @@ use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{self, Acquire, Relaxed, Release, SeqCst};
+use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
 type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
@@ -598,12 +599,12 @@ impl Notify {
     ///     notify.notify_waiters(); // Sends a notification
     /// }
     /// ```
-    pub fn notified_owned(self: &Arc<Self>) -> OwnedNotified {
+    pub fn notified_owned(self: Arc<Self>) -> OwnedNotified {
         // we load the number of times notify_waiters
         // was called and store that in the future.
         let state = self.state.load(SeqCst);
         OwnedNotified {
-            notify: Arc::clone(self),
+            notify: self,
             state: State::Init,
             notify_waiters_calls: get_num_notify_waiters_calls(state),
             waiter: Waiter::new(),
