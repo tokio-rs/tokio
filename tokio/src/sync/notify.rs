@@ -7,7 +7,7 @@
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::Mutex;
+use crate::loom::sync::{Arc, Mutex};
 use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
 use crate::util::WakeList;
 
@@ -17,7 +17,6 @@ use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{self, Acquire, Relaxed, Release, SeqCst};
-use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
 type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
@@ -404,7 +403,7 @@ unsafe impl<'a> Sync for Notified<'a> {}
 /// will immediately return `Poll::Ready`.
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct NotifiedOwned {
+pub struct OwnedNotified {
     /// The `Notify` being received on.
     notify: Arc<Notify>,
 
@@ -418,7 +417,7 @@ pub struct NotifiedOwned {
     waiter: Waiter,
 }
 
-unsafe impl Sync for NotifiedOwned {}
+unsafe impl Sync for OwnedNotified {}
 
 #[derive(Debug)]
 enum State {
@@ -575,7 +574,7 @@ impl Notify {
     /// # Cancel safety
     ///
     /// This method uses a queue to fairly distribute notifications in the order
-    /// they were requested. Cancelling a call to `notified` makes you lose your
+    /// they were requested. Cancelling a call to `notified_owned` makes you lose your
     /// place in the queue.
     ///
     /// # Examples
@@ -599,11 +598,11 @@ impl Notify {
     ///     notify.notify_waiters(); // Sends a notification
     /// }
     /// ```
-    pub fn notified_owned(self: &Arc<Self>) -> NotifiedOwned {
+    pub fn notified_owned(self: &Arc<Self>) -> OwnedNotified {
         // we load the number of times notify_waiters
         // was called and store that in the future.
         let state = self.state.load(SeqCst);
-        NotifiedOwned {
+        OwnedNotified {
             notify: Arc::clone(self),
             state: State::Init,
             notify_waiters_calls: get_num_notify_waiters_calls(state),
@@ -1021,9 +1020,9 @@ impl Drop for Notified<'_> {
     }
 }
 
-// ===== impl NotifiedOwned =====
+// ===== impl OwnedNotified =====
 
-impl NotifiedOwned {
+impl OwnedNotified {
     /// Adds this future to the list of futures that are ready to receive
     /// wakeups from calls to [`notify_one`].
     ///
@@ -1059,7 +1058,7 @@ impl NotifiedOwned {
     }
 }
 
-impl Future for NotifiedOwned {
+impl Future for OwnedNotified {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
@@ -1067,7 +1066,7 @@ impl Future for NotifiedOwned {
     }
 }
 
-impl Drop for NotifiedOwned {
+impl Drop for OwnedNotified {
     fn drop(&mut self) {
         // Safety: The type only transitions to a "Waiting" state when pinned.
         let project = unsafe { Pin::new_unchecked(self).project() };
@@ -1075,7 +1074,7 @@ impl Drop for NotifiedOwned {
     }
 }
 
-// ===== Shared logic for `Notified` and `NotifiedOwned` =====
+// ===== Shared logic for `Notified` and `OwnedNotified` =====
 
 type NotifiedProject<'a> = (&'a Notify, &'a mut State, &'a usize, &'a Waiter);
 
