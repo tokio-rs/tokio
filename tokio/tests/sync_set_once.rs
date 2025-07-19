@@ -6,81 +6,78 @@ use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,
 };
-use std::time::Duration;
-use tokio::runtime;
-use tokio::sync::{SetOnce, SetOnceError as SetError};
-use tokio::time;
+use tokio::sync::SetOnce;
 
-struct Foo {
-    pub drops: Arc<AtomicU32>,
+#[derive(Clone)]
+struct DropCounter {
+    drops: Arc<AtomicU32>,
 }
 
-impl Foo {
-    pub fn new(drops: Arc<AtomicU32>) -> Self {
-        Foo { drops }
+impl DropCounter {
+    fn new() -> Self {
+        DropCounter {
+            drops: Arc::new(AtomicU32::new(0)),
+        }
+    }
+
+    fn assert_num_drops(&self, value: u32) {
+        assert_eq!(value, self.drops.load(Ordering::Relaxed));
     }
 }
 
-impl Drop for Foo {
+impl Drop for DropCounter {
     fn drop(&mut self) {
-        self.drops.fetch_add(1, Ordering::Release);
+        self.drops.fetch_add(1, Ordering::Relaxed);
     }
 }
 
 #[test]
 fn drop_cell() {
-    let drops = Arc::new(AtomicU32::new(0));
-
-    let fooer = Foo::new(Arc::clone(&drops));
+    let fooer = DropCounter::new();
+    let fooer_cl = fooer.clone();
 
     {
         let once_cell = SetOnce::new();
-        let prev = once_cell.set(fooer);
+        let prev = once_cell.set(fooer_cl);
         assert!(prev.is_ok())
     }
-    assert!(drops.load(Ordering::Acquire) == 1);
+
+    fooer.assert_num_drops(1);
 }
 
 #[test]
 fn drop_cell_new_with() {
-    let drops = Arc::new(AtomicU32::new(0));
-    let fooer = Foo::new(Arc::clone(&drops));
+    let fooer = DropCounter::new();
 
     {
-        let once_cell = SetOnce::new_with(Some(fooer));
+        let once_cell = SetOnce::new_with(Some(fooer.clone()));
         assert!(once_cell.initialized());
     }
 
-    assert!(drops.load(Ordering::Acquire) == 1);
+    fooer.assert_num_drops(1);
 }
 
 #[test]
 fn drop_into_inner() {
-    let drops = Arc::new(AtomicU32::new(0));
-    let fooer = Foo::new(Arc::clone(&drops));
+    let fooer = DropCounter::new();
 
     let once_cell = SetOnce::new();
-    assert!(once_cell.set(fooer).is_ok());
+    assert!(once_cell.set(fooer.clone()).is_ok());
     let val = once_cell.into_inner();
-    let count = drops.load(Ordering::Acquire);
-    assert!(count == 0);
+    fooer.assert_num_drops(0);
     drop(val);
-    let count = drops.load(Ordering::Acquire);
-    assert!(count == 1);
+    fooer.assert_num_drops(1);
 }
 
 #[test]
 fn drop_into_inner_new_with() {
-    let drops = Arc::new(AtomicU32::new(0));
-    let fooer = Foo::new(Arc::clone(&drops));
+    let fooer = DropCounter::new();
 
-    let once_cell = SetOnce::new_with(Some(fooer));
-    let fooer = once_cell.into_inner();
-    let count = drops.load(Ordering::Acquire);
-    assert!(count == 0);
-    mem::drop(fooer);
-    let count = drops.load(Ordering::Acquire);
-    assert!(count == 1);
+    let once_cell = SetOnce::new_with(Some(fooer.clone()));
+    let val = once_cell.into_inner();
+    fooer.assert_num_drops(0);
+    mem::drop(val);
+    fooer.assert_num_drops(1);
 }
 
 #[test]
@@ -91,34 +88,20 @@ fn from() {
 
 #[test]
 fn set_and_get() {
-    let rt = runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .unwrap();
-
     static ONCE: SetOnce<u32> = SetOnce::const_new();
 
-    rt.block_on(async {
-        let _ = rt.spawn(async { ONCE.set(5) }).await;
-        let value = ONCE.get().unwrap();
-        assert_eq!(*value, 5);
-    });
+    ONCE.set(5).unwrap();
+    let value = ONCE.get().unwrap();
+    assert_eq!(*value, 5);
 }
 
-#[test]
-fn set_and_wait() {
-    let rt = runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .unwrap();
-
+#[tokio::test]
+async fn set_and_wait() {
     static ONCE: SetOnce<u32> = SetOnce::const_new();
 
-    rt.block_on(async {
-        let _ = rt.spawn(async { ONCE.set(5) }).await;
-        let value = ONCE.wait().await;
-        assert_eq!(*value, 5);
-    });
+    let _ = tokio::spawn(async { ONCE.set(5) }).await;
+    let value = ONCE.wait().await;
+    assert_eq!(*value, 5);
 }
 
 #[test]
@@ -139,71 +122,30 @@ fn set_twice() {
 }
 
 #[test]
-fn set_while_initializing_or_already_init() {
-    let rt = runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .unwrap();
-
-    static ONCE: SetOnce<u32> = SetOnce::const_new();
-
-    rt.block_on(async {
-        let handle1 = rt.spawn(async {
-            time::sleep(Duration::from_millis(1)).await;
-            let set_val = 5;
-            ONCE.set(set_val)?;
-
-            Ok::<u32, SetError<u32>>(set_val)
-        });
-
-        let handle2 = rt.spawn(async {
-            time::sleep(Duration::from_millis(1)).await;
-            let set_val = 10;
-            ONCE.set(set_val)?;
-
-            Ok::<u32, SetError<u32>>(set_val)
-        });
-
-        let result1 = handle1.await.unwrap();
-        let result2 = handle2.await.unwrap();
-
-        assert_eq!(result1, Ok(5));
-
-        assert!(result2.is_err());
-    });
-}
-
-#[test]
 fn is_none_initializing() {
-    let rt = runtime::Builder::new_current_thread()
-        .enable_time()
-        .build()
-        .unwrap();
-
     static ONCE: SetOnce<u32> = SetOnce::const_new();
 
-    rt.block_on(async {
-        time::pause();
+    assert_eq!(ONCE.get(), None);
 
-        tokio::spawn(async { ONCE.set(20) });
+    ONCE.set(20).unwrap();
 
-        tokio::spawn(async { ONCE.set(10) });
+    assert!(ONCE.set(10).is_err());
+}
 
-        let res = ONCE.get();
+#[tokio::test]
+async fn is_some_initializing() {
+    static ONCE: SetOnce<u32> = SetOnce::const_new();
 
-        assert_eq!(res, None);
-    });
+    tokio::spawn(async { ONCE.set(20) });
+
+    assert_eq!(*ONCE.wait().await, 20);
 }
 
 #[test]
-fn is_some_initializing() {
-    let rt = runtime::Builder::new_current_thread().build().unwrap();
+fn into_inner_int_empty_setonce() {
+    let once = SetOnce::<u32>::new();
 
-    static ONCE: SetOnce<u32> = SetOnce::const_new();
+    let val = once.into_inner();
 
-    rt.block_on(async {
-        tokio::spawn(async { ONCE.set(20) });
-
-        assert_eq!(*ONCE.wait().await, 20);
-    });
+    assert!(val.is_none());
 }

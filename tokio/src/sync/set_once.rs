@@ -283,7 +283,7 @@ impl<T> SetOnce<T> {
     /// [`SetOnceError`]: crate::sync::SetOnceError
     pub fn set(&self, value: T) -> Result<(), SetOnceError<T>> {
         if self.initialized() {
-            return Err(SetOnceError::from(value));
+            return Err(SetOnceError(value));
         }
 
         // SAFETY: lock the mutex to ensure only one caller of set
@@ -294,7 +294,7 @@ impl<T> SetOnce<T> {
             // If the value is already set, we return an error
             drop(guard);
 
-            return Err(SetOnceError::from(value));
+            return Err(SetOnceError(value));
         }
 
         // SAFETY: We have locked the mutex and checked if the value is
@@ -350,6 +350,10 @@ impl<T> SetOnce<T> {
     /// indefinitely.
     pub async fn wait(&self) -> &T {
         loop {
+            if let Some(val) = self.get() {
+                return val;
+            }
+
             let notify_fut = self.notify.notified();
             pin!(notify_fut);
             // take the lock because we're reading value_set
@@ -387,23 +391,12 @@ unsafe impl<T: Send> Send for SetOnce<T> {}
 ///
 /// [`SetOnce::set`]: crate::sync::SetOnce::set
 #[derive(Debug, PartialEq, Eq)]
-pub struct SetOnceError<T> {
-    /// The cell was already initialized when [`SetOnce::set`] was called.
-    ///
-    /// [`SetOnce::set`]: crate::sync::OnceCell::set
-    val: T,
-}
+pub struct SetOnceError<T>(pub T);
 
 impl<T> fmt::Display for SetOnceError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AlreadyInitializedError")
+        write!(f, "SetOnceError")
     }
 }
 
 impl<T: fmt::Debug> Error for SetOnceError<T> {}
-
-impl<T> From<T> for SetOnceError<T> {
-    fn from(val: T) -> Self {
-        SetOnceError { val }
-    }
-}
