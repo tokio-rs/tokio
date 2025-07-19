@@ -588,7 +588,7 @@ impl Notify {
     /// async fn main() {
     ///     let notify = Arc::new(Notify::new());
     ///     // register all waiters, in this case 1
-    ///     let notified = notify.notified_owned();
+    ///     let notified = notify.clone().notified_owned();
     ///
     ///     // spawn the taks waiting for the notification
     ///     tokio::spawn(async move {
