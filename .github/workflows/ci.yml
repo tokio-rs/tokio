@@ -583,9 +583,9 @@ jobs:
           - target: armv5te-unknown-linux-gnueabi
             os: ubuntu-latest
           - target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
+            os: ubuntu-24.04-arm
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
+            os: ubuntu-24.04-arm
             rustflags: --cfg tokio_taskdump
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
@@ -629,9 +629,9 @@ jobs:
           - target: armv5te-unknown-linux-gnueabi
             os: ubuntu-latest
           - target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
+            os: ubuntu-24.04-arm
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-22.04-arm # TODO: update to 24.04 when https://github.com/rust-lang/rust/issues/135867 solved
+            os: ubuntu-24.04-arm
             rustflags: --cfg tokio_taskdump
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
