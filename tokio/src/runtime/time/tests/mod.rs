@@ -1,12 +1,11 @@
 #![cfg(not(target_os = "wasi"))]
 
+use std::future::poll_fn;
 use std::sync::Barrier;
-use std::{future::poll_fn, task::Context, time::Duration};
+use std::task::{Context, Waker};
+use std::time::Duration;
 
 use tokio_test::assert_pending;
-
-#[cfg(not(loom))]
-use futures::task::noop_waker_ref;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Arc;
@@ -35,7 +34,7 @@ fn block_on<T>(f: impl std::future::Future<Output = T>) -> T {
 }
 
 fn cx() -> Context<'static> {
-    Context::from_waker(noop_waker_ref())
+    Context::from_waker(Waker::noop())
 }
 
 fn rt(start_paused: bool) -> crate::runtime::Runtime {
@@ -209,7 +208,7 @@ fn reset_future() {
 
             jh.await.unwrap();
 
-            assert!(finished_early.load(Ordering::Relaxed));
+            assert!(finished_early.fetch_or(false, Ordering::Relaxed));
         });
     })
 }
