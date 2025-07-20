@@ -268,6 +268,12 @@ impl CancellationToken {
     /// unless the [`CancellationToken`] is cancelled. In that case the function returns
     /// `None` and the future gets dropped.
     ///
+    /// # Fairness
+    ///
+    /// Calling this on an already-cancelled token directly returns `None`.
+    /// For all subsequent polls, in case of concurrent completion and
+    /// cancellation, this is biased towards the future completion.
+    ///
     /// # Cancellation safety
     ///
     /// This method is only cancel safe if `fut` is cancel safe.
@@ -303,11 +309,15 @@ impl CancellationToken {
             }
         }
 
-        RunUntilCancelledFuture {
-            cancellation: self.cancelled(),
-            future: fut,
+        if self.is_cancelled() {
+            None
+        } else {
+            RunUntilCancelledFuture {
+                cancellation: self.cancelled(),
+                future: fut,
+            }
+            .await
         }
-        .await
     }
 
     /// Runs a future to completion and returns its result wrapped inside of an `Option`
@@ -315,6 +325,12 @@ impl CancellationToken {
     /// `None` and the future gets dropped.
     ///
     /// The function takes self by value and returns a future that owns the token.
+    ///
+    /// # Fairness
+    ///
+    /// Calling this on an already-cancelled token directly returns `None`.
+    /// For all subsequent polls, in case of concurrent completion and
+    /// cancellation, this is biased towards the future completion.
     ///
     /// # Cancellation safety
     ///
