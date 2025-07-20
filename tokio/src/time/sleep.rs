@@ -1,5 +1,6 @@
 use crate::runtime::time::TimerEntry;
 use crate::time::{error::Error, Duration, Instant};
+use crate::util::error::TIME_DISABLED_ERROR;
 use crate::util::trace;
 
 use crate::runtime::scheduler;
@@ -255,10 +256,7 @@ impl Sleep {
         // ensure both scheduler handle and time driver are available,
         // otherwise panic
         let is_time_enabled = scheduler::Handle::with_current(|hdl| hdl.driver().time.is_some());
-        assert!(
-            is_time_enabled,
-            "A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers."
-        );
+        assert!(is_time_enabled, "{TIME_DISABLED_ERROR}");
         let entry = TimerEntry::new(deadline);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {

@@ -8,6 +8,7 @@
 )]
 
 use crate::runtime::park::{ParkThread, UnparkThread};
+use crate::util::error::TIME_DISABLED_ERROR;
 
 use std::io;
 use std::time::Duration;
@@ -110,7 +111,7 @@ impl Handle {
         pub(crate) fn time(&self) -> &crate::runtime::time::Handle {
             self.time
                 .as_ref()
-                .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
+                .expect(TIME_DISABLED_ERROR)
         }
 
         pub(crate) fn clock(&self) -> &Clock {

@@ -62,6 +62,7 @@ use crate::runtime::scheduler;
 use crate::runtime::time;
 use crate::sync::AtomicWaker;
 use crate::time::Instant;
+use crate::util::error::{RUNTIME_SHUTTING_DOWN_ERROR, TIME_DISABLED_ERROR};
 use crate::util::linked_list;
 
 use pin_project_lite::pin_project;
@@ -386,12 +387,19 @@ generate_addr_of_methods! {
 
 impl TimerShared {
     pub(super) fn new() -> Self {
-        Self {
-            driver: scheduler::Handle::current(),
-            registered_when: AtomicU64::new(0),
-            pointers: linked_list::Pointers::new(),
-            state: StateCell::default(),
-            _p: PhantomPinned,
+        // ensure both scheduler handle and time driver are available,
+        // otherwise panic
+        let maybe_hdl =
+            scheduler::Handle::with_current(|hdl| hdl.driver().time.as_ref().map(|_| hdl.clone()));
+        match maybe_hdl {
+            None => panic!("{TIME_DISABLED_ERROR}"),
+            Some(hdl) => Self {
+                driver: hdl,
+                registered_when: AtomicU64::new(STATE_DEREGISTERED),
+                pointers: linked_list::Pointers::new(),
+                state: StateCell::default(),
+                _p: PhantomPinned,
+            },
         }
     }
 
@@ -603,14 +611,6 @@ impl TimerEntry {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), super::Error>> {
-        scheduler::Handle::with_current(|hdl| {
-            assert!(
-                !hdl.driver().time().is_shutdown(),
-                "{}",
-                crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR
-            );
-        });
-
         if !self.registered {
             let deadline = self.deadline;
             self.as_mut().reset(deadline, true);
@@ -619,6 +619,12 @@ impl TimerEntry {
         let inner = self
             .inner()
             .expect("inner should already be initialized by `self.reset()`");
+
+        assert!(
+            !inner.driver().is_shutdown(),
+            "{RUNTIME_SHUTTING_DOWN_ERROR}"
+        );
+
         inner.state.poll(cx.waker())
     }
 }
