@@ -104,6 +104,7 @@ async fn set_and_wait() {
 }
 
 #[test]
+#[cfg_attr(target_family = "wasm", ignore)]
 fn set_and_wait_multiple_threads() {
     static ONCE: SetOnce<u32> = SetOnce::const_new();
 
@@ -118,6 +119,7 @@ fn set_and_wait_multiple_threads() {
 }
 
 #[tokio::test]
+#[cfg_attr(target_family = "wasm", ignore)]
 async fn set_and_wait_threads() {
     static ONCE: SetOnce<u32> = SetOnce::const_new();
 
