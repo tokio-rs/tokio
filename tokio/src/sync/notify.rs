@@ -597,16 +597,17 @@ impl Notify {
     /// #[tokio::main]
     /// async fn main() {
     ///     let notify = Arc::new(Notify::new());
-    ///     // register all waiters, in this case 1
-    ///     let notified = notify.clone().notified_owned();
     ///
-    ///     // spawn the taks waiting for the notification
-    ///     tokio::spawn(async move {
-    ///         notified.await; // Waits for the notification
-    ///         println!("Notified!");
-    ///     });
+    ///     for _ in 0..10 {
+    ///         let notified = notify.clone().notified_owned();
+    ///         tokio::spawn(async move {
+    ///             notified.await;
+    ///             println!("received notification");
+    ///         });
+    ///     }
     ///
-    ///     notify.notify_waiters(); // Sends a notification
+    ///     println!("sending notification");
+    ///     notify.notify_waiters();
     /// }
     /// ```
     pub fn notified_owned(self: Arc<Self>) -> OwnedNotified {
@@ -1307,7 +1308,6 @@ impl NotifiedProject<'_> {
     }
 
     fn drop_notified(self) {
-        // Safety: The type only transitions to a "Waiting" state when pinned.
         let NotifiedProject {
             notify,
             state,
