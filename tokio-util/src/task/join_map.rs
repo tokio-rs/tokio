@@ -395,7 +395,7 @@ where
         self.insert(key, task)
     }
 
-    fn insert(&mut self, key: K, abort: AbortHandle) {
+    fn insert(&mut self, mut key: K, mut abort: AbortHandle) {
         let hash_builder = self.hashes_by_task.hasher();
         let hash = hash_one(hash_builder, &key);
         let id = abort.id();
@@ -408,20 +408,29 @@ where
             Entry::Occupied(occ) => {
                 // There was a previous task spawned with the same key! Cancel
                 // that task, and remove its ID from the map of hashes by task IDs.
-                let (_, abort) = std::mem::replace(occ.into_mut(), (key, abort));
-                abort.abort();
+                (key, abort) = std::mem::replace(occ.into_mut(), (key, abort));
 
+                // Remove the old task ID.
                 let _prev_hash = self.hashes_by_task.remove(&abort.id());
                 debug_assert_eq!(Some(hash), _prev_hash);
+
+                // Associate the key's hash with the new task's ID, for looking up tasks by ID.
+                let _prev = self.hashes_by_task.insert(id, hash);
+                debug_assert!(_prev.is_none(), "no prior task should have had the same ID");
+
+                // Note: it's important to drop `key` and abort the task here.
+                // This defends against any panics during drop handling for causing inconsistent state.
+                abort.abort();
+                drop(key);
             }
             Entry::Vacant(vac) => {
                 vac.insert((key, abort));
+
+                // Associate the key's hash with this task's ID, for looking up tasks by ID.
+                let _prev = self.hashes_by_task.insert(id, hash);
+                debug_assert!(_prev.is_none(), "no prior task should have had the same ID");
             }
         };
-
-        // Associate the key's hash with this task's ID, for looking up tasks by ID.
-        let _prev = self.hashes_by_task.insert(id, hash);
-        debug_assert!(_prev.is_none(), "no prior task should have had the same ID");
     }
 
     /// Waits until one of the tasks in the map completes and returns its
