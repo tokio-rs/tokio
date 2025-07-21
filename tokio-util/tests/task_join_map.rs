@@ -346,7 +346,7 @@ async fn duplicate_keys2() {
     assert!(map.join_next().await.is_none());
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(not(panic = "unwind"), ignore)]
 #[tokio::test]
 async fn duplicate_keys_drop() {
     #[derive(Hash, Debug, PartialEq, Eq)]
