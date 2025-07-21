@@ -9,6 +9,13 @@ pub use spawn_pinned::LocalPoolHandle;
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt"))))]
 pub use join_map::{JoinMap, JoinMapKeys};
 
+#[cfg(all(tokio_unstable, feature = "tracing"))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(all(tokio_unstable, feature = "rt", feature = "tracing")))
+)]
+pub use join_map::Builder as JoinMapBuilder;
+
 pub mod task_tracker;
 pub use task_tracker::TaskTracker;
 
