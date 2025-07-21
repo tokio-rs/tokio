@@ -1,14 +1,13 @@
 #![cfg(not(target_os = "wasi"))]
 
-use std::future::poll_fn;
-use std::sync::Barrier;
-use std::task::{Context, Waker};
-use std::time::Duration;
+use std::{future::poll_fn, task::Context, time::Duration};
 
-use tokio_test::assert_pending;
+#[cfg(not(loom))]
+use futures::task::noop_waker_ref;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Arc;
+use crate::task::yield_now;
 
 use super::TimerEntry;
 
@@ -18,23 +17,6 @@ fn model(f: impl Fn() + Send + Sync + 'static) {
 
     #[cfg(not(loom))]
     f();
-}
-
-fn block_on<T>(f: impl std::future::Future<Output = T>) -> T {
-    #[cfg(loom)]
-    return loom::future::block_on(f);
-
-    #[cfg(not(loom))]
-    {
-        let rt = crate::runtime::Builder::new_current_thread()
-            .build()
-            .unwrap();
-        rt.block_on(f)
-    }
-}
-
-fn cx() -> Context<'static> {
-    Context::from_waker(Waker::noop())
 }
 
 fn rt(start_paused: bool) -> crate::runtime::Runtime {
@@ -50,25 +32,18 @@ fn single_timer() {
     model(|| {
         let rt = rt(false);
         let handle = rt.handle();
-        let barrier = Arc::new(Barrier::new(2));
-        let barrier_clone = barrier.clone();
 
         rt.block_on(async move {
             let handle_ = handle.clone();
-            let jh = handle.spawn_blocking(move || {
+            let jh = handle.spawn(async move {
                 let entry =
                     TimerEntry::new(handle_.inner.driver().clock().now() + Duration::from_secs(1));
                 pin!(entry);
-                assert_pending!(entry.as_mut().poll_elapsed(&mut cx()));
-                // Make sure the previous poll_elapsed was called, so the runtime handle
-                // was cloned and stored in the entry.
-                barrier_clone.wait();
-                block_on(poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
+
+                poll_fn(|cx| entry.as_mut().poll_elapsed(cx)).await.unwrap();
             });
 
-            // Making sure the first poll_elapsed was called, so the runtime handle
-            // was cloned and stored in the entry.
-            barrier.wait();
+            yield_now().await;
 
             let time = handle.inner.driver().time();
             let clock = handle.inner.driver().clock();
@@ -86,26 +61,23 @@ fn drop_timer() {
     model(|| {
         let rt = rt(false);
         let handle = rt.handle();
-        let barrier = Arc::new(Barrier::new(2));
-        let barrier_clone = barrier.clone();
 
         rt.block_on(async move {
             let handle_ = handle.clone();
-            let jh = handle.spawn_blocking(move || {
+            let jh = handle.spawn(async move {
                 let entry =
                     TimerEntry::new(handle_.inner.driver().clock().now() + Duration::from_secs(1));
                 pin!(entry);
 
-                assert_pending!(entry.as_mut().poll_elapsed(&mut cx()));
-                assert_pending!(entry.as_mut().poll_elapsed(&mut cx()));
-                // Make sure the previous poll_elapsed was called, so the runtime handle
-                // was cloned and stored in the entry.
-                barrier_clone.wait();
+                let _ = entry
+                    .as_mut()
+                    .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+                let _ = entry
+                    .as_mut()
+                    .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
             });
 
-            // Making sure the first poll_elapsed was called, so the runtime handle
-            // was cloned and stored in the entry.
-            barrier.wait();
+            yield_now().await;
 
             let time = handle.inner.driver().time();
             let clock = handle.inner.driver().clock();
@@ -123,26 +95,22 @@ fn change_waker() {
     model(|| {
         let rt = rt(false);
         let handle = rt.handle();
-        let barrier = Arc::new(Barrier::new(2));
-        let barrier_clone = barrier.clone();
 
         rt.block_on(async move {
             let handle_ = handle.clone();
-            let jh = handle.spawn_blocking(move || {
+            let jh = handle.spawn(async move {
                 let entry =
                     TimerEntry::new(handle_.inner.driver().clock().now() + Duration::from_secs(1));
                 pin!(entry);
 
-                assert_pending!(entry.as_mut().poll_elapsed(&mut cx()));
-                // Make sure the previous poll_elapsed was called, so the runtime handle
-                // was cloned and stored in the entry.
-                barrier_clone.wait();
-                block_on(poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
+                let _ = entry
+                    .as_mut()
+                    .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+
+                poll_fn(|cx| entry.as_mut().poll_elapsed(cx)).await.unwrap();
             });
 
-            // Making sure the first poll_elapsed was called, so the runtime handle
-            // was cloned and stored in the entry.
-            barrier.wait();
+            yield_now().await;
 
             let time = handle.inner.driver().time();
             let clock = handle.inner.driver().clock();
@@ -166,29 +134,24 @@ fn reset_future() {
         let finished_early_ = finished_early.clone();
         let start = handle.inner.driver().clock().now();
 
-        let barrier = Arc::new(Barrier::new(2));
-        let barrier_clone = barrier.clone();
-
         rt.block_on(async move {
-            let jh = handle.spawn_blocking(move || {
+            let jh = handle.spawn(async move {
                 let entry = TimerEntry::new(start + Duration::from_secs(1));
                 pin!(entry);
 
-                assert_pending!(entry.as_mut().poll_elapsed(&mut cx()));
-                // Make sure the previous poll_elapsed was called, so the runtime handle
-                // was cloned and stored in the entry.
-                barrier_clone.wait();
+                let _ = entry
+                    .as_mut()
+                    .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+
                 entry.as_mut().reset(start + Duration::from_secs(2), true);
 
                 // shouldn't complete before 2s
-                block_on(poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
+                poll_fn(|cx| entry.as_mut().poll_elapsed(cx)).await.unwrap();
 
                 finished_early_.store(true, Ordering::Relaxed);
             });
 
-            // Making sure the first poll_elapsed was called, so the runtime handle
-            // was cloned and stored in the entry.
-            barrier.wait();
+            yield_now().await;
 
             let handle = handle.inner.driver().time();
 
@@ -208,7 +171,7 @@ fn reset_future() {
 
             jh.await.unwrap();
 
-            assert!(finished_early.fetch_or(false, Ordering::Relaxed));
+            assert!(finished_early.load(Ordering::Relaxed));
         });
     })
 }
@@ -236,7 +199,10 @@ fn poll_process_levels() {
                 handle.inner.driver().clock().now() + Duration::from_millis(i),
             ));
 
-            let _ = entry.as_mut().poll_elapsed(&mut cx());
+            let _ = entry
+                .as_mut()
+                .poll_elapsed(&mut Context::from_waker(noop_waker_ref()));
+
             entries.push(entry);
         }
 
@@ -244,10 +210,11 @@ fn poll_process_levels() {
             handle.inner.driver().time().process_at_time(t as u64);
 
             for (deadline, future) in entries.iter_mut().enumerate() {
+                let mut context = Context::from_waker(noop_waker_ref());
                 if deadline <= t {
-                    assert!(future.as_mut().poll_elapsed(&mut cx()).is_ready());
+                    assert!(future.as_mut().poll_elapsed(&mut context).is_ready());
                 } else {
-                    assert!(future.as_mut().poll_elapsed(&mut cx()).is_pending());
+                    assert!(future.as_mut().poll_elapsed(&mut context).is_pending());
                 }
             }
         }
@@ -257,6 +224,8 @@ fn poll_process_levels() {
 #[test]
 #[cfg(not(loom))]
 fn poll_process_levels_targeted() {
+    let mut context = Context::from_waker(noop_waker_ref());
+
     let rt = rt(true);
     let handle = rt.handle();
 
@@ -267,7 +236,7 @@ fn poll_process_levels_targeted() {
         let handle = handle.inner.driver().time();
 
         handle.process_at_time(62);
-        assert_pending!(e1.as_mut().poll_elapsed(&mut cx()));
+        assert!(e1.as_mut().poll_elapsed(&mut context).is_pending());
         handle.process_at_time(192);
         handle.process_at_time(192);
     });
