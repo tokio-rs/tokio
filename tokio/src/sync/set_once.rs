@@ -1,7 +1,7 @@
 use super::Notify;
 
+use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{atomic::AtomicBool, Mutex};
-use crate::{loom::cell::UnsafeCell, pin};
 
 use std::error::Error;
 use std::fmt;
@@ -356,7 +356,6 @@ impl<T> SetOnce<T> {
             }
 
             let notify_fut = self.notify.notified();
-            pin!(notify_fut);
             // take the lock because we're reading value_set
             let guard = self.lock.lock();
 
