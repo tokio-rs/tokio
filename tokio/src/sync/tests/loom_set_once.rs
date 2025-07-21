@@ -6,19 +6,26 @@ use loom::thread;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-struct Foo {
-    pub num_drops: Arc<AtomicU32>,
+#[derive(Clone)]
+struct DropCounter {
+    pub drops: Arc<AtomicU32>,
 }
 
-impl Foo {
-    pub fn new(num_drops: Arc<AtomicU32>) -> Self {
-        Self { num_drops }
+impl DropCounter {
+    pub fn new() -> Self {
+        Self {
+            drops: Arc::new(AtomicU32::new(0)),
+        }
+    }
+
+    fn assert_num_drops(&self, value: u32) {
+        assert_eq!(value, self.drops.load(Ordering::Relaxed));
     }
 }
 
-impl Drop for Foo {
+impl Drop for DropCounter {
     fn drop(&mut self) {
-        self.num_drops.fetch_add(1, Ordering::Release);
+        self.drops.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -28,20 +35,20 @@ fn set_once_drop_test() {
         let set_once = Arc::new(SetOnce::new());
         let set_once_clone = Arc::clone(&set_once);
 
-        let drop_counter = Arc::new(AtomicU32::new(0));
-        let counter_cl = Arc::clone(&drop_counter);
+        let drop_counter = DropCounter::new();
+        let counter_cl = drop_counter.clone();
 
-        let thread = thread::spawn(move || set_once_clone.set(Foo::new(counter_cl)).is_ok());
+        let thread = thread::spawn(move || set_once_clone.set(counter_cl).is_ok());
 
-        let foo = Foo::new(Arc::clone(&drop_counter));
+        let foo = drop_counter.clone();
 
         let set = set_once.set(foo).is_ok();
         let res = thread.join().unwrap();
 
         drop(set_once);
 
-        assert_eq!(drop_counter.load(Ordering::Acquire), 2);
-        assert!(res || set);
+        drop_counter.assert_num_drops(2);
+        assert!(res != set);
     });
 }
 

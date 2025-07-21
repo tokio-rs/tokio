@@ -1,7 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use std::mem;
 use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,
@@ -76,7 +75,7 @@ fn drop_into_inner_new_with() {
     let once_cell = SetOnce::new_with(Some(fooer.clone()));
     let val = once_cell.into_inner();
     fooer.assert_num_drops(0);
-    mem::drop(val);
+    drop(val);
     fooer.assert_num_drops(1);
 }
 
@@ -102,6 +101,34 @@ async fn set_and_wait() {
     let _ = tokio::spawn(async { ONCE.set(5) }).await;
     let value = ONCE.wait().await;
     assert_eq!(*value, 5);
+}
+
+#[test]
+fn set_and_wait_multiple_threads() {
+    static ONCE: SetOnce<u32> = SetOnce::const_new();
+
+    let res1 = std::thread::spawn(|| ONCE.set(4));
+
+    let res2 = std::thread::spawn(|| ONCE.set(3));
+
+    let result_first = res1.join().unwrap().is_err();
+    let result_two = res2.join().unwrap().is_err();
+
+    assert!(result_first != result_two);
+}
+
+#[tokio::test]
+async fn set_and_wait_threads() {
+    static ONCE: SetOnce<u32> = SetOnce::const_new();
+
+    std::thread::spawn(|| {
+        ONCE.set(4).unwrap();
+    })
+    .join()
+    .unwrap();
+
+    let value = ONCE.wait().await;
+    assert_eq!(*value, 4);
 }
 
 #[test]

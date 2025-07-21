@@ -21,9 +21,37 @@ use std::sync::atomic::Ordering;
 // The value cannot be changed after set() is called. Subsequent calls to set()
 // will return a `SetOnceError`.
 
-/// A thread-safe cell that can be written to only once. A `SetOnce`
-/// is inspired from python's [`asyncio.Event`] type. It can be used to wait
-/// until the value of the `SetOnce` is set like a "Event" mechanism.
+/// A thread-safe cell that can be written to only once.
+///
+/// A `SetOnce` is inspired from python's [`asyncio.Event`] type. It can be
+/// used to wait until the value of the `SetOnce` is set like a "Event" mechanism.
+///
+/// # Example
+///
+/// ```
+/// use tokio::sync::{SetOnce, SetOnceError};
+///
+/// static ONCE: SetOnce<u32> = SetOnce::const_new();
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), SetOnceError<u32>> {
+///
+///     // set the value inside a task somewhere...
+///     tokio::spawn(async move { ONCE.set(20) });
+///
+///     // checking with .get doesn't block main thread
+///     println!("{:?}", ONCE.get());
+///
+///     // wait until the value is set, blocks the thread
+///     println!("{:?}", ONCE.wait().await);
+///
+///     Ok(())
+/// }
+/// ```
+///
+/// A `SetOnce` is typically used for global variables that need to be
+/// initialized once on first use, but need no further changes. The `SetOnce`
+/// in Tokio allows the initialization procedure to be asynchronous.
 ///
 /// # Example
 ///
@@ -52,33 +80,6 @@ use std::sync::atomic::Ordering;
 ///     assert!(arc.set(30).is_err());
 ///
 ///     println!("{:?}", arc.get());
-///
-///     Ok(())
-/// }
-/// ```
-///
-/// A `SetOnce` is typically used for global variables that need to be
-/// initialized once on first use, but need no further changes. The `SetOnce`
-/// in Tokio allows the initialization procedure to be asynchronous.
-///
-/// # Example
-///
-/// ```
-/// use tokio::sync::{SetOnce, SetOnceError};
-///
-/// static ONCE: SetOnce<u32> = SetOnce::const_new();
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), SetOnceError<u32>> {
-///
-///     // set the value inside a task somewhere...
-///     tokio::spawn(async move { ONCE.set(20) });
-///
-///     // checking with .get doesn't block main thread
-///     println!("{:?}", ONCE.get());
-///
-///     // wait until the value is set, blocks the thread
-///     println!("{:?}", ONCE.wait().await);
 ///
 ///     Ok(())
 /// }
