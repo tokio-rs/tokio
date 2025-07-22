@@ -63,17 +63,18 @@ pub trait FutureExt: Future {
     /// ```rust
     /// use tokio::sync::oneshot;
     /// use tokio_util::future::FutureExt;
+    /// use tokio_util::sync::CancellationToken;
     ///
-    /// # async fn dox {
+    /// async fn dox() {
     /// let (tx, rx) = oneshot::channel::<()>();
     /// let token = CancellationToken::new();
     /// let child_token = token.child_token();
     /// tokio::spawn(async move {
-    ///     tokio::time::sleep(Duration::from_millis(10)).await;
+    ///     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     ///     token.cancel();
     /// });
     /// assert!(rx.with_cancel(&child_token).await.is_none())
-    /// # }
+    /// }
     /// ```
     fn with_cancel(
         self,
@@ -93,13 +94,14 @@ pub trait FutureExt: Future {
     /// ```rust
     /// use tokio::sync::oneshot;
     /// use tokio_util::future::FutureExt;
+    /// use tokio_util::sync::CancellationToken;
     ///
-    /// # async fn dox {
+    /// # async fn dox() {
     /// let (tx, rx) = oneshot::channel::<()>();
     /// let token = CancellationToken::new();
     /// let child_token = token.child_token();
     /// tokio::spawn(async move {
-    ///     tokio::time::sleep(Duration::from_millis(10)).await;
+    ///     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     ///     token.cancel();
     /// });
     /// assert!(rx.with_cancel_owned(child_token).await.is_none())

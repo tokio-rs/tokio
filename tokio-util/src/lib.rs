@@ -52,6 +52,10 @@ cfg_time! {
     pub mod time;
 }
 
+cfg_future! {
+    pub mod future;
+}
+
 pub mod sync;
 
 pub mod either;
@@ -59,5 +63,3 @@ pub mod either;
 pub use bytes;
 
 mod util;
-
-pub mod future;
