@@ -1,6 +1,8 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "rt", tokio_unstable))]
 
+use std::panic::AssertUnwindSafe;
+
 use tokio::sync::oneshot;
 use tokio::time::Duration;
 use tokio_util::task::JoinMap;
@@ -340,6 +342,37 @@ async fn duplicate_keys2() {
     let (key, res) = map.join_next().await.unwrap();
     assert_eq!(key, 1);
     assert_eq!(res.unwrap(), 2);
+
+    assert!(map.join_next().await.is_none());
+}
+
+#[cfg_attr(not(panic = "unwind"), ignore)]
+#[tokio::test]
+async fn duplicate_keys_drop() {
+    #[derive(Hash, Debug, PartialEq, Eq)]
+    struct Key;
+    impl Drop for Key {
+        fn drop(&mut self) {
+            panic!("drop called for key");
+        }
+    }
+
+    let (send, recv) = oneshot::channel::<()>();
+
+    let mut map = JoinMap::new();
+
+    map.spawn(Key, async { recv.await.unwrap() });
+
+    // replace the task, force it to drop the key and abort the task
+    // we should expect it to panic when dropping the key.
+    let _ = std::panic::catch_unwind(AssertUnwindSafe(|| map.spawn(Key, async {}))).unwrap_err();
+
+    // don't panic when this key drops.
+    let (key, _) = map.join_next().await.unwrap();
+    std::mem::forget(key);
+
+    // original task should have been aborted, so the sender should be dangling.
+    assert!(send.is_closed());
 
     assert!(map.join_next().await.is_none());
 }
