@@ -14,6 +14,9 @@ mod wheel;
 
 pub mod delay_queue;
 
+/// re-export `FutureExt` to avoid breaking change
+pub use crate::future::FutureExt;
+
 #[doc(inline)]
 pub use delay_queue::DelayQueue;
 
