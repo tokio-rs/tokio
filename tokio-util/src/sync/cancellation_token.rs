@@ -419,21 +419,9 @@ pin_project! {
     #[must_use = "futures do nothing unless polled"]
     pub struct RunUntilCancelledFuture<'a, F: Future> {
         #[pin]
-        cancellation: WaitForCancellationFuture<'a>,
+        pub(crate) cancellation: WaitForCancellationFuture<'a>,
         #[pin]
-        future: F,
-    }
-}
-
-impl<'a, F> RunUntilCancelledFuture<'a, F>
-where
-    F: Future,
-{
-    pub(crate) fn new(cancellation_token: &'a CancellationToken, future: F) -> Self {
-        Self {
-            cancellation: cancellation_token.cancelled(),
-            future,
-        }
+        pub(crate) future: F,
     }
 }
 
@@ -459,21 +447,9 @@ pin_project! {
     #[must_use = "futures do nothing unless polled"]
     pub struct RunUntilCancelledFutureOwned<F: Future> {
         #[pin]
-        cancellation: WaitForCancellationFutureOwned,
+        pub(crate) cancellation: WaitForCancellationFutureOwned,
         #[pin]
-        future: F,
-    }
-}
-
-impl<F> RunUntilCancelledFutureOwned<F>
-where
-    F: Future,
-{
-    pub(crate) fn new(cancellation_token: CancellationToken, future: F) -> Self {
-        Self {
-            cancellation: cancellation_token.cancelled_owned(),
-            future,
-        }
+        pub(crate) future: F,
     }
 }
 

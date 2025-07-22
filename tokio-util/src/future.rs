@@ -83,7 +83,10 @@ pub trait FutureExt: Future {
     where
         Self: Sized,
     {
-        RunUntilCancelledFuture::new(cancellation_token, self)
+        RunUntilCancelledFuture {
+            cancellation: cancellation_token.cancelled(),
+            future: self,
+        }
     }
 
     /// A wrapper around [`CancellationToken::run_until_cancelled_owned`], with the advantage that it is easier to write
@@ -114,7 +117,10 @@ pub trait FutureExt: Future {
     where
         Self: Sized,
     {
-        RunUntilCancelledFutureOwned::new(cancellation_token, self)
+        RunUntilCancelledFutureOwned {
+            cancellation: cancellation_token.cancelled_owned(),
+            future: self,
+        }
     }
 }
 
