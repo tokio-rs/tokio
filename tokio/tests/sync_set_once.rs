@@ -98,7 +98,8 @@ fn set_and_get() {
 async fn set_and_wait() {
     static ONCE: SetOnce<u32> = SetOnce::const_new();
 
-    let _ = tokio::spawn(async { ONCE.set(5) });
+    tokio::spawn(async { ONCE.set(5) });
+
     let value = ONCE.wait().await;
     assert_eq!(*value, 5);
 }
