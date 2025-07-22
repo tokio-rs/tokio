@@ -98,7 +98,7 @@ fn set_and_get() {
 async fn set_and_wait() {
     static ONCE: SetOnce<u32> = SetOnce::const_new();
 
-    let _ = tokio::spawn(async { ONCE.set(5) }).await;
+    let _ = tokio::spawn(async { ONCE.set(5) });
     let value = ONCE.wait().await;
     assert_eq!(*value, 5);
 }
@@ -123,13 +123,12 @@ fn set_and_wait_multiple_threads() {
 async fn set_and_wait_threads() {
     static ONCE: SetOnce<u32> = SetOnce::const_new();
 
-    std::thread::spawn(|| {
+    let thread = std::thread::spawn(|| {
         ONCE.set(4).unwrap();
-    })
-    .join()
-    .unwrap();
+    });
 
     let value = ONCE.wait().await;
+    thread.join().unwrap();
     assert_eq!(*value, 4);
 }
 
