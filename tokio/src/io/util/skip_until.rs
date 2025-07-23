@@ -25,10 +25,7 @@ pin_project! {
     }
 }
 
-pub(crate) fn skip_until<'a, R>(
-    reader: &'a mut R,
-    delimiter: u8,
-) -> SkipUntil<'a, R>
+pub(crate) fn skip_until<'a, R>(reader: &'a mut R, delimiter: u8) -> SkipUntil<'a, R>
 where
     R: AsyncBufRead + ?Sized + Unpin,
 {

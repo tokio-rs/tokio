@@ -49,10 +49,7 @@ async fn skip_until_fail() {
 
     let mut read = BufReader::new(mock);
 
-    let err = read
-        .skip_until(b'#')
-        .await
-        .expect_err("Should fail");
+    let err = read.skip_until(b'#').await.expect_err("Should fail");
     assert_eq!(err.kind(), ErrorKind::Other);
     assert_eq!(err.to_string(), "The world has no end");
 }
