@@ -604,6 +604,7 @@ async_assert_fn!(tokio::io::stdout(): Send & Sync & Unpin);
 async_assert_fn!(tokio::io::Split<tokio::io::BufReader<TcpStream>>::next_segment(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::io::Lines<tokio::io::BufReader<TcpStream>>::next_line(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::io::AsyncBufReadExt::read_until(&mut BoxAsyncRead, u8, &mut Vec<u8>): Send & Sync & !Unpin);
+async_assert_fn!(tokio::io::AsyncBufReadExt::skip_until(&mut BoxAsyncRead, u8): Send & Sync & !Unpin);
 async_assert_fn!(
     tokio::io::AsyncBufReadExt::read_line(&mut BoxAsyncRead, &mut String): Send & Sync & !Unpin
 );
