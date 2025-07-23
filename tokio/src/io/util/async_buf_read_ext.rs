@@ -121,9 +121,6 @@ cfg_io_util! {
         /// This function will ignore all instances of [`ErrorKind::Interrupted`] and
         /// will otherwise return any errors returned by [`fill_buf`].
         ///
-        /// If an I/O error is encountered then all bytes read so far will be
-        /// present in `buf` and its length will have been adjusted appropriately.
-        ///
         /// [`fill_buf`]: AsyncBufRead::poll_fill_buf
         /// [`ErrorKind::Interrupted`]: std::io::ErrorKind::Interrupted
         ///
@@ -132,8 +129,8 @@ cfg_io_util! {
         /// If the method is used as the event in a
         /// [`tokio::select!`](crate::select) statement and some other branch
         /// completes first, then some data may have been partially read. Any
-        /// partially read bytes are appended to `buf`, and the method can be
-        /// called again to continue reading until `byte`.
+        /// partially read bytes are skipped, and the method can be called again
+        /// to continue reading until `byte`.
         ///
         /// This method returns the total number of bytes read. If you cancel
         /// the call to `skip_until` and then call it again to continue reading,
@@ -162,7 +159,6 @@ cfg_io_util! {
         ///         .expect("reading from cursor won't fail");
         ///
         ///     assert_eq!(num_bytes, 6);
-        ///     buf.clear();
         ///
         ///     // cursor is at 'i'
         ///     let num_bytes = cursor.skip_until(b'-')
@@ -170,7 +166,6 @@ cfg_io_util! {
         ///         .expect("reading from cursor won't fail");
         ///
         ///     assert_eq!(num_bytes, 5);
-        ///     buf.clear();
         ///
         ///     // cursor is at EOF
         ///     let num_bytes = cursor.skip_until(b'-')
