@@ -373,6 +373,261 @@ impl Handle {
         self.inner.spawn_local(future, id, meta.spawned_at)
     }
 
+    /// # Critical Constraints
+    /// The same restrictions as [`Runtime::block_on`] apply. Follow this decision tree:
+    ///
+    /// ```text
+    /// Is current thread potentially a Tokio scheduler thread?
+    /// ├─ Yes → Use `block_in_place` + `Handle::block_on`
+    /// └─ No  → Safe to use `Handle::block_on` directly
+    /// ```
+    ///
+    /// # Panics
+    /// - If called from within a `spawn_blocking` closure
+    /// - If the runtime has been shutdown
+    ///
+    /// # Safe Examples
+    /// **Safe (external thread)**:
+    /// ```
+    /// use tokio::runtime::Handle;
+    /// 
+    /// #[tokio::main(flavor = "multi_thread")]
+    /// async fn main() {
+    ///     std::thread::spawn(|| {
+    ///         Handle::current().block_on(async { 
+    ///             println!("Called from non-Tokio thread");
+    ///         });
+    ///     }).join().unwrap();
+    /// }
+    /// ```
+    /// 
+    /// **Multithreaded Runtime (Deadlock Risk → Use block_in_place)**
+    /// ```
+    /// use tokio::runtime::Handle;
+    /// 
+    /// #[tokio::main(flavor = "multi_thread")] // or Runtime::new()
+    /// async fn main() {
+    ///     // UNSAFE: Potential deadlock (scheduler thread blocking itself)
+    ///     // Handle::current().block_on(async { /* ... */ });
+    ///
+    ///     // SAFE: Escapes scheduler thread
+    ///     tokio::task::block_in_place(|| {
+    ///         Handle::current().block_on(async {
+    ///             println!("Safe nested blocking in multithreaded runtime");
+    ///         });
+    ///     });
+    /// }
+    /// ```
+    /// 
+    /// **Single-Thread Runtime (enter())**
+    /// ```
+    /// use tokio::runtime::{Handle};
+    /// 
+    /// #[tokio::main(flavor = "current_thread")]
+    /// async fn main() {
+    ///     let handle = Handle::current();
+    ///
+    ///     // SAFE: Enter the runtime context
+    ///     let _guard = handle.enter();
+    ///
+    ///     // Now we can spawn/use runtime features
+    ///     tokio::spawn(async {
+    ///         println!("This works!");
+    ///     }).await.unwrap();
+    /// }
+    /// ```
+    /// or you can do this using ***Scoped Reentrancy***:
+    /// ```
+    /// use tokio::runtime::{Runtime, Handle};
+    /// 
+    /// fn main() {
+    ///     sync_function();
+    /// }
+    /// 
+    /// fn sync_function() {
+    ///     let rt = Runtime::new().unwrap();
+    ///     rt.block_on(async {
+    ///         let handle = Handle::current();
+    ///    
+    ///         // Re-enter the runtime in a nested scope
+    ///         {
+    ///             let _guard = handle.enter(); // Re-entrancy enabled
+    ///             tokio::spawn(async { println!("Safe spawn inside scope") }).await.unwrap();
+    ///         } // _guard drops here, reentrancy ends
+    ///    
+    ///         println!("Back to outer scope");
+    ///     });
+    /// }
+    /// ```
+    /// 
+    /// ***Nested Async-Sync-Async (With Thread Detection)***
+    /// ```
+    /// use tokio::runtime::Runtime;
+    /// use tokio::runtime::Handle;
+    ///
+    /// fn mixed_context() {
+    ///    let is_tokio_thread = Handle::try_current().is_ok();
+    ///    
+    ///    if is_tokio_thread {
+    ///        tokio::task::block_in_place(|| {
+    ///            Handle::current().block_on(async {
+    ///                println!("Nested with thread protection");
+    ///            });
+    ///        });
+    ///    } else {
+    ///        Runtime::new().unwrap().block_on(async {
+    ///            println!("Direct blocking from non-Tokio thread");
+    ///        });
+    ///    }
+    /// }
+    /// ```
+    /// 
+    /// ***With spawn_blocking for CPU-Bound Work***
+    /// ```
+    /// use tokio::runtime::Handle;
+    /// use std::time::Duration;
+    /// 
+    /// #[tokio::main(flavor = "multi_thread")]
+    /// async fn main() {
+    ///     // SAFE: Offloads blocking work to a dedicated thread
+    ///     let result = tokio::task::spawn_blocking(|| {
+    ///     // Sync context here
+    ///     Handle::current().block_on(async {
+    ///             tokio::time::sleep(Duration::from_secs(1)).await;
+    ///             42
+    ///         })
+    ///     }).await.unwrap();
+    ///
+    ///     println!("Result: {}", result);
+    /// }
+    /// ```
+    /// 
+    /// ***Runtime-Agnostic Helper Function***
+    /// ```
+    /// use tokio::runtime::Runtime;
+    /// use tokio::runtime::Handle;
+    /// use std::time::Duration;
+    /// use std::future::Future;
+    ///
+    /// fn main() {
+    ///     // Usage:
+    ///     let _ = safe_block_on(async { tokio::time::sleep(Duration::from_secs(1)).await; }); // "New runtime have been created"
+    /// }
+    /// 
+    /// fn safe_block_on<F: Future<Output = ()>>(future: F) -> F::Output {
+    ///     match Handle::try_current() {
+    ///         Ok(handle) => {
+    ///             // We're on a Tokio thread → use block_in_place
+    ///             tokio::task::block_in_place(|| handle.block_on(future));
+    ///             println!("We are on a Tokio thread, guys.");
+    ///         },
+    ///         Err(_) => {
+    ///             // No runtime → create a new one
+    ///             Runtime::new().unwrap().block_on(future);
+    ///             println!("New runtime have been created");
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    /// 
+    /// # Unsafe / Error cases
+    /// ***Deadlock in Multithreaded Runtime***
+    /// ```
+    /// #[tokio::main(flavor = "multi_thread")]
+    /// async fn main() {
+    ///    // UNSAFE: Direct blocking on a scheduler thread
+    ///    Handle::current().block_on(async {
+    ///        tokio::time::sleep(Duration::from_secs(1)).await; // Deadlock!
+    ///    });
+    ///    // The thread is blocked waiting for itself to make progress
+    /// }
+    /// ```
+    /// How to detect it: 1) Program hangs indefinitely, 2) CPU usage drops to near-zero
+    /// 
+    /// ***Nested Blocking Without block_in_place(Multi-thread runtime Starvation case)***
+    /// ```
+    /// #[tokio::main(flavor = "multi_thread", worker_threads = 1)]
+    /// async fn main() {
+    ///     tokio::spawn(async {
+    ///         // UNSAFE: Nested block_on in spawned task
+    ///         Handle::current().block_on(async {
+    ///             println!("This might deadlock under load");
+    ///         });
+    ///     }).await.unwrap();
+    /// }
+    /// ```
+    /// Not Guaranteed to Deadlock: If the runtime has idle threads, this might appear to work. Under load, it will deadlock when all threads are blocked.
+    /// Misleading Risk: The real danger is thread starvation, not just main thread blocking.
+    /// Additional Example: ***Silent Performance Killer***
+    /// ```
+    /// use tokio::runtime::Handle;
+    /// use std::time::Duration;
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     for _ in 0..100 {
+    ///         tokio::spawn(async {
+    ///             // GRADUAL DEGRADATION:
+    ///             // Under load, this consumes all blocking threads
+    ///             Handle::current().block_on(async { 
+    ///               tokio::time::sleep(Duration::from_millis(10)).await;
+    ///             });
+    ///         });
+    ///     } // Eventually stalls the runtime
+    /// }
+    ///```
+    /// 
+    /// ***Guaranteed Deadlock (Single-Thread Runtime)***
+    /// ```
+    /// use tokio::runtime::Handle;
+    /// 
+    /// #[tokio::main(flavor = "current_thread")] // ← Single-threaded!
+    /// async fn main() {
+    ///     // PANICS: "Cannot start a runtime from within a runtime"
+    ///     Handle::current().block_on(async {});
+    /// }
+    /// ```
+    /// 
+    /// ***Inforrect Thread Detection***
+    /// ```
+    /// use tokio::runtime::{Handle, Runtime};
+    /// use std::future::Future;
+    /// use tokio::time::{sleep, Duration};
+    ///
+    /// // UNSAFE IMPLEMENTATION
+    /// fn unsafe_block_on<F: Future>(future: F) -> F::Output {
+    ///     if Handle::try_current().is_ok() {
+    ///     // Deadlock risk: blocks the scheduler thread!
+    ///         Handle::current().block_on(future)
+    ///     } else {
+    ///         Runtime::new().unwrap().block_on(future)
+    ///     }
+    /// }
+    ///
+    /// #[tokio::main(flavor = "multi_thread", worker_threads = 1)] // Single worker
+    /// async fn main() {
+    ///     // This will deadlock when called from a Tokio thread
+    ///         unsafe_block_on(async {
+    ///         println!("This may never print");
+    ///         sleep(Duration::from_secs(1)).await;
+    ///     });
+    ///
+    ///     println!("Current thread: {:?}", std::thread::current().id()); //Tokio Thread
+    /// }
+    /// ```
+    /// 
+    /// 
+    /// **Deadlock (scheduler thread)**:
+    /// ```
+    /// use tokio::runtime::Handle;
+    /// 
+    /// #[tokio::main(flavor = "multi_thread")]
+    /// async fn main() {
+    ///     Handle::current().block_on(async { 
+    ///         // Will deadlock!
+    ///     });
+    /// }
+    /// ```
+
     /// Returns the flavor of the current `Runtime`.
     ///
     /// # Examples

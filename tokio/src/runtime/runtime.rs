@@ -197,6 +197,50 @@ impl Runtime {
         &self.handle
     }
 
+    /// # When to Use
+    /// - Calling async code from non-Tokio threads (e.g., `main()` or `std::thread`)
+    /// - Initializing applications with mixed sync/async layers
+    ///
+    /// # When to Avoid
+    /// **Never use this** when *all* of these apply:
+    /// 1. You're calling async code from sync context **and**
+    /// 2. The current thread might be a Tokio scheduler thread **and**
+    /// 3. The runtime is multithreaded (`Runtime::new()` or `#[tokio::main]`)
+    ///
+    /// # Safe Alternatives
+    /// ```
+    /// use tokio::task;
+    /// use tokio::runtime::Handle;
+    /// // For sync → async calls in scheduler threads:
+    /// task::block_in_place(|| {
+    ///     Handle::current().block_on(async { /* ... */ });
+    /// });
+    /// ```
+    ///
+    /// # Examples
+    /// ***Basic Safe Usage (Non-Tokio Thread)***:
+    /// ```
+    /// use tokio::runtime::Runtime;
+    /// 
+    /// fn main() {
+    ///     let rt = Runtime::new().unwrap();
+    ///     rt.block_on(async { println!("Hello, default sync OS thread") }); // Prints Hello! We are not using Tokio Thread
+    /// }
+    /// ```
+    ///
+    /// ***Deadlock Risk (scheduler thread)***:
+    /// ```
+    /// use tokio::runtime::Runtime;
+    /// 
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     Runtime::new().unwrap().block_on(async { 
+    ///         println!("We are on scheduler thread");
+    ///         // Will deadlock if on scheduler thread! Now we are on scheduler thread!
+    ///     });
+    /// }
+    /// ```
+
     /// Spawns a future onto the Tokio runtime.
     ///
     /// This spawns the given future onto the runtime's executor, usually a
