@@ -22,6 +22,7 @@ default = []
 
 # Shorthand for enabling everything
 full = ["codec", "compat", "io-util", "time", "net", "rt"]
+
 net = ["tokio/net"]
 compat = ["futures-io"]
 codec = []
