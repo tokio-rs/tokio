@@ -24,6 +24,7 @@ pub trait FutureExt: Future {
     /// assert!(res.is_err());
     /// # }
     /// ```
+    #[cfg(feature = "time")]
     fn timeout(self, timeout: Duration) -> Timeout<Self>
     where
         Self: Sized,
@@ -48,6 +49,7 @@ pub trait FutureExt: Future {
     /// assert!(res.is_err());
     /// # }
     /// ```
+    #[cfg(feature = "time")]
     fn timeout_at(self, deadline: Instant) -> Timeout<Self>
     where
         Self: Sized,
@@ -73,10 +75,10 @@ pub trait FutureExt: Future {
     ///     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     ///     token.cancel();
     /// });
-    /// assert!(rx.with_cancel(&child_token).await.is_none())
+    /// assert!(rx.with_cancellation_token(&child_token).await.is_none())
     /// }
     /// ```
-    fn with_cancel(
+    fn with_cancellation_token(
         self,
         cancellation_token: &CancellationToken,
     ) -> RunUntilCancelledFuture<'_, Self>
@@ -107,10 +109,10 @@ pub trait FutureExt: Future {
     ///     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     ///     token.cancel();
     /// });
-    /// assert!(rx.with_cancel_owned(child_token).await.is_none())
+    /// assert!(rx.with_cancellation_token_owned(child_token).await.is_none())
     /// # }
     /// ```
-    fn with_cancel_owned(
+    fn with_cancellation_token_owned(
         self,
         cancellation_token: CancellationToken,
     ) -> RunUntilCancelledFutureOwned<Self>

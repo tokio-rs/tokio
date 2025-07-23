@@ -69,13 +69,3 @@ macro_rules! cfg_time {
         )*
     }
 }
-
-macro_rules! cfg_future {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "future")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "future")))]
-            $item
-        )*
-    }
-}
