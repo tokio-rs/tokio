@@ -1,8 +1,6 @@
 //! An extension trait for Futures that provides a variety of convenient adapters.
 
-use std::{future::Future, time::Duration};
-
-use tokio::time::{Instant, Timeout};
+use std::future::Future;
 
 use crate::sync::{CancellationToken, RunUntilCancelledFuture, RunUntilCancelledFutureOwned};
 
@@ -25,7 +23,7 @@ pub trait FutureExt: Future {
     /// # }
     /// ```
     #[cfg(feature = "time")]
-    fn timeout(self, timeout: Duration) -> Timeout<Self>
+    fn timeout(self, timeout: std::time::Duration) -> tokio::time::Timeout<Self>
     where
         Self: Sized,
     {
@@ -50,7 +48,7 @@ pub trait FutureExt: Future {
     /// # }
     /// ```
     #[cfg(feature = "time")]
-    fn timeout_at(self, deadline: Instant) -> Timeout<Self>
+    fn timeout_at(self, deadline: tokio::time::Instant) -> tokio::time::Timeout<Self>
     where
         Self: Sized,
     {
