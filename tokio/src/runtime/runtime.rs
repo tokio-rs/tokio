@@ -211,7 +211,7 @@ impl Runtime {
     /// ```
     /// use tokio::task;
     /// use tokio::runtime::Handle;
-    /// // For sync → async calls in scheduler threads:
+    /// // For sync → async calls in scheduler threads(you can find an examples in handle.rs doc-documentation):
     /// task::block_in_place(|| {
     ///     Handle::current().block_on(async { /* ... */ });
     /// });

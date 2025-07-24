@@ -533,6 +533,9 @@ impl Handle {
     /// # Unsafe / Error cases
     /// ***Deadlock in Multithreaded Runtime***
     /// ```
+    /// use std::time::Duration;
+    /// use tokio::runtime::Handle;
+    /// 
     /// #[tokio::main(flavor = "multi_thread")]
     /// async fn main() {
     ///    // UNSAFE: Direct blocking on a scheduler thread
@@ -546,6 +549,8 @@ impl Handle {
     /// 
     /// ***Nested Blocking Without block_in_place(Multi-thread runtime Starvation case)***
     /// ```
+    /// use tokio::runtime::Handle;
+    /// 
     /// #[tokio::main(flavor = "multi_thread", worker_threads = 1)]
     /// async fn main() {
     ///     tokio::spawn(async {
