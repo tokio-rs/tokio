@@ -250,7 +250,7 @@ async fn join_map_coop() {
     loop {
         match map.join_next().now_or_never() {
             Some(Some((key, Ok(i)))) => assert_eq!(key, i),
-            Some(Some((key, Err(err)))) => panic!("failed[{}]: {}", key, err),
+            Some(Some((key, Err(err)))) => panic!("failed[{key}]: {err}"),
             None => {
                 coop_count += 1;
                 tokio::task::yield_now().await;
