@@ -1,8 +1,12 @@
 //! An extension trait for Futures that provides a variety of convenient adapters.
 
+mod with_cancellation_token;
+
 use std::future::Future;
 
-use crate::sync::{CancellationToken, RunUntilCancelledFuture, RunUntilCancelledFutureOwned};
+use with_cancellation_token::{WithCancellationTokenFuture, WithCancellationTokenFutureOwned};
+
+use crate::sync::CancellationToken;
 
 /// A trait which contains a variety of convenient adapters and utilities for `Future`s.
 pub trait FutureExt: Future {
@@ -79,14 +83,11 @@ pub trait FutureExt: Future {
     fn with_cancellation_token(
         self,
         cancellation_token: &CancellationToken,
-    ) -> RunUntilCancelledFuture<'_, Self>
+    ) -> WithCancellationTokenFuture<'_, Self>
     where
         Self: Sized,
     {
-        RunUntilCancelledFuture {
-            cancellation: cancellation_token.cancelled(),
-            future: self,
-        }
+        WithCancellationTokenFuture::new(cancellation_token, self)
     }
 
     /// A wrapper around [`CancellationToken::run_until_cancelled_owned`], with the advantage that it is easier to write
@@ -113,14 +114,11 @@ pub trait FutureExt: Future {
     fn with_cancellation_token_owned(
         self,
         cancellation_token: CancellationToken,
-    ) -> RunUntilCancelledFutureOwned<Self>
+    ) -> WithCancellationTokenFutureOwned<Self>
     where
         Self: Sized,
     {
-        RunUntilCancelledFutureOwned {
-            cancellation: cancellation_token.cancelled_owned(),
-            future: self,
-        }
+        WithCancellationTokenFutureOwned::new(cancellation_token, self)
     }
 }
 

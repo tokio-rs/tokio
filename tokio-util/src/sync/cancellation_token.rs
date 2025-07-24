@@ -281,6 +281,34 @@ impl CancellationToken {
     where
         F: Future,
     {
+        pin_project! {
+            /// A Future that is resolved once the corresponding [`CancellationToken`]
+            /// is cancelled or a given Future gets resolved. It is biased towards the
+            /// Future completion.
+            #[must_use = "futures do nothing unless polled"]
+            struct RunUntilCancelledFuture<'a, F: Future> {
+                #[pin]
+                cancellation: WaitForCancellationFuture<'a>,
+                #[pin]
+                future: F,
+            }
+        }
+
+        impl<'a, F: Future> Future for RunUntilCancelledFuture<'a, F> {
+            type Output = Option<F::Output>;
+
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let this = self.project();
+                if let Poll::Ready(res) = this.future.poll(cx) {
+                    Poll::Ready(Some(res))
+                } else if this.cancellation.poll(cx).is_ready() {
+                    Poll::Ready(None)
+                } else {
+                    Poll::Pending
+                }
+            }
+        }
+
         if self.is_cancelled() {
             None
         } else {
@@ -408,62 +436,6 @@ impl Future for WaitForCancellationFutureOwned {
             this.future.set(MaybeDangling::new(unsafe {
                 Self::new_future(this.cancellation_token)
             }));
-        }
-    }
-}
-
-pin_project! {
-    /// A Future that is resolved once the corresponding [`CancellationToken`]
-    /// is cancelled or a given Future gets resolved. It is biased towards the
-    /// Future completion.
-    #[must_use = "futures do nothing unless polled"]
-    pub struct RunUntilCancelledFuture<'a, F: Future> {
-        #[pin]
-        pub(crate) cancellation: WaitForCancellationFuture<'a>,
-        #[pin]
-        pub(crate) future: F,
-    }
-}
-
-impl<'a, F: Future> Future for RunUntilCancelledFuture<'a, F> {
-    type Output = Option<F::Output>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-        if let Poll::Ready(res) = this.future.poll(cx) {
-            Poll::Ready(Some(res))
-        } else if this.cancellation.poll(cx).is_ready() {
-            Poll::Ready(None)
-        } else {
-            Poll::Pending
-        }
-    }
-}
-
-pin_project! {
-    /// A Future that is resolved once the corresponding [`CancellationToken`]
-    /// is cancelled or a given Future gets resolved. It is biased towards the
-    /// Future completion.
-    #[must_use = "futures do nothing unless polled"]
-    pub struct RunUntilCancelledFutureOwned<F: Future> {
-        #[pin]
-        pub(crate) cancellation: WaitForCancellationFutureOwned,
-        #[pin]
-        pub(crate) future: F,
-    }
-}
-
-impl<F: Future> Future for RunUntilCancelledFutureOwned<F> {
-    type Output = Option<F::Output>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-        if let Poll::Ready(res) = this.future.poll(cx) {
-            Poll::Ready(Some(res))
-        } else if this.cancellation.poll(cx).is_ready() {
-            Poll::Ready(None)
-        } else {
-            Poll::Pending
         }
     }
 }

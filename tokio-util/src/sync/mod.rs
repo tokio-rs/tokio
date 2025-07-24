@@ -5,7 +5,6 @@ pub use cancellation_token::{
     guard::DropGuard, guard_ref::DropGuardRef, CancellationToken, WaitForCancellationFuture,
     WaitForCancellationFutureOwned,
 };
-pub(crate) use cancellation_token::{RunUntilCancelledFuture, RunUntilCancelledFutureOwned};
 
 mod mpsc;
 pub use mpsc::{PollSendError, PollSender};
