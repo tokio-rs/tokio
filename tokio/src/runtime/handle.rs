@@ -632,7 +632,6 @@ impl Handle {
     ///     });
     /// }
     /// ```
-
     /// Returns the flavor of the current `Runtime`.
     ///
     /// # Examples
