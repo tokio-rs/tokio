@@ -356,15 +356,17 @@ impl<T> SetOnce<T> {
             }
 
             let notify_fut = self.notify.notified();
-            // take the lock because we're reading value_set
-            let guard = self.lock.lock();
+            {
+                // Taking the lock here ensures that a concurrent call to `set`
+                // will see the creation of `notify_fut` in case the check
+                // fails.
+                let guard = self.lock.lock();
 
-            if self.value_set.load(Ordering::Relaxed) {
-                // SAFETY: the state is initialized
-                return unsafe { self.get_unchecked() };
+                if self.value_set.load(Ordering::Relaxed) {
+                    // SAFETY: the state is initialized
+                    return unsafe { self.get_unchecked() };
+                }
             }
-
-            drop(guard);
 
             // wait until the value is set
             notify_fut.await;
