@@ -360,7 +360,7 @@ impl<T> SetOnce<T> {
                 // Taking the lock here ensures that a concurrent call to `set`
                 // will see the creation of `notify_fut` in case the check
                 // fails.
-                let guard = self.lock.lock();
+                let _ = self.lock.lock();
 
                 if self.value_set.load(Ordering::Relaxed) {
                     // SAFETY: the state is initialized
