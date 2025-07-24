@@ -45,7 +45,7 @@ slab = { version = "0.4.4", optional = true } # Backs `DelayQueue`
 tracing = { version = "0.1.29", default-features = false, features = ["std"], optional = true }
 
 [target.'cfg(tokio_unstable)'.dependencies]
-hashbrown = { version = "0.15.0", default-features = false, features = ["raw-entry"], optional = true }
+hashbrown = { version = "0.15.0", default-features = false, optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }
