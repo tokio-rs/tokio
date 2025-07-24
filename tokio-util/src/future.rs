@@ -1,10 +1,9 @@
 //! An extension trait for Futures that provides a variety of convenient adapters.
 
 mod with_cancellation_token;
+use with_cancellation_token::{WithCancellationTokenFuture, WithCancellationTokenFutureOwned};
 
 use std::future::Future;
-
-use with_cancellation_token::{WithCancellationTokenFuture, WithCancellationTokenFutureOwned};
 
 use crate::sync::CancellationToken;
 

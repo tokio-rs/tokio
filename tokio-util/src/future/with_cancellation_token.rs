@@ -15,14 +15,14 @@ pin_project! {
     #[must_use = "futures do nothing unless polled"]
     pub struct WithCancellationTokenFuture<'a, F: Future> {
         #[pin]
-        pub cancellation: WaitForCancellationFuture<'a>,
+        cancellation: WaitForCancellationFuture<'a>,
         #[pin]
-        pub future: F,
+        future: F,
     }
 }
 
 impl<'a, F: Future> WithCancellationTokenFuture<'a, F> {
-    pub fn new(cancellation_token: &'a CancellationToken, future: F) -> Self {
+    pub(crate) fn new(cancellation_token: &'a CancellationToken, future: F) -> Self {
         Self {
             cancellation: cancellation_token.cancelled(),
             future,
@@ -59,7 +59,7 @@ pin_project! {
 }
 
 impl<F: Future> WithCancellationTokenFutureOwned<F> {
-    pub fn new(cancellation_token: CancellationToken, future: F) -> Self {
+    pub(crate) fn new(cancellation_token: CancellationToken, future: F) -> Self {
         Self {
             cancellation: cancellation_token.cancelled_owned(),
             future,
