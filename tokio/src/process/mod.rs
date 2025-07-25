@@ -1212,6 +1212,24 @@ pub struct Child {
     pub stderr: Option<ChildStderr>,
 }
 
+impl TryFrom<StdChild> for Child {
+    type Error = io::Error;
+
+    fn try_from(value: StdChild) -> io::Result<Self> {
+        let spawned_child = imp::build_child(value)?;
+
+        Ok(Child {
+            child: FusedChild::Child(ChildDropGuard {
+                inner: spawned_child.child,
+                kill_on_drop: false,
+            }),
+            stdin: spawned_child.stdin.map(|inner| ChildStdin { inner }),
+            stdout: spawned_child.stdout.map(|inner| ChildStdout { inner }),
+            stderr: spawned_child.stderr.map(|inner| ChildStderr { inner }),
+        })
+    }
+}
+
 impl Child {
     /// Returns the OS-assigned process identifier associated with this child
     /// while it is still running.
