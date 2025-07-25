@@ -58,8 +58,8 @@ pub trait FutureExt: Future {
         tokio::time::timeout_at(deadline, self)
     }
 
-    /// Like [`CancellationToken::run_until_cancelled`], but with the advantage that it is easier to write
-    /// fluent call chains.
+    /// Similar to [`CancellationToken::run_until_cancelled`], but with the advantage that it is easier to write
+    /// fluent call chains, and biased towards waiting for CancellationToken to complete.
     ///
     /// # Examples
     ///
@@ -89,8 +89,8 @@ pub trait FutureExt: Future {
         WithCancellationTokenFuture::new(cancellation_token, self)
     }
 
-    /// Like [`CancellationToken::run_until_cancelled_owned`], but with the advantage that it is easier to write
-    /// fluent call chains.
+    /// Similar to [`CancellationToken::run_until_cancelled_owned`], but with the advantage that it is easier to write
+    /// fluent call chains, and biased towards waiting for CancellationToken to complete.
     ///
     /// # Examples
     ///

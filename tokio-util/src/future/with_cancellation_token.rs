@@ -11,7 +11,7 @@ use crate::sync::{CancellationToken, WaitForCancellationFuture, WaitForCancellat
 pin_project! {
     /// A Future that is resolved once the corresponding [`CancellationToken`]
     /// is cancelled or a given Future gets resolved. It is biased towards the
-    /// Future completion.
+    /// CancellationToken cancelled.
     #[must_use = "futures do nothing unless polled"]
     pub struct WithCancellationTokenFuture<'a, F: Future> {
         #[pin]
@@ -35,10 +35,10 @@ impl<'a, F: Future> Future for WithCancellationTokenFuture<'a, F> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        if let Poll::Ready(res) = this.future.poll(cx) {
-            Poll::Ready(Some(res))
-        } else if this.cancellation.poll(cx).is_ready() {
+        if this.cancellation.poll(cx).is_ready() {
             Poll::Ready(None)
+        } else if let Poll::Ready(res) = this.future.poll(cx) {
+            Poll::Ready(Some(res))
         } else {
             Poll::Pending
         }
@@ -48,7 +48,7 @@ impl<'a, F: Future> Future for WithCancellationTokenFuture<'a, F> {
 pin_project! {
     /// A Future that is resolved once the corresponding [`CancellationToken`]
     /// is cancelled or a given Future gets resolved. It is biased towards the
-    /// Future completion.
+    /// CancellationToken cancelled.
     #[must_use = "futures do nothing unless polled"]
     pub struct WithCancellationTokenFutureOwned<F: Future> {
         #[pin]
@@ -72,10 +72,10 @@ impl<F: Future> Future for WithCancellationTokenFutureOwned<F> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        if let Poll::Ready(res) = this.future.poll(cx) {
-            Poll::Ready(Some(res))
-        } else if this.cancellation.poll(cx).is_ready() {
+        if this.cancellation.poll(cx).is_ready() {
             Poll::Ready(None)
+        } else if let Poll::Ready(res) = this.future.poll(cx) {
+            Poll::Ready(Some(res))
         } else {
             Poll::Pending
         }
