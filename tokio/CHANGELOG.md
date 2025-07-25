@@ -1,3 +1,42 @@
+# 1.47.0 (July 25th, 2025)
+
+This release adds a new struct in the `sync` module called `SetOnce` which
+behaves like an event mechanism. Inside the sync module there are more fixes
+and performance improvements included.
+
+## Fixed
+
+- runtime: fix handling of cancelled io_uring Ops ([#7436])
+- sync: remove duplicated code in `OnceCell` tests ([#7458])
+- sync: fix `Cancellationtoken` failing to cancel the ready futures ([#7462])
+- runtime: cleanup legacy tests of alt multi-threaded runtime ([#7451])
+
+## Changed
+
+- sync: improve `AtomicWaker::wake` performance ([#7450])
+- task: Make `cooperative` and `poll_proceed` public ([#7405])
+- (tokio-util JoinMap) Remove raw-entry feature in favour of HashTable API ([#7252])
+
+## Added
+
+- sync: Add `SetOnce` ([#7148])
+
+## Documented
+
+- runtime: improve safety comments of `Readiness<'_>` ([#7415])
+- fix(metric docs): properly annotate compound cfg gates in docs.rs for runtime metrics ([#7449])
+
+[#7436]: https://github.com/tokio-rs/tokio/pull/7436
+[#7458]: https://github.com/tokio-rs/tokio/pull/7458
+[#7462]: https://github.com/tokio-rs/tokio/pull/7462
+[#7451]: https://github.com/tokio-rs/tokio/pull/7451
+[#7450]: https://github.com/tokio-rs/tokio/pull/7450
+[#7405]: https://github.com/tokio-rs/tokio/pull/7405
+[#7148]: https://github.com/tokio-rs/tokio/pull/7148
+[#7252]: https://github.com/tokio-rs/tokio/pull/7252
+[#7415]: https://github.com/tokio-rs/tokio/pull/7415
+[#7449]: https://github.com/tokio-rs/tokio/pull/7449
+
 # 1.46.1 (July 4th, 2025)
 
 This release fixes incorrect spawn locations in runtime task hooks for tasks
