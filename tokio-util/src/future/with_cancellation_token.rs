@@ -11,7 +11,7 @@ use crate::sync::{CancellationToken, WaitForCancellationFuture, WaitForCancellat
 pin_project! {
     /// A Future that is resolved once the corresponding [`CancellationToken`]
     /// is cancelled or a given Future gets resolved. It is biased towards the
-    /// CancellationToken cancelled.
+    /// [`CancellationToken`] cancelled.
     #[must_use = "futures do nothing unless polled"]
     pub struct WithCancellationTokenFuture<'a, F: Future> {
         #[pin]
@@ -48,7 +48,7 @@ impl<'a, F: Future> Future for WithCancellationTokenFuture<'a, F> {
 pin_project! {
     /// A Future that is resolved once the corresponding [`CancellationToken`]
     /// is cancelled or a given Future gets resolved. It is biased towards the
-    /// CancellationToken cancelled.
+    /// [`CancellationToken`] cancelled.
     #[must_use = "futures do nothing unless polled"]
     pub struct WithCancellationTokenFutureOwned<F: Future> {
         #[pin]
