@@ -59,7 +59,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
                 });
 
                 // Avoid busy looping.
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                tokio::task::yield_now().await;
             }
         });
 
