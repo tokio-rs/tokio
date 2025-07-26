@@ -181,7 +181,6 @@ impl Drop for UringContext {
 }
 
 impl Handle {
-    #[allow(dead_code)]
     fn add_uring_source(&self, uringfd: RawFd) -> io::Result<()> {
         let mut source = SourceFd(&uringfd);
         self.registry
@@ -276,8 +275,6 @@ impl Handle {
         Ok(index)
     }
 
-    // TODO: Remove this annotation when operations are actually supported
-    #[allow(unused_variables, unreachable_code)]
     pub(crate) fn cancel_op<T: Cancellable>(&self, index: usize, data: Option<T>) {
         let mut guard = self.get_uring().lock();
         let ctx = &mut *guard;
