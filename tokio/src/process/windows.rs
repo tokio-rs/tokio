@@ -33,9 +33,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use windows_sys::{
-    Win32::Foundation::{
-        DuplicateHandle, BOOLEAN, DUPLICATE_SAME_ACCESS, HANDLE, INVALID_HANDLE_VALUE,
-    },
+    Win32::Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS, HANDLE, INVALID_HANDLE_VALUE},
     Win32::System::Threading::{
         GetCurrentProcess, RegisterWaitForSingleObject, UnregisterWaitEx, INFINITE,
         WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE,
@@ -163,7 +161,7 @@ impl Drop for Waiting {
     }
 }
 
-unsafe extern "system" fn callback(ptr: *mut std::ffi::c_void, _timer_fired: BOOLEAN) {
+unsafe extern "system" fn callback(ptr: *mut std::ffi::c_void, _timer_fired: bool) {
     let complete = &mut *(ptr as *mut Option<oneshot::Sender<()>>);
     let _ = complete.take().unwrap().send(());
 }
