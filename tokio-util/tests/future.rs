@@ -168,7 +168,7 @@ fn pending_future_with_cancellation_token_owned_test() {
 }
 
 #[test]
-fn future_with_already_cancelled_token_owned_test() {
+fn pending_fut_with_already_cancelled_token_owned_test() {
     let (waker, wake_count) = new_count_waker();
     let token = CancellationToken::new();
     token.cancel();
