@@ -18,8 +18,8 @@ bumped to 0.6.
 
 ## Documented
 
-- runtime: improve safety comments of `Readiness<'_>` ([#7415])
 - metrics: fix listed feature requirements for some metrics ([#7449])
+- runtime: improve safety comments of `Readiness<'_>` ([#7415])
 
 [#7148]: https://github.com/tokio-rs/tokio/pull/7148
 [#7405]: https://github.com/tokio-rs/tokio/pull/7405
