@@ -9,9 +9,12 @@ use pin_project_lite::pin_project;
 use crate::sync::{CancellationToken, RunUntilCancelledFuture, RunUntilCancelledFutureOwned};
 
 pin_project! {
-    /// A Future that is resolved once the corresponding [`CancellationToken`]
-    /// is cancelled or a given Future gets resolved. It is biased towards the
-    /// [`CancellationToken`] cancelled.
+    /// A [`Future`] that is resolved once the corresponding [`CancellationToken`]
+    /// is cancelled or a given [`Future`] gets resolved.
+    ///
+    /// This future is Immediately resolved if the corresponding [`CancellationToken`]
+    /// is already cancelled, otherwise, in case of concurrent completion and
+    /// cancellation, this is biased towards the future completion.
     #[must_use = "futures do nothing unless polled"]
     pub struct WithCancellationTokenFuture<'a, F: Future> {
         #[pin]
@@ -41,9 +44,12 @@ impl<'a, F: Future> Future for WithCancellationTokenFuture<'a, F> {
 }
 
 pin_project! {
-    /// A Future that is resolved once the corresponding [`CancellationToken`]
-    /// is cancelled or a given Future gets resolved. It is biased towards the
-    /// [`CancellationToken`] cancelled.
+    /// A [`Future`] that is resolved once the corresponding [`CancellationToken`]
+    /// is cancelled or a given [`Future`] gets resolved.
+    ///
+    /// This future is Immediately resolved if the corresponding [`CancellationToken`]
+    /// is already cancelled, otherwise, in case of concurrent completion and
+    /// cancellation, this is biased towards the future completion.
     #[must_use = "futures do nothing unless polled"]
     pub struct WithCancellationTokenFutureOwned<F: Future> {
         #[pin]
