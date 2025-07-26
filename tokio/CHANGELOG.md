@@ -9,7 +9,7 @@ a lifetime parameter.
 ## Added
 
 - coop: add `cooperative` and `poll_proceed` ([#7405])
-- sync: add `SetOnce` ([#7148])
+- sync: add `SetOnce` ([#7418])
 - sync: add `sync::Notify::notified_owned()` ([#7465])
 
 ## Changed
@@ -23,9 +23,9 @@ a lifetime parameter.
 - metrics: fix listed feature requirements for some metrics ([#7449])
 - runtime: improve safety comments of `Readiness<'_>` ([#7415])
 
-[#7148]: https://github.com/tokio-rs/tokio/pull/7148
 [#7405]: https://github.com/tokio-rs/tokio/pull/7405
 [#7415]: https://github.com/tokio-rs/tokio/pull/7415
+[#7418]: https://github.com/tokio-rs/tokio/pull/7418
 [#7449]: https://github.com/tokio-rs/tokio/pull/7449
 [#7450]: https://github.com/tokio-rs/tokio/pull/7450
 [#7465]: https://github.com/tokio-rs/tokio/pull/7465
