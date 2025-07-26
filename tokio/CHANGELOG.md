@@ -1,14 +1,16 @@
 # 1.47.0 (July 25th, 2025)
 
-This release adds a new struct in the `sync` module called `SetOnce` which
-behaves like an event mechanism. Inside the sync module there are more fixes
-and performance improvements included. `window-sys` bumped to 0.59 and `socket2`
-bumped to 0.6.
+This PR adds `poll_proceed` and `cooperative` to the `coop` module for
+cooperative scheduling, adds `SetOnce` to the `sync` module which provides
+similar functionality to [`std::sync::OnceLock], and adds a new method
+`sync::Notify::notified_owned()` which returns an `OwnedNotified` without
+a lifetime parameter.
 
 ## Added
 
 - coop: add `cooperative` and `poll_proceed` ([#7405])
 - sync: add `SetOnce` ([#7148])
+- sync: add `sync::Notify::notified_owned()` ([#7465])
 
 ## Changed
 
@@ -26,6 +28,7 @@ bumped to 0.6.
 [#7415]: https://github.com/tokio-rs/tokio/pull/7415
 [#7449]: https://github.com/tokio-rs/tokio/pull/7449
 [#7450]: https://github.com/tokio-rs/tokio/pull/7450
+[#7465]: https://github.com/tokio-rs/tokio/pull/7465
 
 # 1.46.1 (July 4th, 2025)
 
