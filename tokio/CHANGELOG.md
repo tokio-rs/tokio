@@ -1,6 +1,6 @@
 # 1.47.0 (July 25th, 2025)
 
-This PR adds `poll_proceed` and `cooperative` to the `coop` module for
+This release adds `poll_proceed` and `cooperative` to the `coop` module for
 cooperative scheduling, adds `SetOnce` to the `sync` module which provides
 similar functionality to [`std::sync::OnceLock], and adds a new method
 `sync::Notify::notified_owned()` which returns an `OwnedNotified` without
