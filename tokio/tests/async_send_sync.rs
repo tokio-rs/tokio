@@ -401,6 +401,7 @@ assert_value!(tokio::sync::broadcast::WeakSender<NN>: !Send & !Sync & Unpin);
 assert_value!(tokio::sync::broadcast::WeakSender<YN>: Send & Sync & Unpin);
 assert_value!(tokio::sync::broadcast::WeakSender<YY>: Send & Sync & Unpin);
 assert_value!(tokio::sync::futures::Notified<'_>: Send & Sync & !Unpin);
+assert_value!(tokio::sync::futures::OwnedNotified: Send & Sync & !Unpin);
 assert_value!(tokio::sync::mpsc::OwnedPermit<NN>: !Send & !Sync & Unpin);
 assert_value!(tokio::sync::mpsc::OwnedPermit<YN>: Send & Sync & Unpin);
 assert_value!(tokio::sync::mpsc::OwnedPermit<YY>: Send & Sync & Unpin);
