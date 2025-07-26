@@ -19,7 +19,7 @@ pub trait FutureExt: Future {
     /// use tokio_util::future::FutureExt;
     ///
     /// # async fn dox() {
-    /// let (tx, rx) = oneshot::channel::<()>();
+    /// let (_tx, rx) = oneshot::channel::<()>();
     ///
     /// let res = rx.timeout(Duration::from_millis(10)).await;
     /// assert!(res.is_err());
@@ -43,7 +43,7 @@ pub trait FutureExt: Future {
     /// use tokio_util::future::FutureExt;
     ///
     /// # async fn dox() {
-    /// let (tx, rx) = oneshot::channel::<()>();
+    /// let (_tx, rx) = oneshot::channel::<()>();
     /// let deadline = Instant::now() + Duration::from_millis(10);
     ///
     /// let res = rx.timeout_at(deadline).await;
@@ -75,7 +75,7 @@ pub trait FutureExt: Future {
     /// use tokio_util::sync::CancellationToken;
     ///
     /// # async fn dox() {
-    /// let (tx, rx) = oneshot::channel::<()>();
+    /// let (_tx, rx) = oneshot::channel::<()>();
     /// let token = CancellationToken::new();
     /// let token_clone = token.clone();
     /// tokio::spawn(async move {
@@ -112,7 +112,7 @@ pub trait FutureExt: Future {
     /// use tokio_util::sync::CancellationToken;
     ///
     /// # async fn dox() {
-    /// let (tx, rx) = oneshot::channel::<()>();
+    /// let (_tx, rx) = oneshot::channel::<()>();
     /// let token = CancellationToken::new();
     /// let token_clone = token.clone();
     /// tokio::spawn(async move {

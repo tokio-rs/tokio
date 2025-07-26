@@ -12,7 +12,7 @@ pin_project! {
     /// A [`Future`] that is resolved once the corresponding [`CancellationToken`]
     /// is cancelled or a given [`Future`] gets resolved.
     ///
-    /// This future is Immediately resolved if the corresponding [`CancellationToken`]
+    /// This future is immediately resolved if the corresponding [`CancellationToken`]
     /// is already cancelled, otherwise, in case of concurrent completion and
     /// cancellation, this is biased towards the future completion.
     #[must_use = "futures do nothing unless polled"]
@@ -47,7 +47,7 @@ pin_project! {
     /// A [`Future`] that is resolved once the corresponding [`CancellationToken`]
     /// is cancelled or a given [`Future`] gets resolved.
     ///
-    /// This future is Immediately resolved if the corresponding [`CancellationToken`]
+    /// This future is immediately resolved if the corresponding [`CancellationToken`]
     /// is already cancelled, otherwise, in case of concurrent completion and
     /// cancellation, this is biased towards the future completion.
     #[must_use = "futures do nothing unless polled"]
