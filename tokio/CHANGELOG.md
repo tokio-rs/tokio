@@ -5,15 +5,10 @@ behaves like an event mechanism. Inside the sync module there are more fixes
 and performance improvements included. `window-sys` bumped to 0.59 and `socket2`
 bumped to 0.6.
 
-## Fixed
-
-- sync: fix `Cancellationtoken` failing to cancel the ready futures ([#7462])
-
 ## Changed
 
 - sync: improve `AtomicWaker::wake` performance ([#7450])
 - task: Make `cooperative` and `poll_proceed` public ([#7405])
-- (tokio-util JoinMap) Remove raw-entry feature in favour of HashTable API ([#7252])
 - build: upgrade windows-sys 0.52 → 0.59 ([#7117])
 - net: Update to socket2 v0.6 ([#7443])
 
