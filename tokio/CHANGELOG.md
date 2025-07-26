@@ -21,16 +21,11 @@ bumped to 0.6.
 - runtime: improve safety comments of `Readiness<'_>` ([#7415])
 - metrics: fix listed feature requirements for some metrics ([#7449])
 
-[#7436]: https://github.com/tokio-rs/tokio/pull/7436
-[#7458]: https://github.com/tokio-rs/tokio/pull/7458
-[#7462]: https://github.com/tokio-rs/tokio/pull/7462
-[#7451]: https://github.com/tokio-rs/tokio/pull/7451
-[#7450]: https://github.com/tokio-rs/tokio/pull/7450
-[#7405]: https://github.com/tokio-rs/tokio/pull/7405
 [#7148]: https://github.com/tokio-rs/tokio/pull/7148
-[#7252]: https://github.com/tokio-rs/tokio/pull/7252
+[#7405]: https://github.com/tokio-rs/tokio/pull/7405
 [#7415]: https://github.com/tokio-rs/tokio/pull/7415
 [#7449]: https://github.com/tokio-rs/tokio/pull/7449
+[#7450]: https://github.com/tokio-rs/tokio/pull/7450
 
 # 1.46.1 (July 4th, 2025)
 
