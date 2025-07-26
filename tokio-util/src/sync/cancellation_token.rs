@@ -417,7 +417,7 @@ pin_project! {
     /// is cancelled or a given Future gets resolved. It is biased towards the
     /// Future completion.
     #[must_use = "futures do nothing unless polled"]
-    pub struct RunUntilCancelledFuture<'a, F: Future> {
+    pub(crate) struct RunUntilCancelledFuture<'a, F: Future> {
         #[pin]
         cancellation: WaitForCancellationFuture<'a>,
         #[pin]
@@ -454,7 +454,7 @@ pin_project! {
     /// is cancelled or a given Future gets resolved. It is biased towards the
     /// Future completion.
     #[must_use = "futures do nothing unless polled"]
-    pub struct RunUntilCancelledFutureOwned<F: Future> {
+    pub(crate) struct RunUntilCancelledFutureOwned<F: Future> {
         #[pin]
         cancellation: WaitForCancellationFutureOwned,
         #[pin]
