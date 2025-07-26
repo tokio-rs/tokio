@@ -147,26 +147,12 @@ impl Drop for UringContext {
             self.submit().expect("Internal error when dropping driver");
         }
 
-        let mut cancel_ops = Slab::new();
-        let mut keys_to_move = Vec::new();
+        let mut ops = std::mem::take(&mut self.ops);
 
-        for (key, lifecycle) in self.ops.iter() {
-            match lifecycle {
-                Lifecycle::Waiting(_) | Lifecycle::Submitted | Lifecycle::Cancelled(_) => {
-                    // these should be cancelled
-                    keys_to_move.push(key);
-                }
-                // We don't wait for completed ops.
-                Lifecycle::Completed(_) => {}
-            }
-        }
+        // Remove all completed ops since we don't need to wait for them.
+        ops.retain(|_, lifecycle| !matches!(lifecycle, Lifecycle::Completed(_)));
 
-        for key in keys_to_move {
-            let lifecycle = self.remove_op(key);
-            cancel_ops.insert(lifecycle);
-        }
-
-        while !cancel_ops.is_empty() {
+        while !ops.is_empty() {
             // Wait until at least one completion is available.
             self.ring_mut()
                 .submit_and_wait(1)
@@ -174,7 +160,7 @@ impl Drop for UringContext {
 
             for cqe in self.ring_mut().completion() {
                 let idx = cqe.user_data() as usize;
-                cancel_ops.remove(idx);
+                ops.remove(idx);
             }
         }
     }
