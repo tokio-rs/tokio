@@ -7,7 +7,6 @@ bumped to 0.6.
 
 ## Fixed
 
-- runtime: fix handling of cancelled io_uring Ops ([#7436])
 - sync: fix `Cancellationtoken` failing to cancel the ready futures ([#7462])
 
 ## Changed
