@@ -5,16 +5,16 @@ behaves like an event mechanism. Inside the sync module there are more fixes
 and performance improvements included. `window-sys` bumped to 0.59 and `socket2`
 bumped to 0.6.
 
+## Added
+
+- coop: add `cooperative` and `poll_proceed` ([#7405])
+- sync: add `SetOnce` ([#7148])
+
 ## Changed
 
 - sync: improve `AtomicWaker::wake` performance ([#7450])
-- task: Make `cooperative` and `poll_proceed` public ([#7405])
 - build: upgrade windows-sys 0.52 → 0.59 ([#7117])
 - net: Update to socket2 v0.6 ([#7443])
-
-## Added
-
-- sync: Add `SetOnce` ([#7148])
 
 ## Documented
 
