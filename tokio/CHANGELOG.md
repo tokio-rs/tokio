@@ -12,9 +12,9 @@ bumped to 0.6.
 
 ## Changed
 
+- deps: upgrade windows-sys 0.52 → 0.59 ([#7117])
+- deps: update to socket2 v0.6 ([#7443])
 - sync: improve `AtomicWaker::wake` performance ([#7450])
-- build: upgrade windows-sys 0.52 → 0.59 ([#7117])
-- net: Update to socket2 v0.6 ([#7443])
 
 ## Documented
 
