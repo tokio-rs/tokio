@@ -19,7 +19,7 @@ bumped to 0.6.
 ## Documented
 
 - runtime: improve safety comments of `Readiness<'_>` ([#7415])
-- fix(metric docs): properly annotate compound cfg gates in docs.rs for runtime metrics ([#7449])
+- metrics: fix listed feature requirements for some metrics ([#7449])
 
 [#7436]: https://github.com/tokio-rs/tokio/pull/7436
 [#7458]: https://github.com/tokio-rs/tokio/pull/7458
