@@ -15,7 +15,7 @@ const DEFAULT_RING_SIZE: u32 = 256;
 
 #[repr(usize)]
 #[derive(Debug, PartialEq, Eq)]
-enum State {
+pub(crate) enum State {
     Uninitialized = 0,
     Initialized = 1,
     Unsupported = 2,
@@ -181,7 +181,6 @@ impl Drop for UringContext {
 }
 
 impl Handle {
-    #[allow(dead_code)]
     fn add_uring_source(&self, uringfd: RawFd) -> io::Result<()> {
         let mut source = SourceFd(&uringfd);
         self.registry
@@ -265,14 +264,17 @@ impl Handle {
             submit_or_remove(ctx)?;
         }
 
+        // Ensure that the completion queue is not full before submitting the entry.
+        while ctx.ring_mut().completion().is_full() {
+            ctx.dispatch_completions();
+        }
+
         // Note: For now, we submit the entry immediately without utilizing batching.
         submit_or_remove(ctx)?;
 
         Ok(index)
     }
 
-    // TODO: Remove this annotation when operations are actually supported
-    #[allow(unused_variables, unreachable_code)]
     pub(crate) fn cancel_op<T: Cancellable>(&self, index: usize, data: Option<T>) {
         let mut guard = self.get_uring().lock();
         let ctx = &mut *guard;
