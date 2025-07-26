@@ -502,7 +502,7 @@ impl Semaphore {
                 .as_ref()
                 .map_or(true, |waker| !waker.will_wake(cx.waker()))
             {
-                old_waker = std::mem::replace(waker, Some(cx.waker().clone()));
+                old_waker = waker.replace(cx.waker().clone());
             }
         });
 

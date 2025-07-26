@@ -149,7 +149,7 @@ When updating this, also update:
 -->
 
 ```
-cargo +1.77 clippy --all --tests --all-features
+cargo +1.88 clippy --all --tests --all-features
 ```
 
 When building documentation, a simple `cargo doc` is not sufficient. To produce

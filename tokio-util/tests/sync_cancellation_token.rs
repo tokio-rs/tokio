@@ -492,6 +492,21 @@ fn run_until_cancelled_test() {
             fut.as_mut().poll(&mut Context::from_waker(&waker))
         );
     }
+
+    // Do not poll the future when token is already cancelled.
+    {
+        let token = CancellationToken::new();
+
+        let fut = token.run_until_cancelled(async { panic!("fut polled after cancellation") });
+        pin!(fut);
+
+        token.cancel();
+
+        assert_eq!(
+            Poll::Ready(None),
+            fut.as_mut().poll(&mut Context::from_waker(&waker))
+        );
+    }
 }
 
 #[test]

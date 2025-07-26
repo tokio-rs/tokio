@@ -7,6 +7,7 @@ use std::ffi::OsStr;
 use std::io::{self, Read, Write};
 use std::pin::Pin;
 use std::ptr;
+use std::ptr::null_mut;
 use std::task::{Context, Poll};
 
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
@@ -2556,7 +2557,7 @@ impl ClientOptions {
             attrs as *mut _,
             windows_sys::OPEN_EXISTING,
             self.get_flags(),
-            0,
+            null_mut(),
         );
 
         if h == windows_sys::INVALID_HANDLE_VALUE {

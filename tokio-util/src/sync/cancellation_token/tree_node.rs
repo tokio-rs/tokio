@@ -18,16 +18,16 @@
 //! Those invariants shall be true at any time.
 //!
 //! 1. A node that has no parents and no handles can no longer be cancelled.
-//!     This is important during both cancellation and refcounting.
+//!    This is important during both cancellation and refcounting.
 //!
 //! 2. If node B *is* or *was* a child of node A, then node B was created *after* node A.
-//!     This is important for deadlock safety, as it is used for lock order.
-//!     Node B can only become the child of node A in two ways:
-//!         - being created with `child_node()`, in which case it is trivially true that
-//!           node A already existed when node B was created
-//!         - being moved A->C->B to A->B because node C was removed in `decrease_handle_refcount()`
-//!           or `cancel()`. In this case the invariant still holds, as B was younger than C, and C
-//!           was younger than A, therefore B is also younger than A.
+//!    This is important for deadlock safety, as it is used for lock order.
+//!    Node B can only become the child of node A in two ways:
+//!    - being created with `child_node()`, in which case it is trivially true that
+//!      node A already existed when node B was created
+//!    - being moved A->C->B to A->B because node C was removed in `decrease_handle_refcount()`
+//!      or `cancel()`. In this case the invariant still holds, as B was younger than C, and C
+//!      was younger than A, therefore B is also younger than A.
 //!
 //! 3. If two nodes are both unlocked and node A is the parent of node B, then node B is a child of
 //!    node A. It is important to always restore that invariant before dropping the lock of a node.
