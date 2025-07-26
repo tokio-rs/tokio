@@ -45,8 +45,11 @@ cfg_io! {
 
 cfg_rt! {
     pub mod context;
-    pub mod task;
 }
+
+#[cfg(any(feature = "rt", feature = "join-map"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "rt", feature = "join-map"))))]
+pub mod task;
 
 cfg_time! {
     pub mod time;
