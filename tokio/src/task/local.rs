@@ -326,6 +326,14 @@ impl<'a> Drop for LocalDataEnterGuard<'a> {
 cfg_rt! {
     /// Spawns a `!Send` future on the current [`LocalSet`] or [`LocalRuntime`].
     ///
+    /// This is possible when either using one of these types
+    /// explicitly, or (with `tokio_unstable`) by opting to use the
+    /// `"local"` runtime flavor in `tokio::main`:
+    ///
+    /// ```ignore
+    /// #[tokio::main(flavor = "local")]
+    /// ```
+    ///
     /// The spawned future will run on the same thread that called `spawn_local`.
     ///
     /// The provided future will start running in the background immediately
