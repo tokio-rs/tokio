@@ -8,8 +8,25 @@ use tokio::pin;
 use tokio_test::{assert_pending, assert_ready_eq};
 use tokio_util::{future::FutureExt, sync::CancellationToken};
 
+#[derive(Default)]
+struct ReadyOnTheSecondPollFuture {
+    polled: bool,
+}
+
+impl Future for ReadyOnTheSecondPollFuture {
+    type Output = ();
+
+    fn poll(mut self: std::pin::Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if !self.polled {
+            self.polled = true;
+            return Poll::Pending;
+        }
+        Poll::Ready(())
+    }
+}
+
 #[test]
-fn ready_future_with_cancellation_token_test() {
+fn ready_fut_with_cancellation_token_test() {
     let (waker, _) = new_count_waker();
     let token = CancellationToken::new();
 
@@ -27,7 +44,7 @@ fn ready_future_with_cancellation_token_test() {
 }
 
 #[test]
-fn pending_future_with_cancellation_token_test() {
+fn pending_fut_with_cancellation_token_test() {
     let (waker, _) = new_count_waker();
     let token = CancellationToken::new();
 
@@ -42,6 +59,24 @@ fn pending_future_with_cancellation_token_test() {
         .poll(&mut Context::from_waker(&waker));
 
     assert_pending!(res);
+}
+
+#[test]
+fn ready_fut_with_already_cancelled_token_test() {
+    let (waker, _) = new_count_waker();
+    let token = CancellationToken::new();
+
+    let ready_fut = ready(());
+
+    let ready_fut_with_token_fut = ready_fut.with_cancellation_token(&token);
+
+    pin!(ready_fut_with_token_fut);
+
+    let res = ready_fut_with_token_fut
+        .as_mut()
+        .poll(&mut Context::from_waker(&waker));
+
+    assert_ready_eq!(res, None);
 }
 
 #[test]
@@ -91,28 +126,12 @@ fn pending_fut_with_token_cancelled_test() {
 
 #[test]
 fn pending_only_on_first_poll_with_cancellation_token_test() {
-    #[derive(Default)]
-    struct TestFuture {
-        polled: bool,
-    }
-
-    impl Future for TestFuture {
-        type Output = ();
-
-        fn poll(mut self: std::pin::Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-            if !self.polled {
-                self.polled = true;
-                return Poll::Pending;
-            }
-            Poll::Ready(())
-        }
-    }
     let (waker, wake_count) = new_count_waker();
     let token = CancellationToken::new();
-    let fut = TestFuture::default().with_cancellation_token(&token);
+    let fut = ReadyOnTheSecondPollFuture::default().with_cancellation_token(&token);
     pin!(fut);
 
-    // first poll, TestFuture returned Pending
+    // first poll, ReadyOnTheSecondPollFuture returned Pending
     let res = fut.as_mut().poll(&mut Context::from_waker(&waker));
     assert_pending!(res);
 
@@ -120,19 +139,13 @@ fn pending_only_on_first_poll_with_cancellation_token_test() {
     assert_eq!(wake_count, 1);
 
     // due to the polling fairness (biased behavior) of WithCancellationToken Future,
-    // subsequent polls are biased toward polling TestFuture, which results in always returning Ready.
-    let res = fut.as_mut().poll(&mut Context::from_waker(&waker));
-    assert_ready_eq!(res, Some(()));
-
-    let res = fut.as_mut().poll(&mut Context::from_waker(&waker));
-    assert_ready_eq!(res, Some(()));
-
+    // subsequent polls are biased toward polling ReadyOnTheSecondPollFuture, which results in always returning Ready.
     let res = fut.as_mut().poll(&mut Context::from_waker(&waker));
     assert_ready_eq!(res, Some(()));
 }
 
 #[test]
-fn ready_future_with_cancellation_owned_token_test() {
+fn ready_fut_with_cancellation_owned_token_test() {
     let (waker, _) = new_count_waker();
     let token = CancellationToken::new();
 
@@ -150,7 +163,7 @@ fn ready_future_with_cancellation_owned_token_test() {
 }
 
 #[test]
-fn pending_future_with_cancellation_token_owned_test() {
+fn pending_fut_with_cancellation_token_owned_test() {
     let (waker, _) = new_count_waker();
     let token = CancellationToken::new();
 
@@ -165,6 +178,24 @@ fn pending_future_with_cancellation_token_owned_test() {
         .poll(&mut Context::from_waker(&waker));
 
     assert_pending!(res);
+}
+
+#[test]
+fn ready_fut_with_already_cancelled_token_owned_test() {
+    let (waker, _) = new_count_waker();
+    let token = CancellationToken::new();
+
+    let ready_fut = ready(());
+
+    let ready_fut_with_token_fut = ready_fut.with_cancellation_token_owned(token);
+
+    pin!(ready_fut_with_token_fut);
+
+    let res = ready_fut_with_token_fut
+        .as_mut()
+        .poll(&mut Context::from_waker(&waker));
+
+    assert_ready_eq!(res, None);
 }
 
 #[test]
@@ -214,28 +245,12 @@ fn pending_fut_with_owned_token_cancelled_test() {
 
 #[test]
 fn pending_only_on_first_poll_with_cancellation_token_owned_test() {
-    #[derive(Default)]
-    struct TestFuture {
-        polled: bool,
-    }
-
-    impl Future for TestFuture {
-        type Output = ();
-
-        fn poll(mut self: std::pin::Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-            if !self.polled {
-                self.polled = true;
-                return Poll::Pending;
-            }
-            Poll::Ready(())
-        }
-    }
     let (waker, wake_count) = new_count_waker();
     let token = CancellationToken::new();
-    let fut = TestFuture::default().with_cancellation_token(&token);
+    let fut = ReadyOnTheSecondPollFuture::default().with_cancellation_token(&token);
     pin!(fut);
 
-    // first poll, TestFuture returned Pending
+    // first poll, ReadyOnTheSecondPollFuture returned Pending
     let res = fut.as_mut().poll(&mut Context::from_waker(&waker));
     assert_pending!(res);
 
@@ -243,13 +258,7 @@ fn pending_only_on_first_poll_with_cancellation_token_owned_test() {
     assert_eq!(wake_count, 1);
 
     // due to the polling fairness (biased behavior) of WithCancellationToken Future,
-    // subsequent polls are biased toward polling TestFuture, which results in always returning Ready.
-    let res = fut.as_mut().poll(&mut Context::from_waker(&waker));
-    assert_ready_eq!(res, Some(()));
-
-    let res = fut.as_mut().poll(&mut Context::from_waker(&waker));
-    assert_ready_eq!(res, Some(()));
-
+    // subsequent polls are biased toward polling ReadyOnTheSecondPollFuture, which results in always returning Ready.
     let res = fut.as_mut().poll(&mut Context::from_waker(&waker));
     assert_ready_eq!(res, Some(()));
 }
