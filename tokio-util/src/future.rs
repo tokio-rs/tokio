@@ -32,9 +32,7 @@ pub trait FutureExt: Future {
         {
             tokio::time::timeout(timeout, self)
         }
-    }
 
-    cfg_time! {
         /// A wrapper around [`tokio::time::timeout_at`], with the advantage that it is easier to write
         /// fluent call chains.
         ///
