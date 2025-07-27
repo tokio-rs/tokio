@@ -449,7 +449,7 @@
 cfg_sync! {
     /// Named future types.
     pub mod futures {
-        pub use super::notify::Notified;
+        pub use super::notify::{Notified, OwnedNotified};
     }
 
     mod barrier;

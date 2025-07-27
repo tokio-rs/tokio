@@ -1,3 +1,35 @@
+# 1.47.0 (July 25th, 2025)
+
+This release adds `poll_proceed` and `cooperative` to the `coop` module for
+cooperative scheduling, adds `SetOnce` to the `sync` module which provides
+similar functionality to [`std::sync::OnceLock], and adds a new method
+`sync::Notify::notified_owned()` which returns an `OwnedNotified` without
+a lifetime parameter.
+
+## Added
+
+- coop: add `cooperative` and `poll_proceed` ([#7405])
+- sync: add `SetOnce` ([#7418])
+- sync: add `sync::Notify::notified_owned()` ([#7465])
+
+## Changed
+
+- deps: upgrade windows-sys 0.52 → 0.59 ([#7117])
+- deps: update to socket2 v0.6 ([#7443])
+- sync: improve `AtomicWaker::wake` performance ([#7450])
+
+## Documented
+
+- metrics: fix listed feature requirements for some metrics ([#7449])
+- runtime: improve safety comments of `Readiness<'_>` ([#7415])
+
+[#7405]: https://github.com/tokio-rs/tokio/pull/7405
+[#7415]: https://github.com/tokio-rs/tokio/pull/7415
+[#7418]: https://github.com/tokio-rs/tokio/pull/7418
+[#7449]: https://github.com/tokio-rs/tokio/pull/7449
+[#7450]: https://github.com/tokio-rs/tokio/pull/7450
+[#7465]: https://github.com/tokio-rs/tokio/pull/7465
+
 # 1.46.1 (July 4th, 2025)
 
 This release fixes incorrect spawn locations in runtime task hooks for tasks
