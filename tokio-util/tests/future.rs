@@ -65,6 +65,7 @@ fn pending_fut_with_cancellation_token_test() {
 fn ready_fut_with_already_cancelled_token_test() {
     let (waker, _) = new_count_waker();
     let token = CancellationToken::new();
+    token.cancel();
 
     let ready_fut = ready(());
 
@@ -184,6 +185,7 @@ fn pending_fut_with_cancellation_token_owned_test() {
 fn ready_fut_with_already_cancelled_token_owned_test() {
     let (waker, _) = new_count_waker();
     let token = CancellationToken::new();
+    token.cancel();
 
     let ready_fut = ready(());
 
