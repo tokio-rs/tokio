@@ -85,7 +85,7 @@ use std::sync::atomic::Ordering;
 /// }
 /// ```
 ///
-/// [`asyncio.Event`]: https://docs.python.org/3/library/asyncio-event.html
+/// [`asyncio.Event`]: https://docs.python.org/3/library/asyncio-sync.html#asyncio.Event
 pub struct SetOnce<T> {
     value_set: AtomicBool,
     value: UnsafeCell<MaybeUninit<T>>,
