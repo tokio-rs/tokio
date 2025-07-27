@@ -81,7 +81,6 @@ where
 
         if let Some(buf) = this.buf {
             if buf.len() + item.len() > buf.capacity() {
-                drop(this);
                 self.as_mut().flush_buf()?;
                 this = self.as_mut().project();
             }
