@@ -1242,6 +1242,7 @@ jobs:
         run: |
           KERNEL_VERSION=$(curl -s https://www.kernel.org/releases.json | jq -r '.latest_stable.version')
           echo "kernel_version=$KERNEL_VERSION" >> $GITHUB_OUTPUT
+
   test-io-uring-on-specific-kernel-versions:
     name: Test io_uring on Linux ${{ matrix.kernel_version }}
     needs: [get-latest-kernel-version, basics]
