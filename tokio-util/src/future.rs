@@ -59,7 +59,7 @@ pub trait FutureExt: Future {
     }
 
     /// Similar to [`CancellationToken::run_until_cancelled`],
-    /// but with the advantage that it is easier to write
+    /// but with the advantage that it is easier to write.
     ///
     /// # Fairness
     ///
@@ -96,7 +96,7 @@ pub trait FutureExt: Future {
     }
 
     /// Similar to [`CancellationToken::run_until_cancelled_owned`],
-    /// but with the advantage that it is easier to write
+    /// but with the advantage that it is easier to write.
     ///
     /// # Fairness
     ///
