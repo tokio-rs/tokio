@@ -26,7 +26,6 @@ pub trait FutureExt: Future {
         /// assert!(res.is_err());
         /// # }
         /// ```
-        #[cfg(feature = "time")]
         fn timeout(self, timeout: std::time::Duration) -> tokio::time::Timeout<Self>
         where
             Self: Sized,
@@ -53,7 +52,6 @@ pub trait FutureExt: Future {
         /// assert!(res.is_err());
         /// # }
         /// ```
-        #[cfg(feature = "time")]
         fn timeout_at(self, deadline: tokio::time::Instant) -> tokio::time::Timeout<Self>
         where
             Self: Sized,
