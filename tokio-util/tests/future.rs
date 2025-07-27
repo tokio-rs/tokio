@@ -139,8 +139,9 @@ fn pending_only_on_first_poll_with_cancellation_token_test() {
     token.cancel();
     assert_eq!(wake_count, 1);
 
-    // due to the polling fairness (biased behavior) of WithCancellationToken Future,
-    // subsequent polls are biased toward polling ReadyOnTheSecondPollFuture, which results in always returning Ready.
+    // due to the polling fairness (biased behavior) of `WithCancellationToken` Future,
+    // subsequent polls are biased toward polling ReadyOnTheSecondPollFuture,
+    // which results in always returning Ready.
     let res = fut.as_mut().poll(&mut Context::from_waker(&waker));
     assert_ready_eq!(res, Some(()));
 }
@@ -259,8 +260,9 @@ fn pending_only_on_first_poll_with_cancellation_token_owned_test() {
     token.cancel();
     assert_eq!(wake_count, 1);
 
-    // due to the polling fairness (biased behavior) of WithCancellationToken Future,
-    // subsequent polls are biased toward polling ReadyOnTheSecondPollFuture, which results in always returning Ready.
+    // due to the polling fairness (biased behavior) of `WithCancellationToken` Future,
+    // subsequent polls are biased toward polling ReadyOnTheSecondPollFuture,
+    // which results in always returning Ready.
     let res = fut.as_mut().poll(&mut Context::from_waker(&waker));
     assert_ready_eq!(res, Some(()));
 }

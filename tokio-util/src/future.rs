@@ -59,7 +59,8 @@ pub trait FutureExt: Future {
     }
 
     /// Similar to [`CancellationToken::run_until_cancelled`],
-    /// but with the advantage that it is easier to write.
+    /// but with the advantage that it is easier to write fluent call chains,
+    /// and biased towards waiting for [`CancellationToken`] to complete.
     ///
     /// # Fairness
     ///
@@ -96,7 +97,8 @@ pub trait FutureExt: Future {
     }
 
     /// Similar to [`CancellationToken::run_until_cancelled_owned`],
-    /// but with the advantage that it is easier to write.
+    /// but with the advantage that it is easier to write fluent call chains,
+    /// and biased towards waiting for [`CancellationToken`] to complete.
     ///
     /// # Fairness
     ///
