@@ -704,3 +704,27 @@ macro_rules! cfg_tokio_uring {
         )*
     };
 }
+
+macro_rules! cfg_tcp_quickack{
+    ($($item:item)*) => {
+        $(
+            #[cfg(
+                any(
+                    target_os = "android",
+                    target_os = "fuchsia",
+                    target_os = "linux",
+                    target_os = "cygwin",
+                )
+            )]
+            #[cfg_attr(docsrs, doc(cfg(
+                any(
+                    target_os = "android",
+                    target_os = "fuchsia",
+                    target_os = "linux",
+                    target_os = "cygwin",
+                )
+            )))]
+            $item
+        )*
+    };
+}

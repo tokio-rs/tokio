@@ -1170,6 +1170,52 @@ impl TcpStream {
         self.io.set_nodelay(nodelay)
     }
 
+    cfg_tcp_quickack! {
+        /// Gets the value of the `TCP_QUICKACK` option on this socket.
+        ///
+        /// For more information about this option, see [`TcpStreamExt::set_quickack`].
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::TcpStream;
+        ///
+        /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+        /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+        ///
+        /// stream.quickack()?;
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub fn quickack(&self) -> io::Result<bool> {
+            socket2::SockRef::from(self).tcp_quickack()
+        }
+
+        /// Enable or disable `TCP_QUICKACK`.
+        ///
+        /// This flag causes Linux to eagerly send ACKs rather than delaying them.
+        /// Linux may reset this flag after further operations on the socket.
+        ///
+        /// See [`man 7 tcp`](https://man7.org/linux/man-pages/man7/tcp.7.html) and
+        /// [TCP delayed acknowledgement](https://en.wikipedia.org/wiki/TCP_delayed_acknowledgment)
+        /// for more information.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::net::TcpStream;
+        ///
+        /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+        /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+        ///
+        /// stream.set_quickack(true)?;
+        /// # Ok(())
+        /// ```
+        pub fn set_quickack(&self, quickack: bool) -> io::Result<()> {
+            socket2::SockRef::from(self).set_tcp_quickack(quickack)
+        }
+    }
+
     cfg_not_wasi! {
         /// Reads the linger duration for this socket by getting the `SO_LINGER`
         /// option.
