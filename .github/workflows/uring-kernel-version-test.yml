@@ -1,4 +1,4 @@
-name: Kernel Version Test
+name: Uring Kernel Version Test
 
 on:
   workflow_call:

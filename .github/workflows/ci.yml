@@ -1253,6 +1253,6 @@ jobs:
           - ${{ needs.get-latest-kernel-version.outputs.kernel_version }}
           # A kernel version that doesn't support io_uring
           - '4.19.325'
-    uses: ./.github/workflows/kernel-version-test.yml
+    uses: ./.github/workflows/uring-kernel-version-test.yml
     with:
       kernel_version: ${{ matrix.kernel_version }}
