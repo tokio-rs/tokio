@@ -1210,6 +1210,7 @@ impl TcpStream {
         ///
         /// stream.set_quickack(true)?;
         /// # Ok(())
+        /// # }
         /// ```
         pub fn set_quickack(&self, quickack: bool) -> io::Result<()> {
             socket2::SockRef::from(self).set_tcp_quickack(quickack)
