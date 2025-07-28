@@ -422,14 +422,11 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     };
 
     let mut checks = vec![];
-    let mut attrs = vec![];
+    let mut errors = vec![];
 
     let build = if let RuntimeFlavor::Local = config.flavor {
-        checks.push(quote! {
-            #[cfg(not(tokio_unstable))]
-            compile_error!("The local runtime flavor is only available when `tokio_unstable` is set.");
-        });
-        attrs.push(quote! { #[cfg(tokio_unstable)] });
+        checks.push(quote! { tokio_unstable });
+        errors.push("The local runtime flavor is only available when `tokio_unstable` is set.");
         quote_spanned! {last_stmt_start_span=> build_local(Default::default())}
     } else {
         quote_spanned! {last_stmt_start_span=> build()}
@@ -454,11 +451,23 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         quote! {}
     };
 
+    let do_checks: TokenStream = checks
+        .iter()
+        .zip(&errors)
+        .map(|(check, error)| {
+            quote! {
+                #[cfg(not(#check))]
+                compile_error!(#error);
+            }
+        })
+        .collect();
+
     let body_ident = quote! { body };
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
     let last_block = quote_spanned! {last_stmt_end_span=>
-        #(#checks)*
-        #(#attrs)*
+        #do_checks
+
+        #[cfg(all(#(#checks),*))]
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
         {
             return #rt
@@ -468,7 +477,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
                 .block_on(#body_ident);
         }
 
-        #[allow(unreachable_code)]
+        #[cfg(not(all(#(#checks),*)))]
         {
             panic!("fell through checks")
         }
