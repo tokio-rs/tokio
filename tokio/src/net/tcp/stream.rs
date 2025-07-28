@@ -1193,11 +1193,11 @@ impl TcpStream {
 
         /// Enable or disable `TCP_QUICKACK`.
         ///
-        /// This flag causes Linux to eagerly send ACKs rather than delaying them.
+        /// This flag causes Linux to eagerly send `ACK`s rather than delaying them.
         /// Linux may reset this flag after further operations on the socket.
         ///
         /// See [`man 7 tcp`](https://man7.org/linux/man-pages/man7/tcp.7.html) and
-        /// [TCP delayed acknowledgement](https://en.wikipedia.org/wiki/TCP_delayed_acknowledgment)
+        /// [TCP delayed acknowledgment](https://en.wikipedia.org/wiki/TCP_delayed_acknowledgment)
         /// for more information.
         ///
         /// # Examples
