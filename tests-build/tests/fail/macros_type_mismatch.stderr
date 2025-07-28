@@ -43,12 +43,11 @@ error[E0308]: mismatched types
    |
    = note:   expected enum `Result<(), ()>`
            found unit type `()`
-help: try wrapping the expression in a variant of `Result`
+help: try adding an expression at the end of the block
    |
-23 |     Ok(Ok(());)
-   |     +++       +
-23 |     Err(Ok(());)
-   |     ++++       +
+23 ~     Ok(());;
+24 +     Ok(())
+   |
 
 error[E0277]: the `?` operator can only be used in an async block that returns `Result` or `Option` (or another type that implements `FromResidual`)
   --> tests/fail/macros_type_mismatch.rs:40:9
@@ -69,10 +68,14 @@ error[E0308]: mismatched types
    |
    = note:   expected enum `Option<()>`
            found unit type `()`
-help: try wrapping the expression in `Some`
+help: try adding an expression at the end of the block
    |
-40 |     Some(None?;)
-   |     +++++      +
+40 ~     None?;;
+41 +     None
+   |
+40 ~     None?;;
+41 +     Some(())
+   |
 
 error[E0277]: the `?` operator can only be used in an async block that returns `Result` or `Option` (or another type that implements `FromResidual`)
   --> tests/fail/macros_type_mismatch.rs:57:11
@@ -93,12 +96,11 @@ error[E0308]: mismatched types
    |
    = note:   expected enum `Result<(), ()>`
            found unit type `()`
-help: try wrapping the expression in a variant of `Result`
+help: try adding an expression at the end of the block
    |
-57 |     Ok(Ok(())?;)
-   |     +++        +
-57 |     Err(Ok(())?;)
-   |     ++++        +
+57 ~     Ok(())?;;
+58 +     Ok(())
+   |
 
 error[E0308]: mismatched types
   --> tests/fail/macros_type_mismatch.rs:66:5
