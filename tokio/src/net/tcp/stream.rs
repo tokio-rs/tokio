@@ -1173,7 +1173,7 @@ impl TcpStream {
     cfg_tcp_quickack! {
         /// Gets the value of the `TCP_QUICKACK` option on this socket.
         ///
-        /// For more information about this option, see [`TcpStreamExt::set_quickack`].
+        /// For more information about this option, see [`TcpStream::set_quickack`].
         ///
         /// # Examples
         ///
