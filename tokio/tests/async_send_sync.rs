@@ -22,14 +22,15 @@ struct YY {}
 #[derive(Clone)]
 #[allow(unused)]
 struct YN {
-    _value: Cell<u8>,
+    _value: *mut i32,
 }
+unsafe impl Send for YN {}
 
 // Send: No, Sync: No
 #[derive(Clone)]
 #[allow(unused)]
 struct NN {
-    _value: Rc<u8>,
+    _value: *mut i32,
 }
 
 #[allow(dead_code)]
@@ -201,7 +202,7 @@ cfg_not_wasi! {
         use super::*;
         assert_value!(tokio::fs::DirBuilder: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
         assert_value!(tokio::fs::DirEntry: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
-        assert_value!(tokio::fs::File: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
+        assert_value!(tokio::fs::File: Send & Sync & Unpin & UnwindSafe & !RefUnwindSafe);
         assert_value!(tokio::fs::OpenOptions: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
         assert_value!(tokio::fs::ReadDir: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
 
@@ -385,21 +386,22 @@ mod windows_signal {
 }
 
 assert_value!(tokio::sync::AcquireError: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
-assert_value!(tokio::sync::Barrier: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::Barrier: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::BarrierWaitResult: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
-assert_value!(tokio::sync::MappedMutexGuard<'_, NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::MappedMutexGuard<'_, YN>: Send &!Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::MappedMutexGuard<'_, YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::Mutex<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::Mutex<YN>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::Mutex<YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::MappedMutexGuard<'_, NN>: !Send & !Sync & Unpin & !UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::MappedMutexGuard<'_, YN>: Send & !Sync & Unpin & !UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::MappedMutexGuard<'_, YY>: Send & Sync & Unpin & !UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::Mutex<NN>: !Send & !Sync & Unpin & UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::Mutex<YN>: Send & Sync & Unpin & UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::Mutex<YY>: Send & Sync & Unpin & UnwindSafe & !RefUnwindSafe);
+
 assert_value!(tokio::sync::MutexGuard<'_, NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::MutexGuard<'_, YN>: Send &!Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::MutexGuard<'_, YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::Notify: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
-assert_value!(tokio::sync::OnceCell<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::OnceCell<YN>: Send &!Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::OnceCell<YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::OnceCell<NN>: !Send & !Sync & Unpin & UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::OnceCell<YN>: Send &!Sync & Unpin & UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::OnceCell<YY>: Send & Sync & Unpin & UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::SetOnce<NN>: !Send & !Sync & Unpin & UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::SetOnce<YN>: Send &!Sync & Unpin & UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::SetOnce<YY>: Send & Sync & Unpin & UnwindSafe & !RefUnwindSafe);
@@ -424,32 +426,32 @@ assert_value!(tokio::sync::OwnedRwLockReadGuard<YY>: Send & Sync & Unpin & !Unwi
 assert_value!(tokio::sync::OwnedRwLockWriteGuard<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::OwnedRwLockWriteGuard<YN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::OwnedRwLockWriteGuard<YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::OwnedSemaphorePermit: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLock<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLock<YN>: Send &!Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLock<YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLockMappedWriteGuard<'_, NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLockMappedWriteGuard<'_, YN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLockMappedWriteGuard<'_, YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLockReadGuard<'_, NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLockReadGuard<'_, YN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLockReadGuard<'_, YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLockWriteGuard<'_, NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLockWriteGuard<'_, YN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::RwLockWriteGuard<'_, YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::Semaphore: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::SemaphorePermit<'_>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::OwnedSemaphorePermit: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::RwLock<NN>: !Send & !Sync & Unpin & UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::RwLock<YN>: Send &!Sync & Unpin & UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::RwLock<YY>: Send & Sync & Unpin & UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::RwLockMappedWriteGuard<'_, NN>: !Send & !Sync & Unpin & !UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::RwLockMappedWriteGuard<'_, YN>: !Send & !Sync & Unpin & !UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::RwLockMappedWriteGuard<'_, YY>: Send & Sync & Unpin & !UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::RwLockReadGuard<'_, NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::RwLockReadGuard<'_, YN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::RwLockReadGuard<'_, YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::RwLockWriteGuard<'_, NN>: !Send & !Sync & Unpin & !UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::RwLockWriteGuard<'_, YN>: !Send & !Sync & Unpin & !UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::RwLockWriteGuard<'_, YY>: Send & Sync & Unpin & !UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::Semaphore: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::SemaphorePermit<'_>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::TryAcquireError: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::TryLockError: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
-assert_value!(tokio::sync::broadcast::Receiver<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::broadcast::Receiver<YN>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::broadcast::Receiver<YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::broadcast::Sender<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::broadcast::Sender<YN>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::broadcast::Sender<YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::broadcast::WeakSender<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::broadcast::WeakSender<YN>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::broadcast::WeakSender<YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::broadcast::Receiver<NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::broadcast::Receiver<YN>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::broadcast::Receiver<YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::broadcast::Sender<NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::broadcast::Sender<YN>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::broadcast::Sender<YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::broadcast::WeakSender<NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::broadcast::WeakSender<YN>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::broadcast::WeakSender<YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::futures::Notified<'_>: Send & Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::futures::OwnedNotified: Send & Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::mpsc::OwnedPermit<NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
@@ -477,13 +479,13 @@ assert_value!(tokio::sync::mpsc::WeakUnboundedSender<NN>: !Send & !Sync & Unpin 
 assert_value!(tokio::sync::mpsc::WeakUnboundedSender<YN>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::mpsc::WeakUnboundedSender<YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::mpsc::error::SendError<NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
-assert_value!(tokio::sync::mpsc::error::SendError<YN>: Send &!Sync & Unpin & UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::mpsc::error::SendError<YN>: Send &!Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::mpsc::error::SendError<YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::mpsc::error::SendTimeoutError<NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
-assert_value!(tokio::sync::mpsc::error::SendTimeoutError<YN>: Send &!Sync & Unpin & UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::mpsc::error::SendTimeoutError<YN>: Send &!Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::mpsc::error::SendTimeoutError<YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::mpsc::error::TrySendError<NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
-assert_value!(tokio::sync::mpsc::error::TrySendError<YN>: Send &!Sync & Unpin & UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::mpsc::error::TrySendError<YN>: Send &!Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::mpsc::error::TrySendError<YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::sync::oneshot::Receiver<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::oneshot::Receiver<YN>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
@@ -491,22 +493,22 @@ assert_value!(tokio::sync::oneshot::Receiver<YY>: Send & Sync & Unpin & !UnwindS
 assert_value!(tokio::sync::oneshot::Sender<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::oneshot::Sender<YN>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::sync::oneshot::Sender<YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::watch::Receiver<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::watch::Receiver<YN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::watch::Receiver<YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::watch::Ref<'_, NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::watch::Ref<'_, YN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::watch::Ref<'_, YY>: !Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::watch::Sender<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::watch::Sender<YN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::sync::watch::Sender<YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::sync::watch::Receiver<NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::watch::Receiver<YN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::watch::Receiver<YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::watch::Ref<'_, NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::watch::Ref<'_, YN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::watch::Ref<'_, YY>: !Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::watch::Sender<NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::watch::Sender<YN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::sync::watch::Sender<YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::task::JoinError: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::task::JoinHandle<NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::task::JoinHandle<YN>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::task::JoinHandle<YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
-assert_value!(tokio::task::JoinSet<NN>: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::task::JoinSet<YN>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
-assert_value!(tokio::task::JoinSet<YY>: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::task::JoinSet<NN>: !Send & !Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::task::JoinSet<YN>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
+assert_value!(tokio::task::JoinSet<YY>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::task::LocalSet: !Send & !Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
 assert_value!(tokio::task::coop::RestoreOnPending: !Send & !Sync & Unpin & UnwindSafe & !RefUnwindSafe);
 async_assert_fn!(tokio::sync::Barrier::wait(_): Send & Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
@@ -584,12 +586,12 @@ async_assert_fn!(tokio::sync::watch::Receiver<YY>::changed(_): Send & Sync & !Un
 async_assert_fn!(tokio::sync::watch::Sender<NN>::closed(_): !Send & !Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
 async_assert_fn!(tokio::sync::watch::Sender<YN>::closed(_): !Send & !Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
 async_assert_fn!(tokio::sync::watch::Sender<YY>::closed(_): Send & Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
-async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::join_next(_): Send & Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
-async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::shutdown(_): Send & Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
-async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::join_next(_): !Send & !Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
-async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::shutdown(_): !Send & !Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
-async_assert_fn!(tokio::task::JoinSet<u32>::join_next(_): Send & Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
-async_assert_fn!(tokio::task::JoinSet<u32>::shutdown(_): Send & Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
+async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::join_next(_): Send & Sync & !Unpin & !UnwindSafe & RefUnwindSafe);
+async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::shutdown(_): Send & Sync & !Unpin & !UnwindSafe & RefUnwindSafe);
+async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::join_next(_): !Send & !Sync & !Unpin & !UnwindSafe & RefUnwindSafe);
+async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::shutdown(_): !Send & !Sync & !Unpin & !UnwindSafe & RefUnwindSafe);
+async_assert_fn!(tokio::task::JoinSet<u32>::join_next(_): Send & Sync & !Unpin & !UnwindSafe & RefUnwindSafe);
+async_assert_fn!(tokio::task::JoinSet<u32>::shutdown(_): Send & Sync & !Unpin & !UnwindSafe & RefUnwindSafe);
 async_assert_fn!(tokio::task::LocalKey<Cell<u32>>::scope(_, Cell<u32>, BoxFuture<()>): !Send & !Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
 async_assert_fn!(tokio::task::LocalKey<Cell<u32>>::scope(_, Cell<u32>, BoxFutureSend<()>): Send & !Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
 async_assert_fn!(tokio::task::LocalKey<Cell<u32>>::scope(_, Cell<u32>, BoxFutureSync<()>): Send & !Sync & !Unpin & !UnwindSafe & !RefUnwindSafe);
@@ -631,7 +633,7 @@ async_assert_fn!(tokio::time::Interval::tick(_): Send & Sync & !Unpin & !UnwindS
 assert_value!(tokio::io::BufReader<TcpStream>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::io::BufStream<TcpStream>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::io::BufWriter<TcpStream>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
-assert_value!(tokio::io::DuplexStream: Send & Sync & Unpin & !UnwindSafe & !RefUnwindSafe);
+assert_value!(tokio::io::DuplexStream: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::io::Empty: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::io::Interest: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
 assert_value!(tokio::io::Lines<TcpStream>: Send & Sync & Unpin & UnwindSafe & RefUnwindSafe);
