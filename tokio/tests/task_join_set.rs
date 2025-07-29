@@ -334,7 +334,7 @@ async fn try_join_next_with_id() {
                 count += 1;
                 joined.insert(id);
             }
-            Some(Err(err)) => panic!("failed: {}", err),
+            Some(Err(err)) => panic!("failed: {err}"),
             None => {
                 break;
             }

@@ -661,7 +661,9 @@ mod unstable {
             .build()
             .unwrap();
         let rt1_values = rt1.block_on(async {
-            let _ = tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) }).await;
+            tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) })
+                .await
+                .unwrap()
         });
 
         let rt2 = tokio::runtime::Builder::new_multi_thread()
@@ -670,7 +672,9 @@ mod unstable {
             .build()
             .unwrap();
         let rt2_values = rt2.block_on(async {
-            let _ = tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) }).await;
+            tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) })
+                .await
+                .unwrap()
         });
 
         assert_eq!(rt1_values, rt2_values);

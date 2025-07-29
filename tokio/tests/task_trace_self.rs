@@ -92,8 +92,8 @@ async fn task_trace_self() {
     for line in good_line {
         let s = format!("{}:{}:", file!(), line);
         assert!(log.lock().unwrap().iter().any(|x| {
-            eprintln!("{}", x);
-            format!("{}", x).contains(&s)
+            eprintln!("{x}");
+            format!("{x}").contains(&s)
         }));
     }
     for line in bad_line {
@@ -102,6 +102,6 @@ async fn task_trace_self() {
             .lock()
             .unwrap()
             .iter()
-            .any(|x| format!("{}", x).contains(&s)));
+            .any(|x| format!("{x}").contains(&s)));
     }
 }

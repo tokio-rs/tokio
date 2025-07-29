@@ -843,6 +843,8 @@ jobs:
       # Run clippy
       - name: "clippy --all"
         run: cargo clippy --all --tests --all-features --no-deps
+        env:
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump --cfg tokio_uring -Dwarnings
 
   docs:
     name: docs
