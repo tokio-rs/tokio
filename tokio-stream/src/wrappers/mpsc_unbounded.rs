@@ -68,14 +68,12 @@ impl<T> Stream for UnboundedReceiverStream<T> {
     ///
     /// For closed channels, it returns `(receiver.len(), receiver.len())`.
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.inner.len();
-        let upper = if self.inner.is_closed() {
-            Some(len)
+        if self.inner.is_closed() {
+            let len = self.inner.len();
+            (len, Some(len))
         } else {
-            None
-        };
-
-        (len, upper)
+            (self.inner.len(), None)
+        }
     }
 }
 
