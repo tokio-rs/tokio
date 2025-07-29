@@ -79,14 +79,12 @@ impl<T> Stream for ReceiverStream<T> {
     ///
     /// [`Permit`]: struct@tokio::sync::mpsc::Permit
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let upper = if self.inner.is_closed() {
+        if self.inner.is_closed() {
             let used_capacity = self.inner.max_capacity() - self.inner.capacity();
-            Some(used_capacity)
+            (self.inner.len(), Some(used_capacity))
         } else {
-            None
-        };
-
-        (self.inner.len(), upper)
+            (self.inner.len(), None)
+        }
     }
 }
 
