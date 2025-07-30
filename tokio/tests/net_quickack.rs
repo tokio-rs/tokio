@@ -2,9 +2,9 @@
 #![cfg(all(
     feature = "net",
     any(
+        target_os = "linux",
         target_os = "android",
         target_os = "fuchsia",
-        target_os = "linux",
         target_os = "cygwin",
     )
 ))]
