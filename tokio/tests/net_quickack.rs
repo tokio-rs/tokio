@@ -10,9 +10,9 @@
 ))]
 #![cfg_attr(miri, ignore)] // No `socket` in miri.
 
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::oneshot;
 
 #[tokio::test]
@@ -47,7 +47,9 @@ async fn socket_works_with_quickack() {
 
     let port = rx_port.await.unwrap();
     let client = tokio::spawn(async move {
-        let mut stream = TcpStream::connect(format!("127.0.0.1:{port}")).await.unwrap();
+        let mut stream = TcpStream::connect(format!("127.0.0.1:{port}"))
+            .await
+            .unwrap();
         stream.set_quickack(true).unwrap();
         assert!(stream.quickack().unwrap());
 
