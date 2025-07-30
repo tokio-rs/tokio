@@ -8,7 +8,7 @@
         target_os = "cygwin",
     )
 ))]
-#![cfg(miri)] // No `socket` in miri.
+#![cfg(not(miri))] // No `socket` in miri.
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
