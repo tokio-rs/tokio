@@ -67,6 +67,25 @@ impl<T> Stream for ReceiverStream<T> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.inner.poll_recv(cx)
     }
+
+    /// Returns the bounds of the stream based on the underlying receiver.
+    ///
+    /// For open channels, it returns `(receiver.len(), None)`.
+    ///
+    /// For closed channels, it returns `(receiver.len(), Some(used_capacity))`
+    /// where `used_capacity` is calculated as `receiver.max_capacity() -
+    /// receiver.capacity()`. This accounts for any [`Permit`] that is still
+    /// able to send a message.
+    ///
+    /// [`Permit`]: struct@tokio::sync::mpsc::Permit
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.inner.is_closed() {
+            let used_capacity = self.inner.max_capacity() - self.inner.capacity();
+            (self.inner.len(), Some(used_capacity))
+        } else {
+            (self.inner.len(), None)
+        }
+    }
 }
 
 impl<T> AsRef<Receiver<T>> for ReceiverStream<T> {
