@@ -37,7 +37,7 @@ async fn socket_works_with_quickack() {
         stream.read_exact(&mut buf).await.unwrap();
         assert_eq!(buf, MESSAGE.as_bytes());
 
-        // There is nothing special about setting quickack to false,
+        // There is nothing special about setting quickack to false
         // at this point, we just want to test the `false` case.
         stream.set_quickack(false).unwrap();
         assert!(!stream.quickack().unwrap());
@@ -57,7 +57,7 @@ async fn socket_works_with_quickack() {
 
         stream.write_all(MESSAGE.as_bytes()).await.unwrap();
 
-        // There is nothing special about setting quickack to false,
+        // There is nothing special about setting quickack to false
         // at this point, we just want to test the `false` case.
         stream.set_quickack(false).unwrap();
         assert!(!stream.quickack().unwrap());
