@@ -119,10 +119,7 @@ where
                         buffer: BytesMut::with_capacity(capacity),
                         has_errored: false,
                     },
-                    write: WriteFrame {
-                        buffer: BytesMut::with_capacity(capacity),
-                        backpressure_boundary: capacity,
-                    },
+                    write: WriteFrame::default(),
                 },
             },
         }
