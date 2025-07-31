@@ -433,4 +433,3 @@ impl Drop for SimplexStream {
         self.close_write();
     }
 }
-
