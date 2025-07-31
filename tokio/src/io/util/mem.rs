@@ -427,3 +427,10 @@ impl AsyncWrite for SimplexStream {
         Poll::Ready(Ok(()))
     }
 }
+
+impl Drop for SimplexStream {
+    fn drop(&mut self) {
+        self.close_write();
+    }
+}
+
