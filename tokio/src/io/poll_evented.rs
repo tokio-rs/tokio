@@ -125,7 +125,7 @@ impl<E: Source> PollEvented<E> {
     }
 
     /// Returns a reference to the registration.
-    #[cfg(feature = "net")]
+    #[cfg(any(feature = "net", all(feature = "process", target_os = "linux")))]
     pub(crate) fn registration(&self) -> &Registration {
         &self.registration
     }
@@ -136,14 +136,6 @@ impl<E: Source> PollEvented<E> {
         let mut inner = self.io.take().unwrap(); // As io shouldn't ever be None, just unwrap here.
         self.registration.deregister(&mut inner)?;
         Ok(inner)
-    }
-
-    #[cfg(all(feature = "process", target_os = "linux"))]
-    pub(crate) fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        self.registration
-            .poll_read_ready(cx)
-            .map_err(io::Error::from)
-            .map_ok(|_| ())
     }
 
     /// Re-register under new runtime with `interest`.
