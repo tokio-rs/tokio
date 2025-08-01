@@ -1412,7 +1412,7 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.43.1"
+version = "1.43.2"
 dependencies = [
  "async-stream",
  "backtrace",
