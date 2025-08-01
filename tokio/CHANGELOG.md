@@ -1,3 +1,11 @@
+# 1.43.2 (August 1st, 2025)
+
+### Fixed
+
+- process: fix panic from spurious pidfd wakeup ([#7494])
+
+[#7494]: https://github.com/tokio-rs/tokio/pull/7494
+
 # 1.43.1 (April 5th, 2025)
 
 This release fixes a soundness issue in the broadcast channel. The channel
