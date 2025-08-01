@@ -116,7 +116,7 @@ cfg_rt! {
     /// finish running. You can use [`shutdown_timeout`] to stop waiting for
     /// them after a certain timeout. Be aware that this will still not cancel
     /// the tasks — they are simply allowed to keep running after the method
-    /// returns.  It is possible for a blocking task to be cancelled if it has
+    /// returns. It is possible for a blocking task to be cancelled if it has
     /// not yet started running, but this is not guaranteed.
     ///
     /// Note that if you are using the single threaded runtime, this function will
