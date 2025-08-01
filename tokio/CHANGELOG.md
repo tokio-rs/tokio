@@ -1,3 +1,12 @@
+# 1.47.1 (August 1st, 2025)
+
+### Fixed
+
+- process: fix panic from spurious pidfd wakeup ([#7494])
+- sync: fix broken link of Python `asyncio.Event` in `SetOnce` docs ([#7485])
+
+[#7485]: https://github.com/tokio-rs/tokio/pull/7485
+
 # 1.47.0 (July 25th, 2025)
 
 This release adds `poll_proceed` and `cooperative` to the `coop` module for
@@ -239,6 +248,14 @@ comment on [#7172].
 [#7185]: https://github.com/tokio-rs/tokio/pull/7185
 [#7186]: https://github.com/tokio-rs/tokio/pull/7186
 [#7192]: https://github.com/tokio-rs/tokio/pull/7192
+
+# 1.43.2 (August 1st, 2025)
+
+### Fixed
+
+- process: fix panic from spurious pidfd wakeup ([#7494])
+
+[#7494]: https://github.com/tokio-rs/tokio/pull/7494
 
 # 1.43.1 (April 5th, 2025)
 
