@@ -1,15 +1,17 @@
 #![cfg(not(target_os = "wasi"))]
 
+use std::future::poll_fn;
 use std::{task::Context, time::Duration};
 
 #[cfg(not(loom))]
 use futures::task::noop_waker_ref;
 
-use crate::loom::sync::atomic::{AtomicBool, Ordering};
-use crate::loom::sync::Arc;
 use crate::loom::thread;
+use crate::runtime::time::timer::with_current_wheel;
+use crate::runtime::Handle;
+use crate::sync::oneshot;
 
-use super::TimerEntry;
+use super::Timer;
 
 fn block_on<T>(f: impl std::future::Future<Output = T>) -> T {
     #[cfg(loom)]
@@ -21,6 +23,7 @@ fn block_on<T>(f: impl std::future::Future<Output = T>) -> T {
             .build()
             .unwrap();
         rt.block_on(f)
+        // futures::executor::block_on(f)
     }
 }
 
@@ -32,9 +35,43 @@ fn model(f: impl Fn() + Send + Sync + 'static) {
     f();
 }
 
+async fn fire_all_timers(handle: &Handle, exit_rx: oneshot::Receiver<()>) {
+    loop {
+        // Keep the worker thread busy, so that it can process injected
+        // timers.
+        crate::task::yield_now().await;
+        if !exit_rx.is_empty() {
+            // break the loop if the thread is exiting
+            break;
+        }
+
+        // In the `block_on` context, we can get the current wheel
+        // fire all timers.
+        with_current_wheel(&handle.inner, |maybe_wheel| {
+            let (wheel, _tx) = maybe_wheel.unwrap();
+            let time = handle.inner.driver().time();
+            time.process_at_time(wheel, u64::MAX); // 2 seconds
+        });
+
+        thread::yield_now();
+        eprintln!("yielding to allow timers to fire");
+    }
+}
+
+// This function must be called inside the `rt.block_on`.
+fn process_at_time(handle: &Handle, at: u64) {
+    let handle = &handle.inner;
+    with_current_wheel(handle, |maybe_wheel| {
+        let (wheel, _tx) = maybe_wheel.unwrap();
+        let time = handle.driver().time();
+        time.process_at_time(wheel, at);
+    });
+}
+
 fn rt(start_paused: bool) -> crate::runtime::Runtime {
     crate::runtime::Builder::new_current_thread()
         .enable_time()
+        .event_interval(1)
         .start_paused(start_paused)
         .build()
         .unwrap()
@@ -45,25 +82,23 @@ fn single_timer() {
     model(|| {
         let rt = rt(false);
         let handle = rt.handle();
+        let (exit_tx, exit_rx) = oneshot::channel();
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(
+            let entry = Timer::new(
                 handle_.inner.clone(),
                 handle_.inner.driver().clock().now() + Duration::from_secs(1),
             );
             pin!(entry);
 
-            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
+            block_on(poll_fn(|cx| entry.as_mut().poll_elapsed(cx)));
+            exit_tx.send(()).unwrap();
         });
 
-        thread::yield_now();
-
-        let time = handle.inner.driver().time();
-        let clock = handle.inner.driver().clock();
-
-        // advance 2s
-        time.process_at_time(time.time_source().now(clock) + 2_000_000_000);
+        rt.block_on(async move {
+            fire_all_timers(handle, exit_rx).await;
+        });
 
         jh.join().unwrap();
     })
@@ -74,10 +109,11 @@ fn drop_timer() {
     model(|| {
         let rt = rt(false);
         let handle = rt.handle();
+        let (exit_tx, exit_rx) = oneshot::channel();
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(
+            let entry = Timer::new(
                 handle_.inner.clone(),
                 handle_.inner.driver().clock().now() + Duration::from_secs(1),
             );
@@ -89,15 +125,12 @@ fn drop_timer() {
             let _ = entry
                 .as_mut()
                 .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+            exit_tx.send(()).unwrap();
         });
 
-        thread::yield_now();
-
-        let time = handle.inner.driver().time();
-        let clock = handle.inner.driver().clock();
-
-        // advance 2s in the future.
-        time.process_at_time(time.time_source().now(clock) + 2_000_000_000);
+        rt.block_on(async move {
+            fire_all_timers(handle, exit_rx).await;
+        });
 
         jh.join().unwrap();
     })
@@ -108,10 +141,12 @@ fn change_waker() {
     model(|| {
         let rt = rt(false);
         let handle = rt.handle();
+        let (exit_tx, exit_rx) = oneshot::channel();
+        let (change_waker_tx, change_waker_rx) = oneshot::channel();
 
         let handle_ = handle.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(
+            let entry = Timer::new(
                 handle_.inner.clone(),
                 handle_.inner.driver().clock().now() + Duration::from_secs(1),
             );
@@ -121,70 +156,33 @@ fn change_waker() {
                 .as_mut()
                 .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
 
-            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
+            // At this point, we cannot let worker thread to wake up
+            // the timer because the waker is a noop.
+            // Let's say the timer has been woken up at this point,
+            // the following poll is basically polling a future that has completed
+            // (already returned `Ready`),which is not encouraged.
+
+            let mut maybe_change_waker_tx = Some(change_waker_tx);
+            block_on(poll_fn(|cx| {
+                let p = entry.as_mut().poll_elapsed(cx);
+                if let Some(tx) = maybe_change_waker_tx.take() {
+                    // notify the worker thread that the waker is useable now
+                    tx.send(()).unwrap();
+                }
+                p
+            }));
+
+            // notify the worker thread to exit
+            exit_tx.send(()).unwrap();
         });
 
-        thread::yield_now();
+        change_waker_rx.blocking_recv().unwrap();
 
-        let time = handle.inner.driver().time();
-        let clock = handle.inner.driver().clock();
-
-        // advance 2s
-        time.process_at_time(time.time_source().now(clock) + 2_000_000_000);
-
-        jh.join().unwrap();
-    })
-}
-
-#[test]
-fn reset_future() {
-    model(|| {
-        let finished_early = Arc::new(AtomicBool::new(false));
-
-        let rt = rt(false);
-        let handle = rt.handle();
-
-        let handle_ = handle.clone();
-        let finished_early_ = finished_early.clone();
-        let start = handle.inner.driver().clock().now();
-
-        let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(handle_.inner.clone(), start + Duration::from_secs(1));
-            pin!(entry);
-
-            let _ = entry
-                .as_mut()
-                .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
-
-            entry.as_mut().reset(start + Duration::from_secs(2), true);
-
-            // shouldn't complete before 2s
-            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
-
-            finished_early_.store(true, Ordering::Relaxed);
+        rt.block_on(async move {
+            fire_all_timers(handle, exit_rx).await;
         });
 
-        thread::yield_now();
-
-        let handle = handle.inner.driver().time();
-
-        handle.process_at_time(
-            handle
-                .time_source()
-                .instant_to_tick(start + Duration::from_millis(1500)),
-        );
-
-        assert!(!finished_early.load(Ordering::Relaxed));
-
-        handle.process_at_time(
-            handle
-                .time_source()
-                .instant_to_tick(start + Duration::from_millis(2500)),
-        );
-
         jh.join().unwrap();
-
-        assert!(finished_early.load(Ordering::Relaxed));
     })
 }
 
@@ -205,31 +203,33 @@ fn poll_process_levels() {
 
     let mut entries = vec![];
 
-    for i in 0..normal_or_miri(1024, 64) {
-        let mut entry = Box::pin(TimerEntry::new(
-            handle.inner.clone(),
-            handle.inner.driver().clock().now() + Duration::from_millis(i),
-        ));
+    rt.block_on(async {
+        for i in 0..normal_or_miri(1024, 64) {
+            let mut entry = Box::pin(Timer::new(
+                handle.inner.clone(),
+                handle.inner.driver().clock().now() + Duration::from_millis(i),
+            ));
 
-        let _ = entry
-            .as_mut()
-            .poll_elapsed(&mut Context::from_waker(noop_waker_ref()));
+            let _ = entry
+                .as_mut()
+                .poll_elapsed(&mut Context::from_waker(noop_waker_ref()));
 
-        entries.push(entry);
-    }
+            entries.push(entry);
+        }
 
-    for t in 1..normal_or_miri(1024, 64) {
-        handle.inner.driver().time().process_at_time(t as u64);
+        for t in 1..normal_or_miri(1024, 64) {
+            process_at_time(handle, t);
 
-        for (deadline, future) in entries.iter_mut().enumerate() {
-            let mut context = Context::from_waker(noop_waker_ref());
-            if deadline <= t {
-                assert!(future.as_mut().poll_elapsed(&mut context).is_ready());
-            } else {
-                assert!(future.as_mut().poll_elapsed(&mut context).is_pending());
+            for (deadline, future) in entries.iter_mut().enumerate() {
+                let mut context = Context::from_waker(noop_waker_ref());
+                if deadline <= t as usize {
+                    assert!(future.as_mut().poll_elapsed(&mut context).is_ready());
+                } else {
+                    assert!(future.as_mut().poll_elapsed(&mut context).is_pending());
+                }
             }
         }
-    }
+    });
 }
 
 #[test]
@@ -240,30 +240,16 @@ fn poll_process_levels_targeted() {
     let rt = rt(true);
     let handle = rt.handle();
 
-    let e1 = TimerEntry::new(
-        handle.inner.clone(),
-        handle.inner.driver().clock().now() + Duration::from_millis(193),
-    );
-    pin!(e1);
+    rt.block_on(async {
+        let e1 = Timer::new(
+            handle.inner.clone(),
+            handle.inner.driver().clock().now() + Duration::from_millis(193),
+        );
+        pin!(e1);
 
-    let handle = handle.inner.driver().time();
-
-    handle.process_at_time(62);
-    assert!(e1.as_mut().poll_elapsed(&mut context).is_pending());
-    handle.process_at_time(192);
-    handle.process_at_time(192);
-}
-
-#[test]
-#[cfg(not(loom))]
-fn instant_to_tick_max() {
-    use crate::runtime::time::entry::MAX_SAFE_MILLIS_DURATION;
-
-    let rt = rt(true);
-    let handle = rt.handle().inner.driver().time();
-
-    let start_time = handle.time_source.start_time();
-    let long_future = start_time + std::time::Duration::from_millis(MAX_SAFE_MILLIS_DURATION + 1);
-
-    assert!(handle.time_source.instant_to_tick(long_future) <= MAX_SAFE_MILLIS_DURATION);
+        process_at_time(handle, 62);
+        assert!(e1.as_mut().poll_elapsed(&mut context).is_pending());
+        process_at_time(handle, 192);
+        process_at_time(handle, 192);
+    })
 }
