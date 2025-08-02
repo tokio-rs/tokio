@@ -56,7 +56,7 @@ Make sure you activated the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.47.0", features = ["full"] }
+tokio = { version = "1.47.1", features = ["full"] }
 ```
 Then, on your main.rs:
 
@@ -216,8 +216,8 @@ warrants a patch release with a fix for the bug, it will be backported and
 released as a new patch release for each LTS minor version. Our current LTS
 releases are:
 
- * `1.38.x` - LTS release until July 2025. (MSRV 1.63)
  * `1.43.x` - LTS release until March 2026. (MSRV 1.70)
+ * `1.47.x` - LTS release until September 2026. (MSRV 1.70)
 
 Each LTS release will continue to receive backported fixes for at least a year.
 If you wish to use a fixed minor release in your project, we recommend that you
@@ -227,7 +227,7 @@ To use a fixed minor version, you can specify the version with a tilde. For
 example, to specify that you wish to use the newest `1.32.x` patch release, you
 can use the following dependency specification:
 ```text
-tokio = { version = "~1.38", features = [...] }
+tokio = { version = "~1.43", features = [...] }
 ```
 
 ### Previous LTS releases
@@ -239,6 +239,7 @@ tokio = { version = "~1.38", features = [...] }
  * `1.25.x` - LTS release until March 2024.
  * `1.32.x` - LTS release until September 2024.
  * `1.36.x` - LTS release until March 2025.
+ * `1.38.x` - LTS release until July 2025.
 
 ## License
 
