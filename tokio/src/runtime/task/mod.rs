@@ -249,7 +249,7 @@ pub(crate) struct Notified<S: 'static>(Task<S>);
 impl<S> Notified<S> {
     #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
     #[inline]
-    pub(crate) fn task_meta<'task, 'meta>(&'task self) -> crate::runtime::TaskMeta<'meta> {
+    pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
         self.0.task_meta()
     }
 }
@@ -270,7 +270,7 @@ pub(crate) struct LocalNotified<S: 'static> {
 impl<S> LocalNotified<S> {
     #[cfg(tokio_unstable)]
     #[inline]
-    pub(crate) fn task_meta<'task, 'meta>(&'task self) -> crate::runtime::TaskMeta<'meta> {
+    pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
         self.task.task_meta()
     }
 }
@@ -441,7 +441,7 @@ impl<S: 'static> Task<S> {
     // the compiler infers the lifetimes to be the same, and considers the task
     // to be borrowed for the lifetime of the returned `TaskMeta`.
     #[cfg(tokio_unstable)]
-    pub(crate) fn task_meta<'task, 'meta>(&'task self) -> crate::runtime::TaskMeta<'meta> {
+    pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
         crate::runtime::TaskMeta {
             id: self.id(),
             spawned_at: self.spawned_at().into(),

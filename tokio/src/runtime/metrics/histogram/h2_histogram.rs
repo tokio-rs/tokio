@@ -50,7 +50,7 @@ impl LogHistogram {
     /// - If `bucket_offset` is greater than the specified number of buckets, `(n - p + 1) * 2^p`
     fn from_n_p(n: u32, p: u32, bucket_offset: usize) -> Self {
         assert!(n >= p, "{n} (n) must be at least as large as {p} (p)");
-        let num_buckets = ((n - p + 1) * 1 << p) as usize - bucket_offset;
+        let num_buckets = ((n - p + 1) << p) as usize - bucket_offset;
         Self {
             num_buckets,
             p,
@@ -59,7 +59,7 @@ impl LogHistogram {
     }
 
     fn truncate_to_max_value(&self, max_value: u64) -> LogHistogram {
-        let mut hist = self.clone();
+        let mut hist = *self;
         while hist.max_value() >= max_value {
             hist.num_buckets -= 1;
         }
@@ -79,11 +79,7 @@ impl LogHistogram {
 
     pub(crate) fn value_to_bucket(&self, value: u64) -> usize {
         let index = bucket_index(value, self.p);
-        let offset_bucket = if index < self.bucket_offset as u64 {
-            0
-        } else {
-            index - self.bucket_offset as u64
-        };
+        let offset_bucket = index.saturating_sub(self.bucket_offset as u64);
         let max = self.num_buckets - 1;
         offset_bucket.min(max as u64) as usize
     }
@@ -180,7 +176,7 @@ impl LogHistogramBuilder {
         assert!(max_error > 0.0, "max_error must be greater than 0");
         assert!(max_error < 1.0, "max_error must be less than 1");
         let mut p = 2;
-        while 2_f64.powf(-1.0 * p as f64) > max_error && p <= MAX_PRECISION {
+        while 2_f64.powf(-(p as f64)) > max_error && p <= MAX_PRECISION {
             p += 1;
         }
         self.precision = Some(p);
@@ -434,9 +430,7 @@ mod test {
             assert_eq!(
                 config.value_to_bucket(i as u64),
                 i,
-                "{} should be in bucket {}",
-                i,
-                i
+                "{i} should be in bucket {i}"
             );
         }
 

@@ -34,16 +34,14 @@ fn spawn_task_hook_fires() {
     let count_realized = count.load(Ordering::SeqCst);
     assert_eq!(
         TASKS, count_realized,
-        "Total number of spawned task hook invocations was incorrect, expected {TASKS}, got {}",
-        count_realized
+        "Total number of spawned task hook invocations was incorrect, expected {TASKS}, got {count_realized}"
     );
 
     let count_ids_realized = ids.lock().unwrap().len();
 
     assert_eq!(
         TASKS, count_ids_realized,
-        "Total number of spawned task hook invocations was incorrect, expected {TASKS}, got {}",
-        count_realized
+        "Total number of spawned task hook invocations was incorrect, expected {TASKS}, got {count_realized}"
     );
 }
 
@@ -180,7 +178,7 @@ fn mk_spawn_location_hook(
     event: &'static str,
     count: &Arc<AtomicUsize>,
 ) -> impl Fn(&tokio::runtime::TaskMeta<'_>) {
-    let count = Arc::clone(&count);
+    let count = Arc::clone(count);
     move |data| {
         eprintln!("{event} ({:?}): {:?}", data.id(), data.spawned_at());
         // Assert that the spawn location is in this file.
