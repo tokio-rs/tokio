@@ -69,7 +69,8 @@ enum Action {
 struct Inner {
     actions: VecDeque<Action>,
     waiting: Option<Instant>,
-    sleep: Option<Pin<Box<Sleep>>>,
+    read_sleep: Option<Pin<Box<Sleep>>>,
+    write_sleep: Option<Pin<Box<Sleep>>>,
     read_wait: Option<Waker>,
     rx: UnboundedReceiverStream<Action>,
     name: String,
@@ -199,7 +200,8 @@ impl Inner {
 
         let inner = Inner {
             actions,
-            sleep: None,
+            read_sleep: None,
+            write_sleep: None,
             read_wait: None,
             rx,
             waiting: None,
@@ -363,12 +365,12 @@ impl AsyncRead for Mock {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         loop {
-            if let Some(ref mut sleep) = self.inner.sleep {
+            if let Some(ref mut sleep) = self.inner.read_sleep {
                 ready!(Pin::new(sleep).poll(cx));
             }
 
             // If a sleep is set, it has already fired
-            self.inner.sleep = None;
+            self.inner.read_sleep = None;
 
             // Capture 'filled' to monitor if it changed
             let filled = buf.filled().len();
@@ -377,7 +379,7 @@ impl AsyncRead for Mock {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
                         let until = Instant::now() + rem;
-                        self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
+                        self.inner.read_sleep = Some(Box::pin(time::sleep_until(until)));
                     } else {
                         self.inner.read_wait = Some(cx.waker().clone());
                         return Poll::Pending;
@@ -411,12 +413,12 @@ impl AsyncWrite for Mock {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         loop {
-            if let Some(ref mut sleep) = self.inner.sleep {
+            if let Some(ref mut sleep) = self.inner.write_sleep {
                 ready!(Pin::new(sleep).poll(cx));
             }
 
             // If a sleep is set, it has already fired
-            self.inner.sleep = None;
+            self.inner.write_sleep = None;
 
             if self.inner.actions.is_empty() {
                 match self.inner.poll_action(cx) {
@@ -436,7 +438,7 @@ impl AsyncWrite for Mock {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
                         let until = Instant::now() + rem;
-                        self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
+                        self.inner.write_sleep = Some(Box::pin(time::sleep_until(until)));
                     } else {
                         panic!("unexpected WouldBlock {}", self.pmsg());
                     }
