@@ -1,0 +1,103 @@
+name: Uring Kernel Version Test
+
+on:
+  workflow_call:
+    inputs:
+      kernel_version:
+        description: 'Version of the Linux kernel to build'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      KERNEL_VERSION: ${{ inputs.kernel_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bison flex libssl-dev libelf-dev \
+            qemu-system-x86 busybox-static cpio xz-utils wget
+
+      - name: Cache Linux source
+        id: cache-kernel
+        uses: actions/cache@v4
+        with:
+          path: linux-${{ env.KERNEL_VERSION }}
+          key: kernel-${{ env.KERNEL_VERSION }}
+
+      - name: Download & build Linux kernel
+        if: steps.cache-kernel.outputs.cache-hit != 'true'
+        run: |
+          MAJOR=${KERNEL_VERSION%%.*}
+          wget https://cdn.kernel.org/pub/linux/kernel/v${MAJOR}.x/linux-${KERNEL_VERSION}.tar.xz
+          tar xf linux-${KERNEL_VERSION}.tar.xz
+          cd linux-${KERNEL_VERSION}
+          make defconfig
+          make -j$(nproc)
+
+      - name: Generate test binaries with io_uring enabled
+        run: |
+          # Build both integration (tokio/tests/) and unit (e.g., tokio/src/fs/file/tests.rs) tests with io_uring enabled
+          rustup target add x86_64-unknown-linux-musl
+          RUSTFLAGS="--cfg tokio_uring" \
+            cargo test -p tokio --features full \
+            --target x86_64-unknown-linux-musl --test 'fs*' --lib --no-run
+
+      - name: Prepare initramfs + tests binaries
+        run: |
+          set -e
+          rm -rf initramfs
+          mkdir -p initramfs/{bin,bin/tests,sbin,proc,sys,tmp}
+
+          # Copy test binaries into initramfs
+          for bin in target/x86_64-unknown-linux-musl/debug/deps/{fs_*,tokio-*}; do
+            if [ -f "$bin" ] && [ -x "$bin" ]; then
+              cp "$bin" initramfs/bin/tests
+            fi
+          done
+
+          # Add BusyBox & symlinks
+          cp /usr/bin/busybox initramfs/bin/
+          for cmd in sh mount uname true sleep; do ln -sf busybox initramfs/bin/$cmd; done
+          ln -sf ../bin/busybox initramfs/sbin/poweroff
+
+          # Generate init script
+          cat > initramfs/init << 'EOF'
+          #!/bin/sh
+          set -e
+          mkdir -p /dev
+          # create device nodes, as some tests require them
+          mknod /dev/null c 1 3
+          mknod /dev/zero c 1 5
+          mknod /dev/tty c 5 0
+          mount -t proc proc /proc
+          mount -t sysfs sysfs /sys
+          mkdir -p /tmp && mount -t tmpfs -o mode=1777 tmpfs /tmp
+          for f in /bin/tests/*; do RUST_BACKTRACE=1 "$f" ; done
+          EOF
+          chmod +x initramfs/init
+
+          # Pack into a CPIO archive
+          (cd initramfs && find . -print0 \
+            | cpio --null -ov --format=newc | gzip -9 > ../initramfs.cpio.gz)
+
+      - name: Run tests in QEMU
+        run: |
+          qemu-system-x86_64 \
+            -kernel linux-${{ env.KERNEL_VERSION }}/arch/x86/boot/bzImage \
+            -initrd initramfs.cpio.gz \
+            -append "console=ttyS0 rootfstype=ramfs panic=1" \
+            -nographic -no-reboot -m 1024 -action panic=exit-failure 2>&1 | tee qemu-output.log
+
+          # qemu always exits with 0, so we check if the tests passed by using grep.
+          if grep -q "test result: FAILED" qemu-output.log; then
+            echo "tests failed (QEMU exited abnormally)"
+            exit 1
+          else
+            echo "all tests passed"
+          fi

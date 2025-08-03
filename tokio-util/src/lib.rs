@@ -62,3 +62,5 @@ pub mod either;
 pub use bytes;
 
 mod util;
+
+pub mod future;

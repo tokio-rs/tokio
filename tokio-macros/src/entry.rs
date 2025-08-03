@@ -10,6 +10,7 @@ type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
 enum RuntimeFlavor {
     CurrentThread,
     Threaded,
+    Local,
 }
 
 impl RuntimeFlavor {
@@ -17,6 +18,7 @@ impl RuntimeFlavor {
         match s {
             "current_thread" => Ok(RuntimeFlavor::CurrentThread),
             "multi_thread" => Ok(RuntimeFlavor::Threaded),
+            "local" => Ok(RuntimeFlavor::Local),
             "single_thread" => Err("The single threaded runtime flavor is called `current_thread`.".to_string()),
             "basic_scheduler" => Err("The `basic_scheduler` runtime flavor has been renamed to `current_thread`.".to_string()),
             "threaded_scheduler" => Err("The `threaded_scheduler` runtime flavor has been renamed to `multi_thread`.".to_string()),
@@ -177,15 +179,16 @@ impl Configuration {
         use RuntimeFlavor as F;
 
         let flavor = self.flavor.unwrap_or(self.default_flavor);
+
         let worker_threads = match (flavor, self.worker_threads) {
-            (F::CurrentThread, Some((_, worker_threads_span))) => {
+            (F::CurrentThread | F::Local, Some((_, worker_threads_span))) => {
                 let msg = format!(
                     "The `worker_threads` option requires the `multi_thread` runtime flavor. Use `#[{}(flavor = \"multi_thread\")]`",
                     self.macro_name(),
                 );
                 return Err(syn::Error::new(worker_threads_span, msg));
             }
-            (F::CurrentThread, None) => None,
+            (F::CurrentThread | F::Local, None) => None,
             (F::Threaded, worker_threads) if self.rt_multi_thread_available => {
                 worker_threads.map(|(val, _span)| val)
             }
@@ -207,7 +210,7 @@ impl Configuration {
                 );
                 return Err(syn::Error::new(start_paused_span, msg));
             }
-            (F::CurrentThread, Some((start_paused, _))) => Some(start_paused),
+            (F::CurrentThread | F::Local, Some((start_paused, _))) => Some(start_paused),
             (_, None) => None,
         };
 
@@ -219,7 +222,7 @@ impl Configuration {
                 );
                 return Err(syn::Error::new(unhandled_panic_span, msg));
             }
-            (F::CurrentThread, Some((unhandled_panic, _))) => Some(unhandled_panic),
+            (F::CurrentThread | F::Local, Some((unhandled_panic, _))) => Some(unhandled_panic),
             (_, None) => None,
         };
 
@@ -408,13 +411,27 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         .unwrap_or_else(|| Ident::new("tokio", last_stmt_start_span).into_token_stream());
 
     let mut rt = match config.flavor {
-        RuntimeFlavor::CurrentThread => quote_spanned! {last_stmt_start_span=>
-            #crate_path::runtime::Builder::new_current_thread()
-        },
+        RuntimeFlavor::CurrentThread | RuntimeFlavor::Local => {
+            quote_spanned! {last_stmt_start_span=>
+                #crate_path::runtime::Builder::new_current_thread()
+            }
+        }
         RuntimeFlavor::Threaded => quote_spanned! {last_stmt_start_span=>
             #crate_path::runtime::Builder::new_multi_thread()
         },
     };
+
+    let mut checks = vec![];
+    let mut errors = vec![];
+
+    let build = if let RuntimeFlavor::Local = config.flavor {
+        checks.push(quote! { tokio_unstable });
+        errors.push("The local runtime flavor is only available when `tokio_unstable` is set.");
+        quote_spanned! {last_stmt_start_span=> build_local(Default::default())}
+    } else {
+        quote_spanned! {last_stmt_start_span=> build()}
+    };
+
     if let Some(v) = config.worker_threads {
         rt = quote_spanned! {last_stmt_start_span=> #rt.worker_threads(#v) };
     }
@@ -434,16 +451,35 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         quote! {}
     };
 
+    let do_checks: TokenStream = checks
+        .iter()
+        .zip(&errors)
+        .map(|(check, error)| {
+            quote! {
+                #[cfg(not(#check))]
+                compile_error!(#error);
+            }
+        })
+        .collect();
+
     let body_ident = quote! { body };
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
     let last_block = quote_spanned! {last_stmt_end_span=>
+        #do_checks
+
+        #[cfg(all(#(#checks),*))]
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
         {
             return #rt
                 .enable_all()
-                .build()
+                .#build
                 .expect("Failed building the Runtime")
                 .block_on(#body_ident);
+        }
+
+        #[cfg(not(all(#(#checks),*)))]
+        {
+            panic!("fell through checks")
         }
     };
 

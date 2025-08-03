@@ -1231,3 +1231,28 @@ jobs:
               echo 'Please remove trailing whitespace from these lines.'
               exit 1
           fi
+
+  get-latest-kernel-version:
+    runs-on: ubuntu-latest
+    outputs:
+      kernel_version: ${{ steps.fetch.outputs.kernel_version }}
+    steps:
+      - name: Fetch latest stable kernel
+        id: fetch
+        run: |
+          KERNEL_VERSION=$(curl -s https://www.kernel.org/releases.json | jq -r '.latest_stable.version')
+          echo "kernel_version=$KERNEL_VERSION" >> $GITHUB_OUTPUT
+
+  test-io-uring-on-specific-kernel-versions:
+    name: Test io_uring on Linux ${{ matrix.kernel_version }}
+    needs: [get-latest-kernel-version, basics]
+    strategy:
+      matrix:
+        kernel_version:
+          # A latest stable kernel version
+          - ${{ needs.get-latest-kernel-version.outputs.kernel_version }}
+          # A kernel version that doesn't support io_uring
+          - '4.19.325'
+    uses: ./.github/workflows/uring-kernel-version-test.yml
+    with:
+      kernel_version: ${{ matrix.kernel_version }}
