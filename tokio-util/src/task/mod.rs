@@ -11,7 +11,8 @@ cfg_rt! {
     pub use abort_on_drop::AbortOnDropHandle;
 }
 
-cfg_join_map! {
-    mod join_map;
-    pub use join_map::{JoinMap, JoinMapKeys};
-}
+#[cfg(feature = "join-map")]
+mod join_map;
+#[cfg(feature = "join-map")]
+#[cfg_attr(docsrs, doc(cfg(feature = "join-map")))]
+pub use join_map::{JoinMap, JoinMapKeys};

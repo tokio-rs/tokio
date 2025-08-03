@@ -30,7 +30,7 @@ time = ["tokio/time", "slab"]
 io = []
 io-util = ["io", "tokio/rt", "tokio/io-util"]
 rt = ["tokio/rt", "tokio/sync", "futures-util"]
-join-map = ["tokio/rt", "hashbrown"]
+join-map = ["rt", "hashbrown"]
 
 __docs_rs = ["futures-util"]
 
