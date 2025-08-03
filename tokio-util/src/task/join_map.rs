@@ -65,7 +65,7 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// ```
 /// use tokio_util::task::JoinMap;
 ///
-/// #[tokio::main]
+/// #[tokio::main(flavor = "current_thread")]
 /// async fn main() {
 ///     let mut map = JoinMap::new();
 ///
@@ -495,7 +495,7 @@ where
     /// ```
     /// use tokio_util::task::JoinMap;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut map = JoinMap::new();
     ///
