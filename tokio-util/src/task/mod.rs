@@ -1,4 +1,7 @@
 //! Extra utilities for spawning tasks
+//!
+//! This module is only available when the `rt` feature is enabled. Note that enabling the
+//! `join-map` feature will automatically also enable the `rt` feature.
 
 cfg_rt! {
     mod spawn_pinned;
