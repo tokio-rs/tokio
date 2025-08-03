@@ -338,17 +338,14 @@ impl<T> SetOnce<T> {
         }
     }
 
-    /// Waits until set is called. The future returned will keep blocking until
-    /// the `SetOnce` is initialized.
+    /// Waits until the value is set.
     ///
     /// If the `SetOnce` is already initialized, it will return the value
     /// immediately.
     ///
-    /// # Note
+    /// # Cancel safety
     ///
-    /// This will keep waiting until the `SetOnce` is initialized, so it
-    /// should be used with care to avoid blocking the current task
-    /// indefinitely.
+    /// This method is cancel safe.
     pub async fn wait(&self) -> &T {
         loop {
             if let Some(val) = self.get() {
