@@ -65,12 +65,12 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// ```
 /// use tokio_util::task::JoinMap;
 ///
-/// #[tokio::main(flavor = "current_thread")]
+/// #[tokio::main]
 /// async fn main() {
 ///     let mut map = JoinMap::new();
 ///
-///     map.spawn("hello world", async move { /* ... */ });
-///     map.spawn("goodbye world", async move { /* ... */});
+///     map.spawn("hello world", std::future::ready(1));
+///     map.spawn("goodbye world", std::future::pending());
 ///
 ///     // Look up the "goodbye world" task in the map and abort it.
 ///     let aborted = map.abort("goodbye world");
@@ -85,7 +85,7 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 ///             assert!(res.unwrap_err().is_cancelled());
 ///         } else {
 ///             // Other tasks should complete normally.
-///             assert!(res.is_ok());
+///             assert_eq!(res.unwrap(), 1);
 ///         }
 ///     }
 /// }
@@ -499,8 +499,8 @@ where
     /// # async fn main() {
     /// let mut map = JoinMap::new();
     ///
-    /// map.spawn("hello world", async move { /* ... */ });
-    /// map.spawn("goodbye world", async move { /* ... */});
+    /// map.spawn("hello world", std::future::ready(1));
+    /// map.spawn("goodbye world", std::future::pending());
     ///
     /// // Look up the "goodbye world" task in the map and abort it.
     /// map.abort("goodbye world");
@@ -511,7 +511,7 @@ where
     ///         assert!(res.unwrap_err().is_cancelled());
     ///     } else {
     ///         // Other tasks should complete normally.
-    ///         assert!(res.is_ok());
+    ///         assert_eq!(res.unwrap(), 1);
     ///     }
     /// }
     /// # }
