@@ -635,6 +635,45 @@ where
     }
 }
 
+/// Extend a [`JoinSet`] with futures from an iterator.
+///
+/// This is equivalent to calling [`JoinSet::spawn`] on each element of the iterator.
+///
+/// # Examples
+///
+/// ```
+/// use tokio::task::JoinSet;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut set: JoinSet<_> = (0..5).map(|i| async move { i }).collect();
+///
+///     set.extend((5..10).map(|i| async move { i }));
+///
+///     let mut seen = [false; 10];
+///     while let Some(res) = set.join_next().await {
+///         let idx = res.unwrap();
+///         seen[idx] = true;
+///     }
+///
+///     for i in 0..10 {
+///         assert!(seen[i]);
+///     }
+/// }
+/// ```
+impl<T, F> std::iter::Extend<F> for JoinSet<T>
+where
+    F: Future<Output = T>,
+    F: Send + 'static,
+    T: Send + 'static,
+{
+    fn extend<I: IntoIterator<Item = F>>(&mut self, iter: I) {
+        iter.into_iter().for_each(|task| {
+            self.spawn(task);
+        });
+    }
+}
+
 // === impl Builder ===
 
 #[cfg(all(tokio_unstable, feature = "tracing"))]
