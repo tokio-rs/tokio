@@ -123,7 +123,7 @@ impl Level {
         let deadline = hdl.deadline();
         let slot = slot_for(deadline, self.level);
 
-        self.slot[slot].push_front(hdl.as_raw());
+        self.slot[slot].push_front(hdl);
 
         self.occupied |= occupied_bit(slot);
     }
@@ -131,7 +131,7 @@ impl Level {
     pub(crate) unsafe fn remove_entry(&mut self, hdl: EntryHandle) {
         let slot = slot_for(hdl.deadline(), self.level);
 
-        unsafe { self.slot[slot].remove(hdl.as_entry_ptr()) };
+        unsafe { self.slot[slot].remove(hdl.into()) };
         if self.slot[slot].is_empty() {
             // The bit is currently set
             debug_assert!(self.occupied & occupied_bit(slot) != 0);
