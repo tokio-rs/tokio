@@ -832,6 +832,11 @@ jobs:
   clippy:
     name: clippy
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rustflags:
+          - ""
+          - "--cfg tokio_unstable --cfg tokio_taskdump --cfg tokio_uring -Dwarnings"
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_clippy }}
@@ -841,9 +846,10 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
       # Run clippy
-      - name: "clippy --all"
+      - name: "clippy --all ${{ matrix.rustflags }}"
         run: cargo clippy --all --tests --all-features --no-deps
-
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
   docs:
     name: docs
     runs-on: ${{ matrix.run.os }}
