@@ -664,7 +664,7 @@ mod unstable {
             .unwrap();
 
         // This makes sure that `enter_runtime()` from worker thread is called before the one from main thread,
-        // ensuring that the RNG state is consistent.
+        // ensuring that the RNG state is consistent. See also https://github.com/tokio-rs/tokio/pull/7495.
         rx.recv().unwrap();
 
         let rt1_values = rt1.block_on(async {
@@ -682,7 +682,7 @@ mod unstable {
             .unwrap();
 
         // This makes sure that `enter_runtime()` from worker thread is called before the one from main thread,
-        // ensuring that the RNG state is consistent.
+        // ensuring that the RNG state is consistent. See also https://github.com/tokio-rs/tokio/pull/7495.
         rx.recv().unwrap();
 
         let rt2_values = rt2.block_on(async {
