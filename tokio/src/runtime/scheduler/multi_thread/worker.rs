@@ -888,7 +888,7 @@ impl Context {
             }
         }
 
-        pub(in crate::runtime) fn with_wheel<F, R>(&self, f: F) -> R
+        pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
         where
             F: FnOnce(Option<(&mut Wheel, mpsc::Sender<EntryHandle>)>) -> R,
         {
@@ -1241,7 +1241,7 @@ impl Handle {
 
     cfg_time! {
         /// Push a timer handle from the remote thread.
-        pub(in crate::runtime) fn push_remote_timer(&self, hdl: EntryHandle) {
+        pub(crate) fn push_remote_timer(&self, hdl: EntryHandle) {
             {
                 let mut synced = self.shared.synced.lock();
                 synced.inject_timers.push(hdl);
@@ -1249,7 +1249,7 @@ impl Handle {
             self.notify_parked_remote();
         }
 
-        pub(in crate::runtime) fn take_remote_timers(&self) -> Vec<EntryHandle> {
+        pub(crate) fn take_remote_timers(&self) -> Vec<EntryHandle> {
             let mut synced = self.shared.synced.lock();
             std::mem::take(&mut synced.inject_timers)
         }

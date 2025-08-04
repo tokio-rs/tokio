@@ -10,15 +10,17 @@ cfg_rt_and_time! {
             tx: mpsc::Sender<EntryHandle>,
             inject: Vec<EntryHandle>,
         ) -> bool {
+            use crate::runtime::time::Insert;
             let mut fired = false;
             // process injected timers
             for hdl in inject {
-                unsafe {
-                    if !wheel.insert(hdl.clone(), tx.clone()) {
-                        // timer is already elapsed, wake it up
+                match unsafe { wheel.insert(hdl.clone(), tx.clone()) } {
+                    Insert::Success => {}
+                    Insert::Elapsed => {
                         hdl.wake_unregistered();
                         fired = true;
                     }
+                    Insert::Cancelling => {}
                 }
             }
 
