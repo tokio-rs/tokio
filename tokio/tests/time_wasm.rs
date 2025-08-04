@@ -20,6 +20,15 @@ fn runtime_without_time_does_not_panic() {
 
 #[cfg(all(feature = "rt", feature = "time"))]
 #[wasm_bindgen_test]
+fn runtime_with_time_does_not_panic() {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    rt.block_on(async {});
+}
+
+#[cfg(all(feature = "rt", feature = "time"))]
+#[wasm_bindgen_test]
 #[should_panic]
 fn sleep_panics_on_unknown_unknown() {
     let rt = tokio::runtime::Builder::new_current_thread()
