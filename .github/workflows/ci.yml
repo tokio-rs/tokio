@@ -1047,7 +1047,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       - name: test tokio
-        run: wasm-pack test --node -- --features "macros sync time"
+        run: wasm-pack test --node -- --features "macros sync time rt"
         working-directory: tokio
 
   wasm32-wasip1:
