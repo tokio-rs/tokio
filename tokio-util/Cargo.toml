@@ -4,7 +4,7 @@ name = "tokio-util"
 # - Remove path dependencies
 # - Update CHANGELOG.md.
 # - Create "tokio-util-0.7.x" git tag.
-version = "0.7.15"
+version = "0.7.16"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -21,7 +21,7 @@ categories = ["asynchronous"]
 default = []
 
 # Shorthand for enabling everything
-full = ["codec", "compat", "io-util", "time", "net", "rt"]
+full = ["codec", "compat", "io-util", "time", "net", "rt", "join-map"]
 
 net = ["tokio/net"]
 compat = ["futures-io"]
@@ -29,7 +29,8 @@ codec = []
 time = ["tokio/time", "slab"]
 io = []
 io-util = ["io", "tokio/rt", "tokio/io-util"]
-rt = ["tokio/rt", "tokio/sync", "futures-util", "hashbrown"]
+rt = ["tokio/rt", "tokio/sync", "futures-util"]
+join-map = ["rt", "hashbrown"]
 
 __docs_rs = ["futures-util"]
 
@@ -43,8 +44,6 @@ futures-util = { version = "0.3.0", optional = true }
 pin-project-lite = "0.2.11"
 slab = { version = "0.4.4", optional = true } # Backs `DelayQueue`
 tracing = { version = "0.1.29", default-features = false, features = ["std"], optional = true }
-
-[target.'cfg(tokio_unstable)'.dependencies]
 hashbrown = { version = "0.15.0", default-features = false, optional = true }
 
 [dev-dependencies]
