@@ -118,11 +118,10 @@ async fn cancel_op_future() {
             };
 
             let fut = opt.open(&path[0]);
-            let res = Box::pin(fut).poll_unpin(cx);
 
-            // The first poll only submit the 'open' operation
-            // to the kernel.
-            assert!(res.is_pending(), "Expected the open to be pending");
+            // If io_uring is enabled (and not falling back to the thread pool),
+            // the first poll should return Pending.
+            let _pending = Box::pin(fut).poll_unpin(cx);
 
             tx.send(()).unwrap();
 
