@@ -109,12 +109,15 @@ cfg_rt! {
     /// running normally. The exception is if the task has not started running
     /// yet; in that case, calling `abort` may prevent the task from starting.
     ///
-    /// When you shut down the executor, it will wait indefinitely for all blocking operations to
-    /// finish. You can use [`shutdown_timeout`] to stop waiting for them after a
-    /// certain timeout. Be aware that this will still not cancel the tasks — they
-    /// are simply allowed to keep running after the method returns.  It is possible
-    /// for a blocking task to be cancelled if it has not yet started running, but this
-    /// is not guaranteed.
+    /// When you shut down the executor, it will attempt to `abort` all tasks
+    /// including `spawn_blocking` tasks. However, `spawn_blocking` tasks
+    /// cannot be aborted once they start running, which means that runtime
+    /// shutdown will wait indefinitely for all started `spawn_blocking` to
+    /// finish running. You can use [`shutdown_timeout`] to stop waiting for
+    /// them after a certain timeout. Be aware that this will still not cancel
+    /// the tasks — they are simply allowed to keep running after the method
+    /// returns. It is possible for a blocking task to be cancelled if it has
+    /// not yet started running, but this is not guaranteed.
     ///
     /// Note that if you are using the single threaded runtime, this function will
     /// still spawn additional threads for blocking operations. The current-thread

@@ -29,10 +29,6 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 ///
 /// When the `JoinMap` is dropped, all tasks in the `JoinMap` are immediately aborted.
 ///
-/// **Note**: This type depends on Tokio's [unstable API][unstable]. See [the
-/// documentation on unstable features][unstable] for details on how to enable
-/// Tokio's unstable features.
-///
 /// # Examples
 ///
 /// Spawn multiple tasks and wait for them:
@@ -73,8 +69,8 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// async fn main() {
 ///     let mut map = JoinMap::new();
 ///
-///     map.spawn("hello world", async move { /* ... */ });
-///     map.spawn("goodbye world", async move { /* ... */});
+///     map.spawn("hello world", std::future::ready(1));
+///     map.spawn("goodbye world", std::future::pending());
 ///
 ///     // Look up the "goodbye world" task in the map and abort it.
 ///     let aborted = map.abort("goodbye world");
@@ -89,18 +85,16 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 ///             assert!(res.unwrap_err().is_cancelled());
 ///         } else {
 ///             // Other tasks should complete normally.
-///             assert!(res.is_ok());
+///             assert_eq!(res.unwrap(), 1);
 ///         }
 ///     }
 /// }
 /// ```
 ///
 /// [`JoinSet`]: tokio::task::JoinSet
-/// [unstable]: tokio#unstable-features
 /// [abort]: fn@Self::abort
 /// [abort_matching]: fn@Self::abort_matching
 /// [contains]: fn@Self::contains_key
-#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
     /// A map of the [`AbortHandle`]s of the tasks spawned on this `JoinMap`,
     /// indexed by their keys.
@@ -501,12 +495,12 @@ where
     /// ```
     /// use tokio_util::task::JoinMap;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut map = JoinMap::new();
     ///
-    /// map.spawn("hello world", async move { /* ... */ });
-    /// map.spawn("goodbye world", async move { /* ... */});
+    /// map.spawn("hello world", std::future::ready(1));
+    /// map.spawn("goodbye world", std::future::pending());
     ///
     /// // Look up the "goodbye world" task in the map and abort it.
     /// map.abort("goodbye world");
@@ -517,7 +511,7 @@ where
     ///         assert!(res.unwrap_err().is_cancelled());
     ///     } else {
     ///         // Other tasks should complete normally.
-    ///         assert!(res.is_ok());
+    ///         assert_eq!(res.unwrap(), 1);
     ///     }
     /// }
     /// # }
@@ -541,9 +535,9 @@ where
     /// assert!(!map.abort("goodbye universe"));
     /// # }
     /// ```
-    pub fn abort<Q: ?Sized>(&mut self, key: &Q) -> bool
+    pub fn abort<Q>(&mut self, key: &Q) -> bool
     where
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
         K: Borrow<Q>,
     {
         match self.get_by_key(key) {
@@ -638,9 +632,9 @@ where
     /// call to [`join_next`], this method will still return `true`.
     ///
     /// [`join_next`]: fn@Self::join_next
-    pub fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
+    pub fn contains_key<Q>(&self, key: &Q) -> bool
     where
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
         K: Borrow<Q>,
     {
         self.get_by_key(key).is_some()
@@ -744,9 +738,9 @@ where
     }
 
     /// Look up a task in the map by its key, returning the key and abort handle.
-    fn get_by_key<'map, Q: ?Sized>(&'map self, key: &Q) -> Option<&'map (K, AbortHandle)>
+    fn get_by_key<'map, Q>(&'map self, key: &Q) -> Option<&'map (K, AbortHandle)>
     where
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
         K: Borrow<Q>,
     {
         let hash_builder = self.hashes_by_task.hasher();
@@ -774,9 +768,10 @@ where
 
 /// Returns the hash for a given key.
 #[inline]
-fn hash_one<S: BuildHasher, Q: ?Sized>(hash_builder: &S, key: &Q) -> u64
+fn hash_one<S, Q>(hash_builder: &S, key: &Q) -> u64
 where
-    Q: Hash,
+    Q: ?Sized + Hash,
+    S: BuildHasher,
 {
     let mut hasher = hash_builder.build_hasher();
     key.hash(&mut hasher);

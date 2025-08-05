@@ -14,16 +14,16 @@ use std::{io, mem, task::Waker};
 const DEFAULT_RING_SIZE: u32 = 256;
 
 #[repr(usize)]
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum State {
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum State {
     Uninitialized = 0,
     Initialized = 1,
     Unsupported = 2,
 }
 
 impl State {
-    fn as_usize(self) -> usize {
-        self as usize
+    fn as_usize(&self) -> usize {
+        *self as usize
     }
 
     fn from_usize(value: usize) -> Self {
@@ -96,10 +96,10 @@ impl UringContext {
                     ops.remove(idx);
                 }
                 Some(other) => {
-                    panic!("unexpected lifecycle for slot {}: {:?}", idx, other);
+                    panic!("unexpected lifecycle for slot {idx}: {other:?}");
                 }
                 None => {
-                    panic!("no op at index {}", idx);
+                    panic!("no op at index {idx}");
                 }
             }
         }
@@ -281,7 +281,7 @@ impl Handle {
                 // We can safely remove the entry from the slab, as it has already been completed.
                 ops.remove(index);
             }
-            prev => panic!("Unexpected state: {:?}", prev),
+            prev => panic!("Unexpected state: {prev:?}"),
         };
     }
 }

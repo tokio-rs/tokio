@@ -61,7 +61,7 @@ impl BacktraceSymbol {
         let name = sym.name();
         Self {
             name: name.as_ref().map(|name| name.as_bytes().into()),
-            name_demangled: name.map(|name| format!("{}", name).into()),
+            name_demangled: name.map(|name| format!("{name}").into()),
             addr: sym.addr().map(Address),
             filename: sym.filename().map(From::from),
             lineno: sym.lineno(),

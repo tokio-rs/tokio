@@ -45,8 +45,10 @@ cfg_io! {
 
 cfg_rt! {
     pub mod context;
-    pub mod task;
 }
+
+#[cfg(feature = "rt")]
+pub mod task;
 
 cfg_time! {
     pub mod time;
@@ -59,3 +61,5 @@ pub mod either;
 pub use bytes;
 
 mod util;
+
+pub mod future;

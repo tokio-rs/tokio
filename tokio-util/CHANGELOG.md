@@ -1,3 +1,35 @@
+# 0.7.16 (August 3rd, 2025)
+
+### Added
+
+- codec: add `FramedWrite::with_capacity` ([#7493])
+- future: add adapters of `CancellationToken` for `FutureExt` ([#7475])
+- sync: add `DropGuardRef` for `CancellationToken` ([#7407])
+- task: add `AbortOnDropHandle::detach` ([#7400])
+- task: stabilise `JoinMap` ([#7075])
+
+### Changed
+
+- codec: also apply capacity to read buffer in `Framed::with_capacity` ([#7500])
+- sync: make `CancellationToken::run_until_cancelled` biased towards the token ([#7462])
+- task: remove raw-entry feature from hashbrown dep ([#7252])
+
+### Documented
+
+- compat: add more documentation to `tokio_util::compat` ([#7279])
+- sync: improve docs of `tokio_util::sync::CancellationToken` ([#7408])
+
+[#7075]: https://github.com/tokio-rs/tokio/pull/7075
+[#7252]: https://github.com/tokio-rs/tokio/pull/7252
+[#7279]: https://github.com/tokio-rs/tokio/pull/7279
+[#7400]: https://github.com/tokio-rs/tokio/pull/7400
+[#7407]: https://github.com/tokio-rs/tokio/pull/7407
+[#7408]: https://github.com/tokio-rs/tokio/pull/7408
+[#7462]: https://github.com/tokio-rs/tokio/pull/7462
+[#7475]: https://github.com/tokio-rs/tokio/pull/7475
+[#7493]: https://github.com/tokio-rs/tokio/pull/7493
+[#7500]: https://github.com/tokio-rs/tokio/pull/7500
+
 # 0.7.15 (April 23rd, 2025)
 
 ### Fixed
