@@ -1194,7 +1194,12 @@ impl TcpStream {
     ))]
     #[cfg_attr(
         docsrs,
-        doc(cfg(any(target_os = "linux", target_os = "android", target_os = "fuchsia")))
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "android",
+            target_os = "fuchsia",
+            target_os = "cygwin"
+        )))
     )]
     pub fn quickack(&self) -> io::Result<bool> {
         socket2::SockRef::from(self).tcp_quickack()
@@ -1229,7 +1234,12 @@ impl TcpStream {
     ))]
     #[cfg_attr(
         docsrs,
-        doc(cfg(any(target_os = "linux", target_os = "android", target_os = "fuchsia")))
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "android",
+            target_os = "fuchsia",
+            target_os = "cygwin"
+        )))
     )]
     pub fn set_quickack(&self, quickack: bool) -> io::Result<()> {
         socket2::SockRef::from(self).set_tcp_quickack(quickack)
