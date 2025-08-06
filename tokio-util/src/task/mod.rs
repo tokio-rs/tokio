@@ -8,6 +8,7 @@ cfg_rt! {
     pub use spawn_pinned::LocalPoolHandle;
 
     pub mod task_tracker;
+    #[doc(inline)]
     pub use task_tracker::TaskTracker;
 
     mod abort_on_drop;
