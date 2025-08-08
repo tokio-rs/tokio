@@ -136,6 +136,7 @@ features = [
 [dev-dependencies]
 tokio-test = { version = "0.4.0", path = "../tokio-test" }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
+tokio-util = { version = "0.7", path = "../tokio-util", features = ["rt"] }
 futures = { version = "0.3.0", features = ["async-await"] }
 mockall = "0.13.0"
 async-stream = "0.3"
@@ -164,10 +165,10 @@ tracing-mock = "= 0.1.0-beta.1"
 [package.metadata.docs.rs]
 all-features = true
 # enable unstable features in the documentation
-rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable", "--cfg", "tokio_taskdump"]
+rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable", "--cfg", "tokio_taskdump", "--cfg", "tokio_uring"]
 # it's necessary to _also_ pass `--cfg tokio_unstable` and `--cfg tokio_taskdump`
 # to rustc, or else dependencies will not be enabled, and the docs build will fail.
-rustc-args = ["--cfg", "tokio_unstable", "--cfg", "tokio_taskdump"]
+rustc-args = ["--cfg", "tokio_unstable", "--cfg", "tokio_taskdump", "--cfg", "tokio_uring"]
 
 [package.metadata.playground]
 features = ["full", "test-util"]

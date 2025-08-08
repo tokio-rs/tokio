@@ -293,3 +293,7 @@ cfg_io_blocking! {
         pub(crate) use crate::blocking::JoinHandle as Blocking;
     }
 }
+
+cfg_tokio_uring! {
+    pub(crate) mod uring;
+}
