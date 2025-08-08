@@ -6,7 +6,7 @@ use tokio::task::spawn_local;
 
 #[test]
 fn test_spawn_local_in_runtime() {
-    let rt = rt();
+    let rt = rt(LocalOptions::default());
 
     let res = rt.block_on(async move {
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -23,8 +23,33 @@ fn test_spawn_local_in_runtime() {
 }
 
 #[test]
+fn test_on_thread_park_in_runtime() {
+    let mut opts = LocalOptions::default();
+    let called = std::rc::Rc::new(std::cell::RefCell::new(false));
+    let cc = called.clone();
+    opts.on_thread_park(move || {
+        *cc.borrow_mut() = true;
+    });
+    let rt = rt(opts);
+
+    rt.block_on(async move {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        spawn_local(async {
+            tokio::task::yield_now().await;
+            tx.send(5).unwrap();
+        });
+
+        // this is not really required execpt to ensure on_thread_park is called
+        rx.await.unwrap()
+    });
+
+    assert!(*called.borrow());
+}
+
+#[test]
 fn test_spawn_from_handle() {
-    let rt = rt();
+    let rt = rt(LocalOptions::default());
 
     let (tx, rx) = tokio::sync::oneshot::channel();
 
@@ -40,7 +65,7 @@ fn test_spawn_from_handle() {
 
 #[test]
 fn test_spawn_local_on_runtime_object() {
-    let rt = rt();
+    let rt = rt(LocalOptions::default());
 
     let (tx, rx) = tokio::sync::oneshot::channel();
 
@@ -56,7 +81,7 @@ fn test_spawn_local_on_runtime_object() {
 
 #[test]
 fn test_spawn_local_from_guard() {
-    let rt = rt();
+    let rt = rt(LocalOptions::default());
 
     let (tx, rx) = tokio::sync::oneshot::channel();
 
@@ -78,7 +103,7 @@ fn test_spawn_from_guard_other_thread() {
     let (tx, rx) = std::sync::mpsc::channel();
 
     std::thread::spawn(move || {
-        let rt = rt();
+        let rt = rt(LocalOptions::default());
         let handle = rt.handle().clone();
 
         tx.send(handle).unwrap();
@@ -98,7 +123,7 @@ fn test_spawn_local_from_guard_other_thread() {
     let (tx, rx) = std::sync::mpsc::channel();
 
     std::thread::spawn(move || {
-        let rt = rt();
+        let rt = rt(LocalOptions::default());
         let handle = rt.handle().clone();
 
         tx.send(handle).unwrap();
@@ -111,9 +136,9 @@ fn test_spawn_local_from_guard_other_thread() {
     spawn_local(async {});
 }
 
-fn rt() -> tokio::runtime::LocalRuntime {
+fn rt(opts: LocalOptions) -> tokio::runtime::LocalRuntime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
-        .build_local(LocalOptions::default())
+        .build_local(opts)
         .unwrap()
 }

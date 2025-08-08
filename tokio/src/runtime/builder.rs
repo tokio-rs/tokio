@@ -13,6 +13,8 @@ use std::io;
 use std::thread::ThreadId;
 use std::time::Duration;
 
+// use super::LocalOptions;
+
 /// Builds Tokio Runtime with custom configuration values.
 ///
 /// Methods can be chained in order to set the configuration values. The
@@ -927,7 +929,7 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn build_local(&mut self, options: LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
-            Kind::CurrentThread => self.build_current_thread_local_runtime(),
+            Kind::CurrentThread => self.build_current_thread_local_runtime(options),
             #[cfg(feature = "rt-multi-thread")]
             Kind::MultiThread => panic!("multi_thread is not supported for LocalRuntime"),
         }
@@ -1439,11 +1441,16 @@ impl Builder {
     }
 
     #[cfg(tokio_unstable)]
-    fn build_current_thread_local_runtime(&mut self) -> io::Result<LocalRuntime> {
+    fn build_current_thread_local_runtime(
+        &mut self,
+        opts: LocalOptions,
+    ) -> io::Result<LocalRuntime> {
         use crate::runtime::local_runtime::LocalRuntimeScheduler;
 
         let tid = std::thread::current().id();
 
+        self.before_park = opts.before_park;
+        self.after_unpark = opts.after_unpark;
         let (scheduler, handle, blocking_pool) =
             self.build_current_thread_runtime_components(Some(tid))?;
 
