@@ -48,3 +48,27 @@ async fn test_stream_mock_drop_during_panic_doesnt_mask_panic() {
     let _stream_mock = StreamMockBuilder::new().next(1).next(2).build();
     panic!("test panic was not masked");
 }
+
+// Ref https://github.com/tokio-rs/tokio/issues/7445
+#[tokio::test]
+async fn test_out_of_order_read_write_sleep_on_mocks_doesnt_hang() {
+    let socket = tokio_test::io::Builder::new()
+        .wait(Duration::from_millis(10))
+        .write([0].as_slice())
+        .read([0].as_slice())
+        .build();
+
+    let (mut recv, mut send) = tokio::io::split(socket);
+    let read_task = tokio::spawn(async move {
+        tokio::io::AsyncReadExt::read_u8(&mut recv)
+            .await
+            .expect("expected read to complete successfully")
+    });
+    tokio::io::AsyncWriteExt::write_u8(&mut send, 0)
+        .await
+        .expect("expected write to complete successfully");
+
+    read_task
+        .await
+        .expect("read_task did not complete successfully");
+}
