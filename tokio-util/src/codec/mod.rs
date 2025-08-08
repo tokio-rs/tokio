@@ -354,3 +354,8 @@ pub use self::lines_codec::{LinesCodec, LinesCodecError};
 
 mod any_delimiter_codec;
 pub use self::any_delimiter_codec::{AnyDelimiterCodec, AnyDelimiterCodecError};
+
+mod composition_codec;
+pub use self::composition_codec::{
+    CompositionDecoder, CompositionEncoder, DecoderCompositionExt, EncoderCompositionExt,
+};
