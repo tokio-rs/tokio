@@ -95,3 +95,19 @@ jobs:
         working-directory: tokio
         env:
           SCOPE: ${{ matrix.scope }}
+
+  loom-cancellation-token:
+    name: loom cancellation_token tests (tokio-util)
+    # Run only in tokio-rs repo and on PRs with label or pushes to master/tokio-* branches
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-sync-util') || (github.base_ref == null))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cancellation_token loom tests
+        working-directory: tokio-util
+        run: cargo test --release --features full -- --nocapture sync::cancellation_token::CancellationToken
