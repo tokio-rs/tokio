@@ -1,12 +1,13 @@
 use super::wheel::EntryHandle;
 use crate::runtime::scheduler::Handle as SchedulerHandle;
+use crate::runtime::time::wheel::cancellation_queue::Sender;
 use crate::runtime::time::wheel::Insert;
-use crate::{runtime::time::Wheel, time::Instant, util::error::RUNTIME_SHUTTING_DOWN_ERROR};
-use std::{
-    pin::Pin,
-    sync::mpsc,
-    task::{Context, Poll},
-};
+use crate::runtime::time::Wheel;
+use crate::time::Instant;
+use crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR;
+
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 pub(crate) struct Timer {
     sched_handle: SchedulerHandle,
@@ -94,7 +95,7 @@ impl Timer {
 
 pub(super) fn with_current_wheel<F, R>(hdl: &SchedulerHandle, f: F) -> R
 where
-    F: FnOnce(Option<(&mut Wheel, mpsc::Sender<EntryHandle>)>) -> R,
+    F: FnOnce(Option<(&mut Wheel, Sender)>) -> R,
 {
     #[cfg(not(feature = "rt"))]
     {

@@ -24,10 +24,8 @@ use std::{fmt, thread};
 
 cfg_time! {
     use crate::runtime::scheduler::util;
-    use crate::runtime::time::{EntryHandle, Wheel};
+    use crate::runtime::time::{EntryHandle, Wheel, cancellation_queue};
     use crate::loom::sync::Mutex;
-
-    use std::sync::mpsc;
 }
 
 /// Executes tasks on the current thread
@@ -76,11 +74,11 @@ struct Core {
 
     #[cfg(feature = "time")]
     /// Channel for sending timers that need to be cancelled
-    timer_cancel_tx: mpsc::Sender<EntryHandle>,
+    timer_cancel_tx: cancellation_queue::Sender,
 
     #[cfg(feature = "time")]
     /// Channel for receiving timers that need to be cancelled
-    timer_cancel_rx: mpsc::Receiver<EntryHandle>,
+    timer_cancel_rx: cancellation_queue::Receiver,
 
     /// Runtime driver
     ///
@@ -193,7 +191,7 @@ impl CurrentThread {
         });
 
         #[cfg(feature = "time")]
-        let (timer_cancel_tx, timer_cancel_rx) = mpsc::channel();
+        let (timer_cancel_tx, timer_cancel_rx) = cancellation_queue::new();
         let core = AtomicCell::new(Some(Box::new(Core {
             tasks: VecDeque::with_capacity(INITIAL_CAPACITY),
             tick: 0,
@@ -314,8 +312,8 @@ fn shutdown2(mut core: Box<Core>, handle: &Handle) -> Box<Core> {
     #[cfg(feature = "time")]
     util::time::shutdown_local_timers(
         &mut core.wheel,
-        core.timer_cancel_tx.clone(),
-        &core.timer_cancel_rx,
+        &core.timer_cancel_tx,
+        &mut core.timer_cancel_rx,
         handle.take_remote_timers(),
         &handle.driver,
     );
@@ -474,10 +472,10 @@ impl Context {
             // otherwise the compiler will complain that the `core` parameter does not need to be mutable
             // if the 'time' feature is not enabled.
             let mut core = core;
-            util::time::remove_cancelled_timers(&mut core.wheel, &core.timer_cancel_rx);
+            util::time::remove_cancelled_timers(&mut core.wheel, &mut core.timer_cancel_rx);
             let should_yield = util::time::insert_inject_timers(
                 &mut core.wheel,
-                core.timer_cancel_tx.clone(),
+                &core.timer_cancel_tx,
                 handle.take_remote_timers(),
             );
             let next_timer = util::time::next_expiration_time(&core.wheel, &handle.driver);
@@ -557,7 +555,7 @@ impl Context {
 
         pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
         where
-            F: FnOnce(Option<(&mut Wheel, mpsc::Sender<EntryHandle>)>) -> R,
+            F: FnOnce(Option<(&mut Wheel, cancellation_queue::Sender)>) -> R,
         {
             self.with_core(|maybe_core| {
                 if let Some(core) = maybe_core {

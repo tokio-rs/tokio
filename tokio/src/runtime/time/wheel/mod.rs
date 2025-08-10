@@ -3,12 +3,15 @@ pub(crate) use self::level::Expiration;
 use self::level::Level;
 
 mod entry;
-use entry::EntryList;
 pub(crate) use entry::Handle as EntryHandle;
 use entry::TransitionToPending;
 use entry::TransitionToRegistered;
+use entry::{Entry, EntryList};
 
-use std::{array, sync::mpsc};
+pub(crate) mod cancellation_queue;
+use cancellation_queue::Sender;
+
+use std::array;
 
 /// Timing wheel implementation.
 ///
@@ -83,11 +86,7 @@ impl Wheel {
     /// The caller must ensure:
     ///
     /// * The entry is not already registered in ANY wheel.
-    pub(crate) unsafe fn insert(
-        &mut self,
-        hdl: EntryHandle,
-        cancel_tx: mpsc::Sender<EntryHandle>,
-    ) -> Insert {
+    pub(crate) unsafe fn insert(&mut self, hdl: EntryHandle, cancel_tx: Sender) -> Insert {
         let deadline = hdl.deadline();
 
         if deadline <= self.elapsed {
