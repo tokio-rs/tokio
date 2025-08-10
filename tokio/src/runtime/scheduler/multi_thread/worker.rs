@@ -76,9 +76,7 @@ use std::time::Duration;
 
 cfg_time! {
     use crate::runtime::scheduler::util;
-    use crate::runtime::time::{EntryHandle, Wheel};
-
-    use std::sync::mpsc;
+    use crate::runtime::time::{EntryHandle, Wheel, cancellation_queue};
 }
 
 mod metrics;
@@ -128,11 +126,11 @@ struct Core {
 
     #[cfg(feature = "time")]
     /// Channel for sending timers that need to be cancelled
-    timer_cancel_tx: mpsc::Sender<EntryHandle>,
+    timer_cancel_tx: cancellation_queue::Sender,
 
     #[cfg(feature = "time")]
     /// Channel for receiving timers that need to be cancelled
-    timer_cancel_rx: mpsc::Receiver<EntryHandle>,
+    timer_cancel_rx: cancellation_queue::Receiver,
 
     /// True if the worker is currently searching for more work. Searching
     /// involves attempting to steal from other workers.
@@ -280,7 +278,7 @@ pub(super) fn create(
         let metrics = WorkerMetrics::from_config(&config);
         let stats = Stats::new(&metrics);
         #[cfg(feature = "time")]
-        let (timer_cancel_tx, timer_cancel_rx) = mpsc::channel();
+        let (timer_cancel_tx, timer_cancel_rx) = cancellation_queue::new();
 
         cores.push(Box::new(Core {
             tick: 0,
@@ -598,8 +596,8 @@ impl Context {
         #[cfg(feature = "time")]
         util::time::shutdown_local_timers(
             &mut core.wheel,
-            core.timer_cancel_tx.clone(),
-            &core.timer_cancel_rx,
+            &core.timer_cancel_tx,
+            &mut core.timer_cancel_rx,
             self.worker.handle.take_remote_timers(),
             &self.worker.handle.driver,
         );
@@ -808,10 +806,10 @@ impl Context {
         let (duration, maybe_advance_duration) = {
             let handle = &self.worker.handle;
 
-            util::time::remove_cancelled_timers(&mut core.wheel, &core.timer_cancel_rx);
+            util::time::remove_cancelled_timers(&mut core.wheel, &mut core.timer_cancel_rx);
             let should_yield = util::time::insert_inject_timers(
                 &mut core.wheel,
-                core.timer_cancel_tx.clone(),
+                &core.timer_cancel_tx,
                 handle.take_remote_timers(),
             );
             let next_timer = util::time::next_expiration_time(&core.wheel, &handle.driver);
@@ -890,7 +888,7 @@ impl Context {
 
         pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
         where
-            F: FnOnce(Option<(&mut Wheel, mpsc::Sender<EntryHandle>)>) -> R,
+            F: FnOnce(Option<(&mut Wheel, cancellation_queue::Sender)>) -> R,
         {
             self.with_core(|core| {
                 if let Some(core) = core {

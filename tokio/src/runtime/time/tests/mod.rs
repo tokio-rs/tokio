@@ -54,7 +54,6 @@ async fn fire_all_timers(handle: &Handle, exit_rx: oneshot::Receiver<()>) {
         });
 
         thread::yield_now();
-        eprintln!("yielding to allow timers to fire");
     }
 }
 

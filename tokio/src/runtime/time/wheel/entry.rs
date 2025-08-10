@@ -1,9 +1,10 @@
+use super::cancellation_queue::Sender;
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::{AtomicU8, Ordering::*};
+use crate::loom::sync::atomic::{AtomicPtr, AtomicU8, Ordering::*};
 use crate::loom::sync::Arc;
 use crate::{sync::AtomicWaker, util::linked_list};
-use std::ptr::NonNull;
-use std::sync::mpsc::Sender;
+
+use std::ptr::{null_mut, NonNull};
 use std::task::Waker;
 
 pub(crate) type EntryList = linked_list::LinkedList<Entry, Entry>;
@@ -29,15 +30,16 @@ const STATE_PENDING: u8 = 3;
 /// the entry is reached its deadline and woken up.
 const STATE_WOKEN_UP: u8 = 4;
 
-/// The [`Handle`] has been sent to the [`mpsc`] channel.
-///
-/// [`mpsc`]: std::sync::mpsc
+/// The [`Handle`] has been sent to the [`Sender`].
 const STATE_CANCELLING: u8 = 5;
 
 #[derive(Debug)]
 pub(crate) struct Entry {
-    /// The pointers used by the intrusive linked list.
+    /// The intrusive pointers used by timer wheel.
     pointers: linked_list::Pointers<Entry>,
+
+    /// The intrusive pointer used by cancellation queue.
+    cancel_pointer: AtomicPtr<Entry>,
 
     /// The tick when this entry is scheduled to expire.
     deadline: u64,
@@ -48,7 +50,7 @@ pub(crate) struct Entry {
     /// The mpsc channel used to cancel the entry.
     // Since `mpsc::Sender` doesn't have `Drop` implementation,
     // we don't need to `drop_in_place` it when the entry is dropped.
-    cancel_tx: UnsafeCell<Option<Sender<Handle>>>,
+    cancel_tx: UnsafeCell<Option<Sender>>,
 
     state: AtomicU8,
 }
@@ -89,6 +91,12 @@ unsafe impl linked_list::Link for Entry {
     }
 }
 
+impl Entry {
+    pub(super) fn cancel_pointer(&self) -> &AtomicPtr<Self> {
+        &self.cancel_pointer
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct Handle {
     entry: Arc<Entry>,
@@ -101,10 +109,19 @@ impl From<Handle> for NonNull<Entry> {
     }
 }
 
+impl From<NonNull<Entry>> for Handle {
+    fn from(ptr: NonNull<Entry>) -> Self {
+        // Safety: `ptr` is guaranteed to be non-null by the caller.
+        let ptr = unsafe { Arc::from_raw(ptr.as_ptr()) };
+        Handle { entry: ptr }
+    }
+}
+
 impl Handle {
     pub(crate) fn new(deadline: u64, waker: &Waker) -> Self {
         let entry = Arc::new(Entry {
             pointers: linked_list::Pointers::new(),
+            cancel_pointer: AtomicPtr::new(null_mut()),
             deadline,
             waker: AtomicWaker::new(),
             cancel_tx: UnsafeCell::new(None),
@@ -163,10 +180,7 @@ impl Handle {
         self.entry.waker.register_by_ref(waker);
     }
 
-    pub(crate) fn transition_to_registered(
-        &self,
-        cancel_tx: Sender<Handle>,
-    ) -> TransitionToRegistered {
+    pub(crate) fn transition_to_registered(&self, cancel_tx: Sender) -> TransitionToRegistered {
         match self.entry.state.compare_exchange(
             STATE_UNREGISTERED,
             STATE_BUSY_REGISTERING,
@@ -246,10 +260,10 @@ impl Handle {
             // this is synchronized with the `transition_to_registered` call,
             // and the `cancel_tx` should be already stored.
             let tx = unsafe { tx.as_mut().unwrap_unchecked() };
-            tx.take()
-                .unwrap()
-                .send(self.clone())
-                .expect("receiver side is closed");
+            let tx = tx.take().unwrap();
+            unsafe {
+                tx.send(self.clone());
+            }
         });
     }
 
@@ -267,6 +281,10 @@ impl Handle {
 
     pub(crate) fn is_woken_up(&self) -> bool {
         self.entry.state.fetch_or(0, SeqCst) == STATE_WOKEN_UP
+    }
+
+    pub(super) fn into_entry(self) -> Arc<Entry> {
+        self.entry
     }
 }
 

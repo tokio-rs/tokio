@@ -1,13 +1,12 @@
 cfg_rt_and_time! {
     pub(crate) mod time {
         use crate::runtime::{scheduler::driver};
-        use crate::runtime::time::{EntryHandle, Wheel};
+        use crate::runtime::time::{EntryHandle, Wheel, cancellation_queue::{Sender, Receiver}};
         use std::time::Duration;
-        use std::sync::mpsc;
 
         pub(crate) fn insert_inject_timers(
             wheel: &mut Wheel,
-            tx: mpsc::Sender<EntryHandle>,
+            tx: &Sender,
             inject: Vec<EntryHandle>,
         ) -> bool {
             use crate::runtime::time::Insert;
@@ -29,9 +28,10 @@ cfg_rt_and_time! {
 
         pub(crate) fn remove_cancelled_timers(
             wheel: &mut Wheel,
-            rx: &mpsc::Receiver<EntryHandle>,
+            rx: &mut Receiver,
         ) {
-            while let Ok(hdl) = rx.try_recv() {
+            let iter = unsafe { rx.recv_all() };
+            for hdl in iter {
                 unsafe {
                     let is_registered = hdl.is_registered();
                     let is_pending = hdl.is_pending();
@@ -145,8 +145,8 @@ cfg_rt_and_time! {
 
         pub(crate) fn shutdown_local_timers(
             wheel: &mut Wheel,
-            tx: mpsc::Sender<EntryHandle>,
-            rx: &mpsc::Receiver<EntryHandle>,
+            tx: &Sender,
+            rx: &mut Receiver,
             inject: Vec<EntryHandle>,
             drv_hdl: &driver::Handle,
         ) {
