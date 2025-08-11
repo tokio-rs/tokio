@@ -19,6 +19,8 @@ cfg_net! {
     ///
     /// A `TcpListener` can be turned into a `Stream` with [`TcpListenerStream`].
     ///
+    /// The socket will be closed when the value is dropped.
+    ///
     /// [`TcpListenerStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.TcpListenerStream.html
     ///
     /// # Errors
