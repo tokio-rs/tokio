@@ -40,6 +40,9 @@ unsafe impl Sync for Inner {}
 
 impl Drop for Inner {
     fn drop(&mut self) {
+        unsafe {
+            let _ = self.take_all();
+        }
         // Drop the stub pointer
         let stub = NonNull::new(self.stub.load(SeqCst)).unwrap();
         drop_stub(stub);
