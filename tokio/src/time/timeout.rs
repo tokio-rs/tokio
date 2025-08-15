@@ -214,7 +214,7 @@ fn poll_delay(
     delay: Pin<&mut Sleep>,
     cx: &mut task::Context<'_>,
 ) -> Poll<Result<std::convert::Infallible, Elapsed>> {
-    let poll_delay = || match delay.poll(cx) {
+    let delay_poll = || match delay.poll(cx) {
         Poll::Ready(()) => Poll::Ready(Err(Elapsed::new())),
         Poll::Pending => Poll::Pending,
     };
@@ -227,8 +227,8 @@ fn poll_delay(
         // cases where the underlying future always exhausts the budget and
         // we never get a chance to evaluate whether the timeout was hit or
         // not.
-        coop::with_unconstrained(poll_delay)
+        coop::with_unconstrained(delay_poll)
     } else {
-        poll_delay()
+        delay_poll()
     }
 }
