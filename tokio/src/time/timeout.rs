@@ -203,26 +203,32 @@ where
             return Poll::Ready(Ok(v));
         }
 
-        let has_budget_now = coop::has_budget_remaining();
+        poll_delay(had_budget_before, me.delay, cx).map(Err)
+    }
+}
 
-        let delay = me.delay;
+// The T-invariant portion of Timeout::<T>::poll. Pulling this out reduces the
+// amount of code that gets duplicated during monomorphization.
+fn poll_delay(
+    had_budget_before: bool,
+    delay: Pin<&mut Sleep>,
+    cx: &mut task::Context<'_>,
+) -> Poll<Elapsed> {
+    let delay_poll = || match delay.poll(cx) {
+        Poll::Ready(()) => Poll::Ready(Elapsed::new()),
+        Poll::Pending => Poll::Pending,
+    };
 
-        let poll_delay = || -> Poll<Self::Output> {
-            match delay.poll(cx) {
-                Poll::Ready(()) => Poll::Ready(Err(Elapsed::new())),
-                Poll::Pending => Poll::Pending,
-            }
-        };
+    let has_budget_now = coop::has_budget_remaining();
 
-        if let (true, false) = (had_budget_before, has_budget_now) {
-            // if it is the underlying future that exhausted the budget, we poll
-            // the `delay` with an unconstrained one. This prevents pathological
-            // cases where the underlying future always exhausts the budget and
-            // we never get a chance to evaluate whether the timeout was hit or
-            // not.
-            coop::with_unconstrained(poll_delay)
-        } else {
-            poll_delay()
-        }
+    if let (true, false) = (had_budget_before, has_budget_now) {
+        // if it is the underlying future that exhausted the budget, we poll
+        // the `delay` with an unconstrained one. This prevents pathological
+        // cases where the underlying future always exhausts the budget and
+        // we never get a chance to evaluate whether the timeout was hit or
+        // not.
+        coop::with_unconstrained(delay_poll)
+    } else {
+        delay_poll()
     }
 }
