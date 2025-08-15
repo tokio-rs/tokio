@@ -1,10 +1,10 @@
 use super::cancellation_queue::Sender;
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::{AtomicPtr, AtomicU8, Ordering::*};
+use crate::loom::sync::atomic::{AtomicU8, Ordering::*};
 use crate::loom::sync::Arc;
 use crate::{sync::AtomicWaker, util::linked_list};
 
-use std::ptr::{null_mut, NonNull};
+use std::ptr::NonNull;
 use std::task::Waker;
 
 pub(crate) type EntryList = linked_list::LinkedList<Entry, Entry>;
@@ -39,7 +39,7 @@ pub(crate) struct Entry {
     pointers: linked_list::Pointers<Entry>,
 
     /// The intrusive pointer used by cancellation queue.
-    cancel_pointer: AtomicPtr<Entry>,
+    cancel_pointer: UnsafeCell<Option<NonNull<Entry>>>,
 
     /// The tick when this entry is scheduled to expire.
     deadline: u64,
@@ -55,10 +55,13 @@ pub(crate) struct Entry {
     state: AtomicU8,
 }
 
-// Safety:
-//
-// * Caller guarantees the `Self::pointers` is used correctly.
-// * AND `Self::cancel_tx` is protected by `Self::state`.
+/// Safety: There are two fields are neither `Send` nor `Sync`.
+///
+/// - [`Self::cancel_pointer`]: This is protected by [`cancellation_queue`].
+/// - [`Self::cancel_tx`]: This is protected by [`Self::state`].
+///
+/// [`cancellation_queue`]: `super::cancellation_queue`
+unsafe impl Send for Entry {}
 unsafe impl Sync for Entry {}
 
 generate_addr_of_methods! {
@@ -92,7 +95,7 @@ unsafe impl linked_list::Link for Entry {
 }
 
 impl Entry {
-    pub(super) fn cancel_pointer(&self) -> &AtomicPtr<Self> {
+    pub(super) fn cancel_pointer(&self) -> &UnsafeCell<Option<NonNull<Self>>> {
         &self.cancel_pointer
     }
 }
@@ -121,7 +124,7 @@ impl Handle {
     pub(crate) fn new(deadline: u64, waker: &Waker) -> Self {
         let entry = Arc::new(Entry {
             pointers: linked_list::Pointers::new(),
-            cancel_pointer: AtomicPtr::new(null_mut()),
+            cancel_pointer: UnsafeCell::new(None),
             deadline,
             waker: AtomicWaker::new(),
             cancel_tx: UnsafeCell::new(None),
@@ -137,6 +140,7 @@ impl Handle {
         match self
             .entry
             .state
+            // We don't need to synchronize anything, so we can use relaxed ordering.
             .compare_exchange(STATE_PENDING, STATE_WOKEN_UP, Relaxed, Relaxed)
         {
             Ok(_) => self.entry.waker.wake(),
@@ -155,11 +159,12 @@ impl Handle {
 
     /// Wake the entry if it has already elapsed before registering to the timer wheel.
     pub(crate) fn wake_unregistered(&self) {
-        match self
-            .entry
-            .state
-            .compare_exchange(STATE_UNREGISTERED, STATE_WOKEN_UP, Relaxed, Relaxed)
-        {
+        match self.entry.state.compare_exchange(
+            STATE_UNREGISTERED,
+            STATE_WOKEN_UP,
+            Relaxed, // no need to synchronize anything
+            Relaxed, // no need to synchronize anything
+        ) {
             Ok(_) => self.entry.waker.wake(),
             Err(STATE_REGISTERED) => {
                 panic!("entry is already registered, please call `wake` instead")
@@ -184,8 +189,8 @@ impl Handle {
         match self.entry.state.compare_exchange(
             STATE_UNREGISTERED,
             STATE_BUSY_REGISTERING,
-            Relaxed,
-            Relaxed,
+            Relaxed, // no need to synchronize anything
+            Relaxed, // no need to synchronize anything
         ) {
             Ok(_) => (), // successfully locked the `self.cancel_tx`
             Err(STATE_BUSY_REGISTERING) => panic!("should not be called concurrently"),
@@ -220,6 +225,7 @@ impl Handle {
         match self
             .entry
             .state
+            // We don't need to synchronize anything, so we can use relaxed ordering.
             .compare_exchange(STATE_REGISTERED, STATE_PENDING, Relaxed, Relaxed)
         {
             Ok(_) => TransitionToPending::Success,
@@ -265,6 +271,9 @@ impl Handle {
                 tx.send(self.clone());
             }
         });
+
+        // No need to emit an release fence here
+        // because this method will not be called twice.
     }
 
     pub(crate) fn deadline(&self) -> u64 {

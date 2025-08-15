@@ -30,11 +30,7 @@ fn single_thread() {
                 unsafe { tx.send(new_handle()) };
             }
 
-            for _ in 0..i {
-                unsafe { rx.try_recv() }.unwrap();
-            }
-
-            assert!(unsafe { rx.try_recv() }.is_none());
+            assert_eq!(rx.recv_all().count(), i);
         }
     });
 }
@@ -69,16 +65,12 @@ fn multi_thread() {
 
         let mut count = 0;
         loop {
-            while unsafe { rx.try_recv() }.is_some() {
-                count += 1;
-            }
+            count += rx.recv_all().count();
             if sent.fetch_add(0, SeqCst) == NUM_ITEMS * NUM_THREADS {
                 jhs.into_iter().for_each(|jh| {
                     jh.join().unwrap();
                 });
-                while unsafe { rx.try_recv() }.is_some() {
-                    count += 1;
-                }
+                count += rx.recv_all().count();
                 break;
             }
             thread::yield_now();

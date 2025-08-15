@@ -30,7 +30,7 @@ cfg_rt_and_time! {
             wheel: &mut Wheel,
             rx: &mut Receiver,
         ) {
-            while let Some(hdl) = unsafe { rx.try_recv() } {
+            for hdl in rx.recv_all() {
                 unsafe {
                     let is_registered = hdl.is_registered();
                     let is_pending = hdl.is_pending();

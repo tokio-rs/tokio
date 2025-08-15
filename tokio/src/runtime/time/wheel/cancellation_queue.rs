@@ -1,195 +1,147 @@
-//! MPSC Intrusive Linked List
-//!
-//! This implementation is based on Dmitry Vyukov's [Intrusive MPSC node-based queue].
-//!
-//! [Intrusive MPSC node-based queue]: https://www.1024cores.net/home/lock-free-algorithms/queues/intrusive-mpsc-node-based-queue
-
 use super::{Entry, EntryHandle};
-use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::{AtomicPtr, Ordering::*};
-use crate::loom::sync::Arc;
+use crate::loom::sync::{Arc, Mutex};
 
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
-use std::ptr::{null, null_mut, NonNull};
-use std::task::{RawWaker, RawWakerVTable, Waker};
+use std::ptr::NonNull;
 
 #[derive(Debug)]
 struct Inner {
-    head: AtomicPtr<Entry>,
-    tail: UnsafeCell<NonNull<Entry>>,
-    stub: NonNull<Entry>,
+    head: Option<NonNull<Entry>>,
+    tail: Option<NonNull<Entry>>,
 }
 
+/// Safety: [`Inner`] is protected by [`Mutex`].
 unsafe impl Send for Inner {}
+
+/// Safety: [`Inner`] is protected by [`Mutex`].
 unsafe impl Sync for Inner {}
 
 impl Drop for Inner {
     fn drop(&mut self) {
         unsafe {
-            while let Some(hdl) = self.try_recv() {
-                drop(hdl);
+            while let Some(head) = self.head {
+                self.head = head.as_ref().cancel_pointer().with(|p| *p);
+                drop(EntryHandle::from(head));
             }
         }
-        drop_stub(self.stub);
     }
 }
 
 impl Inner {
-    pub(crate) fn new() -> Self {
-        let stub = new_stub();
-
+    fn new() -> Self {
         Self {
-            head: AtomicPtr::new(stub.as_ptr()),
-            tail: UnsafeCell::new(stub),
-            stub,
+            head: None,
+            tail: None,
         }
     }
 
     /// # Safety
     ///
-    /// Violating any of the following constraints can lead to
-    /// undefined behavior:
+    /// Behavior is undefined if any of the following conditions are violated:
     ///
-    /// - `hdl` must not be in any queue.
-    unsafe fn push(&self, hdl: EntryHandle) {
-        // Since all items in the queue must be alive until they are removed,
-        // so we should not decrease the reference count.
-        let node = ManuallyDrop::new(hdl.into_entry());
+    /// - `hdl` must not in any cancellation queue.
+    unsafe fn push_back(&mut self, hdl: EntryHandle) {
+        // Since we need to access the intrusive pointer, we must not drop the entry.
+        let entry = ManuallyDrop::new(hdl.into_entry());
 
-        let next = node.cancel_pointer();
-        next.store(null_mut(), SeqCst);
+        entry.cancel_pointer().with_mut(|p| {
+            // Safety: this UnsafeCell is only accessed with the mutex locked.
+            let p = unsafe { p.as_mut() }.unwrap();
+            *p = None;
+        });
 
-        let old_head = self.head.swap(Arc::as_ptr(&node).cast_mut(), SeqCst);
-        old_head
-            .as_ref()
-            .expect("head pointer should never be null")
-            .cancel_pointer()
-            .store(Arc::as_ptr(&node).cast_mut(), SeqCst);
-    }
+        let entry_ptr = Arc::as_ptr(&entry).cast_mut();
 
-    /// # Safety
-    ///
-    /// Violating any of the following constraints can lead to
-    /// undefined behavior:
-    ///
-    /// - This method must not be called concurrently.
-    unsafe fn try_recv(&self) -> Option<EntryHandle> {
-        let mut tail = self.tail.with(|t| *t);
-        let mut next = tail.as_ref().cancel_pointer().load(SeqCst);
-        if tail == self.stub {
-            if next.is_null() {
-                return None;
+        if self.head.is_none() {
+            self.head = NonNull::new(entry_ptr);
+            self.tail = self.head;
+        } else {
+            let tail = self.tail.unwrap();
+            unsafe {
+                tail.as_ref().cancel_pointer().with_mut(|p| {
+                    *p = Some(NonNull::new(entry_ptr).unwrap());
+                });
             }
-
-            self.tail.with_mut(|t| {
-                *t = NonNull::new(next).unwrap();
-            });
-            tail = NonNull::new(next).unwrap();
-            next = next.as_ref().unwrap().cancel_pointer().load(SeqCst);
+            self.tail = Some(NonNull::new(entry_ptr).unwrap());
         }
+    }
 
-        if !next.is_null() {
-            self.tail.with_mut(|t| {
-                *t = NonNull::new(next).unwrap();
-            });
-            return Some(EntryHandle::from(tail));
-        }
+    fn iter(&mut self) -> impl Iterator<Item = EntryHandle> {
+        let mut head = self.head.take();
+        let _ = self.tail.take();
 
-        let head = self.head.load(SeqCst);
-        if tail.as_ptr() != head {
-            return None;
-        }
-
-        self.push(EntryHandle::from(self.stub));
-        next = tail.as_ref().cancel_pointer().load(SeqCst);
-
-        if !next.is_null() {
-            self.tail.with_mut(|t| {
-                *t = NonNull::new(next).unwrap();
-            });
-            return Some(EntryHandle::from(tail));
-        }
-
-        None
+        std::iter::from_fn(move || match head {
+            Some(ptr) => {
+                // Safety: We wrap the `hdl` using `ManuallyDrop` in `self.push_back`,
+                // so the ptr is still valid.
+                head = unsafe { ptr.as_ref() }
+                    .cancel_pointer()
+                    // Safety: All side effects have been synchronized
+                    // by the mutex.
+                    .with(|p| unsafe { *p });
+                let hdl = EntryHandle::from(ptr);
+                Some(hdl)
+            }
+            None => None,
+        })
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct Sender {
-    inner: Arc<Inner>,
+    inner: Arc<Mutex<Inner>>,
 }
 
-/// Safety: [`Sender`] is protected by [`AtomicPtr`]
+/// Safety: [`Inner`] is protected by [`Mutex`].
 unsafe impl Send for Sender {}
 
-/// Safety: [`Sender`] is protected by [`AtomicPtr`]
+/// Safety: [`Inner`] is protected by [`Mutex`].
 unsafe impl Sync for Sender {}
 
 impl Sender {
+    /// # Safety
+    ///
+    /// Behavior is undefined if any of the following conditions are violated:
+    ///
+    /// - `hdl` must not in any cancellation queue.
     pub(crate) unsafe fn send(&self, hdl: EntryHandle) {
-        self.inner.push(hdl);
+        self.inner.lock().push_back(hdl);
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct Receiver {
-    inner: Arc<Inner>,
+    inner: Arc<Mutex<Inner>>,
 
-    // make sure Receiver is `!Sync`
-    _p: PhantomData<*const ()>,
+    // Technically, receiver is `Sync`, however, we only
+    // need single receiver for cancellation purpose,
+    // so we make it `!Sync` to prevent abusing.
+    _not_sync: PhantomData<*const ()>,
 }
 
-/// Safety: [`Receiver`] can only be accessed from a single thread.
+/// Safety: [`Inner`] is protected by [`Mutex`].
+// We need the `Receiver` to be `Send` because the `Core` struct for multi-thread
+// runtime will be send to another thread during the shutdown.
 unsafe impl Send for Receiver {}
 
 impl Receiver {
-    pub(crate) unsafe fn try_recv(&mut self) -> Option<EntryHandle> {
-        self.inner.try_recv()
+    pub(crate) fn recv_all(&mut self) -> impl Iterator<Item = EntryHandle> {
+        self.inner.lock().iter()
     }
 }
 
 pub(crate) fn new() -> (Sender, Receiver) {
-    let inner = Arc::new(Inner::new());
+    let inner = Arc::new(Mutex::new(Inner::new()));
     (
         Sender {
             inner: inner.clone(),
         },
         Receiver {
             inner,
-            _p: PhantomData,
+            _not_sync: PhantomData,
         },
     )
-}
-
-fn new_stub() -> NonNull<Entry> {
-    let hdl = EntryHandle::new(0, &noop_waker());
-    let ptr = Arc::into_raw(hdl.into_entry());
-    NonNull::new(ptr.cast_mut()).expect("stub pointer should never be null")
-}
-
-fn drop_stub(stub: NonNull<Entry>) {
-    let hdl = EntryHandle::from(stub);
-    drop(hdl);
-}
-
-// The following noop waker implementation is from crate `futures`.
-// https://docs.rs/futures/latest/futures/
-
-unsafe fn noop_clone(_data: *const ()) -> RawWaker {
-    noop_raw_waker()
-}
-
-unsafe fn noop(_data: *const ()) {}
-
-const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(noop_clone, noop, noop, noop);
-
-const fn noop_raw_waker() -> RawWaker {
-    RawWaker::new(null(), &NOOP_WAKER_VTABLE)
-}
-
-fn noop_waker() -> Waker {
-    unsafe { Waker::from_raw(noop_raw_waker()) }
 }
 
 #[cfg(test)]
