@@ -30,22 +30,24 @@ fn single_thread() {
                 unsafe { tx.send(new_handle()) };
             }
 
-            let all = unsafe { rx.recv_all() };
-            assert_eq!(all.count(), i);
+            for _ in 0..i {
+                unsafe { rx.try_recv() }.unwrap();
+            }
+
+            assert!(unsafe { rx.try_recv() }.is_none());
         }
     });
 }
 
 #[test]
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_os = "wasi"))] // No thread on wasi.
 fn multi_thread() {
     use crate::loom::sync::atomic::{AtomicUsize, Ordering::SeqCst};
     use crate::loom::sync::Arc;
     use crate::loom::thread;
 
     #[cfg(loom)]
-    // '-1' is for the main thread that runs `loom::model`
-    const NUM_THREADS: usize = 2;
+    const NUM_THREADS: usize = 3;
     #[cfg(not(loom))]
     const NUM_THREADS: usize = 8;
 
@@ -67,14 +69,16 @@ fn multi_thread() {
 
         let mut count = 0;
         loop {
-            let all = unsafe { rx.recv_all() };
-            count += all.count();
+            while unsafe { rx.try_recv() }.is_some() {
+                count += 1;
+            }
             if sent.fetch_add(0, SeqCst) == NUM_ITEMS * NUM_THREADS {
                 jhs.into_iter().for_each(|jh| {
                     jh.join().unwrap();
                 });
-                let all = unsafe { rx.recv_all() };
-                count += all.count();
+                while unsafe { rx.try_recv() }.is_some() {
+                    count += 1;
+                }
                 break;
             }
             thread::yield_now();
