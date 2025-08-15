@@ -203,7 +203,7 @@ where
             return Poll::Ready(Ok(v));
         }
 
-        poll_delay(had_budget_before, me.delay, cx).map_ok(|infallible| match infallible {})
+        poll_delay(had_budget_before, me.delay, cx).map(Err)
     }
 }
 
@@ -213,9 +213,9 @@ fn poll_delay(
     had_budget_before: bool,
     delay: Pin<&mut Sleep>,
     cx: &mut task::Context<'_>,
-) -> Poll<Result<std::convert::Infallible, Elapsed>> {
+) -> Poll<Elapsed> {
     let delay_poll = || match delay.poll(cx) {
-        Poll::Ready(()) => Poll::Ready(Err(Elapsed::new())),
+        Poll::Ready(()) => Poll::Ready(Elapsed::new()),
         Poll::Pending => Poll::Pending,
     };
 
