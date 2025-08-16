@@ -28,7 +28,7 @@ use crate::util::IdleNotifiedSet;
 ///
 /// Spawn multiple tasks and wait for them.
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::task::JoinSet;
 ///
 /// #[tokio::main]
@@ -208,7 +208,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// Spawn multiple blocking tasks and wait for them.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::task::JoinSet;
     ///
     /// #[tokio::main]
@@ -382,7 +382,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// Spawn multiple tasks and `join_all` them.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::task::JoinSet;
     /// use std::time::Duration;
     ///
@@ -404,7 +404,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// Equivalent implementation of `join_all`, using [`join_next`] and loop.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::task::JoinSet;
     /// use std::panic;
     ///
@@ -600,7 +600,7 @@ impl<T> Default for JoinSet<T> {
 ///
 /// The main example from [`JoinSet`]'s documentation can also be written using [`collect`]:
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::task::JoinSet;
 ///
 /// #[tokio::main]
