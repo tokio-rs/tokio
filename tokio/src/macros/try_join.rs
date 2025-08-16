@@ -53,7 +53,7 @@ macro_rules! doc {
         ///
         /// Basic `try_join` with two branches.
         ///
-        /// ```
+        /// ```ignore-wasm
         /// async fn do_stuff_async() -> Result<(), &'static str> {
         ///     // async work
         /// # Ok(())
@@ -83,7 +83,7 @@ macro_rules! doc {
         ///
         /// Using `try_join!` with spawned tasks.
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::task::JoinHandle;
         ///
         /// async fn do_stuff_async() -> Result<(), &'static str> {
@@ -121,7 +121,7 @@ macro_rules! doc {
         /// ```
         /// Using the `biased;` mode to control polling order.
         ///
-        /// ```
+        /// ```ignore-wasm
         /// async fn do_stuff_async() -> Result<(), &'static str> {
         ///     // async work
         /// # Ok(())

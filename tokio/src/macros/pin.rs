@@ -24,7 +24,7 @@
 ///
 /// To make this work requires pinning:
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::pin;
 ///
 /// async fn my_async_fn() {
@@ -69,7 +69,7 @@
 ///
 /// Using with select:
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::{pin, select};
 /// use tokio_stream::{self as stream, StreamExt};
 ///
@@ -101,7 +101,7 @@
 /// Because assigning to a variable followed by pinning is common, there is also
 /// a variant of the macro that supports doing both in one go.
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::{pin, select};
 ///
 /// async fn my_async_fn() {

@@ -149,7 +149,7 @@ macro_rules! doc {
         ///
         /// Basic select with two branches.
         ///
-        /// ```
+        /// ```ignore-wasm
         /// async fn do_stuff_async() {
         ///     // async work
         /// }
@@ -173,7 +173,7 @@ macro_rules! doc {
         ///
         /// Basic stream selecting.
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio_stream::{self as stream, StreamExt};
         ///
         /// #[tokio::main]
@@ -194,7 +194,7 @@ macro_rules! doc {
         /// matching and the fact that `stream::iter` is "fused", i.e. once the stream
         /// is complete, all calls to `next()` return `None`.
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio_stream::{self as stream, StreamExt};
         ///
         /// #[tokio::main]
@@ -226,7 +226,7 @@ macro_rules! doc {
         ///
         /// Here, a stream is consumed for at most 1 second.
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio_stream::{self as stream, StreamExt};
         /// use tokio::time::{self, Duration};
         ///
@@ -256,7 +256,7 @@ macro_rules! doc {
         ///
         /// Joining two values using `select!`.
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::sync::oneshot;
         ///
         /// #[tokio::main]
@@ -291,7 +291,7 @@ macro_rules! doc {
         ///
         /// Using the `biased;` mode to control polling order.
         ///
-        /// ```
+        /// ```ignore-wasm
         /// #[tokio::main]
         /// async fn main() {
         ///     let mut count = 0u8;
@@ -337,7 +337,7 @@ macro_rules! doc {
         /// is to repeatedly run an asynchronous task for up to 50 milliseconds.
         /// However, there is a potential for the `sleep` completion to be missed.
         ///
-        /// ```no_run,should_panic
+        /// ```no_run,should_panic,ignore-wasm
         /// use tokio::time::{self, Duration};
         ///
         /// async fn some_async_work() {
@@ -372,7 +372,7 @@ macro_rules! doc {
         ///
         /// One way to write the above example without the race would be:
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::time::{self, Duration};
         ///
         /// async fn some_async_work() {
@@ -422,7 +422,7 @@ macro_rules! doc {
         ///
         /// ### Example with `select!`
         ///
-        /// ```
+        /// ```ignore-wasm
         /// struct File;
         /// struct Channel;
         /// struct Socket;
@@ -461,7 +461,7 @@ macro_rules! doc {
         /// eliminating the need to manage tasks manually and reducing the risk of
         /// unintended behavior like data loss.
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use std::pin::pin;
         ///
         /// use futures::stream::unfold;
@@ -530,7 +530,7 @@ macro_rules! doc {
         /// - [`futures_lite::future::or`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.or.html)
         /// - [`futures_lite::future::race`](https://docs.rs/futures-lite/latest/futures_lite/future/fn.race.html)
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use futures_concurrency::future::Race;
         ///
         /// #[tokio::main]
