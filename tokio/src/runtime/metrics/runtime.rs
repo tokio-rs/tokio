@@ -34,7 +34,7 @@ impl RuntimeMetrics {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Handle;
     ///
     /// #[tokio::main]
@@ -56,7 +56,7 @@ impl RuntimeMetrics {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Handle;
     ///
     /// #[tokio::main]
@@ -82,7 +82,7 @@ impl RuntimeMetrics {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Handle;
     ///
     /// #[tokio::main]
@@ -123,7 +123,7 @@ impl RuntimeMetrics {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime::Handle;
         ///
         /// #[tokio::main]
@@ -168,7 +168,7 @@ impl RuntimeMetrics {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime::Handle;
         ///
         /// #[tokio::main]
@@ -216,7 +216,7 @@ impl RuntimeMetrics {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime::Handle;
         ///
         /// #[tokio::main]

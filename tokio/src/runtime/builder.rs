@@ -30,7 +30,7 @@ use std::time::Duration;
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::runtime::Builder;
 ///
 /// fn main() {
@@ -323,7 +323,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime;
     ///
     /// let rt = runtime::Builder::new_multi_thread()
@@ -365,7 +365,7 @@ impl Builder {
     ///
     /// ## Multi threaded runtime with 4 threads
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime;
     ///
     /// // This will spawn a work-stealing runtime with 4 worker threads.
@@ -459,7 +459,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -480,7 +480,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     /// # pub fn main() {
@@ -511,7 +511,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -532,7 +532,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -557,7 +557,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -589,7 +589,7 @@ impl Builder {
     /// # Examples
     ///
     /// ## Multithreaded executor
-    /// ```
+    /// ```ignore-wasm
     /// # use std::sync::Arc;
     /// # use std::sync::atomic::{AtomicBool, Ordering};
     /// # use tokio::runtime;
@@ -665,7 +665,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -882,7 +882,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Builder;
     ///
     /// let rt  = Builder::new_multi_thread().build().unwrap();
@@ -954,7 +954,7 @@ impl Builder {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # use std::time::Duration;
     /// # pub fn main() {
@@ -991,7 +991,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
@@ -1025,7 +1025,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
@@ -1567,7 +1567,7 @@ cfg_time! {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()

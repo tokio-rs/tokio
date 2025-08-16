@@ -51,7 +51,7 @@ impl Handle {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Runtime;
     ///
     /// let rt = Runtime::new().unwrap();
@@ -65,7 +65,7 @@ impl Handle {
     /// Do **not** do the following, this shows a scenario that will result in a
     /// panic and possible memory leak.
     ///
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use tokio::runtime::Runtime;
     ///
     /// let rt1 = Runtime::new().unwrap();
@@ -105,7 +105,7 @@ impl Handle {
     /// This can be used to obtain the handle of the surrounding runtime from an async
     /// block or function running on that runtime.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use std::thread;
     /// # use tokio::runtime::Runtime;
     /// # fn dox() {
@@ -169,7 +169,7 @@ impl Handle {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
@@ -203,7 +203,7 @@ impl Handle {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
@@ -255,7 +255,7 @@ impl Handle {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Runtime;
     ///
     /// // Create the runtime
@@ -272,7 +272,7 @@ impl Handle {
     ///
     /// Or using `Handle::current`:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Handle;
     ///
     /// #[tokio::main]
@@ -386,7 +386,7 @@ impl Handle {
     /// }
     /// ```
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::{Handle, RuntimeFlavor};
     ///
     /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]

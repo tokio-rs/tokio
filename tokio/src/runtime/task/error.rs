@@ -45,7 +45,7 @@ impl JoinError {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::panic;
     ///
     /// #[tokio::main]
@@ -71,7 +71,7 @@ impl JoinError {
     ///
     /// # Examples
     ///
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use std::panic;
     ///
     /// #[tokio::main]
@@ -98,7 +98,7 @@ impl JoinError {
     ///
     /// # Examples
     ///
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use std::panic;
     ///
     /// #[tokio::main]
