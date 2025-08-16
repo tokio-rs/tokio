@@ -55,7 +55,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockReadGuard};
     ///
@@ -102,7 +102,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockReadGuard};
     ///
@@ -143,7 +143,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockReadGuard};
     ///

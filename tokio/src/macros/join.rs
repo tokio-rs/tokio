@@ -55,7 +55,7 @@ macro_rules! doc {
         ///
         /// Basic join with two branches
         ///
-        /// ```
+        /// ```ignore-wasm
         /// async fn do_stuff_async() {
         ///     // async work
         /// }
@@ -76,7 +76,7 @@ macro_rules! doc {
         ///
         /// Using the `biased;` mode to control polling order.
         ///
-        /// ```
+        /// ```ignore-wasm
         /// async fn do_stuff_async() {
         ///     // async work
         /// }

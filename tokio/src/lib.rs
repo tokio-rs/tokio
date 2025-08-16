@@ -193,7 +193,7 @@
 //! [`spawn_blocking`]: crate::task::spawn_blocking()
 //! [`thread_keep_alive`]: crate::runtime::Builder::thread_keep_alive()
 //!
-//! ```
+//! ```ignore-wasm
 //! #[tokio::main]
 //! async fn main() {
 //!     // This is running on a core thread.
@@ -265,7 +265,7 @@
 //!
 //! A simple TCP echo server:
 //!
-//! ```no_run
+//! ```no_run,ignore-wasm
 //! use tokio::net::TcpListener;
 //! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!

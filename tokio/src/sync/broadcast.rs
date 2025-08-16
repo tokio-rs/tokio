@@ -70,7 +70,7 @@
 //!
 //! Basic usage
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::sync::broadcast;
 //!
 //! #[tokio::main]
@@ -95,7 +95,7 @@
 //!
 //! Handling lag
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::sync::broadcast;
 //!
 //! #[tokio::main]
@@ -138,7 +138,7 @@ use std::task::{ready, Context, Poll, Waker};
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::broadcast;
 ///
 /// #[tokio::main]
@@ -180,7 +180,7 @@ pub struct Sender<T> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::broadcast::channel;
 ///
 /// #[tokio::main]
@@ -212,7 +212,7 @@ pub struct WeakSender<T> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::broadcast;
 ///
 /// #[tokio::main]
@@ -475,7 +475,7 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::broadcast;
 ///
 /// #[tokio::main]
@@ -606,7 +606,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -671,7 +671,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -719,7 +719,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -766,7 +766,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -817,7 +817,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -842,7 +842,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -866,7 +866,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use futures::FutureExt;
     /// use tokio::sync::broadcast;
     ///
@@ -1145,7 +1145,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -1174,7 +1174,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -1200,7 +1200,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -1345,7 +1345,7 @@ impl<T> Receiver<T> {
     /// [`Sender`]: crate::sync::broadcast::Sender
     ///
     /// # Examples
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -1373,7 +1373,7 @@ impl<T: Clone> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -1419,7 +1419,7 @@ impl<T: Clone> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -1444,7 +1444,7 @@ impl<T: Clone> Receiver<T> {
     ///
     /// Handling lag
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -1493,7 +1493,7 @@ impl<T: Clone> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::broadcast;
     ///
     /// #[tokio::main]
@@ -1521,7 +1521,7 @@ impl<T: Clone> Receiver<T> {
     /// context.
     ///
     /// # Examples
-    /// ```
+    /// ```ignore-wasm
     /// use std::thread;
     /// use tokio::sync::broadcast;
     ///

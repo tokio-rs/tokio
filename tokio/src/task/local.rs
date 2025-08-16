@@ -60,7 +60,7 @@ cfg_rt! {
     /// local task set, we can use [`task::spawn_local`], which can spawn
     /// `!Send` futures. For example:
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use std::rc::Rc;
     /// use tokio::task;
     ///
@@ -94,7 +94,7 @@ cfg_rt! {
     /// several futures on a `LocalSet` and drive the whole set until they
     /// complete. For example,
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio::{task, time};
     /// use std::rc::Rc;
     ///
@@ -132,7 +132,7 @@ cfg_rt! {
     /// and communicate with it using an [`mpsc`] channel.
     ///
     /// The following example puts the `LocalSet` inside a new thread.
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Builder;
     /// use tokio::sync::{mpsc, oneshot};
     /// use tokio::task::LocalSet;
@@ -350,7 +350,7 @@ cfg_rt! {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use std::rc::Rc;
     /// use tokio::task;
     ///
@@ -540,7 +540,7 @@ impl LocalSet {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio::task;
     ///
     /// #[tokio::main]
@@ -608,7 +608,7 @@ impl LocalSet {
     /// issued from a local task, the [`spawn_blocking`] API may be used instead.
     ///
     /// For example, this will panic:
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
@@ -625,7 +625,7 @@ impl LocalSet {
     /// })
     /// ```
     /// This, however, will not panic:
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
@@ -672,7 +672,7 @@ impl LocalSet {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio::task;
     ///
     /// #[tokio::main]

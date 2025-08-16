@@ -34,7 +34,7 @@ cfg_rt! {
     /// In this example, a server is started and `spawn` is used to start a new task
     /// that processes each received connection.
     ///
-    /// ```no_run
+    /// ```no_run,ignore-wasm
     /// use tokio::net::{TcpListener, TcpStream};
     ///
     /// use std::io;
@@ -102,7 +102,7 @@ cfg_rt! {
     ///
     /// For example, this will work:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::task;
     ///
     /// use std::rc::Rc;

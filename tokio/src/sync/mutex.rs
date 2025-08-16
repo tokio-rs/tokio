@@ -55,7 +55,7 @@ use std::{fmt, mem, ptr};
 ///
 /// # Examples:
 ///
-/// ```rust,no_run
+/// ```rust,no_run,ignore-wasm
 /// use tokio::sync::Mutex;
 /// use std::sync::Arc;
 ///
@@ -75,7 +75,7 @@ use std::{fmt, mem, ptr};
 /// ```
 ///
 ///
-/// ```rust,no_run
+/// ```rust,no_run,ignore-wasm
 /// use tokio::sync::Mutex;
 /// use std::sync::Arc;
 ///
@@ -420,7 +420,7 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::Mutex;
     ///
     /// #[tokio::main]
@@ -483,7 +483,7 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::Mutex;
     ///
@@ -540,7 +540,7 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::Mutex;
     ///
@@ -597,7 +597,7 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::Mutex;
     /// use std::sync::Arc;
     ///
@@ -772,7 +772,7 @@ impl<T: ?Sized> Mutex<T> {
     /// Consumes the mutex, returning the underlying data.
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::Mutex;
     ///
     /// #[tokio::main]
@@ -843,7 +843,7 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{Mutex, MutexGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -891,7 +891,7 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{Mutex, MutexGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -935,7 +935,7 @@ impl<'a, T: ?Sized> MutexGuard<'a, T> {
 
     /// Returns a reference to the original `Mutex`.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{Mutex, MutexGuard};
     ///
     /// async fn unlock_and_relock<'l>(guard: MutexGuard<'l, u32>) -> MutexGuard<'l, u32> {
@@ -1024,7 +1024,7 @@ impl<T: ?Sized> OwnedMutexGuard<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{Mutex, OwnedMutexGuard};
     /// use std::sync::Arc;
     ///
@@ -1072,7 +1072,7 @@ impl<T: ?Sized> OwnedMutexGuard<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{Mutex, OwnedMutexGuard};
     /// use std::sync::Arc;
     ///
@@ -1116,7 +1116,7 @@ impl<T: ?Sized> OwnedMutexGuard<T> {
 
     /// Returns a reference to the original `Arc<Mutex>`.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{Mutex, OwnedMutexGuard};
     ///

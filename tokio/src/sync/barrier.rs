@@ -5,7 +5,7 @@ use crate::util::trace;
 
 /// A barrier enables multiple tasks to synchronize the beginning of some computation.
 ///
-/// ```
+/// ```ignore-wasm
 /// # #[tokio::main]
 /// # async fn main() {
 /// use tokio::sync::Barrier;

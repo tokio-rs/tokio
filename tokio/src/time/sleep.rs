@@ -25,7 +25,7 @@ use std::task::{self, ready, Poll};
 ///
 /// Wait 100ms and print "100 ms have elapsed".
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::time::{sleep_until, Instant, Duration};
 ///
 /// #[tokio::main]
@@ -85,7 +85,7 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 ///
 /// Wait 100ms and print "100 ms have elapsed".
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::time::{sleep, Duration};
 ///
 /// #[tokio::main]
@@ -140,7 +140,7 @@ pin_project! {
     ///
     /// Wait 100ms and print "100 ms have elapsed".
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time::{sleep, Duration};
     ///
     /// #[tokio::main]
@@ -152,7 +152,7 @@ pin_project! {
     ///
     /// Use with [`select!`]. Pinning the `Sleep` with [`tokio::pin!`] is
     /// necessary when the same `Sleep` is selected on multiple times.
-    /// ```no_run
+    /// ```no_run,ignore-wasm
     /// use tokio::time::{self, Duration, Instant};
     ///
     /// #[tokio::main]
