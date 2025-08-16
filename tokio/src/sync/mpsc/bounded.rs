@@ -37,7 +37,7 @@ pub struct Sender<T> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::mpsc::channel;
 ///
 /// #[tokio::main]
@@ -131,7 +131,7 @@ pub struct Receiver<T> {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,ignore-wasm
 /// use tokio::sync::mpsc;
 ///
 /// #[tokio::main]
@@ -205,7 +205,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -223,7 +223,7 @@ impl<T> Receiver<T> {
     ///
     /// Values are buffered:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -275,7 +275,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -337,7 +337,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     /// use tokio::sync::mpsc::error::TryRecvError;
     ///
@@ -392,7 +392,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::thread;
     /// use tokio::runtime::Runtime;
     /// use tokio::sync::mpsc;
@@ -445,7 +445,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -482,7 +482,7 @@ impl<T> Receiver<T> {
     /// [`Receiver::close`]: crate::sync::mpsc::Receiver::close
     ///
     /// # Examples
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -504,7 +504,7 @@ impl<T> Receiver<T> {
     /// This method returns `true` if the channel has no messages.
     ///
     /// # Examples
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -524,7 +524,7 @@ impl<T> Receiver<T> {
     /// Returns the number of messages in the channel.
     ///
     /// # Examples
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -549,7 +549,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -596,7 +596,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -667,7 +667,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::task::{Context, Poll};
     /// use std::pin::Pin;
     /// use tokio::sync::mpsc;
@@ -786,7 +786,7 @@ impl<T> Sender<T> {
     /// In the following example, each call to `send` will block until the
     /// previously sent value was received.
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -829,7 +829,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -880,7 +880,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -954,7 +954,7 @@ impl<T> Sender<T> {
     /// In the following example, each call to `send_timeout` will block until the
     /// previously sent value was received, unless the timeout has elapsed.
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio::sync::mpsc;
     /// use tokio::time::{sleep, Duration};
     ///
@@ -1013,7 +1013,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::thread;
     /// use tokio::runtime::Runtime;
     /// use tokio::sync::mpsc;
@@ -1083,7 +1083,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1139,7 +1139,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1202,7 +1202,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     /// Sending a message using an [`OwnedPermit`]:
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1227,7 +1227,7 @@ impl<T> Sender<T> {
     /// When multiple [`OwnedPermit`]s are needed, or the sender cannot be moved
     /// by value, it can be inexpensively cloned before calling `reserve_owned`:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1289,7 +1289,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1346,7 +1346,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1439,7 +1439,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1502,7 +1502,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1551,7 +1551,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1659,7 +1659,7 @@ impl<T> Permit<'_, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1784,7 +1784,7 @@ impl<T> OwnedPermit<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1818,7 +1818,7 @@ impl<T> OwnedPermit<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1859,7 +1859,7 @@ impl<T> OwnedPermit<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -1887,7 +1887,7 @@ impl<T> OwnedPermit<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]

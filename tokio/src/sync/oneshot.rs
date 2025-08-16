@@ -18,7 +18,7 @@
 //!
 //! # Examples
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::sync::oneshot;
 //!
 //! #[tokio::main]
@@ -41,7 +41,7 @@
 //! If the sender is dropped without sending, the receiver will fail with
 //! [`error::RecvError`]:
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::sync::oneshot;
 //!
 //! #[tokio::main]
@@ -62,7 +62,7 @@
 //! To use a `oneshot` channel in a `tokio::select!` loop, add `&mut` in front of
 //! the channel.
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::sync::oneshot;
 //! use tokio::time::{interval, sleep, Duration};
 //!
@@ -95,7 +95,7 @@
 //! To use a `Sender` from a destructor, put it in an [`Option`] and call
 //! [`Option::take`].
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::sync::oneshot;
 //!
 //! struct SendOnDrop {
@@ -144,7 +144,7 @@ use std::task::{ready, Context, Poll, Waker};
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::oneshot;
 ///
 /// #[tokio::main]
@@ -167,7 +167,7 @@ use std::task::{ready, Context, Poll, Waker};
 /// If the sender is dropped without sending, the receiver will fail with
 /// [`error::RecvError`]:
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::oneshot;
 ///
 /// #[tokio::main]
@@ -188,7 +188,7 @@ use std::task::{ready, Context, Poll, Waker};
 /// To use a `Sender` from a destructor, put it in an [`Option`] and call
 /// [`Option::take`].
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::oneshot;
 ///
 /// struct SendOnDrop {
@@ -245,7 +245,7 @@ pub struct Sender<T> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::oneshot;
 ///
 /// #[tokio::main]
@@ -268,7 +268,7 @@ pub struct Sender<T> {
 /// If the sender is dropped without sending, the receiver will fail with
 /// [`error::RecvError`]:
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::oneshot;
 ///
 /// #[tokio::main]
@@ -289,7 +289,7 @@ pub struct Sender<T> {
 /// To use a `Receiver` in a `tokio::select!` loop, add `&mut` in front of the
 /// channel.
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::oneshot;
 /// use tokio::time::{interval, sleep, Duration};
 ///
@@ -447,7 +447,7 @@ struct State(usize);
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::oneshot;
 ///
 /// #[tokio::main]
@@ -573,7 +573,7 @@ impl<T> Sender<T> {
     ///
     /// Send a value to another task
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     ///
     /// #[tokio::main]
@@ -649,7 +649,7 @@ impl<T> Sender<T> {
     ///
     /// Basic usage
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     ///
     /// #[tokio::main]
@@ -667,7 +667,7 @@ impl<T> Sender<T> {
     ///
     /// Paired with select
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     /// use tokio::time::{self, Duration};
     ///
@@ -728,7 +728,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     ///
     /// #[tokio::main]
@@ -772,7 +772,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     ///
     /// use std::future::poll_fn;
@@ -878,7 +878,7 @@ impl<T> Receiver<T> {
     ///
     /// Prevent a value from being sent
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     /// use tokio::sync::oneshot::error::TryRecvError;
     ///
@@ -902,7 +902,7 @@ impl<T> Receiver<T> {
     ///
     /// Receive a value sent **before** calling `close`
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     ///
     /// #[tokio::main]
@@ -940,7 +940,7 @@ impl<T> Receiver<T> {
     ///
     /// Sending a value and polling it.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     ///
     /// use std::task::Poll;
@@ -969,7 +969,7 @@ impl<T> Receiver<T> {
     ///
     /// Dropping the sender.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     ///
     /// #[tokio::main]
@@ -1001,7 +1001,7 @@ impl<T> Receiver<T> {
     ///
     /// Sending a value.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     ///
     /// #[tokio::main]
@@ -1019,7 +1019,7 @@ impl<T> Receiver<T> {
     ///
     /// Dropping the sender.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     ///
     /// #[tokio::main]
@@ -1038,7 +1038,7 @@ impl<T> Receiver<T> {
     ///
     /// Terminated channels are empty.
     ///
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use tokio::sync::oneshot;
     ///
     /// #[tokio::main]
@@ -1098,7 +1098,7 @@ impl<T> Receiver<T> {
     ///
     /// `try_recv` before a value is sent, then after.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     /// use tokio::sync::oneshot::error::TryRecvError;
     ///
@@ -1124,7 +1124,7 @@ impl<T> Receiver<T> {
     ///
     /// `try_recv` when the sender dropped before sending a value
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::oneshot;
     /// use tokio::sync::oneshot::error::TryRecvError;
     ///
@@ -1188,7 +1188,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::thread;
     /// use tokio::sync::oneshot;
     ///

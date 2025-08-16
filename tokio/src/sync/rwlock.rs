@@ -55,7 +55,7 @@ const MAX_READS: u32 = 10;
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::RwLock;
 ///
 /// #[tokio::main]
@@ -406,7 +406,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
@@ -488,7 +488,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
@@ -551,7 +551,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
@@ -627,7 +627,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
@@ -692,7 +692,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
@@ -758,7 +758,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::RwLock;
     ///
     /// #[tokio::main]
@@ -830,7 +830,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::{sync::RwLock};
     ///
@@ -889,7 +889,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
@@ -956,7 +956,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::RwLock;
     ///
     /// #[tokio::main]
@@ -1013,7 +1013,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///

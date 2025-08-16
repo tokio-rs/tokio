@@ -204,7 +204,7 @@ impl<'a, T> Ref<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::watch;
     ///
     /// #[tokio::main]
@@ -646,7 +646,7 @@ impl<T> Receiver<T> {
     /// Returns an error if the channel has been closed.
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::watch;
     ///
     /// #[tokio::main]
@@ -725,7 +725,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::watch;
     ///
     /// #[tokio::main]
@@ -1221,7 +1221,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::watch;
     ///
     /// #[tokio::main]
@@ -1269,7 +1269,7 @@ impl<T> Sender<T> {
     ///
     /// The new channel will receive messages sent on this `Sender`.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::watch;
     ///
     /// #[tokio::main]
@@ -1289,7 +1289,7 @@ impl<T> Sender<T> {
     /// The most recent message is considered seen by the channel, so this test
     /// is guaranteed to pass.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::watch;
     /// use tokio::time::Duration;
     ///
@@ -1325,7 +1325,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::watch;
     ///
     /// #[tokio::main]
@@ -1347,7 +1347,7 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::watch;
     ///
     /// #[tokio::main]

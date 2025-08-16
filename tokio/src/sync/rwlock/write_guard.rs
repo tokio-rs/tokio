@@ -66,7 +66,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{RwLock, RwLockWriteGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -124,7 +124,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{RwLock, RwLockWriteGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -199,7 +199,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{RwLock, RwLockWriteGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -268,7 +268,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{RwLock, RwLockWriteGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -348,7 +348,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::sync::RwLock;
     /// # use std::sync::Arc;
     /// #

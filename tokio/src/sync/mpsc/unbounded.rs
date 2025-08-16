@@ -26,7 +26,7 @@ pub struct UnboundedSender<T> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::mpsc::unbounded_channel;
 ///
 /// #[tokio::main]
@@ -132,7 +132,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -150,7 +150,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// Values are buffered:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -200,7 +200,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -262,7 +262,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     /// use tokio::sync::mpsc::error::TryRecvError;
     ///
@@ -296,7 +296,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::thread;
     /// use tokio::sync::mpsc;
     ///
@@ -349,7 +349,7 @@ impl<T> UnboundedReceiver<T> {
     /// [`UnboundedReceiver::close`]: crate::sync::mpsc::UnboundedReceiver::close
     ///
     /// # Examples
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -371,7 +371,7 @@ impl<T> UnboundedReceiver<T> {
     /// This method returns `true` if the channel has no messages.
     ///
     /// # Examples
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -391,7 +391,7 @@ impl<T> UnboundedReceiver<T> {
     /// Returns the number of messages in the channel.
     ///
     /// # Examples
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]
@@ -454,7 +454,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::task::{Context, Poll};
     /// use std::pin::Pin;
     /// use tokio::sync::mpsc;
@@ -589,7 +589,7 @@ impl<T> UnboundedSender<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::mpsc;
     ///
     /// #[tokio::main]

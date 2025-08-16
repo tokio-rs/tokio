@@ -60,7 +60,7 @@ impl<'a, T: ?Sized> RwLockReadGuard<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{RwLock, RwLockReadGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,7 +112,7 @@ impl<'a, T: ?Sized> RwLockReadGuard<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{RwLock, RwLockReadGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -63,7 +63,7 @@ impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{RwLock, RwLockWriteGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,7 +118,7 @@ impl<'a, T: ?Sized> RwLockMappedWriteGuard<'a, T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{RwLock, RwLockWriteGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
