@@ -137,7 +137,7 @@ impl Handle {
         match self
             .entry
             .state
-            .compare_exchange(STATE_PENDING, STATE_WOKEN_UP, SeqCst, SeqCst)
+            .compare_exchange(STATE_PENDING, STATE_WOKEN_UP, Relaxed, Relaxed)
         {
             Ok(_) => self.entry.waker.wake(),
             Err(STATE_UNREGISTERED) => {
@@ -158,7 +158,7 @@ impl Handle {
         match self
             .entry
             .state
-            .compare_exchange(STATE_UNREGISTERED, STATE_WOKEN_UP, SeqCst, SeqCst)
+            .compare_exchange(STATE_UNREGISTERED, STATE_WOKEN_UP, Relaxed, Relaxed)
         {
             Ok(_) => self.entry.waker.wake(),
             Err(STATE_REGISTERED) => {
@@ -184,8 +184,8 @@ impl Handle {
         match self.entry.state.compare_exchange(
             STATE_UNREGISTERED,
             STATE_BUSY_REGISTERING,
-            SeqCst,
-            SeqCst,
+            Relaxed,
+            Relaxed,
         ) {
             Ok(_) => (), // successfully locked the `self.cancel_tx`
             Err(STATE_BUSY_REGISTERING) => panic!("should not be called concurrently"),
@@ -205,8 +205,8 @@ impl Handle {
         match self.entry.state.compare_exchange(
             STATE_BUSY_REGISTERING,
             STATE_REGISTERED,
-            SeqCst,
-            SeqCst,
+            Release, // `Release` the `cancel_tx` to other threads
+            Relaxed,
         ) {
             Ok(_) => TransitionToRegistered::Success,
             Err(actual) => panic!("state is corrupted ({actual})"),
@@ -220,7 +220,7 @@ impl Handle {
         match self
             .entry
             .state
-            .compare_exchange(STATE_REGISTERED, STATE_PENDING, SeqCst, SeqCst)
+            .compare_exchange(STATE_REGISTERED, STATE_PENDING, Relaxed, Relaxed)
         {
             Ok(_) => TransitionToPending::Success,
             Err(STATE_UNREGISTERED) => panic!("should not be called on unregistered entry"),
@@ -239,8 +239,8 @@ impl Handle {
             match self.entry.state.compare_exchange(
                 STATE_REGISTERED,
                 STATE_CANCELLING,
-                SeqCst,
-                SeqCst,
+                Acquire, // `Acquire` the side-effects of `transition_to_registered`
+                Relaxed,
             ) {
                 Ok(_) => break,
                 Err(STATE_UNREGISTERED) => return, // no need to cancel unregistered entries.
@@ -272,15 +272,15 @@ impl Handle {
     }
 
     pub(crate) fn is_registered(&self) -> bool {
-        self.entry.state.fetch_or(0, SeqCst) == STATE_REGISTERED
+        self.entry.state.fetch_or(0, Relaxed) == STATE_REGISTERED
     }
 
     pub(crate) fn is_pending(&self) -> bool {
-        self.entry.state.fetch_or(0, SeqCst) == STATE_PENDING
+        self.entry.state.fetch_or(0, Relaxed) == STATE_PENDING
     }
 
     pub(crate) fn is_woken_up(&self) -> bool {
-        self.entry.state.fetch_or(0, SeqCst) == STATE_WOKEN_UP
+        self.entry.state.fetch_or(0, Relaxed) == STATE_WOKEN_UP
     }
 
     pub(super) fn into_entry(self) -> Arc<Entry> {
