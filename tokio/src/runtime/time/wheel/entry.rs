@@ -4,6 +4,7 @@ use crate::loom::sync::atomic::{AtomicU8, Ordering::*};
 use crate::loom::sync::Arc;
 use crate::{sync::AtomicWaker, util::linked_list};
 
+use std::marker::PhantomPinned;
 use std::ptr::NonNull;
 use std::task::Waker;
 
@@ -48,11 +49,15 @@ pub(crate) struct Entry {
     waker: AtomicWaker,
 
     /// The mpsc channel used to cancel the entry.
-    // Since `mpsc::Sender` doesn't have `Drop` implementation,
-    // we don't need to `drop_in_place` it when the entry is dropped.
     cancel_tx: UnsafeCell<Option<Sender>>,
 
     state: AtomicU8,
+
+    /// Make the type `!Unpin` to prevent LLVM from emitting
+    /// the `noalias` attribute for mutable references.
+    ///
+    /// See <https://github.com/rust-lang/rust/pull/82834>.
+    _pin: PhantomPinned,
 }
 
 /// Safety: There are two fields are neither `Send` nor `Sync`.
@@ -63,6 +68,17 @@ pub(crate) struct Entry {
 /// [`cancellation_queue`]: `super::cancellation_queue`
 unsafe impl Send for Entry {}
 unsafe impl Sync for Entry {}
+
+impl Drop for Entry {
+    fn drop(&mut self) {
+        // Safety: `cancel_pointer` is protected by `cancellation_queue`.
+        unsafe {
+            self.cancel_pointer.with_mut(|p| {
+                std::ptr::drop_in_place(p);
+            });
+        }
+    }
+}
 
 generate_addr_of_methods! {
     impl<> Entry {
@@ -129,6 +145,7 @@ impl Handle {
             waker: AtomicWaker::new(),
             cancel_tx: UnsafeCell::new(None),
             state: AtomicU8::new(STATE_UNREGISTERED),
+            _pin: PhantomPinned,
         });
         entry.waker.register_by_ref(waker);
 
