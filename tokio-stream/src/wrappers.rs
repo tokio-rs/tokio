@@ -22,9 +22,9 @@ cfg_sync! {
 }
 
 cfg_signal! {
-    #[cfg(unix)]
+    #[cfg(all(unix, not(loom)))]
     mod signal_unix;
-    #[cfg(unix)]
+    #[cfg(all(unix, not(loom)))]
     pub use signal_unix::SignalStream;
 
     #[cfg(any(windows, docsrs))]
@@ -39,12 +39,14 @@ cfg_time! {
 }
 
 cfg_net! {
+    #[cfg(not(loom))]
     mod tcp_listener;
+    #[cfg(not(loom))]
     pub use tcp_listener::TcpListenerStream;
 
-    #[cfg(unix)]
+    #[cfg(all(unix, not(loom)))]
     mod unix_listener;
-    #[cfg(unix)]
+    #[cfg(all(unix, not(loom)))]
     pub use unix_listener::UnixListenerStream;
 }
 
@@ -57,6 +59,8 @@ cfg_io_util! {
 }
 
 cfg_fs! {
+    #[cfg(not(loom))]
     mod read_dir;
+    #[cfg(not(loom))]
     pub use read_dir::ReadDirStream;
 }

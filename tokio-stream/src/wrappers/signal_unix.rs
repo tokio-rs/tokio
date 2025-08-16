@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 use crate::Stream;
 use std::pin::Pin;
 use std::task::{Context, Poll};

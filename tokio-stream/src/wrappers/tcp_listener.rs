@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 use crate::Stream;
 use std::io;
 use std::pin::Pin;
