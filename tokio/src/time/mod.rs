@@ -23,7 +23,7 @@
 //!
 //! Wait 100ms and print "100 ms have elapsed"
 //!
-//! ```
+//! ```ignore-wasm
 //! use std::time::Duration;
 //! use tokio::time::sleep;
 //!
@@ -63,7 +63,7 @@
 //! would only be executed once every three seconds, and not every two
 //! seconds.
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::time;
 //!
 //! async fn task_that_takes_a_second() {

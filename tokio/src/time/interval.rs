@@ -23,7 +23,7 @@ use std::task::{ready, Context, Poll};
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::time::{self, Duration};
 ///
 /// #[tokio::main]
@@ -49,7 +49,7 @@ use std::task::{ready, Context, Poll};
 /// would only be executed once every three seconds, and not every two
 /// seconds.
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::time;
 ///
 /// async fn task_that_takes_a_second() {
@@ -89,7 +89,7 @@ pub fn interval(period: Duration) -> Interval {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::time::{interval_at, Duration, Instant};
 ///
 /// #[tokio::main]
@@ -151,7 +151,7 @@ fn internal_interval_at(
 /// Sometimes, an [`Interval`]'s tick is missed. For example, consider the
 /// following:
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::time::{self, Duration};
 /// # async fn task_that_takes_one_to_three_millis() {}
 ///
@@ -413,7 +413,7 @@ impl Interval {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time;
     ///
     /// use std::time::Duration;
@@ -501,7 +501,7 @@ impl Interval {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time;
     ///
     /// use std::time::Duration;
@@ -533,7 +533,7 @@ impl Interval {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time;
     ///
     /// use std::time::Duration;
@@ -565,7 +565,7 @@ impl Interval {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time;
     ///
     /// use std::time::Duration;
@@ -601,7 +601,7 @@ impl Interval {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time::{self, Instant};
     ///
     /// use std::time::Duration;

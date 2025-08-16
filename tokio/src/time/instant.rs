@@ -78,7 +78,7 @@ impl Instant {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time::{Duration, Instant, sleep};
     ///
     /// #[tokio::main]
@@ -99,7 +99,7 @@ impl Instant {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time::{Duration, Instant, sleep};
     ///
     /// #[tokio::main]
@@ -120,7 +120,7 @@ impl Instant {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time::{Duration, Instant, sleep};
     ///
     /// #[tokio::main]
