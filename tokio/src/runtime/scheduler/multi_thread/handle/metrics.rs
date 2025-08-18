@@ -1,9 +1,5 @@
 use super::Handle;
 
-cfg_64bit_metrics! {
-    use crate::runtime::WorkerMetrics;
-}
-
 cfg_unstable_metrics! {
     use crate::runtime::SchedulerMetrics;
 }
@@ -22,11 +18,11 @@ impl Handle {
     }
 
     cfg_64bit_or_unstable_metrics! {
-        pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
+        pub(crate) fn worker_metrics(&self, worker: usize) -> &crate::runtime::WorkerMetrics {
             &self.shared.worker_metrics[worker]
         }
 
-        pub(crate) fn worker_metrics_checked(&self, worker: usize) -> Option<&WorkerMetrics> {
+        pub(crate) fn worker_metrics_checked(&self, worker: usize) -> Option<&crate::runtime::WorkerMetrics> {
             self.shared.worker_metrics.get(worker)
         }
     }

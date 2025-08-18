@@ -1,8 +1,11 @@
 use crate::runtime::Handle;
 
 cfg_64bit_or_unstable_metrics! {
-    use std::sync::atomic::Ordering::Relaxed;
     use std::time::Duration;
+}
+
+cfg_64bit_metrics! {
+    use std::sync::atomic::Ordering::Relaxed;
 }
 
 cfg_unstable_metrics! {
