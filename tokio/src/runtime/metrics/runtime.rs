@@ -468,9 +468,9 @@ impl RuntimeMetrics {
         ///     let metrics = Handle::current().metrics();
         ///
         ///     let n = metrics.worker_local_queue_depth_checked(0);
-        ///     
+        ///
         ///     assert!(n.is_some());
-        /// 
+        ///
         ///     println!("{} tasks currently pending in worker 0's local queue", n.unwrap());
         /// }
         /// ```

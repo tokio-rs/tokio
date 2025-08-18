@@ -235,6 +235,10 @@ cfg_rt! {
                 match_flavor!(self, Handle(handle) => handle.worker_local_queue_depth(worker))
             }
 
+            pub(crate) fn worker_local_queue_depth_checked(&self, worker: usize) -> usize {
+                match_flavor!(self, Handle(handle) => handle.worker_local_queue_depth_checked(worker))
+            }
+
             pub(crate) fn blocking_queue_depth(&self) -> usize {
                 match_flavor!(self, Handle(handle) => handle.blocking_queue_depth())
             }
