@@ -145,12 +145,12 @@ impl RuntimeMetrics {
             Duration::from_nanos(nanos)
         }
 
-        /// Refer to [`worker_total_busy_duration`] for documentation, as the two functions behave identically.
+        /// Refer to [`Self::worker_total_busy_duration`] for documentation, as the two functions behave identically.
         /// 
         /// This function returns an [`std::option::Option`] instead of panicking when the worker is not found.
         /// 
         /// # Failure
-        /// The method returns a [`std::option::None`] in case the `worker` represents an invalid worker.
+        /// The method returns a [`std::option::Option::None`] in case the `worker` represents an invalid worker.
         /// 
         /// # Errors
         ///
@@ -173,11 +173,11 @@ impl RuntimeMetrics {
                 .inner
                 .worker_metrics_checked(worker);
             
-            metrics_handle.and_then(|metrics| {
+            metrics_handle.map(|metrics| {
                 let nanos = metrics.busy_duration_total
                     .load(Relaxed);
 
-                Some(Duration::from_nanos(nanos))
+                Duration::from_nanos(nanos)
             })
         }
 
