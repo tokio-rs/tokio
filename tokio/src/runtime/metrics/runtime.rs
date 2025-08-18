@@ -141,28 +141,28 @@ impl RuntimeMetrics {
                 .worker_metrics(worker)
                 .busy_duration_total
                 .load(Relaxed);
-            
+
             Duration::from_nanos(nanos)
         }
 
         /// Refer to [`Self::worker_total_busy_duration`] for documentation, as the two functions behave identically.
-        /// 
+        ///
         /// This function returns an [`std::option::Option`] instead of panicking when the worker is not found.
-        /// 
+        ///
         /// # Failure
         /// The method returns a [`std::option::Option::None`] in case the `worker` represents an invalid worker.
-        /// 
+        ///
         /// # Errors
         ///
         /// ```
         /// use tokio::runtime::Handle;
-        /// 
+        ///
         /// #[tokio::main]
         /// async fn main() {
         ///     let metrics = Handle::current().metrics();
         ///
         ///     let n = metrics.worker_total_busy_duration_checked(0);
-        ///     
+        ///
         ///     assert!(n.is_some());
         ///     println!("worker 0 was busy for a total of {:?}", n);
         /// }
@@ -172,7 +172,7 @@ impl RuntimeMetrics {
                 .handle
                 .inner
                 .worker_metrics_checked(worker);
-            
+
             metrics_handle.map(|metrics| {
                 let nanos = metrics.busy_duration_total
                     .load(Relaxed);
