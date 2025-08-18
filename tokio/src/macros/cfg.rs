@@ -280,6 +280,17 @@ macro_rules! cfg_64bit_metrics {
     }
 }
 
+/// Metrics are enabled when tokio unstable is enabled or 64-bit atomics are supported.
+macro_rules! cfg_64bit_or_unstable_metrics {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(tokio_unstable, target_has_atomic = "64"))]
+            #[cfg_attr(docsrs, doc(cfg(any(tokio_unstable, target_has_atomic = "64"))))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_no_64bit_metrics {
     ($($item:item)*) => {
         $(

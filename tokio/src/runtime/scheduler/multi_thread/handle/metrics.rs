@@ -21,7 +21,7 @@ impl Handle {
         self.shared.injection_queue_depth()
     }
 
-    cfg_64bit_metrics! {
+    cfg_64bit_or_unstable_metrics! {
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
             &self.shared.worker_metrics[worker]
         }

@@ -580,7 +580,7 @@ impl Handle {
         self.shared.inject.len()
     }
 
-    cfg_64bit_metrics! {
+    cfg_64bit_or_unstable_metrics! {
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
             assert_eq!(0, worker);
             &self.shared.worker_metrics
@@ -598,8 +598,16 @@ cfg_unstable_metrics! {
             &self.shared.scheduler_metrics
         }
 
-        pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
-            self.worker_metrics(worker).queue_depth()
+        cfg_64bit_or_unstable_metrics! {
+            pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
+                self.worker_metrics(worker).queue_depth()
+            }
+
+            pub(crate) fn worker_local_queue_depth_checked(&self, worker: usize) -> Option<usize> {
+                self.worker_metrics_checked(worker).map(|worker| {
+                    worker.queue_depth()
+                })
+            }
         }
 
         pub(crate) fn num_blocking_threads(&self) -> usize {
