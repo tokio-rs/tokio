@@ -22,6 +22,10 @@ impl Handle {
         &self.shared.worker_metrics[worker]
     }
 
+    pub(crate) fn worker_metrics_checked(&self, worker: usize) -> Option<&WorkerMetrics> {
+        self.shared.worker_metrics.get(worker)
+    }
+
     cfg_unstable_metrics! {
         cfg_64bit_metrics! {
             pub(crate) fn spawned_tasks_count(&self) -> u64 {

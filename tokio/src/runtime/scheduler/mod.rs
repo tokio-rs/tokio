@@ -199,6 +199,10 @@ cfg_rt! {
         pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
             match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
         }
+
+        pub(crate) fn worker_metrics_checked(&self, worker: usize) -> Option<&WorkerMetrics> {
+            match_flavor!(self, Handle(handle) => handle.worker_metrics_checked(worker))
+        }
     }
 
     cfg_unstable_metrics! {

@@ -584,6 +584,10 @@ impl Handle {
         assert_eq!(0, worker);
         &self.shared.worker_metrics
     }
+
+    pub(crate) fn worker_metrics_checked(&self, worker: usize) -> Option<&WorkerMetrics> {
+        matches!(worker, 0).then_some(&self.shared.worker_metrics)
+    }
 }
 
 cfg_unstable_metrics! {
