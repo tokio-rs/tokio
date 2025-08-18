@@ -213,7 +213,7 @@ cfg_rt! {
         use crate::runtime::SchedulerMetrics;
 
         impl Handle {
-            cfg_64bit_or_unstable_metrics! {
+            cfg_64bit_metrics! {
                 pub(crate) fn spawned_tasks_count(&self) -> u64 {
                     match_flavor!(self, Handle(handle) => handle.spawned_tasks_count())
                 }
