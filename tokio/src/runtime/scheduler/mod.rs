@@ -10,7 +10,7 @@ cfg_rt! {
 
     use crate::runtime::TaskHooks;
 
-    cfg_64bit_metrics! {
+    cfg_64bit_or_unstable_metrics! {
         use crate::runtime::WorkerMetrics;
     }
 }
