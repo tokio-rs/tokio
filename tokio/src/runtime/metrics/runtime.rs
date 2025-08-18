@@ -396,7 +396,7 @@ impl RuntimeMetrics {
         ///     let id = metrics.worker_thread_id_checked(0);
         ///
         ///     assert!(id.is_some());
-        ///     println!("worker 0 has id {:?}", id);
+        ///     println!("worker 0 has id {:?}", id.unwrap());
         /// }
         /// ```
         pub fn worker_thread_id_checked(&self, worker: usize) -> Option<Option<ThreadId>> {
@@ -449,6 +449,33 @@ impl RuntimeMetrics {
         /// ```
         pub fn worker_local_queue_depth(&self, worker: usize) -> usize {
             self.handle.inner.worker_local_queue_depth(worker)
+        }
+
+        /// Refer to [`Self::worker_local_queue_depth`] for documentation, as the two functions behave identically.
+        ///
+        /// This function returns an [`std::option::Option`] instead of panicking when the worker is not found.
+        ///
+        /// # Errors
+        /// The method returns a [`std::option::Option::None`] in case the `worker` represents an invalid worker.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let metrics = Handle::current().metrics();
+        ///
+        ///     let n = metrics.worker_local_queue_depth_checked(0);
+        ///     
+        ///     assert!(n.is_some());
+        /// 
+        ///     println!("{} tasks currently pending in worker 0's local queue", n.unwrap());
+        /// }
+        /// ```
+        pub fn worker_local_queue_depth_checked(&self, worker: usize) -> Option<usize> {
+            self.handle.inner.worker_local_queue_depth_checked(worker)
         }
 
         /// Returns `true` if the runtime is tracking the distribution of task poll
