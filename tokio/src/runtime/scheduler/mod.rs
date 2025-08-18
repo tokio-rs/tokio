@@ -10,7 +10,9 @@ cfg_rt! {
 
     use crate::runtime::TaskHooks;
 
-    use crate::runtime::WorkerMetrics;
+    cfg_64bit_metrics! {
+        use crate::runtime::WorkerMetrics;
+    }
 }
 
 cfg_rt_multi_thread! {
@@ -196,12 +198,14 @@ cfg_rt! {
             match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
         }
 
-        pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
-            match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
-        }
+        cfg_64bit_metrics! {
+            pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
+                match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
+            }
 
-        pub(crate) fn worker_metrics_checked(&self, worker: usize) -> Option<&WorkerMetrics> {
-            match_flavor!(self, Handle(handle) => handle.worker_metrics_checked(worker))
+            pub(crate) fn worker_metrics_checked(&self, worker: usize) -> Option<&WorkerMetrics> {
+                match_flavor!(self, Handle(handle) => handle.worker_metrics_checked(worker))
+            }
         }
     }
 

@@ -580,13 +580,15 @@ impl Handle {
         self.shared.inject.len()
     }
 
-    pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
-        assert_eq!(0, worker);
-        &self.shared.worker_metrics
-    }
+    cfg_64bit_metrics! {
+        pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
+            assert_eq!(0, worker);
+            &self.shared.worker_metrics
+        }
 
-    pub(crate) fn worker_metrics_checked(&self, worker: usize) -> Option<&WorkerMetrics> {
-        matches!(worker, 0).then_some(&self.shared.worker_metrics)
+        pub(crate) fn worker_metrics_checked(&self, worker: usize) -> Option<&WorkerMetrics> {
+            matches!(worker, 0).then_some(&self.shared.worker_metrics)
+        }
     }
 }
 

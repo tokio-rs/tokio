@@ -1,5 +1,8 @@
 use super::Handle;
-use crate::runtime::WorkerMetrics;
+
+cfg_64bit_metrics! {
+    use crate::runtime::WorkerMetrics;
+}
 
 cfg_unstable_metrics! {
     use crate::runtime::SchedulerMetrics;
@@ -18,12 +21,14 @@ impl Handle {
         self.shared.injection_queue_depth()
     }
 
-    pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
-        &self.shared.worker_metrics[worker]
-    }
+    cfg_64bit_metrics! {
+        pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
+            &self.shared.worker_metrics[worker]
+        }
 
-    pub(crate) fn worker_metrics_checked(&self, worker: usize) -> Option<&WorkerMetrics> {
-        self.shared.worker_metrics.get(worker)
+        pub(crate) fn worker_metrics_checked(&self, worker: usize) -> Option<&WorkerMetrics> {
+            self.shared.worker_metrics.get(worker)
+        }
     }
 
     cfg_unstable_metrics! {

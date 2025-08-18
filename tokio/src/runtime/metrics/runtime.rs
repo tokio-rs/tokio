@@ -1,7 +1,7 @@
 use crate::runtime::Handle;
-use std::time::Duration;
 
 cfg_64bit_metrics! {
+    use std::time::Duration;
     use std::sync::atomic::Ordering::Relaxed;
 }
 
@@ -168,12 +168,11 @@ impl RuntimeMetrics {
         /// }
         /// ```
         pub fn worker_total_busy_duration_checked(&self, worker: usize) -> Option<Duration> {
-            let metrics_handle = self
+            self
                 .handle
                 .inner
-                .worker_metrics_checked(worker);
-
-            metrics_handle.map(|metrics| {
+                .worker_metrics_checked(worker)
+                .map(|metrics| {
                 let nanos = metrics.busy_duration_total
                     .load(Relaxed);
 
