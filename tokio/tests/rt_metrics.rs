@@ -127,6 +127,54 @@ fn worker_total_busy_duration() {
 }
 
 #[test]
+fn worker_total_busy_duration_checked() {
+    const N: usize = 5;
+
+    let zero = Duration::from_millis(0);
+
+    let rt = current_thread();
+    let metrics = rt.metrics();
+
+    rt.block_on(async {
+        for _ in 0..N {
+            tokio::spawn(async {
+                tokio::task::yield_now().await;
+            })
+            .await
+            .unwrap();
+        }
+    });
+
+    drop(rt);
+
+    assert!(zero < metrics.worker_total_busy_duration_checked(0).unwrap());
+
+    let rt = threaded();
+    let metrics = rt.metrics();
+
+    rt.block_on(async {
+        for _ in 0..N {
+            tokio::spawn(async {
+                tokio::task::yield_now().await;
+            })
+            .await
+            .unwrap();
+        }
+    });
+
+    drop(rt);
+
+    for i in 0..metrics.num_workers() {
+        assert!(zero < metrics.worker_total_busy_duration_checked(i).unwrap());
+    }
+
+    assert_eq!(
+        None,
+        metrics.worker_total_busy_duration_checked(metrics.num_workers())
+    );
+}
+
+#[test]
 fn worker_park_count() {
     let rt = current_thread();
     let metrics = rt.metrics();
