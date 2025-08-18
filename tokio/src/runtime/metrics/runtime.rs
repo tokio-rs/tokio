@@ -149,10 +149,8 @@ impl RuntimeMetrics {
         ///
         /// This function returns an [`std::option::Option`] instead of panicking when the worker is not found.
         ///
-        /// # Failure
-        /// The method returns a [`std::option::Option::None`] in case the `worker` represents an invalid worker.
-        ///
         /// # Errors
+        /// The method returns a [`std::option::Option::None`] in case the `worker` represents an invalid worker.
         ///
         /// ```
         /// use tokio::runtime::Handle;
@@ -377,6 +375,35 @@ impl RuntimeMetrics {
                 .inner
                 .worker_metrics(worker)
                 .thread_id()
+        }
+
+        /// Refer to [`Self::worker_thread_id`] for documentation, as the two functions behave identically.
+        ///
+        /// This function returns an [`std::option::Option`] instead of panicking when the worker is not found.
+        ///
+        /// # Errors
+        /// The method returns a [`std::option::Option::None`] in case the `worker` represents an invalid worker.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Handle;
+        ///
+        /// #[tokio::main]
+        /// async fn main() {
+        ///     let metrics = Handle::current().metrics();
+        ///
+        ///     let id = metrics.worker_thread_id_checked(0);
+        ///
+        ///     assert!(id.is_some());
+        ///     println!("worker 0 has id {:?}", id);
+        /// }
+        /// ```
+        pub fn worker_thread_id_checked(&self, worker: usize) -> Option<Option<ThreadId>> {
+            self.handle
+                .inner
+                .worker_metrics_checked(worker)
+                .map(|worker| worker.thread_id())
         }
 
         /// Renamed to [`RuntimeMetrics::global_queue_depth`]
