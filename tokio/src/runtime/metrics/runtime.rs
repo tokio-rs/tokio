@@ -152,7 +152,7 @@ impl RuntimeMetrics {
         /// # Failure
         /// The method returns a [`std::option::None`] in case the `worker` represents an invalid worker.
         /// 
-        /// # Examples
+        /// # Errors
         ///
         /// ```
         /// use tokio::runtime::Handle;
