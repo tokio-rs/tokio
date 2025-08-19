@@ -254,32 +254,34 @@ impl<T> Receiver<T> {
     ///
     /// In other words, it is a more efficient version of the
     /// following implementation.
-    /// ```no_run
-    /// async fn recv_many(&mut self, buffer: &mut Vec<T>, limit: usize) -> usize {
-    ///     if limit == 0 {
-    ///         return 0;
-    ///     }
-    ///
-    ///     // Wait for at least one message (or channel close).
-    ///     let Some(first_message) = self.recv().await else {
-    ///         return 0;
-    ///     };
-    ///
-    ///     buffer.push(first_message);
-    ///     let mut num_pushed = 1;
-    ///
-    ///     // Try to get more messages, but don't sleep.
-    ///     while num_pushed < limit {
-    ///         if let Some(msg) = self.try_recv() {
-    ///             buffer.push(msg);
-    ///             num_pushed += 1;
-    ///         } else {
-    ///             break;
-    ///         }
-    ///     }
-    ///
-    ///     num_pushed
+    /// ```
+    /// # async fn foo(limit: usize) -> usize {
+    /// # let (tx, mut rx) = tokio::sync::mpsc::channel(64);
+    /// # let mut buffer = Vec::<()>::new();
+    /// if limit == 0 {
+    ///     return 0;
     /// }
+    ///
+    /// // Wait for at least one message (or channel close).
+    /// let Some(first_message) = rx.recv().await else {
+    ///     return 0;
+    /// };
+    ///
+    /// buffer.push(first_message);
+    /// let mut num_pushed = 1;
+    ///
+    /// // Try to get more messages, but don't sleep.
+    /// while num_pushed < limit {
+    ///     if let Ok(msg) = rx.try_recv() {
+    ///         buffer.push(msg);
+    ///         num_pushed += 1;
+    ///     } else {
+    ///         break;
+    ///     }
+    /// }
+    ///
+    /// return num_pushed;
+    /// # }
     /// ```
     ///
     /// # Cancel safety
