@@ -244,8 +244,17 @@ impl<T> Receiver<T> {
 
     /// Receives the next values for this receiver and extends `buffer`.
     ///
-    /// This method is a more efficient version of the following implementation.
-    /// ```
+    /// This method waits for at least one message and pushes it into the buffer,
+    /// then tries to extend `buffer` with up to `limit - 1` additional
+    /// messages that are immediately available in the channel buffer.
+    ///
+    /// It does not receive any message in the following cases:
+    /// - The channel is closed, and there is no active [`Permit`].
+    /// - The `limit` is zero.
+    ///
+    /// In other words, it is a more efficient version of the
+    /// following implementation.
+    /// ```no_run
     /// async fn recv_many(&mut self, buffer: &mut Vec<T>, limit: usize) -> usize {
     ///     if limit == 0 {
     ///         return 0;
