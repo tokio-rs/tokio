@@ -1,5 +1,5 @@
 //! TCP/UDP/Unix helpers for tokio.
-
+#![cfg(not(loom))]
 use crate::either::Either;
 use std::future::Future;
 use std::io::Result;
