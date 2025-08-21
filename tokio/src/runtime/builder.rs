@@ -339,7 +339,13 @@ impl Builder {
         ))]
         self.enable_io();
 
-        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
         self.enable_io_uring();
 
         #[cfg(feature = "time")]
@@ -1582,7 +1588,7 @@ cfg_time! {
     }
 }
 
-cfg_tokio_uring! {
+cfg_io_uring! {
     impl Builder {
         /// Enables the tokio's io_uring driver.
         ///
