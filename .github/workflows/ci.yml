@@ -307,8 +307,8 @@ jobs:
       - name: test tokio full --cfg unstable
         run: |
           set -euxo pipefail
-          cargo nextest run --all-features
-          cargo test --doc --all-features
+          cargo nextest run --features full
+          cargo test --doc --features full
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
@@ -351,7 +351,7 @@ jobs:
           RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_taskdump
 
   test-uring:
-    name: test tokio full --cfg tokio_uring
+    name: test tokio full --features io-uring
     needs: basics
     runs-on: ${{ matrix.os }}
     strategy:
@@ -382,17 +382,17 @@ jobs:
           tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
-      - name: test tokio full --cfg tokio_uring
+      - name: test tokio full --features io-uring
         run: |
           set -euxo pipefail
-          cargo nextest run --all-features
-          cargo test --doc --all-features
+          cargo nextest run --features io-uring,full
+          cargo test --doc --features io-uring,full
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg tokio_uring -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
           # in order to run doctests for unstable features, we must also pass
           # the unstable cfg to RustDoc
-          RUSTDOCFLAGS: --cfg tokio_uring
+          RUSTDOCFLAGS: --cfg tokio_unstable
 
   check-unstable-mt-counters:
     name: check tokio full --internal-mt-counters
@@ -742,13 +742,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: "", rustflags: "" }
-          # Try with unstable feature flags
-          - { name: "--unstable", rustflags: "--cfg tokio_unstable -Dwarnings" }
-          # Try with unstable and taskdump feature flags
-          - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump" }
-          - { name: "--tokio_uring", rustflags: "-Dwarnings --cfg tokio_uring" }
-          - { name: "--unstable --taskdump --tokio_uring", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump --cfg tokio_uring" }
+          - { name: "", rustflags: "", features: "" }
+          - { name: "--unstable", rustflags: "--cfg tokio_unstable -Dwarnings", features: "--skip io-uring" }
+          - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump", features: "--skip io-uring" }
+          - { name: "--unstable --io-uring", rustflags: "-Dwarnings --cfg tokio_unstable", features: "--features io-uring" }
+          - { name: "--unstable --taskdump --io-uring", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump", features: "--features io-uring" }
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_nightly }}
@@ -761,7 +759,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       - name: check --feature-powerset ${{ matrix.name }}
-        run: cargo hack check --all --feature-powerset --depth 2 --keep-going
+        run: cargo hack check --all --feature-powerset ${{ matrix.features }} --depth 2 --keep-going
         env:
           RUSTFLAGS: ${{ matrix.rustflags }}
 
@@ -869,8 +867,8 @@ jobs:
         run:
           - os: windows-latest
           - os: ubuntu-latest
-            RUSTFLAGS: --cfg tokio_taskdump --cfg tokio_uring
-            RUSTDOCFLAGS: --cfg tokio_taskdump --cfg tokio_uring
+            RUSTFLAGS: --cfg tokio_taskdump
+            RUSTDOCFLAGS: --cfg tokio_taskdump
 
     steps:
       - uses: actions/checkout@v5
