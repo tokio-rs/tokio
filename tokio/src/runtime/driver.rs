@@ -348,6 +348,6 @@ cfg_not_time! {
     }
 }
 
-cfg_tokio_uring! {
+cfg_io_uring! {
     pub(crate) mod op;
 }

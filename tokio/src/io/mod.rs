@@ -294,6 +294,6 @@ cfg_io_blocking! {
     }
 }
 
-cfg_tokio_uring! {
+cfg_io_uring! {
     pub(crate) mod uring;
 }

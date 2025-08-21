@@ -1,6 +1,12 @@
 //! Uring file operations tests.
 
-#![cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+#![cfg(all(
+    tokio_unstable,
+    feature = "io-uring",
+    feature = "rt",
+    feature = "fs",
+    target_os = "linux"
+))]
 
 use futures::future::FutureExt;
 use std::sync::mpsc;
