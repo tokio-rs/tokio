@@ -44,6 +44,8 @@ pub(crate) trait Semaphore {
 
     fn add_permits(&self, n: usize);
 
+    fn available_permits(&self) -> usize;
+
     fn close(&self);
 
     fn is_closed(&self) -> bool;
@@ -193,6 +195,14 @@ impl<T, S> Tx<T, S> {
 }
 
 impl<T, S: Semaphore> Tx<T, S> {
+    pub(super) fn is_empty(&self) -> bool {
+        self.inner.semaphore.available_permits() == 0
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.inner.semaphore.available_permits()
+    }
+
     pub(crate) fn is_closed(&self) -> bool {
         self.inner.semaphore.is_closed()
     }
@@ -576,6 +586,10 @@ impl Semaphore for bounded::Semaphore {
         self.semaphore.release(n)
     }
 
+    fn available_permits(&self) -> usize {
+        self.semaphore.available_permits()
+    }
+
     fn is_idle(&self) -> bool {
         self.semaphore.available_permits() == self.bound
     }
@@ -608,6 +622,10 @@ impl Semaphore for unbounded::Semaphore {
             // Something went wrong
             process::abort();
         }
+    }
+
+    fn available_permits(&self) -> usize {
+        self.0.load(Acquire) >> 1
     }
 
     fn is_idle(&self) -> bool {

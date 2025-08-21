@@ -1040,6 +1040,64 @@ async fn test_tx_capacity() {
 }
 
 #[tokio::test]
+async fn test_bounded_tx_len() {
+    let (tx, mut rx) = mpsc::channel::<()>(10);
+
+    // initially len should be 0
+    assert_eq!(tx.len(), 0);
+    assert!(tx.is_empty());
+
+    // queue one message, and len should be 1
+    tx.send(()).await.unwrap();
+    assert_eq!(tx.len(), 1);
+    assert!(!tx.is_empty());
+
+    // queue a second message, and len should be 2
+    tx.send(()).await.unwrap();
+    assert_eq!(tx.len(), 2);
+    assert!(!tx.is_empty());
+
+    // consume a message, and len should be 1
+    let _ = rx.recv().await;
+    assert_eq!(tx.len(), 1);
+    assert!(!tx.is_empty());
+
+    // consume a final message, and len should be 0
+    let _ = rx.recv().await;
+    assert_eq!(tx.len(), 0);
+    assert!(tx.is_empty());
+}
+
+#[tokio::test]
+async fn test_unbounded_tx_len() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+
+    // initially len should be 0
+    assert_eq!(tx.len(), 0);
+    assert!(tx.is_empty());
+
+    // queue one message, and len should be 1
+    tx.send(()).unwrap();
+    assert_eq!(tx.len(), 1);
+    assert!(!tx.is_empty());
+
+    // queue a second message, and len should be 2
+    tx.send(()).unwrap();
+    assert_eq!(tx.len(), 2);
+    assert!(!tx.is_empty());
+
+    // consume a message, and len should be 1
+    let _ = rx.recv().await;
+    assert_eq!(tx.len(), 1);
+    assert!(!tx.is_empty());
+
+    // consume a final message, and len should be 0
+    let _ = rx.recv().await;
+    assert_eq!(tx.len(), 0);
+    assert!(tx.is_empty());
+}
+
+#[tokio::test]
 async fn test_rx_is_closed_when_calling_close_with_sender() {
     // is_closed should return true after calling close but still has a sender
     let (_tx, mut rx) = mpsc::channel::<()>(10);
