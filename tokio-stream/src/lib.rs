@@ -31,7 +31,7 @@
 //! `Stream`, but this is unfortunately not possible. Instead, you can use a
 //! `while let` loop as follows:
 //!
-//! ```rust
+//! ```rust,ignore-wasm
 //! use tokio_stream::{self as stream, StreamExt};
 //!
 //! #[tokio::main]

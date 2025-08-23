@@ -16,7 +16,7 @@ use tokio::sync::watch::error::RecvError;
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// # #[tokio::main]
 /// # async fn main() {
 /// use tokio_stream::{StreamExt, wrappers::WatchStream};
@@ -32,7 +32,7 @@ use tokio::sync::watch::error::RecvError;
 /// # }
 /// ```
 ///
-/// ```
+/// ```ignore-wasm
 /// # #[tokio::main]
 /// # async fn main() {
 /// use tokio_stream::{StreamExt, wrappers::WatchStream};
@@ -50,7 +50,7 @@ use tokio::sync::watch::error::RecvError;
 ///
 /// Example with [`WatchStream<T>::from_changes`]:
 ///
-/// ```
+/// ```ignore-wasm
 /// # #[tokio::main]
 /// # async fn main() {
 /// use futures::future::FutureExt;

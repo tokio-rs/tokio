@@ -128,7 +128,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -170,7 +170,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -202,7 +202,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -238,7 +238,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -282,7 +282,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -417,7 +417,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -453,7 +453,7 @@ pub trait StreamExt: Stream {
     /// standard library.
     ///
     /// # Examples
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -487,7 +487,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio_stream::{Stream, StreamExt};
     ///
     /// use std::pin::Pin;
@@ -550,7 +550,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -579,7 +579,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -605,7 +605,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -636,7 +636,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -679,7 +679,7 @@ pub trait StreamExt: Stream {
     ///
     /// Basic usage:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -694,7 +694,7 @@ pub trait StreamExt: Stream {
     ///
     /// Stopping at the first `false`:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -738,7 +738,7 @@ pub trait StreamExt: Stream {
     ///
     /// Basic usage:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -753,7 +753,7 @@ pub trait StreamExt: Stream {
     ///
     /// Stopping at the first `true`:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -784,7 +784,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio_stream::{self as stream, StreamExt};
     ///
     /// #[tokio::main]
@@ -822,7 +822,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     /// Basic usage:
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, *};
@@ -871,7 +871,7 @@ pub trait StreamExt: Stream {
     ///
     /// Basic usage:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio_stream::{self as stream, StreamExt};
     ///
     /// #[tokio::main]
@@ -888,7 +888,7 @@ pub trait StreamExt: Stream {
     ///
     /// Collecting a stream of `Result` values
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio_stream::{self as stream, StreamExt};
     ///
     /// #[tokio::main]
@@ -944,7 +944,7 @@ pub trait StreamExt: Stream {
     ///
     /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
@@ -1030,7 +1030,7 @@ pub trait StreamExt: Stream {
     ///
     /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};

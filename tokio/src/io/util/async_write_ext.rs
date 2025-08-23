@@ -43,7 +43,7 @@ cfg_io_util! {
     /// [`AsyncWrite`] types. Callers will tend to import this trait instead of
     /// [`AsyncWrite`].
     ///
-    /// ```no_run
+    /// ```no_run,ignore-wasm
     /// use tokio::io::{self, AsyncWriteExt};
     /// use tokio::fs::File;
     ///
@@ -107,7 +107,7 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -147,7 +147,7 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         /// use std::io::IoSlice;
@@ -227,7 +227,7 @@ cfg_io_util! {
         /// [`Buf`]: bytes::Buf
         /// [`Cursor`]: std::io::Cursor
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -298,7 +298,7 @@ cfg_io_util! {
         /// [`Cursor`]: std::io::Cursor
         /// [advanced]: bytes::Buf::advance
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -351,7 +351,7 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -395,7 +395,7 @@ cfg_io_util! {
             ///
             /// Write unsigned 8 bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -432,7 +432,7 @@ cfg_io_util! {
             ///
             /// Write signed 8 bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -470,7 +470,7 @@ cfg_io_util! {
             ///
             /// Write unsigned 16-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -508,7 +508,7 @@ cfg_io_util! {
             ///
             /// Write signed 16-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -546,7 +546,7 @@ cfg_io_util! {
             ///
             /// Write unsigned 32-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -584,7 +584,7 @@ cfg_io_util! {
             ///
             /// Write signed 32-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -622,7 +622,7 @@ cfg_io_util! {
             ///
             /// Write unsigned 64-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -660,7 +660,7 @@ cfg_io_util! {
             ///
             /// Write signed 64-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -698,7 +698,7 @@ cfg_io_util! {
             ///
             /// Write unsigned 128-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -738,7 +738,7 @@ cfg_io_util! {
             ///
             /// Write signed 128-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -778,7 +778,7 @@ cfg_io_util! {
             ///
             /// Write 32-bit floating point type to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -815,7 +815,7 @@ cfg_io_util! {
             ///
             /// Write 64-bit floating point type to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -854,7 +854,7 @@ cfg_io_util! {
             ///
             /// Write unsigned 16-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -892,7 +892,7 @@ cfg_io_util! {
             ///
             /// Write signed 16-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -930,7 +930,7 @@ cfg_io_util! {
             ///
             /// Write unsigned 32-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -968,7 +968,7 @@ cfg_io_util! {
             ///
             /// Write signed 32-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -1006,7 +1006,7 @@ cfg_io_util! {
             ///
             /// Write unsigned 64-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -1044,7 +1044,7 @@ cfg_io_util! {
             ///
             /// Write signed 64-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -1082,7 +1082,7 @@ cfg_io_util! {
             ///
             /// Write unsigned 128-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -1122,7 +1122,7 @@ cfg_io_util! {
             ///
             /// Write signed 128-bit integers to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -1162,7 +1162,7 @@ cfg_io_util! {
             ///
             /// Write 32-bit floating point type to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -1199,7 +1199,7 @@ cfg_io_util! {
             ///
             /// Write 64-bit floating point type to a `AsyncWrite`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncWriteExt};
             ///
             /// #[tokio::main]
@@ -1243,7 +1243,7 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, BufWriter, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -1282,7 +1282,7 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, BufWriter, AsyncWriteExt};
         /// use tokio::fs::File;
         ///

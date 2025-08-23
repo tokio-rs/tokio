@@ -11,7 +11,7 @@ use std::task::{ready, Context, Poll};
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore-wasm
 /// use bytes::{Bytes, BytesMut};
 /// use tokio_stream as stream;
 /// use tokio::io::Result;

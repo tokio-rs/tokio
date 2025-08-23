@@ -63,7 +63,7 @@ use tokio::{
 ///
 /// This is a simple example. For this case, [`JoinSet`] should probably be used instead.
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio_util::task::TaskTracker;
 ///
 /// #[tokio::main]

@@ -40,7 +40,7 @@ cfg_io_util! {
     /// [`AsyncRead`] types. Callers will tend to import this trait instead of
     /// [`AsyncRead`].
     ///
-    /// ```no_run
+    /// ```no_run,ignore-wasm
     /// use tokio::fs::File;
     /// use tokio::io::{self, AsyncReadExt};
     ///
@@ -71,7 +71,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `AsyncRead`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -149,7 +149,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -218,7 +218,7 @@ cfg_io_util! {
         /// [`BytesMut`]: bytes::BytesMut
         /// [`BufMut`]: bytes::BufMut
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -288,7 +288,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -340,7 +340,7 @@ cfg_io_util! {
             ///
             /// Read unsigned 8 bit integers from an `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -384,7 +384,7 @@ cfg_io_util! {
             ///
             /// Read unsigned 8 bit integers from an `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -429,7 +429,7 @@ cfg_io_util! {
             ///
             /// Read unsigned 16 bit big-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -473,7 +473,7 @@ cfg_io_util! {
             ///
             /// Read signed 16 bit big-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -517,7 +517,7 @@ cfg_io_util! {
             ///
             /// Read unsigned 32-bit big-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -561,7 +561,7 @@ cfg_io_util! {
             ///
             /// Read signed 32-bit big-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -604,7 +604,7 @@ cfg_io_util! {
             ///
             /// Read unsigned 64-bit big-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -649,7 +649,7 @@ cfg_io_util! {
             ///
             /// Read signed 64-bit big-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -692,7 +692,7 @@ cfg_io_util! {
             ///
             /// Read unsigned 128-bit big-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -738,7 +738,7 @@ cfg_io_util! {
             ///
             /// Read signed 128-bit big-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -784,7 +784,7 @@ cfg_io_util! {
             ///
             /// Read 32-bit floating point type from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -827,7 +827,7 @@ cfg_io_util! {
             ///
             /// Read 64-bit floating point type from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -872,7 +872,7 @@ cfg_io_util! {
             ///
             /// Read unsigned 16 bit little-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -916,7 +916,7 @@ cfg_io_util! {
             ///
             /// Read signed 16 bit little-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -960,7 +960,7 @@ cfg_io_util! {
             ///
             /// Read unsigned 32-bit little-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -1004,7 +1004,7 @@ cfg_io_util! {
             ///
             /// Read signed 32-bit little-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -1047,7 +1047,7 @@ cfg_io_util! {
             ///
             /// Read unsigned 64-bit little-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -1092,7 +1092,7 @@ cfg_io_util! {
             ///
             /// Read signed 64-bit little-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -1135,7 +1135,7 @@ cfg_io_util! {
             ///
             /// Read unsigned 128-bit little-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -1181,7 +1181,7 @@ cfg_io_util! {
             ///
             /// Read signed 128-bit little-endian integers from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -1227,7 +1227,7 @@ cfg_io_util! {
             ///
             /// Read 32-bit floating point type from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -1270,7 +1270,7 @@ cfg_io_util! {
             ///
             /// Read 64-bit floating point type from a `AsyncRead`:
             ///
-            /// ```rust
+            /// ```rust,ignore-wasm
             /// use tokio::io::{self, AsyncReadExt};
             ///
             /// use std::io::Cursor;
@@ -1314,7 +1314,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, AsyncReadExt};
         /// use tokio::fs::File;
         ///
@@ -1362,7 +1362,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, AsyncReadExt};
         /// use tokio::fs::File;
         ///
@@ -1402,7 +1402,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, AsyncReadExt};
         /// use tokio::fs::File;
         ///

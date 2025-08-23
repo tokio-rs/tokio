@@ -60,7 +60,7 @@ use std::task::{ready, Context, Poll};
 ///
 /// Merging two streams, then remove them after receiving the first value
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio_stream::{StreamExt, StreamMap, Stream};
 /// use tokio::sync::mpsc;
 /// use std::pin::Pin;
@@ -182,7 +182,7 @@ use std::task::{ready, Context, Poll};
 ///
 /// Using `StreamNotifyClose` to handle closed streams with `StreamMap`.
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio_stream::{StreamExt, StreamMap, StreamNotifyClose};
 ///
 /// #[tokio::main]

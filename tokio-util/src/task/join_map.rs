@@ -33,7 +33,7 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 ///
 /// Spawn multiple tasks and wait for them:
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio_util::task::JoinMap;
 ///
 /// #[tokio::main]
@@ -62,7 +62,7 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 ///
 /// Cancel tasks based on their keys:
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio_util::task::JoinMap;
 ///
 /// #[tokio::main]
@@ -185,7 +185,7 @@ impl<K, V, S> JoinMap<K, V, S> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;
@@ -518,7 +518,7 @@ where
     /// ```
     ///
     /// `abort` returns `true` if a task was aborted:
-    /// ```
+    /// ```ignore-wasm
     /// use tokio_util::task::JoinMap;
     ///
     /// # #[tokio::main]
@@ -685,7 +685,7 @@ where
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;
@@ -714,7 +714,7 @@ where
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;

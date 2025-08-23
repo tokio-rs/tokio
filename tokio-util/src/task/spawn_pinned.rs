@@ -21,7 +21,7 @@ use tokio::task::{spawn_local, JoinHandle, LocalSet};
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use std::rc::Rc;
 /// use tokio::task;
 /// use tokio_util::task::LocalPoolHandle;
@@ -93,7 +93,7 @@ impl LocalPoolHandle {
     /// [`FnOnce`] which creates it is.
     ///
     /// # Examples
-    /// ```
+    /// ```ignore-wasm
     /// use std::rc::Rc;
     /// use tokio_util::task::LocalPoolHandle;
     ///
@@ -143,7 +143,7 @@ impl LocalPoolHandle {
     ///
     /// This method can be used to spawn a task on all worker threads of the pool:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio_util::task::LocalPoolHandle;
     ///
     /// #[tokio::main]
