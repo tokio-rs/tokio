@@ -19,7 +19,7 @@ impl<I> Unpin for Once<I> {}
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio_stream::{self as stream, StreamExt};
 ///
 /// #[tokio::main]

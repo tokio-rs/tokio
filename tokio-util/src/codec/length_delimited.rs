@@ -78,7 +78,7 @@
 //! The following will parse a `u16` length field at offset 0, omitting the
 //! frame head in the yielded `BytesMut`.
 //!
-//! ```
+//! ```ignore-wasm
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
 //! # #[tokio::main]
@@ -114,7 +114,7 @@
 //! The following will parse a `u16` length field at offset 0, including the
 //! frame head in the yielded `BytesMut`.
 //!
-//! ```
+//! ```ignore-wasm
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
 //! # #[tokio::main]
@@ -151,7 +151,7 @@
 //! frame head in the yielded `BytesMut`. In this case, the length field
 //! **includes** the frame head length.
 //!
-//! ```
+//! ```ignore-wasm
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
 //! # #[tokio::main]
@@ -187,7 +187,7 @@
 //! The following will parse a 3 byte length field at offset 0 in a 5 byte
 //! frame head, including the frame head in the yielded `BytesMut`.
 //!
-//! ```
+//! ```ignore-wasm
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
 //! # #[tokio::main]
@@ -234,7 +234,7 @@
 //! yielded `BytesMut`, but the trailing 2 bytes of the frame head will be
 //! included.
 //!
-//! ```
+//! ```ignore-wasm
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
 //! # #[tokio::main]
@@ -283,7 +283,7 @@
 //! included. In this case, the length field **includes** the frame head
 //! length.
 //!
-//! ```
+//! ```ignore-wasm
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
 //! # #[tokio::main]
@@ -326,7 +326,7 @@
 //! The following will parse a 3 byte length field at offset 0 in a 4 byte
 //! frame head, excluding the 4th byte from the yielded `BytesMut`.
 //!
-//! ```
+//! ```ignore-wasm
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
 //! # #[tokio::main]

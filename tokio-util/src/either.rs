@@ -40,7 +40,7 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf, Result}
 /// When the output type is the same, we can wrap each future in `Either` to avoid the
 /// issue:
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio_util::either::Either;
 /// # fn some_condition() -> bool { true }
 /// # async fn some_async_function() -> u32 { 10 }

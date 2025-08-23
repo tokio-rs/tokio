@@ -35,7 +35,7 @@
 //! **Example:** using a [`oneshot` channel][oneshot] to receive the result of a
 //! computation.
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::sync::oneshot;
 //!
 //! async fn some_computation() -> String {
@@ -67,7 +67,7 @@
 //!
 //! **Example:**
 //!
-//! ```
+//! ```ignore-wasm
 //! async fn some_computation() -> String {
 //!     "the result of the computation".to_string()
 //! }
@@ -100,7 +100,7 @@
 //! **Example:** using an mpsc to incrementally stream the results of a series
 //! of computations.
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::sync::mpsc;
 //!
 //! async fn some_computation(input: u32) -> String {
@@ -140,7 +140,7 @@
 //! **Example:** sending data from many tasks over a single socket using message
 //! passing.
 //!
-//! ```no_run
+//! ```no_run,ignore-wasm
 //! use tokio::io::{self, AsyncWriteExt};
 //! use tokio::net::TcpStream;
 //! use tokio::sync::mpsc;
@@ -184,7 +184,7 @@
 //! "fetch and increment" command. The counter value **before** the increment is
 //! sent over the provided `oneshot` channel.
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::sync::{oneshot, mpsc};
 //! use Command::Increment;
 //!
@@ -251,7 +251,7 @@
 //!
 //! Basic usage
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::sync::broadcast;
 //!
 //! #[tokio::main]
@@ -293,7 +293,7 @@
 //! changes. In this example, a configuration file is checked periodically. When
 //! the file changes, the configuration changes are signalled to consumers.
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::sync::watch;
 //! use tokio::time::{self, Duration, Instant};
 //!

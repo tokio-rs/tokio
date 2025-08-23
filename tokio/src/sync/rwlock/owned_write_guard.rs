@@ -62,7 +62,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
     ///
@@ -114,7 +114,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
     ///
@@ -186,7 +186,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
     ///
@@ -248,7 +248,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
     ///
@@ -333,7 +333,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::sync::RwLock;
     /// # use std::sync::Arc;
     /// #
@@ -395,7 +395,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
     ///

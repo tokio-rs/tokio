@@ -9,7 +9,7 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore-wasm
 /// # #[tokio::main]
 /// # async fn main() -> std::io::Result<()> {
 /// use tokio_util::io::read_exact_arc;

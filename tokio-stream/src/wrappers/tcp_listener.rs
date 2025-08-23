@@ -10,7 +10,7 @@ use tokio::net::{TcpListener, TcpStream};
 ///
 /// Accept connections from both IPv4 and IPv6 listeners in the same loop:
 ///
-/// ```no_run
+/// ```no_run,ignore-wasm
 /// use std::net::{Ipv4Addr, Ipv6Addr};
 ///
 /// use tokio::net::TcpListener;

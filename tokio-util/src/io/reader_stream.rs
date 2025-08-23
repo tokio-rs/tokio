@@ -15,7 +15,7 @@ pin_project! {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # #[tokio::main]
     /// # async fn main() -> std::io::Result<()> {
     /// use tokio_stream::StreamExt;

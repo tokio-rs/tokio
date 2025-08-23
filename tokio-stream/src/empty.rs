@@ -23,7 +23,7 @@ unsafe impl<T> Sync for Empty<T> {}
 ///
 /// Basic usage:
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio_stream::{self as stream, StreamExt};
 ///
 /// #[tokio::main]

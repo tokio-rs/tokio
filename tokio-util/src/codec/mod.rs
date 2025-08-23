@@ -14,7 +14,7 @@
 //! [`FramedWrite`] are first framed according to a specific codec, and then sent to
 //! an implementor of [`AsyncWrite`].
 //!
-//! ```
+//! ```ignore-wasm
 //! use futures::sink::SinkExt;
 //! use tokio_util::codec::LinesCodec;
 //! use tokio_util::codec::FramedWrite;
@@ -46,7 +46,7 @@
 //! will keep reading from an [`AsyncRead`] implementor until a whole frame, according to a codec,
 //! can be parsed.
 //!
-//!```
+//!```ignore-wasm
 //! use tokio_stream::StreamExt;
 //! use tokio_util::codec::LinesCodec;
 //! use tokio_util::codec::FramedRead;

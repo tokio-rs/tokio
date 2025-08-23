@@ -32,7 +32,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::OnceCell;
 ///
 /// async fn some_computation() -> u32 {
@@ -50,7 +50,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///
 /// It is often useful to write a wrapper method for accessing the value.
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::OnceCell;
 ///
 /// static ONCE: OnceCell<u32> = OnceCell::const_new();
@@ -144,7 +144,7 @@ impl<T> OnceCell<T> {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::OnceCell;
     ///
     /// static ONCE: OnceCell<u32> = OnceCell::const_new();
@@ -199,7 +199,7 @@ impl<T> OnceCell<T> {
     /// visible in [`tokio-console`]. Instead, [`OnceCell::new_with`] should be
     /// used to create an instrumented object if that is needed.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::OnceCell;
     ///
     /// static ONCE: OnceCell<u32> = OnceCell::const_new_with(1);

@@ -14,7 +14,7 @@ pin_project! {
     ///
     /// Using `StreamNotifyClose` to handle closed streams with `StreamMap`.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio_stream::{StreamExt, StreamMap, StreamNotifyClose};
     ///
     /// #[tokio::main]

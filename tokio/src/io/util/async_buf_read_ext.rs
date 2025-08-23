@@ -57,7 +57,7 @@ cfg_io_util! {
         ///
         /// [`Cursor`]: std::io::Cursor
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::io::AsyncBufReadExt;
         ///
         /// use std::io::Cursor;
@@ -159,7 +159,7 @@ cfg_io_util! {
         ///
         /// [`Cursor`]: std::io::Cursor
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::io::AsyncBufReadExt;
         ///
         /// use std::io::Cursor;
@@ -326,7 +326,7 @@ cfg_io_util! {
         ///
         /// [`Cursor`]: std::io::Cursor
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::io::AsyncBufReadExt;
         ///
         /// use std::io::Cursor;

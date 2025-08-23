@@ -52,7 +52,7 @@ type GuardedWaitList = GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::
 ///
 /// Basic usage.
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::Notify;
 /// use std::sync::Arc;
 ///
@@ -544,7 +544,7 @@ impl Notify {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::Notify;
     /// use std::sync::Arc;
     ///
@@ -590,7 +590,7 @@ impl Notify {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::Notify;
     ///
@@ -637,7 +637,7 @@ impl Notify {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::Notify;
     /// use std::sync::Arc;
     ///
@@ -718,7 +718,7 @@ impl Notify {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::Notify;
     /// use std::sync::Arc;
     ///
