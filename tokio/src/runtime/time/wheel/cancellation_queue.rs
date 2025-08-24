@@ -1,14 +1,14 @@
 use super::{Entry, EntryHandle};
 use crate::loom::sync::{Arc, Mutex};
+use crate::util::linked_list;
 
 use std::marker::PhantomData;
-use std::mem::ManuallyDrop;
-use std::ptr::NonNull;
+
+type EntryList = linked_list::LinkedList<(Entry,), Entry>;
 
 #[derive(Debug)]
 struct Inner {
-    head: Option<NonNull<Entry>>,
-    tail: Option<NonNull<Entry>>,
+    list: EntryList,
 }
 
 /// Safety: [`Inner`] is protected by [`Mutex`].
@@ -19,20 +19,14 @@ unsafe impl Sync for Inner {}
 
 impl Drop for Inner {
     fn drop(&mut self) {
-        unsafe {
-            while let Some(head) = self.head {
-                self.head = head.as_ref().cancel_pointer().with(|p| *p);
-                drop(EntryHandle::from(head));
-            }
-        }
+        let _ = self.iter().count();
     }
 }
 
 impl Inner {
     fn new() -> Self {
         Self {
-            head: None,
-            tail: None,
+            list: EntryList::new(),
         }
     }
 
@@ -41,50 +35,13 @@ impl Inner {
     /// Behavior is undefined if any of the following conditions are violated:
     ///
     /// - `hdl` must not in any cancellation queue.
-    unsafe fn push_back(&mut self, hdl: EntryHandle) {
-        // Since we need to access the intrusive pointer, we must not drop the entry.
-        let entry = ManuallyDrop::new(hdl.into_entry());
-
-        entry.cancel_pointer().with_mut(|p| {
-            // Safety: this UnsafeCell is only accessed with the mutex locked.
-            let p = unsafe { p.as_mut() }.unwrap();
-            *p = None;
-        });
-
-        let entry_ptr = Arc::as_ptr(&entry).cast_mut();
-
-        if self.head.is_none() {
-            self.head = NonNull::new(entry_ptr);
-            self.tail = self.head;
-        } else {
-            let tail = self.tail.unwrap();
-            unsafe {
-                tail.as_ref().cancel_pointer().with_mut(|p| {
-                    *p = Some(NonNull::new(entry_ptr).unwrap());
-                });
-            }
-            self.tail = Some(NonNull::new(entry_ptr).unwrap());
-        }
+    unsafe fn push_front(&mut self, hdl: EntryHandle) {
+        self.list.push_front(hdl);
     }
 
     fn iter(&mut self) -> impl Iterator<Item = EntryHandle> {
-        let mut head = self.head.take();
-        let _ = self.tail.take();
-
-        std::iter::from_fn(move || match head {
-            Some(ptr) => {
-                // Safety: We wrap the `hdl` using `ManuallyDrop` in `self.push_back`,
-                // so the ptr is still valid.
-                head = unsafe { ptr.as_ref() }
-                    .cancel_pointer()
-                    // Safety: All side effects have been synchronized
-                    // by the mutex.
-                    .with(|p| unsafe { *p });
-                let hdl = EntryHandle::from(ptr);
-                Some(hdl)
-            }
-            None => None,
-        })
+        let mut list = std::mem::take(&mut self.list);
+        std::iter::from_fn(move || list.pop_front())
     }
 }
 
@@ -106,7 +63,7 @@ impl Sender {
     ///
     /// - `hdl` must not in any cancellation queue.
     pub(crate) unsafe fn send(&self, hdl: EntryHandle) {
-        self.inner.lock().push_back(hdl);
+        self.inner.lock().push_front(hdl);
     }
 }
 

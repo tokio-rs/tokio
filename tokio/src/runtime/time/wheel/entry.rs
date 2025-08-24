@@ -37,10 +37,10 @@ const STATE_CANCELLING: u8 = 5;
 #[derive(Debug)]
 pub(crate) struct Entry {
     /// The intrusive pointers used by timer wheel.
-    pointers: linked_list::Pointers<Entry>,
+    wheel_pointers: linked_list::Pointers<Entry>,
 
     /// The intrusive pointer used by cancellation queue.
-    cancel_pointer: UnsafeCell<Option<NonNull<Entry>>>,
+    cancel_pointers: linked_list::Pointers<Entry>,
 
     /// The tick when this entry is scheduled to expire.
     deadline: u64,
@@ -71,20 +71,10 @@ unsafe impl Sync for Entry {}
 
 impl Drop for Entry {
     fn drop(&mut self) {
-        // Safety: `cancel_pointer` is protected by `cancellation_queue`.
-        unsafe {
-            self.cancel_pointer.with_mut(|p| {
-                std::ptr::drop_in_place(p);
-            });
-        }
-    }
-}
-
-generate_addr_of_methods! {
-    impl<> Entry {
-        unsafe fn addr_of_pointers(self: NonNull<Self>) -> NonNull<linked_list::Pointers<Entry>> {
-            &self.pointers
-        }
+        self.cancel_tx.with_mut(|tx| {
+            let maybe_tx = unsafe { &mut *tx };
+            drop(maybe_tx.take());
+        })
     }
 }
 
@@ -106,19 +96,41 @@ unsafe impl linked_list::Link for Entry {
     unsafe fn pointers(
         target: NonNull<Self::Target>,
     ) -> NonNull<linked_list::Pointers<Self::Target>> {
-        Entry::addr_of_pointers(target)
+        let this = target.as_ptr();
+        let field = std::ptr::addr_of_mut!((*this).wheel_pointers);
+        NonNull::new_unchecked(field)
     }
 }
+// `impl for (Entry,)` is to avoid conflicts with the `Entry` impl,
+// this enables using `Entry` in multiple intrusive lists,
+// this `impl` is for `cancellation_queue`.
+// Safety: `Entry` is always in an `Arc`.
+unsafe impl linked_list::Link for (Entry,) {
+    type Handle = Handle;
+    type Target = Entry;
 
-impl Entry {
-    pub(super) fn cancel_pointer(&self) -> &UnsafeCell<Option<NonNull<Self>>> {
-        &self.cancel_pointer
+    fn as_raw(hdl: &Self::Handle) -> NonNull<Self::Target> {
+        unsafe { NonNull::new_unchecked(Arc::as_ptr(&hdl.entry).cast_mut()) }
+    }
+
+    unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
+        Handle {
+            entry: Arc::from_raw(ptr.as_ptr()),
+        }
+    }
+
+    unsafe fn pointers(
+        target: NonNull<Self::Target>,
+    ) -> NonNull<linked_list::Pointers<Self::Target>> {
+        let this = target.as_ptr();
+        let field = std::ptr::addr_of_mut!((*this).cancel_pointers);
+        NonNull::new_unchecked(field)
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct Handle {
-    entry: Arc<Entry>,
+    pub(crate) entry: Arc<Entry>,
 }
 
 impl From<Handle> for NonNull<Entry> {
@@ -128,19 +140,11 @@ impl From<Handle> for NonNull<Entry> {
     }
 }
 
-impl From<NonNull<Entry>> for Handle {
-    fn from(ptr: NonNull<Entry>) -> Self {
-        // Safety: `ptr` is guaranteed to be non-null by the caller.
-        let ptr = unsafe { Arc::from_raw(ptr.as_ptr()) };
-        Handle { entry: ptr }
-    }
-}
-
 impl Handle {
     pub(crate) fn new(deadline: u64, waker: &Waker) -> Self {
         let entry = Arc::new(Entry {
-            pointers: linked_list::Pointers::new(),
-            cancel_pointer: UnsafeCell::new(None),
+            wheel_pointers: linked_list::Pointers::new(),
+            cancel_pointers: linked_list::Pointers::new(),
             deadline,
             waker: AtomicWaker::new(),
             cancel_tx: UnsafeCell::new(None),
@@ -307,10 +311,6 @@ impl Handle {
 
     pub(crate) fn is_woken_up(&self) -> bool {
         self.entry.state.fetch_or(0, Relaxed) == STATE_WOKEN_UP
-    }
-
-    pub(super) fn into_entry(self) -> Arc<Entry> {
-        self.entry
     }
 }
 
