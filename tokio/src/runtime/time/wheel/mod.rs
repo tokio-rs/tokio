@@ -1,14 +1,17 @@
-use crate::runtime::time::{TimerHandle, TimerShared};
-use crate::time::error::InsertError;
-
 mod level;
 pub(crate) use self::level::Expiration;
 use self::level::Level;
 
-use std::{array, ptr::NonNull};
+mod entry;
+pub(crate) use entry::Handle as EntryHandle;
+use entry::TransitionToPending;
+use entry::TransitionToRegistered;
+use entry::{Entry, EntryList};
 
-use super::entry::STATE_DEREGISTERED;
-use super::EntryList;
+pub(crate) mod cancellation_queue;
+use cancellation_queue::Sender;
+
+use std::array;
 
 /// Timing wheel implementation.
 ///
@@ -70,80 +73,77 @@ impl Wheel {
     ///
     /// # Arguments
     ///
-    /// * `item`: The item to insert into the wheel.
+    /// * `hdl`: The entry handle to insert into the wheel.
     ///
     /// # Return
     ///
-    /// Returns `Ok` when the item is successfully inserted, `Err` otherwise.
-    ///
-    /// `Err(Elapsed)` indicates that `when` represents an instant that has
-    /// already passed. In this case, the caller should fire the timeout
-    /// immediately.
-    ///
-    /// `Err(Invalid)` indicates an invalid `when` argument as been supplied.
+    /// * `true`: The entry was successfully inserted.
+    /// * `false`: the entry has already expired, in this case,
+    ///   the entry is not inserted into the wheel.
     ///
     /// # Safety
     ///
-    /// This function registers item into an intrusive linked list. The caller
-    /// must ensure that `item` is pinned and will not be dropped without first
-    /// being deregistered.
-    pub(crate) unsafe fn insert(
-        &mut self,
-        item: TimerHandle,
-    ) -> Result<u64, (TimerHandle, InsertError)> {
-        let when = item.sync_when();
+    /// The caller must ensure:
+    ///
+    /// * The entry is not already registered in ANY wheel.
+    pub(crate) unsafe fn insert(&mut self, hdl: EntryHandle, cancel_tx: Sender) -> Insert {
+        let deadline = hdl.deadline();
 
-        if when <= self.elapsed {
-            return Err((item, InsertError::Elapsed));
+        if deadline <= self.elapsed {
+            return Insert::Elapsed;
         }
 
         // Get the level at which the entry should be stored
-        let level = self.level_for(when);
+        let level = self.level_for(deadline);
 
-        unsafe {
-            self.levels[level].add_entry(item);
+        match hdl.transition_to_registered(cancel_tx) {
+            TransitionToRegistered::Success => {
+                unsafe {
+                    self.levels[level].add_entry(hdl);
+                }
+
+                debug_assert!({
+                    self.levels[level]
+                        .next_expiration(self.elapsed)
+                        .map(|e| e.deadline >= self.elapsed)
+                        .unwrap_or(true)
+                });
+
+                Insert::Success
+            }
+            TransitionToRegistered::Cancelling => Insert::Cancelling,
         }
-
-        debug_assert!({
-            self.levels[level]
-                .next_expiration(self.elapsed)
-                .map(|e| e.deadline >= self.elapsed)
-                .unwrap_or(true)
-        });
-
-        Ok(when)
     }
 
     /// Removes `item` from the timing wheel.
-    pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
-        unsafe {
-            let when = item.as_ref().registered_when();
-            if when == STATE_DEREGISTERED {
-                self.pending.remove(item);
-            } else {
-                debug_assert!(
-                    self.elapsed <= when,
-                    "elapsed={}; when={}",
-                    self.elapsed,
-                    when
-                );
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure:
+    ///
+    /// * The entry is already registered in THIS wheel.
+    pub(crate) unsafe fn remove(&mut self, hdl: EntryHandle) {
+        if hdl.is_pending() {
+            self.pending.remove(hdl.into());
+        } else {
+            let deadline = hdl.deadline();
+            debug_assert!(
+                self.elapsed <= deadline,
+                "elapsed={}; deadline={}",
+                self.elapsed,
+                deadline
+            );
 
-                let level = self.level_for(when);
-                self.levels[level].remove_entry(item);
-            }
+            let level = self.level_for(deadline);
+            self.levels[level].remove_entry(hdl.clone());
         }
     }
 
-    /// Instant at which to poll.
-    pub(crate) fn poll_at(&self) -> Option<u64> {
-        self.next_expiration().map(|expiration| expiration.deadline)
-    }
-
     /// Advances the timer up to the instant represented by `now`.
-    pub(crate) fn poll(&mut self, now: u64) -> Option<TimerHandle> {
+    pub(crate) fn poll(&mut self, now: u64) -> Option<EntryHandle> {
         loop {
-            if let Some(handle) = self.pending.pop_back() {
-                return Some(handle);
+            if let Some(hdl) = self.pending.pop_back() {
+                return Some(hdl);
             }
 
             match self.next_expiration() {
@@ -193,7 +193,7 @@ impl Wheel {
 
     /// Returns the tick at which this timer wheel next needs to perform some
     /// processing, or None if there are no timers registered.
-    pub(super) fn next_expiration_time(&self) -> Option<u64> {
+    pub(crate) fn next_expiration_time(&self) -> Option<u64> {
         self.next_expiration().map(|ex| ex.deadline)
     }
 
@@ -229,24 +229,20 @@ impl Wheel {
         // those entries again or we'll end up in an infinite loop.
         let mut entries = self.take_entries(expiration);
 
-        while let Some(item) = entries.pop_back() {
+        while let Some(hdl) = entries.pop_back() {
             if expiration.level == 0 {
-                debug_assert_eq!(unsafe { item.registered_when() }, expiration.deadline);
+                debug_assert_eq!(hdl.deadline(), expiration.deadline);
             }
 
-            // Try to expire the entry; this is cheap (doesn't synchronize) if
-            // the timer is not expired, and updates registered_when.
-            match unsafe { item.mark_pending(expiration.deadline) } {
-                Ok(()) => {
-                    // Item was expired
-                    self.pending.push_front(item);
-                }
-                Err(expiration_tick) => {
-                    let level = level_for(expiration.deadline, expiration_tick);
+            match hdl.transition_to_pending(expiration.deadline) {
+                TransitionToPending::Success => self.pending.push_front(hdl),
+                TransitionToPending::NotElapsed(when) => {
+                    let level = level_for(expiration.deadline, when);
                     unsafe {
-                        self.levels[level].add_entry(item);
+                        self.levels[level].add_entry(hdl);
                     }
                 }
+                TransitionToPending::Cancelling => {}
             }
         }
     }
@@ -290,6 +286,18 @@ fn level_for(elapsed: u64, when: u64) -> usize {
     let significant = 63 - leading_zeros;
 
     significant / NUM_LEVELS
+}
+
+pub(crate) enum Insert {
+    /// The entry was successfully inserted.
+    Success,
+
+    /// The entry has already expired, in this case,
+    /// the entry is not inserted into the wheel.
+    Elapsed,
+
+    /// The entry is being cancelled, no need to register it.
+    Cancelling,
 }
 
 #[cfg(all(test, not(loom)))]
