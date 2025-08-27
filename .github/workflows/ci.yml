@@ -808,7 +808,7 @@ jobs:
           cargo hack check --all-features --ignore-private
       - name: "check --all-features --unstable -Z minimal-versions"
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump --cfg tokio_uring -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
           # from determining minimal versions based on dev-dependencies.
@@ -844,7 +844,7 @@ jobs:
       matrix:
         rustflags:
           - ""
-          - "--cfg tokio_unstable --cfg tokio_taskdump --cfg tokio_uring -Dwarnings"
+          - "--cfg tokio_unstable --cfg tokio_taskdump -Dwarnings"
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_clippy }}

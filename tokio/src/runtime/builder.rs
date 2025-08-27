@@ -1604,7 +1604,7 @@ cfg_io_uring! {
         ///     .build()
         ///     .unwrap();
         /// ```
-        #[cfg_attr(docsrs, doc(cfg(tokio_uring)))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "io-uring")))]
         pub fn enable_io_uring(&mut self) -> &mut Self {
             // Currently, the uring flag is equivalent to `enable_io`.
             self.enable_io = true;

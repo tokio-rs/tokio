@@ -839,7 +839,7 @@ impl From<StdOpenOptions> for OpenOptions {
         OpenOptions {
             inner: Kind::Std(options),
             // TODO: Add support for converting `StdOpenOptions` to `UringOpenOptions`
-            // if user enables the `--cfg tokio_uring`. It is blocked by:
+            // if user enables `io-uring`. It is blocked by:
             // * https://github.com/rust-lang/rust/issues/74943
             // * https://github.com/rust-lang/rust/issues/76801
         }
