@@ -120,8 +120,8 @@ jobs:
       - name: test tokio full
         run: |
           set -euxo pipefail
-          cargo nextest run --features full
-          cargo test --doc --features full
+          cargo nextest run --features full,test-util
+          cargo test --doc --features full,test-util
         working-directory: tokio
 
   test-workspace-all-features:
@@ -552,6 +552,7 @@ jobs:
           target: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
+      # Don't use --all-features since io-uring will be enabled and is not supported on those targets.
       - run: cargo check --workspace --features full,test-util --target ${{ matrix.target }}
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
@@ -742,7 +743,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: "", rustflags: "", features: "" }
+          - { name: "", rustflags: "" }
           - { name: "--unstable", rustflags: "--cfg tokio_unstable -Dwarnings" }
           - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump" }
           - { name: "--unstable --taskdump --io-uring", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump" }
