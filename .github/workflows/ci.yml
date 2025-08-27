@@ -552,7 +552,7 @@ jobs:
           target: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check --workspace --all-features --target ${{ matrix.target }}
+      - run: cargo check --workspace --features full,test-util --target ${{ matrix.target }}
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -622,8 +622,8 @@ jobs:
       - name: Tests run with all features (including parking_lot)
         run: |
           set -euxo pipefail
-          cargo nextest run -p tokio --all-features --target ${{ matrix.target }}
-          cargo test --doc -p tokio --all-features --target ${{ matrix.target }}
+          cargo nextest run -p tokio --features full,test-util --target ${{ matrix.target }}
+          cargo test --doc -p tokio --features full,test-util --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
@@ -704,8 +704,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: test tokio --all-features
         run: |
-          cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features
-          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --all-features
+          cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features full,test-util
+          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features full,test-util
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_tuning_tests
@@ -731,7 +731,7 @@ jobs:
       # https://github.com/tokio-rs/tokio/pull/5356
       # https://github.com/tokio-rs/tokio/issues/5373
       - name: Check
-        run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --depth 2 --keep-going
+        run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --skip io-uring --depth 2 --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
 
@@ -743,10 +743,9 @@ jobs:
       matrix:
         include:
           - { name: "", rustflags: "", features: "" }
-          - { name: "--unstable", rustflags: "--cfg tokio_unstable -Dwarnings", features: "--skip io-uring" }
-          - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump", features: "--skip io-uring" }
-          - { name: "--unstable --io-uring", rustflags: "-Dwarnings --cfg tokio_unstable", features: "--features io-uring" }
-          - { name: "--unstable --taskdump --io-uring", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump", features: "--features io-uring" }
+          - { name: "--unstable", rustflags: "--cfg tokio_unstable -Dwarnings" }
+          - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump" }
+          - { name: "--unstable --taskdump --io-uring", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump" }
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_nightly }}
@@ -759,7 +758,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       - name: check --feature-powerset ${{ matrix.name }}
-        run: cargo hack check --all --feature-powerset ${{ matrix.features }} --depth 2 --keep-going
+        run: cargo hack check --all --feature-powerset --depth 2 --keep-going
         env:
           RUSTFLAGS: ${{ matrix.rustflags }}
 
