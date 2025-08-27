@@ -349,7 +349,7 @@ jobs:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
           # in order to run doctests for unstable features, we must also pass
           # the unstable cfg to RustDoc
-          RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_taskdump 
+          RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_taskdump
 
   check-unstable-mt-counters:
     name: check tokio full --internal-mt-counters
