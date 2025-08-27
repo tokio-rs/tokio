@@ -6,7 +6,7 @@ mod entry;
 pub(crate) use entry::Handle as EntryHandle;
 use entry::TransitionToPending;
 use entry::TransitionToRegistered;
-use entry::{Entry, EntryList};
+use entry::{CancellationQueueEntry, Entry, EntryList};
 
 pub(crate) mod cancellation_queue;
 use cancellation_queue::Sender;

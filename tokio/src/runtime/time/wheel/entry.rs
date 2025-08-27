@@ -100,11 +100,16 @@ unsafe impl linked_list::Link for Entry {
         NonNull::new_unchecked(field)
     }
 }
-// `impl for (Entry,)` is to avoid conflicts with the `Entry` impl,
-// this enables using `Entry` in multiple intrusive lists,
-// this `impl` is for `cancellation_queue`.
+
+/// An ZST to allow [`super::cancellation_queue`] to utilize the [`Entry::cancel_pointers`]
+/// by impl [`linked_list::Link`] as we cannot impl it on [`Entry`]
+/// directly due to the conflicting implementations used by [`Entry::wheel_pointers`].
+///
+/// This type should never be constructed.
+pub(super) struct CancellationQueueEntry;
+
 // Safety: `Entry` is always in an `Arc`.
-unsafe impl linked_list::Link for (Entry,) {
+unsafe impl linked_list::Link for CancellationQueueEntry {
     type Handle = Handle;
     type Target = Entry;
 

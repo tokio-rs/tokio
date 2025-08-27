@@ -1,10 +1,11 @@
 use super::{Entry, EntryHandle};
 use crate::loom::sync::{Arc, Mutex};
+use crate::runtime::time::wheel::CancellationQueueEntry;
 use crate::util::linked_list;
 
 use std::marker::PhantomData;
 
-type EntryList = linked_list::LinkedList<(Entry,), Entry>;
+type EntryList = linked_list::LinkedList<CancellationQueueEntry, Entry>;
 
 #[derive(Debug)]
 struct Inner {
