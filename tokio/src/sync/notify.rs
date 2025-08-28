@@ -741,12 +741,14 @@ impl Notify {
     /// }
     /// ```
     pub fn notify_waiters(&self) {
-        let mut waiters = self.waiters.lock();
+        self.lock().notify_waiters();
+    }
 
-        // The state must be loaded while the lock is held. The state may only
-        // transition out of WAITING while the lock is held.
-        let curr = self.state.load(SeqCst);
-
+    fn inner_notify_waiters<'a>(
+        &'a self,
+        curr: usize,
+        mut waiters: crate::loom::sync::MutexGuard<'a, LinkedList<Waiter, Waiter>>,
+    ) {
         if matches!(get_state(curr), EMPTY | NOTIFIED) {
             // There are no waiting tasks. All we need to do is increment the
             // number of times this method was called.
@@ -813,6 +815,20 @@ impl Notify {
         drop(waiters);
 
         wakers.wake_all();
+    }
+
+    pub(crate) fn lock(&self) -> NotifyGuard<'_> {
+        let guarded_waiters = self.waiters.lock();
+
+        // The state must be loaded while the lock is held. The state may only
+        // transition out of WAITING while the lock is held.
+        let current_state = self.state.load(SeqCst);
+
+        NotifyGuard {
+            guarded_notify: self,
+            guarded_waiters,
+            current_state,
+        }
     }
 }
 
@@ -1374,3 +1390,16 @@ unsafe impl linked_list::Link for Waiter {
 }
 
 fn is_unpin<T: Unpin>() {}
+
+pub(crate) struct NotifyGuard<'a> {
+    guarded_notify: &'a Notify,
+    guarded_waiters: crate::loom::sync::MutexGuard<'a, WaitList>,
+    current_state: usize,
+}
+
+impl NotifyGuard<'_> {
+    pub(crate) fn notify_waiters(self) {
+        self.guarded_notify
+            .inner_notify_waiters(self.current_state, self.guarded_waiters);
+    }
+}
