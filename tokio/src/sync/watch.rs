@@ -825,8 +825,13 @@ impl<T> Receiver<T> {
         &mut self,
         mut f: impl FnMut(&T) -> bool,
     ) -> Result<Ref<'_, T>, error::RecvError> {
-        let mut closed = false;
+        let state = self.shared.state.load();
+        let mut closed = state.is_closed();
         loop {
+            if closed {
+                return Err(error::RecvError(()));
+            }
+
             {
                 let inner = self.shared.value.read();
 
@@ -852,10 +857,6 @@ impl<T> Receiver<T> {
                         }
                     };
                 }
-            }
-
-            if closed {
-                return Err(error::RecvError(()));
             }
 
             // Wait for the value to change.
@@ -912,6 +913,12 @@ async fn changed_impl<T>(
     shared: &Shared<T>,
     version: &mut Version,
 ) -> Result<(), error::RecvError> {
+    let state = shared.state.load();
+    let sender_has_been_dropped = state.is_closed();
+    if sender_has_been_dropped {
+        return Err(error::RecvError(()));
+    }
+
     crate::trace::async_trace_leaf().await;
 
     loop {
