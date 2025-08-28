@@ -79,3 +79,21 @@ fn multi_thread() {
         assert_eq!(count, NUM_ITEMS * NUM_THREADS);
     })
 }
+
+#[test]
+fn drop_iter_should_not_leak_memory() {
+    model(|| {
+        let (tx, mut rx) = new();
+
+        let hdls = (0..NUM_ITEMS).map(|_| new_handle()).collect::<Vec<_>>();
+        for hdl in hdls.iter() {
+            unsafe { tx.send(hdl.clone()) };
+        }
+
+        drop(rx.recv_all());
+
+        for hdl in hdls {
+            assert_eq!(hdl.inner_strong_count(), 1);
+        }
+    });
+}

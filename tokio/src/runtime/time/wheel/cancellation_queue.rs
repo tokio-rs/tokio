@@ -20,6 +20,7 @@ unsafe impl Sync for Inner {}
 
 impl Drop for Inner {
     fn drop(&mut self) {
+        // consume all entries
         let _ = self.iter().count();
     }
 }
@@ -41,8 +42,29 @@ impl Inner {
     }
 
     fn iter(&mut self) -> impl Iterator<Item = EntryHandle> {
-        let mut list = std::mem::take(&mut self.list);
-        std::iter::from_fn(move || list.pop_front())
+        struct Iter {
+            list: EntryList,
+        }
+
+        impl Drop for Iter {
+            fn drop(&mut self) {
+                while let Some(hdl) = self.list.pop_front() {
+                    drop(hdl);
+                }
+            }
+        }
+
+        impl Iterator for Iter {
+            type Item = EntryHandle;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                self.list.pop_front()
+            }
+        }
+
+        Iter {
+            list: std::mem::take(&mut self.list),
+        }
     }
 }
 

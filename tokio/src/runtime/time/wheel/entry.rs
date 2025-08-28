@@ -316,6 +316,12 @@ impl Handle {
     pub(crate) fn is_woken_up(&self) -> bool {
         self.entry.state.fetch_or(0, Relaxed) == STATE_WOKEN_UP
     }
+
+    #[cfg(test)]
+    /// Only used for unit tests.
+    pub(crate) fn inner_strong_count(&self) -> usize {
+        Arc::strong_count(&self.entry)
+    }
 }
 
 /// An error returned when trying to transition
