@@ -825,8 +825,7 @@ impl<T> Receiver<T> {
         &mut self,
         mut f: impl FnMut(&T) -> bool,
     ) -> Result<Ref<'_, T>, error::RecvError> {
-        let state = self.shared.state.load();
-        let mut closed = state.is_closed();
+        let mut closed = false;
         loop {
             if closed {
                 return Err(error::RecvError(()));

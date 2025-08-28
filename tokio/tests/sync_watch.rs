@@ -466,23 +466,10 @@ async fn changed_errors_on_closed_channel() {
 #[tokio::test]
 async fn wait_for_errors_on_closed_channel_true_predicate() {
     let (tx, mut rx) = watch::channel(());
-    tx.send(()).unwrap();
 
     drop(tx);
 
-    rx.wait_for(|_| true).await.expect_err(
-        "`wait_for` call returns an error IFF the channel is closed by dropping the senders.",
-    );
-}
-
-#[tokio::test]
-async fn wait_for_errors_on_closed_channel_false_predicate() {
-    let (tx, mut rx) = watch::channel(());
-    tx.send(()).unwrap();
-
-    drop(tx);
-
-    rx.wait_for(|_| false).await.expect_err(
-        "`wait_for` call returns an error IFF the channel is closed by dropping the senders.",
+    rx.wait_for(|_| true).await.expect(
+        "`wait_for` call does not return error even if channel is closed when predicate is true for last value.",
     );
 }
