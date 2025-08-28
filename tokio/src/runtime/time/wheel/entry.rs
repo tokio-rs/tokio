@@ -14,7 +14,8 @@ pub(crate) type EntryList = linked_list::LinkedList<Entry, Entry>;
 const STATE_UNREGISTERED: u8 = 0;
 
 /// The entry is being registered to the timer wheel,
-/// and also saving the `cancel_tx` to the entry.
+/// and also saving the [`Sender`] of the cancellation queue
+/// into the entry.
 const STATE_BUSY_REGISTERING: u8 = 1;
 
 /// The entry is registered to the timer wheel,
