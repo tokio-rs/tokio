@@ -60,12 +60,9 @@ pub(crate) struct Entry {
     _pin: PhantomPinned,
 }
 
-/// Safety: There is a field is neither `Send` nor `Sync`.
+/// Safety: There is a field is not [`Sync`]
 ///
 /// - [`Self::cancel_tx`]: This is protected by [`Self::state`].
-///
-/// [`cancellation_queue`]: `super::cancellation_queue`
-unsafe impl Send for Entry {}
 unsafe impl Sync for Entry {}
 
 impl Drop for Entry {
