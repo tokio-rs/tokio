@@ -827,10 +827,6 @@ impl<T> Receiver<T> {
     ) -> Result<Ref<'_, T>, error::RecvError> {
         let mut closed = false;
         loop {
-            if closed {
-                return Err(error::RecvError(()));
-            }
-
             {
                 let inner = self.shared.value.read();
 
@@ -856,6 +852,10 @@ impl<T> Receiver<T> {
                         }
                     };
                 }
+            }
+
+            if closed {
+                return Err(error::RecvError(()));
             }
 
             // Wait for the value to change.
