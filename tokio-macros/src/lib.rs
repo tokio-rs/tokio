@@ -78,16 +78,11 @@ use proc_macro::TokenStream;
 ///
 /// ## Local
 ///
-/// [Unstable API][unstable] only.
-///
 /// To use the [local runtime], the macro can be configured using
 ///
 /// ```rust
-/// # #[cfg(tokio_unstable)]
 /// #[tokio::main(flavor = "local")]
 /// # async fn main() {}
-/// # #[cfg(not(tokio_unstable))]
-/// # fn main() {}
 /// ```
 ///
 /// # Function arguments
@@ -146,25 +141,19 @@ use proc_macro::TokenStream;
 ///
 /// ## Using the local runtime
 ///
-/// Available in the [unstable API][unstable] only.
-///
 /// The [local runtime] is similar to the current-thread runtime but
 /// supports [`task::spawn_local`](../tokio/task/fn.spawn_local.html).
 ///
 /// ```rust
-/// # #[cfg(tokio_unstable)]
 /// #[tokio::main(flavor = "local")]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
-/// # #[cfg(not(tokio_unstable))]
-/// # fn main() {}
 /// ```
 ///
 /// Equivalent code not using `#[tokio::main]`
 ///
 /// ```rust
-/// # #[cfg(tokio_unstable)]
 /// fn main() {
 ///     tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
@@ -174,8 +163,6 @@ use proc_macro::TokenStream;
 ///             println!("Hello world");
 ///         })
 /// }
-/// # #[cfg(not(tokio_unstable))]
-/// # fn main() {}
 /// ```
 ///
 ///
