@@ -276,6 +276,10 @@ impl<T> SetOnce<T> {
     ///
     /// [`SetOnceError`]: crate::sync::SetOnceError
     pub fn set(&self, value: T) -> Result<(), SetOnceError<T>> {
+        if self.initialized() {
+            return Err(SetOnceError(value));
+        }
+
         // SAFETY: lock notify to ensure only one caller of set
         // can run at a time.
         let guard = self.notify.lock_waiter_list();
