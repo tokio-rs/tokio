@@ -741,7 +741,7 @@ impl Notify {
     /// }
     /// ```
     pub fn notify_waiters(&self) {
-        self.lock().notify_waiters();
+        self.lock_waiter_list().notify_waiters();
     }
 
     fn inner_notify_waiters<'a>(
@@ -817,7 +817,7 @@ impl Notify {
         wakers.wake_all();
     }
 
-    pub(crate) fn lock(&self) -> NotifyGuard<'_> {
+    pub(crate) fn lock_waiter_list(&self) -> NotifyGuard<'_> {
         let guarded_waiters = self.waiters.lock();
 
         // The state must be loaded while the lock is held. The state may only
@@ -1391,6 +1391,10 @@ unsafe impl linked_list::Link for Waiter {
 
 fn is_unpin<T: Unpin>() {}
 
+/// A guard that provides exclusive access to a `Notify`'s internal
+/// waiters list.
+///
+/// While this guard is held, the `Notify` instance's waiter list is locked.
 pub(crate) struct NotifyGuard<'a> {
     guarded_notify: &'a Notify,
     guarded_waiters: crate::loom::sync::MutexGuard<'a, WaitList>,

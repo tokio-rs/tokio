@@ -278,7 +278,7 @@ impl<T> SetOnce<T> {
     pub fn set(&self, value: T) -> Result<(), SetOnceError<T>> {
         // SAFETY: lock notify to ensure only one caller of set
         // can run at a time.
-        let guard = self.notify.lock();
+        let guard = self.notify.lock_waiter_list();
 
         if self.initialized() {
             return Err(SetOnceError(value));
@@ -341,7 +341,7 @@ impl<T> SetOnce<T> {
                 // Taking the lock here ensures that a concurrent call to `set`
                 // will see the creation of `notify_fut` in case the check
                 // fails.
-                let _guard = self.notify.lock();
+                let _guard = self.notify.lock_waiter_list();
 
                 if self.value_set.load(Ordering::Relaxed) {
                     // SAFETY: the state is initialized
