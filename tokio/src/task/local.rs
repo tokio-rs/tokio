@@ -327,7 +327,7 @@ cfg_rt! {
     /// Spawns a `!Send` future on the current [`LocalSet`] or [`LocalRuntime`].
     ///
     /// This is possible when either using one of these types
-    /// explicitly, or (with `tokio_unstable`) by opting to use the
+    /// explicitly by opting to use the
     /// `"local"` runtime flavor in `tokio::main`:
     ///
     /// ```ignore
@@ -407,7 +407,6 @@ cfg_rt! {
                 let future = future.take().unwrap();
 
                 #[cfg(all(
-                    tokio_unstable,
                     tokio_taskdump,
                     feature = "rt",
                     target_os = "linux",

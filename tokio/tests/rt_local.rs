@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", tokio_unstable))]
+#![cfg(feature = "full")]
 
 use tokio::runtime::LocalOptions;
 use tokio::task::spawn_local;

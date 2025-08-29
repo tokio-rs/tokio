@@ -361,14 +361,13 @@ impl Handle {
     {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(
-            tokio_unstable,
             tokio_taskdump,
             feature = "rt",
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
         ))]
         let future = super::task::trace::Trace::root(future);
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let future = crate::util::trace::task(future, "task", meta, id.as_u64());
         self.inner.spawn_local(future, id, meta.spawned_at)
     }

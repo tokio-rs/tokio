@@ -559,6 +559,9 @@ assert_value!(tokio::runtime::EnterGuard<'_>: !Send & Sync & Unpin);
 assert_value!(tokio::runtime::Handle: Send & Sync & Unpin);
 assert_value!(tokio::runtime::Runtime: Send & Sync & Unpin);
 
+assert_value!(tokio::runtime::LocalRuntime: !Send & !Sync & Unpin);
+assert_value!(tokio::runtime::LocalOptions: !Send & !Sync & Unpin);
+
 assert_value!(tokio::time::Interval: Send & Sync & Unpin);
 assert_value!(tokio::time::Instant: Send & Sync & Unpin);
 assert_value!(tokio::time::Sleep: Send & Sync & !Unpin);
@@ -767,12 +770,4 @@ mod unix_asyncfd {
     async_assert_fn!(AsyncFd<ImplsFd<NN>>::readable_mut(_): !Send & !Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<NN>>::writable(_): !Send & !Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<NN>>::writable_mut(_): !Send & !Sync & !Unpin);
-}
-
-#[cfg(tokio_unstable)]
-mod unstable {
-    use super::*;
-
-    assert_value!(tokio::runtime::LocalRuntime: !Send & !Sync & Unpin);
-    assert_value!(tokio::runtime::LocalOptions: !Send & !Sync & Unpin);
 }
