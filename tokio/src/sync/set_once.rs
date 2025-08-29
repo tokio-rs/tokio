@@ -337,25 +337,24 @@ impl<T> SetOnce<T> {
     ///
     /// This method is cancel safe.
     pub async fn wait(&self) -> &T {
-        if let Some(val) = self.get() {
-            return val;
-        }
-
-        let notify_fut = self.notify.notified();
-        pin!(notify_fut);
-
-        poll_fn(|cx| {
-            // Register under the notify's internal lock.
-            let ret = notify_fut.as_mut().poll(cx);
-            if self.value_set.load(Ordering::Acquire) && ret.is_pending() {
-                return Poll::Ready(());
+        loop {
+            if let Some(val) = self.get() {
+                return val;
             }
-            ret
-        })
-        .await;
 
-        // SAFETY: the state is initialized
-        unsafe { self.get_unchecked() }
+            let notify_fut = self.notify.notified();
+            pin!(notify_fut);
+
+            poll_fn(|cx| {
+                // Register under the notify's internal lock.
+                let ret = notify_fut.as_mut().poll(cx);
+                if self.value_set.load(Ordering::Relaxed) && ret.is_pending() {
+                    return Poll::Ready(());
+                }
+                ret
+            })
+            .await;
+        }
     }
 }
 
