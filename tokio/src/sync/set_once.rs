@@ -5,10 +5,12 @@ use crate::loom::sync::atomic::AtomicBool;
 
 use std::error::Error;
 use std::fmt;
+use std::future::{poll_fn, Future};
 use std::mem::MaybeUninit;
 use std::ops::Drop;
 use std::ptr;
 use std::sync::atomic::Ordering;
+use std::task::Poll;
 
 // This file contains an implementation of an SetOnce. The value of SetOnce
 // can only be modified once during initialization.
@@ -335,27 +337,25 @@ impl<T> SetOnce<T> {
     ///
     /// This method is cancel safe.
     pub async fn wait(&self) -> &T {
-        loop {
-            if let Some(val) = self.get() {
-                return val;
-            }
-
-            let notify_fut = self.notify.notified();
-            {
-                // Taking the lock here ensures that a concurrent call to `set`
-                // will see the creation of `notify_fut` in case the check
-                // fails.
-                let _guard = self.notify.lock_waiter_list();
-
-                if self.value_set.load(Ordering::Relaxed) {
-                    // SAFETY: the state is initialized
-                    return unsafe { self.get_unchecked() };
-                }
-            }
-
-            // wait until the value is set
-            notify_fut.await;
+        if let Some(val) = self.get() {
+            return val;
         }
+
+        let notify_fut = self.notify.notified();
+        pin!(notify_fut);
+
+        poll_fn(|cx| {
+            // Register under the notify's internal lock.
+            let ret = notify_fut.as_mut().poll(cx);
+            if self.value_set.load(Ordering::Acquire) && ret.is_pending() {
+                return Poll::Ready(());
+            }
+            ret
+        })
+        .await;
+
+        // SAFETY: the state is initialized
+        unsafe { self.get_unchecked() }
     }
 }
 
