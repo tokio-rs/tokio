@@ -289,7 +289,7 @@ impl<T> SetOnce<T> {
         }
 
         // SAFETY: We have locked the mutex and checked if the value is
-        // initalized or not, so we can safely write to the value
+        // initialized or not, so we can safely write to the value
         unsafe {
             self.value.with_mut(|ptr| (*ptr).as_mut_ptr().write(value));
         }
