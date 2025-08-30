@@ -40,7 +40,7 @@ use std::task::{self, ready, Poll, Waker};
 /// # `Stream` implementation
 ///
 /// Items are retrieved from the queue via [`DelayQueue::poll_expired`]. If no delays have
-/// expired, no items are returned. In this case, `Poll::Pending` is returned and the
+/// expired, no items are returned. In this case, [`Poll::Pending`] is returned and the
 /// current task is registered to be notified once the next item's delay has
 /// expired.
 ///
@@ -66,9 +66,13 @@ use std::task::{self, ready, Poll, Waker};
 /// Capacity can be checked using [`capacity`] and allocated preemptively by using
 /// the [`reserve`] method.
 ///
+/// # Cancel safety
+///
+/// [`DelayQueue`]'s implementation of [`futures::StreamExt::next`] is cancellation safe.
+///
 /// # Usage
 ///
-/// Using `DelayQueue` to manage cache entries.
+/// Using [`DelayQueue`] to manage cache entries.
 ///
 /// ```rust,no_run
 /// use tokio_util::time::{DelayQueue, delay_queue};
