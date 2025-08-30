@@ -68,7 +68,7 @@ use std::task::{self, ready, Poll, Waker};
 ///
 /// # Cancel safety
 ///
-/// [`DelayQueue`]'s implementation of [`futures::StreamExt::next`] is cancellation safe.
+/// [`DelayQueue`]'s implementation of [`StreamExt::next`] is cancellation safe.
 ///
 /// # Usage
 ///
@@ -122,7 +122,8 @@ use std::task::{self, ready, Poll, Waker};
 /// [`insert`]: method@Self::insert
 /// [`insert_at`]: method@Self::insert_at
 /// [`Key`]: struct@Key
-/// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
+/// [`Stream`]: https://docs.rs/futures/0.3.31/futures/stream/trait.Stream.html
+/// [`StreamExt::next`]: https://docs.rs/futures/0.3.31/futures/stream/trait.StreamExt.html#method.next
 /// [`poll_expired`]: method@Self::poll_expired
 /// [`Stream::poll_expired`]: method@Self::poll_expired
 /// [`DelayQueue`]: struct@DelayQueue
