@@ -123,7 +123,7 @@ use std::task::{self, ready, Poll, Waker};
 /// [`insert_at`]: method@Self::insert_at
 /// [`Key`]: struct@Key
 /// [`Stream`]: https://docs.rs/futures/0.3.31/futures/stream/trait.Stream.html
-/// [`StreamExt::next`]: https://docs.rs/futures/0.3.31/futures/stream/trait.StreamExt.html#method.next
+/// [`StreamExt::next`]: https://docs.rs/tokio-stream/0.1.17/tokio_stream/trait.StreamExt.html#method.next
 /// [`poll_expired`]: method@Self::poll_expired
 /// [`Stream::poll_expired`]: method@Self::poll_expired
 /// [`DelayQueue`]: struct@DelayQueue
