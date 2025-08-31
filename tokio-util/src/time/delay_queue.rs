@@ -66,7 +66,7 @@ use std::task::{self, ready, Poll, Waker};
 /// Capacity can be checked using [`capacity`] and allocated preemptively by using
 /// the [`reserve`] method.
 ///
-/// # Cancel safety
+/// # Cancellation safety
 ///
 /// [`DelayQueue`]'s implementation of [`StreamExt::next`] is cancellation safe.
 ///
