@@ -1,7 +1,5 @@
 use super::cancellation_queue::Sender;
-use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::{AtomicU8, Ordering::*};
-use crate::loom::sync::Arc;
+use crate::loom::sync::{Arc, Mutex};
 use crate::{sync::AtomicWaker, util::linked_list};
 
 use std::marker::PhantomPinned;
@@ -10,30 +8,28 @@ use std::task::Waker;
 
 pub(crate) type EntryList = linked_list::LinkedList<Entry, Entry>;
 
-/// A pure new entry, no any changes to the state.
-const STATE_UNREGISTERED: u8 = 0;
+#[derive(Debug)]
+enum State {
+    /// A pure new entry, no any changes to the state.
+    Unregistered,
 
-/// The entry is being registered to the timer wheel,
-/// and also saving the [`Sender`] of the cancellation queue
-/// into the entry.
-const STATE_BUSY_REGISTERING: u8 = 1;
+    /// The entry is registered to the timer wheel,
+    /// but not in the pending queue of the timer wheel.
+    Registered(Sender),
 
-/// The entry is registered to the timer wheel,
-/// but not in the pending queue of the timer wheel.
-const STATE_REGISTERED: u8 = 2;
+    /// The entry is in the pending queue of the timer wheel,
+    /// and not in any wheel level, which means that
+    /// the entry is reached its deadline and waiting to be woken up.
+    Pending,
 
-/// The entry is in the pending queue of the timer wheel,
-/// and not in any wheel level, which means that
-/// the entry is reached its deadline and waiting to be woken up.
-const STATE_PENDING: u8 = 3;
+    /// The waker has been called, and the entry is no longer in the timer wheel
+    /// (both each wheel level and the pending queue), which means that
+    /// the entry is reached its deadline and woken up.
+    WokenUp,
 
-/// The waker has been called, and the entry is no longer in the timer wheel
-/// (both each wheel level and the pending queue), which means that
-/// the entry is reached its deadline and woken up.
-const STATE_WOKEN_UP: u8 = 4;
-
-/// The [`Handle`] has been sent to the [`Sender`].
-const STATE_CANCELLING: u8 = 5;
+    /// The [`Handle`] has been sent to the [`Sender`].
+    Cancelling,
+}
 
 #[derive(Debug)]
 pub(crate) struct Entry {
@@ -49,30 +45,13 @@ pub(crate) struct Entry {
     /// The currently registered waker.
     waker: AtomicWaker,
 
-    /// The mpsc channel used to cancel the entry.
-    cancel_tx: UnsafeCell<Option<Sender>>,
-
-    state: AtomicU8,
+    state: Mutex<State>,
 
     /// Make the type `!Unpin` to prevent LLVM from emitting
     /// the `noalias` attribute for mutable references.
     ///
     /// See <https://github.com/rust-lang/rust/pull/82834>.
     _pin: PhantomPinned,
-}
-
-/// Safety: There is a field is not [`Sync`]
-///
-/// - [`Self::cancel_tx`]: This is protected by [`Self::state`].
-unsafe impl Sync for Entry {}
-
-impl Drop for Entry {
-    fn drop(&mut self) {
-        self.cancel_tx.with_mut(|tx| {
-            let maybe_tx = unsafe { &mut *tx };
-            drop(maybe_tx.take());
-        })
-    }
 }
 
 // Safety: `Entry` is always in an `Arc`.
@@ -149,8 +128,7 @@ impl Handle {
             cancel_pointers: linked_list::Pointers::new(),
             deadline,
             waker: AtomicWaker::new(),
-            cancel_tx: UnsafeCell::new(None),
-            state: AtomicU8::new(STATE_UNREGISTERED),
+            state: Mutex::new(State::Unregistered),
             _pin: PhantomPinned,
         });
         entry.waker.register_by_ref(waker);
@@ -160,47 +138,41 @@ impl Handle {
 
     /// Wake the entry if it is already in the pending queue of the timer wheel.
     pub(crate) fn wake(&self) {
-        match self
-            .entry
-            .state
-            // We don't need to synchronize anything, so we can use relaxed ordering.
-            .compare_exchange(STATE_PENDING, STATE_WOKEN_UP, Relaxed, Relaxed)
-        {
-            Ok(_) => self.entry.waker.wake(),
-            Err(STATE_UNREGISTERED) => {
-                panic!("entry is not registered, please call `wake_unregistered` instead")
+        let mut lock = self.entry.state.lock();
+        match &*lock {
+            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
+            state @ (State::Unregistered | State::Registered(_)) => {
+                panic!("corrupted state: {state:#?}")
             }
-            Err(STATE_BUSY_REGISTERING) => {
-                panic!("should be be called concurrently with `transition_to_registered`")
+            State::Pending => {
+                *lock = State::WokenUp;
+                // Since state has been updated, no need to hold the lock.
+                drop(lock);
+                self.entry.waker.wake();
             }
-            Err(STATE_REGISTERED) => panic!("should not be called on non-pending entry"),
-            Err(STATE_WOKEN_UP) => panic!("should not be called on woken up entry"),
-            Err(STATE_CANCELLING) => (), // no need to wake up cancelling entries
-            Err(actual) => panic!("state is corrupted ({actual})"),
+            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
+            state @ (State::WokenUp | State::Cancelling) => panic!("corrupted state: {state:#?}"),
         }
     }
 
     /// Wake the entry if it has already elapsed before registering to the timer wheel.
     pub(crate) fn wake_unregistered(&self) {
-        match self.entry.state.compare_exchange(
-            STATE_UNREGISTERED,
-            STATE_WOKEN_UP,
-            Relaxed, // no need to synchronize anything
-            Relaxed, // no need to synchronize anything
-        ) {
-            Ok(_) => self.entry.waker.wake(),
-            Err(STATE_REGISTERED) => {
-                panic!("entry is already registered, please call `wake` instead")
+        let mut lock = self.entry.state.lock();
+        match &*lock {
+            State::Unregistered => {
+                *lock = State::WokenUp;
+                // Since state has been updated, no need to hold the lock.
+                drop(lock);
+                self.entry.waker.wake();
             }
-            Err(STATE_BUSY_REGISTERING) => {
-                panic!("should be be called concurrently with `transition_to_registered`")
+            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
+            state @ (State::Registered(_) | State::WokenUp) => {
+                panic!("corrupted state: {state:#?}")
             }
-            Err(STATE_PENDING) => {
-                panic!("entry is already pending, please call `wake` instead")
-            }
-            Err(STATE_WOKEN_UP) => panic!("entry is already woken up"),
-            Err(STATE_CANCELLING) => (), // no need to wake up cancelling entries
-            Err(actual) => panic!("state is corrupted ({actual})"),
+            // don't wake up cancelling entries
+            State::Cancelling => (),
+            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
+            State::Pending => panic!("corrupted state: State::Pending"),
         }
     }
 
@@ -209,35 +181,17 @@ impl Handle {
     }
 
     pub(crate) fn transition_to_registered(&self, cancel_tx: Sender) -> TransitionToRegistered {
-        match self.entry.state.compare_exchange(
-            STATE_UNREGISTERED,
-            STATE_BUSY_REGISTERING,
-            Relaxed, // no need to synchronize anything
-            Relaxed, // no need to synchronize anything
-        ) {
-            Ok(_) => (), // successfully locked the `self.cancel_tx`
-            Err(STATE_BUSY_REGISTERING) => panic!("should not be called concurrently"),
-            Err(STATE_REGISTERED) => panic!("should not be called twice"),
-            Err(STATE_PENDING) => panic!("entry is already pending, cannot register again"),
-            Err(STATE_WOKEN_UP) => panic!("already woken up, cannot register again"),
-            Err(STATE_CANCELLING) => return TransitionToRegistered::Cancelling,
-            Err(actual) => panic!("state is corrupted ({actual})"),
-        }
-
-        self.entry.cancel_tx.with_mut(|tx| {
-            // Safety: we have claimed the `STATE_BUSY_REGISTERING` state
-            let tx = unsafe { tx.as_mut().unwrap_unchecked() };
-            assert!(tx.replace(cancel_tx).is_none(), "duplicate registration");
-        });
-
-        match self.entry.state.compare_exchange(
-            STATE_BUSY_REGISTERING,
-            STATE_REGISTERED,
-            Release, // `Release` the `cancel_tx` to other threads
-            Relaxed,
-        ) {
-            Ok(_) => TransitionToRegistered::Success,
-            Err(actual) => panic!("state is corrupted ({actual})"),
+        let mut lock = self.entry.state.lock();
+        match &*lock {
+            State::Unregistered => {
+                *lock = State::Registered(cancel_tx);
+                TransitionToRegistered::Success
+            }
+            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
+            state @ (State::Registered(_) | State::Pending | State::WokenUp) => {
+                panic!("corrupted state: {state:#?}")
+            }
+            State::Cancelling => TransitionToRegistered::Cancelling,
         }
     }
 
@@ -245,58 +199,38 @@ impl Handle {
         if self.entry.deadline > not_after {
             return TransitionToPending::NotElapsed(self.entry.deadline);
         }
-        match self
-            .entry
-            .state
-            // We don't need to synchronize anything, so we can use relaxed ordering.
-            .compare_exchange(STATE_REGISTERED, STATE_PENDING, Relaxed, Relaxed)
-        {
-            Ok(_) => TransitionToPending::Success,
-            Err(STATE_UNREGISTERED) => panic!("should not be called on unregistered entry"),
-            Err(STATE_BUSY_REGISTERING) => {
-                panic!("should not be called concurrently with `transition_to_registered`")
+
+        let mut lock = self.entry.state.lock();
+        match &*lock {
+            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
+            State::Unregistered => panic!("corrupted state: State::Unregistered"),
+            State::Registered(_) => {
+                *lock = State::Pending;
+                TransitionToPending::Success
             }
-            Err(STATE_PENDING) => panic!("should not be called twice"),
-            Err(STATE_WOKEN_UP) => panic!("should not be called on woken up entry"),
-            Err(STATE_CANCELLING) => TransitionToPending::Cancelling,
-            Err(actual) => panic!("state is corrupted ({actual})"),
+            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
+            state @ (State::Pending | State::WokenUp) => panic!("corrupted state: {state:#?}"),
+            State::Cancelling => TransitionToPending::Cancelling,
         }
     }
 
     pub(crate) fn transition_to_cancelling(&self) {
-        loop {
-            match self.entry.state.compare_exchange(
-                STATE_REGISTERED,
-                STATE_CANCELLING,
-                Acquire, // `Acquire` the side-effects of `transition_to_registered`
-                Relaxed,
-            ) {
-                Ok(_) => break,
-                Err(STATE_UNREGISTERED) => return, // no need to cancel unregistered entries.
-                Err(STATE_BUSY_REGISTERING) => {
-                    // Entry is being registered, wait for it to finish.
-                    std::hint::spin_loop();
-                    continue;
-                }
-                Err(STATE_PENDING) => return, // no need to cancel pending entries
-                Err(STATE_WOKEN_UP) => return, // no need to cancel woken up entries
-                Err(STATE_CANCELLING) => panic!("should not be called twice"),
-                Err(actual) => panic!("state is corrupted ({actual})"),
-            }
-        }
-        self.entry.cancel_tx.with_mut(|tx| {
-            // Safety: Since previous state is `STATE_REGISTERED`,
-            // this is synchronized with the `transition_to_registered` call,
-            // and the `cancel_tx` should be already stored.
-            let tx = unsafe { tx.as_mut().unwrap_unchecked() };
-            let tx = tx.take().unwrap();
-            unsafe {
-                tx.send(self.clone());
-            }
-        });
+        let mut lock = self.entry.state.lock();
 
-        // No need to emit an release fence here
-        // because this method will not be called twice.
+        match *lock {
+            State::Unregistered => *lock = State::Cancelling,
+            State::Registered(ref tx) => {
+                // Safety: entry is not in any cancellation queue
+                unsafe {
+                    tx.send(self.clone());
+                }
+                *lock = State::Cancelling;
+            }
+            // no need to cancel a pending or woken up entry
+            State::Pending | State::WokenUp => *lock = State::Cancelling,
+            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
+            State::Cancelling => panic!("should not be called twice"),
+        }
     }
 
     pub(crate) fn deadline(&self) -> u64 {
@@ -304,15 +238,15 @@ impl Handle {
     }
 
     pub(crate) fn is_registered(&self) -> bool {
-        self.entry.state.fetch_or(0, Relaxed) == STATE_REGISTERED
+        matches!(*self.entry.state.lock(), State::Registered(_))
     }
 
     pub(crate) fn is_pending(&self) -> bool {
-        self.entry.state.fetch_or(0, Relaxed) == STATE_PENDING
+        matches!(*self.entry.state.lock(), State::Pending)
     }
 
     pub(crate) fn is_woken_up(&self) -> bool {
-        self.entry.state.fetch_or(0, Relaxed) == STATE_WOKEN_UP
+        matches!(*self.entry.state.lock(), State::WokenUp)
     }
 
     #[cfg(test)]
