@@ -348,7 +348,7 @@ impl<T> SetOnce<T> {
             poll_fn(|cx| {
                 // Register under the notify's internal lock.
                 let ret = notify_fut.as_mut().poll(cx);
-                if self.value_set.load(Ordering::Relaxed) && ret.is_pending() {
+                if self.value_set.load(Ordering::Relaxed) {
                     return Poll::Ready(());
                 }
                 ret
