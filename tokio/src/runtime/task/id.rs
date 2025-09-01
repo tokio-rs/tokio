@@ -74,7 +74,21 @@ impl Id {
         }
     }
 
-    pub(crate) fn as_u64(&self) -> u64 {
+    /// Retrieves the underlying [`u64`] for this [`Id`]
+    /// There are no guarantees about the order or contents of this [`u64`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # tokio_test::block_on(async {
+    /// let handle = tokio::spawn(async {
+    ///     let id = tokio::task::id();
+    ///     let id_as_u64 : u64 = id.as_u64();
+    /// });
+    /// handle.await.unwrap();
+    /// # });
+    /// ```
+    pub fn as_u64(&self) -> u64 {
         self.0.get()
     }
 }
