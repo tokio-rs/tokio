@@ -31,17 +31,24 @@
 //! `Stream`, but this is unfortunately not possible. Instead, you can use a
 //! `while let` loop as follows:
 //!
-//! ```rust,ignore-wasm
+//! ```rust
+//! # use futures::executor::block_on;
 //! use tokio_stream::{self as stream, StreamExt};
 //!
+//! # /*
 //! #[tokio::main]
 //! async fn main() {
+//! # */
+//! # block_on(async {
 //!     let mut stream = stream::iter(vec![0, 1, 2]);
 //!
 //!     while let Some(value) = stream.next().await {
 //!         println!("Got {}", value);
 //!     }
+//! # })
+//! # /*
 //! }
+//! # */
 //! ```
 //!
 //! # Returning a Stream from a function

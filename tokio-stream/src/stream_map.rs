@@ -60,12 +60,15 @@ use std::task::{ready, Context, Poll};
 ///
 /// Merging two streams, then remove them after receiving the first value
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio_stream::{StreamExt, StreamMap, Stream};
 /// use tokio::sync::mpsc;
 /// use std::pin::Pin;
 ///
+/// # /*
 /// #[tokio::main]
+/// # */
+/// # #[tokio::main(flavor = "current_thread")]
 /// async fn main() {
 ///     let (tx1, mut rx1) = mpsc::channel::<usize>(10);
 ///     let (tx2, mut rx2) = mpsc::channel::<usize>(10);
@@ -182,11 +185,15 @@ use std::task::{ready, Context, Poll};
 ///
 /// Using `StreamNotifyClose` to handle closed streams with `StreamMap`.
 ///
-/// ```ignore-wasm
+/// ```
+/// # use futures::executor::block_on;
 /// use tokio_stream::{StreamExt, StreamMap, StreamNotifyClose};
 ///
+/// # /*
 /// #[tokio::main]
 /// async fn main() {
+/// # */
+/// # block_on(async {
 ///     let mut map = StreamMap::new();
 ///     let stream = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
 ///     let stream2 = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
@@ -198,7 +205,10 @@ use std::task::{ready, Context, Poll};
 ///             None => println!("stream {key:?} closed"),
 ///         }
 ///     }
+/// # })
+/// # /*
 /// }
+/// # */
 /// ```
 
 #[derive(Debug)]

@@ -14,11 +14,15 @@ pin_project! {
     ///
     /// Using `StreamNotifyClose` to handle closed streams with `StreamMap`.
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{StreamExt, StreamMap, StreamNotifyClose};
     ///
+    /// # /*
     /// #[tokio::main]
     /// async fn main() {
+    /// # */
+    /// # block_on(async {
     ///     let mut map = StreamMap::new();
     ///     let stream = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
     ///     let stream2 = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
@@ -30,7 +34,10 @@ pin_project! {
     ///             None => println!("stream {key:?} closed"),
     ///         }
     ///     }
+    /// # })
+    /// # /*
     /// }
+    /// # */
     /// ```
     #[must_use = "streams do nothing unless polled"]
     pub struct StreamNotifyClose<S> {

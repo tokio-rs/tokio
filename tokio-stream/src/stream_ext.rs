@@ -128,18 +128,18 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
     ///
+    /// # block_on(async {
     /// let mut stream = stream::iter(1..=3);
     ///
     /// assert_eq!(stream.next().await, Some(1));
     /// assert_eq!(stream.next().await, Some(2));
     /// assert_eq!(stream.next().await, Some(3));
     /// assert_eq!(stream.next().await, None);
-    /// # }
+    /// # })
     /// ```
     fn next(&mut self) -> Next<'_, Self>
     where
@@ -170,17 +170,17 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
     ///
+    /// # block_on(async {
     /// let mut stream = stream::iter(vec![Ok(1), Ok(2), Err("nope")]);
     ///
     /// assert_eq!(stream.try_next().await, Ok(Some(1)));
     /// assert_eq!(stream.try_next().await, Ok(Some(2)));
     /// assert_eq!(stream.try_next().await, Err("nope"));
-    /// # }
+    /// # })
     /// ```
     fn try_next<T, E>(&mut self) -> TryNext<'_, Self>
     where
@@ -202,18 +202,18 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
     ///
+    /// # block_on(async {
     /// let stream = stream::iter(1..=3);
     /// let mut stream = stream.map(|x| x + 3);
     ///
     /// assert_eq!(stream.next().await, Some(4));
     /// assert_eq!(stream.next().await, Some(5));
     /// assert_eq!(stream.next().await, Some(6));
-    /// # }
+    /// # })
     /// ```
     fn map<T, F>(self, f: F) -> Map<Self, F>
     where
@@ -238,11 +238,11 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
     ///
+    /// # block_on(async {
     /// let stream = stream::iter(1..=10);
     /// let mut stream = stream.map_while(|x| {
     ///     if x < 4 {
@@ -255,7 +255,7 @@ pub trait StreamExt: Stream {
     /// assert_eq!(stream.next().await, Some(5));
     /// assert_eq!(stream.next().await, Some(6));
     /// assert_eq!(stream.next().await, None);
-    /// # }
+    /// # })
     /// ```
     fn map_while<T, F>(self, f: F) -> MapWhile<Self, F>
     where
@@ -282,11 +282,11 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
     ///
+    /// # block_on(async {
     /// async fn do_async_work(value: i32) -> i32 {
     ///     value + 3
     /// }
@@ -299,7 +299,7 @@ pub trait StreamExt: Stream {
     /// assert_eq!(stream.next().await, Some(4));
     /// assert_eq!(stream.next().await, Some(5));
     /// assert_eq!(stream.next().await, Some(6));
-    /// # }
+    /// # })
     /// ```
     fn then<F, Fut>(self, f: F) -> Then<Self, Fut, F>
     where
@@ -417,11 +417,11 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
     ///
+    /// # block_on(async {
     /// let stream = stream::iter(1..=8);
     /// let mut evens = stream.filter(|x| x % 2 == 0);
     ///
@@ -430,7 +430,7 @@ pub trait StreamExt: Stream {
     /// assert_eq!(Some(6), evens.next().await);
     /// assert_eq!(Some(8), evens.next().await);
     /// assert_eq!(None, evens.next().await);
-    /// # }
+    /// # })
     /// ```
     fn filter<F>(self, f: F) -> Filter<Self, F>
     where
@@ -453,11 +453,11 @@ pub trait StreamExt: Stream {
     /// standard library.
     ///
     /// # Examples
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
     ///
+    /// # block_on(async {
     /// let stream = stream::iter(1..=8);
     /// let mut evens = stream.filter_map(|x| {
     ///     if x % 2 == 0 { Some(x + 1) } else { None }
@@ -468,7 +468,7 @@ pub trait StreamExt: Stream {
     /// assert_eq!(Some(7), evens.next().await);
     /// assert_eq!(Some(9), evens.next().await);
     /// assert_eq!(None, evens.next().await);
-    /// # }
+    /// # })
     /// ```
     fn filter_map<T, F>(self, f: F) -> FilterMap<Self, F>
     where
@@ -487,7 +487,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio_stream::{Stream, StreamExt};
     ///
     /// use std::pin::Pin;
@@ -514,7 +514,10 @@ pub trait StreamExt: Stream {
     ///     }
     /// }
     ///
+    /// # /*
     /// #[tokio::main]
+    /// # */
+    /// # #[tokio::main(flavor = "current_thread")]
     /// async fn main() {
     ///     let mut stream = Alternate { state: 0 };
     ///
@@ -550,10 +553,10 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
+    /// # block_on(async {
     ///
     /// let mut stream = stream::iter(1..=10).take(3);
     ///
@@ -561,7 +564,7 @@ pub trait StreamExt: Stream {
     /// assert_eq!(Some(2), stream.next().await);
     /// assert_eq!(Some(3), stream.next().await);
     /// assert_eq!(None, stream.next().await);
-    /// # }
+    /// # })
     /// ```
     fn take(self, n: usize) -> Take<Self>
     where
@@ -579,10 +582,10 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
+    /// # block_on(async {
     ///
     /// let mut stream = stream::iter(1..=10).take_while(|x| *x <= 3);
     ///
@@ -590,7 +593,7 @@ pub trait StreamExt: Stream {
     /// assert_eq!(Some(2), stream.next().await);
     /// assert_eq!(Some(3), stream.next().await);
     /// assert_eq!(None, stream.next().await);
-    /// # }
+    /// # })
     /// ```
     fn take_while<F>(self, f: F) -> TakeWhile<Self, F>
     where
@@ -605,10 +608,10 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
+    /// # block_on(async {
     ///
     /// let mut stream = stream::iter(1..=10).skip(7);
     ///
@@ -616,7 +619,7 @@ pub trait StreamExt: Stream {
     /// assert_eq!(Some(9), stream.next().await);
     /// assert_eq!(Some(10), stream.next().await);
     /// assert_eq!(None, stream.next().await);
-    /// # }
+    /// # })
     /// ```
     fn skip(self, n: usize) -> Skip<Self>
     where
@@ -636,17 +639,17 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
+    /// # block_on(async {
     /// let mut stream = stream::iter(vec![1,2,3,4,1]).skip_while(|x| *x < 3);
     ///
     /// assert_eq!(Some(3), stream.next().await);
     /// assert_eq!(Some(4), stream.next().await);
     /// assert_eq!(Some(1), stream.next().await);
     /// assert_eq!(None, stream.next().await);
-    /// # }
+    /// # })
     /// ```
     fn skip_while<F>(self, f: F) -> SkipWhile<Self, F>
     where
@@ -679,25 +682,25 @@ pub trait StreamExt: Stream {
     ///
     /// Basic usage:
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
+    /// # block_on(async {
     ///
     /// let a = [1, 2, 3];
     ///
     /// assert!(stream::iter(&a).all(|&x| x > 0).await);
     ///
     /// assert!(!stream::iter(&a).all(|&x| x > 2).await);
-    /// # }
+    /// # })
     /// ```
     ///
     /// Stopping at the first `false`:
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
+    /// # block_on(async {
     ///
     /// let a = [1, 2, 3];
     ///
@@ -707,7 +710,7 @@ pub trait StreamExt: Stream {
     ///
     /// // we can still use `iter`, as there are more elements.
     /// assert_eq!(iter.next().await, Some(&3));
-    /// # }
+    /// # })
     /// ```
     fn all<F>(&mut self, f: F) -> AllFuture<'_, Self, F>
     where
@@ -738,25 +741,25 @@ pub trait StreamExt: Stream {
     ///
     /// Basic usage:
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
+    /// # block_on(async {
     ///
     /// let a = [1, 2, 3];
     ///
     /// assert!(stream::iter(&a).any(|&x| x > 0).await);
     ///
     /// assert!(!stream::iter(&a).any(|&x| x > 5).await);
-    /// # }
+    /// # })
     /// ```
     ///
     /// Stopping at the first `true`:
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
+    /// # block_on(async {
     ///
     /// let a = [1, 2, 3];
     ///
@@ -766,7 +769,7 @@ pub trait StreamExt: Stream {
     ///
     /// // we can still use `iter`, as there are more elements.
     /// assert_eq!(iter.next().await, Some(&2));
-    /// # }
+    /// # })
     /// ```
     fn any<F>(&mut self, f: F) -> AnyFuture<'_, Self, F>
     where
@@ -784,11 +787,15 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
     ///
+    /// # /*
     /// #[tokio::main]
     /// async fn main() {
+    /// # */
+    /// # block_on(async {
     ///     let one = stream::iter(vec![1, 2, 3]);
     ///     let two = stream::iter(vec![4, 5, 6]);
     ///
@@ -801,7 +808,10 @@ pub trait StreamExt: Stream {
     ///     assert_eq!(stream.next().await, Some(5));
     ///     assert_eq!(stream.next().await, Some(6));
     ///     assert_eq!(stream.next().await, None);
+    /// # })
+    /// # /*
     /// }
+    /// # */
     /// ```
     fn chain<U>(self, other: U) -> Chain<Self, U>
     where
@@ -822,16 +832,16 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     /// Basic usage:
-    /// ```ignore-wasm
-    /// # #[tokio::main]
-    /// # async fn main() {
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, *};
+    /// # block_on(async {
     ///
     /// let s = stream::iter(vec![1u8, 2, 3]);
     /// let sum = s.fold(0, |acc, x| acc + x).await;
     ///
     /// assert_eq!(sum, 6);
-    /// # }
+    /// # })
     /// ```
     fn fold<B, F>(self, init: B, f: F) -> FoldFuture<Self, B, F>
     where
@@ -871,11 +881,15 @@ pub trait StreamExt: Stream {
     ///
     /// Basic usage:
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
     ///
+    /// # /*
     /// #[tokio::main]
     /// async fn main() {
+    /// # */
+    /// # block_on(async {
     ///     let doubled: Vec<i32> =
     ///         stream::iter(vec![1, 2, 3])
     ///             .map(|x| x * 2)
@@ -883,16 +897,23 @@ pub trait StreamExt: Stream {
     ///             .await;
     ///
     ///     assert_eq!(vec![2, 4, 6], doubled);
+    /// # })
+    /// # /*
     /// }
+    /// # */
     /// ```
     ///
     /// Collecting a stream of `Result` values
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # use futures::executor::block_on;
     /// use tokio_stream::{self as stream, StreamExt};
     ///
+    /// # /*
     /// #[tokio::main]
     /// async fn main() {
+    /// # */
+    /// # block_on(async {
     ///     // A stream containing only `Ok` values will be collected
     ///     let values: Result<Vec<i32>, &str> =
     ///         stream::iter(vec![Ok(1), Ok(2), Ok(3)])
@@ -910,7 +931,10 @@ pub trait StreamExt: Stream {
     ///             .await;
     ///
     ///     assert_eq!(Err("no"), values);
+    /// # })
+    /// # /*
     /// }
+    /// # */
     /// ```
     fn collect<T>(self) -> Collect<Self, T>
     where
@@ -944,8 +968,8 @@ pub trait StreamExt: Stream {
     ///
     /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
+    /// ```
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     /// use std::time::Duration;
@@ -1030,8 +1054,8 @@ pub trait StreamExt: Stream {
     ///
     /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
+    /// ```
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     /// use std::time::Duration;
