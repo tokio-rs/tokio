@@ -151,7 +151,9 @@ impl Handle {
                 self.entry.waker.wake();
             }
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (State::WokenUp | State::Cancelling) => panic!("corrupted state: {state:#?}"),
+            State::WokenUp => panic!("corrupted state: `State::WokenUp`"),
+            // no need to wake up cancelling entry
+            State::Cancelling => (),
         }
     }
 
@@ -169,10 +171,10 @@ impl Handle {
             state @ (State::Registered(_) | State::WokenUp) => {
                 panic!("corrupted state: {state:#?}")
             }
-            // don't wake up cancelling entries
-            State::Cancelling => (),
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
             State::Pending => panic!("corrupted state: State::Pending"),
+            // don't wake up cancelling entries
+            State::Cancelling => (),
         }
     }
 
