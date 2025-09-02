@@ -1248,8 +1248,12 @@ impl Handle {
         }
 
         pub(crate) fn take_remote_timers(&self) -> Vec<EntryHandle> {
-            let mut synced = self.shared.synced.lock();
-            std::mem::take(&mut synced.inject_timers)
+            // It's ok to lost the race, as another worker is
+            // draining the inject_timers.
+            match self.shared.synced.try_lock() {
+                Some(mut synced) => std::mem::take(&mut synced.inject_timers),
+                None => Vec::new(),
+            }
         }
     }
 
