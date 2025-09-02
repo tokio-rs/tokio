@@ -40,7 +40,7 @@ use std::task::{self, ready, Poll, Waker};
 /// # `Stream` implementation
 ///
 /// Items are retrieved from the queue via [`DelayQueue::poll_expired`]. If no delays have
-/// expired, no items are returned. In this case, `Poll::Pending` is returned and the
+/// expired, no items are returned. In this case, [`Poll::Pending`] is returned and the
 /// current task is registered to be notified once the next item's delay has
 /// expired.
 ///
@@ -66,9 +66,13 @@ use std::task::{self, ready, Poll, Waker};
 /// Capacity can be checked using [`capacity`] and allocated preemptively by using
 /// the [`reserve`] method.
 ///
+/// # Cancellation safety
+///
+/// [`DelayQueue`]'s implementation of [`StreamExt::next`] is cancellation safe.
+///
 /// # Usage
 ///
-/// Using `DelayQueue` to manage cache entries.
+/// Using [`DelayQueue`] to manage cache entries.
 ///
 /// ```rust,no_run
 /// use tokio_util::time::{DelayQueue, delay_queue};
@@ -118,7 +122,8 @@ use std::task::{self, ready, Poll, Waker};
 /// [`insert`]: method@Self::insert
 /// [`insert_at`]: method@Self::insert_at
 /// [`Key`]: struct@Key
-/// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
+/// [`Stream`]: https://docs.rs/futures/0.3.31/futures/stream/trait.Stream.html
+/// [`StreamExt::next`]: https://docs.rs/tokio-stream/0.1.17/tokio_stream/trait.StreamExt.html#method.next
 /// [`poll_expired`]: method@Self::poll_expired
 /// [`Stream::poll_expired`]: method@Self::poll_expired
 /// [`DelayQueue`]: struct@DelayQueue
