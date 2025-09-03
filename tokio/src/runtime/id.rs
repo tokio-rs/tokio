@@ -15,7 +15,7 @@ use std::num::{NonZeroU32, NonZeroU64};
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::runtime::Handle;
 ///
 /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]

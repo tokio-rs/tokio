@@ -151,7 +151,7 @@ cfg_unstable! {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime::{self, UnhandledPanic};
         ///
         /// # pub fn main() {
@@ -753,7 +753,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use std::sync::{atomic::AtomicUsize, Arc};
     /// # use tokio::task::yield_now;
     /// # pub fn main() {
@@ -797,7 +797,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use std::sync::{atomic::AtomicUsize, Arc};
     /// # use tokio::task::yield_now;
     /// # pub fn main() {
@@ -1135,7 +1135,7 @@ impl Builder {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
@@ -1205,7 +1205,7 @@ impl Builder {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
@@ -1251,7 +1251,7 @@ impl Builder {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime::{self, HistogramScale};
         ///
         /// # #[allow(deprecated)]
@@ -1275,7 +1275,7 @@ impl Builder {
         ///
         /// # Examples
         /// Configure a [`LogHistogram`] with [default configuration]:
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
         ///
@@ -1289,7 +1289,7 @@ impl Builder {
         /// ```
         ///
         /// Configure a linear histogram with 100 buckets, each 10μs wide
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         /// use std::time::Duration;
         /// use tokio::runtime::HistogramConfiguration;
@@ -1307,7 +1307,7 @@ impl Builder {
         /// - Measure times from 100ns to 120s
         /// - Max error of 0.1
         /// - No more than 1024 buckets
-        /// ```
+        /// ```ignore-wasm
         /// use std::time::Duration;
         /// use tokio::runtime;
         /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
@@ -1373,7 +1373,7 @@ impl Builder {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         /// use std::time::Duration;
         ///
@@ -1408,7 +1408,7 @@ impl Builder {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         ///
         /// # #[allow(deprecated)]

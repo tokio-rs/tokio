@@ -860,7 +860,7 @@ cfg_unstable! {
         /// execute. The call to `run_until` will panic due to the runtime being
         /// forcibly shutdown.
         ///
-        /// ```should_panic
+        /// ```should_panic,ignore-wasm
         /// use tokio::runtime::UnhandledPanic;
         ///
         /// # #[tokio::main]
@@ -894,7 +894,7 @@ cfg_unstable! {
         ///
         /// # Examples
         ///
-        /// ```rust
+        /// ```rust,ignore-wasm
         /// use tokio::task;
         ///
         /// #[tokio::main]
