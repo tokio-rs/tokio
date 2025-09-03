@@ -17,8 +17,8 @@ use tokio::sync::watch::error::RecvError;
 /// # Examples
 ///
 /// ```
-/// # use futures::executor::block_on;
-/// # block_on(async {
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
 /// use tokio_stream::{StreamExt, wrappers::WatchStream};
 /// use tokio::sync::watch;
 ///
@@ -29,12 +29,12 @@ use tokio::sync::watch::error::RecvError;
 ///
 /// tx.send("goodbye").unwrap();
 /// assert_eq!(rx.next().await, Some("goodbye"));
-/// # })
+/// # }
 /// ```
 ///
 /// ```
-/// # use futures::executor::block_on;
-/// # block_on(async {
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
 /// use tokio_stream::{StreamExt, wrappers::WatchStream};
 /// use tokio::sync::watch;
 ///
@@ -45,14 +45,14 @@ use tokio::sync::watch::error::RecvError;
 ///
 /// tx.send("goodbye").unwrap();
 /// assert_eq!(rx.next().await, Some("goodbye"));
-/// # })
+/// # }
 /// ```
 ///
 /// Example with [`WatchStream<T>::from_changes`]:
 ///
 /// ```
-/// # use futures::executor::block_on;
-/// # block_on(async {
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
 /// use futures::future::FutureExt;
 /// use tokio::sync::watch;
 /// use tokio_stream::{StreamExt, wrappers::WatchStream};
@@ -65,7 +65,7 @@ use tokio::sync::watch::error::RecvError;
 ///
 /// tx.send("goodbye").unwrap();
 /// assert_eq!(rx.next().await, Some("goodbye"));
-/// # })
+/// # }
 /// ```
 ///
 /// [`tokio::sync::watch::Receiver`]: struct@tokio::sync::watch::Receiver

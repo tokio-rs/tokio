@@ -20,14 +20,13 @@ impl<I> Unpin for Once<I> {}
 /// # Examples
 ///
 /// ```
-/// # use futures::executor::block_on;
 /// use tokio_stream::{self as stream, StreamExt};
 ///
 /// # /*
 /// #[tokio::main]
-/// async fn main() {
 /// # */
-/// # block_on(async {
+/// # #[tokio::main(flavor = "current_thread")]
+/// async fn main() {
 ///     // one is the loneliest number
 ///     let mut one = stream::once(1);
 ///
@@ -35,10 +34,7 @@ impl<I> Unpin for Once<I> {}
 ///
 ///     // just one, that's all we get
 ///     assert_eq!(None, one.next().await);
-/// # })
-/// # /*
 /// }
-/// # */
 /// ```
 pub fn once<T>(value: T) -> Once<T> {
     Once {

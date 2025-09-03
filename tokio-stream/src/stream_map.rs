@@ -186,14 +186,13 @@ use std::task::{ready, Context, Poll};
 /// Using `StreamNotifyClose` to handle closed streams with `StreamMap`.
 ///
 /// ```
-/// # use futures::executor::block_on;
 /// use tokio_stream::{StreamExt, StreamMap, StreamNotifyClose};
 ///
 /// # /*
 /// #[tokio::main]
-/// async fn main() {
 /// # */
-/// # block_on(async {
+/// # #[tokio::main(flavor = "current_thread")]
+/// async fn main() {
 ///     let mut map = StreamMap::new();
 ///     let stream = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
 ///     let stream2 = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
@@ -205,10 +204,7 @@ use std::task::{ready, Context, Poll};
 ///             None => println!("stream {key:?} closed"),
 ///         }
 ///     }
-/// # })
-/// # /*
 /// }
-/// # */
 /// ```
 
 #[derive(Debug)]
