@@ -15,7 +15,7 @@ type IoResult<T> = Result<T, IoError>;
 
 #[derive(Debug)]
 struct Inner {
-    /// `poll_*` will return [`Poll::Pending`] if the backpressure boundary is reached
+    /// `poll_write` will return [`Poll::Pending`] if the backpressure boundary is reached
     backpressure_boundary: usize,
 
     /// either [`Sender`] or [`Receiver`] is closed
@@ -58,30 +58,26 @@ impl Inner {
         }
     }
 
-    fn wake_receiver(&mut self) {
-        if let Some(waker) = self.receiver_waker.take() {
-            waker.wake();
-        }
+    fn take_receiver_waker(&mut self) -> Option<Waker> {
+        self.receiver_waker.take()
     }
 
-    fn wake_sender(&mut self) {
-        if let Some(waker) = self.sender_waker.take() {
-            waker.wake();
-        }
+    fn take_sender_waker(&mut self) -> Option<Waker> {
+        self.sender_waker.take()
     }
 
     fn is_closed(&self) -> bool {
         self.is_closed
     }
 
-    fn close_receiver(&mut self) {
+    fn close_receiver(&mut self) -> Option<Waker> {
         self.is_closed = true;
-        self.wake_sender();
+        self.take_sender_waker()
     }
 
-    fn close_sender(&mut self) {
+    fn close_sender(&mut self) -> Option<Waker> {
         self.is_closed = true;
-        self.wake_receiver();
+        self.take_receiver_waker()
     }
 }
 
@@ -116,7 +112,11 @@ impl AsyncRead for Receiver {
                 Poll::Ready(Ok(()))
             } else {
                 inner.register_receiver_waker(cx.waker());
-                inner.wake_sender();
+                let waker = inner.take_sender_waker();
+                drop(inner); // unlock before waking up
+                if let Some(waker) = waker {
+                    waker.wake();
+                }
                 Poll::Pending
             };
         }
@@ -125,7 +125,11 @@ impl AsyncRead for Receiver {
 
         buf.put_slice(&inner.buf[..to_read]);
         inner.buf.advance(to_read);
-        inner.wake_sender();
+        let waker = inner.take_sender_waker();
+        drop(inner); // unlock before waking up
+        if let Some(waker) = waker {
+            waker.wake();
+        }
         Poll::Ready(Ok(()))
     }
 }
@@ -169,7 +173,11 @@ impl AsyncWrite for Sender {
         let to_write = buf.len().min(free);
         if to_write == 0 {
             inner.register_sender_waker(cx.waker());
-            inner.wake_receiver();
+            let waker = inner.take_receiver_waker();
+            drop(inner); // unlock before waking up
+            if let Some(waker) = waker {
+                waker.wake();
+            }
             return Poll::Pending;
         }
 
@@ -177,7 +185,11 @@ impl AsyncWrite for Sender {
         ready!(poll_proceed(cx)).made_progress();
 
         inner.buf.extend_from_slice(&buf[..to_write]);
-        inner.wake_receiver();
+        let waker = inner.take_receiver_waker();
+        drop(inner); // unlock before waking up
+        if let Some(waker) = waker {
+            waker.wake();
+        }
         Poll::Ready(Ok(to_write))
     }
 
