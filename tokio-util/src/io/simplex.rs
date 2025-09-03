@@ -38,7 +38,7 @@ impl Inner {
             is_closed: false,
             receiver_waker: None,
             sender_waker: None,
-            buf: BytesMut::new(),
+            buf: BytesMut::with_capacity(backpressure_boundary),
         }
     }
 
