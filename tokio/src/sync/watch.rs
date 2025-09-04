@@ -29,8 +29,10 @@
 //! The [`Receiver`] half provides an asynchronous [`changed`] method. This
 //! method is ready when a new, *unseen* value is sent via the [`Sender`] half.
 //!
-//! * [`Receiver::changed()`] returns `Ok(())` on receiving a new value, or
-//!   `Err(`[`error::RecvError`]`)` if the [`Sender`] has been dropped.
+//! * [`Receiver::changed()`] returns:
+//!     * `Ok(())` on receiving a new value.
+//!     * `Err(`[`RecvError`](error::RecvError)`)` if the
+//!     channel has been closed __AND__ the current value is *seen*.
 //! * If the current value is *unseen* when calling [`changed`], then
 //!   [`changed`] will return immediately. If the current value is *seen*, then
 //!   it will sleep until either a new message is sent via the [`Sender`] half,
@@ -637,14 +639,17 @@ impl<T> Receiver<T> {
     }
 
     /// Checks if this channel contains a message that this receiver has not yet
-    /// seen. The new value is not marked as seen.
+    /// seen. The current values will not be marked as seen.
     ///
-    /// Although this method is called `has_changed`, it does not check new
-    /// messages for equality, so this call will return true even if the new
-    /// message is equal to the old message.
+    /// Although this method is called `has_changed`, it does not check
+    /// messages for equality, so this call will return true even if the current
+    /// message is equal to the previous message.
     ///
+    /// # Errors
+    /// 
     /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
-    /// the latest value is seen.
+    /// the current value is seen.
+    /// 
     /// # Examples
     ///
     /// ```
@@ -705,20 +710,23 @@ impl<T> Receiver<T> {
         self.version = current_version;
     }
 
-    /// Waits for a change notification, then marks the newest value as seen.
+    /// Waits for a change notification, then marks the current value as seen.
     ///
-    /// If the newest value in the channel has not yet been marked seen when
+    /// If the current value in the channel has not yet been marked seen when
     /// this method is called, the method marks that value seen and returns
-    /// immediately. If the newest value has already been marked seen, then the
+    /// immediately. If the current value has already been marked seen, then the
     /// method sleeps until a new message is sent by the [`Sender`] connected to
     /// this `Receiver`, or until the [`Sender`] is dropped.
     ///
-    /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
-    /// the latest value is seen.
     ///
     /// For more information, see
     /// [*Change notifications*](self#change-notifications) in the module-level documentation.
-    ///
+    /// 
+    /// # Errors
+    /// 
+    /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
+    /// the current value is seen.
+    /// 
     /// # Cancel safety
     ///
     /// This method is cancel safe. If you use it as the event in a
