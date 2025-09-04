@@ -643,7 +643,8 @@ impl<T> Receiver<T> {
     /// messages for equality, so this call will return true even if the new
     /// message is equal to the old message.
     ///
-    /// Returns an error if the channel has been closed.
+    /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
+    /// the latest value is seen.
     /// # Examples
     ///
     /// ```
@@ -669,13 +670,16 @@ impl<T> Receiver<T> {
     pub fn has_changed(&self) -> Result<bool, error::RecvError> {
         // Load the version from the state
         let state = self.shared.state.load();
-        if state.is_closed() {
-            // The sender has dropped.
-            return Err(error::RecvError(()));
-        }
         let new_version = state.version();
 
-        Ok(self.version != new_version)
+        let last_value_is_seen = self.version == new_version;
+        let sender_has_dropped = state.is_closed();
+
+        if sender_has_dropped && last_value_is_seen {
+            Err(error::RecvError(()))
+        } else {
+            Ok(!last_value_is_seen)
+        }
     }
 
     /// Marks the state as changed.
@@ -709,7 +713,8 @@ impl<T> Receiver<T> {
     /// method sleeps until a new message is sent by the [`Sender`] connected to
     /// this `Receiver`, or until the [`Sender`] is dropped.
     ///
-    /// This method returns an error if and only if the [`Sender`] is dropped.
+    /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
+    /// the latest value is seen.
     ///
     /// For more information, see
     /// [*Change notifications*](self#change-notifications) in the module-level documentation.

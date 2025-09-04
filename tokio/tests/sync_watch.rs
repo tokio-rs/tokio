@@ -450,3 +450,59 @@ async fn sender_closed_is_cooperative() {
         _ = tokio::task::yield_now() => {},
     }
 }
+
+#[tokio::test]
+async fn changed_does_not_error_on_closed_channel_with_unseen_value() {
+    let (tx, mut rx) = watch::channel("A");
+    tx.send("B").unwrap();
+
+    drop(tx);
+
+    rx.changed()
+        .await
+        .expect("`changed` call does not return an error if the last value is not seen.");
+}
+
+#[tokio::test]
+async fn has_changed_does_not_error_on_closed_channel_with_unseen_value() {
+    let (tx, rx) = watch::channel("A");
+    tx.send("B").unwrap();
+
+    drop(tx);
+
+    let has_changed = rx
+        .has_changed()
+        .expect("`has_changed` call does not return an error if the last value is not seen.");
+
+    assert!(has_changed, "Latest value is not seen");
+}
+
+#[tokio::test]
+async fn changed_errors_on_closed_channel_with_seen_value() {
+    let (tx, mut rx) = watch::channel("A");
+    drop(tx);
+
+    rx.changed()
+        .await
+        .expect_err("`changed` call returns an error if the last value is seen.");
+}
+
+#[tokio::test]
+async fn has_changed_errors_on_closed_channel_with_seen_value() {
+    let (tx, rx) = watch::channel("A");
+    drop(tx);
+
+    rx.has_changed()
+        .expect_err("`has_changed` call returns an error if the last value is seen.");
+}
+
+#[tokio::test]
+async fn wait_for_errors_on_closed_channel_true_predicate() {
+    let (tx, mut rx) = watch::channel("A");
+    tx.send("B").unwrap();
+    drop(tx);
+
+    rx.wait_for(|_| true).await.expect(
+        "`wait_for` call does not return error even if channel is closed when predicate is true for last value.",
+    );
+}
