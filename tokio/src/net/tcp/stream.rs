@@ -70,6 +70,12 @@ cfg_net! {
     pub struct TcpStream {
         io: PollEvented<mio::net::TcpStream>,
     }
+
+    impl AsRef<TcpStream> for TcpStream {
+        fn as_ref(&self) -> &Self {
+            self
+        }
+    }
 }
 
 impl TcpStream {
