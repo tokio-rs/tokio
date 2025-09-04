@@ -12,6 +12,8 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use super::FramedParts;
+
 pin_project! {
     /// A [`Sink`] of frames encoded to an `AsyncWrite`.
     ///
@@ -158,6 +160,18 @@ impl<T, E> FramedWrite<T, E> {
     /// Updates backpressure boundary
     pub fn set_backpressure_boundary(&mut self, boundary: usize) {
         self.inner.state.backpressure_boundary = boundary;
+    }
+
+    /// Consumes the `FramedWrite`, returning its underlying I/O stream, the buffer
+    /// with unprocessed data, and the codec.
+    pub fn into_parts(self) -> FramedParts<T, E> {
+        FramedParts {
+            io: self.inner.inner,
+            codec: self.inner.codec,
+            read_buf: BytesMut::new(),
+            write_buf: self.inner.state.buffer,
+            _priv: (),
+        }
     }
 }
 

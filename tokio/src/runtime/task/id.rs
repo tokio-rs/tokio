@@ -16,7 +16,7 @@ use std::{fmt, num::NonZeroU64};
 ///   [`task::id()`](crate::task::id()) functions and from outside the task via
 ///   the [`JoinHandle::id()`](crate::task::JoinHandle::id()) function.
 #[cfg_attr(docsrs, doc(cfg(all(feature = "rt"))))]
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Id(pub(crate) NonZeroU64);
 
 /// Returns the [`Id`] of the currently running task.
