@@ -639,7 +639,7 @@ impl<T> Receiver<T> {
     }
 
     /// Checks if this channel contains a message that this receiver has not yet
-    /// seen. The current values will not be marked as seen.
+    /// seen. The current value will not be marked as seen.
     ///
     /// Although this method is called `has_changed`, it does not check
     /// messages for equality, so this call will return true even if the current
