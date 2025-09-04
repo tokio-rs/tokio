@@ -32,7 +32,7 @@
 //! * [`Receiver::changed()`] returns:
 //!     * `Ok(())` on receiving a new value.
 //!     * `Err(`[`RecvError`](error::RecvError)`)` if the
-//!     channel has been closed __AND__ the current value is *seen*.
+//!       channel has been closed __AND__ the current value is *seen*.
 //! * If the current value is *unseen* when calling [`changed`], then
 //!   [`changed`] will return immediately. If the current value is *seen*, then
 //!   it will sleep until either a new message is sent via the [`Sender`] half,
@@ -646,10 +646,10 @@ impl<T> Receiver<T> {
     /// message is equal to the previous message.
     ///
     /// # Errors
-    /// 
+    ///
     /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
     /// the current value is seen.
-    /// 
+    ///
     /// # Examples
     ///
     /// ```
@@ -721,12 +721,12 @@ impl<T> Receiver<T> {
     ///
     /// For more information, see
     /// [*Change notifications*](self#change-notifications) in the module-level documentation.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
     /// the current value is seen.
-    /// 
+    ///
     /// # Cancel safety
     ///
     /// This method is cancel safe. If you use it as the event in a
