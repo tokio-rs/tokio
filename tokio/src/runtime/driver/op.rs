@@ -17,11 +17,7 @@ pub(crate) enum CancelData {
         // so `#[allow(dead_code)]` is needed.
         #[allow(dead_code)] Open,
     ),
-    Write(
-        // This field isn't accessed directly, but it holds cancellation data,
-        // so `#[allow(dead_code)]` is needed.
-        #[allow(dead_code)] Write,
-    ),
+    Write(Write),
 }
 
 #[derive(Debug)]

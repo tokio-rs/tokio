@@ -1,5 +1,4 @@
-use crate::fs::asyncify;
-use crate::util::as_ref::OwnedBuf;
+use crate::{fs::asyncify, util::as_ref::OwnedBuf};
 
 use std::{io, path::Path};
 
@@ -42,7 +41,8 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
 
 #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
 async fn write_uring(path: &Path, contents: OwnedBuf) -> io::Result<()> {
-    use crate::{fs::OpenOptions, io::uring::utils::SharedFd, runtime::driver::op::Op};
+    use crate::{fs::OpenOptions, runtime::driver::op::Op};
+    use std::os::fd::AsFd;
 
     let file = OpenOptions::new()
         .write(true)
@@ -51,16 +51,16 @@ async fn write_uring(path: &Path, contents: OwnedBuf) -> io::Result<()> {
         .open(path)
         .await?;
 
-    let fd = SharedFd::try_from(file).expect("unexpected in-flight operation detected");
+    let fd = file.as_fd();
 
     let mut pos = 0;
-    let mut buf = contents;
+    let mut buf = contents.as_ref();
     while !buf.is_empty() {
-        let n = Op::write_at(fd.clone(), buf.clone(), pos)?.await? as usize;
+        let n = Op::write_at(fd, buf, pos)?.await? as usize;
         if n == 0 {
             return Err(io::ErrorKind::WriteZero.into());
         }
-        buf.advance(n);
+        buf = &buf[n..];
         pos += n as u64;
     }
 
