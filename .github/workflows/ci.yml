@@ -43,16 +43,22 @@ jobs:
     name: all systems go
     runs-on: ubuntu-latest
     needs:
+      - basic
       - test-tokio-full
       - test-workspace-all-features
       - test-integration-tests-per-feature
+      - test-workspace-all-features-panic-abort
       - test-parking_lot
       - valgrind
       - test-unstable
+      - test-unstable-taskdump
+      - test-uring
+      - check-unstable-mt-counters
       - miri-lib
       - miri-test
       - miri-doc
       - asan
+      - semver
       - cross-check
       - cross-check-tier3
       - cross-test-with-parking_lot
@@ -75,8 +81,9 @@ jobs:
       - wasm32-wasip1
       - check-external-types
       - check-fuzzing
-      - check-unstable-mt-counters
       - check-spelling
+      - get-latest-kernel-version
+      - test-io-uring-on-specific-kernel-versions
     steps:
       - run: exit 0
 
@@ -861,6 +868,7 @@ jobs:
         run: cargo clippy --all --tests --all-features --no-deps
         env:
           RUSTFLAGS: ${{ matrix.rustflags }}
+
   docs:
     name: docs
     runs-on: ${{ matrix.run.os }}
