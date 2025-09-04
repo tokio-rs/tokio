@@ -1076,6 +1076,12 @@ impl fmt::Debug for UnixStream {
     }
 }
 
+impl AsRef<Self> for UnixStream {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
 impl AsRawFd for UnixStream {
     fn as_raw_fd(&self) -> RawFd {
         self.io.as_raw_fd()
