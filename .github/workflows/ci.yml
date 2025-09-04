@@ -1041,6 +1041,8 @@ jobs:
         include:
           - name: macros sync
             features: "macros sync"
+          - name: macros sync rt
+            features: "macros sync rt"
           - name: macros sync time rt
             features: "macros sync time rt"
     steps:
