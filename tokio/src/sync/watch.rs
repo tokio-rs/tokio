@@ -693,15 +693,15 @@ impl<T> Receiver<T> {
     pub fn has_changed(&self) -> Result<bool, error::RecvError> {
         // Load the version from the state
         let state = self.shared.state.load();
-        let new_version = state.version();
+        let current_version = state.version();
 
-        let last_value_is_seen = self.version == new_version;
+        let current_value_is_seen = self.version == current_version;
         let sender_has_dropped = state.is_closed();
 
-        if sender_has_dropped && last_value_is_seen {
+        if sender_has_dropped && current_value_is_seen {
             Err(error::RecvError(()))
         } else {
-            Ok(!last_value_is_seen)
+            Ok(!current_value_is_seen)
         }
     }
 
