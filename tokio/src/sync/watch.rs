@@ -652,6 +652,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
+    /// ## Basic usage
     /// ```
     /// use tokio::sync::watch;
     ///
@@ -666,9 +667,26 @@ impl<T> Receiver<T> {
     ///
     ///     // The value has been marked as seen
     ///     assert!(!rx.has_changed().unwrap());
+    /// }
+    /// ```
     ///
+    /// ## Closed channel example
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = watch::channel("hello");
+    ///     tx.send("goodbye").unwrap();
     ///     drop(tx);
-    ///     // The `tx` handle has been dropped
+    ///
+    ///     // `has_changed` returns Ok(true) as the current value is not seen.
+    ///     assert!(rx.has_changed().unwrap());
+    ///
+    ///     // Marks the current value as seen.
+    ///     assert_eq!(*rx.borrow_and_update(), "goodbye");
+    ///
+    ///     // The `tx` handle has been dropped __AND__ the current value is seen.
     ///     assert!(rx.has_changed().is_err());
     /// }
     /// ```
