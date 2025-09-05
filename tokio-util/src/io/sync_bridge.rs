@@ -77,7 +77,7 @@ use tokio::io::{
 /// incrementally. This avoids blocking and improves performance over using
 /// `SyncIoBridge`.
 ///
-/// ```rust,ignore-wasm
+/// ```rust
 /// use tokio::io::AsyncReadExt;
 /// use tokio::io::AsyncRead;
 /// use std::io::Cursor;
@@ -104,7 +104,10 @@ use tokio::io::{
 ///    Ok(hash)
 ///}
 ///
+/// # /*
 /// #[tokio::main]
+/// # */
+/// # #[tokio::main(flavor = "current_thread")]
 /// async fn main() -> Result<(), std::io::Error> {
 ///     // Example: In-memory data.
 ///     let data = b"Hello, world!"; // A byte slice.

@@ -11,12 +11,12 @@ use tokio::io::AsyncRead;
 ///
 /// # Example
 ///
-/// ```ignore-wasm
+/// ```
 /// use bytes::{Bytes, BytesMut};
 /// use tokio_stream as stream;
 /// use tokio::io::Result;
 /// use tokio_util::io::{StreamReader, read_buf};
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
 ///
 /// // Create a reader from an iterator. This particular reader will always be

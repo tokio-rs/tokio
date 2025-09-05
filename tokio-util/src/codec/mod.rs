@@ -14,30 +14,30 @@
 //! [`FramedWrite`] are first framed according to a specific codec, and then sent to
 //! an implementor of [`AsyncWrite`].
 //!
-//! ```ignore-wasm
+//! ```
 //! use futures::sink::SinkExt;
 //! use tokio_util::codec::LinesCodec;
 //! use tokio_util::codec::FramedWrite;
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     let buffer = Vec::new();
-//!     let messages = vec!["Hello", "World"];
-//!     let encoder = LinesCodec::new();
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
+//! let buffer = Vec::new();
+//! let messages = vec!["Hello", "World"];
+//! let encoder = LinesCodec::new();
 //!
-//!     // FramedWrite is a sink which means you can send values into it
-//!     // asynchronously.
-//!     let mut writer = FramedWrite::new(buffer, encoder);
+//! // FramedWrite is a sink which means you can send values into it
+//! // asynchronously.
+//! let mut writer = FramedWrite::new(buffer, encoder);
 //!
-//!     // To be able to send values into a FramedWrite, you need to bring the
-//!     // `SinkExt` trait into scope.
-//!     writer.send(messages[0]).await.unwrap();
-//!     writer.send(messages[1]).await.unwrap();
+//! // To be able to send values into a FramedWrite, you need to bring the
+//! // `SinkExt` trait into scope.
+//! writer.send(messages[0]).await.unwrap();
+//! writer.send(messages[1]).await.unwrap();
 //!
-//!     let buffer = writer.get_ref();
+//! let buffer = writer.get_ref();
 //!
-//!     assert_eq!(buffer.as_slice(), "Hello\nWorld\n".as_bytes());
-//! }
+//! assert_eq!(buffer.as_slice(), "Hello\nWorld\n".as_bytes());
+//! # }
 //!```
 //!
 //! # Example decoding using `LinesCodec`

@@ -78,10 +78,10 @@
 //! The following will parse a `u16` length field at offset 0, omitting the
 //! frame head in the yielded `BytesMut`.
 //!
-//! ```ignore-wasm
+//! ```
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! # let io: &[u8] = b"\x00\x0BHello world";
 //! let mut reader = LengthDelimitedCodec::builder()
