@@ -88,7 +88,7 @@ use tokio::io::{
 /// /// and hashes the data incrementally.
 /// async fn hash_stream(mut reader: impl AsyncRead + Unpin, mut hasher: Hasher) -> Result<(), std::io::Error> {
 ///    // Create a buffer to read data into, sized for performance.
-///    let mut data = vec![0; 64 * 1024];
+///    let mut data = vec![0; 16 * 1024];
 ///    loop {
 ///        // Read data from the reader into the buffer.
 ///        let len = reader.read(&mut data).await?;
