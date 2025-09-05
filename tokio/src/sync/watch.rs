@@ -200,7 +200,7 @@ impl<'a, T> Ref<'a, T> {
     /// Indicates if the borrowed value is considered as _changed_ since the last
     /// time it has been marked as seen.
     ///
-    /// Unlike [`Receiver::has_changed()`], this method does not fail if the channel is closed.
+    /// Unlike [`Receiver::has_changed()`], this method is not fallible.
     ///
     /// When borrowed from the [`Sender`] this function will always return `false`.
     ///
@@ -220,10 +220,10 @@ impl<'a, T> Ref<'a, T> {
     ///     // Drop the sender immediately, just for testing purposes.
     ///     drop(tx);
     ///
-    ///     // Even if the sender has already been dropped...
-    ///     assert!(rx.has_changed().is_err());
-    ///     // ...the modified value is still readable and detected as changed.
+    ///     // The modified value is still readable and detected as changed
+    ///     // even if the sender has already been dropped.
     ///     assert_eq!(*rx.borrow(), "goodbye");
+    ///     assert!(rx.has_changed().unwrap());
     ///     assert!(rx.borrow().has_changed());
     ///
     ///     // Read the changed value and mark it as seen.
