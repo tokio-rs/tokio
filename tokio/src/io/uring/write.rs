@@ -23,7 +23,12 @@ impl Cancellable for Write {
 }
 
 impl Op<Write> {
-    pub(crate) fn write_at(fd: BorrowedFd<'_>, buf: &[u8], offset: u64) -> io::Result<Self> {
+    /// # SAFETY
+    ///
+    /// The caller must ensure that `fd` and `buf` remain valid until the
+    /// operation finishes (or gets cancelled) and the `Op::drop` completes.
+    /// Otherwise, the kernel could access freed memory, breaking soundness.
+    pub(crate) unsafe fn write_at(fd: BorrowedFd<'_>, buf: &[u8], offset: u64) -> io::Result<Self> {
         // There is a cap on how many bytes we can write in a single uring write operation.
         // ref: https://github.com/axboe/liburing/discussions/497
         let len: u32 = cmp::min(buf.len(), u32::MAX as usize) as u32;
@@ -32,8 +37,8 @@ impl Op<Write> {
             .offset(offset)
             .build();
 
-        // SAFETY: `fd` and `buf` are owned by caller function, ensuring these params are
-        // valid until operation completes.
+        // SAFETY: `fd` and `buf` valid until the operation completes or gets cancelled
+        // and the `Op::drop` completes.
         let op = unsafe { Op::new(sqe, Write) };
         Ok(op)
     }

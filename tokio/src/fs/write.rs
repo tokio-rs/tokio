@@ -56,7 +56,15 @@ async fn write_uring(path: &Path, contents: OwnedBuf) -> io::Result<()> {
     let mut pos = 0;
     let mut buf = contents.as_ref();
     while !buf.is_empty() {
-        let n = Op::write_at(fd, buf, pos)?.await? as usize;
+        // SAFETY:
+        // If the operation completes successfully, `fd` and `buf` are still
+        // alive within the scope of this function, so remain valid.
+        //
+        // In the case of cancellation, local variables within the scope of
+        // this `async fn` are dropped in the reverse order of their declaration.
+        // Therefore, `Op` is dropped before `fd` and `buf`, ensuring that the
+        // operation finishes gracefully before these resources are dropped.
+        let n = unsafe { Op::write_at(fd, buf, pos) }?.await? as usize;
         if n == 0 {
             return Err(io::ErrorKind::WriteZero.into());
         }
