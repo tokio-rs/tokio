@@ -38,48 +38,6 @@ permissions:
   contents: read
 
 jobs:
-  # Depends on all actions that are required for a "successful" CI run.
-  tests-pass:
-    name: all systems go
-    runs-on: ubuntu-latest
-    needs:
-      - test-tokio-full
-      - test-workspace-all-features
-      - test-integration-tests-per-feature
-      - test-parking_lot
-      - valgrind
-      - test-unstable
-      - miri-lib
-      - miri-test
-      - miri-doc
-      - asan
-      - cross-check
-      - cross-check-tier3
-      - cross-test-with-parking_lot
-      - cross-test-without-parking_lot
-      - no-atomic-u64-test
-      - no-atomic-u64-check
-      - features
-      - minrust
-      - minimal-versions
-      - fmt
-      - clippy
-      - docs
-      - loom-compile
-      - check-readme
-      - test-hyper
-      - test-quinn
-      - x86_64-fortanix-unknown-sgx
-      - check-redox
-      - wasm32-unknown-unknown
-      - wasm32-wasip1
-      - check-external-types
-      - check-fuzzing
-      - check-unstable-mt-counters
-      - check-spelling
-    steps:
-      - run: exit 0
-
   # Basic actions that must pass before we kick off more expensive tests.
   basics:
     name: basic checks
@@ -861,6 +819,7 @@ jobs:
         run: cargo clippy --all --tests --all-features --no-deps
         env:
           RUSTFLAGS: ${{ matrix.rustflags }}
+
   docs:
     name: docs
     runs-on: ${{ matrix.run.os }}
