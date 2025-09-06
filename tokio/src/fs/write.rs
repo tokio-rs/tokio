@@ -1,4 +1,4 @@
-use crate::fs::asyncify;
+use crate::{fs::asyncify, util::as_ref::OwnedBuf};
 
 use std::{io, path::Path};
 
@@ -24,8 +24,58 @@ use std::{io, path::Path};
 /// # }
 /// ```
 pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Result<()> {
-    let path = path.as_ref().to_owned();
+    let path = path.as_ref();
     let contents = crate::util::as_ref::upgrade(contents);
 
+    #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+    {
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+        if driver_handle.check_and_init()? {
+            return write_uring(path, contents).await;
+        }
+    }
+
+    write_spawn_blocking(path, contents).await
+}
+
+#[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+async fn write_uring(path: &Path, contents: OwnedBuf) -> io::Result<()> {
+    use crate::{fs::OpenOptions, runtime::driver::op::Op};
+    use std::os::fd::AsFd;
+
+    let file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)
+        .await?;
+
+    let fd = file.as_fd();
+
+    let mut pos = 0;
+    let mut buf = contents.as_ref();
+    while !buf.is_empty() {
+        // SAFETY:
+        // If the operation completes successfully, `fd` and `buf` are still
+        // alive within the scope of this function, so remain valid.
+        //
+        // In the case of cancellation, local variables within the scope of
+        // this `async fn` are dropped in the reverse order of their declaration.
+        // Therefore, `Op` is dropped before `fd` and `buf`, ensuring that the
+        // operation finishes gracefully before these resources are dropped.
+        let n = unsafe { Op::write_at(fd, buf, pos) }?.await? as usize;
+        if n == 0 {
+            return Err(io::ErrorKind::WriteZero.into());
+        }
+        buf = &buf[n..];
+        pos += n as u64;
+    }
+
+    Ok(())
+}
+
+async fn write_spawn_blocking(path: &Path, contents: OwnedBuf) -> io::Result<()> {
+    let path = path.to_owned();
     asyncify(move || std::fs::write(path, contents)).await
 }

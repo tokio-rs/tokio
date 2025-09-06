@@ -1,4 +1,5 @@
 use crate::io::uring::open::Open;
+use crate::io::uring::write::Write;
 use crate::runtime::Handle;
 use io_uring::cqueue;
 use io_uring::squeue::Entry;
@@ -16,6 +17,7 @@ pub(crate) enum CancelData {
         // so `#[allow(dead_code)]` is needed.
         #[allow(dead_code)] Open,
     ),
+    Write(Write),
 }
 
 #[derive(Debug)]
