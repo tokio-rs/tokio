@@ -256,7 +256,7 @@ mod test {
         .split('.');
 
         let major: u32 = kernel_version_iter.next().unwrap().parse().unwrap();
-        let minor: u32 = kernel_version_iter.next().unwrap().parse().unwrap();
+        let minor: u32 = kernel_version_iter.next().unwrap().trim().parse().unwrap();
 
         major >= 6 || (major == 5 && minor >= 10)
     }
