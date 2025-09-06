@@ -312,7 +312,7 @@ impl LocalRuntime {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::LocalRuntime;
     /// use tokio::task;
     ///

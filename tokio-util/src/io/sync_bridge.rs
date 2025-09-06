@@ -42,7 +42,7 @@ use tokio::io::{
 /// Explanation: This example demonstrates how to asynchronously read data from a
 /// reader into memory and hash it using a synchronous hashing function. The
 /// `SyncIoBridge` is avoided, ensuring that the async runtime is not blocked.
-/// ```rust
+/// ```rust,ignore-wasm
 /// use tokio::io::AsyncReadExt;
 /// use tokio::io::AsyncRead;
 /// use std::io::Cursor;
@@ -88,7 +88,7 @@ use tokio::io::{
 /// /// and hashes the data incrementally.
 /// async fn hash_stream(mut reader: impl AsyncRead + Unpin, mut hasher: Hasher) -> Result<(), std::io::Error> {
 ///    // Create a buffer to read data into, sized for performance.
-///    let mut data = vec![0; 64 * 1024];
+///    let mut data = vec![0; 16 * 1024];
 ///    loop {
 ///        // Read data from the reader into the buffer.
 ///        let len = reader.read(&mut data).await?;
@@ -104,7 +104,10 @@ use tokio::io::{
 ///    Ok(hash)
 ///}
 ///
+/// # /*
 /// #[tokio::main]
+/// # */
+/// # #[tokio::main(flavor = "current_thread")]
 /// async fn main() -> Result<(), std::io::Error> {
 ///     // Example: In-memory data.
 ///     let data = b"Hello, world!"; // A byte slice.
@@ -217,7 +220,7 @@ use tokio::io::{
 /// `spawn_blocking` ensures that the synchronous code is offloaded to a dedicated
 /// thread pool, preventing it from interfering with the async tasks.
 ///
-/// ```rust
+/// ```rust,ignore-wasm
 /// use tokio::task::spawn_blocking;
 /// use tokio_util::io::SyncIoBridge;
 /// use tokio::io::AsyncRead;

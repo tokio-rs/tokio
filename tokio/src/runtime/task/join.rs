@@ -87,7 +87,7 @@ cfg_rt! {
     /// `Result` because panics in the spawned task are caught by Tokio. The `?` operator has
     /// to be double chained to extract the returned value:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::task;
     /// use std::io;
     ///
@@ -105,7 +105,7 @@ cfg_rt! {
     ///
     /// If the task panics, the error is a [`JoinError`] that contains the panic:
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::task;
     /// use std::io;
     /// use std::panic;
@@ -124,7 +124,7 @@ cfg_rt! {
     /// ```
     /// Child being detached and outliving its parent:
     ///
-    /// ```no_run
+    /// ```no_run,ignore-wasm
     /// use tokio::task;
     /// use tokio::time;
     /// use std::time::Duration;

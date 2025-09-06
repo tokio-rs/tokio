@@ -30,7 +30,7 @@ use std::sync::Arc;
 ///
 /// Basic usage:
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::{Semaphore, TryAcquireError};
 ///
 /// #[tokio::main]
@@ -60,7 +60,7 @@ use std::sync::Arc;
 /// no more than 100 files at a time. When trying to open the 101st
 /// file, the program will wait until a permit becomes available before
 /// proceeding to open another file.
-/// ```
+/// ```ignore-wasm
 /// use std::io::Result;
 /// use tokio::fs::File;
 /// use tokio::sync::Semaphore;
@@ -89,7 +89,7 @@ use std::sync::Arc;
 /// sent in parallel at any given time. After a task has sent a request, it
 /// drops the permit to allow other tasks to send requests.
 ///
-/// ```
+/// ```ignore-wasm
 /// use std::sync::Arc;
 /// use tokio::sync::Semaphore;
 ///
@@ -143,7 +143,7 @@ use std::sync::Arc;
 /// [`Semaphore::acquire_owned`] to be movable across the task boundary.
 /// (Since our semaphore is not a global variable — if it was, then `acquire` would be enough.)
 ///
-/// ```no_run
+/// ```no_run,ignore-wasm
 /// use std::sync::Arc;
 /// use tokio::sync::Semaphore;
 /// use tokio::net::TcpListener;
@@ -318,7 +318,7 @@ use std::sync::Arc;
 /// [token bucket]: https://en.wikipedia.org/wiki/Token_bucket
 /// [`add_permits`]: crate::sync::Semaphore::add_permits
 /// [`SemaphorePermit::forget`]: crate::sync::SemaphorePermit::forget
-/// ```
+/// ```ignore-wasm
 /// use std::sync::Arc;
 /// use tokio::sync::Semaphore;
 /// use tokio::time::{interval, Duration};
@@ -556,7 +556,7 @@ impl Semaphore {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::Semaphore;
     ///
     /// #[tokio::main]
@@ -609,7 +609,7 @@ impl Semaphore {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::Semaphore;
     ///
     /// #[tokio::main]
@@ -731,7 +731,7 @@ impl Semaphore {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
@@ -792,7 +792,7 @@ impl Semaphore {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
@@ -931,7 +931,7 @@ impl Semaphore {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::Semaphore;
     /// use std::sync::Arc;
     /// use tokio::sync::TryAcquireError;

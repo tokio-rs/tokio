@@ -34,7 +34,7 @@ cfg_io_util! {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::io::{self, AsyncReadExt};
     ///
     /// #[tokio::main]

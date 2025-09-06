@@ -30,7 +30,7 @@ use std::task::Poll;
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::{SetOnce, SetOnceError};
 ///
 /// static ONCE: SetOnce<u32> = SetOnce::const_new();
@@ -57,7 +57,7 @@ use std::task::Poll;
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::sync::{SetOnce, SetOnceError};
 /// use std::sync::Arc;
 ///
@@ -165,7 +165,7 @@ impl<T> SetOnce<T> {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::{SetOnce, SetOnceError};
     ///
     /// static ONCE: SetOnce<u32> = SetOnce::const_new();
@@ -217,7 +217,7 @@ impl<T> SetOnce<T> {
     /// visible in [`tokio-console`]. Instead, [`SetOnce::new_with`] should be
     /// used to create an instrumented object if that is needed.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::sync::SetOnce;
     ///
     /// static ONCE: SetOnce<u32> = SetOnce::const_new_with(1);

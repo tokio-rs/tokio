@@ -33,7 +33,7 @@
 //! [`futures::io::AsyncReadExt::read`] from the `futures` crate to read it after adapting the
 //! stream via [`compat()`].
 //!
-//! ```no_run
+//! ```no_run,ignore-wasm
 //! use tokio::net::{TcpListener, TcpStream};
 //! use tokio::io::AsyncWriteExt;
 //! use tokio_util::compat::TokioAsyncReadCompatExt;
@@ -65,7 +65,7 @@
 //! The reverse is also possible: you can take a [`futures::io::AsyncRead`] (e.g. a cursor) and
 //! adapt it to be used with [`tokio::io::AsyncReadExt::read_to_end`]
 //!
-//! ```
+//! ```ignore-wasm
 //! use futures::io::Cursor;
 //! use tokio_util::compat::FuturesAsyncReadCompatExt;
 //! use tokio::io::AsyncReadExt;

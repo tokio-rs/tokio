@@ -457,7 +457,7 @@ impl<T> DelayQueue<T> {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// # use tokio_util::time::DelayQueue;
     /// # use std::time::Duration;
     ///
@@ -513,7 +513,7 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio::time::{Duration, Instant};
     /// use tokio_util::time::DelayQueue;
     ///
@@ -633,7 +633,7 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
@@ -688,7 +688,7 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
@@ -739,7 +739,7 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
@@ -837,7 +837,7 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio::time::{Duration, Instant};
     /// use tokio_util::time::DelayQueue;
     ///
@@ -894,7 +894,7 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
@@ -927,7 +927,7 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
@@ -979,7 +979,7 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
@@ -1010,7 +1010,7 @@ impl<T> DelayQueue<T> {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
@@ -1052,7 +1052,7 @@ impl<T> DelayQueue<T> {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,ignore-wasm
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
@@ -1087,7 +1087,7 @@ impl<T> DelayQueue<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
@@ -1117,7 +1117,7 @@ impl<T> DelayQueue<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///

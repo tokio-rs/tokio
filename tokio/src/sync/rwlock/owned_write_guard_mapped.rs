@@ -61,7 +61,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
     ///
@@ -112,7 +112,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockWriteGuard};
     ///
@@ -160,7 +160,7 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockMappedWriteGuard<T, U> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::{
     ///     RwLock,
