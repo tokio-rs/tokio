@@ -295,7 +295,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// This method is cancel safe. If `join_next_with_id` is used as the event in a `tokio::select!`
     /// statement and some other branch completes first, it is guaranteed that no tasks were
-    /// removed from this `JoinSet`.
+    /// removed from this `JoinSet`, nor any task's ID freed for re-use by another task.
     ///
     /// [task ID]: crate::task::Id
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
@@ -535,7 +535,9 @@ impl<T: 'static> JoinSet<T> {
     ///  * `Poll::Ready(None)` if the `JoinSet` is empty.
     ///
     /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
-    /// This can happen if the [coop budget] is reached.
+    /// This can happen if the [coop budget] is reached. However, the task's `JoinHandle` is only
+    /// consumed (and the task ID freed for potential re-use) if this method returns
+    /// `Poll::Ready(Some(_))`.
     ///
     /// [coop budget]: crate::task::coop#cooperative-scheduling
     /// [task ID]: crate::task::Id

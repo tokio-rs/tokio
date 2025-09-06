@@ -5,12 +5,18 @@ use std::{fmt, num::NonZeroU64};
 /// An opaque ID that uniquely identifies a task relative to all other currently
 /// running tasks.
 ///
+/// A task's ID may be re-used for another task only once *both* of the
+/// following happen:
+/// 1. The task itself exits.
+/// 2. The task's [`JoinHandle`](crate::task::JoinHandle) is either dropped, or
+///    joined on (for example, by `await`ing it to completion).
+///
 /// # Notes
 ///
-/// - Task IDs are unique relative to other *currently running* tasks. When a
-///   task completes, the same ID may be used for another task.
 /// - Task IDs are *not* sequential, and do not indicate the order in which
 ///   tasks are spawned, what runtime a task is spawned on, or any other data.
+/// - Holding an [`AbortHandle`](crate::task::AbortHandle) alone does not
+///   prevent a completed task's ID from being re-used.
 /// - The task ID of the currently running task can be obtained from inside the
 ///   task via the [`task::try_id()`](crate::task::try_id()) and
 ///   [`task::id()`](crate::task::id()) functions and from outside the task via
