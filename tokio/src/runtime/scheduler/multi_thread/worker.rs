@@ -74,6 +74,11 @@ use std::task::Waker;
 use std::thread;
 use std::time::Duration;
 
+cfg_time! {
+    use crate::runtime::scheduler::util;
+    use crate::runtime::time::{EntryHandle, Wheel, cancellation_queue};
+}
+
 mod metrics;
 
 cfg_taskdump! {
@@ -114,6 +119,18 @@ struct Core {
 
     /// The worker-local run queue.
     run_queue: queue::Local<Arc<Handle>>,
+
+    #[cfg(feature = "time")]
+    /// Worker local timer wheel
+    wheel: Wheel,
+
+    #[cfg(feature = "time")]
+    /// Channel for sending timers that need to be cancelled
+    timer_cancel_tx: cancellation_queue::Sender,
+
+    #[cfg(feature = "time")]
+    /// Channel for receiving timers that need to be cancelled
+    timer_cancel_rx: cancellation_queue::Receiver,
 
     /// True if the worker is currently searching for more work. Searching
     /// involves attempting to steal from other workers.
@@ -193,6 +210,12 @@ pub(crate) struct Synced {
 
     /// Synchronized state for `Inject`.
     pub(crate) inject: inject::Synced,
+
+    #[cfg(feature = "time")]
+    /// Timers pending to be registered.
+    /// This is used to register a timer but the [`Core`]
+    /// is not available in the current thread.
+    inject_timers: Vec<EntryHandle>,
 }
 
 /// Used to communicate with a worker from other threads.
@@ -254,12 +277,20 @@ pub(super) fn create(
         let unpark = park.unpark();
         let metrics = WorkerMetrics::from_config(&config);
         let stats = Stats::new(&metrics);
+        #[cfg(feature = "time")]
+        let (timer_cancel_tx, timer_cancel_rx) = cancellation_queue::new();
 
         cores.push(Box::new(Core {
             tick: 0,
             lifo_slot: None,
             lifo_enabled: !config.disable_lifo_slot,
             run_queue,
+            #[cfg(feature = "time")]
+            wheel: Wheel::new(),
+            #[cfg(feature = "time")]
+            timer_cancel_tx,
+            #[cfg(feature = "time")]
+            timer_cancel_rx,
             is_searching: false,
             is_shutdown: false,
             is_traced: false,
@@ -287,6 +318,8 @@ pub(super) fn create(
             synced: Mutex::new(Synced {
                 idle: idle_synced,
                 inject: inject_synced,
+                #[cfg(feature = "time")]
+                inject_timers: vec![],
             }),
             shutdown_cores: Mutex::new(vec![]),
             trace_status: TraceStatus::new(remotes_len),
@@ -552,13 +585,22 @@ impl Context {
             } else {
                 // Wait for work
                 core = if !self.defer.is_empty() {
-                    self.park_timeout(core, Some(Duration::from_millis(0)))
+                    self.park_yield(core)
                 } else {
                     self.park(core)
                 };
                 core.stats.start_processing_scheduled_tasks();
             }
         }
+
+        #[cfg(feature = "time")]
+        util::time::shutdown_local_timers(
+            &mut core.wheel,
+            &core.timer_cancel_tx,
+            &mut core.timer_cancel_rx,
+            self.worker.handle.take_remote_timers(),
+            &self.worker.handle.driver,
+        );
 
         core.pre_shutdown(&self.worker);
         // Signal shutdown
@@ -701,7 +743,7 @@ impl Context {
 
             // Call `park` with a 0 timeout. This enables the I/O driver, timer, ...
             // to run without actually putting the thread to sleep.
-            core = self.park_timeout(core, Some(Duration::from_millis(0)));
+            core = self.park_yield(core);
 
             // Run regularly scheduled maintenance
             core.maintenance(&self.worker);
@@ -734,7 +776,7 @@ impl Context {
                 core.stats
                     .submit(&self.worker.handle.shared.worker_metrics[self.worker.index]);
 
-                core = self.park_timeout(core, None);
+                core = self.park_internal(core, None);
 
                 core.stats.unparked();
 
@@ -753,8 +795,40 @@ impl Context {
         core
     }
 
-    fn park_timeout(&self, mut core: Box<Core>, duration: Option<Duration>) -> Box<Core> {
+    fn park_yield(&self, core: Box<Core>) -> Box<Core> {
+        self.park_internal(core, Some(Duration::from_millis(0)))
+    }
+
+    fn park_internal(&self, mut core: Box<Core>, duration: Option<Duration>) -> Box<Core> {
         self.assert_lifo_enabled_is_correct(&core);
+
+        #[cfg(feature = "time")]
+        let (duration, maybe_advance_duration) = {
+            let handle = &self.worker.handle;
+
+            util::time::remove_cancelled_timers(&mut core.wheel, &mut core.timer_cancel_rx);
+            let should_yield = util::time::insert_inject_timers(
+                &mut core.wheel,
+                &core.timer_cancel_tx,
+                handle.take_remote_timers(),
+            );
+            let next_timer = util::time::next_expiration_time(&core.wheel, &handle.driver);
+            if should_yield {
+                (Some(Duration::from_millis(0)), None)
+            } else {
+                let dur = match (next_timer, duration) {
+                    (Some(next_timer), Some(park_duration)) => Some(next_timer.min(park_duration)),
+                    (Some(next_timer), None) => Some(next_timer),
+                    (None, Some(park_duration)) => Some(park_duration),
+                    (None, None) => None,
+                };
+                if util::time::pre_auto_advance(&handle.driver, dur) {
+                    (Some(Duration::ZERO), dur)
+                } else {
+                    (dur, None)
+                }
+            }
+        };
 
         // Take the parker out of core
         let mut park = core.park.take().expect("park missing");
@@ -774,6 +848,13 @@ impl Context {
         // Remove `core` from context
         core = self.core.borrow_mut().take().expect("core missing");
 
+        #[cfg(feature = "time")]
+        {
+            let handle = &self.worker.handle;
+            util::time::post_auto_advance(&handle.driver, maybe_advance_duration);
+            util::time::process_expired_timers(&mut core.wheel, &handle.driver);
+        }
+
         // Place `park` back in `core`
         core.park = Some(park);
 
@@ -791,6 +872,31 @@ impl Context {
             waker.wake_by_ref();
         } else {
             self.defer.defer(waker);
+        }
+    }
+
+    cfg_time! {
+        fn with_core<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(Option<&mut Core>) -> R,
+        {
+            match self.core.borrow_mut().as_mut() {
+                Some(core) => f(Some(core)),
+                None => f(None),
+            }
+        }
+
+        pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(Option<(&mut Wheel, cancellation_queue::Sender)>) -> R,
+        {
+            self.with_core(|core| {
+                if let Some(core) = core {
+                    f(Some((&mut core.wheel, core.timer_cancel_tx.clone())))
+                } else {
+                    f(None)
+                }
+            })
         }
     }
 }
@@ -1128,6 +1234,26 @@ impl Handle {
         // safety: passing in correct `idle::Synced`
         unsafe {
             self.shared.inject.push(&mut synced.inject, task);
+        }
+    }
+
+    cfg_time! {
+        /// Push a timer handle from the remote thread.
+        pub(crate) fn push_remote_timer(&self, hdl: EntryHandle) {
+            {
+                let mut synced = self.shared.synced.lock();
+                synced.inject_timers.push(hdl);
+            }
+            self.notify_parked_remote();
+        }
+
+        pub(crate) fn take_remote_timers(&self) -> Vec<EntryHandle> {
+            // It's ok to lost the race, as another worker is
+            // draining the inject_timers.
+            match self.shared.synced.try_lock() {
+                Some(mut synced) => std::mem::take(&mut synced.inject_timers),
+                None => Vec::new(),
+            }
         }
     }
 

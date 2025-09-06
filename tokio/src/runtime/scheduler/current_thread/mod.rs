@@ -22,6 +22,12 @@ use std::thread::ThreadId;
 use std::time::Duration;
 use std::{fmt, thread};
 
+cfg_time! {
+    use crate::runtime::scheduler::util;
+    use crate::runtime::time::{EntryHandle, Wheel, cancellation_queue};
+    use crate::loom::sync::Mutex;
+}
+
 /// Executes tasks on the current thread
 pub(crate) struct CurrentThread {
     /// Core scheduler data is acquired by a thread entering `block_on`.
@@ -62,6 +68,18 @@ struct Core {
     /// Current tick
     tick: u32,
 
+    #[cfg(feature = "time")]
+    /// Worker local timer wheel
+    wheel: Wheel,
+
+    #[cfg(feature = "time")]
+    /// Channel for sending timers that need to be cancelled
+    timer_cancel_tx: cancellation_queue::Sender,
+
+    #[cfg(feature = "time")]
+    /// Channel for receiving timers that need to be cancelled
+    timer_cancel_rx: cancellation_queue::Receiver,
+
     /// Runtime driver
     ///
     /// The driver is removed before starting to park the thread
@@ -82,6 +100,12 @@ struct Core {
 struct Shared {
     /// Remote run queue
     inject: Inject<Arc<Handle>>,
+
+    #[cfg(feature = "time")]
+    /// Timers pending to be registered.
+    /// This is used to register a timer but the [`Core`]
+    /// is not available in the current thread.
+    inject_timers: Mutex<Vec<EntryHandle>>,
 
     /// Collection of all active tasks spawned onto this executor.
     owned: OwnedTasks<Arc<Handle>>,
@@ -152,6 +176,8 @@ impl CurrentThread {
             },
             shared: Shared {
                 inject: Inject::new(),
+                #[cfg(feature = "time")]
+                inject_timers: Mutex::new(Vec::new()),
                 owned: OwnedTasks::new(1),
                 woken: AtomicBool::new(false),
                 config,
@@ -164,9 +190,17 @@ impl CurrentThread {
             local_tid,
         });
 
+        #[cfg(feature = "time")]
+        let (timer_cancel_tx, timer_cancel_rx) = cancellation_queue::new();
         let core = AtomicCell::new(Some(Box::new(Core {
             tasks: VecDeque::with_capacity(INITIAL_CAPACITY),
             tick: 0,
+            #[cfg(feature = "time")]
+            wheel: Wheel::new(),
+            #[cfg(feature = "time")]
+            timer_cancel_tx,
+            #[cfg(feature = "time")]
+            timer_cancel_rx,
             driver: Some(driver),
             metrics: MetricsBatch::new(&handle.shared.worker_metrics),
             global_queue_interval,
@@ -275,7 +309,16 @@ fn shutdown2(mut core: Box<Core>, handle: &Handle) -> Box<Core> {
     // call returns.
     handle.shared.owned.close_and_shutdown_all(0);
 
-    // Drain local queue
+    #[cfg(feature = "time")]
+    util::time::shutdown_local_timers(
+        &mut core.wheel,
+        &core.timer_cancel_tx,
+        &mut core.timer_cancel_rx,
+        handle.take_remote_timers(),
+        &handle.driver,
+    );
+
+    // Drain the local queue
     // We already shut down every task, so we just need to drop the task.
     while let Some(task) = core.next_local_task(handle) {
         drop(task);
@@ -387,12 +430,7 @@ impl Context {
             core.metrics.about_to_park();
             core.submit_metrics(handle);
 
-            let (c, ()) = self.enter(core, || {
-                driver.park(&handle.driver);
-                self.defer.wake();
-            });
-
-            core = c;
+            core = self.park_internal(core, handle, &mut driver, None);
 
             core.metrics.unparked();
             core.submit_metrics(handle);
@@ -413,12 +451,78 @@ impl Context {
 
         core.submit_metrics(handle);
 
-        let (mut core, ()) = self.enter(core, || {
-            driver.park_timeout(&handle.driver, Duration::from_millis(0));
-            self.defer.wake();
-        });
+        core = self.park_internal(core, handle, &mut driver, Some(Duration::from_millis(0)));
 
         core.driver = Some(driver);
+        core
+    }
+
+    fn park_internal(
+        &self,
+        core: Box<Core>,
+        handle: &Handle,
+        driver: &mut Driver,
+        duration: Option<Duration>,
+    ) -> Box<Core> {
+        debug_assert!(core.driver.is_none());
+
+        #[cfg(feature = "time")]
+        let (core, duration, maybe_advance_duration) = {
+            // declare as mutable to avoid compiler warning,
+            // otherwise the compiler will complain that the `core` parameter does not need to be mutable
+            // if the 'time' feature is not enabled.
+            let mut core = core;
+            util::time::remove_cancelled_timers(&mut core.wheel, &mut core.timer_cancel_rx);
+            let should_yield = util::time::insert_inject_timers(
+                &mut core.wheel,
+                &core.timer_cancel_tx,
+                handle.take_remote_timers(),
+            );
+            let next_timer = util::time::next_expiration_time(&core.wheel, &handle.driver);
+            if should_yield {
+                (core, Some(Duration::from_millis(0)), None)
+            } else {
+                let dur = match (next_timer, duration) {
+                    (Some(next_timer), Some(park_duration)) => Some(next_timer.min(park_duration)),
+                    (Some(next_timer), None) => Some(next_timer),
+                    (None, Some(park_duration)) => Some(park_duration),
+                    (None, None) => None,
+                };
+                if util::time::pre_auto_advance(&handle.driver, dur) {
+                    (core, Some(Duration::ZERO), dur)
+                } else {
+                    (core, dur, None)
+                }
+            }
+        };
+
+        let (core, ()) = self.enter(core, || {
+            if let Some(duration) = duration {
+                driver.park_timeout(&handle.driver, duration);
+            } else {
+                driver.park(&handle.driver);
+            }
+        });
+
+        self.defer.wake();
+
+        #[cfg(feature = "time")]
+        let core = {
+            // declare as mutable to avoid compiler warning
+            // error: variable does not need to be mutable
+            //    --> tokio/src/runtime/scheduler/current_thread/mod.rs:497:14
+            //     |
+            // 497 |         let (mut core, ()) = self.enter(core, || {
+            //     |              ----^^^^
+            //     |              |
+            //     |              help: remove this `mut`
+            //     |
+            let mut core = core;
+            util::time::post_auto_advance(&handle.driver, maybe_advance_duration);
+            util::time::process_expired_timers(&mut core.wheel, &handle.driver);
+            core
+        };
+
         core
     }
 
@@ -438,6 +542,29 @@ impl Context {
 
     pub(crate) fn defer(&self, waker: &Waker) {
         self.defer.defer(waker);
+    }
+
+    cfg_time! {
+        fn with_core<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(Option<&mut Core>) -> R,
+        {
+            let mut core = self.core.borrow_mut();
+            f(core.as_mut().map(|c| c.as_mut()))
+        }
+
+        pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(Option<(&mut Wheel, cancellation_queue::Sender)>) -> R,
+        {
+            self.with_core(|maybe_core| {
+                if let Some(core) = maybe_core {
+                    f(Some((&mut core.wheel, core.timer_cancel_tx.clone())))
+                } else {
+                    f(None)
+                }
+            })
+        }
     }
 }
 
@@ -584,6 +711,22 @@ impl Handle {
         assert_eq!(0, worker);
         &self.shared.worker_metrics
     }
+
+    cfg_time! {
+        /// Push a timer handle from the remote thread.
+        pub(crate) fn push_remote_timer(&self, entry: EntryHandle) {
+            {
+                let mut inject_timers = self.shared.inject_timers.lock();
+                inject_timers.push(entry);
+            }
+            self.driver.unpark();
+        }
+
+        pub(crate) fn take_remote_timers(&self) -> Vec<EntryHandle> {
+            let mut inject_timers = self.shared.inject_timers.lock();
+            std::mem::take(&mut inject_timers)
+        }
+    }
 }
 
 cfg_unstable_metrics! {
@@ -646,10 +789,18 @@ impl Schedule for Arc<Handle> {
             Some(CurrentThread(cx)) if Arc::ptr_eq(self, &cx.handle) => {
                 let mut core = cx.core.borrow_mut();
 
-                // If `None`, the runtime is shutting down, so there is no need
-                // to schedule the task.
                 if let Some(core) = core.as_mut() {
                     core.push_task(self, task);
+                } else {
+                    // runtime is shutting down
+                    // OR waking up expired timers
+
+                    // Track that a task was scheduled from **outside** of the runtime.
+                    self.shared.scheduler_metrics.inc_remote_schedule_count();
+
+                    // Schedule the task
+                    self.shared.inject.push(task);
+                    self.driver.unpark();
                 }
             }
             _ => {

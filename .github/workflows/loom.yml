@@ -52,7 +52,7 @@ jobs:
             toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
       - name: run tests
-        run: cargo test --lib --release --features full -- --nocapture runtime::time::tests
+        run: cargo test --lib --release --features full -- --nocapture runtime::time
         working-directory: tokio
 
   loom-current-thread:
