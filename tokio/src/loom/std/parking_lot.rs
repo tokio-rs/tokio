@@ -6,6 +6,7 @@
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use std::panic;
 use std::sync::LockResult;
 use std::time::Duration;
 
@@ -44,6 +45,37 @@ pub(crate) struct RwLockWriteGuard<'a, T: ?Sized>(
     PhantomData<std::sync::RwLockWriteGuard<'a, T>>,
     parking_lot::RwLockWriteGuard<'a, T>,
 );
+
+// `UnwindSafe` and `RefUnwindSafe` traits have been
+// adjusted to match values from std for wrapped types.
+//
+// See <https://github.com/tokio-rs/tokio/pull/7487> for more info.
+
+// parking_lot's `Mutex` is UnwindSafe and !RefUnwindSafe
+// std's `Mutex` is UnwindSafe and RefUnwindSafe
+impl<T: ?Sized> panic::RefUnwindSafe for Mutex<T> {}
+
+// parking_lot's `MutexGuard` is !UnwindSafe and !RefUnwindSafe
+// std's `MutexGuard` is UnwindSafe and RefUnwindSafe
+impl<T: ?Sized> panic::UnwindSafe for MutexGuard<'_, T> {}
+impl<T: ?Sized> panic::RefUnwindSafe for MutexGuard<'_, T> {}
+
+// parking_lot's `RwLock` is UnwindSafe and !RefUnwindSafe
+// std's `RwLock` is UnwindSafe and RefUnwindSafe
+impl<T> panic::RefUnwindSafe for RwLock<T> {}
+
+// parking_lot's `RwLockReadGuard` is !UnwindSafe and !RefUnwindSafe
+// std's `RwLockReadGuard` is UnwindSafe and RefUnwindSafe
+impl<T: ?Sized> panic::UnwindSafe for RwLockReadGuard<'_, T> {}
+impl<T: ?Sized> panic::RefUnwindSafe for RwLockReadGuard<'_, T> {}
+
+// parking_lot's `RwLockWriteGuard` is !UnwindSafe and !RefUnwindSafe
+// std's `RwLockWriteGuard` is UnwindSafe and RefUnwindSafe
+impl<T: ?Sized> panic::UnwindSafe for RwLockWriteGuard<'_, T> {}
+impl<T: ?Sized> panic::RefUnwindSafe for RwLockWriteGuard<'_, T> {}
+
+// parking_lot's `Condvar` is UnwindSafe and RefUnwindSafe
+// std's `Condwar` is UnwindSafe and RefUnwindSafe
 
 impl<T> Mutex<T> {
     #[inline]

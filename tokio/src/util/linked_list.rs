@@ -11,6 +11,7 @@ use core::fmt;
 use core::marker::{PhantomData, PhantomPinned};
 use core::mem::ManuallyDrop;
 use core::ptr::{self, NonNull};
+use std::panic::UnwindSafe;
 
 /// An intrusive linked list.
 ///
@@ -29,6 +30,7 @@ pub(crate) struct LinkedList<L, T> {
 
 unsafe impl<L: Link> Send for LinkedList<L, L::Target> where L::Target: Send {}
 unsafe impl<L: Link> Sync for LinkedList<L, L::Target> where L::Target: Sync {}
+impl<L: Link> UnwindSafe for LinkedList<L, L::Target> {}
 
 /// Defines how a type is tracked within a linked list.
 ///
