@@ -19,7 +19,7 @@
 //! is:
 //!
 //!
-//!     $ cargo run --example connect 127.0.0.1:8080
+//!     $ cargo run --example connect-tcp 127.0.0.1:8080
 //!     GET foo
 //!     foo = bar
 //!     GET FOOBAR

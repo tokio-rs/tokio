@@ -46,7 +46,8 @@ pub trait AsyncRead {
     ///
     /// On success, returns `Poll::Ready(Ok(()))` and places data in the
     /// unfilled portion of `buf`. If no data was read (`buf.filled().len()` is
-    /// unchanged), it implies that EOF has been reached.
+    /// unchanged), it implies that EOF has been reached, or the output buffer
+    /// had zero capacity (i.e. `buf.remaining()` == 0).
     ///
     /// If no data is available for reading, the method returns `Poll::Pending`
     /// and arranges for the current task (via `cx.waker()`) to receive a
