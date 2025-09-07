@@ -85,7 +85,7 @@ async fn recv(
         let n = reader.recv(&mut buf[..]).await?;
 
         if n > 0 {
-            stdout.send(Bytes::from(buf)).await?;
+            stdout.send(Bytes::copy_from_slice(&buf[..n])).await?;
         }
     }
 }
