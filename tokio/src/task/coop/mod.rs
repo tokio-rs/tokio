@@ -306,75 +306,44 @@ cfg_coop! {
     ///
     /// # Examples
     ///
-    /// This example shows a simple countdown latch that uses [`poll_proceed`] to participate in
-    /// cooperative scheduling.
+    /// This example shows a simple async `Zero` reader that acts like [`/dev/zero`], and uses
+    /// `poll_proceed` to cooperate with the Tokio scheduler.
     ///
     /// ```
-    /// use std::future::{Future};
     /// use std::pin::Pin;
-    /// use std::task::{ready, Context, Poll, Waker};
+    /// use std::io::Result as IoResult;
+    /// use std::task::{ready, Context, Poll};
     /// use tokio::task::coop;
+    /// use tokio::io::{AsyncRead, ReadBuf};
     ///
-    /// struct CountdownLatch<T> {
-    ///     counter: usize,
-    ///     value: Option<T>,
-    ///     waker: Option<Waker>
-    /// }
+    /// struct Zero;
     ///
-    /// impl<T> CountdownLatch<T> {
-    ///     fn new(value: T, count: usize) -> Self {
-    ///         CountdownLatch {
-    ///             counter: count,
-    ///             value: Some(value),
-    ///             waker: None
-    ///         }
-    ///     }
-    ///     fn count_down(&mut self) {
-    ///         if self.counter <= 0 {
-    ///             return;
-    ///         }
+    /// impl AsyncRead for Zero {
+    ///     fn poll_read(
+    ///         self: Pin<&mut Self>,
+    ///         cx: &mut Context<'_>,
+    ///         buf: &mut ReadBuf<'_>
+    ///     ) -> Poll<IoResult<()>> {
+    ///        const ZEROES: [u8; 64] = [0; 64];
     ///
-    ///         self.counter -= 1;
-    ///         if self.counter == 0 {
-    ///             if let Some(w) = self.waker.take() {
-    ///                 w.wake();
-    ///             }
-    ///         }
-    ///     }
-    /// }
-    ///
-    /// impl<T> Future for CountdownLatch<T> {
-    ///     type Output = T;
-    ///
-    ///     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-    ///         // `poll_proceed` checks with the runtime if this task is still allowed to proceed
-    ///         // with performing work.
-    ///         // If not, `Pending` is returned and `ready!` ensures this function returns.
-    ///         // If we are allowed to proceed, coop now represents the budget consumption
-    ///         let coop = ready!(coop::poll_proceed(cx));
-    ///
-    ///         // Get a mutable reference to the CountdownLatch
-    ///         let this = Pin::get_mut(self);
-    ///
-    ///         // Next we check if the latch is ready to release its value
-    ///         if this.counter == 0 {
-    ///             let t = this.value.take();
-    ///             // The latch made progress so call `made_progress` to ensure the budget
-    ///             // is not reverted.
-    ///             coop.made_progress();
-    ///             Poll::Ready(t.unwrap())
-    ///         } else {
-    ///             // If the latch is not ready so return pending and simply drop `coop`.
-    ///             // This will restore the budget making it available again to perform any
-    ///             // other work.
-    ///             this.waker = Some(cx.waker().clone());
-    ///             Poll::Pending
-    ///         }
+    ///        let coop = ready!(coop::poll_proceed(cx));
+    ///        if buf.remaining() == 0 {
+    ///            Poll::Ready(Ok(()))
+    ///        } else {
+    ///            while buf.remaining() > 0 {
+    ///                let len = ZEROES.len().min(buf.remaining());
+    ///                buf.put_slice(&ZEROES[..len]);
+    ///            }
+    ///            // we have made progress, so don't restore the budget
+    ///            // when `coop` is dropped.
+    ///            coop.made_progress();
+    ///            Poll::Pending
+    ///        }
     ///     }
     /// }
-    ///
-    /// impl<T> Unpin for CountdownLatch<T> {}
     /// ```
+    ///
+    /// [`/dev/zero`]: https://man7.org/linux/man-pages/man4/zero.4.html
     #[inline]
     pub fn poll_proceed(cx: &mut Context<'_>) -> Poll<RestoreOnPending> {
         context::budget(|cell| {
