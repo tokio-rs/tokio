@@ -579,6 +579,172 @@ impl File {
     pub fn set_max_buf_size(&mut self, max_buf_size: usize) {
         self.max_buf_size = max_buf_size;
     }
+
+    /// Reads a number of bytes starting from a given offset.
+    ///
+    /// Returns the number of bytes read.
+    ///
+    /// The offset is relative to the start of the file and thus independent
+    /// from the current cursor.
+    ///
+    /// The current file cursor is not affected by this function.
+    ///
+    /// It is not an error to return with a short read.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    /// use tokio::io::AsyncSeekExt;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut buf = vec![0_u8; 10];
+    /// let mut file = File::open("foo.txt").await?;
+    /// file.read_at(&mut buf, 5).await?;
+    ///
+    /// assert_eq!(file.stream_position().await?, 0);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    pub async fn read_at(&self, buf: &mut [u8], offset: u64) -> io::Result<usize> {
+        fn _read_at(std: &StdFile, n: usize, offset: u64) -> io::Result<Vec<u8>> {
+            use std::os::unix::fs::FileExt;
+            let mut buf: Vec<u8> = vec![0; n];
+            let n_read = std.read_at(&mut buf, offset)?;
+            buf.truncate(n_read);
+
+            Ok(buf)
+        }
+
+        let std = self.std.clone();
+        let n = buf.len();
+        let bytes_read = asyncify(move || _read_at(&std, n, offset)).await?;
+        let len = bytes_read.len();
+        buf[..len].copy_from_slice(&bytes_read);
+
+        Ok(len)
+    }
+
+    /// Writes a number of bytes starting from a given offset.
+    ///
+    /// Returns the number of bytes written.
+    ///
+    /// The offset is relative to the start of the file and thus independent from
+    /// the current cursor.
+    ///
+    /// The current file cursor is not affected by this function.
+    ///
+    /// When writing beyond the end of the file, the file is appropriately
+    /// extended and the intermediate bytes are initialized with the value 0.
+    ///
+    /// It is not an error to return a short write.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    /// use tokio::io::AsyncSeekExt;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let mut file = File::create("foo.txt").await?;
+    /// file.write_at(b"foo", 5).await?;
+    ///
+    /// assert_eq!(file.stream_position().await?, 0);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    pub async fn write_at(&self, buf: &[u8], offset: u64) -> io::Result<usize> {
+        use std::os::unix::fs::FileExt;
+
+        let std = self.std.clone();
+        let buf_clone = buf.to_vec();
+        asyncify(move || std.write_at(&buf_clone, offset)).await
+    }
+
+    /// Seeks to a given position and reads a number of bytes.
+    ///
+    /// Returns the number of bytes read.
+    ///
+    /// The offset is relative to the start of the file and thus independent from
+    /// the current cursor. The current cursor is affected by this function, it
+    /// is set to the end of the read.
+    ///
+    /// Reading beyond the end of the file will always return with a length of 0.
+    ///
+    /// It is not an error to return with a short read. When returning from
+    /// such a short read, the file pointer is still updated.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.txt").await?;
+    /// let mut buf = vec![0_u8; 10];
+    /// file.seek_read(&mut buf, 5).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(windows)]
+    #[cfg_attr(docsrs, doc(cfg(windows)))]
+    pub async fn seek_read(&self, buf: &mut [u8], offset: u64) -> io::Result<usize> {
+        fn _read_at(std: &StdFile, n: usize, offset: u64) -> io::Result<Vec<u8>> {
+            use std::os::windows::fs::FileExt;
+            let mut buf: Vec<u8> = vec![0; n];
+            let n_read = std.seek_read(&mut buf, offset)?;
+            buf.truncate(n_read);
+
+            Ok(buf)
+        }
+
+        let std = self.std.clone();
+        let n = buf.len();
+        let bytes_read = asyncify(move || _read_at(&std, n, offset)).await?;
+        let len = bytes_read.len();
+        buf[..len].copy_from_slice(&bytes_read);
+
+        Ok(len)
+    }
+
+    /// Seeks to a given position and writes a number of bytes.
+    ///
+    /// Returns the number of bytes written.
+    ///
+    /// The offset is relative to the start of the file and thus independent from
+    /// the current cursor. The current cursor is affected by this function, it
+    /// is set to the end of the write.
+    ///
+    /// When writing beyond the end of the file, the file is appropriately
+    /// extended and the intermediate bytes are set to zero.
+    ///
+    /// It is not an error to return a short write. When returning from such a
+    /// short write, the file pointer is still updated.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::create("foo.txt").await?;
+    /// file.seek_write(b"foo", 5).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(windows)]
+    #[cfg_attr(docsrs, doc(cfg(windows)))]
+    pub async fn seek_write(&self, buf: &[u8], offset: u64) -> io::Result<usize> {
+        use std::os::windows::fs::FileExt;
+
+        let std = self.std.clone();
+        let buf_clone = buf.to_vec();
+        asyncify(move || std.seek_write(&buf_clone, offset)).await
+    }
 }
 
 impl AsyncRead for File {
