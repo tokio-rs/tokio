@@ -306,37 +306,41 @@ cfg_coop! {
     ///
     /// # Examples
     ///
-    /// This example shows a simple async `Zero` reader that acts like [`/dev/zero`], and uses
-    /// `poll_proceed` to cooperate with the Tokio scheduler.
+    /// This example wraps the [`futures::channel::mpsc::UnboundedReceiver`] to
+    /// cooperate with the Tokio scheduler. Each time a value is received, task budget
+    /// is consumed. If no budget is available, the task yields to the scheduler.
     ///
     /// ```
     /// use std::pin::Pin;
-    /// use std::io::Result as IoResult;
     /// use std::task::{ready, Context, Poll};
     /// use tokio::task::coop;
-    /// use tokio::io::{AsyncRead, ReadBuf};
-    /// use bytes::buf::BufMut;
+    /// use futures::stream::{Stream, StreamExt};
+    /// use futures::channel::mpsc::UnboundedReceiver;
     ///
-    /// struct Zero;
+    /// struct CoopUnboundedReceiver<T> {
+    ///    receiver: UnboundedReceiver<T>,
+    /// }
     ///
-    /// impl AsyncRead for Zero {
-    ///     fn poll_read(
-    ///         self: Pin<&mut Self>,
-    ///         cx: &mut Context<'_>,
-    ///         buf: &mut ReadBuf<'_>
-    ///     ) -> Poll<IoResult<()>> {
-    ///        let coop = ready!(coop::poll_proceed(cx));
-    ///        // fill the buffer with zeros
-    ///        buf.put_bytes(0u8, buf.remaining());
-    ///        // we have made progress, so don't restore the budget
-    ///        // when `coop` is dropped.
-    ///        coop.made_progress();
-    ///        Poll::Ready(Ok(()))
+    /// impl<T> Stream for CoopUnboundedReceiver<T> {
+    ///     type Item = T;
+    ///     fn poll_next(
+    ///         mut self: Pin<&mut Self>,
+    ///         cx: &mut Context<'_>
+    ///     ) -> Poll<Option<T>> {
+    ///         let coop = ready!(coop::poll_proceed(cx));
+    ///         match self.receiver.poll_next_unpin(cx) {
+    ///            Poll::Ready(v) => {
+    ///               // We received a value, so consume budget.
+    ///               coop.made_progress();
+    ///               Poll::Ready(v)
+    ///            }
+    ///            Poll::Pending => Poll::Pending,
+    ///        }
     ///     }
     /// }
     /// ```
     ///
-    /// [`/dev/zero`]: https://man7.org/linux/man-pages/man4/zero.4.html
+    /// [`futures::channel::mpsc::UnboundedReceiver`]: https://docs.rs/futures/0.3.31/futures/channel/mpsc/struct.UnboundedReceiver.html
     #[inline]
     pub fn poll_proceed(cx: &mut Context<'_>) -> Poll<RestoreOnPending> {
         context::budget(|cell| {
