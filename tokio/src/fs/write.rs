@@ -40,9 +40,9 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
 }
 
 #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
-async fn write_uring(path: &Path, contents: OwnedBuf) -> io::Result<()> {
+async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
     use crate::{fs::OpenOptions, runtime::driver::op::Op};
-    use std::os::fd::AsFd;
+    use std::os::fd::OwnedFd;
 
     let file = OpenOptions::new()
         .write(true)
@@ -51,25 +51,26 @@ async fn write_uring(path: &Path, contents: OwnedBuf) -> io::Result<()> {
         .open(path)
         .await?;
 
-    let fd = file.as_fd();
+    let mut fd: OwnedFd = file
+        .try_into_std()
+        .expect("unexpected in-flight operation detected")
+        .into();
 
-    let mut pos = 0;
-    let mut buf = contents.as_ref();
-    while !buf.is_empty() {
-        // SAFETY:
-        // If the operation completes successfully, `fd` and `buf` are still
-        // alive within the scope of this function, so remain valid.
-        //
-        // In the case of cancellation, local variables within the scope of
-        // this `async fn` are dropped in the reverse order of their declaration.
-        // Therefore, `Op` is dropped before `fd` and `buf`, ensuring that the
-        // operation finishes gracefully before these resources are dropped.
-        let n = unsafe { Op::write_at(fd, buf, pos) }?.await? as usize;
+    let total: usize = buf.len();
+    let mut offset: usize = 0;
+    while offset < total {
+        // There is a cap on how many bytes we can write in a single uring write operation.
+        // ref: https://github.com/axboe/liburing/discussions/497
+        let len = std::cmp::min(total - offset, u32::MAX as usize) as u32;
+
+        let (n, _buf, _fd) = Op::write_at(fd, buf, offset, len, offset as u64)?.await?;
         if n == 0 {
             return Err(io::ErrorKind::WriteZero.into());
         }
-        buf = &buf[n..];
-        pos += n as u64;
+
+        buf = _buf;
+        fd = _fd;
+        offset += n as usize;
     }
 
     Ok(())

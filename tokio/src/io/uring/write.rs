@@ -1,18 +1,23 @@
-use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
+use crate::{
+    runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op},
+    util::as_ref::OwnedBuf,
+};
 use io_uring::{opcode, types};
 use std::{
-    cmp, io,
-    os::fd::{AsRawFd, BorrowedFd},
+    io,
+    os::fd::{AsRawFd, OwnedFd},
 };
 
 #[derive(Debug)]
-pub(crate) struct Write;
+pub(crate) struct Write {
+    buf: OwnedBuf,
+    fd: OwnedFd,
+}
 
 impl Completable for Write {
-    // The number of bytes written.
-    type Output = u32;
+    type Output = (u32, OwnedBuf, OwnedFd);
     fn complete(self, cqe: CqeResult) -> io::Result<Self::Output> {
-        cqe.result
+        Ok((cqe.result?, self.buf, self.fd))
     }
 }
 
@@ -23,23 +28,31 @@ impl Cancellable for Write {
 }
 
 impl Op<Write> {
-    /// # SAFETY
-    ///
-    /// The caller must ensure that `fd` and `buf` remain valid until the
-    /// operation finishes (or gets cancelled) and the `Op::drop` completes.
-    /// Otherwise, the kernel could access freed memory, breaking soundness.
-    pub(crate) unsafe fn write_at(fd: BorrowedFd<'_>, buf: &[u8], offset: u64) -> io::Result<Self> {
-        // There is a cap on how many bytes we can write in a single uring write operation.
-        // ref: https://github.com/axboe/liburing/discussions/497
-        let len: u32 = cmp::min(buf.len(), u32::MAX as usize) as u32;
+    /// Issue a write that starts at `buf_offset` within `buf` and writes `len` bytes
+    /// into `file` at `file_offset`.
+    pub(crate) fn write_at(
+        fd: OwnedFd,
+        buf: OwnedBuf,
+        buf_offset: usize,
+        len: u32,
+        file_offset: u64,
+    ) -> io::Result<Self> {
+        // Check if `buf_offset` stays in bounds of the allocation
+        debug_assert!(buf_offset + len as usize <= buf.len());
 
-        let sqe = opcode::Write::new(types::Fd(fd.as_raw_fd()), buf.as_ptr(), len)
-            .offset(offset)
+        // SAFETY:
+        // - `buf_offset` stays in bounds of the allocation.
+        // - `buf` is derived from an actual allocation, and the entire memory
+        //    range is in bounds of that allocation.
+        let ptr = unsafe { buf.as_ptr().add(buf_offset) };
+
+        let sqe = opcode::Write::new(types::Fd(fd.as_raw_fd()), ptr, len)
+            .offset(file_offset)
             .build();
 
-        // SAFETY: `fd` and `buf` valid until the operation completes or gets cancelled
-        // and the `Op::drop` completes.
-        let op = unsafe { Op::new(sqe, Write) };
+        // SAFETY: parameters of the entry, such as `fd` and `buf`, are valid
+        // until this operation completes.
+        let op = unsafe { Op::new(sqe, Write { buf, fd }) };
         Ok(op)
     }
 }
