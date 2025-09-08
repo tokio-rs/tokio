@@ -306,7 +306,7 @@ cfg_coop! {
     ///
     /// # Examples
     ///
-    /// This example wraps the [`futures::channel::mpsc::UnboundedReceiver`] to
+    /// This example wraps the `futures::channel::mpsc::UnboundedReceiver` to
     /// cooperate with the Tokio scheduler. Each time a value is received, task budget
     /// is consumed. If no budget is available, the task yields to the scheduler.
     ///
@@ -339,8 +339,6 @@ cfg_coop! {
     ///     }
     /// }
     /// ```
-    ///
-    /// [`futures::channel::mpsc::UnboundedReceiver`]: https://docs.rs/futures/0.3.31/futures/channel/mpsc/struct.UnboundedReceiver.html
     #[inline]
     pub fn poll_proceed(cx: &mut Context<'_>) -> Poll<RestoreOnPending> {
         context::budget(|cell| {
