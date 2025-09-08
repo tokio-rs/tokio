@@ -315,6 +315,7 @@ cfg_coop! {
     /// use std::task::{ready, Context, Poll};
     /// use tokio::task::coop;
     /// use tokio::io::{AsyncRead, ReadBuf};
+    /// use bytes::buf::BufMut;
     ///
     /// struct Zero;
     ///
@@ -324,16 +325,12 @@ cfg_coop! {
     ///         cx: &mut Context<'_>,
     ///         buf: &mut ReadBuf<'_>
     ///     ) -> Poll<IoResult<()>> {
-    ///        const ZEROES: [u8; 64] = [0; 64];
-    ///
     ///        let coop = ready!(coop::poll_proceed(cx));
     ///        if buf.remaining() == 0 {
     ///            Poll::Ready(Ok(()))
     ///        } else {
-    ///            while buf.remaining() > 0 {
-    ///                let len = ZEROES.len().min(buf.remaining());
-    ///                buf.put_slice(&ZEROES[..len]);
-    ///            }
+    ///            // fill the buffer with zeros
+    ///            buf.put_bytes(0u8, buf.remaining());
     ///            // we have made progress, so don't restore the budget
     ///            // when `coop` is dropped.
     ///            coop.made_progress();
