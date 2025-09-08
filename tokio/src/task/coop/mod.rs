@@ -326,16 +326,12 @@ cfg_coop! {
     ///         buf: &mut ReadBuf<'_>
     ///     ) -> Poll<IoResult<()>> {
     ///        let coop = ready!(coop::poll_proceed(cx));
-    ///        if buf.remaining() == 0 {
-    ///            Poll::Ready(Ok(()))
-    ///        } else {
-    ///            // fill the buffer with zeros
-    ///            buf.put_bytes(0u8, buf.remaining());
-    ///            // we have made progress, so don't restore the budget
-    ///            // when `coop` is dropped.
-    ///            coop.made_progress();
-    ///            Poll::Pending
-    ///        }
+    ///        // fill the buffer with zeros
+    ///        buf.put_bytes(0u8, buf.remaining());
+    ///        // we have made progress, so don't restore the budget
+    ///        // when `coop` is dropped.
+    ///        coop.made_progress();
+    ///        Poll::Ready(Ok(()))
     ///     }
     /// }
     /// ```
