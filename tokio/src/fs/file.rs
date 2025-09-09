@@ -465,7 +465,9 @@ impl File {
         self.inner.lock().await.complete_inflight().await;
         let std = self.std.clone();
         let std_file = asyncify(move || std.try_clone()).await?;
-        Ok(File::from_std(std_file))
+        let mut file = File::from_std(std_file);
+        file.set_max_buf_size(self.max_buf_size);
+        Ok(file)
     }
 
     /// Destructures `File` into a [`std::fs::File`]. This function is
