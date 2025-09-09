@@ -933,7 +933,7 @@ impl Command {
     #[inline]
     pub fn spawn_with(
         &mut self,
-        with: impl Fn(&mut StdCommand) -> io::Result<StdChild>,
+        with: impl FnOnce(&mut StdCommand) -> io::Result<StdChild>,
     ) -> io::Result<Child> {
         // On two lines to circumvent a mutable borrow check failure.
         let child = with(&mut self.std)?;

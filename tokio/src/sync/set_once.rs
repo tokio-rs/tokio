@@ -1,14 +1,16 @@
 use super::Notify;
 
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::{atomic::AtomicBool, Mutex};
+use crate::loom::sync::atomic::AtomicBool;
 
 use std::error::Error;
 use std::fmt;
+use std::future::{poll_fn, Future};
 use std::mem::MaybeUninit;
 use std::ops::Drop;
 use std::ptr;
 use std::sync::atomic::Ordering;
+use std::task::Poll;
 
 // This file contains an implementation of an SetOnce. The value of SetOnce
 // can only be modified once during initialization.
@@ -90,9 +92,6 @@ pub struct SetOnce<T> {
     value_set: AtomicBool,
     value: UnsafeCell<MaybeUninit<T>>,
     notify: Notify,
-    // we lock the mutex inside set to ensure
-    // only one caller of set can run at a time
-    lock: Mutex<()>,
 }
 
 impl<T> Default for SetOnce<T> {
@@ -140,7 +139,6 @@ impl<T> From<T> for SetOnce<T> {
             value_set: AtomicBool::new(true),
             value: UnsafeCell::new(MaybeUninit::new(value)),
             notify: Notify::new(),
-            lock: Mutex::new(()),
         }
     }
 }
@@ -152,7 +150,6 @@ impl<T> SetOnce<T> {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(MaybeUninit::uninit()),
             notify: Notify::new(),
-            lock: Mutex::new(()),
         }
     }
 
@@ -195,7 +192,6 @@ impl<T> SetOnce<T> {
             value_set: AtomicBool::new(false),
             value: UnsafeCell::new(MaybeUninit::uninit()),
             notify: Notify::const_new(),
-            lock: Mutex::const_new(()),
         }
     }
 
@@ -246,7 +242,6 @@ impl<T> SetOnce<T> {
             value_set: AtomicBool::new(true),
             value: UnsafeCell::new(MaybeUninit::new(value)),
             notify: Notify::const_new(),
-            lock: Mutex::const_new(()),
         }
     }
 
@@ -287,19 +282,16 @@ impl<T> SetOnce<T> {
             return Err(SetOnceError(value));
         }
 
-        // SAFETY: lock the mutex to ensure only one caller of set
+        // SAFETY: lock notify to ensure only one caller of set
         // can run at a time.
-        let guard = self.lock.lock();
+        let guard = self.notify.lock_waiter_list();
 
         if self.initialized() {
-            // If the value is already set, we return an error
-            drop(guard);
-
             return Err(SetOnceError(value));
         }
 
         // SAFETY: We have locked the mutex and checked if the value is
-        // initalized or not, so we can safely write to the value
+        // initialized or not, so we can safely write to the value
         unsafe {
             self.value.with_mut(|ptr| (*ptr).as_mut_ptr().write(value));
         }
@@ -308,10 +300,8 @@ impl<T> SetOnce<T> {
         // atomic is able to read the value we just stored.
         self.value_set.store(true, Ordering::Release);
 
-        drop(guard);
-
         // notify the waiting wakers that the value is set
-        self.notify.notify_waiters();
+        guard.notify_waiters();
 
         Ok(())
     }
@@ -353,20 +343,17 @@ impl<T> SetOnce<T> {
             }
 
             let notify_fut = self.notify.notified();
-            {
-                // Taking the lock here ensures that a concurrent call to `set`
-                // will see the creation of `notify_fut` in case the check
-                // fails.
-                let _guard = self.lock.lock();
+            pin!(notify_fut);
 
+            poll_fn(|cx| {
+                // Register under the notify's internal lock.
+                let ret = notify_fut.as_mut().poll(cx);
                 if self.value_set.load(Ordering::Relaxed) {
-                    // SAFETY: the state is initialized
-                    return unsafe { self.get_unchecked() };
+                    return Poll::Ready(());
                 }
-            }
-
-            // wait until the value is set
-            notify_fut.await;
+                ret
+            })
+            .await;
         }
     }
 }
