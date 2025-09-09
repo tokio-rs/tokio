@@ -50,6 +50,16 @@ use crate::util::IdleNotifiedSet;
 ///     }
 /// }
 /// ```
+///
+/// # Task ID guarantees
+///
+/// While a task is tracked in a `JoinSet`, that task's ID is unique relative
+/// to all other running tasks in Tokio. For this purpose, tracking a task in a
+/// `JoinSet` is equivalent to holding a [`JoinHandle`] to it. See the [task ID]
+/// documentation for more info.
+///
+/// [`JoinHandle`]: crate::task::JoinHandle
+/// [task ID]: crate::task::Id
 #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub struct JoinSet<T> {
     inner: IdleNotifiedSet<JoinHandle<T>>,
@@ -295,7 +305,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// This method is cancel safe. If `join_next_with_id` is used as the event in a `tokio::select!`
     /// statement and some other branch completes first, it is guaranteed that no tasks were
-    /// removed from this `JoinSet`, nor any task's ID freed for re-use by another task.
+    /// removed from this `JoinSet`.
     ///
     /// [task ID]: crate::task::Id
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
@@ -535,9 +545,7 @@ impl<T: 'static> JoinSet<T> {
     ///  * `Poll::Ready(None)` if the `JoinSet` is empty.
     ///
     /// Note that this method may return `Poll::Pending` even if one of the tasks has completed.
-    /// This can happen if the [coop budget] is reached. However, the task's `JoinHandle` is only
-    /// consumed (and the task ID freed for potential re-use) if this method returns
-    /// `Poll::Ready(Some(_))`.
+    /// This can happen if the [coop budget] is reached.
     ///
     /// [coop budget]: crate::task::coop#cooperative-scheduling
     /// [task ID]: crate::task::Id
