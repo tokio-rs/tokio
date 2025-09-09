@@ -581,6 +581,11 @@ impl File {
     pub fn set_max_buf_size(&mut self, max_buf_size: usize) {
         self.max_buf_size = max_buf_size;
     }
+
+    /// Get the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.
+    pub fn max_buf_size(&self) -> usize {
+        self.max_buf_size
+    }
 }
 
 impl AsyncRead for File {
