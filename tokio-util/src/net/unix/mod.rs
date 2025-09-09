@@ -1,5 +1,5 @@
 //! Unix domain socket helpers.
-
+#![cfg(not(loom))]
 use super::Listener;
 use std::io::Result;
 use std::task::{Context, Poll};
