@@ -988,7 +988,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     ///
     /// This method only clears readiness events that happened before the creation of this guard.
     /// In other words, if the IO resource becomes ready between the creation of the guard and
-    /// this call to `clear_ready`, then the readiness is not actually cleared.
+    /// this call to `clear_ready_matching`, then the readiness is not actually cleared.
     ///
     /// # Examples
     ///
@@ -1212,7 +1212,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     ///
     /// This method only clears readiness events that happened before the creation of this guard.
     /// In other words, if the IO resource becomes ready between the creation of the guard and
-    /// this call to `clear_ready`, then the readiness is not actually cleared.
+    /// this call to `clear_ready_matching`, then the readiness is not actually cleared.
     ///
     /// # Examples
     ///
