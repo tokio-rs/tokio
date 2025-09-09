@@ -329,12 +329,12 @@ cfg_coop! {
     ///     ) -> Poll<Option<T>> {
     ///         let coop = ready!(coop::poll_proceed(cx));
     ///         match self.receiver.poll_next_unpin(cx) {
-    ///            Poll::Ready(v) => {
-    ///               // We received a value, so consume budget.
-    ///               coop.made_progress();
-    ///               Poll::Ready(v)
-    ///            }
-    ///            Poll::Pending => Poll::Pending,
+    ///             Poll::Ready(v) => {
+    ///                 // We received a value, so consume budget.
+    ///                 coop.made_progress();
+    ///                 Poll::Ready(v)
+    ///             }
+    ///             Poll::Pending => Poll::Pending,
     ///        }
     ///     }
     /// }
