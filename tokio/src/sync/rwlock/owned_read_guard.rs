@@ -55,14 +55,14 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockReadGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     /// struct Foo(u32);
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let lock = Arc::new(RwLock::new(Foo(1)));
     ///
@@ -102,14 +102,14 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockReadGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     /// struct Foo(u32);
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let lock = Arc::new(RwLock::new(Foo(1)));
     ///
@@ -143,14 +143,14 @@ impl<T: ?Sized, U: ?Sized> OwnedRwLockReadGuard<T, U> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use std::sync::Arc;
     /// use tokio::sync::{RwLock, OwnedRwLockReadGuard};
     ///
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     /// struct Foo(u32);
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let lock = Arc::new(RwLock::new(Foo(1)));
     ///

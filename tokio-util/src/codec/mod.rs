@@ -46,30 +46,30 @@
 //! will keep reading from an [`AsyncRead`] implementor until a whole frame, according to a codec,
 //! can be parsed.
 //!
-//!```ignore-wasm
+//!```
 //! use tokio_stream::StreamExt;
 //! use tokio_util::codec::LinesCodec;
 //! use tokio_util::codec::FramedRead;
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     let message = "Hello\nWorld".as_bytes();
-//!     let decoder = LinesCodec::new();
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
+//! let message = "Hello\nWorld".as_bytes();
+//! let decoder = LinesCodec::new();
 //!
-//!     // FramedRead can be used to read a stream of values that are framed according to
-//!     // a codec. FramedRead will read from its input (here `buffer`) until a whole frame
-//!     // can be parsed.
-//!     let mut reader = FramedRead::new(message, decoder);
+//! // FramedRead can be used to read a stream of values that are framed according to
+//! // a codec. FramedRead will read from its input (here `buffer`) until a whole frame
+//! // can be parsed.
+//! let mut reader = FramedRead::new(message, decoder);
 //!
-//!     // To read values from a FramedRead, you need to bring the
-//!     // `StreamExt` trait into scope.
-//!     let frame1 = reader.next().await.unwrap().unwrap();
-//!     let frame2 = reader.next().await.unwrap().unwrap();
+//! // To read values from a FramedRead, you need to bring the
+//! // `StreamExt` trait into scope.
+//! let frame1 = reader.next().await.unwrap().unwrap();
+//! let frame2 = reader.next().await.unwrap().unwrap();
 //!
-//!     assert!(reader.next().await.is_none());
-//!     assert_eq!(frame1, "Hello");
-//!     assert_eq!(frame2, "World");
-//! }
+//! assert!(reader.next().await.is_none());
+//! assert_eq!(frame1, "Hello");
+//! assert_eq!(frame2, "World");
+//! # }
 //! ```
 //!
 //! # The Decoder trait

@@ -37,21 +37,21 @@ pub struct Sender<T> {
 ///
 /// # Examples
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio::sync::mpsc::channel;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, _rx) = channel::<i32>(15);
-///     let tx_weak = tx.downgrade();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, _rx) = channel::<i32>(15);
+/// let tx_weak = tx.downgrade();
 ///
-///     // Upgrading will succeed because `tx` still exists.
-///     assert!(tx_weak.upgrade().is_some());
+/// // Upgrading will succeed because `tx` still exists.
+/// assert!(tx_weak.upgrade().is_some());
 ///
-///     // If we drop `tx`, then it will fail.
-///     drop(tx);
-///     assert!(tx_weak.clone().upgrade().is_none());
-/// }
+/// // If we drop `tx`, then it will fail.
+/// drop(tx);
+/// assert!(tx_weak.clone().upgrade().is_none());
+/// # }
 /// ```
 pub struct WeakSender<T> {
     chan: Arc<chan::Chan<T, Semaphore>>,
@@ -131,26 +131,26 @@ pub struct Receiver<T> {
 ///
 /// # Examples
 ///
-/// ```rust,ignore-wasm
+/// ```rust
 /// use tokio::sync::mpsc;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, mut rx) = mpsc::channel(100);
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, mut rx) = mpsc::channel(100);
 ///
-///     tokio::spawn(async move {
-///         for i in 0..10 {
-///             if let Err(_) = tx.send(i).await {
-///                 println!("receiver dropped");
-///                 return;
-///             }
+/// tokio::spawn(async move {
+///     for i in 0..10 {
+///         if let Err(_) = tx.send(i).await {
+///             println!("receiver dropped");
+///             return;
 ///         }
-///     });
-///
-///     while let Some(i) = rx.recv().await {
-///         println!("got = {}", i);
 ///     }
+/// });
+///
+/// while let Some(i) = rx.recv().await {
+///      println!("got = {}", i);
 /// }
+/// # }
 /// ```
 #[track_caller]
 pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
@@ -205,37 +205,37 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(100);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(100);
     ///
-    ///     tokio::spawn(async move {
-    ///         tx.send("hello").await.unwrap();
-    ///     });
+    /// tokio::spawn(async move {
+    ///     tx.send("hello").await.unwrap();
+    /// });
     ///
-    ///     assert_eq!(Some("hello"), rx.recv().await);
-    ///     assert_eq!(None, rx.recv().await);
-    /// }
+    /// assert_eq!(Some("hello"), rx.recv().await);
+    /// assert_eq!(None, rx.recv().await);
+    /// # }
     /// ```
     ///
     /// Values are buffered:
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(100);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(100);
     ///
-    ///     tx.send("hello").await.unwrap();
-    ///     tx.send("world").await.unwrap();
+    /// tx.send("hello").await.unwrap();
+    /// tx.send("world").await.unwrap();
     ///
-    ///     assert_eq!(Some("hello"), rx.recv().await);
-    ///     assert_eq!(Some("world"), rx.recv().await);
-    /// }
+    /// assert_eq!(Some("hello"), rx.recv().await);
+    /// assert_eq!(Some("world"), rx.recv().await);
+    /// # }
     /// ```
     pub async fn recv(&mut self) -> Option<T> {
         use std::future::poll_fn;
@@ -275,43 +275,43 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut buffer: Vec<&str> = Vec::with_capacity(2);
-    ///     let limit = 2;
-    ///     let (tx, mut rx) = mpsc::channel(100);
-    ///     let tx2 = tx.clone();
-    ///     tx2.send("first").await.unwrap();
-    ///     tx2.send("second").await.unwrap();
-    ///     tx2.send("third").await.unwrap();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut buffer: Vec<&str> = Vec::with_capacity(2);
+    /// let limit = 2;
+    /// let (tx, mut rx) = mpsc::channel(100);
+    /// let tx2 = tx.clone();
+    /// tx2.send("first").await.unwrap();
+    /// tx2.send("second").await.unwrap();
+    /// tx2.send("third").await.unwrap();
     ///
-    ///     // Call `recv_many` to receive up to `limit` (2) values.
-    ///     assert_eq!(2, rx.recv_many(&mut buffer, limit).await);
-    ///     assert_eq!(vec!["first", "second"], buffer);
+    /// // Call `recv_many` to receive up to `limit` (2) values.
+    /// assert_eq!(2, rx.recv_many(&mut buffer, limit).await);
+    /// assert_eq!(vec!["first", "second"], buffer);
     ///
-    ///     // If the buffer is full, the next call to `recv_many`
-    ///     // reserves additional capacity.
-    ///     assert_eq!(1, rx.recv_many(&mut buffer, 1).await);
+    /// // If the buffer is full, the next call to `recv_many`
+    /// // reserves additional capacity.
+    /// assert_eq!(1, rx.recv_many(&mut buffer, 1).await);
     ///
-    ///     tokio::spawn(async move {
-    ///         tx.send("fourth").await.unwrap();
-    ///     });
+    /// tokio::spawn(async move {
+    ///     tx.send("fourth").await.unwrap();
+    /// });
     ///
-    ///     // 'tx' is dropped, but `recv_many`
-    ///     // is guaranteed not to return 0 as the channel
-    ///     // is not yet closed.
-    ///     assert_eq!(1, rx.recv_many(&mut buffer, 1).await);
-    ///     assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
+    /// // 'tx' is dropped, but `recv_many`
+    /// // is guaranteed not to return 0 as the channel
+    /// // is not yet closed.
+    /// assert_eq!(1, rx.recv_many(&mut buffer, 1).await);
+    /// assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
     ///
-    ///     // Once the last sender is dropped, the channel is
-    ///     // closed and `recv_many` returns 0, capacity unchanged.
-    ///     drop(tx2);
-    ///     assert_eq!(0, rx.recv_many(&mut buffer, limit).await);
-    ///     assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
-    /// }
+    /// // Once the last sender is dropped, the channel is
+    /// // closed and `recv_many` returns 0, capacity unchanged.
+    /// drop(tx2);
+    /// assert_eq!(0, rx.recv_many(&mut buffer, limit).await);
+    /// assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
+    /// # }
     /// ```
     pub async fn recv_many(&mut self, buffer: &mut Vec<T>, limit: usize) -> usize {
         use std::future::poll_fn;
@@ -337,26 +337,26 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     /// use tokio::sync::mpsc::error::TryRecvError;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(100);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(100);
     ///
-    ///     tx.send("hello").await.unwrap();
+    /// tx.send("hello").await.unwrap();
     ///
-    ///     assert_eq!(Ok("hello"), rx.try_recv());
-    ///     assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    /// assert_eq!(Ok("hello"), rx.try_recv());
+    /// assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
     ///
-    ///     tx.send("hello").await.unwrap();
-    ///     // Drop the last sender, closing the channel.
-    ///     drop(tx);
+    /// tx.send("hello").await.unwrap();
+    /// // Drop the last sender, closing the channel.
+    /// drop(tx);
     ///
-    ///     assert_eq!(Ok("hello"), rx.try_recv());
-    ///     assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
-    /// }
+    /// assert_eq!(Ok("hello"), rx.try_recv());
+    /// assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+    /// # }
     /// ```
     pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         self.chan.try_recv()
@@ -445,29 +445,29 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(20);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(20);
     ///
-    ///     tokio::spawn(async move {
-    ///         let mut i = 0;
-    ///         while let Ok(permit) = tx.reserve().await {
-    ///             permit.send(i);
-    ///             i += 1;
-    ///         }
-    ///     });
-    ///
-    ///     rx.close();
-    ///
-    ///     while let Some(msg) = rx.recv().await {
-    ///         println!("got {}", msg);
+    /// tokio::spawn(async move {
+    ///     let mut i = 0;
+    ///     while let Ok(permit) = tx.reserve().await {
+    ///         permit.send(i);
+    ///         i += 1;
     ///     }
+    /// });
     ///
-    ///     // Channel closed and no messages are lost.
+    /// rx.close();
+    ///
+    /// while let Some(msg) = rx.recv().await {
+    ///     println!("got {}", msg);
     /// }
+    ///
+    /// // Channel closed and no messages are lost.
+    /// # }
     /// ```
     pub fn close(&mut self) {
         self.chan.close();
@@ -482,18 +482,18 @@ impl<T> Receiver<T> {
     /// [`Receiver::close`]: crate::sync::mpsc::Receiver::close
     ///
     /// # Examples
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (_tx, mut rx) = mpsc::channel::<()>(10);
-    ///     assert!(!rx.is_closed());
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (_tx, mut rx) = mpsc::channel::<()>(10);
+    /// assert!(!rx.is_closed());
     ///
-    ///     rx.close();
+    /// rx.close();
     ///
-    ///     assert!(rx.is_closed());
-    /// }
+    /// assert!(rx.is_closed());
+    /// # }
     /// ```
     pub fn is_closed(&self) -> bool {
         self.chan.is_closed()
@@ -504,17 +504,17 @@ impl<T> Receiver<T> {
     /// This method returns `true` if the channel has no messages.
     ///
     /// # Examples
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = mpsc::channel(10);
-    ///     assert!(rx.is_empty());
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = mpsc::channel(10);
+    /// assert!(rx.is_empty());
     ///
-    ///     tx.send(0).await.unwrap();
-    ///     assert!(!rx.is_empty());
-    /// }
+    /// tx.send(0).await.unwrap();
+    /// assert!(!rx.is_empty());
+    /// # }
     ///
     /// ```
     pub fn is_empty(&self) -> bool {
@@ -524,17 +524,17 @@ impl<T> Receiver<T> {
     /// Returns the number of messages in the channel.
     ///
     /// # Examples
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = mpsc::channel(10);
-    ///     assert_eq!(0, rx.len());
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = mpsc::channel(10);
+    /// assert_eq!(0, rx.len());
     ///
-    ///     tx.send(0).await.unwrap();
-    ///     assert_eq!(1, rx.len());
-    /// }
+    /// tx.send(0).await.unwrap();
+    /// assert_eq!(1, rx.len());
+    /// # }
     /// ```
     pub fn len(&self) -> usize {
         self.chan.len()
@@ -549,36 +549,36 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel::<()>(5);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel::<()>(5);
     ///
-    ///     assert_eq!(rx.capacity(), 5);
+    /// assert_eq!(rx.capacity(), 5);
     ///
-    ///     // Making a reservation drops the capacity by one.
-    ///     let permit = tx.reserve().await.unwrap();
-    ///     assert_eq!(rx.capacity(), 4);
-    ///     assert_eq!(rx.len(), 0);
+    /// // Making a reservation drops the capacity by one.
+    /// let permit = tx.reserve().await.unwrap();
+    /// assert_eq!(rx.capacity(), 4);
+    /// assert_eq!(rx.len(), 0);
     ///
-    ///     // Sending and receiving a value increases the capacity by one.
-    ///     permit.send(());
-    ///     assert_eq!(rx.len(), 1);
-    ///     rx.recv().await.unwrap();
-    ///     assert_eq!(rx.capacity(), 5);
+    /// // Sending and receiving a value increases the capacity by one.
+    /// permit.send(());
+    /// assert_eq!(rx.len(), 1);
+    /// rx.recv().await.unwrap();
+    /// assert_eq!(rx.capacity(), 5);
     ///
-    ///     // Directly sending a message drops the capacity by one.
-    ///     tx.send(()).await.unwrap();
-    ///     assert_eq!(rx.capacity(), 4);
-    ///     assert_eq!(rx.len(), 1);
+    /// // Directly sending a message drops the capacity by one.
+    /// tx.send(()).await.unwrap();
+    /// assert_eq!(rx.capacity(), 4);
+    /// assert_eq!(rx.len(), 1);
     ///
-    ///     // Receiving the message increases the capacity by one.
-    ///     rx.recv().await.unwrap();
-    ///     assert_eq!(rx.capacity(), 5);
-    ///     assert_eq!(rx.len(), 0);
-    /// }
+    /// // Receiving the message increases the capacity by one.
+    /// rx.recv().await.unwrap();
+    /// assert_eq!(rx.capacity(), 5);
+    /// assert_eq!(rx.len(), 0);
+    /// # }
     /// ```
     /// [`capacity`]: Receiver::capacity
     /// [`max_capacity`]: Receiver::max_capacity
@@ -596,23 +596,23 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = mpsc::channel::<()>(5);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = mpsc::channel::<()>(5);
     ///
-    ///     // both max capacity and capacity are the same at first
-    ///     assert_eq!(rx.max_capacity(), 5);
-    ///     assert_eq!(rx.capacity(), 5);
+    /// // both max capacity and capacity are the same at first
+    /// assert_eq!(rx.max_capacity(), 5);
+    /// assert_eq!(rx.capacity(), 5);
     ///
-    ///     // Making a reservation doesn't change the max capacity.
-    ///     let permit = tx.reserve().await.unwrap();
-    ///     assert_eq!(rx.max_capacity(), 5);
-    ///     // but drops the capacity by one
-    ///     assert_eq!(rx.capacity(), 4);
-    /// }
+    /// // Making a reservation doesn't change the max capacity.
+    /// let permit = tx.reserve().await.unwrap();
+    /// assert_eq!(rx.max_capacity(), 5);
+    /// // but drops the capacity by one
+    /// assert_eq!(rx.capacity(), 4);
+    /// # }
     /// ```
     /// [`capacity`]: Receiver::capacity
     /// [`max_capacity`]: Receiver::max_capacity
@@ -667,7 +667,7 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use std::task::{Context, Poll};
     /// use std::pin::Pin;
     /// use tokio::sync::mpsc;
@@ -693,25 +693,25 @@ impl<T> Receiver<T> {
     ///     }
     /// }
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = mpsc::channel(32);
-    ///     let mut buffer = Vec::new();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = mpsc::channel(32);
+    /// let mut buffer = Vec::new();
     ///
-    ///     let my_receiver_future = MyReceiverFuture {
-    ///         receiver: rx,
-    ///         buffer: &mut buffer,
-    ///         limit: 3,
-    ///     };
+    /// let my_receiver_future = MyReceiverFuture {
+    ///     receiver: rx,
+    ///     buffer: &mut buffer,
+    ///     limit: 3,
+    /// };
     ///
-    ///     for i in 0..10 {
-    ///         tx.send(i).await.unwrap();
-    ///     }
-    ///
-    ///     let count = my_receiver_future.await;
-    ///     assert_eq!(count, 3);
-    ///     assert_eq!(buffer, vec![0,1,2])
+    /// for i in 0..10 {
+    ///     tx.send(i).await.unwrap();
     /// }
+    ///
+    /// let count = my_receiver_future.await;
+    /// assert_eq!(count, 3);
+    /// assert_eq!(buffer, vec![0,1,2])
+    /// # }
     /// ```
     pub fn poll_recv_many(
         &mut self,
@@ -786,26 +786,26 @@ impl<T> Sender<T> {
     /// In the following example, each call to `send` will block until the
     /// previously sent value was received.
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(1);
     ///
-    ///     tokio::spawn(async move {
-    ///         for i in 0..10 {
-    ///             if let Err(_) = tx.send(i).await {
-    ///                 println!("receiver dropped");
-    ///                 return;
-    ///             }
+    /// tokio::spawn(async move {
+    ///     for i in 0..10 {
+    ///         if let Err(_) = tx.send(i).await {
+    ///             println!("receiver dropped");
+    ///             return;
     ///         }
-    ///     });
-    ///
-    ///     while let Some(i) = rx.recv().await {
-    ///         println!("got = {}", i);
     ///     }
+    /// });
+    ///
+    /// while let Some(i) = rx.recv().await {
+    ///     println!("got = {}", i);
     /// }
+    /// # }
     /// ```
     pub async fn send(&self, value: T) -> Result<(), SendError<T>> {
         match self.reserve().await {
@@ -829,29 +829,29 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx1, rx) = mpsc::channel::<()>(1);
-    ///     let tx2 = tx1.clone();
-    ///     let tx3 = tx1.clone();
-    ///     let tx4 = tx1.clone();
-    ///     let tx5 = tx1.clone();
-    ///     tokio::spawn(async move {
-    ///         drop(rx);
-    ///     });
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx1, rx) = mpsc::channel::<()>(1);
+    /// let tx2 = tx1.clone();
+    /// let tx3 = tx1.clone();
+    /// let tx4 = tx1.clone();
+    /// let tx5 = tx1.clone();
+    /// tokio::spawn(async move {
+    ///     drop(rx);
+    /// });
     ///
-    ///     futures::join!(
-    ///         tx1.closed(),
-    ///         tx2.closed(),
-    ///         tx3.closed(),
-    ///         tx4.closed(),
-    ///         tx5.closed()
-    ///     );
-    ///     println!("Receiver dropped");
-    /// }
+    /// futures::join!(
+    ///     tx1.closed(),
+    ///     tx2.closed(),
+    ///     tx3.closed(),
+    ///     tx4.closed(),
+    ///     tx5.closed()
+    /// );
+    /// println!("Receiver dropped");
+    /// # }
     /// ```
     pub async fn closed(&self) {
         self.chan.closed().await;
@@ -880,40 +880,40 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     // Create a channel with buffer size 1
-    ///     let (tx1, mut rx) = mpsc::channel(1);
-    ///     let tx2 = tx1.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// // Create a channel with buffer size 1
+    /// let (tx1, mut rx) = mpsc::channel(1);
+    /// let tx2 = tx1.clone();
     ///
-    ///     tokio::spawn(async move {
-    ///         tx1.send(1).await.unwrap();
-    ///         tx1.send(2).await.unwrap();
-    ///         // task waits until the receiver receives a value.
-    ///     });
+    /// tokio::spawn(async move {
+    ///     tx1.send(1).await.unwrap();
+    ///     tx1.send(2).await.unwrap();
+    ///     // task waits until the receiver receives a value.
+    /// });
     ///
-    ///     tokio::spawn(async move {
-    ///         // This will return an error and send
-    ///         // no message if the buffer is full
-    ///         let _ = tx2.try_send(3);
-    ///     });
+    /// tokio::spawn(async move {
+    ///     // This will return an error and send
+    ///     // no message if the buffer is full
+    ///     let _ = tx2.try_send(3);
+    /// });
     ///
-    ///     let mut msg;
-    ///     msg = rx.recv().await.unwrap();
-    ///     println!("message {} received", msg);
+    /// let mut msg;
+    /// msg = rx.recv().await.unwrap();
+    /// println!("message {} received", msg);
     ///
-    ///     msg = rx.recv().await.unwrap();
-    ///     println!("message {} received", msg);
+    /// msg = rx.recv().await.unwrap();
+    /// println!("message {} received", msg);
     ///
-    ///     // Third message may have never been sent
-    ///     match rx.recv().await {
-    ///         Some(msg) => println!("message {} received", msg),
-    ///         None => println!("the third message was never sent"),
-    ///     }
+    /// // Third message may have never been sent
+    /// match rx.recv().await {
+    ///     Some(msg) => println!("message {} received", msg),
+    ///     None => println!("the third message was never sent"),
     /// }
+    /// # }
     /// ```
     pub fn try_send(&self, message: T) -> Result<(), TrySendError<T>> {
         match self.chan.semaphore().semaphore.try_acquire(1) {
@@ -954,28 +954,28 @@ impl<T> Sender<T> {
     /// In the following example, each call to `send_timeout` will block until the
     /// previously sent value was received, unless the timeout has elapsed.
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio::sync::mpsc;
     /// use tokio::time::{sleep, Duration};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(1);
     ///
-    ///     tokio::spawn(async move {
-    ///         for i in 0..10 {
-    ///             if let Err(e) = tx.send_timeout(i, Duration::from_millis(100)).await {
-    ///                 println!("send error: #{:?}", e);
-    ///                 return;
-    ///             }
+    /// tokio::spawn(async move {
+    ///     for i in 0..10 {
+    ///         if let Err(e) = tx.send_timeout(i, Duration::from_millis(100)).await {
+    ///             println!("send error: #{:?}", e);
+    ///             return;
     ///         }
-    ///     });
-    ///
-    ///     while let Some(i) = rx.recv().await {
-    ///         println!("got = {}", i);
-    ///         sleep(Duration::from_millis(200)).await;
     ///     }
+    /// });
+    ///
+    /// while let Some(i) = rx.recv().await {
+    ///     println!("got = {}", i);
+    ///     sleep(Duration::from_millis(200)).await;
     /// }
+    /// # }
     /// ```
     #[cfg(feature = "time")]
     #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
@@ -1083,26 +1083,26 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(1);
     ///
-    ///     // Reserve capacity
-    ///     let permit = tx.reserve().await.unwrap();
+    /// // Reserve capacity
+    /// let permit = tx.reserve().await.unwrap();
     ///
-    ///     // Trying to send directly on the `tx` will fail due to no
-    ///     // available capacity.
-    ///     assert!(tx.try_send(123).is_err());
+    /// // Trying to send directly on the `tx` will fail due to no
+    /// // available capacity.
+    /// assert!(tx.try_send(123).is_err());
     ///
-    ///     // Sending on the permit succeeds
-    ///     permit.send(456);
+    /// // Sending on the permit succeeds
+    /// permit.send(456);
     ///
-    ///     // The value sent on the permit is received
-    ///     assert_eq!(rx.recv().await.unwrap(), 456);
-    /// }
+    /// // The value sent on the permit is received
+    /// assert_eq!(rx.recv().await.unwrap(), 456);
+    /// # }
     /// ```
     pub async fn reserve(&self) -> Result<Permit<'_, T>, SendError<()>> {
         self.reserve_inner(1).await?;
@@ -1139,31 +1139,31 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(2);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(2);
     ///
-    ///     // Reserve capacity
-    ///     let mut permit = tx.reserve_many(2).await.unwrap();
+    /// // Reserve capacity
+    /// let mut permit = tx.reserve_many(2).await.unwrap();
     ///
-    ///     // Trying to send directly on the `tx` will fail due to no
-    ///     // available capacity.
-    ///     assert!(tx.try_send(123).is_err());
+    /// // Trying to send directly on the `tx` will fail due to no
+    /// // available capacity.
+    /// assert!(tx.try_send(123).is_err());
     ///
-    ///     // Sending with the permit iterator succeeds
-    ///     permit.next().unwrap().send(456);
-    ///     permit.next().unwrap().send(457);
+    /// // Sending with the permit iterator succeeds
+    /// permit.next().unwrap().send(456);
+    /// permit.next().unwrap().send(457);
     ///
-    ///     // The iterator should now be exhausted
-    ///     assert!(permit.next().is_none());
+    /// // The iterator should now be exhausted
+    /// assert!(permit.next().is_none());
     ///
-    ///     // The value sent on the permit is received
-    ///     assert_eq!(rx.recv().await.unwrap(), 456);
-    ///     assert_eq!(rx.recv().await.unwrap(), 457);
-    /// }
+    /// // The value sent on the permit is received
+    /// assert_eq!(rx.recv().await.unwrap(), 456);
+    /// assert_eq!(rx.recv().await.unwrap(), 457);
+    /// # }
     /// ```
     pub async fn reserve_many(&self, n: usize) -> Result<PermitIterator<'_, T>, SendError<()>> {
         self.reserve_inner(n).await?;
@@ -1202,51 +1202,51 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     /// Sending a message using an [`OwnedPermit`]:
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(1);
     ///
-    ///     // Reserve capacity, moving the sender.
-    ///     let permit = tx.reserve_owned().await.unwrap();
+    /// // Reserve capacity, moving the sender.
+    /// let permit = tx.reserve_owned().await.unwrap();
     ///
-    ///     // Send a message, consuming the permit and returning
-    ///     // the moved sender.
-    ///     let tx = permit.send(123);
+    /// // Send a message, consuming the permit and returning
+    /// // the moved sender.
+    /// let tx = permit.send(123);
     ///
-    ///     // The value sent on the permit is received.
-    ///     assert_eq!(rx.recv().await.unwrap(), 123);
+    /// // The value sent on the permit is received.
+    /// assert_eq!(rx.recv().await.unwrap(), 123);
     ///
-    ///     // The sender can now be used again.
-    ///     tx.send(456).await.unwrap();
-    /// }
+    /// // The sender can now be used again.
+    /// tx.send(456).await.unwrap();
+    /// # }
     /// ```
     ///
     /// When multiple [`OwnedPermit`]s are needed, or the sender cannot be moved
     /// by value, it can be inexpensively cloned before calling `reserve_owned`:
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(1);
     ///
-    ///     // Clone the sender and reserve capacity.
-    ///     let permit = tx.clone().reserve_owned().await.unwrap();
+    /// // Clone the sender and reserve capacity.
+    /// let permit = tx.clone().reserve_owned().await.unwrap();
     ///
-    ///     // Trying to send directly on the `tx` will fail due to no
-    ///     // available capacity.
-    ///     assert!(tx.try_send(123).is_err());
+    /// // Trying to send directly on the `tx` will fail due to no
+    /// // available capacity.
+    /// assert!(tx.try_send(123).is_err());
     ///
-    ///     // Sending on the permit succeeds.
-    ///     permit.send(456);
+    /// // Sending on the permit succeeds.
+    /// permit.send(456);
     ///
-    ///     // The value sent on the permit is received
-    ///     assert_eq!(rx.recv().await.unwrap(), 456);
-    /// }
+    /// // The value sent on the permit is received
+    /// assert_eq!(rx.recv().await.unwrap(), 456);
+    /// # }
     /// ```
     ///
     /// [`Sender::reserve`]: Sender::reserve
@@ -1289,31 +1289,31 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(1);
     ///
-    ///     // Reserve capacity
-    ///     let permit = tx.try_reserve().unwrap();
+    /// // Reserve capacity
+    /// let permit = tx.try_reserve().unwrap();
     ///
-    ///     // Trying to send directly on the `tx` will fail due to no
-    ///     // available capacity.
-    ///     assert!(tx.try_send(123).is_err());
+    /// // Trying to send directly on the `tx` will fail due to no
+    /// // available capacity.
+    /// assert!(tx.try_send(123).is_err());
     ///
-    ///     // Trying to reserve an additional slot on the `tx` will
-    ///     // fail because there is no capacity.
-    ///     assert!(tx.try_reserve().is_err());
+    /// // Trying to reserve an additional slot on the `tx` will
+    /// // fail because there is no capacity.
+    /// assert!(tx.try_reserve().is_err());
     ///
-    ///     // Sending on the permit succeeds
-    ///     permit.send(456);
+    /// // Sending on the permit succeeds
+    /// permit.send(456);
     ///
-    ///     // The value sent on the permit is received
-    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    /// // The value sent on the permit is received
+    /// assert_eq!(rx.recv().await.unwrap(), 456);
     ///
-    /// }
+    /// # }
     /// ```
     pub fn try_reserve(&self) -> Result<Permit<'_, T>, TrySendError<()>> {
         match self.chan.semaphore().semaphore.try_acquire(1) {
@@ -1346,52 +1346,52 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(2);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(2);
     ///
-    ///     // Reserve capacity
-    ///     let mut permit = tx.try_reserve_many(2).unwrap();
+    /// // Reserve capacity
+    /// let mut permit = tx.try_reserve_many(2).unwrap();
     ///
-    ///     // Trying to send directly on the `tx` will fail due to no
-    ///     // available capacity.
-    ///     assert!(tx.try_send(123).is_err());
+    /// // Trying to send directly on the `tx` will fail due to no
+    /// // available capacity.
+    /// assert!(tx.try_send(123).is_err());
     ///
-    ///     // Trying to reserve an additional slot on the `tx` will
-    ///     // fail because there is no capacity.
-    ///     assert!(tx.try_reserve().is_err());
+    /// // Trying to reserve an additional slot on the `tx` will
+    /// // fail because there is no capacity.
+    /// assert!(tx.try_reserve().is_err());
     ///
-    ///     // Sending with the permit iterator succeeds
-    ///     permit.next().unwrap().send(456);
-    ///     permit.next().unwrap().send(457);
+    /// // Sending with the permit iterator succeeds
+    /// permit.next().unwrap().send(456);
+    /// permit.next().unwrap().send(457);
     ///
-    ///     // The iterator should now be exhausted
-    ///     assert!(permit.next().is_none());
+    /// // The iterator should now be exhausted
+    /// assert!(permit.next().is_none());
     ///
-    ///     // The value sent on the permit is received
-    ///     assert_eq!(rx.recv().await.unwrap(), 456);
-    ///     assert_eq!(rx.recv().await.unwrap(), 457);
+    /// // The value sent on the permit is received
+    /// assert_eq!(rx.recv().await.unwrap(), 456);
+    /// assert_eq!(rx.recv().await.unwrap(), 457);
     ///
-    ///     // Trying to call try_reserve_many with 0 will return an empty iterator
-    ///     let mut permit = tx.try_reserve_many(0).unwrap();
-    ///     assert!(permit.next().is_none());
+    /// // Trying to call try_reserve_many with 0 will return an empty iterator
+    /// let mut permit = tx.try_reserve_many(0).unwrap();
+    /// assert!(permit.next().is_none());
     ///
-    ///     // Trying to call try_reserve_many with a number greater than the channel
-    ///     // capacity will return an error
-    ///     let permit = tx.try_reserve_many(3);
-    ///     assert!(permit.is_err());
+    /// // Trying to call try_reserve_many with a number greater than the channel
+    /// // capacity will return an error
+    /// let permit = tx.try_reserve_many(3);
+    /// assert!(permit.is_err());
     ///
-    ///     // Trying to call try_reserve_many on a closed channel will return an error
-    ///     drop(rx);
-    ///     let permit = tx.try_reserve_many(1);
-    ///     assert!(permit.is_err());
+    /// // Trying to call try_reserve_many on a closed channel will return an error
+    /// drop(rx);
+    /// let permit = tx.try_reserve_many(1);
+    /// assert!(permit.is_err());
     ///
-    ///     let permit = tx.try_reserve_many(0);
-    ///     assert!(permit.is_err());
-    /// }
+    /// let permit = tx.try_reserve_many(0);
+    /// assert!(permit.is_err());
+    /// # }
     /// ```
     pub fn try_reserve_many(&self, n: usize) -> Result<PermitIterator<'_, T>, TrySendError<()>> {
         if n > self.max_capacity() {
@@ -1439,31 +1439,31 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(1);
     ///
-    ///     // Reserve capacity
-    ///     let permit = tx.clone().try_reserve_owned().unwrap();
+    /// // Reserve capacity
+    /// let permit = tx.clone().try_reserve_owned().unwrap();
     ///
-    ///     // Trying to send directly on the `tx` will fail due to no
-    ///     // available capacity.
-    ///     assert!(tx.try_send(123).is_err());
+    /// // Trying to send directly on the `tx` will fail due to no
+    /// // available capacity.
+    /// assert!(tx.try_send(123).is_err());
     ///
-    ///     // Trying to reserve an additional slot on the `tx` will
-    ///     // fail because there is no capacity.
-    ///     assert!(tx.try_reserve().is_err());
+    /// // Trying to reserve an additional slot on the `tx` will
+    /// // fail because there is no capacity.
+    /// assert!(tx.try_reserve().is_err());
     ///
-    ///     // Sending on the permit succeeds
-    ///     permit.send(456);
+    /// // Sending on the permit succeeds
+    /// permit.send(456);
     ///
-    ///     // The value sent on the permit is received
-    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    /// // The value sent on the permit is received
+    /// assert_eq!(rx.recv().await.unwrap(), 456);
     ///
-    /// }
+    /// # }
     /// ```
     pub fn try_reserve_owned(self) -> Result<OwnedPermit<T>, TrySendError<Self>> {
         match self.chan.semaphore().semaphore.try_acquire(1) {
@@ -1502,24 +1502,24 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel::<()>(5);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel::<()>(5);
     ///
-    ///     assert_eq!(tx.capacity(), 5);
+    /// assert_eq!(tx.capacity(), 5);
     ///
-    ///     // Making a reservation drops the capacity by one.
-    ///     let permit = tx.reserve().await.unwrap();
-    ///     assert_eq!(tx.capacity(), 4);
+    /// // Making a reservation drops the capacity by one.
+    /// let permit = tx.reserve().await.unwrap();
+    /// assert_eq!(tx.capacity(), 4);
     ///
-    ///     // Sending and receiving a value increases the capacity by one.
-    ///     permit.send(());
-    ///     rx.recv().await.unwrap();
-    ///     assert_eq!(tx.capacity(), 5);
-    /// }
+    /// // Sending and receiving a value increases the capacity by one.
+    /// permit.send(());
+    /// rx.recv().await.unwrap();
+    /// assert_eq!(tx.capacity(), 5);
+    /// # }
     /// ```
     ///
     /// [`send`]: Sender::send
@@ -1551,23 +1551,23 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, _rx) = mpsc::channel::<()>(5);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, _rx) = mpsc::channel::<()>(5);
     ///
-    ///     // both max capacity and capacity are the same at first
-    ///     assert_eq!(tx.max_capacity(), 5);
-    ///     assert_eq!(tx.capacity(), 5);
+    /// // both max capacity and capacity are the same at first
+    /// assert_eq!(tx.max_capacity(), 5);
+    /// assert_eq!(tx.capacity(), 5);
     ///
-    ///     // Making a reservation doesn't change the max capacity.
-    ///     let permit = tx.reserve().await.unwrap();
-    ///     assert_eq!(tx.max_capacity(), 5);
-    ///     // but drops the capacity by one
-    ///     assert_eq!(tx.capacity(), 4);
-    /// }
+    /// // Making a reservation doesn't change the max capacity.
+    /// let permit = tx.reserve().await.unwrap();
+    /// assert_eq!(tx.max_capacity(), 5);
+    /// // but drops the capacity by one
+    /// assert_eq!(tx.capacity(), 4);
+    /// # }
     /// ```
     ///
     /// [`channel`]: channel
@@ -1659,26 +1659,26 @@ impl<T> Permit<'_, T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(1);
     ///
-    ///     // Reserve capacity
-    ///     let permit = tx.reserve().await.unwrap();
+    /// // Reserve capacity
+    /// let permit = tx.reserve().await.unwrap();
     ///
-    ///     // Trying to send directly on the `tx` will fail due to no
-    ///     // available capacity.
-    ///     assert!(tx.try_send(123).is_err());
+    /// // Trying to send directly on the `tx` will fail due to no
+    /// // available capacity.
+    /// assert!(tx.try_send(123).is_err());
     ///
-    ///     // Send a message on the permit
-    ///     permit.send(456);
+    /// // Send a message on the permit
+    /// permit.send(456);
     ///
-    ///     // The value sent on the permit is received
-    ///     assert_eq!(rx.recv().await.unwrap(), 456);
-    /// }
+    /// // The value sent on the permit is received
+    /// assert_eq!(rx.recv().await.unwrap(), 456);
+    /// # }
     /// ```
     pub fn send(self, value: T) {
         use std::mem;
@@ -1784,25 +1784,25 @@ impl<T> OwnedPermit<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::channel(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::channel(1);
     ///
-    ///     // Reserve capacity
-    ///     let permit = tx.reserve_owned().await.unwrap();
+    /// // Reserve capacity
+    /// let permit = tx.reserve_owned().await.unwrap();
     ///
-    ///     // Send a message on the permit, returning the sender.
-    ///     let tx = permit.send(456);
+    /// // Send a message on the permit, returning the sender.
+    /// let tx = permit.send(456);
     ///
-    ///     // The value sent on the permit is received
-    ///     assert_eq!(rx.recv().await.unwrap(), 456);
+    /// // The value sent on the permit is received
+    /// assert_eq!(rx.recv().await.unwrap(), 456);
     ///
-    ///     // We may now reuse `tx` to send another message.
-    ///     tx.send(789).await.unwrap();
-    /// }
+    /// // We may now reuse `tx` to send another message.
+    /// tx.send(789).await.unwrap();
+    /// # }
     /// ```
     pub fn send(mut self, value: T) -> Sender<T> {
         let chan = self.chan.take().unwrap_or_else(|| {
@@ -1818,28 +1818,28 @@ impl<T> OwnedPermit<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = mpsc::channel(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = mpsc::channel(1);
     ///
-    ///     // Clone the sender and reserve capacity
-    ///     let permit = tx.clone().reserve_owned().await.unwrap();
+    /// // Clone the sender and reserve capacity
+    /// let permit = tx.clone().reserve_owned().await.unwrap();
     ///
-    ///     // Trying to send on the original `tx` will fail, since the `permit`
-    ///     // has reserved all the available capacity.
-    ///     assert!(tx.try_send(123).is_err());
+    /// // Trying to send on the original `tx` will fail, since the `permit`
+    /// // has reserved all the available capacity.
+    /// assert!(tx.try_send(123).is_err());
     ///
-    ///     // Release the permit without sending a message, returning the clone
-    ///     // of the sender.
-    ///     let tx2 = permit.release();
+    /// // Release the permit without sending a message, returning the clone
+    /// // of the sender.
+    /// let tx2 = permit.release();
     ///
-    ///     // We may now reuse `tx` to send another message.
-    ///     tx.send(789).await.unwrap();
-    ///     # drop(rx); drop(tx2);
-    /// }
+    /// // We may now reuse `tx` to send another message.
+    /// tx.send(789).await.unwrap();
+    /// # drop(rx); drop(tx2);
+    /// # }
     /// ```
     ///
     /// [`Sender`]: Sender
@@ -1859,22 +1859,22 @@ impl<T> OwnedPermit<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = mpsc::channel::<()>(2);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = mpsc::channel::<()>(2);
     ///
-    ///     let permit1 = tx.clone().reserve_owned().await.unwrap();
-    ///     let permit2 = tx.clone().reserve_owned().await.unwrap();
-    ///     assert!(permit1.same_channel(&permit2));
+    /// let permit1 = tx.clone().reserve_owned().await.unwrap();
+    /// let permit2 = tx.clone().reserve_owned().await.unwrap();
+    /// assert!(permit1.same_channel(&permit2));
     ///
-    ///     let (tx2, rx2) = mpsc::channel::<()>(1);
+    /// let (tx2, rx2) = mpsc::channel::<()>(1);
     ///
-    ///     let permit3 = tx2.clone().reserve_owned().await.unwrap();
-    ///     assert!(!permit3.same_channel(&permit2));
-    /// }
+    /// let permit3 = tx2.clone().reserve_owned().await.unwrap();
+    /// assert!(!permit3.same_channel(&permit2));
+    /// # }
     /// ```
     pub fn same_channel(&self, other: &Self) -> bool {
         self.chan
@@ -1887,19 +1887,19 @@ impl<T> OwnedPermit<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = mpsc::channel::<()>(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = mpsc::channel::<()>(1);
     ///
-    ///     let permit = tx.clone().reserve_owned().await.unwrap();
-    ///     assert!(permit.same_channel_as_sender(&tx));
+    /// let permit = tx.clone().reserve_owned().await.unwrap();
+    /// assert!(permit.same_channel_as_sender(&tx));
     ///
-    ///     let (tx2, rx2) = mpsc::channel::<()>(1);
-    ///     assert!(!permit.same_channel_as_sender(&tx2));
-    /// }
+    /// let (tx2, rx2) = mpsc::channel::<()>(1);
+    /// assert!(!permit.same_channel_as_sender(&tx2));
+    /// # }
     /// ```
     pub fn same_channel_as_sender(&self, sender: &Sender<T>) -> bool {
         self.chan

@@ -36,8 +36,8 @@
 //! scheduling. When a future is wrapped with `unconstrained`, it will never be forced to yield to
 //! Tokio. For example:
 //!
-//! ```ignore-wasm
-//! # #[tokio::main]
+//! ```
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! use tokio::{task, sync::mpsc};
 //!

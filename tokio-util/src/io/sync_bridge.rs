@@ -42,7 +42,7 @@ use tokio::io::{
 /// Explanation: This example demonstrates how to asynchronously read data from a
 /// reader into memory and hash it using a synchronous hashing function. The
 /// `SyncIoBridge` is avoided, ensuring that the async runtime is not blocked.
-/// ```rust,ignore-wasm
+/// ```rust
 /// use tokio::io::AsyncReadExt;
 /// use tokio::io::AsyncRead;
 /// use std::io::Cursor;
@@ -57,15 +57,15 @@ use tokio::io::{
 ///    let hash = blake3::hash(&data);
 ///
 ///    Ok(hash)
-///}
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), std::io::Error> {
-///     // Example: In-memory data.
-///     let data = b"Hello, world!"; // A byte slice.
-///     let reader = Cursor::new(data); // Create an in-memory AsyncRead.
-///     hash_contents(reader).await
 /// }
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), std::io::Error> {
+/// // Example: In-memory data.
+/// let data = b"Hello, world!"; // A byte slice.
+/// let reader = Cursor::new(data); // Create an in-memory AsyncRead.
+/// hash_contents(reader).await
+/// # }
 /// ```
 ///
 /// When the data doesn't fit into memory, the hashing library will usually
@@ -102,19 +102,16 @@ use tokio::io::{
 ///    let hash = hasher.finalize();
 ///
 ///    Ok(hash)
-///}
-///
-/// # /*
-/// #[tokio::main]
-/// # */
-/// # #[tokio::main(flavor = "current_thread")]
-/// async fn main() -> Result<(), std::io::Error> {
-///     // Example: In-memory data.
-///     let data = b"Hello, world!"; // A byte slice.
-///     let reader = Cursor::new(data); // Create an in-memory AsyncRead.
-///     let hasher = Hasher;
-///     hash_stream(reader, hasher).await
 /// }
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), std::io::Error> {
+/// // Example: In-memory data.
+/// let data = b"Hello, world!"; // A byte slice.
+/// let reader = Cursor::new(data); // Create an in-memory AsyncRead.
+/// let hasher = Hasher;
+/// hash_stream(reader, hasher).await
+/// # }
 /// ```
 ///
 ///

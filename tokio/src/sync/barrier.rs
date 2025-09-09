@@ -5,8 +5,8 @@ use crate::util::trace;
 
 /// A barrier enables multiple tasks to synchronize the beginning of some computation.
 ///
-/// ```ignore-wasm
-/// # #[tokio::main]
+/// ```
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() {
 /// use tokio::sync::Barrier;
 /// use std::sync::Arc;

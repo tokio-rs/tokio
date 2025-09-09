@@ -55,28 +55,28 @@ const MAX_READS: u32 = 10;
 ///
 /// # Examples
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio::sync::RwLock;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let lock = RwLock::new(5);
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let lock = RwLock::new(5);
 ///
-///     // many reader locks can be held at once
-///     {
-///         let r1 = lock.read().await;
-///         let r2 = lock.read().await;
-///         assert_eq!(*r1, 5);
-///         assert_eq!(*r2, 5);
-///     } // read locks are dropped at this point
+/// // many reader locks can be held at once
+/// {
+///     let r1 = lock.read().await;
+///     let r2 = lock.read().await;
+///     assert_eq!(*r1, 5);
+///     assert_eq!(*r2, 5);
+/// } // read locks are dropped at this point
 ///
-///     // only one write lock may be held, however
-///     {
-///         let mut w = lock.write().await;
-///         *w += 1;
-///         assert_eq!(*w, 6);
-///     } // write lock is dropped here
-/// }
+/// // only one write lock may be held, however
+/// {
+///     let mut w = lock.write().await;
+///     *w += 1;
+///     assert_eq!(*w, 6);
+/// } // write lock is dropped here
+/// # }
 /// ```
 ///
 /// [`Mutex`]: struct@super::Mutex
@@ -406,27 +406,27 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let lock = Arc::new(RwLock::new(1));
-    ///     let c_lock = lock.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(1));
+    /// let c_lock = lock.clone();
     ///
-    ///     let n = lock.read().await;
-    ///     assert_eq!(*n, 1);
+    /// let n = lock.read().await;
+    /// assert_eq!(*n, 1);
     ///
-    ///     tokio::spawn(async move {
-    ///         // While main has an active read lock, we acquire one too.
-    ///         let r = c_lock.read().await;
-    ///         assert_eq!(*r, 1);
-    ///     }).await.expect("The spawned task has panicked");
+    /// tokio::spawn(async move {
+    ///     // While main has an active read lock, we acquire one too.
+    ///     let r = c_lock.read().await;
+    ///     assert_eq!(*r, 1);
+    /// }).await.expect("The spawned task has panicked");
     ///
-    ///     // Drop the guard after the spawned task finishes.
-    ///     drop(n);
-    /// }
+    /// // Drop the guard after the spawned task finishes.
+    /// drop(n);
+    /// # }
     /// ```
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {
         let acquire_fut = async {
@@ -488,33 +488,33 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```should_panic
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let rwlock = Arc::new(RwLock::new(1));
-    ///     let mut write_lock = rwlock.write().await;
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let rwlock = Arc::new(RwLock::new(1));
+    /// let mut write_lock = rwlock.write().await;
     ///
-    ///     let blocking_task = tokio::task::spawn_blocking({
-    ///         let rwlock = Arc::clone(&rwlock);
-    ///         move || {
-    ///             // This shall block until the `write_lock` is released.
-    ///             let read_lock = rwlock.blocking_read();
-    ///             assert_eq!(*read_lock, 0);
-    ///         }
-    ///     });
+    /// let blocking_task = tokio::task::spawn_blocking({
+    ///     let rwlock = Arc::clone(&rwlock);
+    ///     move || {
+    ///         // This shall block until the `write_lock` is released.
+    ///         let read_lock = rwlock.blocking_read();
+    ///         assert_eq!(*read_lock, 0);
+    ///     }
+    /// });
     ///
-    ///     *write_lock -= 1;
-    ///     drop(write_lock); // release the lock.
+    /// *write_lock -= 1;
+    /// drop(write_lock); // release the lock.
     ///
-    ///     // Await the completion of the blocking task.
-    ///     blocking_task.await.unwrap();
+    /// // Await the completion of the blocking task.
+    /// blocking_task.await.unwrap();
     ///
-    ///     // Assert uncontended.
-    ///     assert!(rwlock.try_write().is_ok());
-    /// }
+    /// // Assert uncontended.
+    /// assert!(rwlock.try_write().is_ok());
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
@@ -551,26 +551,26 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let lock = Arc::new(RwLock::new(1));
-    ///     let c_lock = lock.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(1));
+    /// let c_lock = lock.clone();
     ///
-    ///     let n = lock.read_owned().await;
-    ///     assert_eq!(*n, 1);
+    /// let n = lock.read_owned().await;
+    /// assert_eq!(*n, 1);
     ///
-    ///     tokio::spawn(async move {
-    ///         // While main has an active read lock, we acquire one too.
-    ///         let r = c_lock.read_owned().await;
-    ///         assert_eq!(*r, 1);
-    ///     }).await.expect("The spawned task has panicked");
+    /// tokio::spawn(async move {
+    ///     // While main has an active read lock, we acquire one too.
+    ///     let r = c_lock.read_owned().await;
+    ///     assert_eq!(*r, 1);
+    /// }).await.expect("The spawned task has panicked");
     ///
-    ///     // Drop the guard after the spawned task finishes.
-    ///     drop(n);
+    /// // Drop the guard after the spawned task finishes.
+    /// drop(n);
     ///}
     /// ```
     pub async fn read_owned(self: Arc<Self>) -> OwnedRwLockReadGuard<T> {
@@ -627,27 +627,27 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let lock = Arc::new(RwLock::new(1));
-    ///     let c_lock = lock.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(1));
+    /// let c_lock = lock.clone();
     ///
-    ///     let v = lock.try_read().unwrap();
-    ///     assert_eq!(*v, 1);
+    /// let v = lock.try_read().unwrap();
+    /// assert_eq!(*v, 1);
     ///
-    ///     tokio::spawn(async move {
-    ///         // While main has an active read lock, we acquire one too.
-    ///         let n = c_lock.read().await;
-    ///         assert_eq!(*n, 1);
-    ///     }).await.expect("The spawned task has panicked");
+    /// tokio::spawn(async move {
+    ///     // While main has an active read lock, we acquire one too.
+    ///     let n = c_lock.read().await;
+    ///     assert_eq!(*n, 1);
+    /// }).await.expect("The spawned task has panicked");
     ///
-    ///     // Drop the guard when spawned task finishes.
-    ///     drop(v);
-    /// }
+    /// // Drop the guard when spawned task finishes.
+    /// drop(v);
+    /// # }
     /// ```
     pub fn try_read(&self) -> Result<RwLockReadGuard<'_, T>, TryLockError> {
         match self.s.try_acquire(1) {
@@ -692,27 +692,27 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let lock = Arc::new(RwLock::new(1));
-    ///     let c_lock = lock.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(1));
+    /// let c_lock = lock.clone();
     ///
-    ///     let v = lock.try_read_owned().unwrap();
-    ///     assert_eq!(*v, 1);
+    /// let v = lock.try_read_owned().unwrap();
+    /// assert_eq!(*v, 1);
     ///
-    ///     tokio::spawn(async move {
-    ///         // While main has an active read lock, we acquire one too.
-    ///         let n = c_lock.read_owned().await;
-    ///         assert_eq!(*n, 1);
-    ///     }).await.expect("The spawned task has panicked");
+    /// tokio::spawn(async move {
+    ///     // While main has an active read lock, we acquire one too.
+    ///     let n = c_lock.read_owned().await;
+    ///     assert_eq!(*n, 1);
+    /// }).await.expect("The spawned task has panicked");
     ///
-    ///     // Drop the guard when spawned task finishes.
-    ///     drop(v);
-    /// }
+    /// // Drop the guard when spawned task finishes.
+    /// drop(v);
+    /// # }
     /// ```
     pub fn try_read_owned(self: Arc<Self>) -> Result<OwnedRwLockReadGuard<T>, TryLockError> {
         match self.s.try_acquire(1) {
@@ -758,16 +758,16 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::RwLock;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///   let lock = RwLock::new(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let lock = RwLock::new(1);
     ///
-    ///   let mut n = lock.write().await;
-    ///   *n = 2;
-    ///}
+    /// let mut n = lock.write().await;
+    /// *n = 2;
+    /// # }
     /// ```
     pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
         let acquire_fut = async {
@@ -830,35 +830,35 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```should_panic
     /// use std::sync::Arc;
     /// use tokio::{sync::RwLock};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let rwlock =  Arc::new(RwLock::new(1));
-    ///     let read_lock = rwlock.read().await;
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let rwlock =  Arc::new(RwLock::new(1));
+    /// let read_lock = rwlock.read().await;
     ///
-    ///     let blocking_task = tokio::task::spawn_blocking({
-    ///         let rwlock = Arc::clone(&rwlock);
-    ///         move || {
-    ///             // This shall block until the `read_lock` is released.
-    ///             let mut write_lock = rwlock.blocking_write();
-    ///             *write_lock = 2;
-    ///         }
-    ///     });
+    /// let blocking_task = tokio::task::spawn_blocking({
+    ///     let rwlock = Arc::clone(&rwlock);
+    ///     move || {
+    ///         // This shall block until the `read_lock` is released.
+    ///         let mut write_lock = rwlock.blocking_write();
+    ///         *write_lock = 2;
+    ///     }
+    /// });
     ///
-    ///     assert_eq!(*read_lock, 1);
-    ///     // Release the last outstanding read lock.
-    ///     drop(read_lock);
+    /// assert_eq!(*read_lock, 1);
+    /// // Release the last outstanding read lock.
+    /// drop(read_lock);
     ///
-    ///     // Await the completion of the blocking task.
-    ///     blocking_task.await.unwrap();
+    /// // Await the completion of the blocking task.
+    /// blocking_task.await.unwrap();
     ///
-    ///     // Assert uncontended.
-    ///     let read_lock = rwlock.try_read().unwrap();
-    ///     assert_eq!(*read_lock, 2);
-    /// }
+    /// // Assert uncontended.
+    /// let read_lock = rwlock.try_read().unwrap();
+    /// assert_eq!(*read_lock, 2);
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
@@ -889,16 +889,16 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///   let lock = Arc::new(RwLock::new(1));
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let lock = Arc::new(RwLock::new(1));
     ///
-    ///   let mut n = lock.write_owned().await;
-    ///   *n = 2;
+    /// let mut n = lock.write_owned().await;
+    /// *n = 2;
     ///}
     /// ```
     pub async fn write_owned(self: Arc<Self>) -> OwnedRwLockWriteGuard<T> {
@@ -956,18 +956,18 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::RwLock;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let rw = RwLock::new(1);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let rw = RwLock::new(1);
     ///
-    ///     let v = rw.read().await;
-    ///     assert_eq!(*v, 1);
+    /// let v = rw.read().await;
+    /// assert_eq!(*v, 1);
     ///
-    ///     assert!(rw.try_write().is_err());
-    /// }
+    /// assert!(rw.try_write().is_err());
+    /// # }
     /// ```
     pub fn try_write(&self) -> Result<RwLockWriteGuard<'_, T>, TryLockError> {
         match self.s.try_acquire(self.mr as usize) {
@@ -1013,19 +1013,19 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let rw = Arc::new(RwLock::new(1));
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let rw = Arc::new(RwLock::new(1));
     ///
-    ///     let v = Arc::clone(&rw).read_owned().await;
-    ///     assert_eq!(*v, 1);
+    /// let v = Arc::clone(&rw).read_owned().await;
+    /// assert_eq!(*v, 1);
     ///
-    ///     assert!(rw.try_write_owned().is_err());
-    /// }
+    /// assert!(rw.try_write_owned().is_err());
+    /// # }
     /// ```
     pub fn try_write_owned(self: Arc<Self>) -> Result<OwnedRwLockWriteGuard<T>, TryLockError> {
         match self.s.try_acquire(self.mr as usize) {

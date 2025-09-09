@@ -28,25 +28,25 @@ use std::sync::atomic::Ordering;
 ///
 /// # Example
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio::sync::{SetOnce, SetOnceError};
 ///
 /// static ONCE: SetOnce<u32> = SetOnce::const_new();
 ///
-/// #[tokio::main]
-/// async fn main() -> Result<(), SetOnceError<u32>> {
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), SetOnceError<u32>> {
 ///
-///     // set the value inside a task somewhere...
-///     tokio::spawn(async move { ONCE.set(20) });
+/// // set the value inside a task somewhere...
+/// tokio::spawn(async move { ONCE.set(20) });
 ///
-///     // checking with .get doesn't block main thread
-///     println!("{:?}", ONCE.get());
+/// // checking with .get doesn't block main thread
+/// println!("{:?}", ONCE.get());
 ///
-///     // wait until the value is set, blocks the thread
-///     println!("{:?}", ONCE.wait().await);
+/// // wait until the value is set, blocks the thread
+/// println!("{:?}", ONCE.wait().await);
 ///
-///     Ok(())
-/// }
+/// Ok(())
+/// # }
 /// ```
 ///
 /// A `SetOnce` is typically used for global variables that need to be
@@ -55,34 +55,34 @@ use std::sync::atomic::Ordering;
 ///
 /// # Example
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio::sync::{SetOnce, SetOnceError};
 /// use std::sync::Arc;
 ///
-/// #[tokio::main]
-/// async fn main() -> Result<(), SetOnceError<u32>> {
-///     let once = SetOnce::new();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), SetOnceError<u32>> {
+/// let once = SetOnce::new();
 ///
-///     let arc = Arc::new(once);
-///     let first_cl = Arc::clone(&arc);
-///     let second_cl = Arc::clone(&arc);
+/// let arc = Arc::new(once);
+/// let first_cl = Arc::clone(&arc);
+/// let second_cl = Arc::clone(&arc);
 ///
-///     // set the value inside a task
-///     tokio::spawn(async move { first_cl.set(20) }).await.unwrap()?;
+/// // set the value inside a task
+/// tokio::spawn(async move { first_cl.set(20) }).await.unwrap()?;
 ///
-///     // wait inside task to not block the main thread
-///     tokio::spawn(async move {
-///         // wait inside async context for the value to be set
-///         assert_eq!(*second_cl.wait().await, 20);
-///     }).await.unwrap();
+/// // wait inside task to not block the main thread
+/// tokio::spawn(async move {
+///      // wait inside async context for the value to be set
+///      assert_eq!(*second_cl.wait().await, 20);
+/// }).await.unwrap();
 ///
-///     // subsequent set calls will fail
-///     assert!(arc.set(30).is_err());
+/// // subsequent set calls will fail
+/// assert!(arc.set(30).is_err());
 ///
-///     println!("{:?}", arc.get());
+/// println!("{:?}", arc.get());
 ///
-///     Ok(())
-/// }
+/// Ok(())
+/// # }
 /// ```
 ///
 /// [`asyncio.Event`]: https://docs.python.org/3/library/asyncio-sync.html#asyncio.Event
@@ -168,7 +168,7 @@ impl<T> SetOnce<T> {
     ///
     /// # Example
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::{SetOnce, SetOnceError};
     ///
     /// static ONCE: SetOnce<u32> = SetOnce::const_new();
@@ -178,13 +178,13 @@ impl<T> SetOnce<T> {
     ///     Ok(ONCE.get())
     /// }
     ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), SetOnceError<u32>> {
-    ///     let result = get_global_integer()?;
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> Result<(), SetOnceError<u32>> {
+    /// let result = get_global_integer()?;
     ///
-    ///     assert_eq!(result, Some(&2));
-    ///     Ok(())
-    /// }
+    /// assert_eq!(result, Some(&2));
+    /// Ok(())
+    /// # }
     /// ```
     ///
     /// [`tokio-console`]: https://github.com/tokio-rs/console
@@ -221,7 +221,7 @@ impl<T> SetOnce<T> {
     /// visible in [`tokio-console`]. Instead, [`SetOnce::new_with`] should be
     /// used to create an instrumented object if that is needed.
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::sync::SetOnce;
     ///
     /// static ONCE: SetOnce<u32> = SetOnce::const_new_with(1);
@@ -230,12 +230,12 @@ impl<T> SetOnce<T> {
     ///     ONCE.get()
     /// }
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let result = get_global_integer();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let result = get_global_integer();
     ///
-    ///     assert_eq!(result, Some(&1));
-    /// }
+    /// assert_eq!(result, Some(&1));
+    /// # }
     /// ```
     ///
     /// [`tokio-console`]: https://github.com/tokio-rs/console

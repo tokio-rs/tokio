@@ -25,14 +25,14 @@ use std::task::{self, ready, Poll};
 ///
 /// Wait 100ms and print "100 ms have elapsed".
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio::time::{sleep_until, Instant, Duration};
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     sleep_until(Instant::now() + Duration::from_millis(100)).await;
-///     println!("100 ms have elapsed");
-/// }
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// sleep_until(Instant::now() + Duration::from_millis(100)).await;
+/// println!("100 ms have elapsed");
+/// # }
 /// ```
 ///
 /// See the documentation for the [`Sleep`] type for more examples.
@@ -85,14 +85,14 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 ///
 /// Wait 100ms and print "100 ms have elapsed".
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio::time::{sleep, Duration};
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     sleep(Duration::from_millis(100)).await;
-///     println!("100 ms have elapsed");
-/// }
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// sleep(Duration::from_millis(100)).await;
+/// println!("100 ms have elapsed");
+/// # }
 /// ```
 ///
 /// See the documentation for the [`Sleep`] type for more examples.
@@ -140,35 +140,35 @@ pin_project! {
     ///
     /// Wait 100ms and print "100 ms have elapsed".
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::time::{sleep, Duration};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     sleep(Duration::from_millis(100)).await;
-    ///     println!("100 ms have elapsed");
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// sleep(Duration::from_millis(100)).await;
+    /// println!("100 ms have elapsed");
+    /// # }
     /// ```
     ///
     /// Use with [`select!`]. Pinning the `Sleep` with [`tokio::pin!`] is
     /// necessary when the same `Sleep` is selected on multiple times.
-    /// ```no_run,ignore-wasm
+    /// ```no_run
     /// use tokio::time::{self, Duration, Instant};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let sleep = time::sleep(Duration::from_millis(10));
-    ///     tokio::pin!(sleep);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let sleep = time::sleep(Duration::from_millis(10));
+    /// tokio::pin!(sleep);
     ///
-    ///     loop {
-    ///         tokio::select! {
-    ///             () = &mut sleep => {
-    ///                 println!("timer elapsed");
-    ///                 sleep.as_mut().reset(Instant::now() + Duration::from_millis(50));
-    ///             },
-    ///         }
+    /// loop {
+    ///     tokio::select! {
+    ///         () = &mut sleep => {
+    ///             println!("timer elapsed");
+    ///             sleep.as_mut().reset(Instant::now() + Duration::from_millis(50));
+    ///         },
     ///     }
     /// }
+    /// # }
     /// ```
     /// Use in a struct with boxing. By pinning the `Sleep` with a `Box`, the
     /// `HasSleep` struct implements `Unpin`, even though `Sleep` does not.

@@ -87,49 +87,50 @@ cfg_rt! {
     /// `Result` because panics in the spawned task are caught by Tokio. The `?` operator has
     /// to be double chained to extract the returned value:
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::task;
     /// use std::io;
     ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
-    ///         Ok(5 + 3)
-    ///     });
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> io::Result<()> {
+    /// let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
+    ///     Ok(5 + 3)
+    /// });
     ///
-    ///     let result = join_handle.await??;
-    ///     assert_eq!(result, 8);
-    ///     Ok(())
-    /// }
+    /// let result = join_handle.await??;
+    /// assert_eq!(result, 8);
+    /// Ok(())
+    /// # }
     /// ```
     ///
     /// If the task panics, the error is a [`JoinError`] that contains the panic:
     ///
-    /// ```ignore-wasm
+    /// ```should_panic
     /// use tokio::task;
     /// use std::io;
     /// use std::panic;
     ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
-    ///         panic!("boom");
-    ///     });
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> io::Result<()> {
+    /// let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
+    ///     panic!("boom");
+    /// });
     ///
-    ///     let err = join_handle.await.unwrap_err();
-    ///     assert!(err.is_panic());
-    ///     Ok(())
-    /// }
+    /// let err = join_handle.await.unwrap_err();
+    /// assert!(err.is_panic());
+    /// Ok(())
+    /// # }
     ///
     /// ```
     /// Child being detached and outliving its parent:
     ///
-    /// ```no_run,ignore-wasm
+    /// ```no_run
     /// use tokio::task;
     /// use tokio::time;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main] async fn main() {
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
     /// let original_task = task::spawn(async {
     ///     let _detached_task = task::spawn(async {
     ///         // Here we sleep to make sure that the first task returns before.

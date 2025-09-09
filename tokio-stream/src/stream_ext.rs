@@ -338,59 +338,62 @@ pub trait StreamExt: Stream {
     /// use std::time::Duration;
     /// use std::pin::Pin;
     ///
+    /// # /*
+    /// #[tokio::main]
+    /// # */
     /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() {
+    /// async fn main() {
     /// # time::pause();
-    /// let (tx1, mut rx1) = mpsc::channel::<usize>(10);
-    /// let (tx2, mut rx2) = mpsc::channel::<usize>(10);
+    ///     let (tx1, mut rx1) = mpsc::channel::<usize>(10);
+    ///     let (tx2, mut rx2) = mpsc::channel::<usize>(10);
     ///
-    /// // Convert the channels to a `Stream`.
-    /// let rx1 = Box::pin(async_stream::stream! {
-    ///       while let Some(item) = rx1.recv().await {
-    ///           yield item;
-    ///       }
-    /// }) as Pin<Box<dyn Stream<Item = usize> + Send>>;
+    ///     // Convert the channels to a `Stream`.
+    ///     let rx1 = Box::pin(async_stream::stream! {
+    ///           while let Some(item) = rx1.recv().await {
+    ///               yield item;
+    ///           }
+    ///     }) as Pin<Box<dyn Stream<Item = usize> + Send>>;
     ///
-    /// let rx2 = Box::pin(async_stream::stream! {
-    ///       while let Some(item) = rx2.recv().await {
-    ///           yield item;
-    ///       }
-    /// }) as Pin<Box<dyn Stream<Item = usize> + Send>>;
+    ///     let rx2 = Box::pin(async_stream::stream! {
+    ///           while let Some(item) = rx2.recv().await {
+    ///               yield item;
+    ///           }
+    ///     }) as Pin<Box<dyn Stream<Item = usize> + Send>>;
     ///
-    /// let mut rx = rx1.merge(rx2);
+    ///     let mut rx = rx1.merge(rx2);
     ///
-    /// tokio::spawn(async move {
-    ///     // Send some values immediately
-    ///     tx1.send(1).await.unwrap();
-    ///     tx1.send(2).await.unwrap();
+    ///     tokio::spawn(async move {
+    ///         // Send some values immediately
+    ///         tx1.send(1).await.unwrap();
+    ///         tx1.send(2).await.unwrap();
     ///
-    ///     // Let the other task send values
-    ///     time::sleep(Duration::from_millis(20)).await;
+    ///         // Let the other task send values
+    ///         time::sleep(Duration::from_millis(20)).await;
     ///
-    ///     tx1.send(4).await.unwrap();
-    /// });
+    ///         tx1.send(4).await.unwrap();
+    ///     });
     ///
-    /// tokio::spawn(async move {
-    ///     // Wait for the first task to send values
-    ///     time::sleep(Duration::from_millis(5)).await;
+    ///     tokio::spawn(async move {
+    ///         // Wait for the first task to send values
+    ///         time::sleep(Duration::from_millis(5)).await;
     ///
-    ///     tx2.send(3).await.unwrap();
+    ///         tx2.send(3).await.unwrap();
     ///
-    ///     time::sleep(Duration::from_millis(25)).await;
+    ///         time::sleep(Duration::from_millis(25)).await;
     ///
-    ///     // Send the final value
-    ///     tx2.send(5).await.unwrap();
-    /// });
+    ///         // Send the final value
+    ///         tx2.send(5).await.unwrap();
+    ///     });
     ///
-    /// assert_eq!(1, rx.next().await.unwrap());
-    /// assert_eq!(2, rx.next().await.unwrap());
-    /// assert_eq!(3, rx.next().await.unwrap());
-    /// assert_eq!(4, rx.next().await.unwrap());
-    /// assert_eq!(5, rx.next().await.unwrap());
+    ///    assert_eq!(1, rx.next().await.unwrap());
+    ///    assert_eq!(2, rx.next().await.unwrap());
+    ///    assert_eq!(3, rx.next().await.unwrap());
+    ///    assert_eq!(4, rx.next().await.unwrap());
+    ///    assert_eq!(5, rx.next().await.unwrap());
     ///
-    /// // The merged stream is consumed
-    /// assert!(rx.next().await.is_none());
-    /// # }
+    ///    // The merged stream is consumed
+    ///    assert!(rx.next().await.is_none());
+    /// }
     /// ```
     fn merge<U>(self, other: U) -> Merge<Self, U>
     where

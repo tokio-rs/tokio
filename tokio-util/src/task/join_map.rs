@@ -33,62 +33,62 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 ///
 /// Spawn multiple tasks and wait for them:
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio_util::task::JoinMap;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut map = JoinMap::new();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut map = JoinMap::new();
 ///
-///     for i in 0..10 {
-///         // Spawn a task on the `JoinMap` with `i` as its key.
-///         map.spawn(i, async move { /* ... */ });
-///     }
-///
-///     let mut seen = [false; 10];
-///
-///     // When a task completes, `join_next` returns the task's key along
-///     // with its output.
-///     while let Some((key, res)) = map.join_next().await {
-///         seen[key] = true;
-///         assert!(res.is_ok(), "task {} completed successfully!", key);
-///     }
-///
-///     for i in 0..10 {
-///         assert!(seen[i]);
-///     }
+/// for i in 0..10 {
+///     // Spawn a task on the `JoinMap` with `i` as its key.
+///     map.spawn(i, async move { /* ... */ });
 /// }
+///
+/// let mut seen = [false; 10];
+///
+/// // When a task completes, `join_next` returns the task's key along
+/// // with its output.
+/// while let Some((key, res)) = map.join_next().await {
+///     seen[key] = true;
+///     assert!(res.is_ok(), "task {} completed successfully!", key);
+/// }
+///
+/// for i in 0..10 {
+///     assert!(seen[i]);
+/// }
+/// # }
 /// ```
 ///
 /// Cancel tasks based on their keys:
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio_util::task::JoinMap;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut map = JoinMap::new();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut map = JoinMap::new();
 ///
-///     map.spawn("hello world", std::future::ready(1));
-///     map.spawn("goodbye world", std::future::pending());
+/// map.spawn("hello world", std::future::ready(1));
+/// map.spawn("goodbye world", std::future::pending());
 ///
-///     // Look up the "goodbye world" task in the map and abort it.
-///     let aborted = map.abort("goodbye world");
+/// // Look up the "goodbye world" task in the map and abort it.
+/// let aborted = map.abort("goodbye world");
 ///
-///     // `JoinMap::abort` returns `true` if a task existed for the
-///     // provided key.
-///     assert!(aborted);
+/// // `JoinMap::abort` returns `true` if a task existed for the
+/// // provided key.
+/// assert!(aborted);
 ///
-///     while let Some((key, res)) = map.join_next().await {
-///         if key == "goodbye world" {
-///             // The aborted task should complete with a cancelled `JoinError`.
-///             assert!(res.unwrap_err().is_cancelled());
-///         } else {
-///             // Other tasks should complete normally.
-///             assert_eq!(res.unwrap(), 1);
-///         }
+/// while let Some((key, res)) = map.join_next().await {
+///     if key == "goodbye world" {
+///         // The aborted task should complete with a cancelled `JoinError`.
+///         assert!(res.unwrap_err().is_cancelled());
+///     } else {
+///         // Other tasks should complete normally.
+///         assert_eq!(res.unwrap(), 1);
 ///     }
 /// }
+/// # }
 /// ```
 ///
 /// [`JoinSet`]: tokio::task::JoinSet
@@ -185,8 +185,8 @@ impl<K, V, S> JoinMap<K, V, S> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
+    /// ```
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;
     /// use std::collections::hash_map::RandomState;
@@ -518,10 +518,10 @@ where
     /// ```
     ///
     /// `abort` returns `true` if a task was aborted:
-    /// ```ignore-wasm
+    /// ```
     /// use tokio_util::task::JoinMap;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut map = JoinMap::new();
     ///
@@ -685,8 +685,8 @@ where
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
+    /// ```
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;
     ///
@@ -714,8 +714,8 @@ where
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
-    /// # #[tokio::main]
+    /// ```
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;
     ///

@@ -67,10 +67,11 @@
 //! A `JoinHandle` is itself a future which may be used to await the output of
 //! the spawned task. For example:
 //!
-//! ```ignore-wasm
+//! ```
 //! use tokio::task;
 //!
-//! # #[tokio::main] async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let join = task::spawn(async {
 //!     // ...
 //!     "hello world!"
@@ -89,10 +90,11 @@
 //! task panics, awaiting its `JoinHandle` will return a [`JoinError`]. For
 //! example:
 //!
-//! ```ignore-wasm
+//! ```should_panic
 //! use tokio::task;
 //!
-//! # #[tokio::main] async fn main() {
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
 //! let join = task::spawn(async {
 //!     panic!("something bad happened!")
 //! });
@@ -242,10 +244,11 @@
 //! scheduled. Eventually, the yielding task will be polled again, allowing it
 //! to execute. For example:
 //!
-//! ```rust,ignore-wasm
+//! ```rust
 //! use tokio::task;
 //!
-//! # #[tokio::main] async fn main() {
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
 //! async {
 //!     task::spawn(async {
 //!         // ...

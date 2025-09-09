@@ -55,7 +55,7 @@ macro_rules! doc {
         ///
         /// Basic join with two branches
         ///
-        /// ```ignore-wasm
+        /// ```
         /// async fn do_stuff_async() {
         ///     // async work
         /// }
@@ -64,14 +64,14 @@ macro_rules! doc {
         ///     // more here
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let (first, second) = tokio::join!(
-        ///         do_stuff_async(),
-        ///         more_async_work());
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let (first, second) = tokio::join!(
+        ///     do_stuff_async(),
+        ///     more_async_work());
         ///
-        ///     // do something with the values
-        /// }
+        /// // do something with the values
+        /// # }
         /// ```
         ///
         /// Using the `biased;` mode to control polling order.
@@ -85,16 +85,16 @@ macro_rules! doc {
         ///     // more here
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let (first, second) = tokio::join!(
-        ///         biased;
-        ///         do_stuff_async(),
-        ///         more_async_work()
-        ///     );
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let (first, second) = tokio::join!(
+        ///     biased;
+        ///     do_stuff_async(),
+        ///     more_async_work()
+        /// );
         ///
-        ///     // do something with the values
-        /// }
+        /// // do something with the values
+        /// # }
         /// ```
 
         #[macro_export]

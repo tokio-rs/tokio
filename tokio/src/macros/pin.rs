@@ -24,20 +24,20 @@
 ///
 /// To make this work requires pinning:
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio::pin;
 ///
 /// async fn my_async_fn() {
 ///     // async logic here
 /// }
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let future = my_async_fn();
-///     pin!(future);
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let future = my_async_fn();
+/// pin!(future);
 ///
-///     (&mut future).await;
-/// }
+/// (&mut future).await;
+/// # }
 /// ```
 ///
 /// Pinning is useful when using `select!` and stream operators that require `T:
@@ -69,7 +69,7 @@
 ///
 /// Using with select:
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio::{pin, select};
 /// use tokio_stream::{self as stream, StreamExt};
 ///
@@ -77,49 +77,49 @@
 ///     // async logic here
 /// }
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut stream = stream::iter(vec![1, 2, 3, 4]);
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut stream = stream::iter(vec![1, 2, 3, 4]);
 ///
-///     let future = my_async_fn();
-///     pin!(future);
+/// let future = my_async_fn();
+/// pin!(future);
 ///
-///     loop {
-///         select! {
-///             _ = &mut future => {
-///                 // Stop looping `future` will be polled after completion
-///                 break;
-///             }
-///             Some(val) = stream.next() => {
-///                 println!("got value = {}", val);
-///             }
+/// loop {
+///     select! {
+///         _ = &mut future => {
+///             // Stop looping `future` will be polled after completion
+///             break;
+///         }
+///         Some(val) = stream.next() => {
+///             println!("got value = {}", val);
 ///         }
 ///     }
 /// }
+/// # }
 /// ```
 ///
 /// Because assigning to a variable followed by pinning is common, there is also
 /// a variant of the macro that supports doing both in one go.
 ///
-/// ```ignore-wasm
+/// ```
 /// use tokio::{pin, select};
 ///
 /// async fn my_async_fn() {
 ///     // async logic here
 /// }
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     pin! {
-///         let future1 = my_async_fn();
-///         let future2 = my_async_fn();
-///     }
-///
-///     select! {
-///         _ = &mut future1 => {}
-///         _ = &mut future2 => {}
-///     }
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// pin! {
+///     let future1 = my_async_fn();
+///     let future2 = my_async_fn();
 /// }
+///
+/// select! {
+///     _ = &mut future1 => {}
+///     _ = &mut future2 => {}
+/// }
+/// # }
 /// ```
 #[macro_export]
 macro_rules! pin {

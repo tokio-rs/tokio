@@ -102,7 +102,7 @@ cfg_rt! {
     ///
     /// For example, this will work:
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio::task;
     ///
     /// use std::rc::Rc;
@@ -112,18 +112,18 @@ cfg_rt! {
     /// # drop(rc);
     /// }
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     tokio::spawn(async {
-    ///         // Force the `Rc` to stay in a scope with no `.await`
-    ///         {
-    ///             let rc = Rc::new(());
-    ///             use_rc(rc.clone());
-    ///         }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// tokio::spawn(async {
+    ///     // Force the `Rc` to stay in a scope with no `.await`
+    ///     {
+    ///         let rc = Rc::new(());
+    ///         use_rc(rc.clone());
+    ///     }
     ///
-    ///         task::yield_now().await;
-    ///     }).await.unwrap();
-    /// }
+    ///     task::yield_now().await;
+    /// }).await.unwrap();
+    /// # }
     /// ```
     ///
     /// This will **not** work:

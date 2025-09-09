@@ -452,11 +452,11 @@ impl<T> DelayQueue<T> {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// # use tokio_util::time::DelayQueue;
     /// # use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::with_capacity(10);
     ///
@@ -508,11 +508,11 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio::time::{Duration, Instant};
     /// use tokio_util::time::DelayQueue;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert_at(
@@ -628,11 +628,11 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -683,11 +683,11 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -734,11 +734,11 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -832,11 +832,11 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio::time::{Duration, Instant};
     /// use tokio_util::time::DelayQueue;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -889,11 +889,11 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::with_capacity(10);
     ///
@@ -922,11 +922,11 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -974,11 +974,11 @@ impl<T> DelayQueue<T> {
     ///
     /// Basic usage
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -1005,11 +1005,11 @@ impl<T> DelayQueue<T> {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -1047,11 +1047,11 @@ impl<T> DelayQueue<T> {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore-wasm
+    /// ```rust
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
     /// assert_eq!(delay_queue.len(), 0);
@@ -1082,11 +1082,11 @@ impl<T> DelayQueue<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -1112,11 +1112,11 @@ impl<T> DelayQueue<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// assert!(delay_queue.is_empty());
