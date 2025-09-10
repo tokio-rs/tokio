@@ -706,10 +706,10 @@ impl<T> Receiver<T> {
     /// If the newest value in the channel has not yet been marked seen when
     /// this method is called, the method marks that value seen and returns
     /// immediately. If the newest value has already been marked seen, then the
-    /// method sleeps until a new message is sent by the [`Sender`] connected to
-    /// this `Receiver`, or until the [`Sender`] is dropped.
+    /// method sleeps until a new message is sent by a [`Sender`] connected to
+    /// this `Receiver`, or until all [`Sender`]s are dropped.
     ///
-    /// This method returns an error if and only if the [`Sender`] is dropped.
+    /// This method returns an error if and only if all [`Sender`]s are dropped.
     ///
     /// For more information, see
     /// [*Change notifications*](self#change-notifications) in the module-level documentation.
@@ -738,6 +738,8 @@ impl<T> Receiver<T> {
     ///
     ///     assert!(rx.changed().await.is_ok());
     ///     assert_eq!(*rx.borrow_and_update(), "goodbye");
+    ///
+    ///     drop(tx);
     ///
     ///     // The `tx` handle has been dropped
     ///     assert!(rx.changed().await.is_err());
