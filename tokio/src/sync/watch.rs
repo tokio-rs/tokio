@@ -30,7 +30,7 @@
 //! method is ready when a new, *unseen* value is sent via the [`Sender`] half.
 //!
 //! * [`Receiver::changed()`] returns `Ok(())` on receiving a new value, or
-//!   `Err(`[`error::RecvError`]`)` if the [`Sender`] has been dropped.
+//!   `Err(`[`error::RecvError`]`)` if all [`Sender`]s have been dropped.
 //! * If the current value is *unseen* when calling [`changed`], then
 //!   [`changed`] will return immediately. If the current value is *seen*, then
 //!   it will sleep until either a new message is sent via the [`Sender`] half,
