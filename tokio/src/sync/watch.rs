@@ -670,7 +670,7 @@ impl<T> Receiver<T> {
         // Load the version from the state
         let state = self.shared.state.load();
         if state.is_closed() {
-            // The sender has dropped.
+            // All senders have dropped.
             return Err(error::RecvError(()));
         }
         let new_version = state.version();
