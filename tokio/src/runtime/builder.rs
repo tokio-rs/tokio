@@ -151,7 +151,7 @@ cfg_unstable! {
         ///
         /// # Examples
         ///
-        /// ```should_panic
+        /// ```ignore-wasm
         /// use tokio::runtime::{self, UnhandledPanic};
         ///
         /// # pub fn main() {

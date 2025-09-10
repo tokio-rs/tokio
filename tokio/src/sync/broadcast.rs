@@ -1521,21 +1521,21 @@ impl<T: Clone> Receiver<T> {
     /// context.
     ///
     /// # Examples
-    /// ```should_panic
+    /// ```ignore-wasm
     /// use std::thread;
     /// use tokio::sync::broadcast;
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() {
-    /// let (tx, mut rx) = broadcast::channel(16);
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = broadcast::channel(16);
     ///
-    /// let sync_code = thread::spawn(move || {
-    ///     assert_eq!(rx.blocking_recv(), Ok(10));
-    /// });
+    ///     let sync_code = thread::spawn(move || {
+    ///         assert_eq!(rx.blocking_recv(), Ok(10));
+    ///     });
     ///
-    /// let _ = tx.send(10);
-    /// sync_code.join().unwrap();
-    /// # }
+    ///     let _ = tx.send(10);
+    ///     sync_code.join().unwrap();
+    /// }
     /// ```
     pub fn blocking_recv(&mut self) -> Result<T, RecvError> {
         crate::future::block_on(self.recv())

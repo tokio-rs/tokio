@@ -1038,19 +1038,19 @@ impl<T> Receiver<T> {
     ///
     /// Terminated channels are empty.
     ///
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use tokio::sync::oneshot;
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() {
-    /// let (tx, mut rx) = oneshot::channel();
-    /// tx.send(0).unwrap();
-    /// let _ = (&mut rx).await;
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel();
+    ///     tx.send(0).unwrap();
+    ///     let _ = (&mut rx).await;
     ///
-    /// // NB: an empty channel is not necessarily safe to poll!
-    /// assert!(rx.is_empty());
-    /// let _ = (&mut rx).await;
-    /// # }
+    ///     // NB: an empty channel is not necessarily safe to poll!
+    ///     assert!(rx.is_empty());
+    ///     let _ = (&mut rx).await;
+    /// }
     /// ```
     pub fn is_empty(&self) -> bool {
         let Some(inner) = self.inner.as_ref() else {
@@ -1188,21 +1188,21 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```should_panic
+    /// ```ignore-wasm
     /// use std::thread;
     /// use tokio::sync::oneshot;
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() {
-    /// let (tx, rx) = oneshot::channel::<u8>();
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = oneshot::channel::<u8>();
     ///
-    /// let sync_code = thread::spawn(move || {
-    ///     assert_eq!(Ok(10), rx.blocking_recv());
-    /// });
+    ///     let sync_code = thread::spawn(move || {
+    ///         assert_eq!(Ok(10), rx.blocking_recv());
+    ///     });
     ///
-    /// let _ = tx.send(10);
-    /// sync_code.join().unwrap();
-    /// # }
+    ///     let _ = tx.send(10);
+    ///     sync_code.join().unwrap();
+    /// }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]

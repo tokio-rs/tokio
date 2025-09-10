@@ -90,11 +90,10 @@
 //! task panics, awaiting its `JoinHandle` will return a [`JoinError`]. For
 //! example:
 //!
-//! ```should_panic
+//! ```ignore-wasm
 //! use tokio::task;
 //!
-//! # #[tokio::main(flavor = "current_thread")]
-//! # async fn main() {
+//! # #[tokio::main] async fn main() {
 //! let join = task::spawn(async {
 //!     panic!("something bad happened!")
 //! });

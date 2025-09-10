@@ -208,27 +208,27 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// Spawn multiple blocking tasks and wait for them.
     ///
-    /// ```should_panic
+    /// ```ignore-wasm
     /// use tokio::task::JoinSet;
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() {
-    /// let mut set = JoinSet::new();
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let mut set = JoinSet::new();
     ///
-    /// for i in 0..10 {
-    ///     set.spawn_blocking(move || { i });
-    /// }
+    ///     for i in 0..10 {
+    ///         set.spawn_blocking(move || { i });
+    ///     }
     ///
-    /// let mut seen = [false; 10];
-    /// while let Some(res) = set.join_next().await {
-    ///     let idx = res.unwrap();
-    ///     seen[idx] = true;
-    /// }
+    ///     let mut seen = [false; 10];
+    ///     while let Some(res) = set.join_next().await {
+    ///         let idx = res.unwrap();
+    ///         seen[idx] = true;
+    ///     }
     ///
-    /// for i in 0..10 {
-    ///     assert!(seen[i]);
+    ///     for i in 0..10 {
+    ///         assert!(seen[i]);
+    ///     }
     /// }
-    /// # }
     /// ```
     ///
     /// # Panics

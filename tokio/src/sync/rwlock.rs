@@ -488,33 +488,33 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```should_panic
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() {
-    /// let rwlock = Arc::new(RwLock::new(1));
-    /// let mut write_lock = rwlock.write().await;
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let rwlock = Arc::new(RwLock::new(1));
+    ///     let mut write_lock = rwlock.write().await;
     ///
-    /// let blocking_task = tokio::task::spawn_blocking({
-    ///     let rwlock = Arc::clone(&rwlock);
-    ///     move || {
-    ///         // This shall block until the `write_lock` is released.
-    ///         let read_lock = rwlock.blocking_read();
-    ///         assert_eq!(*read_lock, 0);
-    ///     }
-    /// });
+    ///     let blocking_task = tokio::task::spawn_blocking({
+    ///         let rwlock = Arc::clone(&rwlock);
+    ///         move || {
+    ///             // This shall block until the `write_lock` is released.
+    ///             let read_lock = rwlock.blocking_read();
+    ///             assert_eq!(*read_lock, 0);
+    ///         }
+    ///     });
     ///
-    /// *write_lock -= 1;
-    /// drop(write_lock); // release the lock.
+    ///     *write_lock -= 1;
+    ///     drop(write_lock); // release the lock.
     ///
-    /// // Await the completion of the blocking task.
-    /// blocking_task.await.unwrap();
+    ///     // Await the completion of the blocking task.
+    ///     blocking_task.await.unwrap();
     ///
-    /// // Assert uncontended.
-    /// assert!(rwlock.try_write().is_ok());
-    /// # }
+    ///     // Assert uncontended.
+    ///     assert!(rwlock.try_write().is_ok());
+    /// }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
@@ -830,35 +830,35 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```should_panic
+    /// ```ignore-wasm
     /// use std::sync::Arc;
     /// use tokio::{sync::RwLock};
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() {
-    /// let rwlock =  Arc::new(RwLock::new(1));
-    /// let read_lock = rwlock.read().await;
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let rwlock =  Arc::new(RwLock::new(1));
+    ///     let read_lock = rwlock.read().await;
     ///
-    /// let blocking_task = tokio::task::spawn_blocking({
-    ///     let rwlock = Arc::clone(&rwlock);
-    ///     move || {
-    ///         // This shall block until the `read_lock` is released.
-    ///         let mut write_lock = rwlock.blocking_write();
-    ///         *write_lock = 2;
-    ///     }
-    /// });
+    ///     let blocking_task = tokio::task::spawn_blocking({
+    ///         let rwlock = Arc::clone(&rwlock);
+    ///         move || {
+    ///             // This shall block until the `read_lock` is released.
+    ///             let mut write_lock = rwlock.blocking_write();
+    ///             *write_lock = 2;
+    ///         }
+    ///     });
     ///
-    /// assert_eq!(*read_lock, 1);
-    /// // Release the last outstanding read lock.
-    /// drop(read_lock);
+    ///     assert_eq!(*read_lock, 1);
+    ///     // Release the last outstanding read lock.
+    ///     drop(read_lock);
     ///
-    /// // Await the completion of the blocking task.
-    /// blocking_task.await.unwrap();
+    ///     // Await the completion of the blocking task.
+    ///     blocking_task.await.unwrap();
     ///
-    /// // Assert uncontended.
-    /// let read_lock = rwlock.try_read().unwrap();
-    /// assert_eq!(*read_lock, 2);
-    /// # }
+    ///     // Assert uncontended.
+    ///     let read_lock = rwlock.try_read().unwrap();
+    ///     assert_eq!(*read_lock, 2);
+    /// }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]

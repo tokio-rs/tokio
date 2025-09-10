@@ -105,21 +105,21 @@ cfg_rt! {
     ///
     /// If the task panics, the error is a [`JoinError`] that contains the panic:
     ///
-    /// ```should_panic
+    /// ```ignore-wasm
     /// use tokio::task;
     /// use std::io;
     /// use std::panic;
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() -> io::Result<()> {
-    /// let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
-    ///     panic!("boom");
-    /// });
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
+    ///         panic!("boom");
+    ///     });
     ///
-    /// let err = join_handle.await.unwrap_err();
-    /// assert!(err.is_panic());
-    /// Ok(())
-    /// # }
+    ///     let err = join_handle.await.unwrap_err();
+    ///     assert!(err.is_panic());
+    ///     Ok(())
+    /// }
     ///
     /// ```
     /// Child being detached and outliving its parent:

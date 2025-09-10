@@ -45,17 +45,17 @@ impl JoinError {
     ///
     /// # Examples
     ///
-    /// ```should_panic
+    /// ```ignore-wasm
     /// use std::panic;
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() {
-    /// let err = tokio::spawn(async {
-    ///     panic!("boom");
-    /// }).await.unwrap_err();
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let err = tokio::spawn(async {
+    ///         panic!("boom");
+    ///     }).await.unwrap_err();
     ///
-    /// assert!(err.is_panic());
-    /// # }
+    ///     assert!(err.is_panic());
+    /// }
     /// ```
     pub fn is_panic(&self) -> bool {
         matches!(&self.repr, Repr::Panic(_))
