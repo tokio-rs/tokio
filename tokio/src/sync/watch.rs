@@ -90,7 +90,7 @@
 //! when all [`Receiver`] handles have been dropped. This indicates that there
 //! is no further interest in the values being produced and work can be stopped.
 //!
-//! The value in the channel will not be dropped until the sender and all
+//! The value in the channel will not be dropped until all senders and all
 //! receivers have been dropped.
 //!
 //! # Thread safety
