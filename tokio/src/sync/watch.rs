@@ -391,7 +391,7 @@ mod state {
     /// Snapshot of the state. The first bit is used as the CLOSED bit.
     /// The remaining bits are used as the version.
     ///
-    /// The CLOSED bit tracks whether the Sender has been dropped. Dropping all
+    /// The CLOSED bit tracks whether all senders have been dropped. Dropping all
     /// receivers does not set it.
     #[derive(Copy, Clone, Debug)]
     pub(super) struct StateSnapshot(usize);
