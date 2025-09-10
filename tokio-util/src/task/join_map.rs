@@ -761,7 +761,6 @@ where
             Ok(entry) => entry.remove().0,
             _ => return None,
         };
-        self.hashes_by_task.remove(&id);
         Some(key)
     }
 }
