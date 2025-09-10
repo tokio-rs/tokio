@@ -739,8 +739,6 @@ impl<T> Receiver<T> {
     ///     assert!(rx.changed().await.is_ok());
     ///     assert_eq!(*rx.borrow_and_update(), "goodbye");
     ///
-    ///     drop(tx);
-    ///
     ///     // The `tx` handle has been dropped
     ///     assert!(rx.changed().await.is_err());
     /// }
@@ -903,7 +901,7 @@ fn maybe_changed<T>(
     }
 
     if state.is_closed() {
-        // The sender has been dropped.
+        // All senders have been dropped.
         return Some(Err(error::RecvError(())));
     }
 
