@@ -3,8 +3,6 @@ use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::time::wheel::CancellationQueueEntry;
 use crate::util::linked_list;
 
-use std::marker::PhantomData;
-
 type EntryList = linked_list::LinkedList<CancellationQueueEntry, Entry>;
 
 #[derive(Debug)]
@@ -93,17 +91,7 @@ impl Sender {
 #[derive(Debug)]
 pub(crate) struct Receiver {
     inner: Arc<Mutex<Inner>>,
-
-    // Technically, receiver is `Sync`, however, we only
-    // need single receiver for cancellation purpose,
-    // so we make it `!Sync` to prevent abusing.
-    _not_sync: PhantomData<*const ()>,
 }
-
-/// Safety: [`Inner`] is protected by [`Mutex`].
-// We need the `Receiver` to be `Send` because the `Core` struct for multi-thread
-// runtime will be send to another thread during the shutdown.
-unsafe impl Send for Receiver {}
 
 impl Receiver {
     pub(crate) fn recv_all(&mut self) -> impl Iterator<Item = EntryHandle> {
@@ -119,7 +107,6 @@ pub(crate) fn new() -> (Sender, Receiver) {
         },
         Receiver {
             inner,
-            _not_sync: PhantomData,
         },
     )
 }
