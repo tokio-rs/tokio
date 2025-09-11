@@ -156,8 +156,7 @@ where
         let res = if wrote_all {
             Ok(())
         } else {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
+            Err(io::Error::other(
                 "failed to write entire datagram to socket",
             )
             .into())

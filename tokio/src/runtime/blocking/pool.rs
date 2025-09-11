@@ -145,7 +145,7 @@ impl From<SpawnError> for io::Error {
     fn from(e: SpawnError) -> Self {
         match e {
             SpawnError::ShuttingDown => {
-                io::Error::new(io::ErrorKind::Other, "blocking pool shutting down")
+                io::Error::other("blocking pool shutting down")
             }
             SpawnError::NoThreads(e) => e,
         }

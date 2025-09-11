@@ -35,7 +35,7 @@ async fn to_string_does_not_truncate_on_utf8_error() {
 async fn to_string_does_not_truncate_on_io_error() {
     let mut mock = Builder::new()
         .read(b"def")
-        .read_error(io::Error::new(io::ErrorKind::Other, "whoops"))
+        .read_error(io::Error::other("whoops"))
         .build();
     let mut s = "abc".to_string();
 

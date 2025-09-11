@@ -198,7 +198,7 @@ mod tests {
         // was not shrunk too much.
         let checked_count = super::MAGIC_CONST * super::MAX_BYTES_PER_CHAR;
         let mut data: Vec<u8> = str::repeat("a", checked_count).into();
-        data.extend(std::iter::repeat(0b1010_1010).take(DEFAULT_MAX_BUF_SIZE - checked_count + 1));
+        data.extend(std::iter::repeat_n(0b1010_1010, DEFAULT_MAX_BUF_SIZE - checked_count + 1));
         let mut writer = LoggingMockWriter::new();
         let mut splitter = super::SplitByUtf8BoundaryIfWindows::new(&mut writer);
         crate::runtime::Builder::new_current_thread()

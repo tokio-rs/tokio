@@ -286,7 +286,7 @@ impl<T> Block<T> {
         let ret = NonNull::new(self.header.next.load(ordering));
 
         debug_assert!(unsafe {
-            ret.map_or(true, |block| {
+            ret.is_none_or(|block| {
                 block.as_ref().header.start_index == self.header.start_index.wrapping_add(BLOCK_CAP)
             })
         });

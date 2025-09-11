@@ -1872,7 +1872,7 @@ impl UdpSocket {
                 // In testing, that only occurred on macOS if you pass a zero-sized buffer,
                 // but the implementation of `Socket::peek_sender()` covers that.
                 .as_socket()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "sender not available"))
+                .ok_or_else(|| io::Error::other("sender not available"))
         })
     }
 

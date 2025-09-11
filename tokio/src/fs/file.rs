@@ -667,8 +667,7 @@ impl AsyncSeek for File {
         let inner = me.inner.get_mut();
 
         match inner.state {
-            State::Busy(_) => Err(io::Error::new(
-                io::ErrorKind::Other,
+            State::Busy(_) => Err(io::Error::other(
                 "other file operation is pending, call poll_complete before start_seek",
             )),
             State::Idle(ref mut buf_cell) => {
@@ -763,7 +762,7 @@ impl AsyncWrite for File {
                         (Operation::Write(res), buf)
                     })
                     .ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::Other, "background task failed")
+                        io::Error::other("background task failed")
                     })?;
 
                     inner.state = State::Busy(blocking_task_join_handle);
@@ -834,7 +833,7 @@ impl AsyncWrite for File {
                         (Operation::Write(res), buf)
                     })
                     .ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::Other, "background task failed")
+                        io::Error::other("background task failed")
                     })?;
 
                     inner.state = State::Busy(blocking_task_join_handle);

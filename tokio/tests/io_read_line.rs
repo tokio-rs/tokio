@@ -77,7 +77,7 @@ async fn read_line_invalid_utf8() {
 async fn read_line_fail() {
     let mock = Builder::new()
         .read(b"Hello Wor")
-        .read_error(Error::new(ErrorKind::Other, "The world has no end"))
+        .read_error(Error::other("The world has no end"))
         .build();
 
     let mut read = BufReader::new(mock);
@@ -94,7 +94,7 @@ async fn read_line_fail_and_utf8_fail() {
     let mock = Builder::new()
         .read(b"Hello Wor")
         .read(b"\xff\xff\xff")
-        .read_error(Error::new(ErrorKind::Other, "The world has no end"))
+        .read_error(Error::other("The world has no end"))
         .build();
 
     let mut read = BufReader::new(mock);

@@ -13,7 +13,7 @@ use crate::signal::RxFuture;
 use crate::sync::watch;
 
 use mio::net::UnixStream;
-use std::io::{self, Error, ErrorKind, Write};
+use std::io::{self, Error, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
@@ -268,8 +268,7 @@ fn action(globals: &'static Globals, signal: libc::c_int) {
 fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     let signal = signal.0;
     if signal < 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
-        return Err(Error::new(
-            ErrorKind::Other,
+        return Err(Error::other(
             format!("Refusing to register signal {signal}"),
         ));
     }
@@ -280,7 +279,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     let globals = globals();
     let siginfo = match globals.storage().get(signal as EventId) {
         Some(slot) => slot,
-        None => return Err(io::Error::new(io::ErrorKind::Other, "signal too large")),
+        None => return Err(io::Error::other("signal too large")),
     };
     let mut registered = Ok(());
     siginfo.init.call_once(|| {
@@ -297,8 +296,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     if siginfo.initialized.load(Ordering::Relaxed) {
         Ok(())
     } else {
-        Err(Error::new(
-            ErrorKind::Other,
+        Err(Error::other(
             "Failed to register signal handler",
         ))
     }

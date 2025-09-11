@@ -159,7 +159,7 @@ fn read_partial_then_not_ready() {
 fn read_err() {
     let mut task = task::spawn(());
     let mock = mock! {
-        Err(io::Error::new(io::ErrorKind::Other, "")),
+        Err(io::Error::other("")),
     };
     let mut framed = FramedRead::new(mock, U32Decoder);
 
@@ -179,7 +179,7 @@ fn read_partial_then_err() {
     let mut task = task::spawn(());
     let mock = mock! {
         Ok(b"\x00\x00".to_vec()),
-        Err(io::Error::new(io::ErrorKind::Other, "")),
+        Err(io::Error::other("")),
     };
     let mut framed = FramedRead::new(mock, U32Decoder);
 
@@ -200,7 +200,7 @@ fn read_partial_would_block_then_err() {
     let mock = mock! {
         Ok(b"\x00\x00".to_vec()),
         Err(io::Error::new(io::ErrorKind::WouldBlock, "")),
-        Err(io::Error::new(io::ErrorKind::Other, "")),
+        Err(io::Error::other("")),
     };
     let mut framed = FramedRead::new(mock, U32Decoder);
 

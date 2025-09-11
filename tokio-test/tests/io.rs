@@ -20,7 +20,7 @@ async fn read() {
 
 #[tokio::test]
 async fn read_error() {
-    let error = io::Error::new(io::ErrorKind::Other, "cruel");
+    let error = io::Error::other("cruel");
     let mut mock = Builder::new()
         .read(b"hello ")
         .read_error(error)
@@ -76,7 +76,7 @@ async fn read_with_handle() {
 
 #[tokio::test]
 async fn write_error() {
-    let error = io::Error::new(io::ErrorKind::Other, "cruel");
+    let error = io::Error::other("cruel");
     let mut mock = Builder::new()
         .write(b"hello ")
         .write_error(error)

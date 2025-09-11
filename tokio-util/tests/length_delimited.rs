@@ -682,7 +682,7 @@ fn encode_overflow() {
     let mut buf = BytesMut::with_capacity(1024);
 
     // Put some data into the buffer without resizing it to hold more.
-    let some_as = std::iter::repeat(b'a').take(1024).collect::<Vec<_>>();
+    let some_as = std::iter::repeat_n(b'a', 1024).collect::<Vec<_>>();
     buf.put_slice(&some_as[..]);
 
     // Trying to encode the length header should resize the buffer if it won't fit.

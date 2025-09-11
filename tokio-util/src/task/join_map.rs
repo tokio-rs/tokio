@@ -772,9 +772,7 @@ where
     Q: ?Sized + Hash,
     S: BuildHasher,
 {
-    let mut hasher = hash_builder.build_hasher();
-    key.hash(&mut hasher);
-    hasher.finish()
+    hash_builder.hash_one(key)
 }
 
 impl<K, V, S> JoinMap<K, V, S>

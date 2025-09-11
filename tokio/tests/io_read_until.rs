@@ -58,7 +58,7 @@ async fn read_until_not_all_ready() {
 async fn read_until_fail() {
     let mock = Builder::new()
         .read(b"Hello \xffWor")
-        .read_error(Error::new(ErrorKind::Other, "The world has no end"))
+        .read_error(Error::other("The world has no end"))
         .build();
 
     let mut read = BufReader::new(mock);

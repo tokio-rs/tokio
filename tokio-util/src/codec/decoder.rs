@@ -148,7 +148,7 @@ pub trait Decoder {
                 if buf.is_empty() {
                     Ok(None)
                 } else {
-                    Err(io::Error::new(io::ErrorKind::Other, "bytes remaining on stream").into())
+                    Err(io::Error::other("bytes remaining on stream").into())
                 }
             }
         }
