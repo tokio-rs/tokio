@@ -1073,10 +1073,7 @@ impl<T: ?Sized> RwLock<T> {
     /// }
     /// ```
     pub fn get_mut(&mut self) -> &mut T {
-        unsafe {
-            // Safety: This is https://github.com/rust-lang/rust/pull/76936
-            &mut *self.c.get()
-        }
+        self.c.get_mut()
     }
 
     /// Consumes the lock, returning the underlying data.

@@ -1516,7 +1516,7 @@ impl UdpSocket {
     /// # Notes
     ///
     /// On Windows, if the data is larger than the buffer specified, the buffer
-    /// is filled with the first part of the data, and `peek_from` returns the error
+    /// is filled with the first part of the data, and peek returns the error
     /// `WSAEMSGSIZE(10040)`. The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
@@ -1561,7 +1561,6 @@ impl UdpSocket {
     }
 
     /// Receives data from the connected address, without removing it from the input queue.
-    /// On success, returns the sending address of the datagram.
     ///
     /// # Notes
     ///
@@ -1611,7 +1610,7 @@ impl UdpSocket {
             self.io.peek(b)
         }))?;
 
-        // Safety: We trust `recv` to have filled up `n` bytes in the buffer.
+        // Safety: We trust `peek` to have filled up `n` bytes in the buffer.
         unsafe {
             buf.assume_init(n);
         }

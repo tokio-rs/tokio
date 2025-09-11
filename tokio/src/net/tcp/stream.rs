@@ -1462,6 +1462,12 @@ impl fmt::Debug for TcpStream {
     }
 }
 
+impl AsRef<Self> for TcpStream {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
 #[cfg(unix)]
 mod sys {
     use super::TcpStream;

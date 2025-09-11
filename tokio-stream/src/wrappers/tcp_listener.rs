@@ -18,12 +18,12 @@ use tokio::net::{TcpListener, TcpStream};
 ///
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
-/// let ipv4_listener = TcpListener::bind((Ipv6Addr::LOCALHOST, 8080)).await?;
-/// let ipv6_listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 8080)).await?;
+/// let ipv4_listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 8080)).await?;
+/// let ipv6_listener = TcpListener::bind((Ipv6Addr::LOCALHOST, 8080)).await?;
 /// let ipv4_connections = TcpListenerStream::new(ipv4_listener);
 /// let ipv6_connections = TcpListenerStream::new(ipv6_listener);
 ///
-/// let mut connections = ipv4_connections.chain(ipv6_connections);
+/// let mut connections = ipv4_connections.merge(ipv6_connections);
 /// while let Some(tcp_stream) = connections.next().await {
 ///     let stream = tcp_stream?;
 ///     let peer_addr = stream.peer_addr()?;
