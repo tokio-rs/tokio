@@ -268,9 +268,9 @@ fn action(globals: &'static Globals, signal: libc::c_int) {
 fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     let signal = signal.0;
     if signal < 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
-        return Err(Error::other(
-            format!("Refusing to register signal {signal}"),
-        ));
+        return Err(Error::other(format!(
+            "Refusing to register signal {signal}"
+        )));
     }
 
     // Check that we have a signal driver running
@@ -296,9 +296,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     if siginfo.initialized.load(Ordering::Relaxed) {
         Ok(())
     } else {
-        Err(Error::other(
-            "Failed to register signal handler",
-        ))
+        Err(Error::other("Failed to register signal handler"))
     }
 }
 

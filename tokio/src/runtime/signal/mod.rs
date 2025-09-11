@@ -134,9 +134,7 @@ impl Handle {
         if self.inner.strong_count() > 0 {
             Ok(())
         } else {
-            Err(std_io::Error::other(
-                "signal driver gone",
-            ))
+            Err(std_io::Error::other("signal driver gone"))
         }
     }
 }

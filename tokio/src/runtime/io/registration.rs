@@ -252,7 +252,5 @@ impl Drop for Registration {
 }
 
 fn gone() -> io::Error {
-    io::Error::other(
-        crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
-    )
+    io::Error::other(crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR)
 }

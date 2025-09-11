@@ -156,10 +156,7 @@ where
         let res = if wrote_all {
             Ok(())
         } else {
-            Err(io::Error::other(
-                "failed to write entire datagram to socket",
-            )
-            .into())
+            Err(io::Error::other("failed to write entire datagram to socket").into())
         };
 
         Poll::Ready(res)

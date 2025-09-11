@@ -761,9 +761,7 @@ impl AsyncWrite for File {
 
                         (Operation::Write(res), buf)
                     })
-                    .ok_or_else(|| {
-                        io::Error::other("background task failed")
-                    })?;
+                    .ok_or_else(|| io::Error::other("background task failed"))?;
 
                     inner.state = State::Busy(blocking_task_join_handle);
 
@@ -832,9 +830,7 @@ impl AsyncWrite for File {
 
                         (Operation::Write(res), buf)
                     })
-                    .ok_or_else(|| {
-                        io::Error::other("background task failed")
-                    })?;
+                    .ok_or_else(|| io::Error::other("background task failed"))?;
 
                     inner.state = State::Busy(blocking_task_join_handle);
 

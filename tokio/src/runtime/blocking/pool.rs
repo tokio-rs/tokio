@@ -144,9 +144,7 @@ pub(crate) enum SpawnError {
 impl From<SpawnError> for io::Error {
     fn from(e: SpawnError) -> Self {
         match e {
-            SpawnError::ShuttingDown => {
-                io::Error::other("blocking pool shutting down")
-            }
+            SpawnError::ShuttingDown => io::Error::other("blocking pool shutting down"),
             SpawnError::NoThreads(e) => e,
         }
     }
