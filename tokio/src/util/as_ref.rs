@@ -7,22 +7,6 @@ pub(crate) enum OwnedBuf {
     Bytes(bytes::Bytes),
 }
 
-impl OwnedBuf {
-    cfg_tokio_uring! {
-        pub(crate) fn len(&self) -> usize {
-            match self {
-                Self::Vec(vec) => vec.len(),
-                #[cfg(feature = "io-util")]
-                Self::Bytes(bytes) => bytes.len(),
-            }
-        }
-
-        pub(crate) fn as_ptr(&self) -> *const u8 {
-            self.as_ref().as_ptr()
-        }
-    }
-}
-
 impl AsRef<[u8]> for OwnedBuf {
     fn as_ref(&self) -> &[u8] {
         match self {

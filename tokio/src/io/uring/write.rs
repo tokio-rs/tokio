@@ -38,13 +38,13 @@ impl Op<Write> {
         file_offset: u64,
     ) -> io::Result<Self> {
         // Check if `buf_offset` stays in bounds of the allocation
-        debug_assert!(buf_offset + len as usize <= buf.len());
+        debug_assert!(buf_offset + len as usize <= buf.as_ref().len());
 
         // SAFETY:
         // - `buf_offset` stays in bounds of the allocation.
         // - `buf` is derived from an actual allocation, and the entire memory
         //    range is in bounds of that allocation.
-        let ptr = unsafe { buf.as_ptr().add(buf_offset) };
+        let ptr = unsafe { buf.as_ref().as_ptr().add(buf_offset) };
 
         let sqe = opcode::Write::new(types::Fd(fd.as_raw_fd()), ptr, len)
             .offset(file_offset)

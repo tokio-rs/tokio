@@ -56,7 +56,7 @@ async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
         .expect("unexpected in-flight operation detected")
         .into();
 
-    let total: usize = buf.len();
+    let total: usize = buf.as_ref().len();
     let mut offset: usize = 0;
     while offset < total {
         // There is a cap on how many bytes we can write in a single uring write operation.
