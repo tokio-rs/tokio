@@ -114,6 +114,7 @@ fn test_spawn_local_from_guard_other_thread() {
 }
 
 #[test]
+#[cfg_attr(target_family = "wasm", ignore)] // threads not supported
 fn test_spawn_local_panic() {
     let rt = rt();
     let local = LocalSet::new();
