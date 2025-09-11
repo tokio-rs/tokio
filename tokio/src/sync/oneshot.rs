@@ -259,8 +259,8 @@ pub struct Sender<T> {
 /// });
 ///
 /// match rx.await {
-///      Ok(v) => println!("got = {:?}", v),
-///      Err(_) => println!("the sender dropped"),
+///     Ok(v) => println!("got = {:?}", v),
+///     Err(_) => println!("the sender dropped"),
 /// }
 /// # }
 /// ```

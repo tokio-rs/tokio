@@ -118,8 +118,8 @@ use std::sync::Arc;
 /// // Collect responses from tasks.
 /// let mut responses = Vec::new();
 /// for jh in jhs {
-///      let response = jh.await.unwrap();
-///      responses.push(response);
+///     let response = jh.await.unwrap();
+///     responses.push(response);
 /// }
 /// // Process responses.
 /// // ...
@@ -811,7 +811,7 @@ impl Semaphore {
     /// }
     ///
     /// for handle in join_handles {
-    ///      handle.await.unwrap();
+    ///     handle.await.unwrap();
     /// }
     /// # }
     /// ```

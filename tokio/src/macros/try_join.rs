@@ -71,12 +71,12 @@ macro_rules! doc {
         ///     more_async_work());
         ///
         /// match res {
-        ///      Ok((first, second)) => {
-        ///          // do something with the values
-        ///      }
-        ///      Err(err) => {
+        ///     Ok((first, second)) => {
+        ///         // do something with the values
+        ///     }
+        ///     Err(err) => {
         ///         println!("processing failed; error = {}", err);
-        ///      }
+        ///     }
         /// }
         /// # }
         /// ```
@@ -141,12 +141,12 @@ macro_rules! doc {
         /// );
         ///
         /// match res {
-        ///      Ok((first, second)) => {
-        ///          // do something with the values
-        ///      }
-        ///      Err(err) => {
+        ///     Ok((first, second)) => {
+        ///         // do something with the values
+        ///     }
+        ///     Err(err) => {
         ///         println!("processing failed; error = {}", err);
-        ///      }
+        ///     }
         /// }
         /// # }
         /// ```

@@ -29,8 +29,8 @@
 //!
 //! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
-//!     sleep(Duration::from_millis(100)).await;
-//!     println!("100 ms have elapsed");
+//! sleep(Duration::from_millis(100)).await;
+//! println!("100 ms have elapsed");
 //! # }
 //! ```
 //!

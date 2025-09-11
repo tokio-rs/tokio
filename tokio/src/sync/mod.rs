@@ -47,8 +47,8 @@
 //! let (tx, rx) = oneshot::channel();
 //!
 //! tokio::spawn(async move {
-//!      let res = some_computation().await;
-//!      tx.send(res).unwrap();
+//!     let res = some_computation().await;
+//!     tx.send(res).unwrap();
 //! });
 //!
 //! // Do other work while the computation is happening in the background
@@ -75,7 +75,7 @@
 //! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! let join_handle = tokio::spawn(async move {
-//!      some_computation().await
+//!     some_computation().await
 //! });
 //!
 //! // Do other work while the computation is happening in the background
@@ -260,13 +260,13 @@
 //! let mut rx2 = tx.subscribe();
 //!
 //! tokio::spawn(async move {
-//!      assert_eq!(rx1.recv().await.unwrap(), 10);
-//!      assert_eq!(rx1.recv().await.unwrap(), 20);
+//!     assert_eq!(rx1.recv().await.unwrap(), 10);
+//!     assert_eq!(rx1.recv().await.unwrap(), 20);
 //! });
 //!
 //! tokio::spawn(async move {
-//!      assert_eq!(rx2.recv().await.unwrap(), 10);
-//!      assert_eq!(rx2.recv().await.unwrap(), 20);
+//!     assert_eq!(rx2.recv().await.unwrap(), 10);
+//!     assert_eq!(rx2.recv().await.unwrap(), 20);
 //! });
 //!
 //! tx.send(10).unwrap();
@@ -325,19 +325,19 @@
 //!
 //! // Spawn a task to monitor the file.
 //! tokio::spawn(async move {
-//!      loop {
-//!          // Wait 10 seconds between checks
-//!          time::sleep(Duration::from_secs(10)).await;
+//!     loop {
+//!         // Wait 10 seconds between checks
+//!         time::sleep(Duration::from_secs(10)).await;
 //!
-//!          // Load the configuration file
-//!          let new_config = Config::load_from_file().await.unwrap();
+//!         // Load the configuration file
+//!         let new_config = Config::load_from_file().await.unwrap();
 //!
-//!          // If the configuration changed, send the new config value
-//!          // on the watch channel.
-//!          if new_config != config {
-//!              tx.send(new_config.clone()).unwrap();
-//!              config = new_config;
-//!          }
+//!         // If the configuration changed, send the new config value
+//!         // on the watch channel.
+//!         if new_config != config {
+//!             tx.send(new_config.clone()).unwrap();
+//!             config = new_config;
+//!         }
 //!     }
 //! });
 //!

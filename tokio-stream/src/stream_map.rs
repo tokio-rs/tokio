@@ -72,15 +72,15 @@ use std::task::{ready, Context, Poll};
 ///
 /// // Convert the channels to a `Stream`.
 /// let rx1 = Box::pin(async_stream::stream! {
-///       while let Some(item) = rx1.recv().await {
-///           yield item;
-///       }
+///     while let Some(item) = rx1.recv().await {
+///         yield item;
+///     }
 /// }) as Pin<Box<dyn Stream<Item = usize> + Send>>;
 ///
 /// let rx2 = Box::pin(async_stream::stream! {
-///       while let Some(item) = rx2.recv().await {
-///           yield item;
-///       }
+///     while let Some(item) = rx2.recv().await {
+///         yield item;
+///     }
 /// }) as Pin<Box<dyn Stream<Item = usize> + Send>>;
 ///
 /// tokio::spawn(async move {

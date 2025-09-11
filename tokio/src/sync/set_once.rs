@@ -74,8 +74,8 @@ use std::task::Poll;
 ///
 /// // wait inside task to not block the main thread
 /// tokio::spawn(async move {
-///      // wait inside async context for the value to be set
-///      assert_eq!(*second_cl.wait().await, 20);
+///     // wait inside async context for the value to be set
+///     assert_eq!(*second_cl.wait().await, 20);
 /// }).await.unwrap();
 ///
 /// // subsequent set calls will fail
