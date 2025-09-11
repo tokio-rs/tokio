@@ -10,18 +10,13 @@ use std::task::Poll;
 use std::task::Waker;
 use std::{io, mem};
 
+// This field isn't accessed directly, but it holds cancellation data,
+// so `#[allow(dead_code)]` is needed.
+#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) enum CancelData {
-    Open(
-        // This field isn't accessed directly, but it holds cancellation data,
-        // so `#[allow(dead_code)]` is needed.
-        #[allow(dead_code)] Open,
-    ),
-    Write(
-        // This field isn't accessed directly, but it holds cancellation data,
-        // so `#[allow(dead_code)]` is needed.
-        #[allow(dead_code)] Write,
-    ),
+    Open(Open),
+    Write(Write),
 }
 
 #[derive(Debug)]
