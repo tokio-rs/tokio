@@ -99,7 +99,7 @@ pub fn pipe() -> io::Result<(Sender, Receiver)> {
 /// # }
 /// ```
 ///
-/// Opening a [`Sender`] on Linux when you are sure the file is a FIFO:
+/// Opening a [`Sender`] on Linux/Android when you are sure the file is a FIFO:
 ///
 /// ```ignore
 /// use tokio::net::unix::pipe;
@@ -141,7 +141,7 @@ impl OpenOptions {
     ///
     /// This option, when true, will indicate that a FIFO file will be opened
     /// in read-write access mode. This operation is not defined by the POSIX
-    /// standard and is only guaranteed to work on Linux.
+    /// standard and is only guaranteed to work on Linux and Android.
     ///
     /// # Examples
     ///
