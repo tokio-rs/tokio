@@ -40,7 +40,7 @@ cfg_io_util! {
     /// [`AsyncRead`] types. Callers will tend to import this trait instead of
     /// [`AsyncRead`].
     ///
-    /// ```no_run
+    /// ```no_run,ignore-wasm
     /// use tokio::fs::File;
     /// use tokio::io::{self, AsyncReadExt};
     ///
@@ -71,7 +71,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `AsyncRead`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -149,7 +149,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -218,7 +218,7 @@ cfg_io_util! {
         /// [`BytesMut`]: bytes::BytesMut
         /// [`BufMut`]: bytes::BufMut
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -288,7 +288,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -345,15 +345,15 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![2, 5]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![2, 5]);
             ///
-            ///     assert_eq!(2, reader.read_u8().await?);
-            ///     assert_eq!(5, reader.read_u8().await?);
+            /// assert_eq!(2, reader.read_u8().await?);
+            /// assert_eq!(5, reader.read_u8().await?);
             ///
-            ///     Ok(())
-            /// }
+            /// Ok(())
+            /// # }
             /// ```
             fn read_u8(&mut self) -> ReadU8;
 
@@ -389,15 +389,15 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![0x02, 0xfb]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![0x02, 0xfb]);
             ///
-            ///     assert_eq!(2, reader.read_i8().await?);
-            ///     assert_eq!(-5, reader.read_i8().await?);
+            /// assert_eq!(2, reader.read_i8().await?);
+            /// assert_eq!(-5, reader.read_i8().await?);
             ///
-            ///     Ok(())
-            /// }
+            /// Ok(())
+            /// # }
             /// ```
             fn read_i8(&mut self) -> ReadI8;
 
@@ -434,14 +434,14 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![2, 5, 3, 0]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![2, 5, 3, 0]);
             ///
-            ///     assert_eq!(517, reader.read_u16().await?);
-            ///     assert_eq!(768, reader.read_u16().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(517, reader.read_u16().await?);
+            /// assert_eq!(768, reader.read_u16().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_u16(&mut self) -> ReadU16;
 
@@ -478,14 +478,14 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![0x00, 0xc1, 0xff, 0x7c]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![0x00, 0xc1, 0xff, 0x7c]);
             ///
-            ///     assert_eq!(193, reader.read_i16().await?);
-            ///     assert_eq!(-132, reader.read_i16().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(193, reader.read_i16().await?);
+            /// assert_eq!(-132, reader.read_i16().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_i16(&mut self) -> ReadI16;
 
@@ -522,13 +522,13 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![0x00, 0x00, 0x01, 0x0b]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![0x00, 0x00, 0x01, 0x0b]);
             ///
-            ///     assert_eq!(267, reader.read_u32().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(267, reader.read_u32().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_u32(&mut self) -> ReadU32;
 
@@ -566,13 +566,13 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![0xff, 0xff, 0x7a, 0x33]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![0xff, 0xff, 0x7a, 0x33]);
             ///
-            ///     assert_eq!(-34253, reader.read_i32().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(-34253, reader.read_i32().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_i32(&mut self) -> ReadI32;
 
@@ -609,15 +609,15 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![
-            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
-            ///     ]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![
+            ///     0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
+            /// ]);
             ///
-            ///     assert_eq!(918733457491587, reader.read_u64().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(918733457491587, reader.read_u64().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_u64(&mut self) -> ReadU64;
 
@@ -654,13 +654,13 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![0x80, 0, 0, 0, 0, 0, 0, 0]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![0x80, 0, 0, 0, 0, 0, 0, 0]);
             ///
-            ///     assert_eq!(i64::MIN, reader.read_i64().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(i64::MIN, reader.read_i64().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_i64(&mut self) -> ReadI64;
 
@@ -697,16 +697,16 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![
             ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83,
-            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
-            ///     ]);
+            ///     0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
+            /// ]);
             ///
-            ///     assert_eq!(16947640962301618749969007319746179, reader.read_u128().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(16947640962301618749969007319746179, reader.read_u128().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_u128(&mut self) -> ReadU128;
 
@@ -743,16 +743,16 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![
-            ///         0x80, 0, 0, 0, 0, 0, 0, 0,
-            ///         0, 0, 0, 0, 0, 0, 0, 0
-            ///     ]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![
+            ///     0x80, 0, 0, 0, 0, 0, 0, 0,
+            ///     0, 0, 0, 0, 0, 0, 0, 0
+            /// ]);
             ///
-            ///     assert_eq!(i128::MIN, reader.read_i128().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(i128::MIN, reader.read_i128().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_i128(&mut self) -> ReadI128;
 
@@ -789,13 +789,13 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![0xff, 0x7f, 0xff, 0xff]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![0xff, 0x7f, 0xff, 0xff]);
             ///
-            ///     assert_eq!(f32::MIN, reader.read_f32().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(f32::MIN, reader.read_f32().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_f32(&mut self) -> ReadF32;
 
@@ -832,15 +832,15 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![
-            ///         0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-            ///     ]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![
+            ///     0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+            /// ]);
             ///
-            ///     assert_eq!(f64::MIN, reader.read_f64().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(f64::MIN, reader.read_f64().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_f64(&mut self) -> ReadF64;
 
@@ -877,14 +877,14 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![2, 5, 3, 0]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![2, 5, 3, 0]);
             ///
-            ///     assert_eq!(1282, reader.read_u16_le().await?);
-            ///     assert_eq!(3, reader.read_u16_le().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(1282, reader.read_u16_le().await?);
+            /// assert_eq!(3, reader.read_u16_le().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_u16_le(&mut self) -> ReadU16Le;
 
@@ -921,14 +921,14 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![0x00, 0xc1, 0xff, 0x7c]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![0x00, 0xc1, 0xff, 0x7c]);
             ///
-            ///     assert_eq!(-16128, reader.read_i16_le().await?);
-            ///     assert_eq!(31999, reader.read_i16_le().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(-16128, reader.read_i16_le().await?);
+            /// assert_eq!(31999, reader.read_i16_le().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_i16_le(&mut self) -> ReadI16Le;
 
@@ -965,13 +965,13 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![0x00, 0x00, 0x01, 0x0b]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![0x00, 0x00, 0x01, 0x0b]);
             ///
-            ///     assert_eq!(184614912, reader.read_u32_le().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(184614912, reader.read_u32_le().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_u32_le(&mut self) -> ReadU32Le;
 
@@ -1009,13 +1009,13 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![0xff, 0xff, 0x7a, 0x33]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![0xff, 0xff, 0x7a, 0x33]);
             ///
-            ///     assert_eq!(863698943, reader.read_i32_le().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(863698943, reader.read_i32_le().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_i32_le(&mut self) -> ReadI32Le;
 
@@ -1052,15 +1052,15 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![
-            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
-            ///     ]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![
+            ///     0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
+            /// ]);
             ///
-            ///     assert_eq!(9477368352180732672, reader.read_u64_le().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(9477368352180732672, reader.read_u64_le().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_u64_le(&mut self) -> ReadU64Le;
 
@@ -1097,13 +1097,13 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![0x80, 0, 0, 0, 0, 0, 0, 0]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![0x80, 0, 0, 0, 0, 0, 0, 0]);
             ///
-            ///     assert_eq!(128, reader.read_i64_le().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(128, reader.read_i64_le().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_i64_le(&mut self) -> ReadI64Le;
 
@@ -1140,16 +1140,16 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![
-            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83,
-            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
-            ///     ]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![
+            ///     0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83,
+            ///     0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
+            /// ]);
             ///
-            ///     assert_eq!(174826588484952389081207917399662330624, reader.read_u128_le().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(174826588484952389081207917399662330624, reader.read_u128_le().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_u128_le(&mut self) -> ReadU128Le;
 
@@ -1186,16 +1186,16 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![
-            ///         0x80, 0, 0, 0, 0, 0, 0, 0,
-            ///         0, 0, 0, 0, 0, 0, 0, 0
-            ///     ]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![
+            ///     0x80, 0, 0, 0, 0, 0, 0, 0,
+            ///     0, 0, 0, 0, 0, 0, 0, 0
+            /// ]);
             ///
-            ///     assert_eq!(128, reader.read_i128_le().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(128, reader.read_i128_le().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_i128_le(&mut self) -> ReadI128Le;
 
@@ -1232,13 +1232,13 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![0xff, 0xff, 0x7f, 0xff]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![0xff, 0xff, 0x7f, 0xff]);
             ///
-            ///     assert_eq!(f32::MIN, reader.read_f32_le().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(f32::MIN, reader.read_f32_le().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_f32_le(&mut self) -> ReadF32Le;
 
@@ -1275,15 +1275,15 @@ cfg_io_util! {
             ///
             /// use std::io::Cursor;
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut reader = Cursor::new(vec![
-            ///         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0xff
-            ///     ]);
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut reader = Cursor::new(vec![
+            ///     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0xff
+            /// ]);
             ///
-            ///     assert_eq!(f64::MIN, reader.read_f64_le().await?);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(f64::MIN, reader.read_f64_le().await?);
+            /// Ok(())
+            /// # }
             /// ```
             fn read_f64_le(&mut self) -> ReadF64Le;
         }
@@ -1314,7 +1314,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, AsyncReadExt};
         /// use tokio::fs::File;
         ///
@@ -1362,7 +1362,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, AsyncReadExt};
         /// use tokio::fs::File;
         ///
@@ -1402,7 +1402,7 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::io::{self, AsyncReadExt};
         /// use tokio::fs::File;
         ///

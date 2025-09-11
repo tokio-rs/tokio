@@ -36,7 +36,7 @@ pin_project! {
     /// This example creates two runtimes, but only [enables time] on one of
     /// them. It then uses the context of the runtime with the timer enabled to
     /// execute a [`sleep`] future on the runtime with timing disabled.
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time::{sleep, Duration};
     /// use tokio_util::context::RuntimeExt;
     ///
@@ -87,7 +87,7 @@ impl<F> TokioContext<F> {
     ///
     /// [`RuntimeExt::wrap`]: fn@RuntimeExt::wrap
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time::{sleep, Duration};
     /// use tokio_util::context::TokioContext;
     ///
@@ -152,7 +152,7 @@ pub trait RuntimeExt {
     /// them. It then uses the context of the runtime with the timer enabled to
     /// execute a [`sleep`] future on the runtime with timing disabled.
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::time::{sleep, Duration};
     /// use tokio_util::context::RuntimeExt;
     ///

@@ -34,7 +34,7 @@ cfg_rt! {
     /// In this example, a server is started and `spawn` is used to start a new task
     /// that processes each received connection.
     ///
-    /// ```no_run
+    /// ```no_run,ignore-wasm
     /// use tokio::net::{TcpListener, TcpStream};
     ///
     /// use std::io;
@@ -112,18 +112,18 @@ cfg_rt! {
     /// # drop(rc);
     /// }
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     tokio::spawn(async {
-    ///         // Force the `Rc` to stay in a scope with no `.await`
-    ///         {
-    ///             let rc = Rc::new(());
-    ///             use_rc(rc.clone());
-    ///         }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// tokio::spawn(async {
+    ///     // Force the `Rc` to stay in a scope with no `.await`
+    ///     {
+    ///         let rc = Rc::new(());
+    ///         use_rc(rc.clone());
+    ///     }
     ///
-    ///         task::yield_now().await;
-    ///     }).await.unwrap();
-    /// }
+    ///     task::yield_now().await;
+    /// }).await.unwrap();
+    /// # }
     /// ```
     ///
     /// This will **not** work:

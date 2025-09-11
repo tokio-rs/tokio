@@ -37,7 +37,7 @@
 //! Tokio. For example:
 //!
 //! ```
-//! # #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! use tokio::{task, sync::mpsc};
 //!
