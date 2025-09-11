@@ -50,6 +50,16 @@ use crate::util::IdleNotifiedSet;
 ///     }
 /// }
 /// ```
+///
+/// # Task ID guarantees
+///
+/// While a task is tracked in a `JoinSet`, that task's ID is unique relative
+/// to all other running tasks in Tokio. For this purpose, tracking a task in a
+/// `JoinSet` is equivalent to holding a [`JoinHandle`] to it. See the [task ID]
+/// documentation for more info.
+///
+/// [`JoinHandle`]: crate::task::JoinHandle
+/// [task ID]: crate::task::Id
 #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub struct JoinSet<T> {
     inner: IdleNotifiedSet<JoinHandle<T>>,
