@@ -56,8 +56,8 @@
 //! the inject queue indefinitely. This would be a ref-count cycle and a memory
 //! leak.
 
-use crate::loom::sync::{Arc, Mutex};
 use crate::loom::sync::atomic::AtomicBool;
+use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
     idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,

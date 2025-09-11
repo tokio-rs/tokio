@@ -111,7 +111,10 @@ impl Driver {
             did_wake: Arc::new(AtomicBool::new(false)),
         };
 
-        let driver = Driver { park, is_shutdown: AtomicBool::new(false) };
+        let driver = Driver {
+            park,
+            is_shutdown: AtomicBool::new(false),
+        };
 
         (driver, handle)
     }

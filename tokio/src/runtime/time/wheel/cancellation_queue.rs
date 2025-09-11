@@ -105,9 +105,7 @@ pub(crate) fn new() -> (Sender, Receiver) {
         Sender {
             inner: inner.clone(),
         },
-        Receiver {
-            inner,
-        },
+        Receiver { inner },
     )
 }
 
