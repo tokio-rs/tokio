@@ -183,7 +183,7 @@ where
                 // pausing or framing
                 if state.eof {
                     // pausing
-                    let frame = pinned.codec.decode_eof(&mut state.buffer).inspect_err(|err| {
+                    let frame = pinned.codec.decode_eof(&mut state.buffer).inspect_err(|_err| {
                         trace!("Got an error, going to errored state");
                         state.has_errored = true;
                     })?;
@@ -197,7 +197,7 @@ where
                 // framing
                 trace!("attempting to decode a frame");
 
-                if let Some(frame) = pinned.codec.decode(&mut state.buffer).inspect_err(|op| {
+                if let Some(frame) = pinned.codec.decode(&mut state.buffer).inspect_err(|_op| {
                     trace!("Got an error, going to errored state");
                     state.has_errored = true;
                 })? {
