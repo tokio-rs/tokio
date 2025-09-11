@@ -1,5 +1,6 @@
 use crate::future::Future;
 use crate::loom::sync::Arc;
+use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::runtime::scheduler::multi_thread::worker;
 use crate::runtime::task::{Notified, Task, TaskHarnessScheduleHooks};
 use crate::runtime::{
@@ -33,6 +34,9 @@ pub(crate) struct Handle {
 
     /// User-supplied hooks to invoke for things
     pub(crate) task_hooks: TaskHooks,
+
+    /// Indicates that the runtime is shutting down.
+    pub(crate) is_shutdown: AtomicBool,
 }
 
 impl Handle {
@@ -50,7 +54,14 @@ impl Handle {
         Self::bind_new_task(me, future, id, spawned_at)
     }
 
+    cfg_time! {
+        pub(crate) fn is_shutdown(&self) -> bool {
+            self.is_shutdown.load(Ordering::SeqCst)
+        }
+    }
+
     pub(crate) fn shutdown(&self) {
+        self.is_shutdown.store(true, Ordering::SeqCst);
         self.close();
     }
 

@@ -1,4 +1,4 @@
-use crate::loom::sync::atomic::AtomicBool;
+use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
@@ -121,6 +121,9 @@ struct Shared {
 
     /// This scheduler only has one worker.
     worker_metrics: WorkerMetrics,
+
+    /// Indicates that the runtime is shutting down.
+    is_shutdown: AtomicBool,
 }
 
 /// Thread-local context.
@@ -183,6 +186,7 @@ impl CurrentThread {
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),
                 worker_metrics,
+                is_shutdown: AtomicBool::new(false),
             },
             driver: driver_handle,
             blocking_spawner,
@@ -300,6 +304,8 @@ impl CurrentThread {
             let core = shutdown2(core, handle);
             *context.core.borrow_mut() = Some(core);
         }
+
+        handle.shared.is_shutdown.store(true, Ordering::SeqCst);
     }
 }
 
@@ -555,11 +561,11 @@ impl Context {
 
         pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
         where
-            F: FnOnce(Option<(&mut Wheel, cancellation_queue::Sender)>) -> R,
+            F: FnOnce(Option<(&mut Wheel, cancellation_queue::Sender, bool)>) -> R,
         {
             self.with_core(|maybe_core| {
                 if let Some(core) = maybe_core {
-                    f(Some((&mut core.wheel, core.timer_cancel_tx.clone())))
+                    f(Some((&mut core.wheel, core.timer_cancel_tx.clone(), false)))
                 } else {
                     f(None)
                 }
@@ -725,6 +731,10 @@ impl Handle {
         pub(crate) fn take_remote_timers(&self) -> Vec<EntryHandle> {
             let mut inject_timers = self.shared.inject_timers.lock();
             std::mem::take(&mut inject_timers)
+        }
+
+        pub(crate) fn is_shutdown(&self) -> bool {
+            self.shared.is_shutdown.load(Ordering::SeqCst)
         }
     }
 }

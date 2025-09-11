@@ -63,7 +63,8 @@ impl Timer {
         with_current_wheel(&this.sched_handle, |maybe_wheel| {
             let deadline = deadline_to_tick(&this.sched_handle, this.deadline);
             let hdl = EntryHandle::new(deadline, cx.waker());
-            if let Some((wheel, tx)) = maybe_wheel {
+            if let Some((wheel, tx, is_shutdown)) = maybe_wheel {
+                assert!(!is_shutdown, "{RUNTIME_SHUTTING_DOWN_ERROR}");
                 // Safety: the entry is not registered yet
                 match unsafe { wheel.insert(hdl.clone(), tx) } {
                     Insert::Success => {
@@ -95,7 +96,7 @@ impl Timer {
 
 pub(super) fn with_current_wheel<F, R>(hdl: &SchedulerHandle, f: F) -> R
 where
-    F: FnOnce(Option<(&mut Wheel, Sender)>) -> R,
+    F: FnOnce(Option<(&mut Wheel, Sender, bool)>) -> R,
 {
     #[cfg(not(feature = "rt"))]
     {
@@ -162,19 +163,20 @@ fn push_from_remote(sched_hdl: &SchedulerHandle, entry_hdl: EntryHandle) {
         use crate::runtime::scheduler::Handle::MultiThread;
 
         match sched_hdl {
-            CurrentThread(hdl) => hdl.push_remote_timer(entry_hdl),
+            CurrentThread(hdl) => {
+                assert!(!hdl.is_shutdown(), "{RUNTIME_SHUTTING_DOWN_ERROR}");
+                hdl.push_remote_timer(entry_hdl)
+            }
             #[cfg(feature = "rt-multi-thread")]
-            MultiThread(hdl) => hdl.push_remote_timer(entry_hdl),
+            MultiThread(hdl) => {
+                assert!(!hdl.is_shutdown(), "{RUNTIME_SHUTTING_DOWN_ERROR}");
+                hdl.push_remote_timer(entry_hdl)
+            }
         }
     }
 }
 
 fn deadline_to_tick(sched_hdl: &SchedulerHandle, deadline: Instant) -> u64 {
     let time_hdl = sched_hdl.driver().time();
-
-    if time_hdl.is_shutdown() {
-        panic!("{RUNTIME_SHUTTING_DOWN_ERROR}");
-    }
-
     time_hdl.time_source().deadline_to_tick(deadline)
 }

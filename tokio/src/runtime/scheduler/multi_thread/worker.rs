@@ -57,6 +57,7 @@
 //! leak.
 
 use crate::loom::sync::{Arc, Mutex};
+use crate::loom::sync::atomic::AtomicBool;
 use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
     idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
@@ -331,6 +332,7 @@ pub(super) fn create(
         driver: driver_handle,
         blocking_spawner,
         seed_generator,
+        is_shutdown: AtomicBool::new(false),
     });
 
     let mut launch = Launch(vec![]);
@@ -888,11 +890,11 @@ impl Context {
 
         pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
         where
-            F: FnOnce(Option<(&mut Wheel, cancellation_queue::Sender)>) -> R,
+            F: FnOnce(Option<(&mut Wheel, cancellation_queue::Sender, bool)>) -> R,
         {
             self.with_core(|core| {
                 if let Some(core) = core {
-                    f(Some((&mut core.wheel, core.timer_cancel_tx.clone())))
+                    f(Some((&mut core.wheel, core.timer_cancel_tx.clone(), core.is_shutdown)))
                 } else {
                     f(None)
                 }

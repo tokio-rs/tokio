@@ -48,7 +48,7 @@ async fn fire_all_timers(handle: &Handle, exit_rx: oneshot::Receiver<()>) {
         // In the `block_on` context, we can get the current wheel
         // fire all timers.
         with_current_wheel(&handle.inner, |maybe_wheel| {
-            let (wheel, _tx) = maybe_wheel.unwrap();
+            let (wheel, _tx, _is_shutdown) = maybe_wheel.unwrap();
             let time = handle.inner.driver().time();
             time.process_at_time(wheel, u64::MAX); // 2 seconds
         });
@@ -61,7 +61,7 @@ async fn fire_all_timers(handle: &Handle, exit_rx: oneshot::Receiver<()>) {
 fn process_at_time(handle: &Handle, at: u64) {
     let handle = &handle.inner;
     with_current_wheel(handle, |maybe_wheel| {
-        let (wheel, _tx) = maybe_wheel.unwrap();
+        let (wheel, _tx, _is_shutdown) = maybe_wheel.unwrap();
         let time = handle.driver().time();
         time.process_at_time(wheel, at);
     });

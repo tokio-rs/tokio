@@ -1,12 +1,14 @@
-use crate::loom::sync::atomic::{AtomicBool, Ordering};
-use crate::loom::sync::Arc;
 use crate::runtime::time::{TimeSource, Wheel};
 use std::fmt;
+
+cfg_test_util! {
+    use crate::loom::sync::Arc;
+    use crate::loom::sync::atomic::{AtomicBool, Ordering};
+}
 
 /// Handle to time driver instance.
 pub(crate) struct Handle {
     pub(super) time_source: TimeSource,
-    pub(super) is_shutdown: Arc<AtomicBool>,
 
     // When `true`, a call to `park_timeout` should immediately return and time
     // should not advance. One reason for this to be `true` is if the task
@@ -48,11 +50,6 @@ impl Handle {
     /// Returns the time source associated with this handle.
     pub(crate) fn time_source(&self) -> &TimeSource {
         &self.time_source
-    }
-
-    /// Checks whether the driver has been shutdown.
-    pub(super) fn is_shutdown(&self) -> bool {
-        self.is_shutdown.load(Ordering::SeqCst)
     }
 
     /// Track that the driver is being unparked

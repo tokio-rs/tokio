@@ -24,8 +24,11 @@ cfg_rt_or_time! {
     pub(crate) use wheel::Wheel;
 }
 
+cfg_test_util! {
+    use crate::loom::sync::Arc;
+}
+
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
-use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, IoStack};
 use crate::time::{Clock, Duration};
 
@@ -89,7 +92,7 @@ pub(crate) struct Driver {
     /// Parker to delegate to.
     park: IoStack,
 
-    is_shutdown: Arc<AtomicBool>,
+    is_shutdown: AtomicBool,
 }
 
 // ===== impl Driver =====
@@ -101,16 +104,14 @@ impl Driver {
     /// Specifying the source of time is useful when testing.
     pub(crate) fn new(park: IoStack, clock: &Clock) -> (Driver, Handle) {
         let time_source = TimeSource::new(clock);
-        let is_shutdown = Arc::new(AtomicBool::new(false));
 
         let handle = Handle {
             time_source,
-            is_shutdown: is_shutdown.clone(),
             #[cfg(feature = "test-util")]
             did_wake: Arc::new(AtomicBool::new(false)),
         };
 
-        let driver = Driver { park, is_shutdown };
+        let driver = Driver { park, is_shutdown: AtomicBool::new(false) };
 
         (driver, handle)
     }
@@ -124,9 +125,7 @@ impl Driver {
     }
 
     pub(crate) fn shutdown(&mut self, rt_handle: &driver::Handle) {
-        let handle = rt_handle.time();
-
-        if handle.is_shutdown() {
+        if self.is_shutdown.load(Ordering::SeqCst) {
             return;
         }
 
