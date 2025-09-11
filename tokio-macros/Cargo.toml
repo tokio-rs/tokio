@@ -3,7 +3,7 @@ name = "tokio-macros"
 # When releasing to crates.io:
 # - Remove path dependencies
 # - Update CHANGELOG.md.
-# - Create "tokio-macros-1.x.y" git tag.
+# - Create "tokio-macros-x.y.z" git tag.
 version = "2.5.0"
 edition = "2021"
 rust-version = "1.70"
