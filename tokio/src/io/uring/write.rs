@@ -36,6 +36,8 @@ impl Op<Write> {
         buf_offset: usize,
         file_offset: u64,
     ) -> io::Result<Self> {
+        // There is a cap on how many bytes we can write in a single uring write operation.
+        // ref: https://github.com/axboe/liburing/discussions/497
         let len = u32::try_from(buf.as_ref().len() - buf_offset).unwrap_or(u32::MAX);
 
         let ptr = buf.as_ref()[buf_offset..buf_offset + len as usize].as_ptr();
