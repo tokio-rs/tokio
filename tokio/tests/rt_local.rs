@@ -1,8 +1,10 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", tokio_unstable))]
 
+use std::panic;
 use tokio::runtime::LocalOptions;
 use tokio::task::spawn_local;
+use tokio::task::LocalSet;
 
 #[test]
 fn test_spawn_local_in_runtime() {
@@ -109,6 +111,25 @@ fn test_spawn_local_from_guard_other_thread() {
     let _guard = handle.enter();
 
     spawn_local(async {});
+}
+
+#[test]
+fn test_spawn_local_panic() {
+    let rt = rt();
+    let local = LocalSet::new();
+
+    rt.block_on(local.run_until(async {
+        let thread_result = std::thread::spawn(|| {
+            let panic_result = panic::catch_unwind(|| {
+                let _jh = tokio::task::spawn_local(async {
+                    println!("you will never see this line");
+                });
+            });
+            assert!(panic_result.is_err(), "Expected panic, but none occurred");
+        })
+        .join();
+        assert!(thread_result.is_ok(), "Thread itself panicked unexpectedly");
+    }));
 }
 
 fn rt() -> tokio::runtime::LocalRuntime {
