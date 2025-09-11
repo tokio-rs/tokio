@@ -28,15 +28,16 @@ impl Cancellable for Write {
 }
 
 impl Op<Write> {
-    /// Issue a write that starts at `buf_offset` within `buf` and writes `len` bytes
+    /// Issue a write that starts at `buf_offset` within `buf` and writes some bytes
     /// into `file` at `file_offset`.
     pub(crate) fn write_at(
         fd: OwnedFd,
         buf: OwnedBuf,
         buf_offset: usize,
-        len: u32,
         file_offset: u64,
     ) -> io::Result<Self> {
+        let len = u32::try_from(buf.as_ref().len() - buf_offset).unwrap_or(u32::MAX);
+
         let ptr = buf.as_ref()[buf_offset..buf_offset + len as usize].as_ptr();
 
         let sqe = opcode::Write::new(types::Fd(fd.as_raw_fd()), ptr, len)

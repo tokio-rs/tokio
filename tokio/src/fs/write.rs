@@ -57,20 +57,18 @@ async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
         .into();
 
     let total: usize = buf.as_ref().len();
-    let mut offset: usize = 0;
-    while offset < total {
-        // There is a cap on how many bytes we can write in a single uring write operation.
-        // ref: https://github.com/axboe/liburing/discussions/497
-        let len = std::cmp::min(total - offset, u32::MAX as usize) as u32;
-
-        let (n, _buf, _fd) = Op::write_at(fd, buf, offset, len, offset as u64)?.await?;
+    let mut buf_offset: usize = 0;
+    let mut file_offset: u64 = 0;
+    while buf_offset < total {
+        let (n, _buf, _fd) = Op::write_at(fd, buf, buf_offset, file_offset)?.await?;
         if n == 0 {
             return Err(io::ErrorKind::WriteZero.into());
         }
 
         buf = _buf;
         fd = _fd;
-        offset += n as usize;
+        buf_offset += n as usize;
+        file_offset += n as u64;
     }
 
     Ok(())
