@@ -29,8 +29,10 @@
 //! The [`Receiver`] half provides an asynchronous [`changed`] method. This
 //! method is ready when a new, *unseen* value is sent via the [`Sender`] half.
 //!
-//! * [`Receiver::changed()`] returns `Ok(())` on receiving a new value, or
-//!   `Err(`[`error::RecvError`]`)` if the [`Sender`] has been dropped.
+//! * [`Receiver::changed()`] returns:
+//!     * `Ok(())` on receiving a new value.
+//!     * `Err(`[`RecvError`](error::RecvError)`)` if the
+//!       channel has been closed __AND__ the current value is *seen*.
 //! * If the current value is *unseen* when calling [`changed`], then
 //!   [`changed`] will return immediately. If the current value is *seen*, then
 //!   it will sleep until either a new message is sent via the [`Sender`] half,
@@ -198,7 +200,7 @@ impl<'a, T> Ref<'a, T> {
     /// Indicates if the borrowed value is considered as _changed_ since the last
     /// time it has been marked as seen.
     ///
-    /// Unlike [`Receiver::has_changed()`], this method does not fail if the channel is closed.
+    /// Unlike [`Receiver::has_changed()`], this method is not fallible.
     ///
     /// When borrowed from the [`Sender`] this function will always return `false`.
     ///
@@ -218,10 +220,10 @@ impl<'a, T> Ref<'a, T> {
     ///     // Drop the sender immediately, just for testing purposes.
     ///     drop(tx);
     ///
-    ///     // Even if the sender has already been dropped...
-    ///     assert!(rx.has_changed().is_err());
-    ///     // ...the modified value is still readable and detected as changed.
+    ///     // The modified value is still readable and detected as changed
+    ///     // even if the sender has already been dropped.
     ///     assert_eq!(*rx.borrow(), "goodbye");
+    ///     assert!(rx.has_changed().unwrap());
     ///     assert!(rx.borrow().has_changed());
     ///
     ///     // Read the changed value and mark it as seen.
@@ -637,15 +639,20 @@ impl<T> Receiver<T> {
     }
 
     /// Checks if this channel contains a message that this receiver has not yet
-    /// seen. The new value is not marked as seen.
+    /// seen. The current value will not be marked as seen.
     ///
-    /// Although this method is called `has_changed`, it does not check new
-    /// messages for equality, so this call will return true even if the new
-    /// message is equal to the old message.
+    /// Although this method is called `has_changed`, it does not check
+    /// messages for equality, so this call will return true even if the current
+    /// message is equal to the previous message.
     ///
-    /// Returns an error if the channel has been closed.
+    /// # Errors
+    ///
+    /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
+    /// the current value is seen.
+    ///
     /// # Examples
     ///
+    /// ## Basic usage
     /// ```
     /// use tokio::sync::watch;
     ///
@@ -660,22 +667,42 @@ impl<T> Receiver<T> {
     ///
     ///     // The value has been marked as seen
     ///     assert!(!rx.has_changed().unwrap());
+    /// }
+    /// ```
     ///
+    /// ## Closed channel example
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = watch::channel("hello");
+    ///     tx.send("goodbye").unwrap();
     ///     drop(tx);
-    ///     // The `tx` handle has been dropped
+    ///
+    ///     // `has_changed` returns Ok(true) as the current value is not seen.
+    ///     assert!(rx.has_changed().unwrap());
+    ///
+    ///     // Marks the current value as seen.
+    ///     assert_eq!(*rx.borrow_and_update(), "goodbye");
+    ///
+    ///     // The `tx` handle has been dropped __AND__ the current value is seen.
     ///     assert!(rx.has_changed().is_err());
     /// }
     /// ```
     pub fn has_changed(&self) -> Result<bool, error::RecvError> {
         // Load the version from the state
         let state = self.shared.state.load();
-        if state.is_closed() {
-            // The sender has dropped.
-            return Err(error::RecvError(()));
-        }
-        let new_version = state.version();
+        let current_version = state.version();
 
-        Ok(self.version != new_version)
+        let current_value_is_seen = self.version == current_version;
+        let sender_has_dropped = state.is_closed();
+
+        if sender_has_dropped && current_value_is_seen {
+            Err(error::RecvError(()))
+        } else {
+            Ok(!current_value_is_seen)
+        }
     }
 
     /// Marks the state as changed.
@@ -701,18 +728,22 @@ impl<T> Receiver<T> {
         self.version = current_version;
     }
 
-    /// Waits for a change notification, then marks the newest value as seen.
+    /// Waits for a change notification, then marks the current value as seen.
     ///
-    /// If the newest value in the channel has not yet been marked seen when
+    /// If the current value in the channel has not yet been marked seen when
     /// this method is called, the method marks that value seen and returns
-    /// immediately. If the newest value has already been marked seen, then the
+    /// immediately. If the current value has already been marked seen, then the
     /// method sleeps until a new message is sent by the [`Sender`] connected to
     /// this `Receiver`, or until the [`Sender`] is dropped.
     ///
-    /// This method returns an error if and only if the [`Sender`] is dropped.
     ///
     /// For more information, see
     /// [*Change notifications*](self#change-notifications) in the module-level documentation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
+    /// the current value is seen.
     ///
     /// # Cancel safety
     ///
