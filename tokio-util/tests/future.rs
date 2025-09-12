@@ -250,7 +250,7 @@ fn pending_fut_with_owned_token_cancelled_test() {
 fn pending_only_on_first_poll_with_cancellation_token_owned_test() {
     let (waker, wake_count) = new_count_waker();
     let token = CancellationToken::new();
-    let fut = ReadyOnTheSecondPollFuture::default().with_cancellation_token(&token);
+    let fut = ReadyOnTheSecondPollFuture::default().with_cancellation_token_owned(token.clone());
     pin!(fut);
 
     // first poll, ReadyOnTheSecondPollFuture returned Pending
