@@ -54,6 +54,10 @@ impl RuntimeMetrics {
     /// This counter increases when a task is spawned and decreases when a
     /// task exits.
     ///
+    /// Note: When using the multi-threaded runtime this number may not
+    /// not have strong consistency i.e. no tasks may be running but the metric
+    /// reports otherwise.
+    ///
     /// # Examples
     ///
     /// ```
