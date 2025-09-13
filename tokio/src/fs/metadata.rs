@@ -4,6 +4,11 @@ use std::fs::Metadata;
 use std::io;
 use std::path::Path;
 
+cfg_tokio_uring! {
+    #[cfg(target_env = "gnu")]
+    use crate::runtime::driver::op::Op;
+}
+
 /// Given a path, queries the file system to get information about a file,
 /// directory, etc.
 ///
@@ -42,5 +47,20 @@ use std::path::Path;
 /// ```
 pub async fn metadata(path: impl AsRef<Path>) -> io::Result<Metadata> {
     let path = path.as_ref().to_owned();
+    #[cfg(all(
+        tokio_uring,
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+        target_env = "gnu"
+    ))]
+    {
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+        if driver_handle.check_and_init()? {
+            return Op::metadata(path.as_ref())?.await;
+        }
+    }
+
     asyncify(|| std::fs::metadata(path)).await
 }

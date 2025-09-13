@@ -40,6 +40,7 @@ fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
 }
 
 #[test]
+#[serial_test::serial]
 fn shutdown_runtime_while_performing_io_uring_ops() {
     fn run(rt: Runtime) {
         let (tx, rx) = mpsc::channel();
@@ -78,7 +79,10 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
     }
 }
 
+// This test opens too many temp files (that's the point of it)
+// but this interfier with other tests which need open temp files as well
 #[test]
+#[serial_test::serial]
 fn open_many_files() {
     fn run(rt: Runtime) {
         const NUM_FILES: usize = 512;
@@ -105,6 +109,7 @@ fn open_many_files() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn cancel_op_future() {
     let (_tmp_file, path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
 

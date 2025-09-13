@@ -108,6 +108,10 @@ io-uring = { version = "0.7.6", default-features = false }
 libc = { version = "0.2.168" }
 mio = { version = "1.0.1", default-features = false, features = ["os-poll", "os-ext"] }
 slab = "0.4.9"
+tokio_shim = { version = "0.0.0", path = "tokio-shim" }
+
+[target.'cfg(all(tokio_uring, target_os = "linux"))'.dev-dependencies]
+serial_test = "2"
 
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.

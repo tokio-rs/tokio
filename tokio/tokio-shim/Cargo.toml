@@ -1,0 +1,13 @@
+[package]
+name = "tokio_shim"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+libc = { version = "0.2.168" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(tokio_uring)',
+] }
