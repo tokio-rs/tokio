@@ -366,8 +366,8 @@ impl<T: futures_io::AsyncSeek> tokio::io::AsyncSeek for Compat<T> {
 }
 
 #[cfg(unix)]
-impl<T: std::os::unix::io::AsRawFd> std::os::unix::io::AsRawFd for Compat<T> {
-    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+impl<T: std::os::fd::AsRawFd> std::os::fd::AsRawFd for Compat<T> {
+    fn as_raw_fd(&self) -> std::os::fd::RawFd {
         self.inner.as_raw_fd()
     }
 }

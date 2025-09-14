@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(unix, feature = "full"))]
 
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, RawFd};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,

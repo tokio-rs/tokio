@@ -9,7 +9,7 @@ use mio::Token;
 use std::fmt;
 use std::io;
 use std::ops::{Deref, DerefMut};
-use std::os::unix::io::AsRawFd;
+use std::os::fd::AsRawFd;
 use std::os::unix::prelude::RawFd;
 use std::task::{ready, Context, Poll};
 

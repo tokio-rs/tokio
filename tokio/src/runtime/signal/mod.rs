@@ -42,7 +42,7 @@ impl Driver {
     /// Creates a new signal `Driver` instance that delegates wakeups to `park`.
     pub(crate) fn new(io: io::Driver, io_handle: &io::Handle) -> std_io::Result<Self> {
         use std::mem::ManuallyDrop;
-        use std::os::unix::io::{AsRawFd, FromRawFd};
+        use std::os::fd::{AsRawFd, FromRawFd};
 
         // NB: We give each driver a "fresh" receiver file descriptor to avoid
         // the issues described in alexcrichton/tokio-process#42.

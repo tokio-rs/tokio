@@ -899,24 +899,22 @@ impl fmt::Debug for File {
 }
 
 #[cfg(unix)]
-impl std::os::unix::io::AsRawFd for File {
-    fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+impl std::os::fd::AsRawFd for File {
+    fn as_raw_fd(&self) -> std::os::fd::RawFd {
         self.std.as_raw_fd()
     }
 }
 
 #[cfg(unix)]
-impl std::os::unix::io::AsFd for File {
-    fn as_fd(&self) -> std::os::unix::io::BorrowedFd<'_> {
-        unsafe {
-            std::os::unix::io::BorrowedFd::borrow_raw(std::os::unix::io::AsRawFd::as_raw_fd(self))
-        }
+impl std::os::fd::AsFd for File {
+    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        unsafe { std::os::fd::BorrowedFd::borrow_raw(std::os::fd::AsRawFd::as_raw_fd(self)) }
     }
 }
 
 #[cfg(unix)]
-impl std::os::unix::io::FromRawFd for File {
-    unsafe fn from_raw_fd(fd: std::os::unix::io::RawFd) -> Self {
+impl std::os::fd::FromRawFd for File {
+    unsafe fn from_raw_fd(fd: std::os::fd::RawFd) -> Self {
         StdFile::from_raw_fd(fd).into()
     }
 }

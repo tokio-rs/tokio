@@ -44,13 +44,13 @@ mock! {
         unsafe fn from_raw_handle(h: std::os::windows::io::RawHandle) -> Self;
     }
     #[cfg(unix)]
-    impl std::os::unix::io::AsRawFd for File {
-        fn as_raw_fd(&self) -> std::os::unix::io::RawFd;
+    impl std::os::fd::AsRawFd for File {
+        fn as_raw_fd(&self) -> std::os::fd::RawFd;
     }
 
     #[cfg(unix)]
-    impl std::os::unix::io::FromRawFd for File {
-        unsafe fn from_raw_fd(h: std::os::unix::io::RawFd) -> Self;
+    impl std::os::fd::FromRawFd for File {
+        unsafe fn from_raw_fd(h: std::os::fd::RawFd) -> Self;
     }
 }
 

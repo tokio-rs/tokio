@@ -6,7 +6,7 @@ use mio::unix::SourceFd;
 use std::error::Error;
 use std::fmt;
 use std::io;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, RawFd};
 use std::task::{ready, Context, Poll};
 
 /// Associates an IO object backed by a Unix file descriptor with the tokio
@@ -930,9 +930,9 @@ impl<T: AsRawFd> AsRawFd for AsyncFd<T> {
     }
 }
 
-impl<T: AsRawFd> std::os::unix::io::AsFd for AsyncFd<T> {
-    fn as_fd(&self) -> std::os::unix::io::BorrowedFd<'_> {
-        unsafe { std::os::unix::io::BorrowedFd::borrow_raw(self.as_raw_fd()) }
+impl<T: AsRawFd> std::os::fd::AsFd for AsyncFd<T> {
+    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        unsafe { std::os::fd::BorrowedFd::borrow_raw(self.as_raw_fd()) }
     }
 }
 

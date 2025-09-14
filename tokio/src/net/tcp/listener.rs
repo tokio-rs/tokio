@@ -274,7 +274,7 @@ impl TcpListener {
     pub fn into_std(self) -> io::Result<std::net::TcpListener> {
         #[cfg(unix)]
         {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
             self.io
                 .into_inner()
                 .map(IntoRawFd::into_raw_fd)

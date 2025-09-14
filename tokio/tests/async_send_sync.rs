@@ -739,8 +739,8 @@ mod unix_asyncfd {
     struct ImplsFd<T> {
         _t: T,
     }
-    impl<T> std::os::unix::io::AsRawFd for ImplsFd<T> {
-        fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
+    impl<T> std::os::fd::AsRawFd for ImplsFd<T> {
+        fn as_raw_fd(&self) -> std::os::fd::RawFd {
             unreachable!()
         }
     }

@@ -91,7 +91,7 @@ pub(crate) mod impl_linux {
     use libc::ucred;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
-        use std::os::unix::io::AsRawFd;
+        use std::os::fd::AsRawFd;
 
         unsafe {
             let raw_fd = sock.as_raw_fd();
@@ -137,7 +137,7 @@ pub(crate) mod impl_netbsd {
     use libc::{c_void, getsockopt, socklen_t, unpcbid, LOCAL_PEEREID, SOL_SOCKET};
     use std::io;
     use std::mem::size_of;
-    use std::os::unix::io::AsRawFd;
+    use std::os::fd::AsRawFd;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
         unsafe {
@@ -179,7 +179,7 @@ pub(crate) mod impl_bsd {
     use libc::getpeereid;
     use std::io;
     use std::mem::MaybeUninit;
-    use std::os::unix::io::AsRawFd;
+    use std::os::fd::AsRawFd;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
         unsafe {
@@ -217,7 +217,7 @@ pub(crate) mod impl_macos {
     use std::io;
     use std::mem::size_of;
     use std::mem::MaybeUninit;
-    use std::os::unix::io::AsRawFd;
+    use std::os::fd::AsRawFd;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
         unsafe {
@@ -260,7 +260,7 @@ pub(crate) mod impl_macos {
 pub(crate) mod impl_solaris {
     use crate::net::unix::{self, UnixStream};
     use std::io;
-    use std::os::unix::io::AsRawFd;
+    use std::os::fd::AsRawFd;
     use std::ptr;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
@@ -293,7 +293,7 @@ pub(crate) mod impl_solaris {
 pub(crate) mod impl_aix {
     use crate::net::unix::UnixStream;
     use std::io;
-    use std::os::unix::io::AsRawFd;
+    use std::os::fd::AsRawFd;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
         unsafe {

@@ -5,7 +5,7 @@ use crate::util::check_socket_for_blocking;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
 use std::task::{ready, Context, Poll};

@@ -11,11 +11,11 @@ use std::io::{self, Read, Write};
 use std::net::Shutdown;
 #[cfg(target_os = "android")]
 use std::os::android::net::SocketAddrExt;
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(target_os = "linux")]
 use std::os::linux::net::SocketAddrExt;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use std::os::unix::ffi::OsStrExt;
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net::{self, SocketAddr as StdSocketAddr};
 use std::path::Path;
 use std::pin::Pin;
