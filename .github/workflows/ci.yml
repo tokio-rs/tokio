@@ -120,6 +120,8 @@ jobs:
       - name: test tokio full
         run: |
           set -euxo pipefail
+          # We use `--features "full,test-util"` instead of `--all-features` since
+          # `--all-features` includes `io_uring`, which is not available on all targets.
           cargo nextest run --features full,test-util
           cargo test --doc --features full,test-util
         working-directory: tokio
@@ -287,6 +289,8 @@ jobs:
     strategy:
       matrix:
         include:
+          # We use `--features "full,test-util"` instead of `--all-features` since
+          # `--all-features` includes `io_uring`, which is not available on all targets.
           - { os: windows-latest, features: "full,test-util" }
           - { os: ubuntu-latest, features: "full,test-util" }
           - { os: ubuntu-latest, features: "full,test-util,io-uring" }
@@ -509,7 +513,7 @@ jobs:
           target: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
-      # Don't use --all-features since io-uring will be enabled and is not supported on those targets.
+      # We don't use --all-features since io-uring will be enabled and is not supported on those targets.
       - run: cargo check --workspace --features full,test-util --target ${{ matrix.target }}
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
@@ -580,6 +584,8 @@ jobs:
       - name: Tests run with all features (including parking_lot)
         run: |
           set -euxo pipefail
+          # We use `--features "full,test-util"` instead of `--all-features` since
+          # `--all-features` includes `io_uring`, which is not available on all targets.
           cargo nextest run -p tokio --features full,test-util --target ${{ matrix.target }}
           cargo test --doc -p tokio --features full,test-util --target ${{ matrix.target }}
         env:
@@ -630,6 +636,8 @@ jobs:
       - name: Tests run with all features (without parking_lot)
         run: |
           set -euxo pipefail
+          # We use `--features "full,test-util"` instead of `--all-features` since
+          # `--all-features` includes `io_uring`, which is not available on all targets.
           cargo nextest run -p tokio --features full,test-util --target ${{ matrix.target }}
           cargo test --doc -p tokio --features full,test-util --target ${{ matrix.target }}
         env:
@@ -662,6 +670,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: test tokio --all-features
         run: |
+          # We use `--features "full,test-util"` instead of `--all-features` since
+          # `--all-features` includes `io_uring`, which is not available on all targets.
           cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features full,test-util
           cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features full,test-util
         env:
@@ -689,6 +699,7 @@ jobs:
       # https://github.com/tokio-rs/tokio/pull/5356
       # https://github.com/tokio-rs/tokio/issues/5373
       - name: Check
+        # We use `--skip io-uring` since io-uring crate doesn't provide a binding for the i686 target.
         run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --skip io-uring --depth 2 --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
