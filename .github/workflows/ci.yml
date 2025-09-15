@@ -714,7 +714,6 @@ jobs:
           - { name: "", rustflags: "" }
           - { name: "--unstable", rustflags: "--cfg tokio_unstable -Dwarnings" }
           - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump" }
-          - { name: "--unstable --taskdump --io-uring", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump" }
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_nightly }}
