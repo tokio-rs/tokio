@@ -30,7 +30,7 @@
 //! method is ready when a new, *unseen* value is sent via the [`Sender`] half.
 //!
 //! * [`Receiver::changed()`] returns `Ok(())` on receiving a new value, or
-//!   `Err(`[`error::RecvError`]`)` if the [`Sender`] has been dropped.
+//!   `Err(`[`error::RecvError`]`)` if all [`Sender`]s have been dropped.
 //! * If the current value is *unseen* when calling [`changed`], then
 //!   [`changed`] will return immediately. If the current value is *seen*, then
 //!   it will sleep until either a new message is sent via the [`Sender`] half,
@@ -90,7 +90,7 @@
 //! when all [`Receiver`] handles have been dropped. This indicates that there
 //! is no further interest in the values being produced and work can be stopped.
 //!
-//! The value in the channel will not be dropped until the sender and all
+//! The value in the channel will not be dropped until all senders and all
 //! receivers have been dropped.
 //!
 //! # Thread safety
@@ -391,7 +391,7 @@ mod state {
     /// Snapshot of the state. The first bit is used as the CLOSED bit.
     /// The remaining bits are used as the version.
     ///
-    /// The CLOSED bit tracks whether the Sender has been dropped. Dropping all
+    /// The CLOSED bit tracks whether all senders have been dropped. Dropping all
     /// receivers does not set it.
     #[derive(Copy, Clone, Debug)]
     pub(super) struct StateSnapshot(usize);
@@ -670,7 +670,7 @@ impl<T> Receiver<T> {
         // Load the version from the state
         let state = self.shared.state.load();
         if state.is_closed() {
-            // The sender has dropped.
+            // All senders have dropped.
             return Err(error::RecvError(()));
         }
         let new_version = state.version();
@@ -706,10 +706,10 @@ impl<T> Receiver<T> {
     /// If the newest value in the channel has not yet been marked seen when
     /// this method is called, the method marks that value seen and returns
     /// immediately. If the newest value has already been marked seen, then the
-    /// method sleeps until a new message is sent by the [`Sender`] connected to
-    /// this `Receiver`, or until the [`Sender`] is dropped.
+    /// method sleeps until a new message is sent by a [`Sender`] connected to
+    /// this `Receiver`, or until all [`Sender`]s are dropped.
     ///
-    /// This method returns an error if and only if the [`Sender`] is dropped.
+    /// This method returns an error if and only if all [`Sender`]s are dropped.
     ///
     /// For more information, see
     /// [*Change notifications*](self#change-notifications) in the module-level documentation.
@@ -901,7 +901,7 @@ fn maybe_changed<T>(
     }
 
     if state.is_closed() {
-        // The sender has been dropped.
+        // All senders have been dropped.
         return Some(Err(error::RecvError(())));
     }
 
