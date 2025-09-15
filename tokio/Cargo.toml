@@ -85,7 +85,7 @@ sync = []
 test-util = ["rt", "sync", "time"]
 time = []
 # Unstable feature. Requires `--cfg tokio_unstable` to enable.
-io-uring = ["dep:io-uring", "libc", "mio/os-poll", "mio/os-ext", "slab"]
+io-uring = ["dep:io-uring", "libc", "mio/os-poll", "mio/os-ext", "dep:slab"]
 
 [dependencies]
 tokio-macros = { version = "~2.5.0", path = "../tokio-macros", optional = true }
