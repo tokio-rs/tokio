@@ -377,7 +377,7 @@ pub struct FramedParts<T, U> {
 
     /// This private field allows us to add additional fields in the future in a
     /// backwards compatible way.
-    _priv: (),
+    pub(crate) _priv: (),
 }
 
 impl<T, U> FramedParts<T, U> {

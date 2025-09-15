@@ -224,7 +224,7 @@ If you wish to use a fixed minor release in your project, we recommend that you
 use an LTS release.
 
 To use a fixed minor version, you can specify the version with a tilde. For
-example, to specify that you wish to use the newest `1.32.x` patch release, you
+example, to specify that you wish to use the newest `1.43.x` patch release, you
 can use the following dependency specification:
 ```text
 tokio = { version = "~1.43", features = [...] }
