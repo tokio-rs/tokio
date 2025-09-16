@@ -278,8 +278,8 @@
 //!
 //! ## `watch` channel
 //!
-//! The [`watch` channel] supports sending **many** values from a **many**
-//! producer to **many** consumers. However, only the **most recent** value is
+//! The [`watch` channel] supports sending **many** values from **many**
+//! producers to **many** consumers. However, only the **most recent** value is
 //! stored in the channel. Consumers are notified when a new value is sent, but
 //! there is no guarantee that consumers will see **all** values.
 //!
