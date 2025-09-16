@@ -12,30 +12,30 @@ use tokio::{
 
 /// A collection of tasks spawned on a Tokio runtime.
 ///
-/// A `JoinQueue` can be used to await the completion of the tasks in FIFO
+/// A [`JoinQueue`] can be used to await the completion of the tasks in FIFO
 /// order. That is, if tasks are spawned in the order A, B, C, then
 /// awaiting the next completed task will always return A first, then B,
 /// then C, regardless of the order in which the tasks actually complete.
 ///
 /// All of the tasks must have the same return type `T`.
 ///
-/// When the `JoinQueue` is dropped, all tasks in the `JoinQueue` are
+/// When the [`JoinQueue`] is dropped, all tasks in the [`JoinQueue`] are
 /// immediately aborted.
 #[derive(Debug)]
 pub struct JoinQueue<T>(VecDeque<AbortOnDropHandle<T>>);
 
 impl<T> JoinQueue<T> {
-    /// Create a new empty `JoinQueue`.
+    /// Create a new empty [`JoinQueue`].
     pub const fn new() -> Self {
         Self(VecDeque::new())
     }
 
-    /// Creates an empty `JoinQueue` with space for at least `capacity` tasks.
+    /// Creates an empty [`JoinQueue`] with space for at least `capacity` tasks.
     pub fn with_capacity(capacity: usize) -> Self {
         Self(VecDeque::with_capacity(capacity))
     }
 
-    /// Returns the number of tasks currently in the `JoinQueue`.
+    /// Returns the number of tasks currently in the [`JoinQueue`].
     ///
     /// This includes both tasks that are currently running and tasks that have
     /// completed but not yet been removed from the queue because outputting of
@@ -44,17 +44,17 @@ impl<T> JoinQueue<T> {
         self.0.len()
     }
 
-    /// Returns whether the `JoinQueue` is empty.
+    /// Returns whether the [`JoinQueue`] is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    /// Spawn the provided task on the `JoinQueue`, returning an [`AbortHandle`]
+    /// Spawn the provided task on the [`JoinQueue`], returning an [`AbortHandle`]
     /// that can be used to remotely cancel the task.
     ///
     /// The provided future will start running in the background immediately
     /// when this method is called, even if you don't await anything on this
-    /// `JoinQueue`.
+    /// [`JoinQueue`].
     ///
     /// # Panics
     ///
@@ -71,12 +71,12 @@ impl<T> JoinQueue<T> {
     }
 
     /// Spawn the provided task on the provided runtime and store it in this
-    /// `JoinQueue` returning an [`AbortHandle`] that can be used to remotely
+    /// [`JoinQueue`] returning an [`AbortHandle`] that can be used to remotely
     /// cancel the task.
     ///
     /// The provided future will start running in the background immediately
     /// when this method is called, even if you don't await anything on this
-    /// `JoinQueue`.
+    /// [`JoinQueue`].
     ///
     /// [`AbortHandle`]: tokio::task::AbortHandle
     #[track_caller]
@@ -89,12 +89,12 @@ impl<T> JoinQueue<T> {
     }
 
     /// Spawn the provided task on the current [`LocalSet`] and store it in this
-    /// `JoinQueue`, returning an [`AbortHandle`] that can be used to remotely
+    /// [`JoinQueue`], returning an [`AbortHandle`] that can be used to remotely
     /// cancel the task.
     ///
     /// The provided future will start running in the background immediately
     /// when this method is called, even if you don't await anything on this
-    /// `JoinQueue`.
+    /// [`JoinQueue`].
     ///
     /// # Panics
     ///
@@ -112,7 +112,7 @@ impl<T> JoinQueue<T> {
     }
 
     /// Spawn the blocking code on the blocking threadpool and store
-    /// it in this `JoinQueue`, returning an [`AbortHandle`] that can be
+    /// it in this [`JoinQueue`], returning an [`AbortHandle`] that can be
     /// used to remotely cancel the task.
     ///
     /// # Panics
@@ -130,7 +130,7 @@ impl<T> JoinQueue<T> {
     }
 
     /// Spawn the blocking code on the blocking threadpool of the
-    /// provided runtime and store it in this `JoinQueue`, returning an
+    /// provided runtime and store it in this [`JoinQueue`], returning an
     /// [`AbortHandle`] that can be used to remotely cancel the task.
     ///
     /// [`AbortHandle`]: tokio::task::AbortHandle
@@ -158,7 +158,7 @@ impl<T> JoinQueue<T> {
     ///
     /// This method is cancel safe. If `join_next` is used as the event in a `tokio::select!`
     /// statement and some other branch completes first, it is guaranteed that no tasks were
-    /// removed from this `JoinQueue`.
+    /// removed from this [`JoinQueue`].
     pub async fn join_next(&mut self) -> Option<Result<T, JoinError>> {
         std::future::poll_fn(|cx| self.poll_join_next(cx)).await
     }
@@ -175,7 +175,7 @@ impl<T> JoinQueue<T> {
     ///
     /// This method is cancel safe. If `join_next_with_id` is used as the event in a `tokio::select!`
     /// statement and some other branch completes first, it is guaranteed that no tasks were
-    /// removed from this `JoinQueue`.
+    /// removed from this [`JoinQueue`].
     ///
     /// [task ID]: tokio::task::Id
     /// [`JoinError::id`]: fn@tokio::task::JoinError::id
@@ -189,7 +189,7 @@ impl<T> JoinQueue<T> {
     /// a loop until it returns `None`.
     ///
     /// This method ignores any panics in the tasks shutting down. When this call returns, the
-    /// `JoinQueue` will be empty.
+    /// [`JoinQueue`] will be empty.
     ///
     /// [`abort_all`]: fn@Self::abort_all
     /// [`join_next`]: fn@Self::join_next
@@ -198,12 +198,12 @@ impl<T> JoinQueue<T> {
         while self.join_next().await.is_some() {}
     }
 
-    /// Awaits the completion of all tasks in this `JoinQueue`, returning a vector of their results.
+    /// Awaits the completion of all tasks in this [`JoinQueue`], returning a vector of their results.
     ///
     /// The results will be stored in the order they were spawned, not the order they completed.
     /// This is a convenience method that is equivalent to calling [`join_next`] in
-    /// a loop. If any tasks on the `JoinQueue` fail with an [`JoinError`], then this call
-    /// to `join_all` will panic and all remaining tasks on the `JoinQueue` are
+    /// a loop. If any tasks on the [`JoinQueue`] fail with an [`JoinError`], then this call
+    /// to `join_all` will panic and all remaining tasks on the [`JoinQueue`] are
     /// cancelled. To handle errors in any other way, manually call [`join_next`]
     /// in a loop.
     ///
@@ -226,28 +226,28 @@ impl<T> JoinQueue<T> {
         output
     }
 
-    /// Aborts all tasks on this `JoinQueue`.
+    /// Aborts all tasks on this [`JoinQueue`].
     ///
-    /// This does not remove the tasks from the `JoinQueue`. To wait for the tasks to complete
-    /// cancellation, you should call `join_next` in a loop until the `JoinQueue` is empty.
+    /// This does not remove the tasks from the [`JoinQueue`]. To wait for the tasks to complete
+    /// cancellation, you should call `join_next` in a loop until the [`JoinQueue`] is empty.
     pub fn abort_all(&mut self) {
         self.0.iter().for_each(|jh| jh.abort());
     }
 
-    /// Removes all tasks from this `JoinQueue` without aborting them.
+    /// Removes all tasks from this [`JoinQueue`] without aborting them.
     ///
-    /// The tasks removed by this call will continue to run in the background even if the `JoinQueue`
+    /// The tasks removed by this call will continue to run in the background even if the [`JoinQueue`]
     /// is dropped.
     pub fn detach_all(&mut self) {
         self.0.drain(..).for_each(|jh| drop(jh.detach()));
     }
 
-    /// Polls for the next task in `JoinQueue` to complete.
+    /// Polls for the next task in [`JoinQueue`] to complete.
     ///
     /// If this returns `Poll::Ready(Some(_))`, then the task that completed is removed from the queue.
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided `Context` is scheduled
-    /// to receive a wakeup when a task in the `JoinQueue` completes. Note that on multiple calls to
+    /// to receive a wakeup when a task in the [`JoinQueue`] completes. Note that on multiple calls to
     /// `poll_join_next`, only the `Waker` from the `Context` passed to the most recent call is
     /// scheduled to receive a wakeup.
     ///
@@ -255,13 +255,13 @@ impl<T> JoinQueue<T> {
     ///
     /// This function returns:
     ///
-    ///  * `Poll::Pending` if the `JoinQueue` is not empty but there is no task whose output is
+    ///  * `Poll::Pending` if the [`JoinQueue`] is not empty but there is no task whose output is
     ///    available right now.
-    ///  * `Poll::Ready(Some(Ok(value)))` if the next task in this `JoinQueue` has completed.
+    ///  * `Poll::Ready(Some(Ok(value)))` if the next task in this [`JoinQueue`] has completed.
     ///    The `value` is the return value that task.
-    ///  * `Poll::Ready(Some(Err(err)))` if the next task in this `JoinQueue` has panicked or been
+    ///  * `Poll::Ready(Some(Err(err)))` if the next task in this [`JoinQueue`] has panicked or been
     ///    aborted. The `err` is the `JoinError` from the panicked/aborted task.
-    ///  * `Poll::Ready(None)` if the `JoinQueue` is empty.
+    ///  * `Poll::Ready(None)` if the [`JoinQueue`] is empty.
     pub fn poll_join_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<T, JoinError>>> {
         let jh = match self.0.front_mut() {
             None => return Poll::Ready(None),
@@ -275,12 +275,12 @@ impl<T> JoinQueue<T> {
         }
     }
 
-    /// Polls for the next task in `JoinQueue` to complete.
+    /// Polls for the next task in [`JoinQueue`] to complete.
     ///
     /// If this returns `Poll::Ready(Some(_))`, then the task that completed is removed from the queue.
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided `Context` is scheduled
-    /// to receive a wakeup when a task in the `JoinQueue` completes. Note that on multiple calls to
+    /// to receive a wakeup when a task in the [`JoinQueue`] completes. Note that on multiple calls to
     /// `poll_join_next`, only the `Waker` from the `Context` passed to the most recent call is
     /// scheduled to receive a wakeup.
     ///
@@ -288,13 +288,13 @@ impl<T> JoinQueue<T> {
     ///
     /// This function returns:
     ///
-    ///  * `Poll::Pending` if the `JoinQueue` is not empty but there is no task whose output is
+    ///  * `Poll::Pending` if the [`JoinQueue`] is not empty but there is no task whose output is
     ///    available right now.
-    ///  * `Poll::Ready(Some(Ok((id, value))))` if the next task in this `JoinQueue` has completed.
+    ///  * `Poll::Ready(Some(Ok((id, value))))` if the next task in this [`JoinQueue`] has completed.
     ///    The `value` is the return value that task, and `id` is its [task ID].
-    ///  * `Poll::Ready(Some(Err(err)))` if the next task in this `JoinQueue` has panicked or been
+    ///  * `Poll::Ready(Some(Err(err)))` if the next task in this [`JoinQueue`] has panicked or been
     ///    aborted. The `err` is the `JoinError` from the panicked/aborted task.
-    ///  * `Poll::Ready(None)` if the `JoinQueue` is empty.
+    ///  * `Poll::Ready(None)` if the [`JoinQueue`] is empty.
     ///
     /// [task ID]: tokio::task::Id
     pub fn poll_join_next_with_id(
