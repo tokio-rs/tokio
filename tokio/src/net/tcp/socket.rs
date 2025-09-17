@@ -252,7 +252,7 @@ impl TcpSocket {
     }
 
     /// Allows the socket to bind to an in-use port. Only available for unix systems
-    /// (excluding Solaris & Illumos).
+    /// (excluding Solaris, Illumos, and Cygwin).
     ///
     /// Behavior is platform specific. Refer to the target platform's
     /// documentation for more details.
@@ -296,7 +296,7 @@ impl TcpSocket {
     }
 
     /// Allows the socket to bind to an in-use port. Only available for unix systems
-    /// (excluding Solaris & Illumos).
+    /// (excluding Solaris, Illumos, and Cygwin).
     ///
     /// Behavior is platform specific. Refer to the target platform's
     /// documentation for more details.
