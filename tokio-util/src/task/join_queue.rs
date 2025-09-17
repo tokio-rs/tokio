@@ -272,7 +272,7 @@ impl<T> JoinQueue<T> {
             // Use `detach` to avoid calling `abort` on a task that has already completed.
             // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
             // we only need to drop the `JoinHandle` for cleanup.
-            let _ = self.0.pop_front().unwrap().detach();
+            drop(self.0.pop_front().unwrap().detach());
             Poll::Ready(Some(res))
         } else {
             Poll::Pending
@@ -313,7 +313,9 @@ impl<T> JoinQueue<T> {
             // Use `detach` to avoid calling `abort` on a task that has already completed.
             // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
             // we only need to drop the `JoinHandle` for cleanup.
-            let id = self.0.pop_front().unwrap().detach().id();
+            let jh = self.0.pop_front().unwrap().detach();
+            let id = jh.id();
+            drop(jh);
             // If the task succeeded, add the task ID to the output. Otherwise, the
             // `JoinError` will already have the task's ID.
             Poll::Ready(Some(res.map(|output| (id, output))))
