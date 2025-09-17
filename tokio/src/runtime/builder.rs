@@ -980,8 +980,10 @@ impl Builder {
     /// tasks. Setting the interval to a smaller value increases the fairness of the scheduler,
     /// at the cost of more synchronization overhead. That can be beneficial for prioritizing
     /// getting started on new work, especially if tasks frequently yield rather than complete
-    /// or await on further I/O. Conversely, a higher value prioritizes existing work, and
-    /// is a good choice when most tasks quickly complete polling.
+    /// or await on further I/O. Setting the interval to `1` will prioritize the global queue and
+    /// tasks from the local queue will be executed only if the global queue is empty.
+    /// Conversely, a higher value prioritizes existing work, and is a good choice when most
+    /// tasks quickly complete polling.
     ///
     /// [the module documentation]: crate::runtime#multi-threaded-runtime-behavior-at-the-time-of-writing
     ///
