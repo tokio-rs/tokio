@@ -208,6 +208,7 @@ impl<T> JoinQueue<T> {
     /// in a loop.
     ///
     /// # Cancel Safety
+    ///
     /// This method is not cancel safe as it calls `join_next` in a loop. If you need
     /// cancel safety, manually call `join_next` in a loop with `Vec` accumulator.
     ///
@@ -268,6 +269,9 @@ impl<T> JoinQueue<T> {
             Some(jh) => jh,
         };
         if let Poll::Ready(res) = Pin::new(jh).poll(cx) {
+            // Use `detach` to avoid calling `abort` on a task that has already completed.
+            // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
+            // we only need to drop the `JoinHandle` for cleanup.
             drop(self.0.pop_front().unwrap().detach());
             Poll::Ready(Some(res))
         } else {
@@ -306,6 +310,9 @@ impl<T> JoinQueue<T> {
             Some(jh) => jh,
         };
         if let Poll::Ready(res) = Pin::new(jh).poll(cx) {
+            // Use `detach` to avoid calling `abort` on a task that has already completed.
+            // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
+            // we only need to drop the `JoinHandle` for cleanup.
             let jh = self.0.pop_front().unwrap().detach();
             let id = jh.id();
             drop(jh);

@@ -107,17 +107,22 @@ async fn test_join_queue_abort_all() {
     assert_eq!(queue.len(), 0);
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn test_join_queue_join_all() {
     let mut queue = JoinQueue::new();
-
+    let mut senders = Vec::new();
     for i in 0..5 {
+        let (tx, rx) = oneshot::channel::<()>();
+        senders.push(Some(tx));
         queue.spawn(async move {
-            tokio::time::sleep(Duration::from_secs(5 - i as u64)).await;
+            let _ = rx.await;
             i
         });
     }
-
+    // Complete all tasks in reverse order
+    while let Some(tx) = senders.pop() {
+        let _ = tx.unwrap().send(());
+    }
     let results = queue.join_all().await;
     assert_eq!(results, vec![0, 1, 2, 3, 4]);
 }
@@ -125,23 +130,34 @@ async fn test_join_queue_join_all() {
 #[tokio::test]
 async fn test_join_queue_shutdown() {
     let mut queue = JoinQueue::new();
+    let mut senders = Vec::new();
 
     for _ in 0..5 {
-        queue.spawn(futures::future::pending::<()>());
+        let (tx, rx) = oneshot::channel::<()>();
+        senders.push(tx);
+        queue.spawn(async move {
+            let _ = rx.await;
+        });
     }
 
     queue.shutdown().await;
     assert_eq!(queue.len(), 0);
+    while let Some(tx) = senders.pop() {
+        assert!(tx.is_closed());
+    }
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn test_join_queue_with_manual_abort() {
     let mut queue = JoinQueue::new();
     let mut num_canceled = 0;
     let mut num_completed = 0;
+    let mut senders = Vec::new();
     for i in 0..16 {
+        let (tx, rx) = oneshot::channel::<()>();
+        senders.push(Some(tx));
         let abort = queue.spawn(async move {
-            tokio::time::sleep(Duration::from_secs(20 - i as u64)).await;
+            let _ = rx.await;
             i
         });
 
@@ -149,6 +165,10 @@ async fn test_join_queue_with_manual_abort() {
             // abort odd-numbered tasks.
             abort.abort();
         }
+    }
+    // Complete all tasks in reverse order
+    while let Some(tx) = senders.pop() {
+        let _ = tx.unwrap().send(());
     }
     loop {
         match queue.join_next().await {
