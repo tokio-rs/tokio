@@ -706,3 +706,17 @@ fn broadcast_sender_closed_with_extra_subscribe() {
     assert!(task3.is_woken());
     assert_ready!(task3.poll());
 }
+
+#[tokio::test]
+async fn broadcast_sender_new_must_be_closed() {
+    let capacity = 1;
+    let tx: broadcast::Sender<()> = broadcast::Sender::new(capacity);
+
+    let mut task = task::spawn(tx.closed());
+    assert_ready!(task.poll());
+
+    let _rx = tx.subscribe();
+
+    let mut task2 = task::spawn(tx.closed());
+    assert_pending!(task2.poll());
+}
