@@ -29,7 +29,6 @@ use std::time::Duration;
 /// [runtime]: crate::runtime::Runtime
 /// [module]: crate::runtime
 #[derive(Debug)]
-#[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
 pub struct LocalRuntime {
     /// Task scheduler
     scheduler: LocalRuntimeScheduler,
@@ -231,7 +230,6 @@ impl LocalRuntime {
     #[track_caller]
     fn block_on_inner<F: Future>(&self, future: F, _meta: SpawnMeta<'_>) -> F::Output {
         #[cfg(all(
-            tokio_unstable,
             tokio_taskdump,
             feature = "rt",
             target_os = "linux",
@@ -239,7 +237,7 @@ impl LocalRuntime {
         ))]
         let future = crate::runtime::task::trace::Trace::root(future);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let future = crate::util::trace::task(
             future,
             "block_on",
@@ -320,6 +318,7 @@ impl LocalRuntime {
     /// use std::time::Duration;
     ///
     /// fn main() {
+    /// #  if cfg!(miri) { return } // Miri reports error when main thread terminated without waiting all remaining threads.
     ///    let runtime = LocalRuntime::new().unwrap();
     ///
     ///    runtime.block_on(async move {
