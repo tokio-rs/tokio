@@ -10,7 +10,7 @@ use tokio::{
     task::{AbortHandle, Id, JoinError, JoinHandle},
 };
 
-/// A collection of tasks spawned on a Tokio runtime.
+/// A FIFO queue for of tasks spawned on a Tokio runtime.
 ///
 /// A [`JoinQueue`] can be used to await the completion of the tasks in FIFO
 /// order. That is, if tasks are spawned in the order A, B, C, then
@@ -144,9 +144,9 @@ impl<T> JoinQueue<T> {
     }
 
     fn push_back(&mut self, jh: JoinHandle<T>) -> AbortHandle {
-        let join_handle = AbortOnDropHandle::new(jh);
-        let abort_handle = join_handle.abort_handle();
-        self.0.push_back(join_handle);
+        let jh = AbortOnDropHandle::new(jh);
+        let abort_handle = jh.abort_handle();
+        self.0.push_back(jh);
         abort_handle
     }
 

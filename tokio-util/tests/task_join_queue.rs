@@ -96,7 +96,6 @@ async fn test_join_queue_abort_all() {
     let mut count = 0;
     while let Some(res) = queue.join_next().await {
         if count < 5 {
-            assert!(res.is_err());
             assert!(res.unwrap_err().is_cancelled());
         } else {
             assert!(res.is_ok());
@@ -104,7 +103,7 @@ async fn test_join_queue_abort_all() {
         count += 1;
     }
     assert_eq!(count, 10);
-    assert_eq!(queue.len(), 0);
+    assert!(queue.is_empty());
 }
 
 #[tokio::test]
@@ -113,7 +112,7 @@ async fn test_join_queue_join_all() {
     let mut senders = Vec::new();
     for i in 0..5 {
         let (tx, rx) = oneshot::channel::<()>();
-        senders.push(Some(tx));
+        senders.push(tx);
         queue.spawn(async move {
             let _ = rx.await;
             i
@@ -121,7 +120,7 @@ async fn test_join_queue_join_all() {
     }
     // Complete all tasks in reverse order
     while let Some(tx) = senders.pop() {
-        let _ = tx.unwrap().send(());
+        let _ = tx.send(());
     }
     let results = queue.join_all().await;
     assert_eq!(results, vec![0, 1, 2, 3, 4]);
@@ -141,7 +140,7 @@ async fn test_join_queue_shutdown() {
     }
 
     queue.shutdown().await;
-    assert_eq!(queue.len(), 0);
+    assert!(queue.is_empty());
     while let Some(tx) = senders.pop() {
         assert!(tx.is_closed());
     }
@@ -155,7 +154,7 @@ async fn test_join_queue_with_manual_abort() {
     let mut senders = Vec::new();
     for i in 0..16 {
         let (tx, rx) = oneshot::channel::<()>();
-        senders.push(Some(tx));
+        senders.push(tx);
         let abort = queue.spawn(async move {
             let _ = rx.await;
             i
@@ -168,19 +167,18 @@ async fn test_join_queue_with_manual_abort() {
     }
     // Complete all tasks in reverse order
     while let Some(tx) = senders.pop() {
-        let _ = tx.unwrap().send(());
+        let _ = tx.send(());
     }
-    loop {
-        match queue.join_next().await {
-            Some(Ok(res)) => {
+    while let Some(res) = queue.join_next().await {
+        match res {
+            Ok(res) => {
                 assert_eq!(res, num_completed * 2);
                 num_completed += 1;
             }
-            Some(Err(e)) => {
+            Err(e) => {
                 assert!(e.is_cancelled());
                 num_canceled += 1;
             }
-            None => break,
         }
     }
 
@@ -188,8 +186,8 @@ async fn test_join_queue_with_manual_abort() {
     assert_eq!(num_completed, 8);
 }
 
-#[tokio::test(flavor = "current_thread")]
-async fn try_join_next_with_id() {
+#[tokio::test]
+async fn test_join_queue_join_next_with_id() {
     const TASK_NUM: u32 = 1000;
 
     let (send, recv) = tokio::sync::watch::channel(());
@@ -210,16 +208,13 @@ async fn try_join_next_with_id() {
 
     let mut count = 0;
     let mut joined = Vec::with_capacity(TASK_NUM as usize);
-    loop {
-        match set.join_next_with_id().await {
-            Some(Ok((id, ()))) => {
+    while let Some(res) = set.join_next_with_id().await {
+        match res {
+            Ok((id, ())) => {
                 count += 1;
                 joined.push(id);
             }
-            Some(Err(err)) => panic!("failed: {err}"),
-            None => {
-                break;
-            }
+            Err(err) => panic!("failed: {err}"),
         }
     }
 
