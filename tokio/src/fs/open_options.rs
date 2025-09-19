@@ -3,7 +3,7 @@ use crate::fs::{asyncify, File};
 use std::io;
 use std::path::Path;
 
-cfg_tokio_uring! {
+cfg_io_uring! {
     mod uring_open_options;
     pub(crate) use uring_open_options::UringOpenOptions;
     use crate::runtime::driver::op::Op;
@@ -92,7 +92,13 @@ pub struct OpenOptions {
 #[derive(Debug, Clone)]
 enum Kind {
     Std(StdOpenOptions),
-    #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux"
+    ))]
     Uring(UringOpenOptions),
 }
 
@@ -114,9 +120,21 @@ impl OpenOptions {
     /// let future = options.read(true).open("foo.txt");
     /// ```
     pub fn new() -> OpenOptions {
-        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux"
+        ))]
         let inner = Kind::Uring(UringOpenOptions::new());
-        #[cfg(not(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux")))]
+        #[cfg(not(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux"
+        )))]
         let inner = Kind::Std(StdOpenOptions::new());
 
         OpenOptions { inner }
@@ -152,7 +170,13 @@ impl OpenOptions {
             Kind::Std(opts) => {
                 opts.read(read);
             }
-            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux"
+            ))]
             Kind::Uring(opts) => {
                 opts.read(read);
             }
@@ -190,7 +214,13 @@ impl OpenOptions {
             Kind::Std(opts) => {
                 opts.write(write);
             }
-            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux"
+            ))]
             Kind::Uring(opts) => {
                 opts.write(write);
             }
@@ -257,7 +287,13 @@ impl OpenOptions {
             Kind::Std(opts) => {
                 opts.append(append);
             }
-            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux"
+            ))]
             Kind::Uring(opts) => {
                 opts.append(append);
             }
@@ -298,7 +334,13 @@ impl OpenOptions {
             Kind::Std(opts) => {
                 opts.truncate(truncate);
             }
-            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux"
+            ))]
             Kind::Uring(opts) => {
                 opts.truncate(truncate);
             }
@@ -342,7 +384,13 @@ impl OpenOptions {
             Kind::Std(opts) => {
                 opts.create(create);
             }
-            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux"
+            ))]
             Kind::Uring(opts) => {
                 opts.create(create);
             }
@@ -393,7 +441,13 @@ impl OpenOptions {
             Kind::Std(opts) => {
                 opts.create_new(create_new);
             }
-            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux"
+            ))]
             Kind::Uring(opts) => {
                 opts.create_new(create_new);
             }
@@ -437,8 +491,9 @@ impl OpenOptions {
     /// # io_uring support
     ///
     /// On Linux, you can also use `io_uring` for executing system calls.
-    /// To enable `io_uring`, you need to specify the `--cfg tokio_uring` flag
-    /// at compile time and set the `Builder::enable_io_uring` runtime option.
+    /// To enable `io_uring`, you need to specify the `--cfg tokio_unstable`
+    /// flag at compile time, enable the `io-uring` cargo feature, and set the
+    /// `Builder::enable_io_uring` runtime option.
     ///
     /// Support for `io_uring` is currently experimental, so its behavior may
     /// change or it may be removed in future versions.
@@ -465,7 +520,13 @@ impl OpenOptions {
     pub async fn open(&self, path: impl AsRef<Path>) -> io::Result<File> {
         match &self.inner {
             Kind::Std(opts) => Self::std_open(opts, path).await,
-            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux"
+            ))]
             Kind::Uring(opts) => {
                 let handle = crate::runtime::Handle::current();
                 let driver_handle = handle.inner.driver().io();
@@ -528,7 +589,13 @@ feature! {
                 Kind::Std(opts) => {
                     opts.mode(mode);
                 }
-                #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+                #[cfg(all(
+                    tokio_unstable,
+                    feature = "io-uring",
+                    feature = "rt",
+                    feature = "fs",
+                    target_os = "linux"
+                ))]
                 Kind::Uring(opts) => {
                     opts.mode(mode);
                 }
@@ -567,7 +634,13 @@ feature! {
                 Kind::Std(opts) => {
                     opts.custom_flags(flags);
                 }
-                #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+                #[cfg(all(
+                    tokio_unstable,
+                    feature = "io-uring",
+                    feature = "rt",
+                    feature = "fs",
+                    target_os = "linux"
+                ))]
                 Kind::Uring(opts) => {
                     opts.custom_flags(flags);
                 }
@@ -766,7 +839,7 @@ impl From<StdOpenOptions> for OpenOptions {
         OpenOptions {
             inner: Kind::Std(options),
             // TODO: Add support for converting `StdOpenOptions` to `UringOpenOptions`
-            // if user enables the `--cfg tokio_uring`. It is blocked by:
+            // if user enables `io-uring` cargo feature. It is blocked by:
             // * https://github.com/rust-lang/rust/issues/74943
             // * https://github.com/rust-lang/rust/issues/76801
         }
