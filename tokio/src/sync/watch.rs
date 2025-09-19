@@ -92,7 +92,7 @@
 //! when all [`Receiver`] handles have been dropped. This indicates that there
 //! is no further interest in the values being produced and work can be stopped.
 //!
-//! The value in the channel will not be dropped until the sender and all
+//! The value in the channel will not be dropped until all senders and all
 //! receivers have been dropped.
 //!
 //! # Thread safety
@@ -393,7 +393,7 @@ mod state {
     /// Snapshot of the state. The first bit is used as the CLOSED bit.
     /// The remaining bits are used as the version.
     ///
-    /// The CLOSED bit tracks whether the Sender has been dropped. Dropping all
+    /// The CLOSED bit tracks whether all senders have been dropped. Dropping all
     /// receivers does not set it.
     #[derive(Copy, Clone, Debug)]
     pub(super) struct StateSnapshot(usize);
@@ -732,18 +732,17 @@ impl<T> Receiver<T> {
     ///
     /// If the current value in the channel has not yet been marked seen when
     /// this method is called, the method marks that value seen and returns
-    /// immediately. If the current value has already been marked seen, then the
-    /// method sleeps until a new message is sent by the [`Sender`] connected to
-    /// this `Receiver`, or until the [`Sender`] is dropped.
-    ///
+    /// immediately. If the newest value has already been marked seen, then the
+    /// method sleeps until a new message is sent by a [`Sender`] connected to
+    /// this `Receiver`, or until all [`Sender`]s are dropped.
     ///
     /// For more information, see
     /// [*Change notifications*](self#change-notifications) in the module-level documentation.
     ///
     /// # Errors
     ///
-    /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
-    /// the current value is seen.
+    /// This method returns a [`RecvError`](error::RecvError) if and only if all [`Sender`]s
+    /// are dropped.
     ///
     /// # Cancel safety
     ///
@@ -932,7 +931,7 @@ fn maybe_changed<T>(
     }
 
     if state.is_closed() {
-        // The sender has been dropped.
+        // All senders have been dropped.
         return Some(Err(error::RecvError(())));
     }
 

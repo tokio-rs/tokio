@@ -26,6 +26,7 @@ pub trait FutureExt: Future {
         /// assert!(res.is_err());
         /// # }
         /// ```
+        #[track_caller]
         fn timeout(self, timeout: std::time::Duration) -> tokio::time::Timeout<Self>
         where
             Self: Sized,

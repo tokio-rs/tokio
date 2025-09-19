@@ -217,6 +217,23 @@ fn delay_queue_reserve_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[test]
+fn future_ext_to_panic_caller() -> Result<(), Box<dyn Error>> {
+    use tokio::{sync::oneshot, time::Duration};
+    use tokio_util::future::FutureExt;
+
+    let panic_location_file = test_panic(|| {
+        let (_tx, rx) = oneshot::channel::<()>();
+        // this panics because there is no runtime available
+        let _res = rx.timeout(Duration::from_millis(10));
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
 fn basic() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
