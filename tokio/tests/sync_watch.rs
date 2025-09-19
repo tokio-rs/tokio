@@ -452,7 +452,7 @@ async fn sender_closed_is_cooperative() {
 }
 
 #[tokio::test]
-async fn changed_does_not_error_on_closed_channel_with_unseen_value() {
+async fn changed_succeeds_on_closed_channel_with_unseen_value() {
     let (tx, mut rx) = watch::channel("A");
     tx.send("B").unwrap();
 
@@ -464,24 +464,24 @@ async fn changed_does_not_error_on_closed_channel_with_unseen_value() {
 }
 
 #[tokio::test]
-async fn has_changed_does_not_error_on_closed_channel_with_unseen_value() {
-    let (tx, rx) = watch::channel("A");
-    tx.send("B").unwrap();
-
-    drop(tx);
-
-    rx.has_changed()
-        .expect_err("`has_changed` call returns an error even if the last value is not seen.");
-}
-
-#[tokio::test]
 async fn changed_errors_on_closed_channel_with_seen_value() {
     let (tx, mut rx) = watch::channel("A");
     drop(tx);
 
     rx.changed()
         .await
-        .expect_err("`changed` call returns an error if the last value is seen.");
+        .expect_err("`has_changed` iff channel is closed.");
+}
+
+#[tokio::test]
+async fn has_changed_errors_on_closed_channel_with_unseen_value() {
+    let (tx, rx) = watch::channel("A");
+    tx.send("B").unwrap();
+
+    drop(tx);
+
+    rx.has_changed()
+        .expect_err("`has_changed` iff channel is closed.");
 }
 
 #[tokio::test]
