@@ -473,8 +473,8 @@ async fn changed_errors_on_closed_channel_with_seen_value() {
         .expect_err("`has_changed` iff channel is closed.");
 }
 
-#[tokio::test]
-async fn has_changed_errors_on_closed_channel_with_unseen_value() {
+#[test]
+fn has_changed_errors_on_closed_channel_with_unseen_value() {
     let (tx, rx) = watch::channel("A");
     tx.send("B").unwrap();
 
@@ -484,8 +484,8 @@ async fn has_changed_errors_on_closed_channel_with_unseen_value() {
         .expect_err("`has_changed` iff channel is closed.");
 }
 
-#[tokio::test]
-async fn has_changed_errors_on_closed_channel_with_seen_value() {
+#[test]
+fn has_changed_errors_on_closed_channel_with_seen_value() {
     let (tx, rx) = watch::channel("A");
     drop(tx);
 
