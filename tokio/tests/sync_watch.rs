@@ -470,11 +470,8 @@ async fn has_changed_does_not_error_on_closed_channel_with_unseen_value() {
 
     drop(tx);
 
-    let has_changed = rx
-        .has_changed()
-        .expect("`has_changed` call does not return an error if the last value is not seen.");
-
-    assert!(has_changed, "Latest value is not seen");
+    rx.has_changed()
+        .expect_err("`has_changed` call returns an error even if the last value is not seen.");
 }
 
 #[tokio::test]

@@ -44,7 +44,27 @@
 //!   The current value at the time the [`Receiver`] is created is considered
 //!   *seen*.
 //!
-//! ## `borrow_and_update` versus `borrow`
+//! ## [`changed`] versus [`has_changed`]
+//! The [`Receiver`] half provides two methods for checking for changes
+//! in the channel, [`has_changed`] and [`changed`].
+//!
+//! * [`has_changed`] is a *synchronous* method that checks whether the current
+//!   value is seen or not and returns a boolean. This method does __not__ mark the
+//!   value as seen.
+//!
+//! * [`changed`] is an *asynchronous* method that will return once an unseen
+//!   value is in the channel. This method does mark the value as seen.
+//!
+//! Note there are two behavioral differences on when these two methods return
+//! an error.
+//!
+//! - [`has_changed`] errors if and only if the channel is closed.
+//! - [`changed`] errors if the channel has been closed __AND__
+//!   the current value is seen.
+//!
+//! See the example below that shows how these methods have different fallibility.
+//!
+//! ## [`borrow_and_update`] versus [`borrow`]
 //!
 //! If the receiver intends to await notifications from [`changed`] in a loop,
 //! [`Receiver::borrow_and_update()`] should be preferred over
@@ -86,6 +106,31 @@
 //! # }
 //! ```
 //!
+//! Difference on fallibility of [`changed`] versus [`has_changed`].
+//! ```
+//! use tokio::sync::watch;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let (tx, mut rx) = watch::channel("hello");
+//!     tx.send("goodbye").unwrap();
+//!     drop(tx);
+//!     
+//!     // `has_changed` does not mark the value as seen and errors
+//!     // since the channel is closed.
+//!     assert!(rx.has_changed().is_err());
+//!     
+//!     // `changed` returns Ok since the value is not already marked as seen
+//!     // even if the channel is closed.
+//!     assert!(rx.changed().await.is_ok());
+//!     
+//!     // The `changed` call above marks the value as seen.
+//!     // The next `changed` call now returns an error as the channel is closed
+//!     // AND the current value is seen.
+//!     assert!(rx.changed().await.is_err());
+//! }
+//! ```
+//!
 //! # Closing
 //!
 //! [`Sender::is_closed`] and [`Sender::closed`] allow the producer to detect
@@ -104,6 +149,9 @@
 //! [`Sender`]: crate::sync::watch::Sender
 //! [`Receiver`]: crate::sync::watch::Receiver
 //! [`changed`]: crate::sync::watch::Receiver::changed
+//! [`has_changed`]: crate::sync::watch::Receiver::has_changed
+//! [`borrow`]: crate::sync::watch::Receiver::borrow
+//! [`borrow_and_update`]: crate::sync::watch::Receiver::borrow_and_update
 //! [`Receiver::changed()`]: crate::sync::watch::Receiver::changed
 //! [`Receiver::borrow()`]: crate::sync::watch::Receiver::borrow
 //! [`Receiver::borrow_and_update()`]:
@@ -200,7 +248,7 @@ impl<'a, T> Ref<'a, T> {
     /// Indicates if the borrowed value is considered as _changed_ since the last
     /// time it has been marked as seen.
     ///
-    /// Unlike [`Receiver::has_changed()`], this method is not fallible.
+    /// Unlike [`Receiver::has_changed()`], this method does not fail if the channel is closed.
     ///
     /// When borrowed from the [`Sender`] this function will always return `false`.
     ///
@@ -220,10 +268,10 @@ impl<'a, T> Ref<'a, T> {
     ///     // Drop the sender immediately, just for testing purposes.
     ///     drop(tx);
     ///
-    ///     // The modified value is still readable and detected as changed
-    ///     // even if the sender has already been dropped.
+    ///     // Even if the sender has already been dropped...
+    ///     assert!(rx.has_changed().is_err());
+    ///     // ...the modified value is still readable and detected as changed.
     ///     assert_eq!(*rx.borrow(), "goodbye");
-    ///     assert!(rx.has_changed().unwrap());
     ///     assert!(rx.borrow().has_changed());
     ///
     ///     // Read the changed value and mark it as seen.
@@ -647,8 +695,7 @@ impl<T> Receiver<T> {
     ///
     /// # Errors
     ///
-    /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
-    /// the current value is seen.
+    /// Returns a [`RecvError`](error::RecvError) if and only if the channel has been closed.
     ///
     /// # Examples
     ///
@@ -676,33 +723,25 @@ impl<T> Receiver<T> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let (tx, mut rx) = watch::channel("hello");
+    ///     let (tx, rx) = watch::channel("hello");
     ///     tx.send("goodbye").unwrap();
+    ///
     ///     drop(tx);
     ///
-    ///     // `has_changed` returns Ok(true) as the current value is not seen.
-    ///     assert!(rx.has_changed().unwrap());
-    ///
-    ///     // Marks the current value as seen.
-    ///     assert_eq!(*rx.borrow_and_update(), "goodbye");
-    ///
-    ///     // The `tx` handle has been dropped __AND__ the current value is seen.
+    ///     // The channel is closed
     ///     assert!(rx.has_changed().is_err());
     /// }
     /// ```
     pub fn has_changed(&self) -> Result<bool, error::RecvError> {
         // Load the version from the state
         let state = self.shared.state.load();
-        let current_version = state.version();
-
-        let current_value_is_seen = self.version == current_version;
-        let sender_has_dropped = state.is_closed();
-
-        if sender_has_dropped && current_value_is_seen {
-            Err(error::RecvError(()))
-        } else {
-            Ok(!current_value_is_seen)
+        if state.is_closed() {
+            // All senders have dropped.
+            return Err(error::RecvError(()));
         }
+        let new_version = state.version();
+
+        Ok(self.version != new_version)
     }
 
     /// Marks the state as changed.
@@ -741,8 +780,8 @@ impl<T> Receiver<T> {
     ///
     /// # Errors
     ///
-    /// This method returns a [`RecvError`](error::RecvError) if and only if all [`Sender`]s
-    /// are dropped.
+    /// Returns a [`RecvError`](error::RecvError) if the channel has been closed __AND__
+    /// the current value is seen.
     ///
     /// # Cancel safety
     ///
