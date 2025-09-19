@@ -6,6 +6,8 @@ env:
   RUST_STABLE: stable
   RUST_NIGHTLY: nightly-2025-01-25
   RUSTFLAGS: -D warnings
+  # This excludes unstable features like io_uring, which require '--cfg tokio_unstable'.
+  TOKIO_STABLE_FEATURES: full,test-util
 
 # Test FreeBSD in a full VM on cirrus-ci.com.  Test the i686 target too, in the
 # same VM.  The binary will be built in 32-bit mode, but will execute on a
@@ -23,7 +25,13 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --all-features
+    - cargo test --all --features $TOKIO_STABLE_FEATURES
+    # Free the disk space before the next build,
+    # otherwise cirrus-ci complains about "No space left on device".
+    - cargo clean
+    # Enable all unstable features, including io_uring, because it supports
+    # x86_64 FreeBSD.
+    - RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" cargo test --all --all-features
 
 task:
   name: FreeBSD docs
@@ -55,4 +63,4 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --all-features --target i686-unknown-freebsd
+    - cargo test --all --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd
