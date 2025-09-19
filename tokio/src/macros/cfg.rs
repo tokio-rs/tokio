@@ -499,7 +499,7 @@ macro_rules! cfg_taskdump {
         $(
             #[cfg(all(
                 tokio_unstable,
-                tokio_taskdump,
+                feature = "taskdump",
                 feature = "rt",
                 target_os = "linux",
                 any(
@@ -508,6 +508,19 @@ macro_rules! cfg_taskdump {
                     target_arch = "x86_64"
                 )
             ))]
+            #[cfg_attr(docsrs, doc(cfg(
+                all(
+                    tokio_unstable,
+                    feature = "taskdump",
+                    feature = "rt",
+                    target_os = "linux",
+                    any(
+                        target_arch = "aarch64",
+                        target_arch = "x86",
+                        target_arch = "x86_64"
+                    )
+                )
+            )))]
             $item
         )*
     };
@@ -518,7 +531,7 @@ macro_rules! cfg_not_taskdump {
         $(
             #[cfg(not(all(
                 tokio_unstable,
-                tokio_taskdump,
+                feature = "taskdump",
                 feature = "rt",
                 target_os = "linux",
                 any(
@@ -527,6 +540,17 @@ macro_rules! cfg_not_taskdump {
                     target_arch = "x86_64"
                 )
             )))]
+            #[cfg_attr(docsrs, doc(cfg(not(all(
+                tokio_unstable,
+                feature = "taskdump",
+                feature = "rt",
+                target_os = "linux",
+                any(
+                    target_arch = "aarch64",
+                    target_arch = "x86",
+                    target_arch = "x86_64"
+                )
+            )))))]
             $item
         )*
     };

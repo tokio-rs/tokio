@@ -402,15 +402,10 @@ impl<S: 'static> Task<S> {
         Task::new(RawTask::from_raw(ptr))
     }
 
-    #[cfg(all(
-        tokio_unstable,
-        tokio_taskdump,
-        feature = "rt",
-        target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
-    ))]
-    pub(super) fn as_raw(&self) -> RawTask {
-        self.raw
+    cfg_taskdump! {
+        pub(super) fn as_raw(&self) -> RawTask {
+            self.raw
+        }
     }
 
     fn header(&self) -> &Header {

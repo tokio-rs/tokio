@@ -1218,7 +1218,12 @@ impl NotifiedProject<'_> {
                     return Poll::Pending;
                 }
                 State::Waiting => {
-                    #[cfg(tokio_taskdump)]
+                    #[cfg(all(
+                        tokio_unstable,
+                        feature = "taskdump",
+                        target_os = "linux",
+                        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+                    ))]
                     if let Some(waker) = waker {
                         let mut ctx = Context::from_waker(waker);
                         std::task::ready!(crate::trace::trace_leaf(&mut ctx));
@@ -1312,7 +1317,12 @@ impl NotifiedProject<'_> {
                     drop(old_waker);
                 }
                 State::Done => {
-                    #[cfg(tokio_taskdump)]
+                    #[cfg(all(
+                        tokio_unstable,
+                        feature = "taskdump",
+                        target_os = "linux",
+                        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+                    ))]
                     if let Some(waker) = waker {
                         let mut ctx = Context::from_waker(waker);
                         std::task::ready!(crate::trace::trace_leaf(&mut ctx));

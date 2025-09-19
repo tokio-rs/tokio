@@ -408,7 +408,7 @@ cfg_rt! {
 
                 #[cfg(all(
                     tokio_unstable,
-                    tokio_taskdump,
+                    feature = "taskdump",
                     feature = "rt",
                     target_os = "linux",
                     any(
