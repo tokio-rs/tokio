@@ -115,15 +115,15 @@
 //!     let (tx, mut rx) = watch::channel("hello");
 //!     tx.send("goodbye").unwrap();
 //!     drop(tx);
-//!     
+//!
 //!     // `has_changed` does not mark the value as seen and errors
 //!     // since the channel is closed.
 //!     assert!(rx.has_changed().is_err());
-//!     
+//!
 //!     // `changed` returns Ok since the value is not already marked as seen
 //!     // even if the channel is closed.
 //!     assert!(rx.changed().await.is_ok());
-//!     
+//!
 //!     // The `changed` call above marks the value as seen.
 //!     // The next `changed` call now returns an error as the channel is closed
 //!     // AND the current value is seen.
