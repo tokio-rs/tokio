@@ -25,7 +25,7 @@ error[E0308]: mismatched types
                    found enum `Result<(), _>`
 help: a return type might be missing here
    |
-9  | async fn missing_return_type() -> _ {
+ 9 | async fn missing_return_type() -> _ {
    |                                ++++
 help: consider using `Result::expect` to unwrap the `Result<(), _>` value, panicking if the value is a `Result::Err`
    |
