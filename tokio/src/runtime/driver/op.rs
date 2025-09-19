@@ -1,3 +1,5 @@
+#[cfg(target_env = "gnu")]
+use crate::io::uring::metadata::Metadata;
 use crate::io::uring::open::Open;
 use crate::runtime::Handle;
 use io_uring::cqueue;
@@ -9,13 +11,14 @@ use std::task::Poll;
 use std::task::Waker;
 use std::{io, mem};
 
+// This field isn't accessed directly, but it holds cancellation data,
+// so `#[allow(dead_code)]` is needed.
+#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) enum CancelData {
-    Open(
-        // This field isn't accessed directly, but it holds cancellation data,
-        // so `#[allow(dead_code)]` is needed.
-        #[allow(dead_code)] Open,
-    ),
+    #[cfg(target_env = "gnu")]
+    Metadata(Metadata),
+    Open(Open),
 }
 
 #[derive(Debug)]
