@@ -481,7 +481,7 @@ fn has_changed_errors_on_closed_channel_with_unseen_value() {
     drop(tx);
 
     rx.has_changed()
-        .expect_err("`has_changed` iff channel is closed.");
+        .expect_err("`has_changed` returns an error if and only if channel is closed. Even if the current value is not seen.");
 }
 
 #[test]
@@ -490,7 +490,7 @@ fn has_changed_errors_on_closed_channel_with_seen_value() {
     drop(tx);
 
     rx.has_changed()
-        .expect_err("`has_changed` call returns an error if the last value is seen.");
+        .expect_err("`has_changed` returns an error if and only if channel is closed.");
 }
 
 #[tokio::test]
