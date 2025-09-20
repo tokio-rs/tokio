@@ -432,6 +432,11 @@
 //! Enabling any other feature (including `full`) will cause a compilation
 //! failure.
 //!
+//! When using `WASM` with multiple threads, support for blocking calls is
+//! required. This means that, for example, using a Tokio mpsc channel to send
+//! messages from a web worker to the main browser context will not work, as the
+//! main browser context does not support blocking.
+//!
 //! The `time` module will only work on `WASM` platforms that have support for
 //! timers (e.g. wasm32-wasi). The timing functions will panic if used on a `WASM`
 //! platform that does not support timers.
