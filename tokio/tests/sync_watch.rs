@@ -460,7 +460,7 @@ async fn changed_succeeds_on_closed_channel_with_unseen_value() {
 
     rx.changed()
         .await
-        .expect("`changed` call does not return an error if the last value is not seen.");
+        .expect("should not return error as long as the current value is not seen");
 }
 
 #[tokio::test]
@@ -470,7 +470,7 @@ async fn changed_errors_on_closed_channel_with_seen_value() {
 
     rx.changed()
         .await
-        .expect_err("`has_changed` iff channel is closed.");
+        .expect_err("should return error if the tx is closed and the current value is seen");
 }
 
 #[test]
