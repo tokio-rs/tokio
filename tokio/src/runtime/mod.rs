@@ -13,6 +13,52 @@
 //! not required to configure a [`Runtime`] manually, and a user may just use the
 //! [`tokio::main`] attribute macro, which creates a [`Runtime`] under the hood.
 //!
+//! # Choose your runtime
+//!
+//! Here is the rules of thumb to choose the right runtime for your application.
+//!
+//! ```plaintext
+//!    +------------------------------------------------------+
+//!    | Do you want work-stealing or multi-thread scheduler? |
+//!    +------------------------------------------------------+
+//!                    | Yes              | No
+//!                    |                  |
+//!                    |                  |
+//!                    v                  |
+//!      +------------------------+       |
+//!      | Multi-threaded Runtime |       |
+//!      +------------------------+       |
+//!                                       |
+//!                                       V
+//!                      +--------------------------------+
+//!                      | Do you execute `!Send` Future? |
+//!                      +--------------------------------+
+//!                            | Yes                 | No
+//!                            |                     |
+//!                            V                     |
+//!              +--------------------------+        |
+//!              | Local Runtime (unstable) |        |
+//!              +--------------------------+        |
+//!                                                  |
+//!                                                  v
+//!                                      +------------------------+
+//!                                      | Current-thread Runtime |
+//!                                      +------------------------+
+//! ```
+//!
+//! The above decision tree is not exhaustive. there are other factors that
+//! may influence your decision.
+//!
+//! ## Bridging with sync code
+//!
+//! See <https://tokio.rs/tokio/topics/bridging> for details.
+//!
+//! ## NUMA awareness
+//!
+//! The tokio runtime is not NUMA (Non-Uniform Memory Access) aware.
+//! You may want to start multiple runtimes instead of a single runtime
+//! for better performance on NUMA systems.
+//!
 //! # Usage
 //!
 //! When no fine tuning is required, the [`tokio::main`] attribute macro can be
