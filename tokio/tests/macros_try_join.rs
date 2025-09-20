@@ -256,7 +256,6 @@ async fn empty_try_join() {
 async fn caller_names_const_count() {
     let (tx, rx) = oneshot::channel::<u32>();
 
-    #[allow(unused)]
     const COUNT: u32 = 2;
 
     let mut try_join = task::spawn(async { tokio::try_join!(async { tx.send(COUNT) }) });
@@ -265,6 +264,6 @@ async fn caller_names_const_count() {
     let res = rx.await.unwrap();
 
     // This passing demonstrates that the const in the macro is
-    // shadowing the caller-specified COUNT value.
-    assert_eq!(1, res);
+    // not shadowing the caller-specified COUNT value
+    assert_eq!(2, res);
 }
