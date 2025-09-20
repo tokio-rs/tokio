@@ -19,25 +19,25 @@
 //! use tokio_util::codec::LinesCodec;
 //! use tokio_util::codec::FramedWrite;
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     let buffer = Vec::new();
-//!     let messages = vec!["Hello", "World"];
-//!     let encoder = LinesCodec::new();
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
+//! let buffer = Vec::new();
+//! let messages = vec!["Hello", "World"];
+//! let encoder = LinesCodec::new();
 //!
-//!     // FramedWrite is a sink which means you can send values into it
-//!     // asynchronously.
-//!     let mut writer = FramedWrite::new(buffer, encoder);
+//! // FramedWrite is a sink which means you can send values into it
+//! // asynchronously.
+//! let mut writer = FramedWrite::new(buffer, encoder);
 //!
-//!     // To be able to send values into a FramedWrite, you need to bring the
-//!     // `SinkExt` trait into scope.
-//!     writer.send(messages[0]).await.unwrap();
-//!     writer.send(messages[1]).await.unwrap();
+//! // To be able to send values into a FramedWrite, you need to bring the
+//! // `SinkExt` trait into scope.
+//! writer.send(messages[0]).await.unwrap();
+//! writer.send(messages[1]).await.unwrap();
 //!
-//!     let buffer = writer.get_ref();
+//! let buffer = writer.get_ref();
 //!
-//!     assert_eq!(buffer.as_slice(), "Hello\nWorld\n".as_bytes());
-//! }
+//! assert_eq!(buffer.as_slice(), "Hello\nWorld\n".as_bytes());
+//! # }
 //!```
 //!
 //! # Example decoding using `LinesCodec`
@@ -51,25 +51,25 @@
 //! use tokio_util::codec::LinesCodec;
 //! use tokio_util::codec::FramedRead;
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     let message = "Hello\nWorld".as_bytes();
-//!     let decoder = LinesCodec::new();
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
+//! let message = "Hello\nWorld".as_bytes();
+//! let decoder = LinesCodec::new();
 //!
-//!     // FramedRead can be used to read a stream of values that are framed according to
-//!     // a codec. FramedRead will read from its input (here `buffer`) until a whole frame
-//!     // can be parsed.
-//!     let mut reader = FramedRead::new(message, decoder);
+//! // FramedRead can be used to read a stream of values that are framed according to
+//! // a codec. FramedRead will read from its input (here `buffer`) until a whole frame
+//! // can be parsed.
+//! let mut reader = FramedRead::new(message, decoder);
 //!
-//!     // To read values from a FramedRead, you need to bring the
-//!     // `StreamExt` trait into scope.
-//!     let frame1 = reader.next().await.unwrap().unwrap();
-//!     let frame2 = reader.next().await.unwrap().unwrap();
+//! // To read values from a FramedRead, you need to bring the
+//! // `StreamExt` trait into scope.
+//! let frame1 = reader.next().await.unwrap().unwrap();
+//! let frame2 = reader.next().await.unwrap().unwrap();
 //!
-//!     assert!(reader.next().await.is_none());
-//!     assert_eq!(frame1, "Hello");
-//!     assert_eq!(frame2, "World");
-//! }
+//! assert!(reader.next().await.is_none());
+//! assert_eq!(frame1, "Hello");
+//! assert_eq!(frame2, "World");
+//! # }
 //! ```
 //!
 //! # The Decoder trait

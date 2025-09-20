@@ -30,7 +30,7 @@ use std::time::Duration;
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use tokio::runtime::Builder;
 ///
 /// fn main() {
@@ -151,7 +151,7 @@ cfg_unstable! {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime::{self, UnhandledPanic};
         ///
         /// # pub fn main() {
@@ -323,7 +323,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime;
     ///
     /// let rt = runtime::Builder::new_multi_thread()
@@ -371,7 +371,7 @@ impl Builder {
     ///
     /// ## Multi threaded runtime with 4 threads
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime;
     ///
     /// // This will spawn a work-stealing runtime with 4 worker threads.
@@ -465,7 +465,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -486,7 +486,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     /// # pub fn main() {
@@ -517,7 +517,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
@@ -538,7 +538,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -563,7 +563,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -595,7 +595,7 @@ impl Builder {
     /// # Examples
     ///
     /// ## Multithreaded executor
-    /// ```
+    /// ```ignore-wasm
     /// # use std::sync::Arc;
     /// # use std::sync::atomic::{AtomicBool, Ordering};
     /// # use tokio::runtime;
@@ -671,7 +671,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -759,7 +759,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use std::sync::{atomic::AtomicUsize, Arc};
     /// # use tokio::task::yield_now;
     /// # pub fn main() {
@@ -803,7 +803,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use std::sync::{atomic::AtomicUsize, Arc};
     /// # use tokio::task::yield_now;
     /// # pub fn main() {
@@ -888,7 +888,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use tokio::runtime::Builder;
     ///
     /// let rt  = Builder::new_multi_thread().build().unwrap();
@@ -960,7 +960,7 @@ impl Builder {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # use std::time::Duration;
     /// # pub fn main() {
@@ -999,7 +999,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
@@ -1033,7 +1033,7 @@ impl Builder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
@@ -1143,7 +1143,7 @@ impl Builder {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
@@ -1213,7 +1213,7 @@ impl Builder {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
@@ -1259,7 +1259,7 @@ impl Builder {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime::{self, HistogramScale};
         ///
         /// # #[allow(deprecated)]
@@ -1283,7 +1283,7 @@ impl Builder {
         ///
         /// # Examples
         /// Configure a [`LogHistogram`] with [default configuration]:
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
         ///
@@ -1297,7 +1297,7 @@ impl Builder {
         /// ```
         ///
         /// Configure a linear histogram with 100 buckets, each 10μs wide
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         /// use std::time::Duration;
         /// use tokio::runtime::HistogramConfiguration;
@@ -1315,7 +1315,7 @@ impl Builder {
         /// - Measure times from 100ns to 120s
         /// - Max error of 0.1
         /// - No more than 1024 buckets
-        /// ```
+        /// ```ignore-wasm
         /// use std::time::Duration;
         /// use tokio::runtime;
         /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
@@ -1381,7 +1381,7 @@ impl Builder {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         /// use std::time::Duration;
         ///
@@ -1416,7 +1416,7 @@ impl Builder {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         ///
         /// # #[allow(deprecated)]
@@ -1575,7 +1575,7 @@ cfg_time! {
         ///
         /// # Examples
         ///
-        /// ```
+        /// ```ignore-wasm
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()

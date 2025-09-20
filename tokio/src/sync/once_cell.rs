@@ -41,11 +41,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///
 /// static ONCE: OnceCell<u32> = OnceCell::const_new();
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let result = ONCE.get_or_init(some_computation).await;
-///     assert_eq!(*result, 2);
-/// }
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let result = ONCE.get_or_init(some_computation).await;
+/// assert_eq!(*result, 2);
+/// # }
 /// ```
 ///
 /// It is often useful to write a wrapper method for accessing the value.
@@ -61,11 +61,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///     }).await
 /// }
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let result = get_global_integer().await;
-///     assert_eq!(*result, 2);
-/// }
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let result = get_global_integer().await;
+/// assert_eq!(*result, 2);
+/// # }
 /// ```
 pub struct OnceCell<T> {
     value_set: AtomicBool,
@@ -155,11 +155,11 @@ impl<T> OnceCell<T> {
     ///     }).await
     /// }
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let result = get_global_integer().await;
-    ///     assert_eq!(*result, 2);
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let result = get_global_integer().await;
+    /// assert_eq!(*result, 2);
+    /// # }
     /// ```
     ///
     /// [`tokio-console`]: https://github.com/tokio-rs/console
@@ -210,11 +210,11 @@ impl<T> OnceCell<T> {
     ///     }).await
     /// }
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let result = get_global_integer().await;
-    ///     assert_eq!(*result, 1);
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let result = get_global_integer().await;
+    /// assert_eq!(*result, 1);
+    /// # }
     /// ```
     ///
     /// [`tokio-console`]: https://github.com/tokio-rs/console

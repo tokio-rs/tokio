@@ -988,10 +988,10 @@ jobs:
             features: "macros sync time rt"
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust 1.88.0
+      - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
+          toolchain: ${{ env.rust_stable }}
       - name: Install wasm-pack
         uses: taiki-e/install-action@wasm-pack
 
@@ -1011,10 +1011,10 @@ jobs:
           - wasm32-wasip1-threads
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust 1.88.0
+      - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
+          toolchain: ${{ env.rust_stable }}
           targets: ${{ matrix.target }}
 
       # Install dependencies
@@ -1025,11 +1025,14 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       - name: WASI test tokio full
-        run: cargo test -p tokio --target ${{ matrix.target }} --features full
+        run: cargo test -p tokio --target ${{ matrix.target }} --features "sync,macros,io-util,rt,time"
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
+          # in order to run doctests for unstable features, we must also pass
+          # the unstable cfg to RustDoc
+          RUSTDOCFLAGS: --cfg tokio_unstable
 
       - name: WASI test tokio-util full
         run: cargo test -p tokio-util --target ${{ matrix.target }} --features full

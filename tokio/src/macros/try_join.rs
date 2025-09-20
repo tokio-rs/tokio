@@ -64,21 +64,21 @@ macro_rules! doc {
         /// # Ok(())
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let res = tokio::try_join!(
-        ///         do_stuff_async(),
-        ///         more_async_work());
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let res = tokio::try_join!(
+        ///     do_stuff_async(),
+        ///     more_async_work());
         ///
-        ///     match res {
-        ///          Ok((first, second)) => {
-        ///              // do something with the values
-        ///          }
-        ///          Err(err) => {
-        ///             println!("processing failed; error = {}", err);
-        ///          }
+        /// match res {
+        ///     Ok((first, second)) => {
+        ///         // do something with the values
+        ///     }
+        ///     Err(err) => {
+        ///         println!("processing failed; error = {}", err);
         ///     }
         /// }
+        /// # }
         /// ```
         ///
         /// Using `try_join!` with spawned tasks.
@@ -104,20 +104,20 @@ macro_rules! doc {
         ///     }
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let handle1 = tokio::spawn(do_stuff_async());
-        ///     let handle2 = tokio::spawn(more_async_work());
-        ///     match tokio::try_join!(flatten(handle1), flatten(handle2)) {
-        ///         Ok(val) => {
-        ///             // do something with the values
-        ///         }
-        ///         Err(err) => {
-        ///             println!("Failed with {}.", err);
-        ///             # assert_eq!(err, "failed");
-        ///         }
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let handle1 = tokio::spawn(do_stuff_async());
+        /// let handle2 = tokio::spawn(more_async_work());
+        /// match tokio::try_join!(flatten(handle1), flatten(handle2)) {
+        ///     Ok(val) => {
+        ///         // do something with the values
+        ///     }
+        ///     Err(err) => {
+        ///         println!("Failed with {}.", err);
+        ///         # assert_eq!(err, "failed");
         ///     }
         /// }
+        /// # }
         /// ```
         /// Using the `biased;` mode to control polling order.
         ///
@@ -132,23 +132,23 @@ macro_rules! doc {
         /// # Ok(())
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let res = tokio::try_join!(
-        ///         biased;
-        ///         do_stuff_async(),
-        ///         more_async_work()
-        ///     );
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let res = tokio::try_join!(
+        ///     biased;
+        ///     do_stuff_async(),
+        ///     more_async_work()
+        /// );
         ///
-        ///     match res {
-        ///          Ok((first, second)) => {
-        ///              // do something with the values
-        ///          }
-        ///          Err(err) => {
-        ///             println!("processing failed; error = {}", err);
-        ///          }
+        /// match res {
+        ///     Ok((first, second)) => {
+        ///         // do something with the values
+        ///     }
+        ///     Err(err) => {
+        ///         println!("processing failed; error = {}", err);
         ///     }
         /// }
+        /// # }
         /// ```
         #[macro_export]
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]

@@ -11,20 +11,20 @@ cfg_io_util! {
     /// use std::io::{self, Cursor, SeekFrom};
     /// use tokio::io::{AsyncSeekExt, AsyncReadExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let mut cursor = Cursor::new(b"abcdefg");
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> io::Result<()> {
+    /// let mut cursor = Cursor::new(b"abcdefg");
     ///
-    ///     // the `seek` method is defined by this trait
-    ///     cursor.seek(SeekFrom::Start(3)).await?;
+    /// // the `seek` method is defined by this trait
+    /// cursor.seek(SeekFrom::Start(3)).await?;
     ///
-    ///     let mut buf = [0; 1];
-    ///     let n = cursor.read(&mut buf).await?;
-    ///     assert_eq!(n, 1);
-    ///     assert_eq!(buf, [b'd']);
+    /// let mut buf = [0; 1];
+    /// let n = cursor.read(&mut buf).await?;
+    /// assert_eq!(n, 1);
+    /// assert_eq!(buf, [b'd']);
     ///
-    ///     Ok(())
-    /// }
+    /// Ok(())
+    /// # }
     /// ```
     ///
     /// See [module][crate::io] documentation for more details.
@@ -45,7 +45,7 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run
+        /// ```no_run,ignore-wasm
         /// use tokio::fs::File;
         /// use tokio::io::{AsyncSeekExt, AsyncReadExt};
         ///

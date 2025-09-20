@@ -39,12 +39,12 @@ cfg_io_util! {
     /// ```
     /// use tokio::io::{self, AsyncReadExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
     ///     let mut buffer = String::new();
     ///     io::empty().read_to_string(&mut buffer).await.unwrap();
     ///     assert!(buffer.is_empty());
-    /// }
+    /// # }
     /// ```
     ///
     /// A convoluted way of getting the length of a buffer:
@@ -52,12 +52,12 @@ cfg_io_util! {
     /// ```
     /// use tokio::io::{self, AsyncWriteExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let buffer = vec![1, 2, 3, 5, 8];
-    ///     let num_bytes = io::empty().write(&buffer).await.unwrap();
-    ///     assert_eq!(num_bytes, 5);
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let buffer = vec![1, 2, 3, 5, 8];
+    /// let num_bytes = io::empty().write(&buffer).await.unwrap();
+    /// assert_eq!(num_bytes, 5);
+    /// # }
     /// ```
     pub fn empty() -> Empty {
         Empty { _p: () }

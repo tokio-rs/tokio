@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore-wasm
 /// use std::sync::{Arc, Barrier};
 /// use std::thread;
 ///
@@ -102,7 +102,7 @@ impl Barrier {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore-wasm
     /// use std::sync::{Arc, Barrier};
     /// use std::thread;
     ///

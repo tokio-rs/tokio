@@ -35,7 +35,7 @@
 //! [demonstrating][std_example] reading some bytes from a [`std::fs::File`]. We
 //! can do the same with [`tokio::fs::File`][`File`]:
 //!
-//! ```no_run
+//! ```no_run,ignore-wasm
 //! use tokio::io::{self, AsyncReadExt};
 //! use tokio::fs::File;
 //!
@@ -72,7 +72,7 @@
 //! For example, [`BufReader`] works with the [`AsyncBufRead`] trait to add
 //! extra methods to any async reader:
 //!
-//! ```no_run
+//! ```no_run,ignore-wasm
 //! use tokio::io::{self, BufReader, AsyncBufReadExt};
 //! use tokio::fs::File;
 //!
@@ -94,7 +94,7 @@
 //! to [`write`](crate::io::AsyncWriteExt::write). However, you **must** flush
 //! [`BufWriter`] to ensure that any buffered data is written.
 //!
-//! ```no_run
+//! ```no_run,ignore-wasm
 //! use tokio::io::{self, BufWriter, AsyncWriteExt};
 //! use tokio::fs::File;
 //!

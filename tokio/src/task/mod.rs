@@ -70,7 +70,8 @@
 //! ```
 //! use tokio::task;
 //!
-//! # #[tokio::main] async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let join = task::spawn(async {
 //!     // ...
 //!     "hello world!"
@@ -89,7 +90,7 @@
 //! task panics, awaiting its `JoinHandle` will return a [`JoinError`]. For
 //! example:
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::task;
 //!
 //! # #[tokio::main] async fn main() {
@@ -220,7 +221,7 @@
 //!
 //! For example:
 //!
-//! ```
+//! ```ignore-wasm
 //! use tokio::task;
 //!
 //! # async fn docs() {
@@ -245,7 +246,8 @@
 //! ```rust
 //! use tokio::task;
 //!
-//! # #[tokio::main] async fn main() {
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
 //! async {
 //!     task::spawn(async {
 //!         // ...

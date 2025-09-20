@@ -10,7 +10,7 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 /// # Example
 ///
 /// ```
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
 /// use tokio_util::io::read_exact_arc;
 ///
