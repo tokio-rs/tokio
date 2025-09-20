@@ -21,7 +21,7 @@ use tokio::{
 ///
 /// When the [`JoinQueue`] is dropped, all tasks in the [`JoinQueue`] are
 /// immediately aborted.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct JoinQueue<T>(VecDeque<AbortOnDropHandle<T>>);
 
 impl<T> JoinQueue<T> {
@@ -322,12 +322,6 @@ impl<T> JoinQueue<T> {
         } else {
             Poll::Pending
         }
-    }
-}
-
-impl<T> Default for JoinQueue<T> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
