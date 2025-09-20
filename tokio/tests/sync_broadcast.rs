@@ -656,3 +656,15 @@ async fn receiver_recv_is_cooperative() {
         _ = tokio::task::yield_now() => {},
     }
 }
+
+#[tokio::test]
+async fn broadcast_sender_new_must_be_closed() {
+    let capacity = 1;
+    let tx: broadcast::Sender<()> = broadcast::Sender::new(capacity);
+
+    tx.send(()).unwrap_err();
+
+    let _rx = tx.subscribe();
+
+    tx.send(()).unwrap();
+}
