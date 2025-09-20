@@ -71,11 +71,8 @@ impl Parker {
     }
 
     pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
-        // Only parking with zero is supported...
-        assert_eq!(duration, Duration::from_millis(0));
-
         if let Some(mut driver) = self.inner.shared.driver.try_lock() {
-            driver.park_timeout(handle, duration);
+            self.inner.park_driver(&mut driver, handle, Some(duration));
         } else {
             // https://github.com/tokio-rs/tokio/issues/6536
             // Hacky, but it's just for loom tests. The counter gets incremented during
@@ -124,7 +121,7 @@ impl Inner {
         }
 
         if let Some(mut driver) = self.shared.driver.try_lock() {
-            self.park_driver(&mut driver, handle);
+            self.park_driver(&mut driver, handle, None);
         } else {
             self.park_condvar();
         }
@@ -170,7 +167,19 @@ impl Inner {
         }
     }
 
-    fn park_driver(&self, driver: &mut Driver, handle: &driver::Handle) {
+    fn park_driver(
+        &self,
+        driver: &mut Driver,
+        handle: &driver::Handle,
+        duration: Option<Duration>,
+    ) {
+        if duration.as_ref().is_some_and(Duration::is_zero) {
+            // zero duration doesn't actually park the thread, it just
+            // polls the I/O events, timers, etc.
+            driver.park_timeout(handle, Duration::ZERO);
+            return;
+        }
+
         match self
             .state
             .compare_exchange(EMPTY, PARKED_DRIVER, SeqCst, SeqCst)
@@ -191,7 +200,12 @@ impl Inner {
             Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
 
-        driver.park(handle);
+        if let Some(duration) = duration {
+            debug_assert_ne!(duration, Duration::ZERO);
+            driver.park_timeout(handle, duration);
+        } else {
+            driver.park(handle);
+        }
 
         match self.state.swap(EMPTY, SeqCst) {
             NOTIFIED => {}      // got a notification, hurray!
