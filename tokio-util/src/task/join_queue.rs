@@ -183,6 +183,53 @@ impl<T> JoinQueue<T> {
         std::future::poll_fn(|cx| self.poll_join_next_with_id(cx)).await
     }
 
+    /// Tries to join the next task in FIFO order if it has completed.
+    ///
+    /// Returns `None` if the queue is empty or if the next task is not yet ready.
+    pub fn try_join_next(&mut self) -> Option<Result<T, JoinError>> {
+        let waker = futures_util::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+
+        let jh = self.0.front_mut()?;
+        if let Poll::Ready(res) = Pin::new(jh).poll(&mut cx) {
+            // Use `detach` to avoid calling `abort` on a task that has already completed.
+            // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
+            // we only need to drop the `JoinHandle` for cleanup.
+            drop(self.0.pop_front().unwrap().detach());
+            Some(res)
+        } else {
+            None
+        }
+    }
+
+    /// Tries to join the next task in FIFO order if it has completed and return its output,
+    /// along with its [task ID].
+    ///
+    /// Returns `None` if the queue is empty or if the next task is not yet ready.
+    ///
+    /// When this method returns an error, then the id of the task that failed can be accessed
+    /// using the [`JoinError::id`] method.
+    ///
+    /// [task ID]: crate::task::Id
+    /// [`JoinError::id`]: fn@crate::task::JoinError::id
+    pub fn try_join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
+        let waker = futures_util::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+
+        let jh = self.0.front_mut()?;
+        if let Poll::Ready(res) = Pin::new(jh).poll(&mut cx) {
+            // Use `detach` to avoid calling `abort` on a task that has already completed.
+            // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
+            // we only need to drop the `JoinHandle` for cleanup.
+            let jh = self.0.pop_front().unwrap().detach();
+            let id = jh.id();
+            drop(jh);
+            Some(res.map(|output| (id, output)))
+        } else {
+            None
+        }
+    }
+
     /// Aborts all tasks and waits for them to finish shutting down.
     ///
     /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_next`] in
