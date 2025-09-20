@@ -1,4 +1,4 @@
-307
+308
 &
 +
 <
@@ -190,6 +190,7 @@ nonblocking
 nondecreasing
 noop
 ntasks
+NUMA
 ok
 oneshot
 ORed
