@@ -14,6 +14,7 @@ mod copy_to_bytes;
 mod inspect;
 mod read_buf;
 mod reader_stream;
+pub mod simplex;
 mod sink_writer;
 mod stream_reader;
 
