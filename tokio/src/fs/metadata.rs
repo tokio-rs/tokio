@@ -42,5 +42,5 @@ use std::path::Path;
 /// ```
 pub async fn metadata(path: impl AsRef<Path>) -> io::Result<Metadata> {
     let path = path.as_ref().to_owned();
-    asyncify(|| std::fs::metadata(path)).await
+    asyncify(move || std::fs::metadata(path)).await
 }
