@@ -221,3 +221,61 @@ async fn test_join_queue_join_next_with_id() {
     assert_eq!(count, TASK_NUM);
     assert_eq!(joined, spawned);
 }
+
+#[tokio::test]
+async fn test_join_queue_try_join_next() {
+    let mut queue = JoinQueue::new();
+    let (tx1, rx1) = oneshot::channel::<()>();
+    queue.spawn(async {
+        let _ = rx1.await;
+    });
+    let (tx2, rx2) = oneshot::channel::<()>();
+    queue.spawn(async {
+        let _ = rx2.await;
+    });
+    let (tx3, rx3) = oneshot::channel::<()>();
+    queue.spawn(async {
+        let _ = rx3.await;
+    });
+
+    assert_eq!(queue.len(), 3);
+    assert!(queue.try_join_next().is_none());
+    assert_eq!(queue.len(), 3);
+    assert!(queue.try_join_next().is_none());
+    assert_eq!(queue.len(), 3);
+    assert!(queue.try_join_next().is_none());
+    assert_eq!(queue.len(), 3);
+
+    tx1.send(()).unwrap();
+    tokio::task::yield_now().await;
+
+    assert_eq!(queue.len(), 3);
+    assert!(queue.try_join_next().is_some());
+    assert_eq!(queue.len(), 2);
+    assert!(queue.try_join_next().is_none());
+    assert_eq!(queue.len(), 2);
+    assert!(queue.try_join_next().is_none());
+    assert_eq!(queue.len(), 2);
+
+    tx3.send(()).unwrap();
+    tokio::task::yield_now().await;
+
+    assert_eq!(queue.len(), 2);
+    assert!(queue.try_join_next().is_none());
+    assert_eq!(queue.len(), 2);
+    assert!(queue.try_join_next().is_none());
+    assert_eq!(queue.len(), 2);
+
+    tx2.send(()).unwrap();
+    tokio::task::yield_now().await;
+
+    assert_eq!(queue.len(), 2);
+    assert!(queue.try_join_next().is_some());
+    assert_eq!(queue.len(), 1);
+    assert!(queue.try_join_next().is_some());
+    assert!(queue.is_empty());
+    assert!(queue.try_join_next().is_none());
+    assert!(queue.is_empty());
+    assert!(queue.try_join_next().is_none());
+    assert!(queue.is_empty());
+}
