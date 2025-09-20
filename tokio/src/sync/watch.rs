@@ -45,6 +45,7 @@
 //!   *seen*.
 //!
 //! ## [`changed`] versus [`has_changed`]
+
 //! The [`Receiver`] half provides two methods for checking for changes
 //! in the channel, [`has_changed`] and [`changed`].
 //!
@@ -700,6 +701,7 @@ impl<T> Receiver<T> {
     /// # Examples
     ///
     /// ## Basic usage
+
     /// ```
     /// use tokio::sync::watch;
     ///
@@ -718,6 +720,7 @@ impl<T> Receiver<T> {
     /// ```
     ///
     /// ## Closed channel example
+
     /// ```
     /// use tokio::sync::watch;
     ///
