@@ -30,6 +30,28 @@ impl<T> AbortOnDropHandle<T> {
         Self(handle)
     }
 
+    /// Shortcut for [`tokio::spawn`] followed by [`Self::new`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio_util::task::AbortOnDropHandle;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let _handle = AbortOnDropHandle::spawn(async move {
+    ///     // ...
+    /// });
+    /// # }
+    /// ```
+    #[track_caller]
+    pub fn spawn<F>(future: F) -> Self
+    where
+        F: Future<Output = T> + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        Self::new(tokio::spawn(future))
+    }
+
     /// Abort the task associated with this handle,
     /// equivalent to [`JoinHandle::abort`].
     pub fn abort(&self) {
