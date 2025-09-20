@@ -210,8 +210,8 @@ impl<T> JoinQueue<T> {
     /// When this method returns an error, then the id of the task that failed can be accessed
     /// using the [`JoinError::id`] method.
     ///
-    /// [task ID]: crate::task::Id
-    /// [`JoinError::id`]: fn@crate::task::JoinError::id
+    /// [task ID]: tokio::task::Id
+    /// [`JoinError::id`]: fn@tokio::task::JoinError::id
     pub fn try_join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         let waker = futures_util::task::noop_waker();
         let mut cx = Context::from_waker(&waker);
