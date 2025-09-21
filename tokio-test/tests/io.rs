@@ -1,8 +1,14 @@
 #![warn(rust_2018_idioms)]
 
+use futures_test::task::{noop_context, panic_waker};
+use futures_util::pin_mut;
+use std::future::Future;
 use std::io;
+use std::task::{Context, Poll};
+use tokio::io::AsyncWrite;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time::{Duration, Instant};
+use tokio_test::assert_pending;
 use tokio_test::io::Builder;
 
 #[tokio::test]
@@ -169,4 +175,85 @@ async fn multiple_wait() {
         "consuming the whole mock only took {}ms",
         start.elapsed().as_millis()
     );
+}
+
+// No matter which usecase, it doesn't make sense for a read
+// hang forever. However, currently, if there is no sequenced read
+// action, it will hang forever.
+//
+// Since we want be aware of the fixing of this bug,
+// no matter intentionally or unintentionally,
+// we add this test to catch the behavior change.
+//
+// It looks like fixing it is not hard, but not sure the downstream
+// impact, which might be a breaking change due to the
+// `Mock::inner::read_wait` field, so we keep it as is for now.
+//
+// TODO: fix this bug
+#[test]
+fn should_hang_forever_on_read_but_no_sequenced_read_action() {
+    let mut mock = Builder::new()
+        .write_error(io::Error::new(io::ErrorKind::Other, "cruel"))
+        .build();
+
+    let mut buf = [0; 1];
+    let read_exact_fut = mock.read(&mut buf);
+    pin_mut!(read_exact_fut);
+    assert_pending!(read_exact_fut.poll(&mut Context::from_waker(&panic_waker())));
+}
+
+// The `Mock` is expected to always panic if there is an unconsumed error action,
+// rather than silently ignoring it. However,
+// currently it only panics on unconsumed read/write actions,
+// not on error actions. Fixing this requires a breaking change.
+//
+// This test verifies that it does not panic yet,
+// to prevent accidentally introducing the breaking change prematurely.
+//
+// TODO: fix this bug in the next major release
+#[test]
+fn do_not_panic_unconsumed_error() {
+    let _mock = Builder::new()
+        .read_error(io::Error::new(io::ErrorKind::Other, "cruel"))
+        .build();
+}
+
+// The `Mock` must never panic, even if cloned multiple times.
+// However, at present, cloning the builder under certain
+// conditions causes a panic.
+//
+// Fixing this would require making `Mock` non-`Clone`,
+// which is a breaking change.
+//
+// Since we want be aware of the fixing of this bug,
+// no matter intentionally or unintentionally,
+// we add this test to catch the behavior change.
+//
+// TODO: fix this bug in the next major release
+#[tokio::test]
+#[should_panic = "There are no other references.: Custom { kind: Other, error: \"cruel\" }"]
+async fn panic_if_clone_the_build_with_error_action() {
+    let mut builder = Builder::new();
+    builder.write_error(io::Error::new(io::ErrorKind::Other, "cruel"));
+    let mut builder2 = builder.clone();
+
+    let mut mock = builder.build();
+    let _mock2 = builder2.build();
+
+    // this write_all will panic due to unwrapping the error from `Arc`
+    mock.write_all(b"hello").await.unwrap();
+    unreachable!();
+}
+
+#[tokio::test]
+async fn should_not_hang_forever_on_zero_length_write() {
+    let mock = Builder::new().write(b"write").build();
+    pin_mut!(mock);
+    match mock.as_mut().poll_write(&mut noop_context(), &[0u8; 0]) {
+        // drain the remaining write action to avoid panic at drop of the `mock`
+        Poll::Ready(Ok(0)) => mock.write_all(b"write").await.unwrap(),
+        Poll::Ready(Ok(n)) => panic!("expected to write 0 bytes, wrote {n} bytes instead"),
+        Poll::Ready(Err(e)) => panic!("expected to write 0 bytes, got error {e} instead"),
+        Poll::Pending => panic!("expected to write 0 bytes immediately, but pending instead"),
+    }
 }
