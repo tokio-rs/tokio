@@ -8,8 +8,8 @@ use std::task::{Context, Poll};
 use tokio::io::AsyncWrite;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time::{Duration, Instant};
-use tokio_test::assert_pending;
 use tokio_test::io::Builder;
+use tokio_test::{assert_pending, assert_ready};
 
 #[tokio::test]
 async fn read() {
@@ -232,7 +232,7 @@ fn do_not_panic_unconsumed_error() {
 // TODO: fix this bug in the next major release
 #[tokio::test]
 #[should_panic = "There are no other references.: Custom { kind: Other, error: \"cruel\" }"]
-async fn panic_if_clone_the_build_with_error_action() {
+async fn should_panic_if_clone_the_builder_with_error_action() {
     let mut builder = Builder::new();
     builder.write_error(io::Error::new(io::ErrorKind::Other, "cruel"));
     let mut builder2 = builder.clone();
@@ -256,4 +256,45 @@ async fn should_not_hang_forever_on_zero_length_write() {
         Poll::Ready(Err(e)) => panic!("expected to write 0 bytes, got error {e} instead"),
         Poll::Pending => panic!("expected to write 0 bytes immediately, but pending instead"),
     }
+}
+
+#[tokio::test]
+async fn shutdown() {
+    let mut mock = Builder::new().shutdown().build();
+    mock.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn shutdown_error() {
+    let error = io::Error::new(io::ErrorKind::Other, "cruel");
+    let mut mock = Builder::new().shutdown_error(error).build();
+    let err = mock.shutdown().await.unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::Other);
+    assert_eq!("cruel", format!("{err}"));
+}
+
+#[tokio::test(start_paused = true)]
+async fn shutdown_wait() {
+    const WAIT: Duration = Duration::from_secs(1);
+
+    let mock = Builder::new().wait(WAIT).shutdown().build();
+    pin_mut!(mock);
+
+    assert_pending!(mock.as_mut().poll_shutdown(&mut noop_context()));
+
+    tokio::time::advance(WAIT).await;
+    let _ = assert_ready!(mock.as_mut().poll_shutdown(&mut noop_context()));
+}
+
+#[test]
+#[should_panic = "AsyncWrite::poll_shutdown was not called. (1 actions remain)"]
+fn should_panic_on_leftover_shutdown_action() {
+    let _mock = Builder::new().shutdown().build();
+}
+
+#[test]
+fn should_not_panic_on_leftover_shutdown_error_action() {
+    let _mock = Builder::new()
+        .shutdown_error(io::Error::new(io::ErrorKind::Other, "cruel"))
+        .build();
 }

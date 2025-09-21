@@ -60,11 +60,13 @@ pub struct Builder {
 enum Action {
     Read(Vec<u8>),
     Write(Vec<u8>),
+    Shutdown,
     Wait(Duration),
     // Wrapped in Arc so that Builder can be cloned and Send.
     // Mock is not cloned as does not need to check Rc for ref counts.
     ReadError(Option<Arc<io::Error>>),
     WriteError(Option<Arc<io::Error>>),
+    ShutdownError(Option<Arc<io::Error>>),
 }
 
 struct Inner {
@@ -74,6 +76,13 @@ struct Inner {
     read_wait: Option<Waker>,
     rx: UnboundedReceiverStream<Action>,
     name: String,
+}
+
+enum Shutdown {
+    ShouldSuccess,
+    ShouldError(io::Error),
+    NeedWait,
+    NoActions,
 }
 
 impl Builder {
@@ -127,6 +136,25 @@ impl Builder {
     pub fn wait(&mut self, duration: Duration) -> &mut Self {
         let duration = cmp::max(duration, Duration::from_millis(1));
         self.actions.push_back(Action::Wait(duration));
+        self
+    }
+
+    /// Sequence a shutdown operation.
+    ///
+    /// The next operation in the mock's script will be to expect a
+    /// [`AsyncWrite::poll_shutdown`] call.
+    pub fn shutdown(&mut self) -> &mut Self {
+        self.actions.push_back(Action::Shutdown);
+        self
+    }
+
+    /// Sequence a shutdown operation that produces an error.
+    ///
+    /// The next operation in the mock's script will be to expect a
+    /// [`AsyncWrite::poll_shutdown`] call that returns `error`.
+    pub fn shutdown_error(&mut self, error: io::Error) -> &mut Self {
+        let error = Some(error.into());
+        self.actions.push_back(Action::ShutdownError(error));
         self
     }
 
@@ -198,6 +226,10 @@ impl Inner {
 
         let rx = UnboundedReceiverStream::new(rx);
 
+        // Actually, we should deny any write action after the shutdown action.
+        // However, since we currently doesn't check the write action after the error
+        // like BrokenPipe error, we ignore this case to keep the behavior consistent.
+
         let inner = Inner {
             actions,
             sleep: None,
@@ -242,6 +274,9 @@ impl Inner {
                 // Either waiting or expecting a write
                 Err(io::ErrorKind::WouldBlock.into())
             }
+            Some(&mut Action::Shutdown) | Some(&mut Action::ShutdownError(_)) => {
+                panic!("unexpected read, expect poll_shutdown");
+            }
             None => Ok(()),
         }
     }
@@ -284,6 +319,9 @@ impl Inner {
                     break;
                 }
                 Action::Read(_) | Action::ReadError(_) => (),
+                Action::Shutdown | Action::ShutdownError(_) => {
+                    panic!("unexpected write, expect poll_shutdown");
+                }
             }
         }
 
@@ -294,6 +332,25 @@ impl Inner {
         match self.action() {
             Some(&mut Action::Wait(dur)) => Some(dur),
             _ => None,
+        }
+    }
+
+    fn shutdown(&mut self) -> Shutdown {
+        match self.action() {
+            Some(&mut Action::Shutdown) => Shutdown::ShouldSuccess,
+            Some(&mut Action::ShutdownError(ref mut err)) => {
+                let err = err.take().expect("Should have been removed from actions.");
+                let err = Arc::try_unwrap(err).expect("There are no other references.");
+                Shutdown::ShouldError(err)
+            }
+            Some(&mut Action::Read(_)) | Some(&mut Action::ReadError(_)) => {
+                panic!("unexpected poll_shutdown, expect read");
+            }
+            Some(&mut Action::Write(_)) | Some(&mut Action::WriteError(_)) => {
+                panic!("unexpected poll_shutdown, expect write");
+            }
+            Some(&mut Action::Wait(_)) => Shutdown::NeedWait,
+            None => Shutdown::NoActions,
         }
     }
 
@@ -329,6 +386,12 @@ impl Inner {
                     }
                 }
                 Action::ReadError(ref mut error) | Action::WriteError(ref mut error) => {
+                    if error.is_some() {
+                        break;
+                    }
+                }
+                Action::Shutdown => break,
+                Action::ShutdownError(ref mut error) => {
                     if error.is_some() {
                         break;
                     }
@@ -472,8 +535,55 @@ impl AsyncWrite for Mock {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<io::Result<()>> {
+        loop {
+            if let Some(ref mut sleep) = self.inner.sleep {
+                ready!(Pin::new(sleep).poll(cx));
+            }
+
+            // If a sleep is set, it has already fired
+            self.inner.sleep = None;
+
+            match self.inner.shutdown() {
+                Shutdown::ShouldSuccess => {
+                    assert!(matches!(
+                        self.inner.actions.pop_front(),
+                        Some(Action::Shutdown)
+                    ));
+                    self.maybe_wakeup_reader();
+                    return Poll::Ready(Ok(()));
+                }
+                Shutdown::ShouldError(e) => {
+                    assert!(matches!(
+                        self.inner.actions.pop_front(),
+                        Some(Action::ShutdownError(_))
+                    ));
+                    self.maybe_wakeup_reader();
+                    return Poll::Ready(Err(e));
+                }
+                Shutdown::NeedWait => {
+                    if let Some(rem) = self.inner.remaining_wait() {
+                        let until = Instant::now() + rem;
+                        self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
+                    } else {
+                        panic!(
+                            "unexpected poll_shutdown, expect read or write {}",
+                            self.pmsg()
+                        );
+                    }
+                }
+                Shutdown::NoActions => {
+                    if let Some(action) = ready!(self.inner.poll_action(cx)) {
+                        self.inner.actions.push_back(action);
+                    } else {
+                        panic!(
+                            "unexpected poll_shutdown, but actually no more sequenced actions {}",
+                            self.pmsg()
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -496,7 +606,11 @@ impl Drop for Mock {
                 "There is still data left to write. {}",
                 self.pmsg()
             ),
+            Action::Shutdown => panic!("AsyncWrite::poll_shutdown was not called. {}", self.pmsg()),
             Action::ReadError(_) | Action::WriteError(_) | Action::Wait(_) => (),
+            // Since the existing implementation ignores the read/write error, so we also ignore the
+            // shutdown error here to keep the behavior consistent.
+            Action::ShutdownError(_) => (),
         });
     }
 }
