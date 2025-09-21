@@ -275,7 +275,47 @@ async fn test_join_queue_try_join_next() {
 }
 
 #[tokio::test]
+async fn test_join_queue_try_join_next_disabled_coop() {
+    // This number is large enough to trigger coop. Without using `tokio::task::coop::unconstrained`
+    // inside `try_join_next` this test fails on `assert!(coop_count == 0)`.
+    const TASK_NUM: u32 = 1000;
+
+    static SEM: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(0);
+
+    let mut queue = JoinQueue::new();
+
+    for _ in 0..TASK_NUM {
+        queue.spawn(async {
+            SEM.add_permits(1);
+        });
+    }
+
+    let _ = SEM.acquire_many(TASK_NUM).await.unwrap();
+
+    let mut count = 0;
+    let mut coop_count = 0;
+    while !queue.is_empty() {
+        match queue.try_join_next() {
+            Some(Ok(())) => {}
+            Some(Err(err)) => panic!("failed: {err}"),
+            None => {
+                coop_count += 1;
+                tokio::task::yield_now().await;
+                continue;
+            }
+        }
+        count += 1;
+    }
+    assert!(coop_count == 0);
+    assert_eq!(count, TASK_NUM);
+}
+
+#[tokio::test]
 async fn test_join_queue_try_join_next_with_id() {
+    // Note that this number is large enough to trigger coop as in
+    // `test_join_queue_try_join_next_coop` test. Without using
+    // `tokio::task::coop::unconstrained` inside `try_join_next_with_id`
+    // this test fails on `assert_eq!(count, TASK_NUM)`.
     const TASK_NUM: u32 = 1000;
 
     let (send, recv) = tokio::sync::watch::channel(());
