@@ -84,6 +84,8 @@ signal = [
 sync = []
 test-util = ["rt", "sync", "time"]
 time = []
+# Unstable feature. Requires `--cfg tokio_unstable` to enable.
+io-uring = ["dep:io-uring", "libc", "mio/os-poll", "mio/os-ext", "dep:slab"]
 
 [dependencies]
 tokio-macros = { version = "~2.5.0", path = "../tokio-macros", optional = true }
@@ -103,11 +105,13 @@ socket2 = { version = "0.6.0", optional = true, features = ["all"] }
 [target.'cfg(tokio_unstable)'.dependencies]
 tracing = { version = "0.1.29", default-features = false, features = ["std"], optional = true } # Not in full
 
-[target.'cfg(all(tokio_uring, target_os = "linux"))'.dependencies]
-io-uring = { version = "0.7.6", default-features = false }
-libc = { version = "0.2.168" }
-mio = { version = "1.0.1", default-features = false, features = ["os-poll", "os-ext"] }
-slab = "0.4.9"
+# Currently unstable. The API exposed by these features may be broken at any time.
+# Requires `--cfg tokio_unstable` to enable.
+[target.'cfg(all(tokio_unstable, target_os = "linux"))'.dependencies]
+io-uring = { version = "0.7.6", default-features = false, optional = true }
+libc = { version = "0.2.168", optional = true }
+mio = { version = "1.0.1", default-features = false, features = ["os-poll", "os-ext"], optional = true }
+slab = { version = "0.4.9", optional = true }
 
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
@@ -165,10 +169,10 @@ tracing-mock = "= 0.1.0-beta.1"
 [package.metadata.docs.rs]
 all-features = true
 # enable unstable features in the documentation
-rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable", "--cfg", "tokio_taskdump", "--cfg", "tokio_uring"]
+rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable", "--cfg", "tokio_taskdump"]
 # it's necessary to _also_ pass `--cfg tokio_unstable` and `--cfg tokio_taskdump`
 # to rustc, or else dependencies will not be enabled, and the docs build will fail.
-rustc-args = ["--cfg", "tokio_unstable", "--cfg", "tokio_taskdump", "--cfg", "tokio_uring"]
+rustc-args = ["--cfg", "tokio_unstable", "--cfg", "tokio_taskdump"]
 
 [package.metadata.playground]
 features = ["full", "test-util"]

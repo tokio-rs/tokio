@@ -339,7 +339,13 @@ impl Builder {
         ))]
         self.enable_io();
 
-        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
         self.enable_io_uring();
 
         #[cfg(feature = "time")]
@@ -1584,7 +1590,7 @@ cfg_time! {
     }
 }
 
-cfg_tokio_uring! {
+cfg_io_uring! {
     impl Builder {
         /// Enables the tokio's io_uring driver.
         ///
@@ -1600,7 +1606,7 @@ cfg_tokio_uring! {
         ///     .build()
         ///     .unwrap();
         /// ```
-        #[cfg_attr(docsrs, doc(cfg(tokio_uring)))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "io-uring")))]
         pub fn enable_io_uring(&mut self) -> &mut Self {
             // Currently, the uring flag is equivalent to `enable_io`.
             self.enable_io = true;

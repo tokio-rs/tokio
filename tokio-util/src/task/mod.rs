@@ -13,6 +13,9 @@ cfg_rt! {
 
     mod abort_on_drop;
     pub use abort_on_drop::AbortOnDropHandle;
+
+    mod join_queue;
+    pub use join_queue::JoinQueue;
 }
 
 #[cfg(feature = "join-map")]

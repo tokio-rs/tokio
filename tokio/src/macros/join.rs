@@ -113,7 +113,7 @@ doc! {macro_rules! join {
     (@ {
         // Type of rotator that controls which inner future to start with
         // when polling our output future.
-        rotator=$rotator:ty;
+        rotator_select=$rotator_select:ty;
 
         // One `_` for each branch in the `join!` macro. This is not used once
         // normalization is complete.
@@ -126,7 +126,7 @@ doc! {macro_rules! join {
         $( ( $($skip:tt)* ) $e:expr, )*
 
     }) => {{
-        use $crate::macros::support::{maybe_done, poll_fn, Future, Pin};
+        use $crate::macros::support::{maybe_done, poll_fn, Future, Pin, RotatorSelect};
         use $crate::macros::support::Poll::{Ready, Pending};
 
         // Safety: nothing must be moved out of `futures`. This is to satisfy
@@ -143,14 +143,14 @@ doc! {macro_rules! join {
         // <https://internals.rust-lang.org/t/surprising-soundness-trouble-around-pollfn/17484>
         let mut futures = &mut futures;
 
-        const COUNT: u32 = $($total)*;
-
         // Each time the future created by poll_fn is polled, if not using biased mode,
         // a different future is polled first to ensure every future passed to join!
         // can make progress even if one of the futures consumes the whole budget.
-        let mut rotator = <$rotator>::default();
+        let mut rotator = <$rotator_select as RotatorSelect>::Rotator::<{$($total)*}>::default();
 
         poll_fn(move |cx| {
+            const COUNT: u32 = $($total)*;
+
             let mut is_pending = false;
             let mut to_run = COUNT;
 
@@ -205,23 +205,47 @@ doc! {macro_rules! join {
 
     // ===== Normalize =====
 
-    (@ { rotator=$rotator:ty; ( $($s:tt)* ) ( $($n:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
-        $crate::join!(@{ rotator=$rotator; ($($s)* _) ($($n)* + 1) $($t)* ($($s)*) $e, } $($r)*)
+    (@ { rotator_select=$rotator_select:ty; ( $($s:tt)* ) ( $($n:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
+        $crate::join!(@{ rotator_select=$rotator_select; ($($s)* _) ($($n)* + 1) $($t)* ($($s)*) $e, } $($r)*)
     };
 
     // ===== Entry point =====
     ( biased; $($e:expr),+ $(,)?) => {
-        $crate::join!(@{ rotator=$crate::macros::support::BiasedRotator; () (0) } $($e,)*)
+        $crate::join!(@{ rotator_select=$crate::macros::support::SelectBiased; () (0) } $($e,)*)
     };
 
     ( $($e:expr),+ $(,)?) => {
-        $crate::join!(@{ rotator=$crate::macros::support::Rotator<COUNT>; () (0) } $($e,)*)
+        $crate::join!(@{ rotator_select=$crate::macros::support::SelectNormal; () (0) } $($e,)*)
     };
 
     (biased;) => { async {}.await };
 
     () => { async {}.await }
 }}
+
+/// Helper trait to select which type of `Rotator` to use.
+// We need this to allow specifying a const generic without
+// colliding with caller const names due to macro hygiene.
+pub trait RotatorSelect {
+    type Rotator<const COUNT: u32>: Default;
+}
+
+/// Marker type indicating that the starting branch should
+/// rotate each poll.
+#[derive(Debug)]
+pub struct SelectNormal;
+/// Marker type indicating that the starting branch should
+/// be the first declared branch each poll.
+#[derive(Debug)]
+pub struct SelectBiased;
+
+impl RotatorSelect for SelectNormal {
+    type Rotator<const COUNT: u32> = Rotator<COUNT>;
+}
+
+impl RotatorSelect for SelectBiased {
+    type Rotator<const COUNT: u32> = BiasedRotator;
+}
 
 /// Rotates by one each [`Self::num_skip`] call up to COUNT - 1.
 #[derive(Default, Debug)]
