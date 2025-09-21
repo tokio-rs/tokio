@@ -18,9 +18,9 @@ pub(crate) use source::TimeSource;
 mod wheel;
 cfg_rt_and_time! {
     pub(crate) use wheel::{Insert, EntryHandle};
-    pub(crate) use wheel::cancellation_queue;
 }
 cfg_rt_or_time! {
+    pub(crate) use wheel::cancellation_queue;
     pub(crate) use wheel::Wheel;
 }
 
@@ -134,6 +134,22 @@ impl Driver {
 
         self.is_shutdown.store(true, Ordering::SeqCst);
         self.park.shutdown(rt_handle);
+    }
+}
+
+cfg_rt_or_time! {
+    /// Local context for the time driver.
+    pub(crate) enum Context<'a> {
+        /// The runtime is running, we can access it.
+        Running {
+            /// the local time wheel
+            wheel: &'a mut Wheel,
+            /// channel to push timers that are pending cancellation
+            canc_tx: &'a cancellation_queue::Sender,
+        },
+        #[cfg(feature = "rt-multi-thread")]
+        /// The runtime is shutting down, no timers can be registered.
+        Shutdown,
     }
 }
 

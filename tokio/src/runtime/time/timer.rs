@@ -1,13 +1,14 @@
 use super::wheel::EntryHandle;
 use crate::runtime::scheduler::Handle as SchedulerHandle;
-use crate::runtime::time::wheel::cancellation_queue::Sender;
 use crate::runtime::time::wheel::Insert;
-use crate::runtime::time::Wheel;
+use crate::runtime::time::Context as TimeContext;
 use crate::time::Instant;
-use crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR;
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+#[cfg(any(feature = "rt", feature = "rt-multi-thread"))]
+use crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR;
 
 pub(crate) struct Timer {
     sched_handle: SchedulerHandle,
@@ -60,24 +61,29 @@ impl Timer {
     fn register(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         let this = self.get_mut();
 
-        with_current_wheel(&this.sched_handle, |maybe_wheel| {
+        with_current_wheel(&this.sched_handle, |maybe_time_cx| {
             let deadline = deadline_to_tick(&this.sched_handle, this.deadline);
             let hdl = EntryHandle::new(deadline, cx.waker());
-            if let Some((wheel, tx, is_shutdown)) = maybe_wheel {
-                assert!(!is_shutdown, "{RUNTIME_SHUTTING_DOWN_ERROR}");
-                // Safety: the entry is not registered yet
-                match unsafe { wheel.insert(hdl.clone(), tx) } {
-                    Insert::Success => {
-                        this.entry = Some(hdl);
-                        Poll::Pending
+
+            match maybe_time_cx {
+                Some(TimeContext::Running { wheel, canc_tx }) => {
+                    // Safety: the entry is not registered yet
+                    match unsafe { wheel.insert(hdl.clone(), canc_tx.clone()) } {
+                        Insert::Success => {
+                            this.entry = Some(hdl);
+                            Poll::Pending
+                        }
+                        Insert::Elapsed => Poll::Ready(()),
+                        Insert::Cancelling => Poll::Pending,
                     }
-                    Insert::Elapsed => Poll::Ready(()),
-                    Insert::Cancelling => Poll::Pending,
                 }
-            } else {
-                this.entry = Some(hdl.clone());
-                push_from_remote(&this.sched_handle, hdl);
-                Poll::Pending
+                #[cfg(feature = "rt-multi-thread")]
+                Some(TimeContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
+                None => {
+                    this.entry = Some(hdl.clone());
+                    push_from_remote(&this.sched_handle, hdl);
+                    Poll::Pending
+                }
             }
         })
     }
@@ -96,7 +102,7 @@ impl Timer {
 
 pub(super) fn with_current_wheel<F, R>(hdl: &SchedulerHandle, f: F) -> R
 where
-    F: FnOnce(Option<(&mut Wheel, Sender, bool)>) -> R,
+    F: FnOnce(Option<TimeContext<'_>>) -> R,
 {
     #[cfg(not(feature = "rt"))]
     {

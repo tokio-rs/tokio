@@ -561,13 +561,15 @@ impl Context {
 
         pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
         where
-            F: FnOnce(Option<(&mut Wheel, cancellation_queue::Sender, bool)>) -> R,
+            F: FnOnce(Option<crate::runtime::time::Context<'_>>) -> R,
         {
             self.with_core(|maybe_core| {
-                if let Some(core) = maybe_core {
-                    f(Some((&mut core.wheel, core.timer_cancel_tx.clone(), false)))
-                } else {
-                    f(None)
+                match maybe_core {
+                    Some(core) => f(Some(crate::runtime::time::Context::Running {
+                        wheel: &mut core.wheel,
+                        canc_tx: &core.timer_cancel_tx,
+                    })),
+                    None => f(None),
                 }
             })
         }
