@@ -3,7 +3,7 @@
 //! A mock stream implementing [`Stream`].
 //!
 //! # Overview
-//! This crate provides a `StreamMock` that can be used to test code that interacts with streams.
+//! This module provides a `StreamMock` that can be used to test code that interacts with streams.
 //! It allows you to mock the behavior of a stream and control the items it yields and the waiting
 //! intervals between items.
 //!
@@ -66,14 +66,6 @@ impl<T: Unpin> StreamMockBuilder<T> {
         self.actions.push_back(Action::Next(value));
         self
     }
-
-    // Queue an item to be consumed by the sink,
-    // commented out until Sink is implemented.
-    //
-    // pub fn consume(mut self, value: T) -> Self {
-    //    self.actions.push_back(Action::Consume(value));
-    //    self
-    // }
 
     /// Queue the stream to wait for a duration
     pub fn wait(mut self, duration: Duration) -> Self {
