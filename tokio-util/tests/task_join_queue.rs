@@ -192,12 +192,12 @@ async fn test_join_queue_join_next_with_id() {
 
     let (send, recv) = tokio::sync::watch::channel(());
 
-    let mut set = JoinQueue::new();
+    let mut queue = JoinQueue::new();
     let mut spawned = Vec::with_capacity(TASK_NUM as usize);
 
     for _ in 0..TASK_NUM {
         let mut recv = recv.clone();
-        let handle = set.spawn(async move { recv.changed().await.unwrap() });
+        let handle = queue.spawn(async move { recv.changed().await.unwrap() });
 
         spawned.push(handle.id());
     }
@@ -208,7 +208,7 @@ async fn test_join_queue_join_next_with_id() {
 
     let mut count = 0;
     let mut joined = Vec::with_capacity(TASK_NUM as usize);
-    while let Some(res) = set.join_next_with_id().await {
+    while let Some(res) = queue.join_next_with_id().await {
         match res {
             Ok((id, ())) => {
                 count += 1;
@@ -278,4 +278,42 @@ async fn test_join_queue_try_join_next() {
     assert!(queue.is_empty());
     assert!(queue.try_join_next().is_none());
     assert!(queue.is_empty());
+}
+
+#[tokio::test]
+async fn test_join_queue_try_join_next_with_id() {
+    const TASK_NUM: u32 = 1000;
+
+    let (send, recv) = tokio::sync::watch::channel(());
+
+    let mut queue = JoinQueue::new();
+    let mut spawned = Vec::with_capacity(TASK_NUM as usize);
+
+    for _ in 0..TASK_NUM {
+        let mut recv = recv.clone();
+        let handle = queue.spawn(async move { recv.changed().await.unwrap() });
+
+        spawned.push(handle.id());
+    }
+    drop(recv);
+
+    assert!(queue.try_join_next_with_id().is_none());
+
+    send.send_replace(());
+    send.closed().await;
+
+    let mut count = 0;
+    let mut joined = Vec::with_capacity(TASK_NUM as usize);
+    while let Some(res) = queue.try_join_next_with_id() {
+        match res {
+            Ok((id, ())) => {
+                count += 1;
+                joined.push(id);
+            }
+            Err(err) => panic!("failed: {err}"),
+        }
+    }
+
+    assert_eq!(count, TASK_NUM);
+    assert_eq!(joined, spawned);
 }
