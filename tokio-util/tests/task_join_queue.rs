@@ -238,13 +238,16 @@ async fn test_join_queue_try_join_next() {
         let _ = rx3.await;
     });
 
+    fn check_try_join_next_is_noop(queue: &mut JoinQueue<()>) {
+        let len = queue.len();
+        for _ in 0..5 {
+            assert!(queue.try_join_next().is_none());
+            assert_eq!(queue.len(), len);
+        }
+    }
+
     assert_eq!(queue.len(), 3);
-    assert!(queue.try_join_next().is_none());
-    assert_eq!(queue.len(), 3);
-    assert!(queue.try_join_next().is_none());
-    assert_eq!(queue.len(), 3);
-    assert!(queue.try_join_next().is_none());
-    assert_eq!(queue.len(), 3);
+    check_try_join_next_is_noop(&mut queue);
 
     tx1.send(()).unwrap();
     tokio::task::yield_now().await;
@@ -252,19 +255,13 @@ async fn test_join_queue_try_join_next() {
     assert_eq!(queue.len(), 3);
     assert!(queue.try_join_next().is_some());
     assert_eq!(queue.len(), 2);
-    assert!(queue.try_join_next().is_none());
-    assert_eq!(queue.len(), 2);
-    assert!(queue.try_join_next().is_none());
-    assert_eq!(queue.len(), 2);
+    check_try_join_next_is_noop(&mut queue);
 
     tx3.send(()).unwrap();
     tokio::task::yield_now().await;
 
     assert_eq!(queue.len(), 2);
-    assert!(queue.try_join_next().is_none());
-    assert_eq!(queue.len(), 2);
-    assert!(queue.try_join_next().is_none());
-    assert_eq!(queue.len(), 2);
+    check_try_join_next_is_noop(&mut queue);
 
     tx2.send(()).unwrap();
     tokio::task::yield_now().await;
@@ -274,10 +271,7 @@ async fn test_join_queue_try_join_next() {
     assert_eq!(queue.len(), 1);
     assert!(queue.try_join_next().is_some());
     assert!(queue.is_empty());
-    assert!(queue.try_join_next().is_none());
-    assert!(queue.is_empty());
-    assert!(queue.try_join_next().is_none());
-    assert!(queue.is_empty());
+    check_try_join_next_is_noop(&mut queue);
 }
 
 #[tokio::test]
