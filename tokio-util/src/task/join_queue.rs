@@ -208,6 +208,20 @@ impl<T> JoinQueue<T> {
         Some(res)
     }
 
+    /// Temporary function to debug the state of all tasks in the queue.
+    pub fn dbg_state(&mut self)
+    where
+        T: std::fmt::Debug,
+    {
+        let mut counter = 0;
+        for jh in &mut self.0 {
+            let finished = jh.is_finished();
+            let res = jh.now_or_never();
+            println!("task {counter}, finished: {finished}, result: {res:?}");
+            counter += 1;
+        }
+    }
+
     /// Tries to join the next task in FIFO order if it has completed and return its output,
     /// along with its [task ID].
     ///

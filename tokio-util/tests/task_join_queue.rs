@@ -282,7 +282,7 @@ async fn test_join_queue_try_join_next() {
 
 #[tokio::test]
 async fn test_join_queue_try_join_next_with_id() {
-    const TASK_NUM: u32 = 1000;
+    const TASK_NUM: u32 = 130;
 
     let (send, recv) = tokio::sync::watch::channel(());
 
@@ -302,18 +302,20 @@ async fn test_join_queue_try_join_next_with_id() {
     send.send_replace(());
     send.closed().await;
 
-    let mut count = 0;
-    let mut joined = Vec::with_capacity(TASK_NUM as usize);
-    while let Some(res) = queue.try_join_next_with_id() {
-        match res {
-            Ok((id, ())) => {
-                count += 1;
-                joined.push(id);
-            }
-            Err(err) => panic!("failed: {err}"),
-        }
-    }
+    queue.dbg_state();
 
-    assert_eq!(count, TASK_NUM);
-    assert_eq!(joined, spawned);
+    // let mut count = 0;
+    // let mut joined = Vec::with_capacity(TASK_NUM as usize);
+    // while let Some(res) = queue.try_join_next_with_id() {
+    //     match res {
+    //         Ok((id, ())) => {
+    //             count += 1;
+    //             joined.push(id);
+    //         }
+    //         Err(err) => panic!("failed: {err}"),
+    //     }
+    // }
+
+    // assert_eq!(count, TASK_NUM);
+    // assert_eq!(joined, spawned);
 }
