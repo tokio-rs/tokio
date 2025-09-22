@@ -60,7 +60,9 @@ use std::sync::Arc;
 /// no more than 100 files at a time. When trying to open the 101st
 /// file, the program will wait until a permit becomes available before
 /// proceeding to open another file.
-/// ```ignore-wasm
+/// ```
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use std::io::Result;
 /// use tokio::fs::File;
 /// use tokio::sync::Semaphore;
@@ -74,6 +76,7 @@ use std::sync::Arc;
 ///     buffer.write_all(message).await?;
 ///     Ok(()) // Permit goes out of scope here, and is available again for acquisition
 /// }
+/// # }
 /// ```
 ///
 /// ## Limit the number of outgoing requests being sent at the same time
@@ -143,7 +146,9 @@ use std::sync::Arc;
 /// [`Semaphore::acquire_owned`] to be movable across the task boundary.
 /// (Since our semaphore is not a global variable — if it was, then `acquire` would be enough.)
 ///
-/// ```no_run,ignore-wasm
+/// ```no_run
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use std::sync::Arc;
 /// use tokio::sync::Semaphore;
 /// use tokio::net::TcpListener;
@@ -173,6 +178,7 @@ use std::sync::Arc;
 /// }
 /// # async fn handle_connection(_socket: &mut tokio::net::TcpStream) {
 /// #   // Do work
+/// # }
 /// # }
 /// ```
 ///

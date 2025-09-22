@@ -217,7 +217,9 @@ use tokio::io::{
 /// `spawn_blocking` ensures that the synchronous code is offloaded to a dedicated
 /// thread pool, preventing it from interfering with the async tasks.
 ///
-/// ```rust,ignore-wasm
+/// ```rust
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use tokio::task::spawn_blocking;
 /// use tokio_util::io::SyncIoBridge;
 /// use tokio::io::AsyncRead;
@@ -255,6 +257,7 @@ use tokio::io::{
 ///
 ///     Ok(())
 /// }
+/// # }
 /// ```
 ///
 #[derive(Debug)]

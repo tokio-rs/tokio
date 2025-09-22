@@ -76,7 +76,9 @@ macro_rules! doc {
         ///
         /// Using the `biased;` mode to control polling order.
         ///
-        /// ```ignore-wasm
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// async fn do_stuff_async() {
         ///     // async work
         /// }
@@ -94,6 +96,7 @@ macro_rules! doc {
         /// );
         ///
         /// // do something with the values
+        /// # }
         /// # }
         /// ```
 

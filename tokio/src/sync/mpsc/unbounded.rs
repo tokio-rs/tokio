@@ -296,7 +296,9 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::thread;
     /// use tokio::sync::mpsc;
     ///
@@ -311,6 +313,7 @@ impl<T> UnboundedReceiver<T> {
     ///     let _ = tx.send(10);
     ///     sync_code.join().unwrap();
     /// }
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
@@ -454,7 +457,9 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::task::{Context, Poll};
     /// use std::pin::Pin;
     /// use tokio::sync::mpsc;
@@ -498,6 +503,7 @@ impl<T> UnboundedReceiver<T> {
     /// let count = my_receiver_future.await;
     /// assert_eq!(count, 3);
     /// assert_eq!(buffer, vec![0,1,2])
+    /// # }
     /// # }
     /// ```
     pub fn poll_recv_many(

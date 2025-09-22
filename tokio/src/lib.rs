@@ -193,7 +193,9 @@
 //! [`spawn_blocking`]: crate::task::spawn_blocking()
 //! [`thread_keep_alive`]: crate::runtime::Builder::thread_keep_alive()
 //!
-//! ```ignore-wasm
+//! ```
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! #[tokio::main]
 //! async fn main() {
 //!     // This is running on a core thread.
@@ -208,6 +210,7 @@
 //!     // panic.
 //!     blocking_task.await.unwrap();
 //! }
+//! # }
 //! ```
 //!
 //! If your code is CPU-bound and you wish to limit the number of threads used
@@ -265,7 +268,9 @@
 //!
 //! A simple TCP echo server:
 //!
-//! ```no_run,ignore-wasm
+//! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::net::TcpListener;
 //! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!
@@ -300,6 +305,7 @@
 //!         });
 //!     }
 //! }
+//! # }
 //! ```
 //!
 //! # Feature flags

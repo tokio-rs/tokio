@@ -43,7 +43,9 @@ cfg_io_util! {
     /// [`AsyncWrite`] types. Callers will tend to import this trait instead of
     /// [`AsyncWrite`].
     ///
-    /// ```no_run,ignore-wasm
+    /// ```no_run
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::io::{self, AsyncWriteExt};
     /// use tokio::fs::File;
     ///
@@ -61,6 +63,7 @@ cfg_io_util! {
     ///
     ///     Ok(())
     /// }
+    /// # }
     /// ```
     ///
     /// See [module][crate::io] documentation for more details.
@@ -107,7 +110,9 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -120,6 +125,7 @@ cfg_io_util! {
         ///     file.flush().await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn write<'a>(&'a mut self, src: &'a [u8]) -> Write<'a, Self>
         where
@@ -147,7 +153,9 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         /// use std::io::IoSlice;
@@ -167,6 +175,7 @@ cfg_io_util! {
         ///
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         ///
         /// [`write`]: AsyncWriteExt::write
@@ -227,7 +236,9 @@ cfg_io_util! {
         /// [`Buf`]: bytes::Buf
         /// [`Cursor`]: std::io::Cursor
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -250,6 +261,7 @@ cfg_io_util! {
         ///
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn write_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteBuf<'a, Self, B>
         where
@@ -298,7 +310,9 @@ cfg_io_util! {
         /// [`Cursor`]: std::io::Cursor
         /// [advanced]: bytes::Buf::advance
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -313,6 +327,7 @@ cfg_io_util! {
         ///     file.flush().await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         ///
         /// [`write`]: AsyncWriteExt::write
@@ -351,7 +366,9 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -363,6 +380,7 @@ cfg_io_util! {
         ///     file.flush().await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         ///
         /// [`write`]: AsyncWriteExt::write
@@ -1243,7 +1261,9 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, BufWriter, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -1256,6 +1276,7 @@ cfg_io_util! {
         ///     buffer.flush().await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn flush(&mut self) -> Flush<'_, Self>
         where
@@ -1282,7 +1303,9 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, BufWriter, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -1295,6 +1318,7 @@ cfg_io_util! {
         ///     buffer.shutdown().await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn shutdown(&mut self) -> Shutdown<'_, Self>
         where

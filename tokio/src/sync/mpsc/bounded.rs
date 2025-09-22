@@ -392,7 +392,9 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::thread;
     /// use tokio::runtime::Runtime;
     /// use tokio::sync::mpsc;
@@ -411,6 +413,7 @@ impl<T> Receiver<T> {
     ///         });
     ///     sync_code.join().unwrap()
     /// }
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
@@ -1013,7 +1016,9 @@ impl<T> Sender<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::thread;
     /// use tokio::runtime::Runtime;
     /// use tokio::sync::mpsc;
@@ -1030,6 +1035,7 @@ impl<T> Sender<T> {
     ///     });
     ///     sync_code.join().unwrap()
     /// }
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]

@@ -90,7 +90,9 @@
 //! task panics, awaiting its `JoinHandle` will return a [`JoinError`]. For
 //! example:
 //!
-//! ```ignore-wasm
+//! ```
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::task;
 //!
 //! # #[tokio::main] async fn main() {
@@ -100,6 +102,7 @@
 //!
 //! // The returned result indicates that the task failed.
 //! assert!(join.await.is_err());
+//! # }
 //! # }
 //! ```
 //!
@@ -221,7 +224,9 @@
 //!
 //! For example:
 //!
-//! ```ignore-wasm
+//! ```
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::task;
 //!
 //! # async fn docs() {
@@ -231,6 +236,7 @@
 //! });
 //!
 //! assert_eq!(result, "blocking completed");
+//! # }
 //! # }
 //! ```
 //!

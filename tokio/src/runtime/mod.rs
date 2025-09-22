@@ -18,7 +18,9 @@
 //! When no fine tuning is required, the [`tokio::main`] attribute macro can be
 //! used.
 //!
-//! ```no_run,ignore-wasm
+//! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::net::TcpListener;
 //! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!
@@ -53,6 +55,7 @@
 //!         });
 //!     }
 //! }
+//! # }
 //! ```
 //!
 //! From within the context of the runtime, additional tasks are spawned using
@@ -61,7 +64,9 @@
 //!
 //! A [`Runtime`] instance can also be used directly.
 //!
-//! ```no_run,ignore-wasm
+//! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::net::TcpListener;
 //! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //! use tokio::runtime::Runtime;
@@ -102,6 +107,7 @@
 //!         }
 //!     })
 //! }
+//! # }
 //! ```
 //!
 //! ## Runtime Configurations
@@ -117,12 +123,15 @@
 //! CPU core available on the system. This tends to be the ideal configuration
 //! for most applications. The multi-thread scheduler requires the `rt-multi-thread`
 //! feature flag, and is selected by default:
-//! ```ignore-wasm
+//! ```
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::runtime;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let threaded_rt = runtime::Runtime::new()?;
 //! # Ok(()) }
+//! # }
 //! ```
 //!
 //! Most applications should use the multi-thread scheduler, except in some

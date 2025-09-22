@@ -40,7 +40,9 @@ cfg_io_util! {
     /// [`AsyncRead`] types. Callers will tend to import this trait instead of
     /// [`AsyncRead`].
     ///
-    /// ```no_run,ignore-wasm
+    /// ```no_run
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::fs::File;
     /// use tokio::io::{self, AsyncReadExt};
     ///
@@ -54,6 +56,7 @@ cfg_io_util! {
     ///
     ///     Ok(())
     /// }
+    /// # }
     /// ```
     ///
     /// See [module][crate::io] documentation for more details.
@@ -71,7 +74,9 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `AsyncRead`:
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -88,6 +93,7 @@ cfg_io_util! {
         ///     handle.read_to_string(&mut buffer).await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn chain<R>(self, next: R) -> Chain<Self, R>
         where
@@ -149,7 +155,9 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -164,6 +172,7 @@ cfg_io_util! {
         ///     println!("The bytes: {:?}", &buffer[..n]);
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn read<'a>(&'a mut self, buf: &'a mut [u8]) -> Read<'a, Self>
         where
@@ -218,7 +227,9 @@ cfg_io_util! {
         /// [`BytesMut`]: bytes::BytesMut
         /// [`BufMut`]: bytes::BufMut
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -242,6 +253,7 @@ cfg_io_util! {
         ///     println!("The bytes: {:?}", &buffer[..]);
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn read_buf<'a, B>(&'a mut self, buf: &'a mut B) -> ReadBuf<'a, Self, B>
         where
@@ -288,7 +300,9 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::fs::File;
         /// use tokio::io::{self, AsyncReadExt};
         ///
@@ -302,6 +316,7 @@ cfg_io_util! {
         ///     f.read_exact(&mut buffer).await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         ///
         /// [`ErrorKind::UnexpectedEof`]: std::io::ErrorKind::UnexpectedEof
@@ -1314,7 +1329,9 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncReadExt};
         /// use tokio::fs::File;
         ///
@@ -1327,6 +1344,7 @@ cfg_io_util! {
         ///     f.read_to_end(&mut buffer).await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         ///
         /// (See also the [`tokio::fs::read`] convenience function for reading from a
@@ -1362,7 +1380,9 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncReadExt};
         /// use tokio::fs::File;
         ///
@@ -1374,6 +1394,7 @@ cfg_io_util! {
         ///     f.read_to_string(&mut buffer).await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         ///
         /// (See also the [`crate::fs::read_to_string`] convenience function for
@@ -1402,7 +1423,9 @@ cfg_io_util! {
         ///
         /// [`File`][crate::fs::File]s implement `Read`:
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncReadExt};
         /// use tokio::fs::File;
         ///
@@ -1417,6 +1440,7 @@ cfg_io_util! {
         ///     handle.read(&mut buffer).await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn take(self, limit: u64) -> Take<Self>
         where

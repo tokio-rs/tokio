@@ -35,7 +35,9 @@
 //! [demonstrating][std_example] reading some bytes from a [`std::fs::File`]. We
 //! can do the same with [`tokio::fs::File`][`File`]:
 //!
-//! ```no_run,ignore-wasm
+//! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::io::{self, AsyncReadExt};
 //! use tokio::fs::File;
 //!
@@ -50,6 +52,7 @@
 //!     println!("The bytes: {:?}", &buffer[..n]);
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! [`File`]: crate::fs::File
@@ -72,7 +75,9 @@
 //! For example, [`BufReader`] works with the [`AsyncBufRead`] trait to add
 //! extra methods to any async reader:
 //!
-//! ```no_run,ignore-wasm
+//! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::io::{self, BufReader, AsyncBufReadExt};
 //! use tokio::fs::File;
 //!
@@ -88,13 +93,16 @@
 //!     println!("{}", buffer);
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! [`BufWriter`] doesn't add any new ways of writing; it just buffers every call
 //! to [`write`](crate::io::AsyncWriteExt::write). However, you **must** flush
 //! [`BufWriter`] to ensure that any buffered data is written.
 //!
-//! ```no_run,ignore-wasm
+//! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::io::{self, BufWriter, AsyncWriteExt};
 //! use tokio::fs::File;
 //!
@@ -114,6 +122,7 @@
 //!
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! [stdbuf]: std::io#bufreader-and-bufwriter

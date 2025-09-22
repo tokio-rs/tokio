@@ -51,7 +51,9 @@ impl Handle {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// let rt = Runtime::new().unwrap();
@@ -60,6 +62,7 @@ impl Handle {
     /// tokio::spawn(async {
     ///     println!("Hello world!");
     /// });
+    /// # }
     /// ```
     ///
     /// Do **not** do the following, this shows a scenario that will result in a
@@ -105,7 +108,9 @@ impl Handle {
     /// This can be used to obtain the handle of the surrounding runtime from an async
     /// block or function running on that runtime.
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use std::thread;
     /// # use tokio::runtime::Runtime;
     /// # fn dox() {
@@ -133,6 +138,7 @@ impl Handle {
     /// });
     /// # handle.join().unwrap();
     /// # });
+    /// # }
     /// # }
     /// ```
     #[track_caller]
@@ -169,7 +175,9 @@ impl Handle {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
@@ -182,6 +190,7 @@ impl Handle {
     /// handle.spawn(async {
     ///     println!("now running on a worker thread");
     /// });
+    /// # }
     /// # }
     /// ```
     #[track_caller]
@@ -203,7 +212,9 @@ impl Handle {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
@@ -217,6 +228,8 @@ impl Handle {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
+    /// # }
+    /// ```
     #[track_caller]
     pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
@@ -255,7 +268,9 @@ impl Handle {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// // Create the runtime
@@ -268,11 +283,14 @@ impl Handle {
     /// handle.block_on(async {
     ///     println!("hello");
     /// });
+    /// # }
     /// ```
     ///
     /// Or using `Handle::current`:
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Handle;
     ///
     /// #[tokio::main]
@@ -285,6 +303,7 @@ impl Handle {
     ///         });
     ///     });
     /// }
+    /// # }
     /// ```
     ///
     /// [`JoinError`]: struct@crate::task::JoinError
@@ -386,13 +405,16 @@ impl Handle {
     /// }
     /// ```
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::{Handle, RuntimeFlavor};
     ///
     /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
     /// async fn main() {
     ///   assert_eq!(RuntimeFlavor::MultiThread, Handle::current().runtime_flavor());
     /// }
+    /// # }
     /// ```
     pub fn runtime_flavor(&self) -> RuntimeFlavor {
         match self.inner {

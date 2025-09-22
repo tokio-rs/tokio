@@ -140,7 +140,9 @@
 //! **Example:** sending data from many tasks over a single socket using message
 //! passing.
 //!
-//! ```no_run,ignore-wasm
+//! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::io::{self, AsyncWriteExt};
 //! use tokio::net::TcpStream;
 //! use tokio::sync::mpsc;
@@ -172,6 +174,7 @@
 //!
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! The [`mpsc`] and [`oneshot`] channels can be combined to provide a request /

@@ -132,7 +132,9 @@ cfg_rt! {
     /// and communicate with it using an [`mpsc`] channel.
     ///
     /// The following example puts the `LocalSet` inside a new thread.
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Builder;
     /// use tokio::sync::{mpsc, oneshot};
     /// use tokio::task::LocalSet;
@@ -212,6 +214,7 @@ cfg_rt! {
     ///     let eleven = response.await.unwrap();
     ///     assert_eq!(eleven, 11);
     /// }
+    /// # }
     /// ```
     ///
     /// [`Send`]: trait@std::marker::Send
@@ -625,7 +628,9 @@ impl LocalSet {
     /// })
     /// ```
     /// This, however, will not panic:
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
@@ -640,6 +645,7 @@ impl LocalSet {
     ///     });
     ///     join.await.unwrap();
     /// })
+    /// # }
     /// ```
     ///
     /// [`spawn_local`]: fn@spawn_local

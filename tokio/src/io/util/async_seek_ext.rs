@@ -45,7 +45,9 @@ cfg_io_util! {
         ///
         /// # Examples
         ///
-        /// ```no_run,ignore-wasm
+        /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::fs::File;
         /// use tokio::io::{AsyncSeekExt, AsyncReadExt};
         ///
@@ -58,6 +60,7 @@ cfg_io_util! {
         /// let mut contents = vec![0u8; 10];
         /// file.read_exact(&mut contents).await?;
         /// # Ok(())
+        /// # }
         /// # }
         /// ```
         fn seek(&mut self, pos: SeekFrom) -> Seek<'_, Self>

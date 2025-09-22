@@ -488,7 +488,9 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
@@ -515,6 +517,7 @@ impl<T: ?Sized> RwLock<T> {
     ///     // Assert uncontended.
     ///     assert!(rwlock.try_write().is_ok());
     /// }
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
@@ -830,7 +833,9 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::sync::Arc;
     /// use tokio::{sync::RwLock};
     ///
@@ -859,6 +864,7 @@ impl<T: ?Sized> RwLock<T> {
     ///     let read_lock = rwlock.try_read().unwrap();
     ///     assert_eq!(*read_lock, 2);
     /// }
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]

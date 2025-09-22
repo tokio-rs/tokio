@@ -208,7 +208,9 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// Spawn multiple blocking tasks and wait for them.
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::task::JoinSet;
     ///
     /// #[tokio::main]
@@ -229,6 +231,7 @@ impl<T: 'static> JoinSet<T> {
     ///         assert!(seen[i]);
     ///     }
     /// }
+    /// # }
     /// ```
     ///
     /// # Panics

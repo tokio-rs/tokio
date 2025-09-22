@@ -251,7 +251,9 @@ impl RuntimeMetrics {
         ///
         /// # Examples
         ///
-        /// ```ignore-wasm
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime::Handle;
         ///
         /// # #[tokio::main(flavor = "current_thread")]
@@ -264,6 +266,7 @@ impl RuntimeMetrics {
         ///
         /// let n = metrics.num_blocking_threads();
         /// println!("Runtime has created {} threads", n);
+        /// # }
         /// # }
         /// ```
         pub fn num_blocking_threads(&self) -> usize {
@@ -281,7 +284,9 @@ impl RuntimeMetrics {
         ///
         /// # Examples
         ///
-        /// ```ignore-wasm
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime::Handle;
         ///
         /// #[tokio::main]
@@ -295,6 +300,7 @@ impl RuntimeMetrics {
         ///     let n = metrics.num_idle_blocking_threads();
         ///     println!("Runtime has {} idle blocking thread pool threads", n);
         /// }
+        /// # }
         /// ```
         pub fn num_idle_blocking_threads(&self) -> usize {
             self.handle.inner.num_idle_blocking_threads()

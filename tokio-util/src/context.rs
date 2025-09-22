@@ -36,7 +36,9 @@ pin_project! {
     /// This example creates two runtimes, but only [enables time] on one of
     /// them. It then uses the context of the runtime with the timer enabled to
     /// execute a [`sleep`] future on the runtime with timing disabled.
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::time::{sleep, Duration};
     /// use tokio_util::context::RuntimeExt;
     ///
@@ -56,6 +58,7 @@ pin_project! {
     ///
     /// // Execute the future on rt2.
     /// rt2.block_on(fut);
+    /// # }
     /// ```
     ///
     /// [`Handle`]: struct@tokio::runtime::Handle
@@ -87,7 +90,9 @@ impl<F> TokioContext<F> {
     ///
     /// [`RuntimeExt::wrap`]: fn@RuntimeExt::wrap
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::time::{sleep, Duration};
     /// use tokio_util::context::TokioContext;
     ///
@@ -109,6 +114,7 @@ impl<F> TokioContext<F> {
     ///
     /// // Execute the future on rt2.
     /// rt2.block_on(fut);
+    /// # }
     /// ```
     pub fn new(future: F, handle: Handle) -> TokioContext<F> {
         TokioContext {
@@ -152,7 +158,9 @@ pub trait RuntimeExt {
     /// them. It then uses the context of the runtime with the timer enabled to
     /// execute a [`sleep`] future on the runtime with timing disabled.
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::time::{sleep, Duration};
     /// use tokio_util::context::RuntimeExt;
     ///
@@ -172,6 +180,7 @@ pub trait RuntimeExt {
     ///
     /// // Execute the future on rt2.
     /// rt2.block_on(fut);
+    /// # }
     /// ```
     ///
     /// [`TokioContext`]: struct@crate::context::TokioContext

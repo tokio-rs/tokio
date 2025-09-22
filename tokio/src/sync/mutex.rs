@@ -483,7 +483,9 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::sync::Arc;
     /// use tokio::sync::Mutex;
     ///
@@ -510,7 +512,7 @@ impl<T: ?Sized> Mutex<T> {
     ///     let n = mutex.try_lock().unwrap();
     ///     assert_eq!(*n, 2);
     /// }
-    ///
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
@@ -540,7 +542,9 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::sync::Arc;
     /// use tokio::sync::Mutex;
     ///
@@ -567,7 +571,7 @@ impl<T: ?Sized> Mutex<T> {
     ///     let n = mutex.try_lock().unwrap();
     ///     assert_eq!(*n, 2);
     /// }
-    ///
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]

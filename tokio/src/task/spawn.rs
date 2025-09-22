@@ -34,7 +34,9 @@ cfg_rt! {
     /// In this example, a server is started and `spawn` is used to start a new task
     /// that processes each received connection.
     ///
-    /// ```no_run,ignore-wasm
+    /// ```no_run
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::net::{TcpListener, TcpStream};
     ///
     /// use std::io;
@@ -57,6 +59,7 @@ cfg_rt! {
     ///         });
     ///     }
     /// }
+    /// # }
     /// ```
     ///
     /// To run multiple tasks in parallel and receive their results, join

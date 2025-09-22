@@ -105,7 +105,9 @@ cfg_rt! {
     ///
     /// If the task panics, the error is a [`JoinError`] that contains the panic:
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::task;
     /// use std::io;
     /// use std::panic;
@@ -120,7 +122,7 @@ cfg_rt! {
     ///     assert!(err.is_panic());
     ///     Ok(())
     /// }
-    ///
+    /// # }
     /// ```
     /// Child being detached and outliving its parent:
     ///
