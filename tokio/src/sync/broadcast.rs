@@ -566,7 +566,7 @@ impl<T> Sender<T> {
             tail: Mutex::new(Tail {
                 pos: 0,
                 rx_cnt: receiver_count,
-                closed: false,
+                closed: receiver_count == 0,
                 waiters: LinkedList::new(),
             }),
             num_tx: AtomicUsize::new(1),

@@ -348,7 +348,13 @@ impl Builder {
         ))]
         self.enable_io();
 
-        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
         self.enable_io_uring();
 
         #[cfg(feature = "time")]
@@ -1025,8 +1031,10 @@ impl Builder {
     /// tasks. Setting the interval to a smaller value increases the fairness of the scheduler,
     /// at the cost of more synchronization overhead. That can be beneficial for prioritizing
     /// getting started on new work, especially if tasks frequently yield rather than complete
-    /// or await on further I/O. Conversely, a higher value prioritizes existing work, and
-    /// is a good choice when most tasks quickly complete polling.
+    /// or await on further I/O. Setting the interval to `1` will prioritize the global queue and
+    /// tasks from the local queue will be executed only if the global queue is empty.
+    /// Conversely, a higher value prioritizes existing work, and is a good choice when most
+    /// tasks quickly complete polling.
     ///
     /// [the module documentation]: crate::runtime#multi-threaded-runtime-behavior-at-the-time-of-writing
     ///
@@ -1660,7 +1668,7 @@ cfg_time! {
     }
 }
 
-cfg_tokio_uring! {
+cfg_io_uring! {
     impl Builder {
         /// Enables the tokio's io_uring driver.
         ///
@@ -1676,7 +1684,7 @@ cfg_tokio_uring! {
         ///     .build()
         ///     .unwrap();
         /// ```
-        #[cfg_attr(docsrs, doc(cfg(tokio_uring)))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "io-uring")))]
         pub fn enable_io_uring(&mut self) -> &mut Self {
             // Currently, the uring flag is equivalent to `enable_io`.
             self.enable_io = true;

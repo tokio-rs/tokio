@@ -247,3 +247,23 @@ async fn empty_try_join() {
     assert_eq!(tokio::try_join!() as Result<_, ()>, Ok(()));
     assert_eq!(tokio::try_join!(biased;) as Result<_, ()>, Ok(()));
 }
+
+// Regression test for: https://github.com/tokio-rs/tokio/issues/7637
+// We want to make sure that the `const COUNT: u32` declaration
+// inside the macro body doesn't leak to the caller to cause compiler failures
+// or variable shadowing.
+#[tokio::test]
+async fn caller_names_const_count() {
+    let (tx, rx) = oneshot::channel::<u32>();
+
+    const COUNT: u32 = 2;
+
+    let mut try_join = task::spawn(async { tokio::try_join!(async { tx.send(COUNT) }) });
+    assert_ready!(try_join.poll()).unwrap();
+
+    let res = rx.await.unwrap();
+
+    // This passing demonstrates that the const in the macro is
+    // not shadowing the caller-specified COUNT value
+    assert_eq!(2, res);
+}

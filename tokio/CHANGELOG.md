@@ -11,7 +11,7 @@
 
 This release adds `poll_proceed` and `cooperative` to the `coop` module for
 cooperative scheduling, adds `SetOnce` to the `sync` module which provides
-similar functionality to [`std::sync::OnceLock], and adds a new method
+similar functionality to [`std::sync::OnceLock`], and adds a new method
 `sync::Notify::notified_owned()` which returns an `OwnedNotified` without
 a lifetime parameter.
 
@@ -32,9 +32,11 @@ a lifetime parameter.
 - metrics: fix listed feature requirements for some metrics ([#7449])
 - runtime: improve safety comments of `Readiness<'_>` ([#7415])
 
+[#7117]: https://github.com/tokio-rs/tokio/pull/7117
 [#7405]: https://github.com/tokio-rs/tokio/pull/7405
 [#7415]: https://github.com/tokio-rs/tokio/pull/7415
 [#7418]: https://github.com/tokio-rs/tokio/pull/7418
+[#7443]: https://github.com/tokio-rs/tokio/pull/7443
 [#7449]: https://github.com/tokio-rs/tokio/pull/7449
 [#7450]: https://github.com/tokio-rs/tokio/pull/7450
 [#7465]: https://github.com/tokio-rs/tokio/pull/7465
@@ -48,7 +50,7 @@ locations in Tracing events.
 
 ## Unstable
 
-- runtime: add `TaskMeta::spawn_location` tracking where a task was spawned
+- runtime: add `TaskMeta::spawned_at` tracking where a task was spawned
   ([#7440])
 
 [#7440]: https://github.com/tokio-rs/tokio/pull/7440
