@@ -189,19 +189,15 @@ impl<T> JoinQueue<T> {
     /// Returns `None` if the queue is empty or if the next task is not yet ready.
     pub fn try_join_next(&mut self) -> Option<Result<T, JoinError>> {
         let jh = self.0.front_mut()?;
-        if jh.is_finished() {
-            // Since this function is not async and cannot be forced to yield, we should
-            // disable budgeting when we want to check for the `JoinHandle` readiness.
-            let jh = tokio::task::coop::unconstrained(jh);
-            let res = jh.now_or_never()?;
-            // Use `detach` to avoid calling `abort` on a task that has already completed.
-            // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
-            // we only need to drop the `JoinHandle` for cleanup.
-            drop(self.0.pop_front().unwrap().detach());
-            Some(res)
-        } else {
-            None
-        }
+        // Since this function is not async and cannot be forced to yield, we should
+        // disable budgeting when we want to check for the `JoinHandle` readiness.
+        let jh = tokio::task::coop::unconstrained(jh);
+        let res = jh.now_or_never()?;
+        // Use `detach` to avoid calling `abort` on a task that has already completed.
+        // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
+        // we only need to drop the `JoinHandle` for cleanup.
+        drop(self.0.pop_front().unwrap().detach());
+        Some(res)
     }
 
     /// Tries to join the next task in FIFO order if it has completed and return its output,
@@ -216,21 +212,17 @@ impl<T> JoinQueue<T> {
     /// [`JoinError::id`]: fn@tokio::task::JoinError::id
     pub fn try_join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         let jh = self.0.front_mut()?;
-        if jh.is_finished() {
-            // Since this function is not async and cannot be forced to yield, we should
-            // disable budgeting when we want to check for the `JoinHandle` readiness.
-            let jh = tokio::task::coop::unconstrained(jh);
-            let res = jh.now_or_never()?;
-            // Use `detach` to avoid calling `abort` on a task that has already completed.
-            // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
-            // we only need to drop the `JoinHandle` for cleanup.
-            let jh = self.0.pop_front().unwrap().detach();
-            let id = jh.id();
-            drop(jh);
-            Some(res.map(|output| (id, output)))
-        } else {
-            None
-        }
+        // Since this function is not async and cannot be forced to yield, we should
+        // disable budgeting when we want to check for the `JoinHandle` readiness.
+        let jh = tokio::task::coop::unconstrained(jh);
+        let res = jh.now_or_never()?;
+        // Use `detach` to avoid calling `abort` on a task that has already completed.
+        // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
+        // we only need to drop the `JoinHandle` for cleanup.
+        let jh = self.0.pop_front().unwrap().detach();
+        let id = jh.id();
+        drop(jh);
+        Some(res.map(|output| (id, output)))
     }
 
     /// Aborts all tasks and waits for them to finish shutting down.
