@@ -45,7 +45,7 @@ a lifetime parameter.
 
 This release fixes incorrect spawn locations in runtime task hooks for tasks
 spawned using `tokio::spawn` rather than `Runtime::spawn`. This issue only
-effected the spawn location in `TaskMeta::spawned_at`, and did not effect task
+affected the spawn location in `TaskMeta::spawned_at`, and did not affect task
 locations in Tracing events.
 
 ## Unstable
