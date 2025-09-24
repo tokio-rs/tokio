@@ -210,7 +210,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Check tests --unstable --features ${{ env.TOKIO_STABLE_FEATURES }}
+      - name: Check tests --features ${{ env.TOKIO_STABLE_FEATURES }}
         run: cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
 
   valgrind:
@@ -340,15 +340,13 @@ jobs:
         with:
           tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
-      # Run `tokio` with "unstable" and "taskdump" cfg flags.
+      # Since the internal-mt-counters feature is only for debugging purposes,
+      # we can enable all features including unstable.
       - name: check tokio full --cfg unstable --cfg internal-mt-counters
         run: |
           set -euxo pipefail
-          # taskdump is an unstable feature, but it can only be enabled
-          # by --cfg tokio_taskdump, not by a feature flag, so we can
-          # use $TOKIO_STABLE_FEATURES here.
-          cargo nextest run --features $TOKIO_STABLE_FEATURES
-          cargo test --doc --features $TOKIO_STABLE_FEATURES
+          cargo nextest run --all-features
+          cargo test --doc --all-features
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_internal_mt_counters -Dwarnings
@@ -747,9 +745,7 @@ jobs:
           cargo hack --remove-dev-deps --workspace
           # Update Cargo.lock to minimal version dependencies.
           cargo update -Z minimal-versions
-          # We use `--features "full,test-util"` instead of `--all-features` since
-          # `--all-features` includes `io_uring`, which requires '--cfg tokio_unstable'.
-          cargo hack check -p tokio --features full,test-util --ignore-private
+          cargo hack check -p tokio --features $TOKIO_STABLE_FEATURES --ignore-private
           cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features --ignore-private
       - name: "check --all-features --unstable -Z minimal-versions"
         env:
