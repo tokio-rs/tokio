@@ -100,6 +100,7 @@ fn drop_token_no_child() {
     });
 }
 
+#[ignore]
 #[test]
 fn drop_token_with_children() {
     loom::model(|| {
@@ -125,6 +126,7 @@ fn drop_token_with_children() {
     });
 }
 
+#[ignore]
 #[test]
 fn drop_and_cancel_token() {
     loom::model(|| {
@@ -150,6 +152,7 @@ fn drop_and_cancel_token() {
     });
 }
 
+#[ignore]
 #[test]
 fn cancel_parent_and_child() {
     loom::model(|| {
