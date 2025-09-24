@@ -238,6 +238,8 @@ async fn test_join_queue_try_join_next() {
         let _ = rx3.await;
     });
 
+    // This function also checks that calling `queue.try_join_next()` repeatedly when
+    // no task is ready is idempotent, i.e. that it does not change the queue state.
     fn check_try_join_next_is_noop(queue: &mut JoinQueue<()>) {
         let len = queue.len();
         for _ in 0..5 {
@@ -280,38 +282,38 @@ async fn test_join_queue_try_join_next_disabled_coop() {
     // inside `try_join_next` this test fails on `assert!(coop_count == 0)`.
     const TASK_NUM: u32 = 1000;
 
-    static SEM: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(0);
+    let sem: std::sync::Arc<tokio::sync::Semaphore> =
+        std::sync::Arc::new(tokio::sync::Semaphore::new(0));
 
     let mut queue = JoinQueue::new();
 
     for _ in 0..TASK_NUM {
-        queue.spawn(async {
-            SEM.add_permits(1);
+        let sem = sem.clone();
+        queue.spawn(async move {
+            sem.add_permits(1);
         });
     }
 
-    let _ = SEM.acquire_many(TASK_NUM).await.unwrap();
+    let _ = sem.acquire_many(TASK_NUM).await.unwrap();
 
     let mut count = 0;
     let mut coop_count = 0;
     while !queue.is_empty() {
         match queue.try_join_next() {
-            Some(Ok(())) => {}
+            Some(Ok(())) => count += 1,
             Some(Err(err)) => panic!("failed: {err}"),
             None => {
                 coop_count += 1;
                 tokio::task::yield_now().await;
-                continue;
             }
         }
-        count += 1;
     }
-    assert!(coop_count == 0);
+    assert_eq!(coop_count, 0);
     assert_eq!(count, TASK_NUM);
 }
 
 #[tokio::test]
-async fn test_join_queue_try_join_next_with_id() {
+async fn test_join_queue_try_join_next_with_id_disabled_coop() {
     // Note that this number is large enough to trigger coop as in
     // `test_join_queue_try_join_next_coop` test. Without using
     // `tokio::task::coop::unconstrained` inside `try_join_next_with_id`
@@ -337,17 +339,23 @@ async fn test_join_queue_try_join_next_with_id() {
     send.closed().await;
 
     let mut count = 0;
+    let mut coop_count = 0;
     let mut joined = Vec::with_capacity(TASK_NUM as usize);
-    while let Some(res) = queue.try_join_next_with_id() {
-        match res {
-            Ok((id, ())) => {
+    while !queue.is_empty() {
+        match queue.try_join_next_with_id() {
+            Some(Ok((id, ()))) => {
                 count += 1;
                 joined.push(id);
             }
-            Err(err) => panic!("failed: {err}"),
+            Some(Err(err)) => panic!("failed: {err}"),
+            None => {
+                coop_count += 1;
+                tokio::task::yield_now().await;
+            }
         }
     }
 
+    assert_eq!(coop_count, 0);
     assert_eq!(count, TASK_NUM);
     assert_eq!(joined, spawned);
 }
