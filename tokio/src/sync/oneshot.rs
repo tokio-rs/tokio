@@ -1188,7 +1188,9 @@ impl<T> Receiver<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore-wasm
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::thread;
     /// use tokio::sync::oneshot;
     ///
@@ -1203,6 +1205,7 @@ impl<T> Receiver<T> {
     ///     let _ = tx.send(10);
     ///     sync_code.join().unwrap();
     /// }
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
