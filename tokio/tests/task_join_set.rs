@@ -455,8 +455,8 @@ fn shutdown_spawn_local_local_runtime() {
     });
 }
 
-// Dropping a `JoinSet` created inside a **LocalRuntime**
-// must abort every still-running `!Send` task that was
+// Dropping a `JoinSet` created inside a `LocalRuntime`
+// must abort every still-running task that was
 // added with `JoinSet::spawn_local`.
 #[cfg(tokio_unstable)]
 #[test]

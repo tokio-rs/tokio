@@ -113,6 +113,13 @@ fn test_spawn_local_from_guard_other_thread() {
     spawn_local(async {});
 }
 
+// This test guarantees that **`tokio::task::spawn_local` panics** when it is invoked
+// from a thread that is *not* running the `LocalRuntime` / `LocalSet` to which
+// the task would belong.
+// The test creates a `LocalRuntime` and `LocalSet`, drives the `LocalSet` on the `LocalRuntime`'s thread,
+// then spawns a **separate OS thread** and tries to call
+// `tokio::task::spawn_local` there. `std::panic::catch_unwind` is then used
+// to capture the panic and to assert that it indeed occurs.
 #[test]
 #[cfg_attr(target_family = "wasm", ignore)] // threads not supported
 fn test_spawn_local_panic() {
