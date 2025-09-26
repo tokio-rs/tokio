@@ -192,7 +192,7 @@ fn local_runtime_spawn_and_wait() {
     rt.block_on(async {
         let tracker = TaskTracker::new();
 
-        for _ in 0..5 {
+        for _ in 0..N {
             tracker.spawn(async {});
         }
 
