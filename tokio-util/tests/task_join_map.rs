@@ -4,6 +4,7 @@
 use std::panic::AssertUnwindSafe;
 
 use futures::future::{pending, FutureExt};
+#[cfg(tokio_unstable)]
 use tokio::runtime::LocalRuntime;
 use tokio::sync::oneshot;
 use tokio::task::LocalSet;
