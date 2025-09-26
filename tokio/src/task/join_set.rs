@@ -31,24 +31,24 @@ use crate::util::IdleNotifiedSet;
 /// ```
 /// use tokio::task::JoinSet;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut set = JoinSet::new();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut set = JoinSet::new();
 ///
-///     for i in 0..10 {
-///         set.spawn(async move { i });
-///     }
-///
-///     let mut seen = [false; 10];
-///     while let Some(res) = set.join_next().await {
-///         let idx = res.unwrap();
-///         seen[idx] = true;
-///     }
-///
-///     for i in 0..10 {
-///         assert!(seen[i]);
-///     }
+/// for i in 0..10 {
+///     set.spawn(async move { i });
 /// }
+///
+/// let mut seen = [false; 10];
+/// while let Some(res) = set.join_next().await {
+///     let idx = res.unwrap();
+///     seen[idx] = true;
+/// }
+///
+/// for i in 0..10 {
+///     assert!(seen[i]);
+/// }
+/// # }
 /// ```
 ///
 /// # Task ID guarantees
@@ -219,6 +219,8 @@ impl<T: 'static> JoinSet<T> {
     /// Spawn multiple blocking tasks and wait for them.
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::task::JoinSet;
     ///
     /// #[tokio::main]
@@ -239,6 +241,7 @@ impl<T: 'static> JoinSet<T> {
     ///         assert!(seen[i]);
     ///     }
     /// }
+    /// # }
     /// ```
     ///
     /// # Panics
@@ -396,20 +399,20 @@ impl<T: 'static> JoinSet<T> {
     /// use tokio::task::JoinSet;
     /// use std::time::Duration;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut set = JoinSet::new();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut set = JoinSet::new();
     ///
-    ///     for i in 0..3 {
-    ///        set.spawn(async move {
-    ///            tokio::time::sleep(Duration::from_secs(3 - i)).await;
-    ///            i
-    ///        });
-    ///     }
-    ///
-    ///     let output = set.join_all().await;
-    ///     assert_eq!(output, vec![2, 1, 0]);
+    /// for i in 0..3 {
+    ///     set.spawn(async move {
+    ///         tokio::time::sleep(Duration::from_secs(3 - i)).await;
+    ///         i
+    ///     });
     /// }
+    ///
+    /// let output = set.join_all().await;
+    /// assert_eq!(output, vec![2, 1, 0]);
+    /// # }
     /// ```
     ///
     /// Equivalent implementation of `join_all`, using [`join_next`] and loop.
@@ -418,24 +421,24 @@ impl<T: 'static> JoinSet<T> {
     /// use tokio::task::JoinSet;
     /// use std::panic;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut set = JoinSet::new();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut set = JoinSet::new();
     ///
-    ///     for i in 0..3 {
-    ///        set.spawn(async move {i});
-    ///     }
-    ///
-    ///     let mut output = Vec::new();
-    ///     while let Some(res) = set.join_next().await{
-    ///         match res {
-    ///             Ok(t) => output.push(t),
-    ///             Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
-    ///             Err(err) => panic!("{err}"),
-    ///         }
-    ///     }
-    ///     assert_eq!(output.len(),3);
+    /// for i in 0..3 {
+    ///     set.spawn(async move {i});
     /// }
+    ///
+    /// let mut output = Vec::new();
+    /// while let Some(res) = set.join_next().await{
+    ///     match res {
+    ///         Ok(t) => output.push(t),
+    ///         Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
+    ///         Err(err) => panic!("{err}"),
+    ///     }
+    /// }
+    /// assert_eq!(output.len(),3);
+    /// # }
     /// ```
     /// [`join_next`]: fn@Self::join_next
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
@@ -613,20 +616,20 @@ impl<T> Default for JoinSet<T> {
 /// ```
 /// use tokio::task::JoinSet;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut set: JoinSet<_> = (0..10).map(|i| async move { i }).collect();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut set: JoinSet<_> = (0..10).map(|i| async move { i }).collect();
 ///
-///     let mut seen = [false; 10];
-///     while let Some(res) = set.join_next().await {
-///         let idx = res.unwrap();
-///         seen[idx] = true;
-///     }
-///
-///     for i in 0..10 {
-///         assert!(seen[i]);
-///     }
+/// let mut seen = [false; 10];
+/// while let Some(res) = set.join_next().await {
+///     let idx = res.unwrap();
+///     seen[idx] = true;
 /// }
+///
+/// for i in 0..10 {
+///      assert!(seen[i]);
+/// }
+/// # }
 /// ```
 ///
 /// [`collect`]: std::iter::Iterator::collect

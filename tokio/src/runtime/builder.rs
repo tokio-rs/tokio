@@ -31,6 +31,8 @@ use std::time::Duration;
 /// # Examples
 ///
 /// ```
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use tokio::runtime::Builder;
 ///
 /// fn main() {
@@ -44,6 +46,7 @@ use std::time::Duration;
 ///
 ///     // use runtime ...
 /// }
+/// # }
 /// ```
 pub struct Builder {
     /// Runtime type
@@ -152,6 +155,8 @@ cfg_unstable! {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime::{self, UnhandledPanic};
         ///
         /// # pub fn main() {
@@ -173,6 +178,7 @@ cfg_unstable! {
         ///     // The second task completes normally
         ///     assert!(task2.await.is_ok());
         /// })
+        /// # }
         /// # }
         /// ```
         ///
@@ -324,12 +330,15 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime;
     ///
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .enable_all()
     ///     .build()
     ///     .unwrap();
+    /// # }
     /// ```
     pub fn enable_all(&mut self) -> &mut Self {
         #[cfg(any(
@@ -372,6 +381,8 @@ impl Builder {
     /// ## Multi threaded runtime with 4 threads
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime;
     ///
     /// // This will spawn a work-stealing runtime with 4 worker threads.
@@ -381,6 +392,7 @@ impl Builder {
     ///     .unwrap();
     ///
     /// rt.spawn(async move {});
+    /// # }
     /// ```
     ///
     /// ## Current thread runtime (will only run on the current thread via `Runtime::block_on`)
@@ -466,12 +478,15 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_name("my-pool")
     ///     .build();
+    /// # }
     /// # }
     /// ```
     pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
@@ -487,6 +502,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     /// # pub fn main() {
@@ -497,6 +514,7 @@ impl Builder {
     ///        format!("my-pool-{}", id)
     ///     })
     ///     .build();
+    /// # }
     /// # }
     /// ```
     pub fn thread_name_fn<F>(&mut self, f: F) -> &mut Self
@@ -518,12 +536,15 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_stack_size(32 * 1024)
     ///     .build();
+    /// # }
     /// # }
     /// ```
     pub fn thread_stack_size(&mut self, val: usize) -> &mut Self {
@@ -539,6 +560,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -546,6 +569,7 @@ impl Builder {
     ///         println!("thread started");
     ///     })
     ///     .build();
+    /// # }
     /// # }
     /// ```
     #[cfg(not(loom))]
@@ -564,6 +588,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -571,6 +597,7 @@ impl Builder {
     ///         println!("thread stopping");
     ///     })
     ///     .build();
+    /// # }
     /// # }
     /// ```
     #[cfg(not(loom))]
@@ -596,6 +623,8 @@ impl Builder {
     ///
     /// ## Multithreaded executor
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use std::sync::Arc;
     /// # use std::sync::atomic::{AtomicBool, Ordering};
     /// # use tokio::runtime;
@@ -621,6 +650,7 @@ impl Builder {
     /// runtime.block_on(async {
     ///    barrier.wait().await;
     /// })
+    /// # }
     /// # }
     /// ```
     /// ## Current thread executor
@@ -672,6 +702,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -684,6 +716,7 @@ impl Builder {
     ///    tokio::task::yield_now().await;
     ///    println!("Hello from Tokio!");
     /// })
+    /// # }
     /// # }
     /// ```
     #[cfg(not(loom))]
@@ -760,6 +793,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use std::sync::{atomic::AtomicUsize, Arc};
     /// # use tokio::task::yield_now;
     /// # pub fn main() {
@@ -777,6 +812,7 @@ impl Builder {
     /// });
     /// let _ = rt.block_on(task);
     ///
+    /// # }
     /// # }
     /// ```
     #[cfg(tokio_unstable)]
@@ -804,6 +840,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use std::sync::{atomic::AtomicUsize, Arc};
     /// # use tokio::task::yield_now;
     /// # pub fn main() {
@@ -821,6 +859,7 @@ impl Builder {
     /// });
     /// let _ = rt.block_on(task);
     ///
+    /// # }
     /// # }
     /// ```
     #[cfg(tokio_unstable)]
@@ -889,6 +928,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Builder;
     ///
     /// let rt  = Builder::new_multi_thread().build().unwrap();
@@ -896,6 +937,7 @@ impl Builder {
     /// rt.block_on(async {
     ///     println!("Hello from the Tokio runtime");
     /// });
+    /// # }
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
@@ -961,12 +1003,15 @@ impl Builder {
     /// # Example
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # use std::time::Duration;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_keep_alive(Duration::from_millis(100))
     ///     .build();
+    /// # }
     /// # }
     /// ```
     pub fn thread_keep_alive(&mut self, duration: Duration) -> &mut Self {
@@ -1000,11 +1045,14 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .global_queue_interval(31)
     ///     .build();
+    /// # }
     /// # }
     /// ```
     #[track_caller]
@@ -1034,11 +1082,14 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .event_interval(31)
     ///     .build();
+    /// # }
     /// # }
     /// ```
     pub fn event_interval(&mut self, val: u32) -> &mut Self {
@@ -1144,12 +1195,15 @@ impl Builder {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
         ///     .disable_lifo_slot()
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         ///
         /// [tokio-rs/tokio-metrics]: https://github.com/tokio-rs/tokio-metrics
@@ -1214,6 +1268,8 @@ impl Builder {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
@@ -1226,6 +1282,7 @@ impl Builder {
         /// # assert_eq!(m.poll_time_histogram_num_buckets(), 10);
         /// # assert_eq!(m.poll_time_histogram_bucket_range(0), us(0)..us(100));
         /// # assert_eq!(m.poll_time_histogram_bucket_range(1), us(100)..us(200));
+        /// # }
         /// ```
         ///
         /// [`Handle::metrics()`]: crate::runtime::Handle::metrics
@@ -1260,6 +1317,8 @@ impl Builder {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime::{self, HistogramScale};
         ///
         /// # #[allow(deprecated)]
@@ -1268,6 +1327,7 @@ impl Builder {
         ///     .metrics_poll_count_histogram_scale(HistogramScale::Log)
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_scale(&mut self, histogram_scale: crate::runtime::HistogramScale) -> &mut Self {
@@ -1284,6 +1344,8 @@ impl Builder {
         /// # Examples
         /// Configure a [`LogHistogram`] with [default configuration]:
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
         ///
@@ -1294,10 +1356,13 @@ impl Builder {
         ///     )
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         ///
         /// Configure a linear histogram with 100 buckets, each 10μs wide
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         /// use std::time::Duration;
         /// use tokio::runtime::HistogramConfiguration;
@@ -1309,6 +1374,7 @@ impl Builder {
         ///     )
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         ///
         /// Configure a [`LogHistogram`] with the following settings:
@@ -1316,6 +1382,8 @@ impl Builder {
         /// - Max error of 0.1
         /// - No more than 1024 buckets
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use std::time::Duration;
         /// use tokio::runtime;
         /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
@@ -1333,6 +1401,7 @@ impl Builder {
         ///     )
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         ///
         /// When migrating from the legacy histogram ([`HistogramScale::Log`]) and wanting
@@ -1382,6 +1451,8 @@ impl Builder {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         /// use std::time::Duration;
         ///
@@ -1391,6 +1462,7 @@ impl Builder {
         ///     .metrics_poll_count_histogram_resolution(Duration::from_micros(100))
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_resolution(&mut self, resolution: Duration) -> &mut Self {
@@ -1417,6 +1489,8 @@ impl Builder {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         ///
         /// # #[allow(deprecated)]
@@ -1425,6 +1499,7 @@ impl Builder {
         ///     .metrics_poll_count_histogram_buckets(15)
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_buckets(&mut self, buckets: usize) -> &mut Self {
@@ -1576,12 +1651,15 @@ cfg_time! {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
         ///     .enable_time()
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         pub fn enable_time(&mut self) -> &mut Self {
             self.enable_time = true;

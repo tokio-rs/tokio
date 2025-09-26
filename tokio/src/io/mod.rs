@@ -36,6 +36,8 @@
 //! can do the same with [`tokio::fs::File`][`File`]:
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::io::{self, AsyncReadExt};
 //! use tokio::fs::File;
 //!
@@ -50,6 +52,7 @@
 //!     println!("The bytes: {:?}", &buffer[..n]);
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! [`File`]: crate::fs::File
@@ -73,6 +76,8 @@
 //! extra methods to any async reader:
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::io::{self, BufReader, AsyncBufReadExt};
 //! use tokio::fs::File;
 //!
@@ -88,6 +93,7 @@
 //!     println!("{}", buffer);
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! [`BufWriter`] doesn't add any new ways of writing; it just buffers every call
@@ -95,6 +101,8 @@
 //! [`BufWriter`] to ensure that any buffered data is written.
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::io::{self, BufWriter, AsyncWriteExt};
 //! use tokio::fs::File;
 //!
@@ -114,6 +122,7 @@
 //!
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! [stdbuf]: std::io#bufreader-and-bufwriter
