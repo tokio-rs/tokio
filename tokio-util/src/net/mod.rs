@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! TCP/UDP/Unix helpers for tokio.
 
 use crate::either::Either;

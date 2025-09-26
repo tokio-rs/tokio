@@ -57,6 +57,9 @@ futures-test = "0.3.5"
 parking_lot = "0.12.0"
 tempfile = "3.1.0"
 
+[target.'cfg(loom)'.dev-dependencies]
+loom = { version = "0.7", features = ["futures", "checkpoint"] }
+
 [package.metadata.docs.rs]
 all-features = true
 # enable unstable features in the documentation
