@@ -449,7 +449,7 @@ fn shutdown_spawn_local_local_runtime() {
         for rx in receivers {
             assert!(
                 rx.await.is_err(),
-                "task should have been aborted and sender dropped",
+                "the task should have been aborted and the sender dropped",
             );
         }
     });
@@ -485,7 +485,7 @@ fn drop_spawn_local_local_runtime() {
         for rx in receivers {
             assert!(
                 rx.await.is_err(),
-                "task should have been aborted and sender dropped",
+                "the task should have been aborted and the sender dropped",
             );
         }
     });
@@ -618,7 +618,7 @@ async fn shutdown_spawn_local_on() {
             for rx in receivers {
                 assert!(
                     rx.await.is_err(),
-                    "task should have been aborted and sender dropped"
+                    "the task should have been aborted and the sender dropped"
                 );
             }
         })
@@ -657,7 +657,7 @@ async fn drop_spawn_local_on() {
             for rx in receivers {
                 assert!(
                     rx.await.is_err(),
-                    "task should have been aborted and sender dropped"
+                    "the task should have been aborted and the sender dropped"
                 );
             }
         })
@@ -730,7 +730,7 @@ async fn drop_spawn_local_on_running_localset() {
             for rx in receivers {
                 assert!(
                     rx.await.is_err(),
-                    "task should have been aborted and sender dropped"
+                    "the task should have been aborted and the sender dropped"
                 );
             }
         })
