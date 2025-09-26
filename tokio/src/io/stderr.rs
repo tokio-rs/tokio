@@ -79,7 +79,7 @@ cfg_io_std! {
 
 #[cfg(unix)]
 mod sys {
-    use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, RawFd};
+    use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
 
     use super::Stderr;
 

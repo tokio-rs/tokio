@@ -251,7 +251,7 @@ async fn file_debug_fmt() {
 #[tokio::test]
 #[cfg(unix)]
 async fn unix_fd_is_valid() {
-    use std::os::unix::io::AsRawFd;
+    use std::os::fd::AsRawFd;
     let tempfile = tempfile();
 
     let file = File::create(tempfile.path()).await.unwrap();
@@ -261,7 +261,7 @@ async fn unix_fd_is_valid() {
 #[tokio::test]
 #[cfg(unix)]
 async fn read_file_from_unix_fd() {
-    use std::os::unix::io::{FromRawFd, IntoRawFd};
+    use std::os::fd::{FromRawFd, IntoRawFd};
 
     let mut tempfile = tempfile();
     tempfile.write_all(HELLO).unwrap();

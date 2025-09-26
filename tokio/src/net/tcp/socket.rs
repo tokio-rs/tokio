@@ -5,7 +5,7 @@ use std::io;
 use std::net::SocketAddr;
 
 #[cfg(unix)]
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::time::Duration;
 
 cfg_windows! {
@@ -670,7 +670,7 @@ impl TcpSocket {
         }
         #[cfg(unix)]
         let mio = {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
 
             let raw_fd = self.inner.into_raw_fd();
             unsafe { mio::net::TcpStream::from_raw_fd(raw_fd) }
@@ -726,7 +726,7 @@ impl TcpSocket {
         self.inner.listen(backlog as i32)?;
         #[cfg(unix)]
         let mio = {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
 
             let raw_fd = self.inner.into_raw_fd();
             unsafe { mio::net::TcpListener::from_raw_fd(raw_fd) }
@@ -780,7 +780,7 @@ impl TcpSocket {
     pub fn from_std_stream(std_stream: std::net::TcpStream) -> TcpSocket {
         #[cfg(unix)]
         {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
 
             let raw_fd = std_stream.into_raw_fd();
             unsafe { TcpSocket::from_raw_fd(raw_fd) }
