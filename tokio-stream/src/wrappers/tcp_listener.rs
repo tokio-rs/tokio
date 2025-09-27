@@ -11,6 +11,8 @@ use tokio::net::{TcpListener, TcpStream};
 /// Accept connections from both IPv4 and IPv6 listeners in the same loop:
 ///
 /// ```no_run
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use std::net::{Ipv4Addr, Ipv6Addr};
 ///
 /// use tokio::net::TcpListener;
@@ -30,6 +32,7 @@ use tokio::net::{TcpListener, TcpStream};
 ///     println!("accepted connection; peer address = {peer_addr}");
 /// }
 /// # Ok(())
+/// # }
 /// # }
 /// ```
 ///

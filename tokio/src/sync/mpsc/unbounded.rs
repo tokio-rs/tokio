@@ -29,18 +29,18 @@ pub struct UnboundedSender<T> {
 /// ```
 /// use tokio::sync::mpsc::unbounded_channel;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, _rx) = unbounded_channel::<i32>();
-///     let tx_weak = tx.downgrade();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, _rx) = unbounded_channel::<i32>();
+/// let tx_weak = tx.downgrade();
 ///
-///     // Upgrading will succeed because `tx` still exists.
-///     assert!(tx_weak.upgrade().is_some());
+/// // Upgrading will succeed because `tx` still exists.
+/// assert!(tx_weak.upgrade().is_some());
 ///
-///     // If we drop `tx`, then it will fail.
-///     drop(tx);
-///     assert!(tx_weak.clone().upgrade().is_none());
-/// }
+/// // If we drop `tx`, then it will fail.
+/// drop(tx);
+/// assert!(tx_weak.clone().upgrade().is_none());
+/// # }
 /// ```
 pub struct WeakUnboundedSender<T> {
     chan: Arc<chan::Chan<T, Semaphore>>,
@@ -135,17 +135,17 @@ impl<T> UnboundedReceiver<T> {
     /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::unbounded_channel();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::unbounded_channel();
     ///
-    ///     tokio::spawn(async move {
-    ///         tx.send("hello").unwrap();
-    ///     });
+    /// tokio::spawn(async move {
+    ///     tx.send("hello").unwrap();
+    /// });
     ///
-    ///     assert_eq!(Some("hello"), rx.recv().await);
-    ///     assert_eq!(None, rx.recv().await);
-    /// }
+    /// assert_eq!(Some("hello"), rx.recv().await);
+    /// assert_eq!(None, rx.recv().await);
+    /// # }
     /// ```
     ///
     /// Values are buffered:
@@ -153,16 +153,16 @@ impl<T> UnboundedReceiver<T> {
     /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::unbounded_channel();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::unbounded_channel();
     ///
-    ///     tx.send("hello").unwrap();
-    ///     tx.send("world").unwrap();
+    /// tx.send("hello").unwrap();
+    /// tx.send("world").unwrap();
     ///
-    ///     assert_eq!(Some("hello"), rx.recv().await);
-    ///     assert_eq!(Some("world"), rx.recv().await);
-    /// }
+    /// assert_eq!(Some("hello"), rx.recv().await);
+    /// assert_eq!(Some("world"), rx.recv().await);
+    /// # }
     /// ```
     pub async fn recv(&mut self) -> Option<T> {
         use std::future::poll_fn;
@@ -203,40 +203,40 @@ impl<T> UnboundedReceiver<T> {
     /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut buffer: Vec<&str> = Vec::with_capacity(2);
-    ///     let limit = 2;
-    ///     let (tx, mut rx) = mpsc::unbounded_channel();
-    ///     let tx2 = tx.clone();
-    ///     tx2.send("first").unwrap();
-    ///     tx2.send("second").unwrap();
-    ///     tx2.send("third").unwrap();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut buffer: Vec<&str> = Vec::with_capacity(2);
+    /// let limit = 2;
+    /// let (tx, mut rx) = mpsc::unbounded_channel();
+    /// let tx2 = tx.clone();
+    /// tx2.send("first").unwrap();
+    /// tx2.send("second").unwrap();
+    /// tx2.send("third").unwrap();
     ///
-    ///     // Call `recv_many` to receive up to `limit` (2) values.
-    ///     assert_eq!(2, rx.recv_many(&mut buffer, limit).await);
-    ///     assert_eq!(vec!["first", "second"], buffer);
+    /// // Call `recv_many` to receive up to `limit` (2) values.
+    /// assert_eq!(2, rx.recv_many(&mut buffer, limit).await);
+    /// assert_eq!(vec!["first", "second"], buffer);
     ///
-    ///     // If the buffer is full, the next call to `recv_many`
-    ///     // reserves additional capacity.
-    ///     assert_eq!(1, rx.recv_many(&mut buffer, limit).await);
+    /// // If the buffer is full, the next call to `recv_many`
+    /// // reserves additional capacity.
+    /// assert_eq!(1, rx.recv_many(&mut buffer, limit).await);
     ///
-    ///     tokio::spawn(async move {
-    ///         tx.send("fourth").unwrap();
-    ///     });
+    /// tokio::spawn(async move {
+    ///     tx.send("fourth").unwrap();
+    /// });
     ///
-    ///     // 'tx' is dropped, but `recv_many`
-    ///     // is guaranteed not to return 0 as the channel
-    ///     // is not yet closed.
-    ///     assert_eq!(1, rx.recv_many(&mut buffer, limit).await);
-    ///     assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
+    /// // 'tx' is dropped, but `recv_many`
+    /// // is guaranteed not to return 0 as the channel
+    /// // is not yet closed.
+    /// assert_eq!(1, rx.recv_many(&mut buffer, limit).await);
+    /// assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
     ///
-    ///     // Once the last sender is dropped, the channel is
-    ///     // closed and `recv_many` returns 0, capacity unchanged.
-    ///     drop(tx2);
-    ///     assert_eq!(0, rx.recv_many(&mut buffer, limit).await);
-    ///     assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
-    /// }
+    /// // Once the last sender is dropped, the channel is
+    /// // closed and `recv_many` returns 0, capacity unchanged.
+    /// drop(tx2);
+    /// assert_eq!(0, rx.recv_many(&mut buffer, limit).await);
+    /// assert_eq!(vec!["first", "second", "third", "fourth"], buffer);
+    /// # }
     /// ```
     pub async fn recv_many(&mut self, buffer: &mut Vec<T>, limit: usize) -> usize {
         use std::future::poll_fn;
@@ -266,22 +266,22 @@ impl<T> UnboundedReceiver<T> {
     /// use tokio::sync::mpsc;
     /// use tokio::sync::mpsc::error::TryRecvError;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = mpsc::unbounded_channel();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = mpsc::unbounded_channel();
     ///
-    ///     tx.send("hello").unwrap();
+    /// tx.send("hello").unwrap();
     ///
-    ///     assert_eq!(Ok("hello"), rx.try_recv());
-    ///     assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    /// assert_eq!(Ok("hello"), rx.try_recv());
+    /// assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
     ///
-    ///     tx.send("hello").unwrap();
-    ///     // Drop the last sender, closing the channel.
-    ///     drop(tx);
+    /// tx.send("hello").unwrap();
+    /// // Drop the last sender, closing the channel.
+    /// drop(tx);
     ///
-    ///     assert_eq!(Ok("hello"), rx.try_recv());
-    ///     assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
-    /// }
+    /// assert_eq!(Ok("hello"), rx.try_recv());
+    /// assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+    /// # }
     /// ```
     pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         self.chan.try_recv()
@@ -297,6 +297,8 @@ impl<T> UnboundedReceiver<T> {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::thread;
     /// use tokio::sync::mpsc;
     ///
@@ -311,6 +313,7 @@ impl<T> UnboundedReceiver<T> {
     ///     let _ = tx.send(10);
     ///     sync_code.join().unwrap();
     /// }
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
@@ -352,15 +355,15 @@ impl<T> UnboundedReceiver<T> {
     /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (_tx, mut rx) = mpsc::unbounded_channel::<()>();
-    ///     assert!(!rx.is_closed());
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (_tx, mut rx) = mpsc::unbounded_channel::<()>();
+    /// assert!(!rx.is_closed());
     ///
-    ///     rx.close();
+    /// rx.close();
     ///
-    ///     assert!(rx.is_closed());
-    /// }
+    /// assert!(rx.is_closed());
+    /// # }
     /// ```
     pub fn is_closed(&self) -> bool {
         self.chan.is_closed()
@@ -374,14 +377,14 @@ impl<T> UnboundedReceiver<T> {
     /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = mpsc::unbounded_channel();
-    ///     assert!(rx.is_empty());
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = mpsc::unbounded_channel();
+    /// assert!(rx.is_empty());
     ///
-    ///     tx.send(0).unwrap();
-    ///     assert!(!rx.is_empty());
-    /// }
+    /// tx.send(0).unwrap();
+    /// assert!(!rx.is_empty());
+    /// # }
     ///
     /// ```
     pub fn is_empty(&self) -> bool {
@@ -394,14 +397,14 @@ impl<T> UnboundedReceiver<T> {
     /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = mpsc::unbounded_channel();
-    ///     assert_eq!(0, rx.len());
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = mpsc::unbounded_channel();
+    /// assert_eq!(0, rx.len());
     ///
-    ///     tx.send(0).unwrap();
-    ///     assert_eq!(1, rx.len());
-    /// }
+    /// tx.send(0).unwrap();
+    /// assert_eq!(1, rx.len());
+    /// # }
     /// ```
     pub fn len(&self) -> usize {
         self.chan.len()
@@ -455,6 +458,8 @@ impl<T> UnboundedReceiver<T> {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::task::{Context, Poll};
     /// use std::pin::Pin;
     /// use tokio::sync::mpsc;
@@ -480,25 +485,26 @@ impl<T> UnboundedReceiver<T> {
     ///     }
     /// }
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = mpsc::unbounded_channel::<i32>();
-    ///     let mut buffer = Vec::new();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = mpsc::unbounded_channel::<i32>();
+    /// let mut buffer = Vec::new();
     ///
-    ///     let my_receiver_future = MyReceiverFuture {
-    ///         receiver: rx,
-    ///         buffer: &mut buffer,
-    ///         limit: 3,
-    ///     };
+    /// let my_receiver_future = MyReceiverFuture {
+    ///     receiver: rx,
+    ///     buffer: &mut buffer,
+    ///     limit: 3,
+    /// };
     ///
-    ///     for i in 0..10 {
-    ///         tx.send(i).expect("Unable to send integer");
-    ///     }
-    ///
-    ///     let count = my_receiver_future.await;
-    ///     assert_eq!(count, 3);
-    ///     assert_eq!(buffer, vec![0,1,2])
+    /// for i in 0..10 {
+    ///     tx.send(i).expect("Unable to send integer");
     /// }
+    ///
+    /// let count = my_receiver_future.await;
+    /// assert_eq!(count, 3);
+    /// assert_eq!(buffer, vec![0,1,2])
+    /// # }
+    /// # }
     /// ```
     pub fn poll_recv_many(
         &mut self,
@@ -592,26 +598,26 @@ impl<T> UnboundedSender<T> {
     /// ```
     /// use tokio::sync::mpsc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx1, rx) = mpsc::unbounded_channel::<()>();
-    ///     let tx2 = tx1.clone();
-    ///     let tx3 = tx1.clone();
-    ///     let tx4 = tx1.clone();
-    ///     let tx5 = tx1.clone();
-    ///     tokio::spawn(async move {
-    ///         drop(rx);
-    ///     });
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx1, rx) = mpsc::unbounded_channel::<()>();
+    /// let tx2 = tx1.clone();
+    /// let tx3 = tx1.clone();
+    /// let tx4 = tx1.clone();
+    /// let tx5 = tx1.clone();
+    /// tokio::spawn(async move {
+    ///     drop(rx);
+    /// });
     ///
-    ///     futures::join!(
-    ///         tx1.closed(),
-    ///         tx2.closed(),
-    ///         tx3.closed(),
-    ///         tx4.closed(),
-    ///         tx5.closed()
-    ///     );
-    ////     println!("Receiver dropped");
-    /// }
+    /// futures::join!(
+    ///     tx1.closed(),
+    ///     tx2.closed(),
+    ///     tx3.closed(),
+    ///     tx4.closed(),
+    ///     tx5.closed()
+    /// );
+    /// println!("Receiver dropped");
+    /// # }
     /// ```
     pub async fn closed(&self) {
         self.chan.closed().await;

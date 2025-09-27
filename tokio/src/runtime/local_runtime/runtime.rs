@@ -313,6 +313,8 @@ impl LocalRuntime {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::LocalRuntime;
     /// use tokio::task;
     ///
@@ -330,6 +332,7 @@ impl LocalRuntime {
     ///
     ///    runtime.shutdown_timeout(Duration::from_millis(100));
     /// }
+    /// # }
     /// ```
     pub fn shutdown_timeout(mut self, duration: Duration) {
         // Wakeup and shutdown all the worker threads

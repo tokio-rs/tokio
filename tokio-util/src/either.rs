@@ -46,18 +46,18 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf, Result}
 /// # async fn some_async_function() -> u32 { 10 }
 /// # async fn other_async_function() -> u32 { 20 }
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let result = if some_condition() {
-///         Either::Left(some_async_function())
-///     } else {
-///         Either::Right(other_async_function())
-///     };
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let result = if some_condition() {
+///     Either::Left(some_async_function())
+/// } else {
+///     Either::Right(other_async_function())
+/// };
 ///
-///     let value = result.await;
-///     println!("Result is {}", value);
-///     # assert_eq!(value, 10);
-/// }
+/// let value = result.await;
+/// println!("Result is {}", value);
+/// # assert_eq!(value, 10);
+/// # }
 /// ```
 #[allow(missing_docs)] // Doc-comments for variants in this particular case don't make much sense.
 #[derive(Debug, Clone)]

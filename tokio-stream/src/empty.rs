@@ -26,12 +26,12 @@ unsafe impl<T> Sync for Empty<T> {}
 /// ```
 /// use tokio_stream::{self as stream, StreamExt};
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut none = stream::empty::<i32>();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut none = stream::empty::<i32>();
 ///
-///     assert_eq!(None, none.next().await);
-/// }
+/// assert_eq!(None, none.next().await);
+/// # }
 /// ```
 pub const fn empty<T>() -> Empty<T> {
     Empty(PhantomData)

@@ -37,12 +37,12 @@ cfg_io_util! {
     /// ```
     /// use tokio::io::{self, AsyncReadExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut buffer = [0; 3];
-    ///     io::repeat(0b101).read_exact(&mut buffer).await.unwrap();
-    ///     assert_eq!(buffer, [0b101, 0b101, 0b101]);
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut buffer = [0; 3];
+    /// io::repeat(0b101).read_exact(&mut buffer).await.unwrap();
+    /// assert_eq!(buffer, [0b101, 0b101, 0b101]);
+    /// # }
     /// ```
     pub fn repeat(byte: u8) -> Repeat {
         Repeat { byte }

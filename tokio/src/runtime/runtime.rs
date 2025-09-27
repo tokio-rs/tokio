@@ -184,6 +184,8 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// let rt = Runtime::new()
@@ -192,6 +194,7 @@ impl Runtime {
     /// let handle = rt.handle();
     ///
     /// // Use the handle...
+    /// # }
     /// ```
     pub fn handle(&self) -> &Handle {
         &self.handle
@@ -214,6 +217,8 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
@@ -224,6 +229,7 @@ impl Runtime {
     /// rt.spawn(async {
     ///     println!("now running on a worker thread");
     /// });
+    /// # }
     /// # }
     /// ```
     #[track_caller]
@@ -247,6 +253,8 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
@@ -257,6 +265,7 @@ impl Runtime {
     /// rt.spawn_blocking(|| {
     ///     println!("now running on a worker thread");
     /// });
+    /// # }
     /// # }
     /// ```
     #[track_caller]
@@ -309,6 +318,8 @@ impl Runtime {
     /// # Examples
     ///
     /// ```no_run
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// // Create the runtime
@@ -318,6 +329,7 @@ impl Runtime {
     /// rt.block_on(async {
     ///     println!("hello");
     /// });
+    /// # }
     /// ```
     ///
     /// [handle]: fn@Handle::block_on
@@ -372,6 +384,8 @@ impl Runtime {
     /// # Example
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     /// use tokio::task::JoinHandle;
     ///
@@ -394,6 +408,7 @@ impl Runtime {
     ///     // Wait for the task before we end the test.
     ///     rt.block_on(handle).unwrap();
     /// }
+    /// # }
     /// ```
     pub fn enter(&self) -> EnterGuard<'_> {
         self.handle.enter()
@@ -407,6 +422,8 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
@@ -425,6 +442,7 @@ impl Runtime {
     ///
     ///    runtime.shutdown_timeout(Duration::from_millis(100));
     /// }
+    /// # }
     /// ```
     pub fn shutdown_timeout(mut self, duration: Duration) {
         // Wakeup and shutdown all the worker threads
@@ -448,6 +466,8 @@ impl Runtime {
     /// This function is equivalent to calling `shutdown_timeout(Duration::from_nanos(0))`.
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// fn main() {
@@ -459,6 +479,7 @@ impl Runtime {
     ///        inner_runtime.shutdown_background();
     ///    });
     /// }
+    /// # }
     /// ```
     pub fn shutdown_background(self) {
         self.shutdown_timeout(Duration::from_nanos(0));
