@@ -484,10 +484,7 @@ impl Interval {
                 .unwrap_or_else(Instant::far_future)
         };
 
-        // When we arrive here, the internal delay returned `Poll::Ready`.
-        // Reset the delay but do not register it. It should be registered with
-        // the next call to [`poll_tick`].
-        self.delay.as_mut().reset_without_reregister(next);
+        self.delay.as_mut().reset(next);
 
         // Return the time when we were scheduled to tick
         Poll::Ready(timeout)
