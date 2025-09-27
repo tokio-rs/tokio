@@ -81,7 +81,7 @@
 //! ```
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! # let io: &[u8] = b"\x00\x0BHello world";
 //! let mut reader = LengthDelimitedCodec::builder()
@@ -117,7 +117,7 @@
 //! ```
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! # let io: &[u8] = b"\x00\x0BHello world";
 //! let mut reader = LengthDelimitedCodec::builder()
@@ -154,7 +154,7 @@
 //! ```
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! # let io: &[u8] = b"\x00\x0DHello world";
 //! let mut reader = LengthDelimitedCodec::builder()
@@ -190,7 +190,7 @@
 //! ```
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! # let io: &[u8] = b"\x00\x00\x0B\xCA\xFEHello world";
 //! let mut reader = LengthDelimitedCodec::builder()
@@ -237,7 +237,7 @@
 //! ```
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! # let io: &[u8] = b"\xCA\x00\x0B\xFEHello world";
 //! let mut reader = LengthDelimitedCodec::builder()
@@ -286,7 +286,7 @@
 //! ```
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! # let io: &[u8] = b"\xCA\x00\x0F\xFEHello world";
 //! let mut reader = LengthDelimitedCodec::builder()
@@ -329,7 +329,7 @@
 //! ```
 //! # use tokio_stream::StreamExt;
 //! # use tokio_util::codec::LengthDelimitedCodec;
-//! # #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! # let io: &[u8] = b"\x00\x00\x0B\xFFHello world";
 //! let mut reader = LengthDelimitedCodec::builder()

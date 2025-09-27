@@ -62,36 +62,36 @@ cfg_io_util! {
         ///
         /// use std::io::Cursor;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let mut cursor = Cursor::new(b"lorem-ipsum");
-        ///     let mut buf = vec![];
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let mut cursor = Cursor::new(b"lorem-ipsum");
+        /// let mut buf = vec![];
         ///
-        ///     // cursor is at 'l'
-        ///     let num_bytes = cursor.read_until(b'-', &mut buf)
-        ///         .await
-        ///         .expect("reading from cursor won't fail");
+        /// // cursor is at 'l'
+        /// let num_bytes = cursor.read_until(b'-', &mut buf)
+        ///     .await
+        ///     .expect("reading from cursor won't fail");
         ///
-        ///     assert_eq!(num_bytes, 6);
-        ///     assert_eq!(buf, b"lorem-");
-        ///     buf.clear();
+        /// assert_eq!(num_bytes, 6);
+        /// assert_eq!(buf, b"lorem-");
+        /// buf.clear();
         ///
-        ///     // cursor is at 'i'
-        ///     let num_bytes = cursor.read_until(b'-', &mut buf)
-        ///         .await
-        ///         .expect("reading from cursor won't fail");
+        /// // cursor is at 'i'
+        /// let num_bytes = cursor.read_until(b'-', &mut buf)
+        ///     .await
+        ///     .expect("reading from cursor won't fail");
         ///
-        ///     assert_eq!(num_bytes, 5);
-        ///     assert_eq!(buf, b"ipsum");
-        ///     buf.clear();
+        /// assert_eq!(num_bytes, 5);
+        /// assert_eq!(buf, b"ipsum");
+        /// buf.clear();
         ///
-        ///     // cursor is at EOF
-        ///     let num_bytes = cursor.read_until(b'-', &mut buf)
-        ///         .await
-        ///         .expect("reading from cursor won't fail");
-        ///     assert_eq!(num_bytes, 0);
-        ///     assert_eq!(buf, b"");
-        /// }
+        /// // cursor is at EOF
+        /// let num_bytes = cursor.read_until(b'-', &mut buf)
+        ///     .await
+        ///     .expect("reading from cursor won't fail");
+        /// assert_eq!(num_bytes, 0);
+        /// assert_eq!(buf, b"");
+        /// # }
         /// ```
         fn read_until<'a>(&'a mut self, byte: u8, buf: &'a mut Vec<u8>) -> ReadUntil<'a, Self>
         where
@@ -164,37 +164,37 @@ cfg_io_util! {
         ///
         /// use std::io::Cursor;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let mut cursor = Cursor::new(b"foo\nbar");
-        ///     let mut buf = String::new();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let mut cursor = Cursor::new(b"foo\nbar");
+        /// let mut buf = String::new();
         ///
-        ///     // cursor is at 'f'
-        ///     let num_bytes = cursor.read_line(&mut buf)
-        ///         .await
-        ///         .expect("reading from cursor won't fail");
+        /// // cursor is at 'f'
+        /// let num_bytes = cursor.read_line(&mut buf)
+        ///     .await
+        ///     .expect("reading from cursor won't fail");
         ///
-        ///     assert_eq!(num_bytes, 4);
-        ///     assert_eq!(buf, "foo\n");
-        ///     buf.clear();
+        /// assert_eq!(num_bytes, 4);
+        /// assert_eq!(buf, "foo\n");
+        /// buf.clear();
         ///
-        ///     // cursor is at 'b'
-        ///     let num_bytes = cursor.read_line(&mut buf)
-        ///         .await
-        ///         .expect("reading from cursor won't fail");
+        /// // cursor is at 'b'
+        /// let num_bytes = cursor.read_line(&mut buf)
+        ///     .await
+        ///     .expect("reading from cursor won't fail");
         ///
-        ///     assert_eq!(num_bytes, 3);
-        ///     assert_eq!(buf, "bar");
-        ///     buf.clear();
+        /// assert_eq!(num_bytes, 3);
+        /// assert_eq!(buf, "bar");
+        /// buf.clear();
         ///
-        ///     // cursor is at EOF
-        ///     let num_bytes = cursor.read_line(&mut buf)
-        ///         .await
-        ///         .expect("reading from cursor won't fail");
+        /// // cursor is at EOF
+        /// let num_bytes = cursor.read_line(&mut buf)
+        ///     .await
+        ///     .expect("reading from cursor won't fail");
         ///
-        ///     assert_eq!(num_bytes, 0);
-        ///     assert_eq!(buf, "");
-        /// }
+        /// assert_eq!(num_bytes, 0);
+        /// assert_eq!(buf, "");
+        /// # }
         /// ```
         fn read_line<'a>(&'a mut self, buf: &'a mut String) -> ReadLine<'a, Self>
         where
@@ -331,17 +331,17 @@ cfg_io_util! {
         ///
         /// use std::io::Cursor;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let cursor = Cursor::new(b"lorem\nipsum\r\ndolor");
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let cursor = Cursor::new(b"lorem\nipsum\r\ndolor");
         ///
-        ///     let mut lines = cursor.lines();
+        /// let mut lines = cursor.lines();
         ///
-        ///     assert_eq!(lines.next_line().await.unwrap(), Some(String::from("lorem")));
-        ///     assert_eq!(lines.next_line().await.unwrap(), Some(String::from("ipsum")));
-        ///     assert_eq!(lines.next_line().await.unwrap(), Some(String::from("dolor")));
-        ///     assert_eq!(lines.next_line().await.unwrap(), None);
-        /// }
+        /// assert_eq!(lines.next_line().await.unwrap(), Some(String::from("lorem")));
+        /// assert_eq!(lines.next_line().await.unwrap(), Some(String::from("ipsum")));
+        /// assert_eq!(lines.next_line().await.unwrap(), Some(String::from("dolor")));
+        /// assert_eq!(lines.next_line().await.unwrap(), None);
+        /// # }
         /// ```
         ///
         /// [`AsyncBufReadExt::read_line`]: AsyncBufReadExt::read_line

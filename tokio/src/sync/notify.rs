@@ -56,22 +56,22 @@ type GuardedWaitList = GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::
 /// use tokio::sync::Notify;
 /// use std::sync::Arc;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let notify = Arc::new(Notify::new());
-///     let notify2 = notify.clone();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let notify = Arc::new(Notify::new());
+/// let notify2 = notify.clone();
 ///
-///     let handle = tokio::spawn(async move {
-///         notify2.notified().await;
-///         println!("received notification");
-///     });
+/// let handle = tokio::spawn(async move {
+///     notify2.notified().await;
+///     println!("received notification");
+/// });
 ///
-///     println!("sending notification");
-///     notify.notify_one();
+/// println!("sending notification");
+/// notify.notify_one();
 ///
-///     // Wait for task to receive notification.
-///     handle.await.unwrap();
-/// }
+/// // Wait for task to receive notification.
+/// handle.await.unwrap();
+/// # }
 /// ```
 ///
 /// Unbound multi-producer single-consumer (mpsc) channel.
@@ -548,19 +548,19 @@ impl Notify {
     /// use tokio::sync::Notify;
     /// use std::sync::Arc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let notify = Arc::new(Notify::new());
-    ///     let notify2 = notify.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let notify = Arc::new(Notify::new());
+    /// let notify2 = notify.clone();
     ///
-    ///     tokio::spawn(async move {
-    ///         notify2.notified().await;
-    ///         println!("received notification");
-    ///     });
+    /// tokio::spawn(async move {
+    ///     notify2.notified().await;
+    ///     println!("received notification");
+    /// });
     ///
-    ///     println!("sending notification");
-    ///     notify.notify_one();
-    /// }
+    /// println!("sending notification");
+    /// notify.notify_one();
+    /// # }
     /// ```
     pub fn notified(&self) -> Notified<'_> {
         // we load the number of times notify_waiters
@@ -594,21 +594,21 @@ impl Notify {
     /// use std::sync::Arc;
     /// use tokio::sync::Notify;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let notify = Arc::new(Notify::new());
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let notify = Arc::new(Notify::new());
     ///
-    ///     for _ in 0..10 {
-    ///         let notified = notify.clone().notified_owned();
-    ///         tokio::spawn(async move {
-    ///             notified.await;
-    ///             println!("received notification");
-    ///         });
-    ///     }
-    ///
-    ///     println!("sending notification");
-    ///     notify.notify_waiters();
+    /// for _ in 0..10 {
+    ///     let notified = notify.clone().notified_owned();
+    ///     tokio::spawn(async move {
+    ///         notified.await;
+    ///         println!("received notification");
+    ///     });
     /// }
+    ///
+    /// println!("sending notification");
+    /// notify.notify_waiters();
+    /// # }
     /// ```
     pub fn notified_owned(self: Arc<Self>) -> OwnedNotified {
         // we load the number of times notify_waiters
@@ -641,19 +641,19 @@ impl Notify {
     /// use tokio::sync::Notify;
     /// use std::sync::Arc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let notify = Arc::new(Notify::new());
-    ///     let notify2 = notify.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let notify = Arc::new(Notify::new());
+    /// let notify2 = notify.clone();
     ///
-    ///     tokio::spawn(async move {
-    ///         notify2.notified().await;
-    ///         println!("received notification");
-    ///     });
+    /// tokio::spawn(async move {
+    ///     notify2.notified().await;
+    ///     println!("received notification");
+    /// });
     ///
-    ///     println!("sending notification");
-    ///     notify.notify_one();
-    /// }
+    /// println!("sending notification");
+    /// notify.notify_one();
+    /// # }
     /// ```
     // Alias for old name in 0.x
     #[cfg_attr(docsrs, doc(alias = "notify"))]
@@ -722,23 +722,23 @@ impl Notify {
     /// use tokio::sync::Notify;
     /// use std::sync::Arc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let notify = Arc::new(Notify::new());
-    ///     let notify2 = notify.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let notify = Arc::new(Notify::new());
+    /// let notify2 = notify.clone();
     ///
-    ///     let notified1 = notify.notified();
-    ///     let notified2 = notify.notified();
+    /// let notified1 = notify.notified();
+    /// let notified2 = notify.notified();
     ///
-    ///     let handle = tokio::spawn(async move {
-    ///         println!("sending notifications");
-    ///         notify2.notify_waiters();
-    ///     });
+    /// let handle = tokio::spawn(async move {
+    ///     println!("sending notifications");
+    ///     notify2.notify_waiters();
+    /// });
     ///
-    ///     notified1.await;
-    ///     notified2.await;
-    ///     println!("received notifications");
-    /// }
+    /// notified1.await;
+    /// notified2.await;
+    /// println!("received notifications");
+    /// # }
     /// ```
     pub fn notify_waiters(&self) {
         self.lock_waiter_list().notify_waiters();

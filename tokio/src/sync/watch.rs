@@ -111,25 +111,25 @@
 //! ```
 //! use tokio::sync::watch;
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     let (tx, mut rx) = watch::channel("hello");
-//!     tx.send("goodbye").unwrap();
-//!     drop(tx);
+//! #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
+//! let (tx, mut rx) = watch::channel("hello");
+//! tx.send("goodbye").unwrap();
+//! drop(tx);
 //!
-//!     // `has_changed` does not mark the value as seen and errors
-//!     // since the channel is closed.
-//!     assert!(rx.has_changed().is_err());
+//! // `has_changed` does not mark the value as seen and errors
+//! // since the channel is closed.
+//! assert!(rx.has_changed().is_err());
 //!
-//!     // `changed` returns Ok since the value is not already marked as seen
-//!     // even if the channel is closed.
-//!     assert!(rx.changed().await.is_ok());
+//! // `changed` returns Ok since the value is not already marked as seen
+//! // even if the channel is closed.
+//! assert!(rx.changed().await.is_ok());
 //!
-//!     // The `changed` call above marks the value as seen.
-//!     // The next `changed` call now returns an error as the channel is closed
-//!     // AND the current value is seen.
-//!     assert!(rx.changed().await.is_err());
-//! }
+//! // The `changed` call above marks the value as seen.
+//! // The next `changed` call now returns an error as the channel is closed
+//! // AND the current value is seen.
+//! assert!(rx.changed().await.is_err());
+//! # }
 //! ```
 //!
 //! # Closing
@@ -258,35 +258,35 @@ impl<'a, T> Ref<'a, T> {
     /// ```
     /// use tokio::sync::watch;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = watch::channel("hello");
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = watch::channel("hello");
     ///
-    ///     tx.send("goodbye").unwrap();
-    ///     // The sender does never consider the value as changed.
-    ///     assert!(!tx.borrow().has_changed());
+    /// tx.send("goodbye").unwrap();
+    /// // The sender does never consider the value as changed.
+    /// assert!(!tx.borrow().has_changed());
     ///
-    ///     // Drop the sender immediately, just for testing purposes.
-    ///     drop(tx);
+    /// // Drop the sender immediately, just for testing purposes.
+    /// drop(tx);
     ///
-    ///     // Even if the sender has already been dropped...
-    ///     assert!(rx.has_changed().is_err());
-    ///     // ...the modified value is still readable and detected as changed.
-    ///     assert_eq!(*rx.borrow(), "goodbye");
-    ///     assert!(rx.borrow().has_changed());
+    /// // Even if the sender has already been dropped...
+    /// assert!(rx.has_changed().is_err());
+    /// // ...the modified value is still readable and detected as changed.
+    /// assert_eq!(*rx.borrow(), "goodbye");
+    /// assert!(rx.borrow().has_changed());
     ///
-    ///     // Read the changed value and mark it as seen.
-    ///     {
-    ///         let received = rx.borrow_and_update();
-    ///         assert_eq!(*received, "goodbye");
-    ///         assert!(received.has_changed());
-    ///         // Release the read lock when leaving this scope.
-    ///     }
-    ///
-    ///     // Now the value has already been marked as seen and could
-    ///     // never be modified again (after the sender has been dropped).
-    ///     assert!(!rx.borrow().has_changed());
+    /// // Read the changed value and mark it as seen.
+    /// {
+    ///     let received = rx.borrow_and_update();
+    ///     assert_eq!(*received, "goodbye");
+    ///     assert!(received.has_changed());
+    ///     // Release the read lock when leaving this scope.
     /// }
+    ///
+    /// // Now the value has already been marked as seen and could
+    /// // never be modified again (after the sender has been dropped).
+    /// assert!(!rx.borrow().has_changed());
+    /// # }
     /// ```
     pub fn has_changed(&self) -> bool {
         self.has_changed
@@ -705,18 +705,18 @@ impl<T> Receiver<T> {
     /// ```
     /// use tokio::sync::watch;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = watch::channel("hello");
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = watch::channel("hello");
     ///
-    ///     tx.send("goodbye").unwrap();
+    /// tx.send("goodbye").unwrap();
     ///
-    ///     assert!(rx.has_changed().unwrap());
-    ///     assert_eq!(*rx.borrow_and_update(), "goodbye");
+    /// assert!(rx.has_changed().unwrap());
+    /// assert_eq!(*rx.borrow_and_update(), "goodbye");
     ///
-    ///     // The value has been marked as seen
-    ///     assert!(!rx.has_changed().unwrap());
-    /// }
+    /// // The value has been marked as seen
+    /// assert!(!rx.has_changed().unwrap());
+    /// # }
     /// ```
     ///
     /// ## Closed channel example
@@ -724,16 +724,16 @@ impl<T> Receiver<T> {
     /// ```
     /// use tokio::sync::watch;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = watch::channel("hello");
-    ///     tx.send("goodbye").unwrap();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = watch::channel("hello");
+    /// tx.send("goodbye").unwrap();
     ///
-    ///     drop(tx);
+    /// drop(tx);
     ///
-    ///     // The channel is closed
-    ///     assert!(rx.has_changed().is_err());
-    /// }
+    /// // The channel is closed
+    /// assert!(rx.has_changed().is_err());
+    /// # }
     /// ```
     pub fn has_changed(&self) -> Result<bool, error::RecvError> {
         // Load the version from the state
@@ -800,20 +800,20 @@ impl<T> Receiver<T> {
     /// ```
     /// use tokio::sync::watch;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = watch::channel("hello");
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = watch::channel("hello");
     ///
-    ///     tokio::spawn(async move {
-    ///         tx.send("goodbye").unwrap();
-    ///     });
+    /// tokio::spawn(async move {
+    ///     tx.send("goodbye").unwrap();
+    /// });
     ///
-    ///     assert!(rx.changed().await.is_ok());
-    ///     assert_eq!(*rx.borrow_and_update(), "goodbye");
+    /// assert!(rx.changed().await.is_ok());
+    /// assert_eq!(*rx.borrow_and_update(), "goodbye");
     ///
-    ///     // The `tx` handle has been dropped
-    ///     assert!(rx.changed().await.is_err());
-    /// }
+    /// // The `tx` handle has been dropped
+    /// assert!(rx.changed().await.is_err());
+    /// # }
     /// ```
     pub async fn changed(&mut self) -> Result<(), error::RecvError> {
         cooperative(changed_impl(&self.shared, &mut self.version)).await
@@ -1296,19 +1296,19 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::watch;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = watch::channel("hello");
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = watch::channel("hello");
     ///
-    ///     tokio::spawn(async move {
-    ///         // use `rx`
-    ///         drop(rx);
-    ///     });
+    /// tokio::spawn(async move {
+    ///     // use `rx`
+    ///     drop(rx);
+    /// });
     ///
-    ///     // Waits for `rx` to drop
-    ///     tx.closed().await;
-    ///     println!("the `rx` handles dropped")
-    /// }
+    /// // Waits for `rx` to drop
+    /// tx.closed().await;
+    /// println!("the `rx` handles dropped")
+    /// # }
     /// ```
     pub async fn closed(&self) {
         cooperative(async {
@@ -1344,18 +1344,18 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::watch;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, _rx) = watch::channel(0u64);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, _rx) = watch::channel(0u64);
     ///
-    ///     tx.send(5).unwrap();
+    /// tx.send(5).unwrap();
     ///
-    ///     let rx = tx.subscribe();
-    ///     assert_eq!(5, *rx.borrow());
+    /// let rx = tx.subscribe();
+    /// assert_eq!(5, *rx.borrow());
     ///
-    ///     tx.send(10).unwrap();
-    ///     assert_eq!(10, *rx.borrow());
-    /// }
+    /// tx.send(10).unwrap();
+    /// assert_eq!(10, *rx.borrow());
+    /// # }
     /// ```
     ///
     /// The most recent message is considered seen by the channel, so this test
@@ -1365,24 +1365,24 @@ impl<T> Sender<T> {
     /// use tokio::sync::watch;
     /// use tokio::time::Duration;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, _rx) = watch::channel(0u64);
-    ///     tx.send(5).unwrap();
-    ///     let mut rx = tx.subscribe();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, _rx) = watch::channel(0u64);
+    /// tx.send(5).unwrap();
+    /// let mut rx = tx.subscribe();
     ///
-    ///     tokio::spawn(async move {
-    ///         // by spawning and sleeping, the message is sent after `main`
-    ///         // hits the call to `changed`.
-    ///         # if false {
-    ///         tokio::time::sleep(Duration::from_millis(10)).await;
-    ///         # }
-    ///         tx.send(100).unwrap();
-    ///     });
+    /// tokio::spawn(async move {
+    ///     // by spawning and sleeping, the message is sent after `main`
+    ///     // hits the call to `changed`.
+    ///     # if false {
+    ///     tokio::time::sleep(Duration::from_millis(10)).await;
+    ///     # }
+    ///     tx.send(100).unwrap();
+    /// });
     ///
-    ///     rx.changed().await.unwrap();
-    ///     assert_eq!(100, *rx.borrow());
-    /// }
+    /// rx.changed().await.unwrap();
+    /// assert_eq!(100, *rx.borrow());
+    /// # }
     /// ```
     pub fn subscribe(&self) -> Receiver<T> {
         let shared = self.shared.clone();
@@ -1400,16 +1400,16 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::watch;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx1) = watch::channel("hello");
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx1) = watch::channel("hello");
     ///
-    ///     assert_eq!(1, tx.receiver_count());
+    /// assert_eq!(1, tx.receiver_count());
     ///
-    ///     let mut _rx2 = rx1.clone();
+    /// let mut _rx2 = rx1.clone();
     ///
-    ///     assert_eq!(2, tx.receiver_count());
-    /// }
+    /// assert_eq!(2, tx.receiver_count());
+    /// # }
     /// ```
     pub fn receiver_count(&self) -> usize {
         self.shared.ref_count_rx.load(Relaxed)
@@ -1422,17 +1422,17 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::watch;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx1, rx) = watch::channel("hello");
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx1, rx) = watch::channel("hello");
     ///
-    ///     assert_eq!(1, tx1.sender_count());
+    /// assert_eq!(1, tx1.sender_count());
     ///
-    ///     let tx2 = tx1.clone();
+    /// let tx2 = tx1.clone();
     ///
-    ///     assert_eq!(2, tx1.sender_count());
-    ///     assert_eq!(2, tx2.sender_count());
-    /// }
+    /// assert_eq!(2, tx1.sender_count());
+    /// assert_eq!(2, tx2.sender_count());
+    /// # }
     /// ```
     pub fn sender_count(&self) -> usize {
         self.shared.ref_count_tx.load(Relaxed)
