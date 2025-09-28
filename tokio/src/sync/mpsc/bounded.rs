@@ -127,12 +127,9 @@ pub struct Receiver<T> {
 ///
 /// # Panics
 ///
-/// Panics if the buffer capacity is 0 or is greater than [`Semaphore::MAX_PERMITS`].
-///
-/// ```rust,should_panic
-/// use tokio::sync::{mpsc, Semaphore};
-/// mpsc::channel::<()>(Semaphore::MAX_PERMITS + 1);
-/// ```
+/// Panics if the buffer capacity is 0. Also panics if the buffer capacity is
+/// greater than [`Semaphore::MAX_PERMITS`], but this behavior may change in a
+/// future version.
 ///
 /// [`Semaphore::MAX_PERMITS`]: crate::sync::Semaphore::MAX_PERMITS
 ///
