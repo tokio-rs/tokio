@@ -3,7 +3,10 @@
 use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback};
 #[cfg(tokio_unstable)]
-use crate::runtime::{metrics::HistogramConfiguration, LocalOptions, LocalRuntime, TaskMeta};
+use crate::runtime::{
+    metrics::HistogramConfiguration, LocalOptions, LocalRuntime, TaskMeta, TaskSpawnCallback,
+    UserData,
+};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use crate::runtime::blocking::BlockingPool;
@@ -89,6 +92,9 @@ pub struct Builder {
     pub(super) after_unpark: Option<Callback>,
 
     /// To run before each task is spawned.
+    #[cfg(tokio_unstable)]
+    pub(super) before_spawn: Option<TaskSpawnCallback>,
+    #[cfg(not(tokio_unstable))]
     pub(super) before_spawn: Option<TaskCallback>,
 
     /// To run before each poll
@@ -731,8 +737,15 @@ impl Builder {
     /// Executes function `f` just before a task is spawned.
     ///
     /// `f` is called within the Tokio context, so functions like
-    /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback being
-    /// invoked immediately.
+    /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback
+    /// being invoked immediately.
+    ///
+    /// `f` must return an `Option<&'static dyn Any>`. A value returned by this callback
+    /// is attached to the task and can be retrieved using [`TaskMeta::get_data`] in
+    /// subsequent calls to other hooks for this task such as
+    /// [`on_before_task_poll`](crate::runtime::Builder::on_before_task_poll),
+    /// [`on_after_task_poll`](crate::runtime::Builder::on_after_task_poll), and
+    /// [`on_task_terminate`](crate::runtime::Builder::on_task_terminate).
     ///
     /// This can be used for bookkeeping or monitoring purposes.
     ///
@@ -755,6 +768,7 @@ impl Builder {
     /// let runtime = runtime::Builder::new_current_thread()
     ///     .on_task_spawn(|_| {
     ///         println!("spawning task");
+    ///         None::<()>
     ///     })
     ///     .build()
     ///     .unwrap();
@@ -768,13 +782,70 @@ impl Builder {
     /// })
     /// # }
     /// ```
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # use tokio::runtime;
+    /// # use std::sync::atomic::{AtomicUsize, Ordering};
+    /// # pub fn main() {
+    /// struct YieldingTaskMetadata {
+    ///     pub yield_count: AtomicUsize,
+    /// }
+    /// let runtime = runtime::Builder::new_current_thread()
+    ///     .on_task_spawn(|meta| {
+    ///         println!("spawning task {}", meta.id());
+    ///         Some(YieldingTaskMetadata { yield_count: AtomicUsize::new(0) })
+    ///     })
+    ///     .on_after_task_poll(|meta| {
+    ///         if let Some(data) = meta.get_data::<YieldingTaskMetadata>() {
+    ///             println!("task {} yield count: {}", meta.id(), data.yield_count.fetch_add(1, Ordering::Relaxed));
+    ///         }
+    ///     })
+    ///     .on_task_terminate(|meta| {
+    ///         match meta.get_data::<YieldingTaskMetadata>() {
+    ///             Some(data) => {
+    ///                 let yield_count = data.yield_count.load(Ordering::Relaxed);
+    ///                 println!("task {} total yield count: {}", meta.id(), yield_count);
+    ///                 assert!(yield_count == 64);
+    ///             },
+    ///             None => panic!("task has missing or incorrect user data"),
+    ///         }
+    ///     })
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// runtime.block_on(async {
+    ///     let _ = tokio::task::spawn(async {
+    ///         for _ in 0..64 {
+    ///             println!("yielding");
+    ///             tokio::task::yield_now().await;
+    ///         }
+    ///     }).await.unwrap();
+    /// })
+    /// # }
+    /// ```
     #[cfg(all(not(loom), tokio_unstable))]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
-    pub fn on_task_spawn<F>(&mut self, f: F) -> &mut Self
+    pub fn on_task_spawn<F, T>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
+        F: Fn(&TaskMeta<'_>) -> Option<T> + Send + Sync + 'static,
+        T: 'static,
     {
-        self.before_spawn = Some(std::sync::Arc::new(f));
+        use std::any::Any;
+
+        fn wrap<F, T>(f: F) -> impl Fn(&TaskMeta<'_>) -> UserData + Send + Sync + 'static
+        where
+            F: Fn(&TaskMeta<'_>) -> Option<T> + Send + Sync + 'static,
+            T: 'static,
+        {
+            move |meta| {
+                f(meta).map(|value| {
+                    let boxed: Box<dyn Any> = Box::new(value);
+                    Box::leak(boxed) as &'static dyn Any
+                })
+            }
+        }
+        self.before_spawn = Some(std::sync::Arc::new(wrap(f)));
         self
     }
 

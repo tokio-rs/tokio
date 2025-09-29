@@ -8,6 +8,8 @@ use crate::runtime::{
     TaskHooks, TaskMeta,
 };
 use crate::util::RngSeedGenerator;
+#[cfg(tokio_unstable)]
+use crate::runtime::task_hooks::UserData;
 
 use std::fmt;
 
@@ -47,7 +49,23 @@ impl Handle {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        Self::bind_new_task(me, future, id, spawned_at)
+        Self::bind_new_task(me, future, id, spawned_at, #[cfg(tokio_unstable)] None)
+    }
+
+    /// Spawns a future with user data onto the thread pool
+    #[cfg(tokio_unstable)]
+    pub(crate) fn spawn_with_user_data<F>(
+        me: &Arc<Self>,
+        future: F,
+        id: task::Id,
+        spawned_at: SpawnLocation,
+        user_data: UserData,
+    ) -> JoinHandle<F::Output>
+    where
+        F: crate::future::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        Self::bind_new_task(me, future, id, spawned_at, user_data)
     }
 
     pub(crate) fn shutdown(&self) {
@@ -60,18 +78,34 @@ impl Handle {
         future: T,
         id: task::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)]
+        user_data: UserData,
     ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
-
-        me.task_hooks.spawn(&TaskMeta {
+        let task_meta = TaskMeta {
             id,
             spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
             _phantom: Default::default(),
-        });
+        };
+
+        #[cfg(not(tokio_unstable))]
+        {
+            me.task_hooks.spawn(&task_meta);
+        }
+
+        let (handle, notified) = me.shared.owned.bind(
+            future,
+            me.clone(),
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            me.task_hooks.spawn(&task_meta),
+        );
 
         me.schedule_option_task_without_yield(notified);
 

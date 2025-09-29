@@ -404,7 +404,14 @@ impl Runtime {
         let (handle, notified) =
             self.0
                 .owned
-                .bind(future, self.clone(), Id::next(), SpawnLocation::capture());
+                .bind(
+                    future,
+                    self.clone(),
+                    Id::next(),
+                    SpawnLocation::capture(),
+                    #[cfg(tokio_unstable)]
+                    None,
+                );
 
         if let Some(notified) = notified {
             self.schedule(notified);

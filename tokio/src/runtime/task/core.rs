@@ -11,6 +11,8 @@
 
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
+#[cfg(tokio_unstable)]
+use crate::runtime::task_hooks::UserData;
 use crate::runtime::context;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
@@ -182,6 +184,10 @@ pub(crate) struct Header {
     /// The tracing ID for this instrumented task.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) tracing_id: Option<tracing::Id>,
+
+    /// Custom user defined metadata for this task for use in hooks.
+    #[cfg(tokio_unstable)]
+    pub(super) user_data: UserData,
 }
 
 unsafe impl Send for Header {}
@@ -223,12 +229,14 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         state: State,
         task_id: Id,
         #[cfg(tokio_unstable)] spawned_at: &'static Location<'static>,
+        #[cfg(tokio_unstable)] user_data: UserData,
     ) -> Box<Cell<T, S>> {
         // Separated into a non-generic function to reduce LLVM codegen
         fn new_header(
             state: State,
             vtable: &'static Vtable,
             #[cfg(all(tokio_unstable, feature = "tracing"))] tracing_id: Option<tracing::Id>,
+            #[cfg(tokio_unstable)] user_data: UserData,
         ) -> Header {
             Header {
                 state,
@@ -237,6 +245,8 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 owner_id: UnsafeCell::new(None),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
+                #[cfg(tokio_unstable)]
+                user_data,
             }
         }
 
@@ -250,6 +260,8 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 vtable,
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
+                #[cfg(tokio_unstable)]
+                user_data,
             ),
             core: Core {
                 scheduler,
@@ -513,6 +525,16 @@ impl Header {
     pub(super) unsafe fn get_spawn_location(me: NonNull<Header>) -> &'static Location<'static> {
         let ptr = Header::get_spawn_location_ptr(me).as_ptr();
         *ptr
+    }
+
+    /// Gets the user data from the task header.
+    ///
+    /// # Safety
+    ///
+    /// The provided raw pointer must point at the header of a task.
+    #[cfg(tokio_unstable)]
+    pub(super) unsafe fn get_user_data(me: NonNull<Header>) -> UserData {
+        me.as_ref().user_data
     }
 
     /// Gets the tracing id of the task containing this `Header`.

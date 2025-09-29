@@ -1,7 +1,18 @@
 use super::Config;
+#[cfg(tokio_unstable)]
+use std::any::Any;
 use std::marker::PhantomData;
 
 impl TaskHooks {
+    #[cfg(tokio_unstable)]
+    pub(crate) fn spawn(&self, meta: &TaskMeta<'_>) -> UserData {
+        match self.task_spawn_callback.as_ref() {
+            Some(f) => f(meta),
+            None => None,
+        }
+    }
+
+    #[cfg(not(tokio_unstable))]
     pub(crate) fn spawn(&self, meta: &TaskMeta<'_>) {
         if let Some(f) = self.task_spawn_callback.as_ref() {
             f(meta)
@@ -39,6 +50,9 @@ impl TaskHooks {
 
 #[derive(Clone)]
 pub(crate) struct TaskHooks {
+    #[cfg(tokio_unstable)]
+    pub(crate) task_spawn_callback: Option<TaskSpawnCallback>,
+    #[cfg(not(tokio_unstable))]
     pub(crate) task_spawn_callback: Option<TaskCallback>,
     pub(crate) task_terminate_callback: Option<TaskCallback>,
     #[cfg(tokio_unstable)]
@@ -62,6 +76,9 @@ pub struct TaskMeta<'a> {
     /// The location where the task was spawned.
     #[cfg_attr(not(tokio_unstable), allow(unreachable_pub, dead_code))]
     pub(crate) spawned_at: crate::runtime::task::SpawnLocation,
+    /// Optional user-defined metadata for the task.
+    #[cfg(tokio_unstable)]
+    pub(crate) user_data: UserData,
     pub(crate) _phantom: PhantomData<&'a ()>,
 }
 
@@ -77,7 +94,27 @@ impl<'a> TaskMeta<'a> {
     pub fn spawned_at(&self) -> &'static std::panic::Location<'static> {
         self.spawned_at.0
     }
+
+    /// Return the user-defined metadata for this task if it is set and of the
+    /// correct type.
+    #[cfg(tokio_unstable)]
+    pub fn get_data<T: 'static>(&self) -> Option<&T> {
+        self.user_data?.downcast_ref::<T>()
+    }
 }
 
 /// Runs on specific task-related events
 pub(crate) type TaskCallback = std::sync::Arc<dyn Fn(&TaskMeta<'_>) + Send + Sync>;
+
+/// Runs on task-spawn events, and can optionally return user-defined metadata
+/// to attach to the task, which are accessible in subsequent hooks.
+#[cfg(tokio_unstable)]
+pub(crate) type TaskSpawnCallback = std::sync::Arc<dyn Fn(&TaskMeta<'_>) -> UserData + Send + Sync>;
+
+/// User data that can be attached to a task when spawning.
+///
+/// This type alias provides a cleaner interface for the user data parameter
+/// used throughout the task spawning system when the `tokio_unstable` feature
+/// is enabled.
+#[cfg(tokio_unstable)]
+pub(crate) type UserData = Option<&'static dyn Any>;

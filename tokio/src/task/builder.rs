@@ -4,6 +4,8 @@ use crate::{
     task::{JoinHandle, LocalSet},
     util::trace::SpawnMeta,
 };
+#[cfg(tokio_unstable)]
+use crate::runtime::UserData;
 use std::{future::Future, io, mem};
 
 /// Factory which is used to configure the properties of a new task.
@@ -62,6 +64,7 @@ use std::{future::Future, io, mem};
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 pub struct Builder<'a> {
     name: Option<&'a str>,
+    user_data: UserData,
 }
 
 impl<'a> Builder<'a> {
@@ -72,7 +75,18 @@ impl<'a> Builder<'a> {
 
     /// Assigns a name to the task which will be spawned.
     pub fn name(&self, name: &'a str) -> Self {
-        Self { name: Some(name) }
+        Self {
+            name: Some(name),
+            user_data: self.user_data,
+        }
+    }
+
+    /// Assigns user data to the task which will be spawned.
+    pub fn data(self, data: &'static dyn std::any::Any) -> Self {
+        Self {
+            name: self.name,
+            user_data: Some(data),
+        }
     }
 
     /// Spawns a task with this builder's settings on the current runtime.
@@ -91,9 +105,17 @@ impl<'a> Builder<'a> {
     {
         let fut_size = mem::size_of::<Fut>();
         Ok(if fut_size > BOX_FUTURE_THRESHOLD {
-            super::spawn::spawn_inner(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            super::spawn::spawn_inner_with_user_data(
+                Box::pin(future),
+                SpawnMeta::new(self.name, fut_size),
+                self.user_data,
+            )
         } else {
-            super::spawn::spawn_inner(future, SpawnMeta::new(self.name, fut_size))
+            super::spawn::spawn_inner_with_user_data(
+                future,
+                SpawnMeta::new(self.name, fut_size),
+                self.user_data,
+            )
         })
     }
 
