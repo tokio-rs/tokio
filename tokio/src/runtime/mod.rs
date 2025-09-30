@@ -19,6 +19,8 @@
 //! used.
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::net::TcpListener;
 //! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!
@@ -53,6 +55,7 @@
 //!         });
 //!     }
 //! }
+//! # }
 //! ```
 //!
 //! From within the context of the runtime, additional tasks are spawned using
@@ -62,6 +65,8 @@
 //! A [`Runtime`] instance can also be used directly.
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::net::TcpListener;
 //! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //! use tokio::runtime::Runtime;
@@ -102,6 +107,7 @@
 //!         }
 //!     })
 //! }
+//! # }
 //! ```
 //!
 //! ## Runtime Configurations
@@ -118,11 +124,14 @@
 //! for most applications. The multi-thread scheduler requires the `rt-multi-thread`
 //! feature flag, and is selected by default:
 //! ```
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::runtime;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let threaded_rt = runtime::Runtime::new()?;
 //! # Ok(()) }
+//! # }
 //! ```
 //!
 //! Most applications should use the multi-thread scheduler, except in some
@@ -168,7 +177,6 @@
 //! [`tokio::main`]: ../attr.main.html
 //! [runtime builder]: crate::runtime::Builder
 //! [`Runtime::new`]: crate::runtime::Runtime::new
-//! [`Builder::threaded_scheduler`]: crate::runtime::Builder::threaded_scheduler
 //! [`Builder::enable_io`]: crate::runtime::Builder::enable_io
 //! [`Builder::enable_time`]: crate::runtime::Builder::enable_time
 //! [`Builder::enable_all`]: crate::runtime::Builder::enable_all

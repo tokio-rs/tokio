@@ -66,23 +66,23 @@ use tokio::{
 /// ```
 /// use tokio_util::task::TaskTracker;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let tracker = TaskTracker::new();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let tracker = TaskTracker::new();
 ///
-///     for i in 0..10 {
-///         tracker.spawn(async move {
-///             println!("Task {} is running!", i);
-///         });
-///     }
-///     // Once we spawned everything, we close the tracker.
-///     tracker.close();
-///
-///     // Wait for everything to finish.
-///     tracker.wait().await;
-///
-///     println!("This is printed after all of the tasks.");
+/// for i in 0..10 {
+///     tracker.spawn(async move {
+///         println!("Task {} is running!", i);
+///     });
 /// }
+/// // Once we spawned everything, we close the tracker.
+/// tracker.close();
+///
+/// // Wait for everything to finish.
+/// tracker.wait().await;
+///
+/// println!("This is printed after all of the tasks.");
+/// # }
 /// ```
 ///
 /// ## Wait for tasks to exit

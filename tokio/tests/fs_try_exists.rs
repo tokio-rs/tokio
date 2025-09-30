@@ -16,7 +16,10 @@ async fn try_exists() {
     assert!(fs::try_exists(existing_path).await.unwrap());
     assert!(!fs::try_exists(nonexisting_path).await.unwrap());
     // FreeBSD root user always has permission to stat.
-    #[cfg(all(unix, not(any(target_os = "freebsd", tokio_uring))))]
+    #[cfg(all(
+        unix,
+        not(any(target_os = "freebsd", all(tokio_unstable, feature = "io-uring")))
+    ))]
     {
         use std::os::unix::prelude::PermissionsExt;
         let permission_denied_directory_path = dir.path().join("baz");
