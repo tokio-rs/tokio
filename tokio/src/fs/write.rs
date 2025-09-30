@@ -27,7 +27,13 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
     let path = path.as_ref();
     let contents = crate::util::as_ref::upgrade(contents);
 
-    #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux"
+    ))]
     {
         let handle = crate::runtime::Handle::current();
         let driver_handle = handle.inner.driver().io();
@@ -39,7 +45,13 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
     write_spawn_blocking(path, contents).await
 }
 
-#[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux"))]
+#[cfg(all(
+    tokio_unstable,
+    feature = "io-uring",
+    feature = "rt",
+    feature = "fs",
+    target_os = "linux"
+))]
 async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
     use crate::{fs::OpenOptions, runtime::driver::op::Op};
     use std::os::fd::OwnedFd;
