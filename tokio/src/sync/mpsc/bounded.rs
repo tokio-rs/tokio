@@ -127,9 +127,8 @@ pub struct Receiver<T> {
 ///
 /// # Panics
 ///
-/// Panics if the buffer capacity is 0. Also panics if the buffer capacity is
-/// greater than [`Semaphore::MAX_PERMITS`], but this behavior may change in a
-/// future version.
+/// Panics if the buffer capacity is 0, or too large. Currently the maximum
+/// capacity is [`Semaphore::MAX_PERMITS`].
 ///
 /// [`Semaphore::MAX_PERMITS`]: crate::sync::Semaphore::MAX_PERMITS
 ///
