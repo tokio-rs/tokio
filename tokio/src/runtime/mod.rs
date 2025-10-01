@@ -425,8 +425,6 @@ cfg_rt! {
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
 
-        mod local_runtime;
-        pub use local_runtime::{LocalRuntime, LocalOptions};
     }
 
     cfg_taskdump! {
@@ -447,6 +445,9 @@ cfg_rt! {
 
     mod runtime;
     pub use runtime::{Runtime, RuntimeFlavor};
+
+    mod local_runtime;
+    pub use local_runtime::{LocalRuntime, LocalOptions};
 
     /// Boundary value to prevent stack overflow caused by a large-sized
     /// Future being placed in the stack.
