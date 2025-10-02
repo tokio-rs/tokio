@@ -17,9 +17,11 @@
   RUSTDOCFLAGS="""
     --cfg docsrs \
     --cfg tokio_unstable \
-    --cfg tokio_taskdump \
     """
-  RUSTFLAGS="--cfg tokio_unstable --cfg tokio_taskdump --cfg docsrs"
+  RUSTFLAGS="""
+    --cfg docsrs \
+    --cfg tokio_unstable
+    """
 
 [[redirects]]
   from = "/"

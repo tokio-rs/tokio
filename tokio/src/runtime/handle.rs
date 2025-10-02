@@ -329,7 +329,7 @@ impl Handle {
     fn block_on_inner<F: Future>(&self, future: F, _meta: SpawnMeta<'_>) -> F::Output {
         #[cfg(all(
             tokio_unstable,
-            tokio_taskdump,
+            feature = "taskdump",
             feature = "rt",
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
@@ -356,7 +356,7 @@ impl Handle {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(
             tokio_unstable,
-            tokio_taskdump,
+            feature = "taskdump",
             feature = "rt",
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
@@ -381,7 +381,7 @@ impl Handle {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(
             tokio_unstable,
-            tokio_taskdump,
+            feature = "taskdump",
             feature = "rt",
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
@@ -536,19 +536,19 @@ cfg_taskdump! {
         /// ## Unstable Features
         ///
         /// This functionality is **unstable**, and requires both the
-        /// `tokio_unstable` and `tokio_taskdump` `cfg` flags to be set.
+        /// `--cfg tokio_unstable` and cargo feature `taskdump` to be set.
         ///
         /// You can do this by setting the `RUSTFLAGS` environment variable
         /// before invoking `cargo`; e.g.:
         /// ```bash
-        /// RUSTFLAGS="--cfg tokio_unstable --cfg tokio_taskdump" cargo run --example dump
+        /// RUSTFLAGS="--cfg tokio_unstable cargo run --example dump
         /// ```
         ///
         /// Or by [configuring][cargo-config] `rustflags` in
         /// `.cargo/config.toml`:
         /// ```text
         /// [build]
-        /// rustflags = ["--cfg", "tokio_unstable", "--cfg", "tokio_taskdump"]
+        /// rustflags = ["--cfg", "tokio_unstable"]
         /// ```
         ///
         /// [cargo-config]:
@@ -568,7 +568,7 @@ cfg_taskdump! {
         ///
         /// ## Performance
         ///
-        /// Although enabling the `tokio_taskdump` feature imposes virtually no
+        /// Although enabling the `taskdump` feature imposes virtually no
         /// additional runtime overhead, actually calling `Handle::dump` is
         /// expensive. The runtime must synchronize and pause its workers, then
         /// re-poll every task in a special tracing mode. Avoid requesting dumps

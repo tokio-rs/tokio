@@ -499,7 +499,7 @@ macro_rules! cfg_taskdump {
         $(
             #[cfg(all(
                 tokio_unstable,
-                tokio_taskdump,
+                feature = "taskdump",
                 feature = "rt",
                 target_os = "linux",
                 any(
@@ -518,7 +518,7 @@ macro_rules! cfg_not_taskdump {
         $(
             #[cfg(not(all(
                 tokio_unstable,
-                tokio_taskdump,
+                feature = "taskdump",
                 feature = "rt",
                 target_os = "linux",
                 any(
