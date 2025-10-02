@@ -1,3 +1,5 @@
+#![cfg(not(loom))]
+
 //! UDP framing
 
 mod frame;
