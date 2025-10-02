@@ -673,8 +673,9 @@ where
     /// ```
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        self.tasks_by_key
-            .reserve(additional, |(k, _)| self.hashes_by_task.hasher().hash_one(k));
+        self.tasks_by_key.reserve(additional, |(k, _)| {
+            self.hashes_by_task.hasher().hash_one(k)
+        });
         self.hashes_by_task.reserve(additional);
     }
 
@@ -730,8 +731,9 @@ where
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.hashes_by_task.shrink_to(min_capacity);
-        self.tasks_by_key
-            .shrink_to(min_capacity, |(k, _)| self.hashes_by_task.hasher().hash_one(k))
+        self.tasks_by_key.shrink_to(min_capacity, |(k, _)| {
+            self.hashes_by_task.hasher().hash_one(k)
+        })
     }
 
     /// Look up a task in the map by its key, returning the key and abort handle.
