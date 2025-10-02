@@ -186,12 +186,13 @@ When updating this, also update:
 
 Tokio will keep a rolling MSRV (minimum supported rust version) policy of **at
 least** 6 months. When increasing the MSRV, the new Rust version must have been
-released at least six months ago. The current MSRV is 1.70.
+released at least six months ago. The current MSRV is 1.71.
 
 Note that the MSRV is not increased automatically, and only as part of a minor
 release. The MSRV history for past minor releases can be found below:
 
- * 1.39 to now  - Rust 1.70
+ * 1.48 to now  - Rust 1.71
+ * 1.39 to 1.47 - Rust 1.70
  * 1.30 to 1.38 - Rust 1.63
  * 1.27 to 1.29 - Rust 1.56
  * 1.17 to 1.26 - Rust 1.49

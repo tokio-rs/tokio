@@ -4,7 +4,7 @@ use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::fmt;
 use std::future::Future;
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 use tokio::runtime::Handle;
 use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
@@ -391,13 +391,13 @@ where
 
     fn insert(&mut self, mut key: K, mut abort: AbortHandle) {
         let hash_builder = self.hashes_by_task.hasher();
-        let hash = hash_one(hash_builder, &key);
+        let hash = hash_builder.hash_one(&key);
         let id = abort.id();
 
         // Insert the new key into the map of tasks by keys.
         let entry =
             self.tasks_by_key
-                .entry(hash, |(k, _)| *k == key, |(k, _)| hash_one(hash_builder, k));
+                .entry(hash, |(k, _)| *k == key, |(k, _)| hash_builder.hash_one(k));
         match entry {
             Entry::Occupied(occ) => {
                 // There was a previous task spawned with the same key! Cancel
@@ -673,9 +673,9 @@ where
     /// ```
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        let hash_builder = self.hashes_by_task.hasher();
-        self.tasks_by_key
-            .reserve(additional, |(k, _)| hash_one(hash_builder, k));
+        self.tasks_by_key.reserve(additional, |(k, _)| {
+            self.hashes_by_task.hasher().hash_one(k)
+        });
         self.hashes_by_task.reserve(additional);
     }
 
@@ -701,9 +701,8 @@ where
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.hashes_by_task.shrink_to_fit();
-        let hash_builder = self.hashes_by_task.hasher();
         self.tasks_by_key
-            .shrink_to_fit(|(k, _)| hash_one(hash_builder, k));
+            .shrink_to_fit(|(k, _)| self.hashes_by_task.hasher().hash_one(k));
     }
 
     /// Shrinks the capacity of the map with a lower limit. It will drop
@@ -732,9 +731,9 @@ where
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.hashes_by_task.shrink_to(min_capacity);
-        let hash_builder = self.hashes_by_task.hasher();
-        self.tasks_by_key
-            .shrink_to(min_capacity, |(k, _)| hash_one(hash_builder, k))
+        self.tasks_by_key.shrink_to(min_capacity, |(k, _)| {
+            self.hashes_by_task.hasher().hash_one(k)
+        })
     }
 
     /// Look up a task in the map by its key, returning the key and abort handle.
@@ -743,8 +742,7 @@ where
         Q: ?Sized + Hash + Eq,
         K: Borrow<Q>,
     {
-        let hash_builder = self.hashes_by_task.hasher();
-        let hash = hash_one(hash_builder, key);
+        let hash = self.hashes_by_task.hasher().hash_one(key);
         self.tasks_by_key.find(hash, |(k, _)| k.borrow() == key)
     }
 
@@ -763,18 +761,6 @@ where
         };
         Some(key)
     }
-}
-
-/// Returns the hash for a given key.
-#[inline]
-fn hash_one<S, Q>(hash_builder: &S, key: &Q) -> u64
-where
-    Q: ?Sized + Hash,
-    S: BuildHasher,
-{
-    let mut hasher = hash_builder.build_hasher();
-    key.hash(&mut hasher);
-    hasher.finish()
 }
 
 impl<K, V, S> JoinMap<K, V, S>
