@@ -1,7 +1,7 @@
 use std::io;
 use std::path::Path;
 
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 
 use crate::net::{UnixDatagram, UnixListener, UnixStream};
 
@@ -178,7 +178,7 @@ impl UnixSocket {
 
         self.inner.listen(backlog as i32)?;
         let mio = {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
 
             let raw_fd = self.inner.into_raw_fd();
             unsafe { mio::net::UnixListener::from_raw_fd(raw_fd) }
@@ -213,7 +213,7 @@ impl UnixSocket {
             }
         }
         let mio = {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
 
             let raw_fd = self.inner.into_raw_fd();
             unsafe { mio::net::UnixStream::from_raw_fd(raw_fd) }
@@ -235,7 +235,7 @@ impl UnixSocket {
             ));
         }
         let mio = {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
 
             let raw_fd = self.inner.into_raw_fd();
             unsafe { mio::net::UnixDatagram::from_raw_fd(raw_fd) }
