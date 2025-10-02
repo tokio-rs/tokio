@@ -8,7 +8,7 @@ name = "tokio"
 # - Create "v1.x.y" git tag.
 version = "1.47.1"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.71"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 readme = "README.md"

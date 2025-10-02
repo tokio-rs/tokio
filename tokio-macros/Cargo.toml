@@ -6,7 +6,7 @@ name = "tokio-macros"
 # - Create "tokio-macros-x.y.z" git tag.
 version = "2.5.0"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.71"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"

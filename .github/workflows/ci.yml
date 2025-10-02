@@ -28,7 +28,7 @@ env:
   # - tokio-util/Cargo.toml
   # - tokio-test/Cargo.toml
   # - tokio-stream/Cargo.toml
-  rust_min: '1.70'
+  rust_min: '1.71'
   # This excludes unstable features like io_uring,
   # which require '--cfg tokio_unstable'.
   TOKIO_STABLE_FEATURES: "full,test-util"
