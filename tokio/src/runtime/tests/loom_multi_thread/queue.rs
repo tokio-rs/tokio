@@ -62,6 +62,65 @@ fn basic() {
     });
 }
 
+// Like `basic`, but with tasks in the LIFO slot.
+#[test]
+fn basic_lifo() {
+    loom::model(|| {
+        let (steal, mut local) = queue::local();
+        let inject = RefCell::new(vec![]);
+        let mut stats = new_stats();
+
+        let th = thread::spawn(move || {
+            let mut stats = new_stats();
+            let (_, mut local) = queue::local();
+            let mut n = 0;
+
+            for _ in 0..3 {
+                if steal.steal_into(&mut local, &mut stats).is_some() {
+                    n += 1;
+                }
+
+                while local.pop().is_some() {
+                    n += 1;
+                }
+            }
+
+            n
+        });
+
+        let mut n = 0;
+
+        for _ in 0..2 {
+            for _ in 0..2 {
+                let (task, _) = unowned(async {});
+                if let Some(prev) = local.push_lifo(task) {
+                    local.push_back_or_overflow(prev, &inject, &mut stats);
+                }
+            }
+
+            if local.pop_lifo().or_else(|| local.pop()).is_some() {
+                n += 1;
+            }
+
+            // Push another task
+            let (task, _) = unowned(async {});
+            if let Some(prev) = local.push_lifo(task) {
+                local.push_back_or_overflow(prev, &inject, &mut stats);
+            }
+
+            while local.pop_lifo().or_else(|| local.pop()).is_some() {
+                n += 1;
+            }
+        }
+
+        n += inject.borrow_mut().drain(..).count();
+
+        n += th.join().unwrap();
+
+        assert_eq!(6, n);
+    });
+}
+
 #[test]
 fn steal_overflow() {
     loom::model(|| {
@@ -116,23 +175,6 @@ fn steal_overflow() {
 fn multi_stealer() {
     const NUM_TASKS: usize = 5;
 
-    fn steal_tasks(steal: queue::Steal<NoopSchedule>) -> usize {
-        let mut stats = new_stats();
-        let (_, mut local) = queue::local();
-
-        if steal.steal_into(&mut local, &mut stats).is_none() {
-            return 0;
-        }
-
-        let mut n = 1;
-
-        while local.pop().is_some() {
-            n += 1;
-        }
-
-        n
-    }
-
     loom::model(|| {
         let (steal, mut local) = queue::local();
         let inject = RefCell::new(vec![]);
@@ -164,6 +206,67 @@ fn multi_stealer() {
 
         assert_eq!(n, NUM_TASKS);
     });
+}
+
+// Like `multi_stealer`, but with tasks in the LIFO slot.
+#[test]
+fn multi_stealer_lifo() {
+    const NUM_TASKS: usize = 5;
+
+    loom::model(|| {
+        let (steal, mut local) = queue::local();
+        let inject = RefCell::new(vec![]);
+        let mut stats = new_stats();
+
+        // Push work into the LIFO slot.
+        for _ in 0..NUM_TASKS {
+            let (task, _) = unowned(async {});
+            // Push the new task into the LIFO slot, as though it's being
+            // notified locally.
+            if let Some(prev) = local.push_lifo(task) {
+                // If a task was already in the LIFO slot, stick the previous
+                // LIFO task into the queue.
+                local.push_back_or_overflow(prev, &inject, &mut stats);
+            }
+        }
+
+        let th1 = {
+            let steal = steal.clone();
+            thread::spawn(move || steal_tasks(steal))
+        };
+
+        let th2 = thread::spawn(move || steal_tasks(steal));
+
+        let mut n = 0;
+
+        while local.pop_lifo().or_else(|| local.pop()).is_some() {
+            n += 1;
+        }
+
+        n += inject.borrow_mut().drain(..).count();
+
+        n += th1.join().unwrap();
+        n += th2.join().unwrap();
+
+        assert_eq!(n, NUM_TASKS);
+    });
+}
+
+fn steal_tasks(steal: queue::Steal<NoopSchedule>) -> usize {
+    let mut stats = new_stats();
+    let (_, mut local) = queue::local();
+
+    if steal.steal_into(&mut local, &mut stats).is_none() {
+        return 0;
+    }
+
+    let mut n = 1;
+
+    while local.pop().is_some() {
+        n += 1;
+    }
+
+    n
 }
 
 #[test]
