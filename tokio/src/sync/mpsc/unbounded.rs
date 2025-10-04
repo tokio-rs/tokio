@@ -533,9 +533,10 @@ impl<T> UnboundedSender<T> {
 
     /// Attempts to send a message on this `UnboundedSender` without blocking.
     ///
-    /// This method is not marked async because sending a message to an unbounded channel
-    /// never requires any form of waiting. Because of this, the `send` method can be
-    /// used in both synchronous and asynchronous code without problems.
+    /// This method is not marked as `async` because sending a message to an unbounded channel
+    /// never requires any form of waiting. This is due to the channel's infinite capacity,
+    /// allowing the `send` operation to complete immediately. As a result, the `send` method can be
+    /// used in both synchronous and asynchronous code without issues.
     ///
     /// If the receive half of the channel is closed, either due to [`close`]
     /// being called or the [`UnboundedReceiver`] having been dropped, this
