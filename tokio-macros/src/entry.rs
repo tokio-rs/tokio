@@ -468,7 +468,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         #do_checks
 
         #[cfg(all(#(#checks),*))]
-        #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return)]
+        #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return, clippy::unwrap_in_result)]
         {
             return #rt
                 .enable_all()
