@@ -112,33 +112,10 @@ where
 
     #[cfg(feature = "rt")]
     {
-        use crate::loom::sync::Arc;
         use crate::runtime::context;
-        use crate::runtime::scheduler::Context;
-        use crate::runtime::scheduler::Handle::CurrentThread;
-        #[cfg(feature = "rt-multi-thread")]
-        use crate::runtime::scheduler::Handle::MultiThread;
 
-        let is_same_rt = context::with_current(|cur_hdl| match (cur_hdl, hdl) {
-            (CurrentThread(cur_hdl), CurrentThread(hdl)) => Arc::ptr_eq(cur_hdl, hdl),
-            #[cfg(feature = "rt-multi-thread")]
-            (MultiThread(cur_hdl), MultiThread(hdl)) => Arc::ptr_eq(cur_hdl, hdl),
-            #[cfg(feature = "rt-multi-thread")]
-            // this above cfg is needed to avoid the compiler warning reported by:
-            // cargo check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json \
-            //     --manifest-path tokio/Cargo.toml --no-default-features \
-            //     --features test-util`
-            // error: unreachable pattern
-            //    --> tokio/src/runtime/time/timer.rs:118:13
-            //     |
-            // 115 |             (CurrentThread(cur_hdl), CurrentThread(hdl)) => Arc::ptr_eq(cur_hdl, hdl),
-            //     |             -------------------------------------------- matches all the relevant values
-            // ...
-            // 118 |             _ => false,
-            //     |             ^ no value can reach this
-            _ => false,
-        })
-        .unwrap_or_default();
+        let is_same_rt =
+            context::with_current(|cur_hdl| cur_hdl.is_same_runtime(hdl)).unwrap_or_default();
 
         if !is_same_rt {
             // We don't want to create the timer in one runtime,
@@ -146,9 +123,7 @@ where
             f(None)
         } else {
             context::with_scheduler(|maybe_cx| match maybe_cx {
-                Some(Context::CurrentThread(cx)) => cx.with_wheel(f),
-                #[cfg(feature = "rt-multi-thread")]
-                Some(Context::MultiThread(cx)) => cx.with_wheel(f),
+                Some(cx) => cx.with_wheel(f),
                 None => f(None),
             })
         }
@@ -164,21 +139,8 @@ fn push_from_remote(sched_hdl: &SchedulerHandle, entry_hdl: EntryHandle) {
 
     #[cfg(feature = "rt")]
     {
-        use crate::runtime::scheduler::Handle::CurrentThread;
-        #[cfg(feature = "rt-multi-thread")]
-        use crate::runtime::scheduler::Handle::MultiThread;
-
-        match sched_hdl {
-            CurrentThread(hdl) => {
-                assert!(!hdl.is_shutdown(), "{RUNTIME_SHUTTING_DOWN_ERROR}");
-                hdl.push_remote_timer(entry_hdl)
-            }
-            #[cfg(feature = "rt-multi-thread")]
-            MultiThread(hdl) => {
-                assert!(!hdl.is_shutdown(), "{RUNTIME_SHUTTING_DOWN_ERROR}");
-                hdl.push_remote_timer(entry_hdl)
-            }
-        }
+        assert!(!sched_hdl.is_shutdown(), "{RUNTIME_SHUTTING_DOWN_ERROR}");
+        sched_hdl.push_remote_timer(entry_hdl);
     }
 }
 
