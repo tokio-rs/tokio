@@ -468,14 +468,21 @@ impl Context {
             let mut core = core;
 
             let mut time_context = core.time_context.take().unwrap();
-            util::time::remove_cancelled_timers(&mut time_context.wheel, &mut time_context.canc_rx);
-            let should_yield = util::time::insert_inject_timers(
-                &mut time_context.wheel,
-                &time_context.canc_tx,
-                handle.take_remote_timers(),
-            );
-            let next_timer = util::time::next_expiration_time(&time_context.wheel, &handle.driver);
-            core.time_context = Some(time_context);
+            let (mut core, (should_yield, next_timer)) = self.enter(core, || {
+                util::time::remove_cancelled_timers(
+                    &mut time_context.wheel,
+                    &mut time_context.canc_rx,
+                );
+                let should_yield = util::time::insert_inject_timers(
+                    &mut time_context.wheel,
+                    &time_context.canc_tx,
+                    handle.take_remote_timers(),
+                );
+                let next_timer =
+                    util::time::next_expiration_time(&time_context.wheel, &handle.driver);
+                (should_yield, next_timer)
+            });
+            assert!(core.time_context.replace(time_context).is_none());
 
             if should_yield {
                 (core, Some(Duration::from_millis(0)), None)
@@ -518,8 +525,10 @@ impl Context {
             let mut core = core;
 
             let mut time_context = core.time_context.take().unwrap();
-            util::time::post_auto_advance(&handle.driver, maybe_advance_duration);
-            util::time::process_expired_timers(&mut time_context.wheel, &handle.driver);
+            let (mut core, ()) = self.enter(core, || {
+                util::time::post_auto_advance(&handle.driver, maybe_advance_duration);
+                util::time::process_expired_timers(&mut time_context.wheel, &handle.driver);
+            });
             core.time_context = Some(time_context);
 
             core

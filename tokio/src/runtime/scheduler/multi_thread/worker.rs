@@ -798,10 +798,12 @@ impl Context {
         self.assert_lifo_enabled_is_correct(&core);
 
         #[cfg(feature = "time")]
-        let (duration, maybe_advance_duration) = {
+        let (mut core, duration, maybe_advance_duration) = {
             let handle = &self.worker.handle;
 
             let mut time_context = core.time_context.take().expect("time context missing");
+            // Store `core` in context
+            *self.core.borrow_mut() = Some(core);
             util::time::remove_cancelled_timers(&mut time_context.wheel, &mut time_context.canc_rx);
             let should_yield = util::time::insert_inject_timers(
                 &mut time_context.wheel,
@@ -809,10 +811,11 @@ impl Context {
                 handle.take_remote_timers(),
             );
             let next_timer = util::time::next_expiration_time(&time_context.wheel, &handle.driver);
+            let mut core = self.core.borrow_mut().take().expect("core missing");
             core.time_context = Some(time_context);
 
             if should_yield {
-                (Some(Duration::from_millis(0)), None)
+                (core, Some(Duration::from_millis(0)), None)
             } else {
                 let dur = match (next_timer, duration) {
                     (Some(next_timer), Some(park_duration)) => Some(next_timer.min(park_duration)),
@@ -821,9 +824,9 @@ impl Context {
                     (None, None) => None,
                 };
                 if util::time::pre_auto_advance(&handle.driver, dur) {
-                    (Some(Duration::ZERO), dur)
+                    (core, Some(Duration::ZERO), dur)
                 } else {
-                    (dur, None)
+                    (core, dur, None)
                 }
             }
         };
@@ -843,17 +846,22 @@ impl Context {
 
         self.defer.wake();
 
-        // Remove `core` from context
-        core = self.core.borrow_mut().take().expect("core missing");
-
         #[cfg(feature = "time")]
         {
             let handle = &self.worker.handle;
+            // Remove `core` from context
+            core = self.core.borrow_mut().take().expect("core missing");
+
             let mut core_time_context = core.time_context.take().expect("time context missing");
             util::time::post_auto_advance(&handle.driver, maybe_advance_duration);
             util::time::process_expired_timers(&mut core_time_context.wheel, &handle.driver);
             core.time_context = Some(core_time_context);
+
+            assert!(self.core.borrow_mut().replace(core).is_none());
         }
+
+        // Remove `core` from context
+        core = self.core.borrow_mut().take().expect("core missing");
 
         // Place `park` back in `core`
         core.park = Some(park);
