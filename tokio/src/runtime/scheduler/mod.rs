@@ -116,7 +116,8 @@ cfg_rt! {
                     (Handle::CurrentThread(a), Handle::CurrentThread(b)) => Arc::ptr_eq(a, b),
                     #[cfg(feature = "rt-multi-thread")]
                     (Handle::MultiThread(a), Handle::MultiThread(b)) => Arc::ptr_eq(a, b),
-                    _ => false,
+                    #[cfg(feature = "rt-multi-thread")]
+                    _ => false, // different runtime types
                 }
             }
 
