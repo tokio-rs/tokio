@@ -96,5 +96,10 @@ name = "time_timeout"
 path = "time_timeout.rs"
 harness = false
 
+[[bench]]
+name = "time_drop_sleep_contention"
+path = "time_drop_sleep_contention.rs"
+harness = false
+
 [lints]
 workspace = true
