@@ -421,6 +421,7 @@ where
             Some(core) => core,
             None => return Ok(()),
         };
+        #[cfg(feature = "time")]
         assert!(
             core.time_context.is_some(),
             "should always be `Some` unless processing local timers"
