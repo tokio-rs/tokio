@@ -179,6 +179,7 @@ impl Handle {
     }
 
     pub(crate) fn register_waker(&self, waker: &Waker) {
+        let _lock = self.entry.state.lock();
         self.entry.waker.register_by_ref(waker);
     }
 
