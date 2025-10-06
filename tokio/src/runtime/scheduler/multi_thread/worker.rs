@@ -77,7 +77,7 @@ use std::time::Duration;
 
 cfg_time! {
     use crate::runtime::scheduler::util;
-    use crate::runtime::time::{EntryHandle, Wheel, cancellation_queue};
+    use crate::runtime::time::EntryHandle;
 }
 
 mod metrics;
@@ -122,16 +122,7 @@ struct Core {
     run_queue: queue::Local<Arc<Handle>>,
 
     #[cfg(feature = "time")]
-    /// Worker local timer wheel
-    wheel: Wheel,
-
-    #[cfg(feature = "time")]
-    /// Channel for sending timers that need to be cancelled
-    timer_cancel_tx: cancellation_queue::Sender,
-
-    #[cfg(feature = "time")]
-    /// Channel for receiving timers that need to be cancelled
-    timer_cancel_rx: cancellation_queue::Receiver,
+    time_context: Option<crate::runtime::time::Context2>,
 
     /// True if the worker is currently searching for more work. Searching
     /// involves attempting to steal from other workers.
@@ -278,8 +269,6 @@ pub(super) fn create(
         let unpark = park.unpark();
         let metrics = WorkerMetrics::from_config(&config);
         let stats = Stats::new(&metrics);
-        #[cfg(feature = "time")]
-        let (timer_cancel_tx, timer_cancel_rx) = cancellation_queue::new();
 
         cores.push(Box::new(Core {
             tick: 0,
@@ -287,11 +276,7 @@ pub(super) fn create(
             lifo_enabled: !config.disable_lifo_slot,
             run_queue,
             #[cfg(feature = "time")]
-            wheel: Wheel::new(),
-            #[cfg(feature = "time")]
-            timer_cancel_tx,
-            #[cfg(feature = "time")]
-            timer_cancel_rx,
+            time_context: Some(crate::runtime::time::Context2::new()),
             is_searching: false,
             is_shutdown: false,
             is_traced: false,
@@ -436,6 +421,10 @@ where
             Some(core) => core,
             None => return Ok(()),
         };
+        assert!(
+            core.time_context.is_some(),
+            "should always be `Some` unless processing local timers"
+        );
 
         // If we heavily call `spawn_blocking`, there might be no available thread to
         // run this core. Except for the task in the lifo_slot, all tasks can be
@@ -596,14 +585,17 @@ impl Context {
         }
 
         #[cfg(feature = "time")]
-        util::time::shutdown_local_timers(
-            &mut core.wheel,
-            &core.timer_cancel_tx,
-            &mut core.timer_cancel_rx,
-            self.worker.handle.take_remote_timers(),
-            &self.worker.handle.driver,
-        );
-
+        {
+            let mut time_context = core.time_context.take().expect("time context missing");
+            util::time::shutdown_local_timers(
+                &mut time_context.wheel,
+                &time_context.canc_tx,
+                &mut time_context.canc_rx,
+                self.worker.handle.take_remote_timers(),
+                &self.worker.handle.driver,
+            );
+            core.time_context = Some(time_context);
+        }
         core.pre_shutdown(&self.worker);
         // Signal shutdown
         self.worker.handle.shutdown_core(core);
@@ -808,13 +800,16 @@ impl Context {
         let (duration, maybe_advance_duration) = {
             let handle = &self.worker.handle;
 
-            util::time::remove_cancelled_timers(&mut core.wheel, &mut core.timer_cancel_rx);
+            let mut time_context = core.time_context.take().expect("time context missing");
+            util::time::remove_cancelled_timers(&mut time_context.wheel, &mut time_context.canc_rx);
             let should_yield = util::time::insert_inject_timers(
-                &mut core.wheel,
-                &core.timer_cancel_tx,
+                &mut time_context.wheel,
+                &time_context.canc_tx,
                 handle.take_remote_timers(),
             );
-            let next_timer = util::time::next_expiration_time(&core.wheel, &handle.driver);
+            let next_timer = util::time::next_expiration_time(&time_context.wheel, &handle.driver);
+            core.time_context = Some(time_context);
+
             if should_yield {
                 (Some(Duration::from_millis(0)), None)
             } else {
@@ -853,8 +848,10 @@ impl Context {
         #[cfg(feature = "time")]
         {
             let handle = &self.worker.handle;
+            let mut core_time_context = core.time_context.take().expect("time context missing");
             util::time::post_auto_advance(&handle.driver, maybe_advance_duration);
-            util::time::process_expired_timers(&mut core.wheel, &handle.driver);
+            util::time::process_expired_timers(&mut core_time_context.wheel, &handle.driver);
+            core.time_context = Some(core_time_context);
         }
 
         // Place `park` back in `core`
@@ -895,10 +892,13 @@ impl Context {
             self.with_core(|maybe_core| {
                 match maybe_core {
                     Some(core) if core.is_shutdown => f(Some(crate::runtime::time::Context::Shutdown)),
-                    Some(core) => f(Some(crate::runtime::time::Context::Running {
-                        wheel: &mut core.wheel,
-                        canc_tx: &core.timer_cancel_tx,
-                    })),
+                    Some(core) => {
+                        let time_context = core.time_context.as_mut().expect("time context missing");
+                        f(Some(crate::runtime::time::Context::Running {
+                            wheel: &mut time_context.wheel,
+                            canc_tx: &time_context.canc_tx,
+                        }))
+                    }
                     None => f(None),
                 }
             })

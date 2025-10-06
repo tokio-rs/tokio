@@ -151,6 +151,23 @@ cfg_rt_or_time! {
         /// The runtime is shutting down, no timers can be registered.
         Shutdown,
     }
+
+    pub(crate) struct Context2 {
+        pub(crate) wheel: Wheel,
+        pub(crate) canc_tx: cancellation_queue::Sender,
+        pub(crate) canc_rx: cancellation_queue::Receiver,
+    }
+
+    impl Context2 {
+        pub(crate) fn new() -> Self {
+            let (canc_tx, canc_rx) = cancellation_queue::new();
+            Self {
+                wheel: Wheel::new(),
+                canc_tx,
+                canc_rx,
+            }
+        }
+    }
 }
 
 #[cfg(test)]
