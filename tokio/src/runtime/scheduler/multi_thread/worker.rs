@@ -851,12 +851,12 @@ impl Context {
             let handle = &self.worker.handle;
             // Remove `core` from context
             core = self.core.borrow_mut().take().expect("core missing");
-
-            let mut core_time_context = core.time_context.take().expect("time context missing");
+            let mut time_context = core.time_context.take().expect("time context missing");
+            *self.core.borrow_mut() = Some(core);
             util::time::post_auto_advance(&handle.driver, maybe_advance_duration);
-            util::time::process_expired_timers(&mut core_time_context.wheel, &handle.driver);
-            core.time_context = Some(core_time_context);
-
+            util::time::process_expired_timers(&mut time_context.wheel, &handle.driver);
+            core = self.core.borrow_mut().take().expect("core missing");
+            core.time_context = Some(time_context);
             assert!(self.core.borrow_mut().replace(core).is_none());
         }
 
