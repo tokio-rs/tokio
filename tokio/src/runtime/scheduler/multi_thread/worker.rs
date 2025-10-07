@@ -902,11 +902,13 @@ impl Context {
                 match maybe_core {
                     Some(core) if core.is_shutdown => f(Some(crate::runtime::time::Context::Shutdown)),
                     Some(core) => {
-                        let time_context = core.time_context.as_mut().expect("time context missing");
-                        f(Some(crate::runtime::time::Context::Running {
-                            wheel: &mut time_context.wheel,
-                            canc_tx: &time_context.canc_tx,
-                        }))
+                        match core.time_context {
+                            Some(ref mut time_context) => f(Some(crate::runtime::time::Context::Running {
+                                wheel: &mut time_context.wheel,
+                                canc_tx: &time_context.canc_tx,
+                            })),
+                            None => f(None),
+                        }
                     }
                     None => f(None),
                 }
