@@ -448,6 +448,7 @@ fn spawn_local_local_runtime() {
 
     rt.block_on(async {
         let mut map = JoinMap::new();
+
         spawn_index_tasks(&mut map, N, None);
 
         assert!(map.join_next().now_or_never().is_none());
@@ -468,6 +469,7 @@ fn spawn_local_on_local_runtime() {
     rt.block_on(async {
         let local = LocalSet::new();
         let mut map = JoinMap::new();
+
         spawn_index_tasks(&mut map, N, Some(&local));
 
         assert!(map.join_next().now_or_never().is_none());
