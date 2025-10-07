@@ -451,6 +451,7 @@ fn spawn_local_local_runtime() {
         spawn_index_tasks(&mut map, N, None);
 
         assert!(map.join_next().now_or_never().is_none());
+
         drain_joinmap_and_assert(map, N).await;
     });
 }
@@ -538,6 +539,7 @@ async fn spawn_local_running_localset() {
             let mut map = JoinMap::new();
 
             spawn_index_tasks(&mut map, N, None);
+
             drain_joinmap_and_assert(map, N).await;
         })
         .await;
@@ -574,6 +576,7 @@ async fn shutdown_spawn_local_localset() {
         .run_until(async {
             let mut map = JoinMap::new();
             let mut receivers = Vec::new();
+
             spawn_pending_tasks(&mut map, &mut receivers, N, None);
 
             assert!(map.join_next().now_or_never().is_none());
