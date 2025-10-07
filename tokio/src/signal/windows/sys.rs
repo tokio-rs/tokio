@@ -4,7 +4,7 @@ use std::sync::Once;
 use crate::signal::registry::{globals, EventId, EventInfo, Init, Storage};
 use crate::signal::RxFuture;
 
-use windows_sys::Win32::Foundation::BOOL;
+use windows_sys::core::BOOL;
 use windows_sys::Win32::System::Console as console;
 
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
