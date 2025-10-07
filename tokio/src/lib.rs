@@ -194,6 +194,8 @@
 //! [`thread_keep_alive`]: crate::runtime::Builder::thread_keep_alive()
 //!
 //! ```
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! #[tokio::main]
 //! async fn main() {
 //!     // This is running on a core thread.
@@ -208,6 +210,7 @@
 //!     // panic.
 //!     blocking_task.await.unwrap();
 //! }
+//! # }
 //! ```
 //!
 //! If your code is CPU-bound and you wish to limit the number of threads used
@@ -266,6 +269,8 @@
 //! A simple TCP echo server:
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::net::TcpListener;
 //! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!
@@ -300,6 +305,7 @@
 //!         });
 //!     }
 //! }
+//! # }
 //! ```
 //!
 //! # Feature flags
@@ -331,11 +337,11 @@
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
-//! - `parking_lot`: As a potential optimization, use the `_parking_lot_` crate's
+//! - `parking_lot`: As a potential optimization, use the [`parking_lot`] crate's
 //!   synchronization primitives internally. Also, this
 //!   dependency is necessary to construct some of our primitives
 //!   in a `const` context. `MSRV` may increase according to the
-//!   `_parking_lot_` release in use.
+//!   [`parking_lot`] release in use.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._
@@ -473,6 +479,9 @@ compile_error! {
     )
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
+
+#[cfg(all(not(tokio_unstable), feature = "io-uring"))]
+compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");
 
 #[cfg(all(not(tokio_unstable), tokio_taskdump))]
 compile_error!("The `tokio_taskdump` feature requires `--cfg tokio_unstable`.");
