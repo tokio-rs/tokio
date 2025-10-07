@@ -17,6 +17,64 @@ fn rt() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
+// Spawn `N` tasks that return their index (`i`).
+fn spawn_index_tasks(map: &mut JoinMap<usize, usize>, n: usize, on: Option<&LocalSet>) {
+    for i in 0..n {
+        let rc = std::rc::Rc::new(i);
+        match on {
+            None => map.spawn_local(i, async move { *rc }),
+            Some(local) => map.spawn_local_on(i, async move { *rc }, local),
+        };
+    }
+}
+
+// Spawn `N` “pending” tasks that own a `oneshot::Sender`.
+// When the task is aborted the sender is dropped, which is observed
+// via the returned `Receiver`s.
+fn spawn_pending_tasks(
+    map: &mut JoinMap<usize, ()>,
+    receivers: &mut Vec<oneshot::Receiver<()>>,
+    n: usize,
+    on: Option<&LocalSet>,
+) {
+    for i in 0..n {
+        let (tx, rx) = oneshot::channel::<()>();
+        receivers.push(rx);
+
+        let fut = async move {
+            pending::<()>().await;
+            drop(tx);
+        };
+        match on {
+            None => map.spawn_local(i, fut),
+            Some(local) => map.spawn_local_on(i, fut, local),
+        };
+    }
+}
+
+/// Await every task in JoinMap and assert every task returns its own key.
+async fn drain_joinmap_and_assert(mut map: JoinMap<usize, usize>, n: usize) {
+    let mut seen = vec![false; n];
+    while let Some((k, res)) = map.join_next().await {
+        let v = res.expect("task panicked");
+        assert_eq!(k, v);
+        seen[v] = true;
+    }
+    assert!(seen.into_iter().all(|b| b));
+    assert!(map.is_empty());
+}
+
+// Await every receiver and assert they all return `Err` because the
+// corresponding sender (inside an aborted task) was dropped.
+async fn await_receivers_and_assert(receivers: Vec<oneshot::Receiver<()>>) {
+    for rx in receivers {
+        assert!(
+            rx.await.is_err(),
+            "task should have been aborted and sender dropped"
+        );
+    }
+}
+
 #[tokio::test(start_paused = true)]
 async fn test_with_sleep() {
     let mut map = JoinMap::new();
@@ -386,29 +444,15 @@ async fn duplicate_keys_drop() {
 #[test]
 fn spawn_local_local_runtime() {
     const N: usize = 8;
-    let rt = LocalRuntime::new().expect("failed to create LocalRuntime");
+    let rt = LocalRuntime::new().unwrap();
 
-    let completed: [bool; N] = rt.block_on(async {
+    rt.block_on(async {
         let mut map = JoinMap::new();
-        for i in 0..N {
-            let rc = std::rc::Rc::new(i);
-            map.spawn_local(i, async move { *rc });
-        }
+        spawn_index_tasks(&mut map, N, None);
 
         assert!(map.join_next().now_or_never().is_none());
-
-        let mut seen = [false; N];
-        while let Some((k, res)) = map.join_next().await {
-            let v = res.expect("task panicked");
-            assert_eq!(k, v);
-            seen[v] = true;
-        }
-
-        assert!(map.is_empty());
-        seen
+        drain_joinmap_and_assert(map, N).await;
     });
-
-    assert!(completed.into_iter().all(|b| b));
 }
 
 // Drive a `JoinMap` on top of a `LocalRuntime` and verify that tasks
@@ -418,33 +462,20 @@ fn spawn_local_local_runtime() {
 #[test]
 fn spawn_local_on_local_runtime() {
     const N: usize = 8;
-    let rt = LocalRuntime::new().expect("failed to build LocalRuntime");
+    let rt = LocalRuntime::new().unwrap();
 
     rt.block_on(async {
         let local = LocalSet::new();
         let mut map = JoinMap::new();
-        for i in 0..N {
-            let rc = std::rc::Rc::new(i);
-            map.spawn_local_on(i, async move { *rc }, &local);
-        }
+        spawn_index_tasks(&mut map, N, Some(&local));
 
         assert!(map.join_next().now_or_never().is_none());
 
-        let mut results = local
+        local
             .run_until(async move {
-                let mut out = Vec::<usize>::with_capacity(N);
-                while let Some((k, res)) = map.join_next().await {
-                    let v = res.expect("task panicked");
-                    assert_eq!(k, v);
-                    out.push(v);
-                }
-                assert!(map.is_empty());
-                out
+                drain_joinmap_and_assert(map, N).await;
             })
             .await;
-
-        results.sort();
-        assert_eq!(results, (0..N).collect::<Vec<_>>());
     });
 }
 
@@ -455,33 +486,19 @@ fn spawn_local_on_local_runtime() {
 #[test]
 fn shutdown_spawn_local_local_runtime() {
     const N: usize = 8;
-    let rt = LocalRuntime::new().expect("failed to build LocalRuntime");
+    let rt = LocalRuntime::new().unwrap();
 
     rt.block_on(async {
         let mut map = JoinMap::new();
         let mut receivers = Vec::new();
 
-        for i in 0..N {
-            let (tx, rx) = oneshot::channel::<()>();
-            receivers.push(rx);
-
-            map.spawn_local(i, async move {
-                pending::<()>().await;
-                drop(tx);
-            });
-        }
+        spawn_pending_tasks(&mut map, &mut receivers, N, None);
 
         assert!(map.join_next().now_or_never().is_none());
 
         map.shutdown().await;
         assert!(map.is_empty());
-
-        for rx in receivers {
-            assert!(
-                rx.await.is_err(),
-                "the task should have been aborted and the sender dropped",
-            );
-        }
+        await_receivers_and_assert(receivers).await;
     });
 }
 
@@ -492,32 +509,19 @@ fn shutdown_spawn_local_local_runtime() {
 #[test]
 fn drop_spawn_local_local_runtime() {
     const N: usize = 8;
-    let rt = LocalRuntime::new().expect("failed to build LocalRuntime");
+    let rt = LocalRuntime::new().unwrap();
 
     rt.block_on(async {
         let mut map = JoinMap::new();
         let mut receivers = Vec::new();
 
-        for i in 0..N {
-            let (tx, rx) = oneshot::channel::<()>();
-            receivers.push(rx);
-
-            map.spawn_local(i, async move {
-                pending::<()>().await;
-                drop(tx);
-            });
-        }
+        spawn_pending_tasks(&mut map, &mut receivers, N, None);
 
         assert!(map.join_next().now_or_never().is_none());
 
         drop(map);
 
-        for rx in receivers {
-            assert!(
-                rx.await.is_err(),
-                "the task should have been aborted and the sender dropped"
-            );
-        }
+        await_receivers_and_assert(receivers).await;
     });
 }
 
@@ -532,18 +536,9 @@ async fn spawn_local_running_localset() {
     local
         .run_until(async move {
             let mut map = JoinMap::new();
-            for i in 0..N {
-                map.spawn_local(i, async move { i });
-            }
 
-            let mut seen = [false; N];
-            while let Some((k, res)) = map.join_next().await {
-                let v = res.expect("task failed");
-                assert_eq!(k, v);
-                seen[v] = true;
-            }
-            assert!(seen.into_iter().all(|b| b));
-            assert!(map.is_empty());
+            spawn_index_tasks(&mut map, N, None);
+            drain_joinmap_and_assert(map, N).await;
         })
         .await;
 }
@@ -554,29 +549,16 @@ async fn spawn_local_running_localset() {
 #[tokio::test(flavor = "current_thread")]
 async fn spawn_local_on_on_started_localset() {
     const N: usize = 8;
-
     let local = LocalSet::new();
     let mut pending_map = JoinMap::new();
 
-    for i in 0..N {
-        pending_map.spawn_local_on(i, async move { i }, &local);
-    }
+    spawn_index_tasks(&mut pending_map, N, Some(&local));
 
     assert!(pending_map.join_next().now_or_never().is_none());
 
     local
         .run_until(async move {
-            let mut map = pending_map;
-            let mut out = Vec::new();
-
-            while let Some((k, res)) = map.join_next().await {
-                let v = res.expect("task failed");
-                assert_eq!(k, v);
-                out.push(v);
-            }
-            out.sort();
-            assert_eq!(out, (0..N).collect::<Vec<_>>());
-            assert!(map.is_empty());
+            drain_joinmap_and_assert(pending_map, N).await;
         })
         .await;
 }
@@ -592,28 +574,14 @@ async fn shutdown_spawn_local_localset() {
         .run_until(async {
             let mut map = JoinMap::new();
             let mut receivers = Vec::new();
-
-            for i in 0..N {
-                let (tx, rx) = oneshot::channel::<()>();
-                receivers.push(rx);
-
-                map.spawn_local(i, async move {
-                    pending::<()>().await;
-                    drop(tx);
-                });
-            }
+            spawn_pending_tasks(&mut map, &mut receivers, N, None);
 
             assert!(map.join_next().now_or_never().is_none());
 
             map.shutdown().await;
-            assert!(map.is_empty());
 
-            for rx in receivers {
-                assert!(
-                    rx.await.is_err(),
-                    "the task should have been aborted and the sender dropped"
-                );
-            }
+            assert!(map.is_empty());
+            await_receivers_and_assert(receivers).await;
         })
         .await;
 }
@@ -623,24 +591,11 @@ async fn shutdown_spawn_local_localset() {
 #[tokio::test(flavor = "current_thread")]
 async fn shutdown_spawn_local_on() {
     const N: usize = 8;
-
     let local = LocalSet::new();
     let mut map = JoinMap::new();
     let mut receivers = Vec::new();
 
-    for i in 0..N {
-        let (tx, rx) = oneshot::channel::<()>();
-        receivers.push(rx);
-
-        map.spawn_local_on(
-            i,
-            async move {
-                pending::<()>().await;
-                drop(tx);
-            },
-            &local,
-        );
-    }
+    spawn_pending_tasks(&mut map, &mut receivers, N, Some(&local));
 
     assert!(map.join_next().now_or_never().is_none());
 
@@ -648,13 +603,7 @@ async fn shutdown_spawn_local_on() {
         .run_until(async move {
             map.shutdown().await;
             assert!(map.is_empty());
-
-            for rx in receivers {
-                assert!(
-                    rx.await.is_err(),
-                    "the task should have been aborted and the sender dropped"
-                );
-            }
+            await_receivers_and_assert(receivers).await;
         })
         .await;
 }
@@ -664,38 +613,18 @@ async fn shutdown_spawn_local_on() {
 #[tokio::test(flavor = "current_thread")]
 async fn drop_spawn_local_on() {
     const N: usize = 8;
-
     let local = LocalSet::new();
     let mut map = JoinMap::new();
     let mut receivers = Vec::new();
 
-    for i in 0..N {
-        let (tx, rx) = oneshot::channel::<()>();
-        receivers.push(rx);
-
-        map.spawn_local_on(
-            i,
-            async move {
-                pending::<()>().await;
-                drop(tx);
-            },
-            &local,
-        );
-    }
+    spawn_pending_tasks(&mut map, &mut receivers, N, Some(&local));
 
     assert!(map.join_next().now_or_never().is_none());
 
     drop(map);
 
     local
-        .run_until(async move {
-            for rx in receivers {
-                assert!(
-                    rx.await.is_err(),
-                    "the task should have been aborted and the sender dropped"
-                );
-            }
-        })
+        .run_until(async move { await_receivers_and_assert(receivers).await })
         .await;
 }
 
@@ -711,25 +640,13 @@ async fn drop_spawn_local_localset() {
             let mut map = JoinMap::new();
             let mut receivers = Vec::new();
 
-            for i in 0..N {
-                let (tx, rx) = oneshot::channel::<()>();
-                receivers.push(rx);
-                map.spawn_local(i, async move {
-                    pending::<()>().await;
-                    drop(tx);
-                });
-            }
+            spawn_pending_tasks(&mut map, &mut receivers, N, None);
 
             assert!(map.join_next().now_or_never().is_none());
 
             drop(map);
 
-            for rx in receivers {
-                assert!(
-                    rx.await.is_err(),
-                    "the task should have been aborted and the sender dropped"
-                );
-            }
+            await_receivers_and_assert(receivers).await;
         })
         .await;
 }
@@ -739,36 +656,18 @@ async fn drop_spawn_local_localset() {
 #[tokio::test(flavor = "current_thread")]
 async fn drop_spawn_local_on_running_localset() {
     const N: usize = 8;
-
     let local = LocalSet::new();
     let mut map = JoinMap::new();
     let mut receivers = Vec::new();
 
-    for i in 0..N {
-        let (tx, rx) = oneshot::channel::<()>();
-        receivers.push(rx);
-
-        map.spawn_local_on(
-            i,
-            async move {
-                pending::<()>().await;
-                drop(tx);
-            },
-            &local,
-        );
-    }
+    spawn_pending_tasks(&mut map, &mut receivers, N, Some(&local));
 
     assert!(map.join_next().now_or_never().is_none());
 
     local
         .run_until(async move {
             drop(map);
-            for rx in receivers {
-                assert!(
-                    rx.await.is_err(),
-                    "the task should have been aborted and the sender dropped"
-                );
-            }
+            await_receivers_and_assert(receivers).await;
         })
         .await;
 }
