@@ -252,6 +252,15 @@ impl Handle {
     /// timers will not work unless there is another thread currently calling
     /// [`Runtime::block_on`] on the same runtime.
     ///
+    /// If this function is called from within a Tokio runtime's asynchronous
+    /// context, such as inside a [`Runtime::block_on`] scope, or from a function
+    /// annotated with the [`tokio::main`] attribute macro, it will panic, because
+    /// nesting runtimes is not allowed.
+    /// The same applies when calling `Handle::block_on` to re-enter the current
+    /// runtime. To safely run asynchronous code from such a context, you can use
+    /// [`task::block_in_place`] (only available with the multi-thread scheduler),
+    /// as shown in the example below.
+    ///
     /// # If the runtime has been shut down
     ///
     /// If the `Handle`'s associated `Runtime` has been shut down (through
@@ -306,6 +315,23 @@ impl Handle {
     /// # }
     /// ```
     ///
+    /// `Handle::block_on` may use [`task::block_in_place`] to re-enter the async context of a multi-thread scheduler runtime:
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::task;
+    /// use tokio::runtime::Handle;
+    ///
+    /// # async fn docs() {
+    /// task::block_in_place(move || {
+    ///     Handle::current().block_on(async move {
+    ///         // do something async
+    ///     });
+    /// });
+    /// # }
+    /// # }
+    /// ```
+    ///
     /// [`JoinError`]: struct@crate::task::JoinError
     /// [`JoinHandle`]: struct@crate::task::JoinHandle
     /// [`Runtime::block_on`]: fn@crate::runtime::Runtime::block_on
@@ -315,6 +341,8 @@ impl Handle {
     /// [`tokio::fs`]: crate::fs
     /// [`tokio::net`]: crate::net
     /// [`tokio::time`]: crate::time
+    /// [`tokio::main`]: ../attr.main.html
+    /// [`task::block_in_place`]: crate::task::block_in_place
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let fut_size = mem::size_of::<F>();
