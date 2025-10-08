@@ -441,6 +441,7 @@ mod spawn_local {
     use super::*;
 
     mod local_runtime {
+        #[cfg(tokio_unstable)]
         use super::*;
 
         // JoinMap::spawn_local on a LocalRuntime
@@ -574,6 +575,7 @@ mod spawn_local_on {
     use super::*;
 
     mod local_runtime {
+        #[cfg(tokio_unstable)]
         use super::*;
 
         // Drive a `JoinMap` on top of a `LocalRuntime` and verify that tasks

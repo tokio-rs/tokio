@@ -410,6 +410,7 @@ mod spawn_local {
     use super::*;
 
     mod local_runtime {
+        #[cfg(tokio_unstable)]
         use super::*;
 
         // JoinSet::spawn_local on a LocalRuntime
@@ -546,6 +547,7 @@ mod spawn_local_on {
     use super::*;
 
     mod local_runtime {
+        #[cfg(tokio_unstable)]
         use super::*;
 
         // Drive a `LocalSet` on top of a `LocalRuntime` and verify that tasks
