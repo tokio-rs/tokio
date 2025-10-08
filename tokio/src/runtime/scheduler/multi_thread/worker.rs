@@ -794,42 +794,14 @@ impl Context {
         self.park_internal(core, Some(Duration::from_millis(0)))
     }
 
-    fn park_internal(&self, mut core: Box<Core>, duration: Option<Duration>) -> Box<Core> {
+    fn park_internal(&self, core: Box<Core>, duration: Option<Duration>) -> Box<Core> {
         self.assert_lifo_enabled_is_correct(&core);
 
-        #[cfg(feature = "time")]
-        let (mut core, duration, maybe_advance_duration) = {
-            let handle = &self.worker.handle;
-
-            let mut time_context = core.time_context.take().expect("time context missing");
-            // Store `core` in context
-            *self.core.borrow_mut() = Some(core);
-            util::time::remove_cancelled_timers(&mut time_context.wheel, &mut time_context.canc_rx);
-            let should_yield = util::time::insert_inject_timers(
-                &mut time_context.wheel,
-                &time_context.canc_tx,
-                handle.take_remote_timers(),
-            );
-            let next_timer = util::time::next_expiration_time(&time_context.wheel, &handle.driver);
-            let mut core = self.core.borrow_mut().take().expect("core missing");
-            core.time_context = Some(time_context);
-
-            if should_yield {
-                (core, Some(Duration::from_millis(0)), None)
-            } else {
-                let dur = match (next_timer, duration) {
-                    (Some(next_timer), Some(park_duration)) => Some(next_timer.min(park_duration)),
-                    (Some(next_timer), None) => Some(next_timer),
-                    (None, Some(park_duration)) => Some(park_duration),
-                    (None, None) => None,
-                };
-                if util::time::pre_auto_advance(&handle.driver, dur) {
-                    (core, Some(Duration::ZERO), dur)
-                } else {
-                    (core, dur, None)
-                }
-            }
-        };
+        let MaintainLocalTimer {
+            mut core,
+            park_duration: duration,
+            auto_advance_duration,
+        } = self.maintain_local_timers_before_parking(core, duration);
 
         // Take the parker out of core
         let mut park = core.park.take().expect("park missing");
@@ -846,25 +818,13 @@ impl Context {
 
         self.defer.wake();
 
-        #[cfg(feature = "time")]
-        {
-            let handle = &self.worker.handle;
-            // Remove `core` from context
-            core = self.core.borrow_mut().take().expect("core missing");
-            let mut time_context = core.time_context.take().expect("time context missing");
-            *self.core.borrow_mut() = Some(core);
-            util::time::post_auto_advance(&handle.driver, maybe_advance_duration);
-            util::time::process_expired_timers(&mut time_context.wheel, &handle.driver);
-            core = self.core.borrow_mut().take().expect("core missing");
-            core.time_context = Some(time_context);
-            assert!(self.core.borrow_mut().replace(core).is_none());
-        }
-
         // Remove `core` from context
         core = self.core.borrow_mut().take().expect("core missing");
 
         // Place `park` back in `core`
         core.park = Some(park);
+
+        core = self.maintain_local_timers_after_parking(core, auto_advance_duration);
 
         if core.should_notify_others() {
             self.worker.handle.notify_parked_local();
@@ -884,6 +844,89 @@ impl Context {
     }
 
     cfg_time! {
+        /// Maintain local timers before parking the resource driver.
+        ///
+        /// * Remove cancelled timers from the local timer wheel.
+        /// * Register remote timers to the local timer wheel.
+        /// * Adjust the park duration based on
+        ///   * the next timer expiration time.
+        ///   * whether auto-advancing is required (feature = "test-util").
+        ///
+        /// # Returns
+        ///
+        /// `(Box<Core>, park_duration, auto_advance_duration)`
+        fn maintain_local_timers_before_parking(
+            &self,core: Box<Core>,
+            park_duration: Option<Duration>
+        ) -> MaintainLocalTimer {
+            let (core, park_duration, auto_advance_duration) = {
+                let handle = &self.worker.handle;
+
+                let (core, (should_yield, next_timer)) =
+                    self.enter_with_time_context(core, |time_cx| {
+                        util::time::remove_cancelled_timers(&mut time_cx.wheel, &mut time_cx.canc_rx);
+                        let should_yield = util::time::insert_inject_timers(
+                            &mut time_cx.wheel,
+                            &time_cx.canc_tx,
+                            handle.take_remote_timers(),
+                        );
+                        let next_timer =
+                            util::time::next_expiration_time(&time_cx.wheel, &handle.driver);
+                        (should_yield, next_timer)
+                    });
+
+                if should_yield {
+                    (core, Some(Duration::from_millis(0)), None)
+                } else {
+                    let dur = match (next_timer, park_duration) {
+                        (Some(next_timer), Some(park_duration)) => Some(next_timer.min(park_duration)),
+                        (Some(next_timer), None) => Some(next_timer),
+                        (None, Some(park_duration)) => Some(park_duration),
+                        (None, None) => None,
+                    };
+                    if util::time::pre_auto_advance(&handle.driver, dur) {
+                        (core, Some(Duration::ZERO), dur)
+                    } else {
+                        (core, dur, None)
+                    }
+                }
+            };
+
+            MaintainLocalTimer { core, park_duration, auto_advance_duration }
+        }
+
+        /// Maintain local timers after unparking the resource driver.
+        ///
+        /// * Auto-advance time, if required (feature = "test-util").
+        /// * Process expired timers.
+        fn maintain_local_timers_after_parking(
+            &self,
+            core: Box<Core>,
+            auto_advance_duration: Option<Duration>
+        ) -> Box<Core> {
+            let handle = &self.worker.handle;
+            let (core, ()) = self.enter_with_time_context(core, |time_cx| {
+                util::time::post_auto_advance(&handle.driver, auto_advance_duration);
+                util::time::process_expired_timers(&mut time_cx.wheel, &handle.driver);
+            });
+            core
+        }
+
+        /// Take out the time context from the core,
+        /// and then setup the [`Core`] to the thread-local [`Context`],
+        /// finally, run the provided closure `f` with the time context.
+        fn enter_with_time_context<F, R>(&self, mut core: Box<Core>, f: F) -> (Box<Core>, R)
+        where
+            F: FnOnce(&mut crate::runtime::time::Context2) -> R,
+        {
+            let mut time_cx = core.time_context.take().expect("time context missing");
+            assert!(self.core.borrow_mut().replace(core).is_none());
+            let ret = f(&mut time_cx);
+            let mut core = self.core.borrow_mut().take().expect("core missing");
+            assert!(core.time_context.replace(time_cx).is_none());
+            (core, ret)
+        }
+
         fn with_core<F, R>(&self, f: F) -> R
         where
             F: FnOnce(Option<&mut Core>) -> R,
@@ -914,7 +957,25 @@ impl Context {
                 }
             })
         }
-    }
+    } // cfg_time!
+
+    cfg_not_time! {
+        fn maintain_local_timers_before_parking(
+            &self,
+            core: Box<Core>,
+            park_duration: Option<Duration>
+        ) -> MaintainLocalTimer {
+            MaintainLocalTimer { core, park_duration, auto_advance_duration: None }
+        }
+
+        fn maintain_local_timers_after_parking(
+            &self,
+            core: Box<Core>,
+            _auto_advance_duration: Option<Duration>
+        ) -> Box<Core> {
+            core
+        }
+    } // cfg_not_time!
 }
 
 impl Core {
@@ -1389,6 +1450,13 @@ impl<'a> Lock<inject::Synced> for &'a Handle {
             lock: self.shared.synced.lock(),
         }
     }
+}
+
+/// Returned by [`Context::maintain_local_timers_before_parking`].
+struct MaintainLocalTimer {
+    core: Box<Core>,
+    park_duration: Option<Duration>,
+    auto_advance_duration: Option<Duration>,
 }
 
 #[track_caller]

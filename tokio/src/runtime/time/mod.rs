@@ -138,7 +138,7 @@ impl Driver {
 }
 
 cfg_rt_or_time! {
-    /// Local context for the time driver.
+    /// Local context for the time driver, used when creating timers.
     pub(crate) enum Context<'a> {
         /// The runtime is running, we can access it.
         Running {
@@ -152,6 +152,8 @@ cfg_rt_or_time! {
         Shutdown,
     }
 
+    /// Local context for the time driver, used when the runtime wants to
+    /// fire/cancel timers.
     pub(crate) struct Context2 {
         pub(crate) wheel: Wheel,
         pub(crate) canc_tx: cancellation_queue::Sender,
