@@ -337,11 +337,11 @@
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
-//! - `parking_lot`: As a potential optimization, use the `_parking_lot_` crate's
+//! - `parking_lot`: As a potential optimization, use the [`parking_lot`] crate's
 //!   synchronization primitives internally. Also, this
 //!   dependency is necessary to construct some of our primitives
 //!   in a `const` context. `MSRV` may increase according to the
-//!   `_parking_lot_` release in use.
+//!   [`parking_lot`] release in use.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._
