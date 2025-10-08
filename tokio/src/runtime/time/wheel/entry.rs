@@ -1,6 +1,6 @@
 use super::cancellation_queue::Sender;
 use crate::loom::sync::{Arc, Mutex};
-use crate::{sync::AtomicWaker, util::linked_list};
+use crate::util::linked_list;
 
 use std::marker::PhantomPinned;
 use std::ptr::NonNull;
@@ -11,16 +11,16 @@ pub(crate) type EntryList = linked_list::LinkedList<Entry, Entry>;
 #[derive(Debug)]
 enum State {
     /// A pure new entry, no any changes to the state.
-    Unregistered,
+    Unregistered(Waker),
 
     /// The entry is registered to the timer wheel,
     /// but not in the pending queue of the timer wheel.
-    Registered(Sender),
+    Registered(Sender, Waker),
 
     /// The entry is in the pending queue of the timer wheel,
     /// and not in any wheel level, which means that
     /// the entry is reached its deadline and waiting to be woken up.
-    Pending,
+    Pending(Waker),
 
     /// The waker has been called, and the entry is no longer in the timer wheel
     /// (both each wheel level and the pending queue), which means that
@@ -41,9 +41,6 @@ pub(crate) struct Entry {
 
     /// The tick when this entry is scheduled to expire.
     deadline: u64,
-
-    /// The currently registered waker.
-    waker: AtomicWaker,
 
     state: Mutex<State>,
 
@@ -127,11 +124,9 @@ impl Handle {
             wheel_pointers: linked_list::Pointers::new(),
             cancel_pointers: linked_list::Pointers::new(),
             deadline,
-            waker: AtomicWaker::new(),
-            state: Mutex::new(State::Unregistered),
+            state: Mutex::new(State::Unregistered(waker.clone())),
             _pin: PhantomPinned,
         });
-        entry.waker.register_by_ref(waker);
 
         Handle { entry }
     }
@@ -141,14 +136,19 @@ impl Handle {
         let mut lock = self.entry.state.lock();
         match &*lock {
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (State::Unregistered | State::Registered(_)) => {
+            state @ (State::Unregistered(_) | State::Registered(_, _)) => {
                 panic!("corrupted state: {state:#?}")
             }
-            State::Pending => {
-                *lock = State::WokenUp;
+            State::Pending(_waker) => {
+                let old_state = std::mem::replace(&mut *lock, State::WokenUp);
                 // Since state has been updated, no need to hold the lock.
                 drop(lock);
-                self.entry.waker.wake();
+                if let State::Pending(old_waker) = old_state {
+                    // Merge the wakers to ensure that the most recent waker is used.
+                    old_waker.wake();
+                } else {
+                    unreachable!()
+                }
             }
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
             State::WokenUp => panic!("corrupted state: `State::WokenUp`"),
@@ -161,37 +161,59 @@ impl Handle {
     pub(crate) fn wake_unregistered(&self) {
         let mut lock = self.entry.state.lock();
         match &*lock {
-            State::Unregistered => {
-                *lock = State::WokenUp;
+            State::Unregistered(_waker) => {
+                let old_state = std::mem::replace(&mut *lock, State::WokenUp);
                 // Since state has been updated, no need to hold the lock.
                 drop(lock);
-                self.entry.waker.wake();
+                if let State::Unregistered(old_waker) = old_state {
+                    // Merge the wakers to ensure that the most recent waker is used.
+                    old_waker.wake();
+                } else {
+                    unreachable!()
+                }
             }
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (State::Registered(_) | State::WokenUp) => {
+            state @ (State::Registered(_, _) | State::WokenUp) => {
                 panic!("corrupted state: {state:#?}")
             }
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            State::Pending => panic!("corrupted state: State::Pending"),
+            State::Pending(_) => panic!("corrupted state: State::Pending"),
             // don't wake up cancelling entries
             State::Cancelling => (),
         }
     }
 
     pub(crate) fn register_waker(&self, waker: &Waker) {
-        let _lock = self.entry.state.lock();
-        self.entry.waker.register_by_ref(waker);
+        let mut lock = self.entry.state.lock();
+        match &mut *lock {
+            State::Unregistered(old_waker) => {
+                if !old_waker.will_wake(waker) {
+                    *old_waker = waker.clone();
+                }
+            }
+            State::Registered(_, old_waker) => {
+                if !old_waker.will_wake(waker) {
+                    *old_waker = waker.clone();
+                }
+            }
+            State::Pending(old_waker) => {
+                if !old_waker.will_wake(waker) {
+                    *old_waker = waker.clone();
+                }
+            }
+            State::WokenUp | State::Cancelling => (), // no need to update the waker
+        }
     }
 
     pub(crate) fn transition_to_registered(&self, cancel_tx: Sender) -> TransitionToRegistered {
         let mut lock = self.entry.state.lock();
         match &*lock {
-            State::Unregistered => {
-                *lock = State::Registered(cancel_tx);
+            State::Unregistered(waker) => {
+                *lock = State::Registered(cancel_tx, waker.clone());
                 TransitionToRegistered::Success
             }
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (State::Registered(_) | State::Pending | State::WokenUp) => {
+            state @ (State::Registered(_, _) | State::Pending(_) | State::WokenUp) => {
                 panic!("corrupted state: {state:#?}")
             }
             State::Cancelling => TransitionToRegistered::Cancelling,
@@ -206,13 +228,13 @@ impl Handle {
         let mut lock = self.entry.state.lock();
         match &*lock {
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            State::Unregistered => panic!("corrupted state: State::Unregistered"),
-            State::Registered(_) => {
-                *lock = State::Pending;
+            State::Unregistered(_) => panic!("corrupted state: State::Unregistered"),
+            State::Registered(_, waker) => {
+                *lock = State::Pending(waker.clone());
                 TransitionToPending::Success
             }
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (State::Pending | State::WokenUp) => panic!("corrupted state: {state:#?}"),
+            state @ (State::Pending(_) | State::WokenUp) => panic!("corrupted state: {state:#?}"),
             State::Cancelling => TransitionToPending::Cancelling,
         }
     }
@@ -221,8 +243,8 @@ impl Handle {
         let mut lock = self.entry.state.lock();
 
         match *lock {
-            State::Unregistered => *lock = State::Cancelling,
-            State::Registered(ref tx) => {
+            State::Unregistered(_) => *lock = State::Cancelling,
+            State::Registered(ref tx, _) => {
                 // Safety: entry is not in any cancellation queue
                 unsafe {
                     tx.send(self.clone());
@@ -230,7 +252,7 @@ impl Handle {
                 *lock = State::Cancelling;
             }
             // no need to cancel a pending or woken up entry
-            State::Pending | State::WokenUp => *lock = State::Cancelling,
+            State::Pending(_) | State::WokenUp => *lock = State::Cancelling,
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
             State::Cancelling => panic!("should not be called twice"),
         }
@@ -241,11 +263,11 @@ impl Handle {
     }
 
     pub(crate) fn is_registered(&self) -> bool {
-        matches!(*self.entry.state.lock(), State::Registered(_))
+        matches!(*self.entry.state.lock(), State::Registered(_, _))
     }
 
     pub(crate) fn is_pending(&self) -> bool {
-        matches!(*self.entry.state.lock(), State::Pending)
+        matches!(*self.entry.state.lock(), State::Pending(_))
     }
 
     pub(crate) fn is_woken_up(&self) -> bool {
