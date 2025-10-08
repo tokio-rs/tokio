@@ -406,244 +406,254 @@ async fn try_join_next_with_id() {
     assert_eq!(joined, spawned);
 }
 
-// JoinSet::spawn_local on a LocalRuntime
-// We create a `LocalRuntime`, enter it, spawn several local tasks with
-// `JoinSet::spawn_local`, and wait for every task to finish.
-#[cfg(tokio_unstable)]
-#[test]
-fn spawn_local_local_runtime() {
-    const N: usize = 8;
-    let rt = LocalRuntime::new().unwrap();
+mod spawn_local {
+    use super::*;
 
-    rt.block_on(async {
-        let mut set = JoinSet::new();
-        spawn_index_tasks(&mut set, N, None);
+    mod local_runtime {
+        use super::*;
 
-        assert!(set.try_join_next().is_none());
+        // JoinSet::spawn_local on a LocalRuntime
+        // We create a `LocalRuntime`, enter it, spawn several local tasks with
+        // `JoinSet::spawn_local`, and wait for every task to finish.
+        #[cfg(tokio_unstable)]
+        #[test]
+        fn spawn_local_local_runtime() {
+            const N: usize = 8;
+            let rt = LocalRuntime::new().unwrap();
 
-        drain_joinset_and_assert(set, N).await;
-    });
-}
+            rt.block_on(async {
+                let mut set = JoinSet::new();
+                spawn_index_tasks(&mut set, N, None);
 
-// Drive a `LocalSet` on top of a `LocalRuntime` and verify that tasks
-// queued with `JoinSet::spawn_local_on` run to completion only after the
-// `LocalSet` starts.
-#[cfg(tokio_unstable)]
-#[test]
-fn spawn_local_on_local_runtime() {
-    const N: usize = 8;
-    let rt = LocalRuntime::new().unwrap();
-
-    rt.block_on(async {
-        let local = LocalSet::new();
-        let mut set = JoinSet::new();
-
-        spawn_index_tasks(&mut set, N, Some(&local));
-
-        assert!(set.try_join_next().is_none());
-
-        local
-            .run_until(async move {
+                assert!(set.try_join_next().is_none());
                 drain_joinset_and_assert(set, N).await;
-            })
-            .await;
-    });
+            });
+        }
+
+        // Calling `JoinSet::shutdown` inside a `LocalRuntime` must
+        // abort and drain every still-running task that was
+        // inserted with `JoinSet::spawn_local`.
+        #[cfg(tokio_unstable)]
+        #[test]
+        fn shutdown_spawn_local_local_runtime() {
+            const N: usize = 8;
+            let rt = LocalRuntime::new().unwrap();
+
+            rt.block_on(async {
+                let mut set = JoinSet::new();
+                let mut receivers = Vec::new();
+
+                spawn_pending_tasks(&mut set, &mut receivers, N, None);
+
+                assert!(set.try_join_next().is_none());
+                set.shutdown().await;
+                assert!(set.is_empty());
+
+                await_receivers_and_assert(receivers).await;
+            });
+        }
+
+        // Dropping a `JoinSet` created inside a `LocalRuntime`
+        // must abort every still-running task that was
+        // added with `JoinSet::spawn_local`.
+        #[cfg(tokio_unstable)]
+        #[test]
+        fn drop_spawn_local_local_runtime() {
+            const N: usize = 8;
+            let rt = LocalRuntime::new().unwrap();
+
+            rt.block_on(async {
+                let mut set = JoinSet::new();
+                let mut receivers = Vec::new();
+
+                spawn_pending_tasks(&mut set, &mut receivers, N, None);
+
+                assert!(set.try_join_next().is_none());
+                drop(set);
+
+                await_receivers_and_assert(receivers).await;
+            });
+        }
+    }
+
+    mod local_set {
+        use super::*;
+
+        // JoinSet::spawn_local on a LocalSet.
+        // Every task is spawned with `spawn_local` **inside** the `LocalSet`
+        // that is currently running.
+        #[tokio::test(flavor = "current_thread")]
+        async fn spawn_local_running_localset() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+
+            local
+                .run_until(async move {
+                    let mut set = JoinSet::new();
+                    spawn_index_tasks(&mut set, N, None);
+                    drain_joinset_and_assert(set, N).await;
+                })
+                .await;
+        }
+
+        // Shutdown a `JoinSet` that was populated with `spawn_local`
+        // must abort all still-running tasks.
+        #[tokio::test(flavor = "current_thread")]
+        async fn shutdown_spawn_local_localset() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+
+            local
+                .run_until(async {
+                    let mut set = JoinSet::new();
+                    let mut receivers = Vec::new();
+
+                    spawn_pending_tasks(&mut set, &mut receivers, N, None);
+                    assert!(set.try_join_next().is_none());
+
+                    set.shutdown().await;
+                    assert!(set.is_empty());
+
+                    await_receivers_and_assert(receivers).await;
+                })
+                .await;
+        }
+
+        // Dropping a `JoinSet` that was populated with `spawn_local`
+        // must abort all still-running tasks.
+        #[tokio::test(flavor = "current_thread")]
+        async fn drop_spawn_local_localset() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+
+            local
+                .run_until(async {
+                    let mut set = JoinSet::new();
+                    let mut receivers = Vec::new();
+
+                    spawn_pending_tasks(&mut set, &mut receivers, N, None);
+                    assert!(set.try_join_next().is_none());
+
+                    drop(set);
+                    await_receivers_and_assert(receivers).await;
+                })
+                .await;
+        }
+    }
 }
 
-// Calling `JoinSet::shutdown` inside a `LocalRuntime` must
-// abort and drain every still-running task that was
-// inserted with `JoinSet::spawn_local`.
-#[cfg(tokio_unstable)]
-#[test]
-fn shutdown_spawn_local_local_runtime() {
-    const N: usize = 8;
-    let rt = LocalRuntime::new().unwrap();
+mod spawn_local_on {
+    use super::*;
 
-    rt.block_on(async {
-        let mut set = JoinSet::new();
-        let mut receivers = Vec::new();
+    mod local_runtime {
+        use super::*;
 
-        spawn_pending_tasks(&mut set, &mut receivers, N, None);
+        // Drive a `LocalSet` on top of a `LocalRuntime` and verify that tasks
+        // queued with `JoinSet::spawn_local_on` run to completion only after
+        // the `LocalSet` starts.
+        #[cfg(tokio_unstable)]
+        #[test]
+        fn spawn_local_on_local_runtime() {
+            const N: usize = 8;
+            let rt = LocalRuntime::new().unwrap();
 
-        assert!(set.try_join_next().is_none());
+            rt.block_on(async {
+                let local = LocalSet::new();
+                let mut set = JoinSet::new();
 
-        set.shutdown().await;
+                spawn_index_tasks(&mut set, N, Some(&local));
+                assert!(set.try_join_next().is_none());
 
-        assert!(set.is_empty());
+                local
+                    .run_until(async move {
+                        drain_joinset_and_assert(set, N).await;
+                    })
+                    .await;
+            });
+        }
+    }
 
-        await_receivers_and_assert(receivers).await;
-    });
-}
+    mod local_set {
+        use super::*;
 
-// Dropping a `JoinSet` created inside a `LocalRuntime`
-// must abort every still-running task that was
-// added with `JoinSet::spawn_local`.
-#[cfg(tokio_unstable)]
-#[test]
-fn drop_spawn_local_local_runtime() {
-    const N: usize = 8;
-    let rt = LocalRuntime::new().unwrap();
+        // JoinSet::spawn_local on a LocalSet.
+        // Tasks are queued with `spawn_local_on` **before** the `LocalSet` is
+        // running, then executed once the `LocalSet` is started.
+        #[tokio::test(flavor = "current_thread")]
+        async fn spawn_local_on_on_started_localset() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+            let mut pending_set = JoinSet::new();
 
-    rt.block_on(async {
-        let mut set = JoinSet::new();
-        let mut receivers = Vec::new();
+            spawn_index_tasks(&mut pending_set, N, Some(&local));
+            assert!(pending_set.try_join_next().is_none());
 
-        spawn_pending_tasks(&mut set, &mut receivers, N, None);
+            local
+                .run_until(async move {
+                    drain_joinset_and_assert(pending_set, N).await;
+                })
+                .await;
+        }
 
-        assert!(set.try_join_next().is_none());
-
-        drop(set);
-
-        await_receivers_and_assert(receivers).await;
-    });
-}
-
-// JoinSet::spawn_local on a LocalSet.
-// Every task is spawned with `spawn_local` **inside** the `LocalSet` that is
-// currently running.
-#[tokio::test(flavor = "current_thread")]
-async fn spawn_local_running_localset() {
-    const N: usize = 8;
-    let local = LocalSet::new();
-
-    local
-        .run_until(async move {
-            let mut set = JoinSet::new();
-            spawn_index_tasks(&mut set, N, None);
-            drain_joinset_and_assert(set, N).await;
-        })
-        .await;
-}
-
-// JoinSet::spawn_local on a LocalSet.
-// Tasks are queued with `spawn_local_on` **before** the `LocalSet` is
-// running, then executed once the `LocalSet` is started.
-#[tokio::test(flavor = "current_thread")]
-async fn spawn_local_on_on_started_localset() {
-    const N: usize = 8;
-    let local = LocalSet::new();
-    let mut pending_set = JoinSet::new();
-
-    spawn_index_tasks(&mut pending_set, N, Some(&local));
-
-    assert!(pending_set.try_join_next().is_none());
-
-    local
-        .run_until(async move {
-            drain_joinset_and_assert(pending_set, N).await;
-        })
-        .await;
-}
-
-// Shutdown a `JoinSet` that was populated with `spawn_local` must abort all
-// still-running tasks.
-#[tokio::test(flavor = "current_thread")]
-async fn shutdown_spawn_local_localset() {
-    const N: usize = 8;
-    let local = LocalSet::new();
-
-    local
-        .run_until(async {
+        // Calling `JoinSet::shutdown` on a set whose tasks were queued with
+        // `spawn_local_on` must abort all of them once the `LocalSet` is driven.
+        #[tokio::test(flavor = "current_thread")]
+        async fn shutdown_spawn_local_on() {
+            const N: usize = 8;
+            let local = LocalSet::new();
             let mut set = JoinSet::new();
             let mut receivers = Vec::new();
 
-            spawn_pending_tasks(&mut set, &mut receivers, N, None);
-
+            spawn_pending_tasks(&mut set, &mut receivers, N, Some(&local));
             assert!(set.try_join_next().is_none());
 
-            set.shutdown().await;
+            local
+                .run_until(async move {
+                    set.shutdown().await;
+                    assert!(set.is_empty());
+                    await_receivers_and_assert(receivers).await;
+                })
+                .await;
+        }
 
-            assert!(set.is_empty());
-
-            await_receivers_and_assert(receivers).await;
-        })
-        .await;
-}
-
-// Calling `JoinSet::shutdown` on a set whose tasks were queued with
-// `spawn_local_on` must abort all of them once the `LocalSet` is driven.
-#[tokio::test(flavor = "current_thread")]
-async fn shutdown_spawn_local_on() {
-    const N: usize = 8;
-    let local = LocalSet::new();
-    let mut set = JoinSet::new();
-    let mut receivers = Vec::new();
-
-    spawn_pending_tasks(&mut set, &mut receivers, N, Some(&local));
-
-    assert!(set.try_join_next().is_none());
-
-    local
-        .run_until(async move {
-            set.shutdown().await;
-            assert!(set.is_empty());
-            await_receivers_and_assert(receivers).await;
-        })
-        .await;
-}
-
-// Dropping a `JoinSet` whose tasks were queued with `spawn_local_on`
-// must cancel all of them once the `LocalSet` is subsequently driven.
-#[tokio::test(flavor = "current_thread")]
-async fn drop_spawn_local_on() {
-    const N: usize = 8;
-    let local = LocalSet::new();
-    let mut set = JoinSet::new();
-    let mut receivers = Vec::new();
-
-    spawn_pending_tasks(&mut set, &mut receivers, N, Some(&local));
-
-    assert!(set.try_join_next().is_none());
-
-    drop(set);
-
-    local
-        .run_until(async move {
-            await_receivers_and_assert(receivers).await;
-        })
-        .await;
-}
-
-// Dropping a `JoinSet` that was populated with `spawn_local` must abort all
-// still-running tasks.
-#[tokio::test(flavor = "current_thread")]
-async fn drop_spawn_local_localset() {
-    const N: usize = 8;
-
-    let local = LocalSet::new();
-    local
-        .run_until(async {
+        // Dropping a `JoinSet` whose tasks were queued with `spawn_local_on`
+        // must cancel all of them once the `LocalSet` is subsequently driven.
+        #[tokio::test(flavor = "current_thread")]
+        async fn drop_spawn_local_on() {
+            const N: usize = 8;
+            let local = LocalSet::new();
             let mut set = JoinSet::new();
             let mut receivers = Vec::new();
 
-            spawn_pending_tasks(&mut set, &mut receivers, N, None);
+            spawn_pending_tasks(&mut set, &mut receivers, N, Some(&local));
+            assert!(set.try_join_next().is_none());
+            drop(set);
 
+            local
+                .run_until(async move {
+                    await_receivers_and_assert(receivers).await;
+                })
+                .await;
+        }
+
+        // Dropping a `JoinSet` whose tasks were queued with `spawn_local_on`
+        // when the `LocalSet` is already driven.
+        #[tokio::test(flavor = "current_thread")]
+        async fn drop_spawn_local_on_running_localset() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+            let mut set = JoinSet::new();
+            let mut receivers = Vec::new();
+
+            spawn_pending_tasks(&mut set, &mut receivers, N, Some(&local));
             assert!(set.try_join_next().is_none());
 
-            drop(set);
-
-            await_receivers_and_assert(receivers).await;
-        })
-        .await;
-}
-
-// Dropping a `JoinSet` whose tasks were queued with `spawn_local_on`
-// when the `LocalSet` is already driven.
-#[tokio::test(flavor = "current_thread")]
-async fn drop_spawn_local_on_running_localset() {
-    const N: usize = 8;
-    let local = LocalSet::new();
-    let mut set = JoinSet::new();
-    let mut receivers = Vec::new();
-
-    spawn_pending_tasks(&mut set, &mut receivers, N, Some(&local));
-
-    assert!(set.try_join_next().is_none());
-
-    local
-        .run_until(async move {
-            drop(set);
-            await_receivers_and_assert(receivers).await;
-        })
-        .await;
+            local
+                .run_until(async move {
+                    drop(set);
+                    await_receivers_and_assert(receivers).await;
+                })
+                .await;
+        }
+    }
 }
