@@ -282,7 +282,6 @@ impl<T: Clone + 'static> LocalKey<T> {
     /// If the task-local with the associated key is not present, this
     /// method will return an `AccessError`. For a panicking variant,
     /// see `get`.
-    #[track_caller]
     pub fn try_get(&'static self) -> Result<T, AccessError> {
         self.try_with(|v| v.clone())
     }
