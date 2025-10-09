@@ -252,15 +252,6 @@ impl Handle {
     /// timers will not work unless there is another thread currently calling
     /// [`Runtime::block_on`] on the same runtime.
     ///
-    /// If this function is called from within a Tokio runtime's asynchronous
-    /// context, such as inside a [`Runtime::block_on`] scope, or from a function
-    /// annotated with the [`tokio::main`] attribute macro, it will panic, because
-    /// nesting runtimes is not allowed.
-    /// The same applies when calling `Handle::block_on` to re-enter the current
-    /// runtime. To safely run asynchronous code from such a context, you can use
-    /// [`task::block_in_place`] (only available with the multi-thread scheduler),
-    /// as shown in the example below.
-    ///
     /// # If the runtime has been shut down
     ///
     /// If the `Handle`'s associated `Runtime` has been shut down (through
@@ -271,9 +262,12 @@ impl Handle {
     ///
     /// # Panics
     ///
-    /// This function panics if the provided future panics, if called within an
-    /// asynchronous execution context, or if a timer future is executed on a runtime that has been
-    /// shut down.
+    /// This function will panic if any of the following conditions are met:
+    /// - The provided future panics.
+    /// - It is called from within an asynchronous context, such as inside
+    ///   [`Runtime::block_on`], `Handle::block_on`, or from a function annotated
+    ///   with [`tokio::main`].
+    /// - A timer future is executed on a runtime that has been shut down.
     ///
     /// # Examples
     ///
