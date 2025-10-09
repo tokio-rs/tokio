@@ -413,12 +413,10 @@ mod spawn_local {
         #[cfg(tokio_unstable)]
         use super::*;
 
-        // JoinSet::spawn_local on a LocalRuntime
-        // We create a `LocalRuntime`, enter it, spawn several local tasks with
-        // `JoinSet::spawn_local`, and wait for every task to finish.
+        /// Spawn several tasks, and then join all tasks.
         #[cfg(tokio_unstable)]
         #[test]
-        fn spawn_local_local_runtime() {
+        fn spawn_then_join_next() {
             const N: usize = 8;
             let rt = LocalRuntime::new().unwrap();
 
@@ -431,12 +429,10 @@ mod spawn_local {
             });
         }
 
-        // Calling `JoinSet::shutdown` inside a `LocalRuntime` must
-        // abort and drain every still-running task that was
-        // inserted with `JoinSet::spawn_local`.
+        /// Spawn several pending-forever tasks, and then shutdown the [`JoinSet`].
         #[cfg(tokio_unstable)]
         #[test]
-        fn shutdown_spawn_local_local_runtime() {
+        fn spawn_then_shutdown() {
             const N: usize = 8;
             let rt = LocalRuntime::new().unwrap();
 
@@ -454,12 +450,10 @@ mod spawn_local {
             });
         }
 
-        // Dropping a `JoinSet` created inside a `LocalRuntime`
-        // must abort every still-running task that was
-        // added with `JoinSet::spawn_local`.
+        /// Spawn several pending-forever tasks, and then drop the [`JoinSet`].
         #[cfg(tokio_unstable)]
         #[test]
-        fn drop_spawn_local_local_runtime() {
+        fn spawn_then_drop() {
             const N: usize = 8;
             let rt = LocalRuntime::new().unwrap();
 
@@ -480,11 +474,9 @@ mod spawn_local {
     mod local_set {
         use super::*;
 
-        // JoinSet::spawn_local on a LocalSet.
-        // Every task is spawned with `spawn_local` **inside** the `LocalSet`
-        // that is currently running.
+        /// Spawn several tasks, and then join all tasks.
         #[tokio::test(flavor = "current_thread")]
-        async fn spawn_local_running_localset() {
+        async fn spawn_then_join_next() {
             const N: usize = 8;
             let local = LocalSet::new();
 
@@ -497,10 +489,9 @@ mod spawn_local {
                 .await;
         }
 
-        // Shutdown a `JoinSet` that was populated with `spawn_local`
-        // must abort all still-running tasks.
+        /// Spawn several pending-forever tasks, and then shutdown the [`JoinSet`].
         #[tokio::test(flavor = "current_thread")]
-        async fn shutdown_spawn_local_localset() {
+        async fn spawn_then_shutdown() {
             const N: usize = 8;
             let local = LocalSet::new();
 
@@ -520,10 +511,9 @@ mod spawn_local {
                 .await;
         }
 
-        // Dropping a `JoinSet` that was populated with `spawn_local`
-        // must abort all still-running tasks.
+        /// Spawn several pending-forever tasks, and then drop the [`JoinSet`].
         #[tokio::test(flavor = "current_thread")]
-        async fn drop_spawn_local_localset() {
+        async fn spawn_then_drop() {
             const N: usize = 8;
             let local = LocalSet::new();
 
@@ -550,12 +540,10 @@ mod spawn_local_on {
         #[cfg(tokio_unstable)]
         use super::*;
 
-        // Drive a `LocalSet` on top of a `LocalRuntime` and verify that tasks
-        // queued with `JoinSet::spawn_local_on` run to completion only after
-        // the `LocalSet` starts.
+        /// Spawn several tasks, and then join all tasks.
         #[cfg(tokio_unstable)]
         #[test]
-        fn spawn_local_on_local_runtime() {
+        fn spawn_then_join_next() {
             const N: usize = 8;
             let rt = LocalRuntime::new().unwrap();
 
@@ -578,11 +566,9 @@ mod spawn_local_on {
     mod local_set {
         use super::*;
 
-        // JoinSet::spawn_local on a LocalSet.
-        // Tasks are queued with `spawn_local_on` **before** the `LocalSet` is
-        // running, then executed once the `LocalSet` is started.
+        /// Spawn several tasks, and then join all tasks.
         #[tokio::test(flavor = "current_thread")]
-        async fn spawn_local_on_on_started_localset() {
+        async fn spawn_then_join_next() {
             const N: usize = 8;
             let local = LocalSet::new();
             let mut pending_set = JoinSet::new();
@@ -597,10 +583,9 @@ mod spawn_local_on {
                 .await;
         }
 
-        // Calling `JoinSet::shutdown` on a set whose tasks were queued with
-        // `spawn_local_on` must abort all of them once the `LocalSet` is driven.
+        /// Spawn several pending-forever tasks, and then shutdown the [`JoinSet`].
         #[tokio::test(flavor = "current_thread")]
-        async fn shutdown_spawn_local_on() {
+        async fn spawn_then_shutdown() {
             const N: usize = 8;
             let local = LocalSet::new();
             let mut set = JoinSet::new();
