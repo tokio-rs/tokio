@@ -309,7 +309,8 @@ impl Handle {
     /// # }
     /// ```
     ///
-    /// `Handle::block_on` may use [`task::block_in_place`] to re-enter the async context of a multi-thread scheduler runtime:
+    /// `Handle::block_on` may be combined with [`task::block_in_place`] to
+    /// re-enter the async context of a multi-thread scheduler runtime:
     /// ```
     /// # #[cfg(not(target_family = "wasm"))]
     /// # {
