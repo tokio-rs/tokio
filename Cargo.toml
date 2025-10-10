@@ -27,7 +27,6 @@ unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(tokio_internal_mt_counters)',
   'cfg(tokio_no_parking_lot)',
   'cfg(tokio_no_tuning_tests)',
-  'cfg(tokio_taskdump)',
   'cfg(tokio_unstable)',
   'cfg(target_os, values("cygwin"))',
 ] }
