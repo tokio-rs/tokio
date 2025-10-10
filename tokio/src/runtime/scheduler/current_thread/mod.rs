@@ -387,7 +387,7 @@ impl Core {
     }
 }
 
-#[cfg(tokio_taskdump)]
+#[cfg(feature = "taskdump")]
 fn wake_deferred_tasks_and_free(context: &Context) {
     let wakers = context.defer.take_deferred();
     for waker in wakers {
@@ -701,7 +701,7 @@ impl Handle {
     /// Capture a snapshot of this runtime's state.
     #[cfg(all(
         tokio_unstable,
-        tokio_taskdump,
+        feature = "taskdump",
         target_os = "linux",
         any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
     ))]

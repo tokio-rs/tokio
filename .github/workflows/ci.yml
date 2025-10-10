@@ -309,17 +309,14 @@ jobs:
       - name: test tokio full --cfg unstable --cfg taskdump
         run: |
           set -euxo pipefail
-          # taskdump is an unstable feature, but it can only be enabled
-          # by --cfg tokio_taskdump, not by a feature flag, so we can
-          # use $TOKIO_STABLE_FEATURES here.
-          cargo nextest run --features $TOKIO_STABLE_FEATURES
+          cargo nextest run --features $TOKIO_STABLE_FEATURES,taskdump
           cargo test --doc --features $TOKIO_STABLE_FEATURES
         working-directory: tokio
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
           # in order to run doctests for unstable features, we must also pass
           # the unstable cfg to RustDoc
-          RUSTDOCFLAGS: --cfg tokio_unstable --cfg tokio_taskdump
+          RUSTDOCFLAGS: --cfg tokio_unstable
 
   check-unstable-mt-counters:
     name: check tokio full --internal-mt-counters
@@ -484,7 +481,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       # We don't use --all-features since io-uring will be enabled and is not supported on those targets.
-      - run: cargo check --workspace --features full,test-util --target ${{ matrix.target }}
+      - run: cargo check --workspace --features $TOKIO_STABLE_FEATURES --target ${{ matrix.target }}
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -496,8 +493,9 @@ jobs:
       matrix:
         target:
           - name: x86_64-unknown-haiku
+            exclude_features: "taskdump" # taskdump is only available on Linux
           - name: armv7-sony-vita-newlibeabihf
-            exclude_features: "process,signal,rt-process-signal,full"
+            exclude_features: "process,signal,rt-process-signal,full,taskdump"
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_nightly }}
@@ -522,14 +520,14 @@ jobs:
         include:
           - target: i686-unknown-linux-gnu
             os: ubuntu-latest
-            rustflags: --cfg tokio_taskdump
+            extra_features: "taskdump"
           - target: armv5te-unknown-linux-gnueabi
             os: ubuntu-latest
           - target: armv7-unknown-linux-gnueabihf
             os: ubuntu-24.04-arm
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-24.04-arm
-            rustflags: --cfg tokio_taskdump
+            extra_features: "io-uring,taskdump"
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
     steps:
@@ -554,13 +552,15 @@ jobs:
       - name: Tests run with all features (including parking_lot)
         run: |
           set -euxo pipefail
-          # We use `--features "full,test-util"` instead of `--all-features` since
-          # `--all-features` includes `io_uring`, which is not available on all targets.
-          cargo nextest run -p tokio --features full,test-util --target ${{ matrix.target }}
-          cargo test --doc -p tokio --features full,test-util --target ${{ matrix.target }}
+          # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
+          # `--all-features` includes `io_uring` and `taskdump`,
+          # which is not available on all targets.
+          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
+          RUSTDOCFLAGS: --cfg tokio_unstable -Dwarnings
 
   cross-test-without-parking_lot:
     needs: basics
@@ -570,14 +570,14 @@ jobs:
         include:
           - target: i686-unknown-linux-gnu
             os: ubuntu-latest
-            rustflags: --cfg tokio_taskdump
+            extra_features: "taskdump"
           - target: armv5te-unknown-linux-gnueabi
             os: ubuntu-latest
           - target: armv7-unknown-linux-gnueabihf
             os: ubuntu-24.04-arm
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-24.04-arm
-            rustflags: --cfg tokio_taskdump
+            extra_features: "io-uring,taskdump"
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
     steps:
@@ -606,13 +606,15 @@ jobs:
       - name: Tests run with all features (without parking_lot)
         run: |
           set -euxo pipefail
-          # We use `--features "full,test-util"` instead of `--all-features` since
-          # `--all-features` includes `io_uring`, which is not available on all targets.
-          cargo nextest run -p tokio --features full,test-util --target ${{ matrix.target }}
-          cargo test --doc -p tokio --features full,test-util --target ${{ matrix.target }}
+          # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
+          # `--all-features` includes `io_uring` and `taskdump`,
+          # which is not available on all targets.
+          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_parking_lot --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
+          RUSTDOCFLAGS: --cfg tokio_unstable -Dwarnings
 
   # See https://github.com/tokio-rs/tokio/issues/5187
   no-atomic-u64-test:
@@ -640,13 +642,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: test tokio --all-features
         run: |
-          # We use `--features "full,test-util"` instead of `--all-features` since
-          # `--all-features` includes `io_uring`, which is not available on all targets.
-          cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features full,test-util
-          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features full,test-util
+          cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
+          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
         env:
           RUST_TEST_THREADS: 1
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings --cfg tokio_no_tuning_tests
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
 
   no-atomic-u64-check:
     name: Check tokio --feature-powerset --depth 2 on i686-unknown-linux-gnu without AtomicU64
@@ -672,18 +672,24 @@ jobs:
         # We use `--skip io-uring` since io-uring crate doesn't provide a binding for the i686 target.
         run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --skip io-uring --depth 2 --keep-going
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
   features:
-    name: features ${{ matrix.name }}
+    name: features exclude ${{ matrix.name }}
     needs: basics
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - { name: "", rustflags: "", exclude_features: "io-uring" }
-          - { name: "--unstable", rustflags: "--cfg tokio_unstable -Dwarnings", exclude_features: "" }
-          - { name: "--unstable --taskdump", rustflags: "--cfg tokio_unstable -Dwarnings --cfg tokio_taskdump", exclude_features: "" }
+          - name: ""
+            rustflags: ""
+            exclude_features: "io-uring,taskdump"
+          - name: "--unstable"
+            rustflags: "--cfg tokio_unstable -Dwarnings"
+            exclude_features: "io-uring,taskdump"
+          - name: "--unstable io-uring,taskdump"
+            rustflags: "--cfg tokio_unstable -Dwarnings"
+            exclude_features: ""
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_nightly }}
@@ -749,7 +755,7 @@ jobs:
           cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features --ignore-private
       - name: "check --all-features --unstable -Z minimal-versions"
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
           # from determining minimal versions based on dev-dependencies.
@@ -795,7 +801,7 @@ jobs:
       - name: "clippy --all --all-features --unstable"
         run: cargo clippy --all --tests --no-deps --all-features
         env:
-          RUSTFLAGS: --cfg tokio_unstable --cfg tokio_taskdump -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
   docs:
     name: docs
@@ -804,9 +810,9 @@ jobs:
       matrix:
         run:
           - os: windows-latest
+            extra_features: "tracing"
           - os: ubuntu-latest
-            RUSTFLAGS: --cfg tokio_taskdump
-            RUSTDOCFLAGS: --cfg tokio_taskdump
+            extra_features: "tracing,io-uring,taskdump"
 
     steps:
       - uses: actions/checkout@v5
@@ -816,11 +822,10 @@ jobs:
           toolchain: ${{ env.rust_nightly }}
       - uses: Swatinem/rust-cache@v2
       - name: "doc --lib --all-features"
-        run: |
-          cargo doc --lib --no-deps --all-features --document-private-items
+        run: cargo doc --lib --no-deps --document-private-items --features $TOKIO_STABLE_FEATURES,${{ matrix.run.extra_features }}
         env:
-          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable ${{ matrix.run.RUSTFLAGS }}
-          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings ${{ matrix.run.RUSTDOCFLAGS }}
+          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
+          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
 
   loom-compile:
     name: build loom tests
@@ -1083,26 +1088,31 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os:
-          - windows-latest
-          - ubuntu-latest
-        rust:
-          # `check-external-types` requires a specific Rust nightly version. See
-          # the README for details: https://github.com/awslabs/cargo-check-external-types
-          - nightly-2024-06-30
+        include:
+          - os: windows-latest
+            # Windows neither supports io-uring nor taskdump.
+            extra_features: "tracing"
+          - os: ubuntu-latest
+            # includes all unstable features.
+            extra_features: "tracing,io-uring,taskdump"
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ matrix.rust }}
+          # `check-external-types` requires a specific Rust nightly version. See
+          # the README for details: https://github.com/awslabs/cargo-check-external-types
+          toolchain: nightly-2025-08-06
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-check-external-types
         uses: taiki-e/cache-cargo-install-action@v1
         with:
-          tool: cargo-check-external-types@0.1.13
+          tool: cargo-check-external-types@0.3.0
       - name: check-external-types
-        run: cargo check-external-types --features $TOKIO_STABLE_FEATURES
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTDOCFLAGS: --cfg tokio_unstable
+        run: cargo check-external-types --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
         working-directory: tokio
 
   check-fuzzing:
