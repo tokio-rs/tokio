@@ -70,9 +70,10 @@ use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::task::Waker;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 mod metrics;
 
@@ -139,6 +140,10 @@ struct Core {
 
     /// Fast random number generator.
     rand: FastRand,
+
+    /// Per-worker timers: lock-free HashMap for timer registration
+    /// Maps deadline -> wakers to fire at that time
+    timers: HashMap<Instant, Vec<Waker>>,
 }
 
 /// State shared across all workers
@@ -267,6 +272,7 @@ pub(super) fn create(
             global_queue_interval: stats.tuned_global_queue_interval(&config),
             stats,
             rand: FastRand::from_seed(config.seed_generator.next_seed()),
+            timers: HashMap::new(),
         }));
 
         remotes.push(Remote { steal, unpark });
@@ -534,6 +540,9 @@ impl Context {
             // Run maintenance, if needed
             core = self.maintenance(core);
 
+            // Fire any expired timers (lock-free, per-worker)
+            core.fire_expired_timers(Instant::now());
+
             // First, check work available to the current worker.
             if let Some(task) = core.next_task(&self.worker) {
                 core = self.run_task(task, core)?;
@@ -793,6 +802,21 @@ impl Context {
             self.defer.defer(waker);
         }
     }
+
+    /// Register a timer with the current worker's local timer HashMap.
+    ///
+    /// This is called from TimerEntry when a timer needs to be registered.
+    /// Returns true if successfully registered, false if no core is available
+    /// (e.g., during block_in_place).
+    pub(crate) fn register_timer(&self, deadline: Instant, waker: Waker) -> bool {
+        let mut core = self.core.borrow_mut();
+        if let Some(core) = core.as_mut() {
+            core.register_timer(deadline, waker);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl Core {
@@ -1041,6 +1065,32 @@ impl Core {
         if u32::abs_diff(self.global_queue_interval, next) > 2 {
             self.global_queue_interval = next;
         }
+    }
+
+    /// Fire all timers that have expired by the given instant.
+    ///
+    /// This scans the per-worker timer HashMap and wakes all tasks whose
+    /// deadlines have passed. Unlike the global timer wheel, this is lock-free
+    /// and doesn't require any synchronization.
+    fn fire_expired_timers(&mut self, now: Instant) {
+        self.timers.retain(|&deadline, wakers| {
+            (now < deadline) || {
+                wakers.drain(..).for_each(Waker::wake);
+                false
+            }
+        });
+    }
+
+    /// Register a timer waker at the given deadline.
+    ///
+    /// This is called from TimerEntry::poll_elapsed when a timer is registered.
+    /// The waker will be fired when fire_expired_timers() is called with a time
+    /// >= deadline.
+    pub(crate) fn register_timer(&mut self, deadline: Instant, waker: Waker) {
+        self.timers
+            .entry(deadline)
+            .or_insert_with(Vec::new)
+            .push(waker);
     }
 }
 
