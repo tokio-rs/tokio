@@ -262,9 +262,12 @@ impl Handle {
     ///
     /// # Panics
     ///
-    /// This function panics if the provided future panics, if called within an
-    /// asynchronous execution context, or if a timer future is executed on a runtime that has been
-    /// shut down.
+    /// This function will panic if any of the following conditions are met:
+    /// - The provided future panics.
+    /// - It is called from within an asynchronous context, such as inside
+    ///   [`Runtime::block_on`], `Handle::block_on`, or from a function annotated
+    ///   with [`tokio::main`].
+    /// - A timer future is executed on a runtime that has been shut down.
     ///
     /// # Examples
     ///
@@ -306,6 +309,24 @@ impl Handle {
     /// # }
     /// ```
     ///
+    /// `Handle::block_on` may be combined with [`task::block_in_place`] to
+    /// re-enter the async context of a multi-thread scheduler runtime:
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::task;
+    /// use tokio::runtime::Handle;
+    ///
+    /// # async fn docs() {
+    /// task::block_in_place(move || {
+    ///     Handle::current().block_on(async move {
+    ///         // do something async
+    ///     });
+    /// });
+    /// # }
+    /// # }
+    /// ```
+    ///
     /// [`JoinError`]: struct@crate::task::JoinError
     /// [`JoinHandle`]: struct@crate::task::JoinHandle
     /// [`Runtime::block_on`]: fn@crate::runtime::Runtime::block_on
@@ -315,6 +336,8 @@ impl Handle {
     /// [`tokio::fs`]: crate::fs
     /// [`tokio::net`]: crate::net
     /// [`tokio::time`]: crate::time
+    /// [`tokio::main`]: ../attr.main.html
+    /// [`task::block_in_place`]: crate::task::block_in_place
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let fut_size = mem::size_of::<F>();
