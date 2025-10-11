@@ -89,7 +89,7 @@ impl<T> JoinQueue<T> {
     }
 
     /// Spawn the provided task on the current [`LocalSet`] or [`LocalRuntime`]
-    /// and store it in this [`JoinQueue`], returning an [`AbortHandle`] that 
+    /// and store it in this [`JoinQueue`], returning an [`AbortHandle`] that
     /// can be used to remotely cancel the task.
     ///
     /// The provided future will start running in the background immediately
