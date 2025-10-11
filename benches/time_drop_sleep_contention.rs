@@ -1,31 +1,18 @@
-/// Benchmark demonstrating timer mutex contention on drop (Issue #6504)
+/// Benchmark measuring timer lifecycle performance (Issue #6504)
 ///
-/// This benchmark creates many timers, polls them once to initialize and register
-/// them with the timer wheel, then drops them before they fire. This is the common
-/// case for timeouts that are set but don't fire.
+/// This benchmark creates many timers, polls them once to register with the timer
+/// system, then drops them before they fire. This simulates the common case of
+/// timeouts that don't fire (e.g., operations completing before timeout).
 ///
-/// Each drop acquires the global timer mutex to deregister from the wheel, causing
-/// severe contention under concurrent load.
-///
-/// ## Baseline Results (Pre-Fix)
-///
-/// ```text
-/// timer_drop_single_thread_10k:         33.3 ms (32.7-34.0 ms)
-/// timer_drop_multi_thread_10k_8workers: 21.6 ms (19.1-24.7 ms)
-/// ```
-///
-/// **Analysis**: Multi-threaded (8 workers) is only 1.54x faster than single-threaded,
-/// demonstrating severe mutex contention.
-
+/// The benchmark compares single-threaded vs multi-threaded performance to reveal
+/// contention in timer registration and deregistration.
 use std::future::{poll_fn, Future};
-use std::pin::Pin;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use tokio::{
-    runtime::Runtime,
-    time::{sleep, Duration},
-};
+use tokio::{runtime::Runtime, time::sleep};
+
+const TIMER_COUNT: usize = 10_000;
 
 fn build_runtime(workers: usize) -> Runtime {
     if workers == 1 {
@@ -42,63 +29,91 @@ fn build_runtime(workers: usize) -> Runtime {
     }
 }
 
-async fn create_and_drop_timers(count: usize, workers: usize) {
+/// Returns (wall_clock_duration, per_task_durations)
+async fn create_and_drop_timers_instrumented(count: usize, workers: usize) -> (Duration, Vec<Duration>) {
     let handles: Vec<_> = (0..workers)
         .map(|_| {
             tokio::spawn(async move {
+                // Create all sleep futures
+                let mut sleeps = Vec::with_capacity(count / workers);
                 for _ in 0..count / workers {
-                    let mut sleep = Box::pin(sleep(Duration::from_secs(60)));
+                    sleeps.push(Box::pin(sleep(Duration::from_secs(60))));
+                }
 
-                    // Poll once to initialize and register without awaiting
+                // Start timing - poll and drop (METERED)
+                let start = Instant::now();
+                for mut sleep in sleeps {
+                    // Poll once to register
                     poll_fn(|cx| {
                         let _ = sleep.as_mut().poll(cx);
                         std::task::Poll::Ready(())
                     })
                     .await;
 
+                    // Drop to deregister
                     black_box(drop(sleep));
                 }
+                let elapsed = start.elapsed();
+
+                elapsed
             })
         })
         .collect();
 
+    let wall_clock_start = Instant::now();
+
+    let mut task_durations = Vec::with_capacity(workers);
     for handle in handles {
-        handle.await.unwrap();
+        task_durations.push(handle.await.unwrap());
     }
+
+    let wall_clock = wall_clock_start.elapsed();
+
+    (wall_clock, task_durations)
 }
 
-fn timer_drop_contention_single_thread(c: &mut Criterion) {
+fn bench_many_timers(c: &mut Criterion) {
+    let mut group = c.benchmark_group("many_timers");
+
+    // Single-threaded baseline
     let runtime = build_runtime(1);
-
-    c.bench_function("timer_drop_single_thread_10k", |b| {
+    group.bench_function("single_thread", |b| {
         b.iter_custom(|iters| {
-            let start = Instant::now();
-            runtime.block_on(async {
-                black_box(create_and_drop_timers(10_000 * iters as usize, 1)).await;
+            let (wall_clock, _task_durations) = runtime.block_on(async {
+                create_and_drop_timers_instrumented(TIMER_COUNT * iters as usize, 1).await
             });
-            start.elapsed()
+
+            wall_clock
         })
     });
-}
 
-fn timer_drop_contention_multi_thread(c: &mut Criterion) {
-    let runtime = build_runtime(8);
-
-    c.bench_function("timer_drop_multi_thread_10k_8workers", |b| {
+    // Multi-threaded with 8 workers
+    let runtime_multi = build_runtime(8);
+    group.bench_function("multi_thread", |b| {
         b.iter_custom(|iters| {
-            let start = Instant::now();
-            runtime.block_on(async {
-                black_box(create_and_drop_timers(10_000 * iters as usize, 8)).await;
+            let (wall_clock, task_durations) = runtime_multi.block_on(async {
+                create_and_drop_timers_instrumented(TIMER_COUNT * iters as usize, 8).await
             });
-            start.elapsed()
+
+            // Print variance stats to stderr
+            let min = task_durations.iter().min().unwrap();
+            let max = task_durations.iter().max().unwrap();
+            let range = max.saturating_sub(*min);
+            eprintln!(
+                "multi_thread: wall={:?}, min={:?}, max={:?}, range={:?}",
+                wall_clock, min, max, range
+            );
+
+            wall_clock
         })
     });
+
+    group.finish();
 }
 
 criterion_group!(
-    timer_contention,
-    timer_drop_contention_single_thread,
-    timer_drop_contention_multi_thread
+    many_timers,
+    bench_many_timers
 );
 
-criterion_main!(timer_contention);
+criterion_main!(many_timers);
