@@ -345,7 +345,7 @@ where
         self.insert(key, task);
     }
 
-    /// Spawn the provided task on the current [`LocalSet`] or [`LocalRuntime`] 
+    /// Spawn the provided task on the current [`LocalSet`] or [`LocalRuntime`]
     /// and store it in this `JoinMap` with the provided key.
     ///
     /// If a task previously existed in the `JoinMap` for this key, that task
