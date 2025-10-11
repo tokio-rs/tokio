@@ -97,8 +97,8 @@ path = "time_timeout.rs"
 harness = false
 
 [[bench]]
-name = "time_drop_sleep_contention"
-path = "time_drop_sleep_contention.rs"
+name = "time_many_timers"
+path = "time_many_timers.rs"
 harness = false
 
 [lints]
