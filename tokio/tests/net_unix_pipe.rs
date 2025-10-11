@@ -8,8 +8,8 @@ use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
 
 use std::fs::File;
 use std::io;
+use std::os::fd::AsRawFd;
 use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 
 /// Helper struct which will clean up temporary files once dropped.
