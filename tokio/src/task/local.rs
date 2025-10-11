@@ -345,7 +345,7 @@ cfg_rt! {
     ///
     /// # Panics
     ///
-    /// This function panics if called outside of a [`LocalSet`].
+    /// This function panics if called outside of a [`LocalSet`] or [`LocalRuntime`].
     ///
     /// Note that if [`tokio::spawn`] is used from within a `LocalSet`, the
     /// resulting new task will _not_ be inside the `LocalSet`, so you must use
@@ -428,7 +428,7 @@ cfg_rt! {
                 unsafe { handle.spawn_local(task, id, meta.spawned_at) }
             } else {
                 match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
-                    None => panic!("`spawn_local` called from outside of a `task::LocalSet` or LocalRuntime"),
+                    None => panic!("`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"),
                     Some(cx) => cx.spawn(future.take().unwrap(), meta)
                 }
             })
@@ -438,7 +438,7 @@ cfg_rt! {
             Ok(None) => panic!("Local tasks can only be spawned on a LocalRuntime from the thread the runtime was created on"),
             Ok(Some(join_handle)) => join_handle,
             Err(_) => match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
-                None => panic!("`spawn_local` called from outside of a `task::LocalSet` or LocalRuntime"),
+                None => panic!("`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"),
                 Some(cx) => cx.spawn(future.unwrap(), meta)
             }
         }

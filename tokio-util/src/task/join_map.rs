@@ -345,8 +345,8 @@ where
         self.insert(key, task);
     }
 
-    /// Spawn the provided task on the current [`LocalSet`] and store it in this
-    /// `JoinMap` with the provided key.
+    /// Spawn the provided task on the current [`LocalSet`] or [`LocalRuntime`]
+    /// and store it in this `JoinMap` with the provided key.
     ///
     /// If a task previously existed in the `JoinMap` for this key, that task
     /// will be cancelled and replaced with the new one. The previous task will
@@ -355,9 +355,10 @@ where
     ///
     /// # Panics
     ///
-    /// This method panics if it is called outside of a `LocalSet`.
+    /// This method panics if it is called outside of a `LocalSet` or `LocalRuntime`.
     ///
     /// [`LocalSet`]: tokio::task::LocalSet
+    /// [`LocalRuntime`]: tokio::runtime::LocalRuntime
     /// [`join_next`]: Self::join_next
     #[track_caller]
     pub fn spawn_local<F>(&mut self, key: K, task: F)

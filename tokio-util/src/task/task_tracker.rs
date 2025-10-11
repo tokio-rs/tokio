@@ -401,11 +401,17 @@ impl TaskTracker {
         handle.spawn(self.track_future(task))
     }
 
-    /// Spawn the provided future on the current [`LocalSet`], and track it in this `TaskTracker`.
+    /// Spawn the provided future on the current [`LocalSet`] or [`LocalRuntime`]
+    /// and track it in this `TaskTracker`.
     ///
     /// This is equivalent to `tokio::task::spawn_local(tracker.track_future(task))`.
     ///
+    /// # Panics
+    ///
+    /// This method panics if it is called outside of a `LocalSet` or `LocalRuntime`.
+    ///
     /// [`LocalSet`]: tokio::task::LocalSet
+    /// [`LocalRuntime`]: tokio::runtime::LocalRuntime
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]
