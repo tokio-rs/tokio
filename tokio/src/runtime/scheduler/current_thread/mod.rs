@@ -472,9 +472,9 @@ impl Context {
             } else {
                 driver.park(&handle.driver);
             }
-        });
 
-        self.defer.wake();
+            self.defer.wake();
+        });
 
         self.maintain_local_timers_after_parking(core, handle, auto_advance_duration)
     }
@@ -858,17 +858,10 @@ impl Schedule for Arc<Handle> {
             Some(CurrentThread(cx)) if Arc::ptr_eq(self, &cx.handle) => {
                 let mut core = cx.core.borrow_mut();
 
+                // If `None`, the runtime is shutting down, so there is no need
+                // to schedule the task.
                 if let Some(core) = core.as_mut() {
                     core.push_task(self, task);
-                } else {
-                    // runtime is shutting down
-
-                    // Track that a task was scheduled from **outside** of the runtime.
-                    self.shared.scheduler_metrics.inc_remote_schedule_count();
-
-                    // Schedule the task
-                    self.shared.inject.push(task);
-                    self.driver.unpark();
                 }
             }
             _ => {
