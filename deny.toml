@@ -9,7 +9,7 @@ allow = [
     "Apache-2.0",
 ]
 exceptions = [
-    { allow = ["Unicode-3.0", "Unicode-DFS-2016"], crate = "unicode-ident" },
+    { allow = ["Unicode-3.0"], crate = "unicode-ident" },
 ]
 
 [bans]
