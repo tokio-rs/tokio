@@ -70,6 +70,11 @@ impl Parker {
         self.inner.park(handle);
     }
 
+    /// Parks the current thread for up to `duration`.
+    ///
+    /// This function tries to acquire the driver lock. If it succeeds, it
+    /// parks using the driver. Otherwise, it fails back to using a condvar,
+    /// unless the duration is zero, in which case it returns immediately.
     pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
         if let Some(mut driver) = self.inner.shared.driver.try_lock() {
             self.inner.park_driver(&mut driver, handle, Some(duration));
@@ -129,6 +134,13 @@ impl Inner {
         }
     }
 
+    /// Parks the current thread using a condvar for up to `duration`.
+    ///
+    /// If `duration` is `None`, parks indefinitely until notified.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `duration` is `Some` and the duration is zero.
     fn park_condvar(&self, duration: Option<Duration>) {
         // Otherwise we need to coordinate going to sleep
         let mut m = self.mutex.lock();
@@ -167,9 +179,8 @@ impl Inner {
             if is_timeout {
                 match self.state.swap(EMPTY, SeqCst) {
                     PARKED_CONDVAR => return, // timed out, and no notification received
-                    NOTIFIED => return,       // nofication and timeout happened concurrently,
-                    // treat as notification
-                    _ => return, // surious wakeup, since this function is called with a timeout,
+                    NOTIFIED => return,       // notification and timeout happened concurrently
+                    _ => return, // spurious wakeup, since this function is called with a timeout,
                                  // we cannot go back to sleep.
                                  // Otherwise, we may miss the expired timers.
                 }

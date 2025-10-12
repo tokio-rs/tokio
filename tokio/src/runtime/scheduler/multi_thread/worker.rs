@@ -800,6 +800,10 @@ impl Context {
         // Take the parker out of core
         let mut park = core.park.take().expect("park missing");
 
+        // Must happens after taking out the parker, as the `Handle::schedule_local`
+        // will delay the notify if the parker taken out.
+        //
+        // See comments in `Handle::schedule_local` for more details.
         let MaintainLocalTimer {
             mut core,
             park_duration: duration,
@@ -821,6 +825,10 @@ impl Context {
         // Remove `core` from context
         core = self.core.borrow_mut().take().expect("core missing");
 
+        // Must happens before placing back the parker, as the `Handle::schedule_local`
+        // will delay the notify if the parker is still in `core`.
+        //
+        // See comments in `Handle::schedule_local` for more details.
         core = self.maintain_local_timers_after_parking(core, auto_advance_duration);
 
         // Place `park` back in `core`
