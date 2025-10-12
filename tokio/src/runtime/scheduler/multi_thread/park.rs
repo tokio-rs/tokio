@@ -73,6 +73,8 @@ impl Parker {
     pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
         if let Some(mut driver) = self.inner.shared.driver.try_lock() {
             self.inner.park_driver(&mut driver, handle, Some(duration));
+        } else if !duration.is_zero() {
+            self.inner.park_condvar(Some(duration));
         } else {
             // https://github.com/tokio-rs/tokio/issues/6536
             // Hacky, but it's just for loom tests. The counter gets incremented during
@@ -123,11 +125,11 @@ impl Inner {
         if let Some(mut driver) = self.shared.driver.try_lock() {
             self.park_driver(&mut driver, handle, None);
         } else {
-            self.park_condvar();
+            self.park_condvar(None);
         }
     }
 
-    fn park_condvar(&self) {
+    fn park_condvar(&self, duration: Option<Duration>) {
         // Otherwise we need to coordinate going to sleep
         let mut m = self.mutex.lock();
 
@@ -152,9 +154,26 @@ impl Inner {
         }
 
         loop {
-            m = self.condvar.wait(m).unwrap();
+            let is_timeout;
+            (m, is_timeout) = match duration {
+                Some(dur) => {
+                    assert_ne!(dur, Duration::ZERO);
+                    let (m, res) = self.condvar.wait_timeout(m, dur).unwrap();
+                    (m, res.timed_out())
+                }
+                None => (self.condvar.wait(m).unwrap(), false),
+            };
 
-            if self
+            if is_timeout {
+                match self.state.swap(EMPTY, SeqCst) {
+                    PARKED_CONDVAR => return, // timed out, and no notification received
+                    NOTIFIED => return,       // nofication and timeout happened concurrently,
+                    // treat as notification
+                    _ => return, // surious wakeup, since this function is called with a timeout,
+                                 // we cannot go back to sleep.
+                                 // Otherwise, we may miss the expired timers.
+                }
+            } else if self
                 .state
                 .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
                 .is_ok()

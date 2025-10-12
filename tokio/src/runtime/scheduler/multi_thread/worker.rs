@@ -794,17 +794,17 @@ impl Context {
         self.park_internal(core, Some(Duration::from_millis(0)))
     }
 
-    fn park_internal(&self, core: Box<Core>, duration: Option<Duration>) -> Box<Core> {
+    fn park_internal(&self, mut core: Box<Core>, duration: Option<Duration>) -> Box<Core> {
         self.assert_lifo_enabled_is_correct(&core);
+
+        // Take the parker out of core
+        let mut park = core.park.take().expect("park missing");
 
         let MaintainLocalTimer {
             mut core,
             park_duration: duration,
             auto_advance_duration,
         } = self.maintain_local_timers_before_parking(core, duration);
-
-        // Take the parker out of core
-        let mut park = core.park.take().expect("park missing");
 
         // Store `core` in context
         *self.core.borrow_mut() = Some(core);
@@ -821,10 +821,10 @@ impl Context {
         // Remove `core` from context
         core = self.core.borrow_mut().take().expect("core missing");
 
+        core = self.maintain_local_timers_after_parking(core, auto_advance_duration);
+
         // Place `park` back in `core`
         core.park = Some(park);
-
-        core = self.maintain_local_timers_after_parking(core, auto_advance_duration);
 
         if core.should_notify_others() {
             self.worker.handle.notify_parked_local();
