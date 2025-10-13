@@ -95,14 +95,41 @@ where
     pidfd: PollEvented<Pidfd>,
 }
 
+fn display_eq(d: impl std::fmt::Display, s: &str) -> bool {
+    use std::fmt::Write;
+
+    struct FormatEq<'r> {
+        remainder: &'r str,
+        unequal: bool,
+    }
+
+    impl<'r> Write for FormatEq<'r> {
+        fn write_str(&mut self, s: &str) -> std::fmt::Result {
+            if !self.unequal {
+                if let Some(new_remainder) = self.remainder.strip_prefix(s) {
+                    self.remainder = new_remainder;
+                } else {
+                    self.unequal = true;
+                }
+            }
+            Ok(())
+        }
+    }
+
+    let mut fmt_eq = FormatEq {
+        remainder: s,
+        unequal: false,
+    };
+    let _ = write!(fmt_eq, "{d}");
+    fmt_eq.remainder.is_empty() && !fmt_eq.unequal
+}
+
 #[allow(deprecated)]
 fn is_rt_shutdown_err(err: &io::Error) -> bool {
     if let Some(inner) = err.get_ref() {
-        // Using `Error::description()` is more efficient than `format!("{inner}")`,
-        // so we use it here even if it is deprecated.
         err.kind() == io::ErrorKind::Other
             && inner.source().is_none()
-            && inner.description() == RUNTIME_SHUTTING_DOWN_ERROR
+            && display_eq(inner, RUNTIME_SHUTTING_DOWN_ERROR)
     } else {
         false
     }
