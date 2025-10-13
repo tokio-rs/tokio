@@ -494,8 +494,8 @@ jobs:
         target:
           - name: x86_64-unknown-haiku
             exclude_features: "taskdump" # taskdump is only available on Linux
-          - name: armv7-sony-vita-newlibeabihf
-            exclude_features: "process,signal,rt-process-signal,full,taskdump"
+#         - name: armv7-sony-vita-newlibeabihf
+#           exclude_features: "process,signal,rt-process-signal,full,taskdump"
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_nightly }}
