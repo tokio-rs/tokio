@@ -630,7 +630,7 @@ jobs:
           components: rust-src
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@main
         with:
           tool: cargo-nextest
 
