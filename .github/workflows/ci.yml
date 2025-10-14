@@ -646,6 +646,7 @@ jobs:
           cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
         env:
           RUST_TEST_THREADS: 1
+          RUSTDOCFLAGS: --cfg tokio_unstable
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
 
   no-atomic-u64-check:
