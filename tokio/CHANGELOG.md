@@ -28,7 +28,6 @@ The MSRV is increased to 1.71.
 - macros: fix hygiene issue in `join!` and `try_join!` ([#7638])
 - net: fix copy/paste errors in udp peek methods ([#7604])
 - process: fix error when runtime is shut down on nightly-2025-10-12 ([#7672])
-- process: fix panic from spurious pidfd wakeup ([#7494])
 - runtime: use release ordering in `wake_by_ref()` even if already woken ([#7622])
 - sync: close the `broadcast::Sender` in `broadcast::Sender::new()` ([#7629])
 - sync: fix implementation of unused `RwLock::try_*` methods ([#7587])
