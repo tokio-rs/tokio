@@ -249,6 +249,18 @@ comment on [#7172].
 [#7186]: https://github.com/tokio-rs/tokio/pull/7186
 [#7192]: https://github.com/tokio-rs/tokio/pull/7192
 
+# 1.43.3 (October 14th, 2025)
+
+### Fixed
+
+- runtime: use release ordering in `wake_by_ref()` even if already woken ([#7622])
+- sync: close the `broadcast::Sender` in `broadcast::Sender::new()` ([#7629])
+- process: fix error when runtime is shut down on nightly-2025-10-12 ([#7672])
+
+[#7622]: https://github.com/tokio-rs/tokio/pull/7622
+[#7629]: https://github.com/tokio-rs/tokio/pull/7629
+[#7672]: https://github.com/tokio-rs/tokio/pull/7672
+
 # 1.43.2 (August 1st, 2025)
 
 ### Fixed
