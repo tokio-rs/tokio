@@ -439,7 +439,14 @@ impl<T, S: Semaphore> Rx<T, S> {
                             return Ok(value);
                         }
                         TryPopResult::Closed => return Err(TryRecvError::Disconnected),
-                        TryPopResult::Empty => return Err(TryRecvError::Empty),
+                        TryPopResult::Empty => {
+                            // If close() was called, an empty queue should report Disconnected.
+                            return if rx_fields.rx_closed {
+                                Err(TryRecvError::Disconnected)
+                            } else {
+                                Err(TryRecvError::Empty)
+                            };
+                        }
                         TryPopResult::Busy => {} // fall through
                     }
                 };
