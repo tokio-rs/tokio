@@ -35,8 +35,13 @@ pub(crate) enum TryPopResult<T> {
     /// Successfully popped a value.
     Ok(T),
     /// The channel is empty.
+    ///
+    /// Returned after `Rx::close()` when no values remain,
+    /// even if senders still exist.
     Empty,
     /// The channel is empty and closed.
+    ///
+    /// Returned when the send half is closed (all senders dropped).
     Closed,
     /// The channel is not empty, but the first value is being written.
     Busy,
