@@ -16,7 +16,7 @@ env:
   RUSTUP_WINDOWS_PATH_ADD_BIN: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2025-01-25
+  rust_nightly: nightly-2025-10-12
   # Pin a specific miri version
   rust_miri_nightly: nightly-2025-06-02
   rust_clippy: '1.88'
@@ -494,8 +494,8 @@ jobs:
         target:
           - name: x86_64-unknown-haiku
             exclude_features: "taskdump" # taskdump is only available on Linux
-          - name: armv7-sony-vita-newlibeabihf
-            exclude_features: "process,signal,rt-process-signal,full,taskdump"
+#         - name: armv7-sony-vita-newlibeabihf
+#           exclude_features: "process,signal,rt-process-signal,full,taskdump"
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_nightly }}
@@ -646,6 +646,7 @@ jobs:
           cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
         env:
           RUST_TEST_THREADS: 1
+          RUSTDOCFLAGS: --cfg tokio_unstable
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
 
   no-atomic-u64-check:

@@ -1,15 +1,6 @@
 [build]
-  # TODO: unfreeze toolchain
-  # error[E0557]: feature has been removed
-  #   --> /opt/buildhome/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.13/src/lib.rs:89:29
-  #    |
-  # 89 | #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-  #    |                             ^^^^^^^^^^^^ feature has been removed
-  #    |
-  #    = note: removed in 1.58.0; see <https://github.com/rust-lang/rust/pull/138907; for more information
-  #    = note: merged into `doc_cfg`
   command = """
-    rustup install nightly-2025-01-25 --profile minimal && cargo doc --no-deps --all-features
+    rustup install nightly --profile minimal && cargo doc --no-deps --all-features
     """
   publish = "target/doc"
 
