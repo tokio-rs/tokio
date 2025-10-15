@@ -177,7 +177,7 @@ async fn multiple_wait() {
     );
 }
 
-// No matter which usecase, it doesn't make sense for a read
+// No matter which usecase, it doesn't make sense for a read to
 // hang forever. However, currently, if there is no sequenced read
 // action, it will hang forever.
 //
@@ -225,7 +225,7 @@ fn do_not_panic_unconsumed_error() {
 // Fixing this would require making `Mock` non-`Clone`,
 // which is a breaking change.
 //
-// Since we want be aware of the fixing of this bug,
+// Since we want to be aware of the fixing of this bug,
 // no matter intentionally or unintentionally,
 // we add this test to catch the behavior change.
 //
