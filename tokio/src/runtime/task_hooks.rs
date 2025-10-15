@@ -98,8 +98,8 @@ impl<'a> TaskMeta<'a> {
     /// Return the user-defined metadata for this task if it is set and of the
     /// correct type.
     #[cfg(tokio_unstable)]
-    pub fn get_data<T: 'static>(&self) -> Option<&T> {
-        self.user_data?.downcast_ref::<T>()
+    pub fn get_data(&self) -> UserData {
+        self.user_data
     }
 }
 

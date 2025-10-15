@@ -768,7 +768,7 @@ impl Builder {
     /// let runtime = runtime::Builder::new_current_thread()
     ///     .on_task_spawn(|_| {
     ///         println!("spawning task");
-    ///         None::<()>
+    ///         None
     ///     })
     ///     .build()
     ///     .unwrap();
@@ -794,15 +794,16 @@ impl Builder {
     /// let runtime = runtime::Builder::new_current_thread()
     ///     .on_task_spawn(|meta| {
     ///         println!("spawning task {}", meta.id());
-    ///         Some(YieldingTaskMetadata { yield_count: AtomicUsize::new(0) })
+    ///         let meta = Box::new(YieldingTaskMetadata { yield_count: AtomicUsize::new(0) });
+    ///         Some(Box::leak(meta) as &dyn std::any::Any)
     ///     })
     ///     .on_after_task_poll(|meta| {
-    ///         if let Some(data) = meta.get_data::<YieldingTaskMetadata>() {
+    ///         if let Some(data) = meta.get_data().and_then(|data| data.downcast_ref::<YieldingTaskMetadata>()) {
     ///             println!("task {} yield count: {}", meta.id(), data.yield_count.fetch_add(1, Ordering::Relaxed));
     ///         }
     ///     })
     ///     .on_task_terminate(|meta| {
-    ///         match meta.get_data::<YieldingTaskMetadata>() {
+    ///         match meta.get_data().and_then(|data| data.downcast_ref::<YieldingTaskMetadata>()) {
     ///             Some(data) => {
     ///                 let yield_count = data.yield_count.load(Ordering::Relaxed);
     ///                 println!("task {} total yield count: {}", meta.id(), yield_count);
@@ -826,26 +827,11 @@ impl Builder {
     /// ```
     #[cfg(all(not(loom), tokio_unstable))]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
-    pub fn on_task_spawn<F, T>(&mut self, f: F) -> &mut Self
+    pub fn on_task_spawn<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(&TaskMeta<'_>) -> Option<T> + Send + Sync + 'static,
-        T: 'static,
+        F: Fn(&TaskMeta<'_>) -> UserData + Send + Sync + 'static,
     {
-        use std::any::Any;
-
-        fn wrap<F, T>(f: F) -> impl Fn(&TaskMeta<'_>) -> UserData + Send + Sync + 'static
-        where
-            F: Fn(&TaskMeta<'_>) -> Option<T> + Send + Sync + 'static,
-            T: 'static,
-        {
-            move |meta| {
-                f(meta).map(|value| {
-                    let boxed: Box<dyn Any> = Box::new(value);
-                    Box::leak(boxed) as &'static dyn Any
-                })
-            }
-        }
-        self.before_spawn = Some(std::sync::Arc::new(wrap(f)));
+        self.before_spawn = Some(std::sync::Arc::new(f));
         self
     }
 
