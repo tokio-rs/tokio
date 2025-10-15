@@ -784,7 +784,6 @@ impl Builder {
     /// ```
     ///
     /// ```
-    /// # #[cfg(not(target_family = "wasm"))]
     /// # use tokio::runtime;
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     /// # pub fn main() {
