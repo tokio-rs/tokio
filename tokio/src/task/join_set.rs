@@ -31,24 +31,24 @@ use crate::util::IdleNotifiedSet;
 /// ```
 /// use tokio::task::JoinSet;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut set = JoinSet::new();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut set = JoinSet::new();
 ///
-///     for i in 0..10 {
-///         set.spawn(async move { i });
-///     }
-///
-///     let mut seen = [false; 10];
-///     while let Some(res) = set.join_next().await {
-///         let idx = res.unwrap();
-///         seen[idx] = true;
-///     }
-///
-///     for i in 0..10 {
-///         assert!(seen[i]);
-///     }
+/// for i in 0..10 {
+///     set.spawn(async move { i });
 /// }
+///
+/// let mut seen = [false; 10];
+/// while let Some(res) = set.join_next().await {
+///     let idx = res.unwrap();
+///     seen[idx] = true;
+/// }
+///
+/// for i in 0..10 {
+///     assert!(seen[i]);
+/// }
+/// # }
 /// ```
 ///
 /// # Task ID guarantees
@@ -167,9 +167,9 @@ impl<T: 'static> JoinSet<T> {
         self.insert(handle.spawn(task))
     }
 
-    /// Spawn the provided task on the current [`LocalSet`] and store it in this
-    /// `JoinSet`, returning an [`AbortHandle`] that can be used to remotely
-    /// cancel the task.
+    /// Spawn the provided task on the current [`LocalSet`] or [`LocalRuntime`]
+    /// and store it in this `JoinSet`, returning an [`AbortHandle`] that can
+    /// be used to remotely cancel the task.
     ///
     /// The provided future will start running in the background immediately
     /// when this method is called, even if you don't await anything on this
@@ -177,9 +177,10 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// # Panics
     ///
-    /// This method panics if it is called outside of a `LocalSet`.
+    /// This method panics if it is called outside of a `LocalSet`or `LocalRuntime`.
     ///
     /// [`LocalSet`]: crate::task::LocalSet
+    /// [`LocalRuntime`]: crate::runtime::LocalRuntime
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
     pub fn spawn_local<F>(&mut self, task: F) -> AbortHandle
@@ -219,6 +220,8 @@ impl<T: 'static> JoinSet<T> {
     /// Spawn multiple blocking tasks and wait for them.
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::task::JoinSet;
     ///
     /// #[tokio::main]
@@ -239,6 +242,7 @@ impl<T: 'static> JoinSet<T> {
     ///         assert!(seen[i]);
     ///     }
     /// }
+    /// # }
     /// ```
     ///
     /// # Panics
@@ -396,20 +400,20 @@ impl<T: 'static> JoinSet<T> {
     /// use tokio::task::JoinSet;
     /// use std::time::Duration;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut set = JoinSet::new();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut set = JoinSet::new();
     ///
-    ///     for i in 0..3 {
-    ///        set.spawn(async move {
-    ///            tokio::time::sleep(Duration::from_secs(3 - i)).await;
-    ///            i
-    ///        });
-    ///     }
-    ///
-    ///     let output = set.join_all().await;
-    ///     assert_eq!(output, vec![2, 1, 0]);
+    /// for i in 0..3 {
+    ///     set.spawn(async move {
+    ///         tokio::time::sleep(Duration::from_secs(3 - i)).await;
+    ///         i
+    ///     });
     /// }
+    ///
+    /// let output = set.join_all().await;
+    /// assert_eq!(output, vec![2, 1, 0]);
+    /// # }
     /// ```
     ///
     /// Equivalent implementation of `join_all`, using [`join_next`] and loop.
@@ -418,24 +422,24 @@ impl<T: 'static> JoinSet<T> {
     /// use tokio::task::JoinSet;
     /// use std::panic;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut set = JoinSet::new();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut set = JoinSet::new();
     ///
-    ///     for i in 0..3 {
-    ///        set.spawn(async move {i});
-    ///     }
-    ///
-    ///     let mut output = Vec::new();
-    ///     while let Some(res) = set.join_next().await{
-    ///         match res {
-    ///             Ok(t) => output.push(t),
-    ///             Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
-    ///             Err(err) => panic!("{err}"),
-    ///         }
-    ///     }
-    ///     assert_eq!(output.len(),3);
+    /// for i in 0..3 {
+    ///     set.spawn(async move {i});
     /// }
+    ///
+    /// let mut output = Vec::new();
+    /// while let Some(res) = set.join_next().await{
+    ///     match res {
+    ///         Ok(t) => output.push(t),
+    ///         Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
+    ///         Err(err) => panic!("{err}"),
+    ///     }
+    /// }
+    /// assert_eq!(output.len(),3);
+    /// # }
     /// ```
     /// [`join_next`]: fn@Self::join_next
     /// [`JoinError::id`]: fn@crate::task::JoinError::id
@@ -613,20 +617,20 @@ impl<T> Default for JoinSet<T> {
 /// ```
 /// use tokio::task::JoinSet;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut set: JoinSet<_> = (0..10).map(|i| async move { i }).collect();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut set: JoinSet<_> = (0..10).map(|i| async move { i }).collect();
 ///
-///     let mut seen = [false; 10];
-///     while let Some(res) = set.join_next().await {
-///         let idx = res.unwrap();
-///         seen[idx] = true;
-///     }
-///
-///     for i in 0..10 {
-///         assert!(seen[i]);
-///     }
+/// let mut seen = [false; 10];
+/// while let Some(res) = set.join_next().await {
+///     let idx = res.unwrap();
+///     seen[idx] = true;
 /// }
+///
+/// for i in 0..10 {
+///      assert!(seen[i]);
+/// }
+/// # }
 /// ```
 ///
 /// [`collect`]: std::iter::Iterator::collect

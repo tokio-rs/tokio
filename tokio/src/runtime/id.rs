@@ -16,12 +16,15 @@ use std::num::{NonZeroU32, NonZeroU64};
 /// # Examples
 ///
 /// ```
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use tokio::runtime::Handle;
 ///
 /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 /// async fn main() {
 ///   println!("Current runtime id: {}", Handle::current().id());
 /// }
+/// # }
 /// ```
 ///
 /// **Note**: This is an [unstable API][unstable]. The public API of this type

@@ -1458,7 +1458,8 @@ impl AsyncWrite for TcpStream {
 
 impl fmt::Debug for TcpStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        // skip PollEvented noise
+        (*self.io).fmt(f)
     }
 }
 

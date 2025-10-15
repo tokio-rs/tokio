@@ -88,9 +88,9 @@ impl<T> JoinQueue<T> {
         self.push_back(handle.spawn(task))
     }
 
-    /// Spawn the provided task on the current [`LocalSet`] and store it in this
-    /// [`JoinQueue`], returning an [`AbortHandle`] that can be used to remotely
-    /// cancel the task.
+    /// Spawn the provided task on the current [`LocalSet`] or [`LocalRuntime`]
+    /// and store it in this [`JoinQueue`], returning an [`AbortHandle`] that
+    /// can be used to remotely cancel the task.
     ///
     /// The provided future will start running in the background immediately
     /// when this method is called, even if you don't await anything on this
@@ -98,9 +98,10 @@ impl<T> JoinQueue<T> {
     ///
     /// # Panics
     ///
-    /// This method panics if it is called outside of a `LocalSet`.
+    /// This method panics if it is called outside of a `LocalSet` or `LocalRuntime`.
     ///
     /// [`LocalSet`]: tokio::task::LocalSet
+    /// [`LocalRuntime`]: tokio::runtime::LocalRuntime
     /// [`AbortHandle`]: tokio::task::AbortHandle
     #[track_caller]
     pub fn spawn_local<F>(&mut self, task: F) -> AbortHandle
@@ -181,6 +182,59 @@ impl<T> JoinQueue<T> {
     /// [`JoinError::id`]: fn@tokio::task::JoinError::id
     pub async fn join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
         std::future::poll_fn(|cx| self.poll_join_next_with_id(cx)).await
+    }
+
+    /// Tries to poll an `AbortOnDropHandle` without blocking or yielding.
+    ///
+    /// Note that on success the handle will panic on subsequent polls
+    /// since it becomes consumed.
+    fn try_poll_handle(jh: &mut AbortOnDropHandle<T>) -> Option<Result<T, JoinError>> {
+        let waker = futures_util::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+
+        // Since this function is not async and cannot be forced to yield, we should
+        // disable budgeting when we want to check for the `JoinHandle` readiness.
+        let jh = std::pin::pin!(tokio::task::coop::unconstrained(jh));
+        if let Poll::Ready(res) = jh.poll(&mut cx) {
+            Some(res)
+        } else {
+            None
+        }
+    }
+
+    /// Tries to join the next task in FIFO order if it has completed.
+    ///
+    /// Returns `None` if the queue is empty or if the next task is not yet ready.
+    pub fn try_join_next(&mut self) -> Option<Result<T, JoinError>> {
+        let jh = self.0.front_mut()?;
+        let res = Self::try_poll_handle(jh)?;
+        // Use `detach` to avoid calling `abort` on a task that has already completed.
+        // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
+        // we only need to drop the `JoinHandle` for cleanup.
+        drop(self.0.pop_front().unwrap().detach());
+        Some(res)
+    }
+
+    /// Tries to join the next task in FIFO order if it has completed and return its output,
+    /// along with its [task ID].
+    ///
+    /// Returns `None` if the queue is empty or if the next task is not yet ready.
+    ///
+    /// When this method returns an error, then the id of the task that failed can be accessed
+    /// using the [`JoinError::id`] method.
+    ///
+    /// [task ID]: tokio::task::Id
+    /// [`JoinError::id`]: fn@tokio::task::JoinError::id
+    pub fn try_join_next_with_id(&mut self) -> Option<Result<(Id, T), JoinError>> {
+        let jh = self.0.front_mut()?;
+        let res = Self::try_poll_handle(jh)?;
+        // Use `detach` to avoid calling `abort` on a task that has already completed.
+        // Dropping `AbortOnDropHandle` would abort the task, but since it is finished,
+        // we only need to drop the `JoinHandle` for cleanup.
+        let jh = self.0.pop_front().unwrap().detach();
+        let id = jh.id();
+        drop(jh);
+        Some(res.map(|output| (id, output)))
     }
 
     /// Aborts all tasks and waits for them to finish shutting down.

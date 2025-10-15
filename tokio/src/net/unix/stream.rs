@@ -1072,7 +1072,7 @@ impl UnixStream {
 
 impl fmt::Debug for UnixStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        (*self.io).fmt(f)
     }
 }
 

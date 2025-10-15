@@ -37,13 +37,13 @@ impl RuntimeMetrics {
     /// ```
     /// use tokio::runtime::Handle;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let metrics = Handle::current().metrics();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let metrics = Handle::current().metrics();
     ///
-    ///     let n = metrics.num_workers();
-    ///     println!("Runtime is using {} workers", n);
-    /// }
+    /// let n = metrics.num_workers();
+    /// println!("Runtime is using {} workers", n);
+    /// # }
     /// ```
     pub fn num_workers(&self) -> usize {
         self.handle.inner.num_workers()
@@ -59,13 +59,13 @@ impl RuntimeMetrics {
     /// ```
     /// use tokio::runtime::Handle;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///    let metrics = Handle::current().metrics();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let metrics = Handle::current().metrics();
     ///
-    ///     let n = metrics.num_alive_tasks();
-    ///     println!("Runtime has {} alive tasks", n);
-    /// }
+    /// let n = metrics.num_alive_tasks();
+    /// println!("Runtime has {} alive tasks", n);
+    /// # }
     /// ```
     pub fn num_alive_tasks(&self) -> usize {
         self.handle.inner.num_alive_tasks()
@@ -85,13 +85,13 @@ impl RuntimeMetrics {
     /// ```
     /// use tokio::runtime::Handle;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let metrics = Handle::current().metrics();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let metrics = Handle::current().metrics();
     ///
-    ///     let n = metrics.global_queue_depth();
-    ///     println!("{} tasks currently pending in the runtime's global queue", n);
-    /// }
+    /// let n = metrics.global_queue_depth();
+    /// println!("{} tasks currently pending in the runtime's global queue", n);
+    /// # }
     /// ```
     pub fn global_queue_depth(&self) -> usize {
         self.handle.inner.injection_queue_depth()
@@ -126,13 +126,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.worker_total_busy_duration(0);
-        ///     println!("worker 0 was busy for a total of {:?}", n);
-        /// }
+        /// let n = metrics.worker_total_busy_duration(0);
+        /// println!("worker 0 was busy for a total of {:?}", n);
+        /// # }
         /// ```
         pub fn worker_total_busy_duration(&self, worker: usize) -> Duration {
             let nanos = self
@@ -171,13 +171,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.worker_park_count(0);
-        ///     println!("worker 0 parked {} times", n);
-        /// }
+        /// let n = metrics.worker_park_count(0);
+        /// println!("worker 0 parked {} times", n);
+        /// # }
         /// ```
         pub fn worker_park_count(&self, worker: usize) -> u64 {
             self.handle
@@ -219,19 +219,19 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
-        ///     let n = metrics.worker_park_unpark_count(0);
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
+        /// let n = metrics.worker_park_unpark_count(0);
         ///
-        ///     println!("worker 0 parked and unparked {} times", n);
+        /// println!("worker 0 parked and unparked {} times", n);
         ///
-        ///     if n % 2 == 0 {
-        ///         println!("worker 0 is active");
-        ///     } else {
-        ///         println!("worker 0 is parked");
-        ///     }
+        /// if n % 2 == 0 {
+        ///     println!("worker 0 is active");
+        /// } else {
+        ///     println!("worker 0 is parked");
         /// }
+        /// # }
         /// ```
         pub fn worker_park_unpark_count(&self, worker: usize) -> u64 {
             self.handle
@@ -252,19 +252,22 @@ impl RuntimeMetrics {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let _ = tokio::task::spawn_blocking(move || {
-        ///         // Stand-in for compute-heavy work or using synchronous APIs
-        ///         1 + 1
-        ///     }).await;
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let _ = tokio::task::spawn_blocking(move || {
+        ///     // Stand-in for compute-heavy work or using synchronous APIs
+        ///     1 + 1
+        /// }).await;
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.num_blocking_threads();
-        ///     println!("Runtime has created {} threads", n);
-        /// }
+        /// let n = metrics.num_blocking_threads();
+        /// println!("Runtime has created {} threads", n);
+        /// # }
+        /// # }
         /// ```
         pub fn num_blocking_threads(&self) -> usize {
             self.handle.inner.num_blocking_threads()
@@ -282,6 +285,8 @@ impl RuntimeMetrics {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime::Handle;
         ///
         /// #[tokio::main]
@@ -295,6 +300,7 @@ impl RuntimeMetrics {
         ///     let n = metrics.num_idle_blocking_threads();
         ///     println!("Runtime has {} idle blocking thread pool threads", n);
         /// }
+        /// # }
         /// ```
         pub fn num_idle_blocking_threads(&self) -> usize {
             self.handle.inner.num_idle_blocking_threads()
@@ -328,13 +334,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let id = metrics.worker_thread_id(0);
-        ///     println!("worker 0 has id {:?}", id);
-        /// }
+        /// let id = metrics.worker_thread_id(0);
+        /// println!("worker 0 has id {:?}", id);
+        /// # }
         /// ```
         pub fn worker_thread_id(&self, worker: usize) -> Option<ThreadId> {
             self.handle
@@ -376,13 +382,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.worker_local_queue_depth(0);
-        ///     println!("{} tasks currently pending in worker 0's local queue", n);
-        /// }
+        /// let n = metrics.worker_local_queue_depth(0);
+        /// println!("{} tasks currently pending in worker 0's local queue", n);
+        /// # }
         /// ```
         pub fn worker_local_queue_depth(&self, worker: usize) -> usize {
             self.handle.inner.worker_local_queue_depth(worker)
@@ -550,13 +556,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.blocking_queue_depth();
-        ///     println!("{} tasks currently pending in the blocking thread pool", n);
-        /// }
+        /// let n = metrics.blocking_queue_depth();
+        /// println!("{} tasks currently pending in the blocking thread pool", n);
+        /// # }
         /// ```
         pub fn blocking_queue_depth(&self) -> usize {
             self.handle.inner.blocking_queue_depth()
@@ -580,13 +586,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///    let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.spawned_tasks_count();
-        ///     println!("Runtime has had {} tasks spawned", n);
-        /// }
+        /// let n = metrics.spawned_tasks_count();
+        /// println!("Runtime has had {} tasks spawned", n);
+        /// # }
         /// ```
         pub fn spawned_tasks_count(&self) -> u64 {
             self.handle.inner.spawned_tasks_count()
@@ -608,13 +614,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.remote_schedule_count();
-        ///     println!("{} tasks were scheduled from outside the runtime", n);
-        /// }
+        /// let n = metrics.remote_schedule_count();
+        /// println!("{} tasks were scheduled from outside the runtime", n);
+        /// # }
         /// ```
         pub fn remote_schedule_count(&self) -> u64 {
             self.handle
@@ -666,13 +672,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.worker_noop_count(0);
-        ///     println!("worker 0 had {} no-op unparks", n);
-        /// }
+        /// let n = metrics.worker_noop_count(0);
+        /// println!("worker 0 had {} no-op unparks", n);
+        /// # }
         /// ```
         pub fn worker_noop_count(&self, worker: usize) -> u64 {
             self.handle
@@ -712,13 +718,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.worker_steal_count(0);
-        ///     println!("worker 0 has stolen {} tasks", n);
-        /// }
+        /// let n = metrics.worker_steal_count(0);
+        /// println!("worker 0 has stolen {} tasks", n);
+        /// # }
         /// ```
         pub fn worker_steal_count(&self, worker: usize) -> u64 {
             self.handle
@@ -758,13 +764,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.worker_steal_operations(0);
-        ///     println!("worker 0 has stolen tasks {} times", n);
-        /// }
+        /// let n = metrics.worker_steal_operations(0);
+        /// println!("worker 0 has stolen tasks {} times", n);
+        /// # }
         /// ```
         pub fn worker_steal_operations(&self, worker: usize) -> u64 {
             self.handle
@@ -799,13 +805,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.worker_poll_count(0);
-        ///     println!("worker 0 has polled {} tasks", n);
-        /// }
+        /// let n = metrics.worker_poll_count(0);
+        /// println!("worker 0 has polled {} tasks", n);
+        /// # }
         /// ```
         pub fn worker_poll_count(&self, worker: usize) -> u64 {
             self.handle
@@ -844,13 +850,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.worker_local_schedule_count(0);
-        ///     println!("{} tasks were scheduled on the worker's local queue", n);
-        /// }
+        /// let n = metrics.worker_local_schedule_count(0);
+        /// println!("{} tasks were scheduled on the worker's local queue", n);
+        /// # }
         /// ```
         pub fn worker_local_schedule_count(&self, worker: usize) -> u64 {
             self.handle
@@ -890,13 +896,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.worker_overflow_count(0);
-        ///     println!("worker 0 has overflowed its queue {} times", n);
-        /// }
+        /// let n = metrics.worker_overflow_count(0);
+        /// println!("worker 0 has overflowed its queue {} times", n);
+        /// # }
         /// ```
         pub fn worker_overflow_count(&self, worker: usize) -> u64 {
             self.handle
@@ -999,13 +1005,13 @@ impl RuntimeMetrics {
         /// ```
         /// use tokio::runtime::Handle;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let metrics = Handle::current().metrics();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let metrics = Handle::current().metrics();
         ///
-        ///     let n = metrics.worker_mean_poll_time(0);
-        ///     println!("worker 0 has a mean poll time of {:?}", n);
-        /// }
+        /// let n = metrics.worker_mean_poll_time(0);
+        /// println!("worker 0 has a mean poll time of {:?}", n);
+        /// # }
         /// ```
         #[track_caller]
         pub fn worker_mean_poll_time(&self, worker: usize) -> Duration {
