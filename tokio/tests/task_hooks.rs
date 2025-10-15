@@ -23,7 +23,7 @@ fn spawn_task_hook_fires() {
             ids2.lock().unwrap().insert(data.id());
 
             count2.fetch_add(1, Ordering::SeqCst);
-            None::<()>
+            None
         })
         .build()
         .unwrap();
