@@ -458,7 +458,14 @@ impl Handle {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        Self::spawn_with_user_data(me, future, id, spawned_at, #[cfg(tokio_unstable)] None)
+        Self::spawn_with_user_data(
+            me,
+            future,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            None,
+        )
     }
 
     #[track_caller]
@@ -467,8 +474,7 @@ impl Handle {
         future: F,
         id: crate::runtime::task::Id,
         spawned_at: SpawnLocation,
-        #[cfg(tokio_unstable)]
-        user_data: UserData,
+        #[cfg(tokio_unstable)] user_data: UserData,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,

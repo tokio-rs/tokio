@@ -11,12 +11,12 @@
 
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
-#[cfg(tokio_unstable)]
-use crate::runtime::task_hooks::UserData;
 use crate::runtime::context;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule, TaskHarnessScheduleHooks};
+#[cfg(tokio_unstable)]
+use crate::runtime::task_hooks::UserData;
 use crate::util::linked_list;
 
 use std::num::NonZeroU64;

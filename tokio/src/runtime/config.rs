@@ -2,9 +2,9 @@
     any(not(all(tokio_unstable, feature = "full")), target_family = "wasm"),
     allow(dead_code)
 )]
-use crate::runtime::{Callback, TaskCallback};
 #[cfg(tokio_unstable)]
 use crate::runtime::TaskSpawnCallback;
+use crate::runtime::{Callback, TaskCallback};
 use crate::util::RngSeedGenerator;
 
 pub(crate) struct Config {

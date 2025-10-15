@@ -2,14 +2,14 @@ use crate::future::Future;
 use crate::loom::sync::Arc;
 use crate::runtime::scheduler::multi_thread::worker;
 use crate::runtime::task::{Notified, Task, TaskHarnessScheduleHooks};
+#[cfg(tokio_unstable)]
+use crate::runtime::task_hooks::UserData;
 use crate::runtime::{
     blocking, driver,
     task::{self, JoinHandle, SpawnLocation},
     TaskHooks, TaskMeta,
 };
 use crate::util::RngSeedGenerator;
-#[cfg(tokio_unstable)]
-use crate::runtime::task_hooks::UserData;
 
 use std::fmt;
 
@@ -49,7 +49,14 @@ impl Handle {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        Self::bind_new_task(me, future, id, spawned_at, #[cfg(tokio_unstable)] None)
+        Self::bind_new_task(
+            me,
+            future,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            None,
+        )
     }
 
     /// Spawns a future with user data onto the thread pool
@@ -78,8 +85,7 @@ impl Handle {
         future: T,
         id: task::Id,
         spawned_at: SpawnLocation,
-        #[cfg(tokio_unstable)]
-        user_data: UserData,
+        #[cfg(tokio_unstable)] user_data: UserData,
     ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,

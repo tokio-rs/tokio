@@ -1,11 +1,11 @@
 #![allow(unreachable_pub)]
+#[cfg(tokio_unstable)]
+use crate::runtime::UserData;
 use crate::{
     runtime::{Handle, BOX_FUTURE_THRESHOLD},
     task::{JoinHandle, LocalSet},
     util::trace::SpawnMeta,
 };
-#[cfg(tokio_unstable)]
-use crate::runtime::UserData;
 use std::{future::Future, io, mem};
 
 /// Factory which is used to configure the properties of a new task.

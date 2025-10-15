@@ -401,17 +401,14 @@ impl Runtime {
         T: 'static + Send + Future,
         T::Output: 'static + Send,
     {
-        let (handle, notified) =
-            self.0
-                .owned
-                .bind(
-                    future,
-                    self.clone(),
-                    Id::next(),
-                    SpawnLocation::capture(),
-                    #[cfg(tokio_unstable)]
-                    None,
-                );
+        let (handle, notified) = self.0.owned.bind(
+            future,
+            self.clone(),
+            Id::next(),
+            SpawnLocation::capture(),
+            #[cfg(tokio_unstable)]
+            None,
+        );
 
         if let Some(notified) = notified {
             self.schedule(notified);
