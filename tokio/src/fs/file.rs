@@ -150,10 +150,7 @@ impl File {
     /// [`read_to_end`]: fn@crate::io::AsyncReadExt::read_to_end
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn open(path: impl AsRef<Path>) -> io::Result<File> {
-        let path = path.as_ref().to_owned();
-        let std = asyncify(|| StdFile::open(path)).await?;
-
-        Ok(File::from_std(std))
+        Self::options().read(true).open(path).await
     }
 
     /// Opens a file in write-only mode.
@@ -188,9 +185,12 @@ impl File {
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn create(path: impl AsRef<Path>) -> io::Result<File> {
-        let path = path.as_ref().to_owned();
-        let std_file = asyncify(move || StdFile::create(path)).await?;
-        Ok(File::from_std(std_file))
+        Self::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .await
     }
 
     /// Opens a file in read-write mode.

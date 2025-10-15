@@ -262,9 +262,12 @@ impl Handle {
     ///
     /// # Panics
     ///
-    /// This function panics if the provided future panics, if called within an
-    /// asynchronous execution context, or if a timer future is executed on a runtime that has been
-    /// shut down.
+    /// This function will panic if any of the following conditions are met:
+    /// - The provided future panics.
+    /// - It is called from within an asynchronous context, such as inside
+    ///   [`Runtime::block_on`], `Handle::block_on`, or from a function annotated
+    ///   with [`tokio::main`].
+    /// - A timer future is executed on a runtime that has been shut down.
     ///
     /// # Examples
     ///
@@ -306,6 +309,24 @@ impl Handle {
     /// # }
     /// ```
     ///
+    /// `Handle::block_on` may be combined with [`task::block_in_place`] to
+    /// re-enter the async context of a multi-thread scheduler runtime:
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::task;
+    /// use tokio::runtime::Handle;
+    ///
+    /// # async fn docs() {
+    /// task::block_in_place(move || {
+    ///     Handle::current().block_on(async move {
+    ///         // do something async
+    ///     });
+    /// });
+    /// # }
+    /// # }
+    /// ```
+    ///
     /// [`JoinError`]: struct@crate::task::JoinError
     /// [`JoinHandle`]: struct@crate::task::JoinHandle
     /// [`Runtime::block_on`]: fn@crate::runtime::Runtime::block_on
@@ -315,6 +336,8 @@ impl Handle {
     /// [`tokio::fs`]: crate::fs
     /// [`tokio::net`]: crate::net
     /// [`tokio::time`]: crate::time
+    /// [`tokio::main`]: ../attr.main.html
+    /// [`task::block_in_place`]: crate::task::block_in_place
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let fut_size = mem::size_of::<F>();
@@ -329,7 +352,7 @@ impl Handle {
     fn block_on_inner<F: Future>(&self, future: F, _meta: SpawnMeta<'_>) -> F::Output {
         #[cfg(all(
             tokio_unstable,
-            tokio_taskdump,
+            feature = "taskdump",
             feature = "rt",
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
@@ -356,7 +379,7 @@ impl Handle {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(
             tokio_unstable,
-            tokio_taskdump,
+            feature = "taskdump",
             feature = "rt",
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
@@ -381,7 +404,7 @@ impl Handle {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(
             tokio_unstable,
-            tokio_taskdump,
+            feature = "taskdump",
             feature = "rt",
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
@@ -536,19 +559,19 @@ cfg_taskdump! {
         /// ## Unstable Features
         ///
         /// This functionality is **unstable**, and requires both the
-        /// `tokio_unstable` and `tokio_taskdump` `cfg` flags to be set.
+        /// `--cfg tokio_unstable` and cargo feature `taskdump` to be set.
         ///
         /// You can do this by setting the `RUSTFLAGS` environment variable
         /// before invoking `cargo`; e.g.:
         /// ```bash
-        /// RUSTFLAGS="--cfg tokio_unstable --cfg tokio_taskdump" cargo run --example dump
+        /// RUSTFLAGS="--cfg tokio_unstable cargo run --example dump
         /// ```
         ///
         /// Or by [configuring][cargo-config] `rustflags` in
         /// `.cargo/config.toml`:
         /// ```text
         /// [build]
-        /// rustflags = ["--cfg", "tokio_unstable", "--cfg", "tokio_taskdump"]
+        /// rustflags = ["--cfg", "tokio_unstable"]
         /// ```
         ///
         /// [cargo-config]:
@@ -568,7 +591,7 @@ cfg_taskdump! {
         ///
         /// ## Performance
         ///
-        /// Although enabling the `tokio_taskdump` feature imposes virtually no
+        /// Although enabling the `taskdump` feature imposes virtually no
         /// additional runtime overhead, actually calling `Handle::dump` is
         /// expensive. The runtime must synchronize and pause its workers, then
         /// re-poll every task in a special tracing mode. Avoid requesting dumps

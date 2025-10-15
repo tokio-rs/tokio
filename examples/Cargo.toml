@@ -24,6 +24,9 @@ httparse = "1.0"
 httpdate = "1.0"
 once_cell = "1.5.2"
 
+[target.'cfg(all(tokio_unstable, target_os = "linux"))'.dev-dependencies]
+tokio = { version = "1.0.0", path = "../tokio", features = ["full", "tracing", "taskdump"] }
+
 [target.'cfg(windows)'.dev-dependencies.windows-sys]
 version = "0.61"
 

@@ -1604,7 +1604,7 @@ impl TryFrom<std::os::unix::net::UnixDatagram> for UnixDatagram {
 
 impl fmt::Debug for UnixDatagram {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        (*self.io).fmt(f)
     }
 }
 

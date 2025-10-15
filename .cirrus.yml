@@ -29,9 +29,12 @@ task:
     # Free the disk space before the next build,
     # otherwise cirrus-ci complains about "No space left on device".
     - cargo clean
-    # Enable all unstable features, including io_uring, because it supports
-    # x86_64 FreeBSD.
-    - RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" cargo test --all --all-features
+    # Enable all unstable features except `taskdump`, which is Linux-only.
+    - |
+      RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
+      RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" \
+        cargo test \
+          --features $TOKIO_STABLE_FEATURES,io-uring,tracing
 
 task:
   name: FreeBSD docs
@@ -48,7 +51,9 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo doc --lib --no-deps --all-features --document-private-items
+    # We use `--features $TOKIO_STABLE_FEATURES,io-uring,tracing` instead of
+    # `--all-features` to exclude `taskdump`, which is Linux-only.
+    - cargo doc --lib --no-deps --features $TOKIO_STABLE_FEATURES,io-uring,tracing --document-private-items
 
 task:
   name: FreeBSD 32-bit
