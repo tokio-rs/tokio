@@ -378,17 +378,18 @@ cfg_rt! {
     /// With local runtime flavor ([Unstable API][unstable] only).
     ///
     /// ```rust
-    /// use tokio::task::spawn_local;
-    ///
-    /// #[cfg(tokio_unstable)]
+    /// # #[cfg(tokio_unstable)]
     /// #[tokio::main(flavor = "local")]
     /// async fn main() {
-    ///     let join = spawn_local(async {
+    ///     let join = tokio::task::spawn_local(async {
     ///         println!("my nonsend data...")
     ///     });
     ///
     ///    join.await.unwrap()
-    /// }
+    ///  }
+    /// # #[cfg(not(tokio_unstable))]
+    /// # fn main() {}
+    ///
     /// ```
     ///
     /// [`LocalSet`]: struct@crate::task::LocalSet
