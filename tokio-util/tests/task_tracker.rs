@@ -1,5 +1,10 @@
 #![warn(rust_2018_idioms)]
 
+use futures::future::pending;
+#[cfg(tokio_unstable)]
+use std::rc::Rc;
+use tokio::sync::mpsc;
+use tokio::task::LocalSet;
 use tokio_test::{assert_pending, assert_ready, task};
 use tokio_util::task::TaskTracker;
 
@@ -174,5 +179,184 @@ fn notify_many() {
 
     for wait in &mut waits {
         assert_ready!(wait.poll());
+    }
+}
+
+#[cfg(tokio_unstable)]
+mod spawn {
+    use super::*;
+
+    /// Spawn several tasks, and then close the [`TaskTracker`].
+    #[tokio::test(flavor = "local")]
+    async fn spawn_then_close() {
+        const N: usize = 8;
+
+        let tracker = TaskTracker::new();
+
+        for _ in 0..N {
+            tracker.spawn(async {});
+        }
+
+        for _ in 0..N {
+            tracker.spawn_on(async {}, &tokio::runtime::Handle::current());
+        }
+
+        tracker.close();
+        tracker.wait().await;
+
+        assert!(tracker.is_empty());
+        assert!(tracker.is_closed());
+    }
+}
+
+#[cfg(tokio_unstable)]
+mod spawn_local {
+    use super::*;
+
+    /// Spawn several tasks, and then close the [`TaskTracker`].
+    #[tokio::test(flavor = "local")]
+    async fn spawn_then_close() {
+        const N: usize = 8;
+
+        let tracker = TaskTracker::new();
+
+        for _ in 0..N {
+            let rc = Rc::new(());
+            tracker.spawn_local(async move {
+                drop(rc);
+            });
+        }
+
+        tracker.close();
+        tracker.wait().await;
+
+        assert!(tracker.is_empty());
+        assert!(tracker.is_closed());
+    }
+
+    /// Close the [`TaskTracker`], and then spawn several tasks
+    #[tokio::test(flavor = "local")]
+    async fn spawn_after_close() {
+        const N: usize = 8;
+
+        let tracker = TaskTracker::new();
+
+        tracker.close();
+
+        for _ in 0..N {
+            let rc = Rc::new(());
+            tracker.spawn_local(async move {
+                drop(rc);
+            });
+        }
+
+        tracker.wait().await;
+
+        assert!(tracker.is_closed());
+        assert!(tracker.is_empty());
+    }
+}
+
+mod spawn_local_on {
+    use super::*;
+
+    #[cfg(tokio_unstable)]
+    mod local_runtime {
+        use super::*;
+
+        /// Spawn several tasks, and then close the [`TaskTracker`].
+        #[tokio::test(flavor = "local")]
+        async fn spawn_then_close() {
+            const N: usize = 8;
+            let local_set = LocalSet::new();
+
+            let tracker = TaskTracker::new();
+
+            for _ in 0..N {
+                let rc = Rc::new(());
+                tracker.spawn_local_on(
+                    async move {
+                        drop(rc);
+                    },
+                    &local_set,
+                );
+            }
+
+            local_set
+                .run_until(async {
+                    tracker.close();
+                    tracker.wait().await;
+
+                    assert!(tracker.is_empty());
+                    assert!(tracker.is_closed());
+                })
+                .await;
+        }
+    }
+
+    mod local_set {
+        use super::*;
+
+        /// Spawn several pending-forever tasks, and then drop the [`TaskTracker`]
+        /// while the `LocalSet` is already driven.
+        #[tokio::test(flavor = "current_thread")]
+        async fn spawn_then_drop() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+            let tracker = TaskTracker::new();
+            let (tx, mut rx) = mpsc::unbounded_channel::<()>();
+
+            for _i in 0..N {
+                let tx = tx.clone();
+                tracker.spawn_local_on(
+                    async move {
+                        pending::<()>().await;
+                        drop(tx);
+                    },
+                    &local,
+                );
+            }
+            drop(tx);
+
+            local
+                .run_until(async move {
+                    drop(tracker);
+                    tokio::task::yield_now().await;
+
+                    use tokio::sync::mpsc::error::TryRecvError;
+
+                    assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
+                })
+                .await;
+        }
+
+        /// Close the tracker first, spawn several pending-forever tasks,
+        /// then wait while the`LocalSet` is already driven.
+        #[tokio::test(flavor = "current_thread")]
+        async fn close_then_spawn() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+            let tracker = TaskTracker::new();
+
+            tracker.close();
+
+            for _ in 0..N {
+                let rc = std::rc::Rc::new(());
+                tracker.spawn_local_on(
+                    async move {
+                        drop(rc);
+                    },
+                    &local,
+                );
+            }
+
+            local
+                .run_until(async move {
+                    tracker.wait().await;
+                    assert!(tracker.is_closed());
+                    assert!(tracker.is_empty());
+                })
+                .await;
+        }
     }
 }
