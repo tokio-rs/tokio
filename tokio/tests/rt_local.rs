@@ -138,6 +138,8 @@ fn test_spawn_local_panic() {
         .join();
         assert!(thread_result.is_ok(), "Thread itself panicked unexpectedly");
     }));
+}
+
 #[test]
 #[should_panic = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"]
 fn test_spawn_local_in_current_thread_runtime() {
