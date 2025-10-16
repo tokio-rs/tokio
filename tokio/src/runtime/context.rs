@@ -184,7 +184,6 @@ cfg_rt! {
     }
 }
 
-
 cfg_rt_or_time! {
     use crate::runtime::ThreadId;
 
