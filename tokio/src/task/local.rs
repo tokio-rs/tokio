@@ -353,7 +353,7 @@ cfg_rt! {
     ///
     /// # Examples
     ///
-    /// With LocalSet:
+    /// With `LocalSet`:
     ///
     /// ```rust
     /// use std::rc::Rc;
@@ -380,6 +380,7 @@ cfg_rt! {
     /// ```rust
     /// use tokio::task::spawn_local;
     ///
+    /// #[cfg(tokio_unstable)]
     /// #[tokio::main(flavor = "local")]
     /// async fn main() {
     ///     let join = spawn_local(async {
