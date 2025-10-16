@@ -1,4 +1,5 @@
 use super::wheel::EntryHandle;
+use crate::runtime::context;
 use crate::runtime::scheduler::Handle as SchedulerHandle;
 use crate::runtime::time::wheel::Insert;
 use crate::runtime::time::Context as TimeContext;
@@ -33,7 +34,18 @@ impl std::fmt::Debug for Timer {
 impl Drop for Timer {
     fn drop(&mut self) {
         if let Some(entry) = self.entry.take() {
-            entry.transition_to_cancelling();
+            with_current_wheel(&self.sched_handle, |maybe_time_cx| {
+                if let Some(TimeContext::Running { wheel, canc_tx: _ }) = maybe_time_cx {
+                    if let Ok(thread_id) = context::thread_id() {
+                        if entry.can_be_cancelled_locally(thread_id) {
+                            // Safety: we have verified that the entry is registered in this wheel.
+                            unsafe { wheel.remove(entry) };
+                        }
+                    }
+                } else {
+                    entry.transition_to_cancelling();
+                }
+            });
         }
     }
 }
@@ -64,11 +76,12 @@ impl Timer {
         with_current_wheel(&this.sched_handle, |maybe_time_cx| {
             let deadline = deadline_to_tick(&this.sched_handle, this.deadline);
             let hdl = EntryHandle::new(deadline, cx.waker());
+            let thread_id = context::thread_id().ok();
 
-            match maybe_time_cx {
-                Some(TimeContext::Running { wheel, canc_tx }) => {
+            match (maybe_time_cx, thread_id) {
+                (Some(TimeContext::Running { wheel, canc_tx }), Some(thread_id)) => {
                     // Safety: the entry is not registered yet
-                    match unsafe { wheel.insert(hdl.clone(), canc_tx.clone()) } {
+                    match unsafe { wheel.insert(hdl.clone(), canc_tx.clone(), thread_id) } {
                         Insert::Success => {
                             this.entry = Some(hdl);
                             Poll::Pending
@@ -78,8 +91,8 @@ impl Timer {
                     }
                 }
                 #[cfg(feature = "rt-multi-thread")]
-                Some(TimeContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
-                None => {
+                (Some(TimeContext::Shutdown), _) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
+                _ => {
                     this.entry = Some(hdl.clone());
                     push_from_remote(&this.sched_handle, hdl);
                     Poll::Pending

@@ -305,7 +305,6 @@ fn shutdown2(mut core: Box<Core>, handle: &Handle) -> Box<Core> {
         let mut time_context = core.time_context.take().unwrap();
         util::time::shutdown_local_timers(
             &mut time_context.wheel,
-            &time_context.canc_tx,
             &mut time_context.canc_rx,
             handle.take_remote_timers(),
             &handle.driver,

@@ -11,9 +11,10 @@ cfg_rt_and_time! {
         ) -> bool {
             use crate::runtime::time::Insert;
             let mut fired = false;
+            let thread_id = crate::runtime::context::thread_id().expect("should not be called during the thread shutdown");
             // process injected timers
             for hdl in inject {
-                match unsafe { wheel.insert(hdl.clone(), tx.clone()) } {
+                match unsafe { wheel.insert(hdl.clone(), tx.clone(), thread_id) } {
                     Insert::Success => {}
                     Insert::Elapsed => {
                         hdl.wake_unregistered();
@@ -144,7 +145,6 @@ cfg_rt_and_time! {
 
         pub(crate) fn shutdown_local_timers(
             wheel: &mut Wheel,
-            tx: &Sender,
             rx: &mut Receiver,
             inject: Vec<EntryHandle>,
             drv_hdl: &driver::Handle,
@@ -156,8 +156,12 @@ cfg_rt_and_time! {
                 };
 
                 remove_cancelled_timers(wheel, rx);
-                insert_inject_timers(wheel, tx, inject);
                 time_hdl.shutdown(wheel);
+
+                // simply wake all unregistered timers
+                for hdl in inject {
+                    hdl.wake_unregistered();
+                }
             });
         }
     }

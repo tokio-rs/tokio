@@ -590,7 +590,6 @@ impl Context {
             let mut time_context = core.time_context.take().expect("time context missing");
             util::time::shutdown_local_timers(
                 &mut time_context.wheel,
-                &time_context.canc_tx,
                 &mut time_context.canc_rx,
                 self.worker.handle.take_remote_timers(),
                 &self.worker.handle.driver,

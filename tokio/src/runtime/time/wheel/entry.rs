@@ -1,5 +1,6 @@
 use super::cancellation_queue::Sender;
 use crate::loom::sync::{Arc, Mutex};
+use crate::runtime::ThreadId;
 use crate::util::linked_list;
 
 use std::marker::PhantomPinned;
@@ -15,7 +16,7 @@ enum State {
 
     /// The entry is registered to the timer wheel,
     /// but not in the pending queue of the timer wheel.
-    Registered(Sender, Waker),
+    Registered(Sender, Waker, ThreadId),
 
     /// The entry is in the pending queue of the timer wheel,
     /// and not in any wheel level, which means that
@@ -136,7 +137,7 @@ impl Handle {
         let mut lock = self.entry.state.lock();
         match &*lock {
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (State::Unregistered(_) | State::Registered(_, _)) => {
+            state @ (State::Unregistered(..) | State::Registered(..)) => {
                 panic!("corrupted state: {state:#?}")
             }
             State::Pending(_waker) => {
@@ -173,7 +174,7 @@ impl Handle {
                 }
             }
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (State::Registered(_, _) | State::WokenUp) => {
+            state @ (State::Registered(..) | State::WokenUp) => {
                 panic!("corrupted state: {state:#?}")
             }
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
@@ -191,7 +192,7 @@ impl Handle {
                     *old_waker = waker.clone();
                 }
             }
-            State::Registered(_, old_waker) => {
+            State::Registered(_, old_waker, _) => {
                 if !old_waker.will_wake(waker) {
                     *old_waker = waker.clone();
                 }
@@ -205,15 +206,19 @@ impl Handle {
         }
     }
 
-    pub(crate) fn transition_to_registered(&self, cancel_tx: Sender) -> TransitionToRegistered {
+    pub(crate) fn transition_to_registered(
+        &self,
+        cancel_tx: Sender,
+        thread_id: ThreadId,
+    ) -> TransitionToRegistered {
         let mut lock = self.entry.state.lock();
         match &*lock {
             State::Unregistered(waker) => {
-                *lock = State::Registered(cancel_tx, waker.clone());
+                *lock = State::Registered(cancel_tx, waker.clone(), thread_id);
                 TransitionToRegistered::Success
             }
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (State::Registered(_, _) | State::Pending(_) | State::WokenUp) => {
+            state @ (State::Registered(..) | State::Pending(..) | State::WokenUp) => {
                 panic!("corrupted state: {state:#?}")
             }
             State::Cancelling => TransitionToRegistered::Cancelling,
@@ -229,7 +234,7 @@ impl Handle {
         match &*lock {
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
             State::Unregistered(_) => panic!("corrupted state: State::Unregistered"),
-            State::Registered(_, waker) => {
+            State::Registered(_, waker, _) => {
                 *lock = State::Pending(waker.clone());
                 TransitionToPending::Success
             }
@@ -244,7 +249,7 @@ impl Handle {
 
         match *lock {
             State::Unregistered(_) => *lock = State::Cancelling,
-            State::Registered(ref tx, _) => {
+            State::Registered(ref tx, _, _) => {
                 // Safety: entry is not in any cancellation queue
                 unsafe {
                     tx.send(self.clone());
@@ -262,8 +267,18 @@ impl Handle {
         self.entry.deadline
     }
 
+    /// Equivalent to `is_registered() && thread_id == entry_thread_id`.
+    pub(crate) fn can_be_cancelled_locally(&self, thread_id: ThreadId) -> bool {
+        let lock = self.entry.state.lock();
+        match &*lock {
+            State::Unregistered(_) => panic!("corrupted state: State::Unregistered"),
+            State::Registered(_, _, entry_thread_id) => *entry_thread_id == thread_id,
+            State::Pending(..) | State::WokenUp | State::Cancelling => false,
+        }
+    }
+
     pub(crate) fn is_registered(&self) -> bool {
-        matches!(*self.entry.state.lock(), State::Registered(_, _))
+        matches!(*self.entry.state.lock(), State::Registered(..))
     }
 
     pub(crate) fn is_pending(&self) -> bool {
