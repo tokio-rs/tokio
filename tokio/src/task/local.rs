@@ -375,16 +375,15 @@ cfg_rt! {
     /// }).await;
     /// # }
     /// ```
-    /// With local runtime flavor (unstable):
+    /// With local runtime flavor ([Unstable API][unstable] only).
     ///
     /// ```rust
     /// use tokio::task::spawn_local;
     ///
-    /// #[cfg(tokio_unstable)]
     /// #[tokio::main(flavor = "local")]
     /// async fn main() {
-    ///     let join = spawn_local(async { 
-    ///         println!("my nonsend data...") 
+    ///     let join = spawn_local(async {
+    ///         println!("my nonsend data...")
     ///     });
     ///
     ///    join.await.unwrap()
