@@ -138,6 +138,26 @@ fn test_spawn_local_panic() {
         .join();
         assert!(thread_result.is_ok(), "Thread itself panicked unexpectedly");
     }));
+#[test]
+#[should_panic = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"]
+fn test_spawn_local_in_current_thread_runtime() {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+
+    rt.block_on(async move {
+        spawn_local(async {});
+    })
+}
+
+#[test]
+#[should_panic = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"]
+fn test_spawn_local_in_multi_thread_runtime() {
+    let rt = tokio::runtime::Builder::new_multi_thread().build().unwrap();
+
+    rt.block_on(async move {
+        spawn_local(async {});
+    })
 }
 
 fn rt() -> tokio::runtime::LocalRuntime {

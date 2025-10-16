@@ -124,7 +124,6 @@ fn display_eq(d: impl std::fmt::Display, s: &str) -> bool {
     fmt_eq.remainder.is_empty() && !fmt_eq.unequal
 }
 
-#[allow(deprecated)]
 fn is_rt_shutdown_err(err: &io::Error) -> bool {
     if let Some(inner) = err.get_ref() {
         err.kind() == io::ErrorKind::Other
