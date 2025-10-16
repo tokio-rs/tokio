@@ -395,7 +395,7 @@ cfg_rt! {
     /// [`LocalSet`]: struct@crate::task::LocalSet
     /// [`LocalRuntime`]: struct@crate::runtime::LocalRuntime
     /// [`tokio::spawn`]: fn@crate::task::spawn
-    /// [unstable]: ../tokio/index.html#unstable-features
+    /// [unstable]: ../index.html#unstable-features
     #[track_caller]
     pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
     where
