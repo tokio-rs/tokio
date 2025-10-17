@@ -1,4 +1,5 @@
 use crate::io::uring::open::Open;
+use crate::io::uring::read::Read;
 use crate::io::uring::write::Write;
 use crate::runtime::Handle;
 
@@ -17,6 +18,7 @@ use std::task::{Context, Poll, Waker};
 pub(crate) enum CancelData {
     Open(Open),
     Write(Write),
+    Read(Read),
 }
 
 #[derive(Debug)]
