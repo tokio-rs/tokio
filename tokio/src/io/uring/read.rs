@@ -1,7 +1,8 @@
+use crate::fs::read_uring::MAX_READ_SIZE;
 use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
 
+use io_uring::squeue::Flags;
 use io_uring::{opcode, types};
-use std::io::{self, Error};
 use std::os::fd::{AsRawFd, OwnedFd};
 
 #[derive(Debug)]
@@ -11,22 +12,23 @@ pub(crate) struct Read {
 }
 
 impl Completable for Read {
-    type Output = (io::Result<u32>, OwnedFd, Vec<u8>);
+    type Output = (CqeResult, OwnedFd, Vec<u8>);
 
     fn complete(self, cqe: CqeResult) -> Self::Output {
         let mut buf = self.buf;
 
-        if let Ok(len) = cqe.result {
-            let new_len = buf.len() + len as usize;
-            // SAFETY: Kernel read len bytes
-            unsafe { buf.set_len(new_len) };
+        match cqe {
+            // increase length of buffer on successful
+            // completion
+            CqeResult::Single(Ok(len)) => {
+                let new_len = buf.len() + len as usize;
+                // SAFETY: Kernel read len bytes
+                unsafe { buf.set_len(new_len) };
+            }
+            _ => (),
         }
 
-        (cqe.result, self.fd, buf)
-    }
-
-    fn complete_with_error(self, err: Error) -> Self::Output {
-        (Err(err), self.fd, self.buf)
+        (cqe, self.fd, buf)
     }
 }
 
@@ -57,5 +59,34 @@ impl Op<Read> {
 
         // SAFETY: Parameters are valid for the entire duration of the operation
         unsafe { Op::new(read_op, Read { fd, buf }) }
+    }
+
+    // Submit batch requests to read a FD, the function splits reads by MAX_READ_SIZE
+    // and returns a list of CQEs which can be used to determine if read was successful
+    // or not
+    pub(crate) fn read_batch(fd: OwnedFd, mut buf: Vec<u8>, len: usize) -> Self {
+        let entries = {
+            // total number of batch entries to read the file completly
+            let mut batch_entries = Vec::new();
+
+            for start in (0..len).step_by(MAX_READ_SIZE) {
+                let end = (start + MAX_READ_SIZE).min(len); // clamp to len for the final chunk
+                                                            // MAX_READ_SIZE is less than u32
+                let len = (end - start) as u32;
+
+                let buf_mut_ptr = buf.spare_capacity_mut().as_mut_ptr().cast();
+
+                let op = opcode::Read::new(types::Fd(fd.as_raw_fd()), buf_mut_ptr, len)
+                    .offset(start as u64)
+                    .build()
+                    .flags(Flags::IO_LINK);
+
+                batch_entries.push(op);
+            }
+
+            batch_entries
+        };
+
+        unsafe { Op::batch(entries, Read { fd, buf }) }
     }
 }
