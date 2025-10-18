@@ -374,6 +374,8 @@ where
                 f(&TaskMeta {
                     id: self.core().task_id,
                     spawned_at: self.core().spawned_at.into(),
+                    #[cfg(tokio_unstable)]
+                    user_data: self.header().user_data,
                     _phantom: Default::default(),
                 })
             }));
