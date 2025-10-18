@@ -36,8 +36,9 @@ pub(crate) enum TryPopResult<T> {
     Ok(T),
     /// The channel is empty.
     ///
-    /// Returned after `Rx::close()` when no values remain,
-    /// even if senders still exist.
+    /// Note that `list.rs` only tracks the close state set by senders. If the
+    /// channel is closed by `Rx::close()`, then `TryPopResult::Empty` is still
+    /// returned, and the close state needs to be handled by `chan.rs`.
     Empty,
     /// The channel is empty and closed.
     ///
