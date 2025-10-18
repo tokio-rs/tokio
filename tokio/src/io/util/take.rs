@@ -15,7 +15,7 @@ pin_project! {
         #[pin]
         inner: R,
         // Add '_' to avoid conflicts with `limit` method.
-        limit_: u64,
+        pub(crate) limit_: u64,
     }
 }
 
@@ -86,6 +86,7 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
         }
 
         let me = self.project();
+
         let mut b = buf.take(usize::try_from(*me.limit_).unwrap_or(usize::MAX));
 
         let buf_ptr = b.filled().as_ptr();
@@ -93,13 +94,12 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
         assert_eq!(b.filled().as_ptr(), buf_ptr);
 
         let n = b.filled().len();
+        debug_assert!(buf.filled().len() + n <= buf.capacity());
 
-        // We need to update the original ReadBuf
-        unsafe {
-            buf.assume_init(n);
-        }
-        buf.advance(n);
-        *me.limit_ -= n as u64;
+        buf.finalize_read(n);
+
+        *me.limit_ = me.limit_.saturating_sub(n as u64);
+
         Poll::Ready(Ok(()))
     }
 }
