@@ -606,6 +606,18 @@ impl TimerEntry {
         );
 
         if !self.registered {
+            #[cfg(feature = "rt-multi-thread")]
+            {
+                // Try worker-local registration first (lock-free on multi-threaded runtime)
+                if crate::runtime::context::try_register_timer(self.deadline, cx.waker().clone()) {
+                    // Successfully registered with worker-local timers
+                    let this = self.as_mut().project();
+                    *this.registered = true;
+                    return Poll::Pending;
+                }
+            }
+
+            // Fall back to global timer wheel (current_thread runtime or block_in_place)
             let deadline = self.deadline;
             self.as_mut().reset(deadline, true);
         }
