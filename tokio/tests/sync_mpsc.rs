@@ -967,6 +967,15 @@ fn try_recv_unbounded() {
 }
 
 #[test]
+fn try_recv_after_receiver_close() {
+    let (_tx, mut rx) = mpsc::channel::<()>(5);
+
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    rx.close();
+    assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+}
+
+#[test]
 fn try_recv_close_while_empty_bounded() {
     let (tx, mut rx) = mpsc::channel::<()>(5);
 
