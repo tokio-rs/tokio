@@ -407,6 +407,24 @@ async fn try_join_next_with_id() {
 mod spawn_local {
     use super::*;
 
+    #[test]
+    #[should_panic(
+        expected = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"
+    )]
+    fn panic_outside_any_runtime() {
+        let mut set = JoinSet::new();
+        set.spawn_local(async {});
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[should_panic(
+        expected = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"
+    )]
+    async fn panic_in_multi_thread_runtime() {
+        let mut set = JoinSet::new();
+        set.spawn_local(async {});
+    }
+
     #[cfg(tokio_unstable)]
     mod local_runtime {
         use super::*;
