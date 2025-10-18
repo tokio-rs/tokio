@@ -94,9 +94,8 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
         assert_eq!(b.filled().as_ptr(), buf_ptr);
 
         let n = b.filled().len();
-        debug_assert!(buf.filled().len() + n <= buf.capacity());
 
-        buf.finalize_read(n);
+        buf.finalize_read(n)?;
 
         *me.limit_ = me.limit_.saturating_sub(n as u64);
 

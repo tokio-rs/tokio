@@ -1,4 +1,5 @@
 use std::fmt;
+use std::io::{Error, ErrorKind};
 use std::mem::MaybeUninit;
 
 /// A wrapper around a byte buffer that is incrementally filled and initialized.
@@ -86,16 +87,20 @@ impl<'a> ReadBuf<'a> {
     }
 
     /// Updates the `ReadBuf` after a read operation using a sub-buffer created by `take`.
+    /// Returns an error if `n` would exceed the remaining capacity.
     #[inline]
-    pub fn finalize_read(&mut self, n: usize) {
-        // safety: The caller must ensure that exactly `n` bytes were written into the buffer by the
-        // inner reader and that `n` does not exceed the remaining capacity of the buffer.
+    pub fn finalize_read(&mut self, n: usize) -> Result<(), Error> {
+        if self.filled().len() + n > self.capacity() {
+            return Err(Error::new(ErrorKind::InvalidInput, "n too large"));
+        }
+        // safety: The caller must ensure that exactly `n` bytes were written into the buffer.
         //
         // We need to update the original ReadBuf
         unsafe {
             self.assume_init(n);
         }
         self.advance(n);
+        Ok(())
     }
 
     /// Returns a shared reference to the initialized portion of the buffer.
