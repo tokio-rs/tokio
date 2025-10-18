@@ -21,5 +21,5 @@ R-loom-multi-thread:
 - tokio/src/runtime/task/**
 
 R-loom-util-sync:
-  - tokio-util/src/sync/*
-  - tokio-util/src/sync/**/*
+- tokio-util/src/*
+- tokio-util/src/**/*
