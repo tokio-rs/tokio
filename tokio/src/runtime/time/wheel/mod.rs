@@ -6,6 +6,7 @@ use self::level::Level;
 
 mod entry;
 pub(crate) use entry::Handle as EntryHandle;
+pub(crate) use entry::State as EntryState;
 use entry::TransitionToPending;
 use entry::TransitionToRegistered;
 use entry::{CancellationQueueEntry, Entry, EntryList};

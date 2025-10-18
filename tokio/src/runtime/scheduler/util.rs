@@ -1,7 +1,8 @@
 cfg_rt_and_time! {
     pub(crate) mod time {
         use crate::runtime::{scheduler::driver};
-        use crate::runtime::time::{EntryHandle, Wheel, cancellation_queue::{Sender, Receiver}};
+        use crate::runtime::time::{EntryHandle, EntryState, Wheel};
+        use crate::runtime::time::cancellation_queue::{Sender, Receiver};
         use std::time::Duration;
 
         pub(crate) fn insert_inject_timers(
@@ -32,12 +33,14 @@ cfg_rt_and_time! {
             rx: &mut Receiver,
         ) {
             for hdl in rx.recv_all() {
-                unsafe {
-                    let is_registered = hdl.is_registered();
-                    let is_pending = hdl.is_pending();
-                    if is_registered && !is_pending {
-                        wheel.remove(hdl);
+                match hdl.state() {
+                    // INVARIANT: unregistered entry should not be in the wheel.
+                    EntryState::Unregistered => unreachable!(),
+                    EntryState::Registered(_thread_id) | EntryState::Pending(_thread_id) => {
+                        // Safety: we have verified that the entry is registered in this wheel.
+                        unsafe { wheel.remove(hdl) };
                     }
+                    EntryState::Cancelling | EntryState::WokenUp => (),
                 }
             }
         }

@@ -180,9 +180,10 @@ impl Inner {
                 match self.state.swap(EMPTY, SeqCst) {
                     PARKED_CONDVAR => return, // timed out, and no notification received
                     NOTIFIED => return,       // notification and timeout happened concurrently
-                    _ => return, // spurious wakeup, since this function is called with a timeout,
-                                 // we cannot go back to sleep.
-                                 // Otherwise, we may miss the expired timers.
+                    actual @ (PARKED_DRIVER | EMPTY) => {
+                        panic!("inconsistent park_timeout state, actual = {actual}")
+                    }
+                    invalid => panic!("invalid park_timeout state, actual = {invalid}"),
                 }
             } else if self
                 .state

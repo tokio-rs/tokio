@@ -1,4 +1,4 @@
-use super::wheel::EntryHandle;
+use super::wheel::{EntryHandle, EntryState};
 use crate::runtime::context;
 use crate::runtime::scheduler::Handle as SchedulerHandle;
 use crate::runtime::time::wheel::Insert;
@@ -36,10 +36,21 @@ impl Drop for Timer {
         if let Some(entry) = self.entry.take() {
             with_current_wheel(&self.sched_handle, |maybe_time_cx| {
                 if let Some(TimeContext::Running { wheel, canc_tx: _ }) = maybe_time_cx {
-                    if let Ok(thread_id) = context::thread_id() {
-                        if entry.can_be_cancelled_locally(thread_id) {
-                            // Safety: we have verified that the entry is registered in this wheel.
-                            unsafe { wheel.remove(entry) };
+                    if let Ok(curr_id) = context::thread_id() {
+                        match entry.state() {
+                            // INVARIANT: `self.entry` is `Some` only after the timer is registered.
+                            EntryState::Unregistered => unreachable!(),
+                            EntryState::Registered(thread_id) | EntryState::Pending(thread_id)
+                                if thread_id == curr_id =>
+                            {
+                                // Safety: we have verified that the entry is registered in this wheel.
+                                unsafe { wheel.remove(entry) };
+                            }
+                            // thread_id doesn't match or entry is in WokenUp/Cancelling state
+                            EntryState::Registered(..)
+                            | EntryState::Pending(..)
+                            | EntryState::Cancelling // entry is already in cancellation queue, nothing to do
+                            | EntryState::WokenUp => (), // entry is already woken up, nothing to do
                         }
                     }
                 } else {
