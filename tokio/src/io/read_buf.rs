@@ -85,6 +85,19 @@ impl<'a> ReadBuf<'a> {
         unsafe { ReadBuf::uninit(&mut self.unfilled_mut()[..max]) }
     }
 
+    /// Updates the `ReadBuf` after a read operation using a sub-buffer created by `take`.
+    #[inline]
+    pub fn finalize_read(&mut self, n: usize) {
+        // safety: The caller must ensure that exactly `n` bytes were written into the buffer by the
+        // inner reader and that `n` does not exceed the remaining capacity of the buffer.
+        //
+        // We need to update the original ReadBuf
+        unsafe {
+            self.assume_init(n);
+        }
+        self.advance(n);
+    }
+
     /// Returns a shared reference to the initialized portion of the buffer.
     ///
     /// This includes the filled portion.
