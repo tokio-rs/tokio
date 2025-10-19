@@ -100,8 +100,8 @@ fn drop_token_no_child() {
     });
 }
 
-// Temporarily disabled due to a false positive in loom - see https://github.com/tokio-rs/tokio/pull/7644#issuecomment-3328381344
-#[ignore]
+// Temporarily disabled due to a false positive in loom -
+// see https://github.com/tokio-rs/tokio/pull/7644#issuecomment-3328381344#[ignore]
 #[test]
 fn drop_token_with_children() {
     loom::model(|| {
@@ -127,8 +127,8 @@ fn drop_token_with_children() {
     });
 }
 
-// Temporarily disabled due to a false positive in loom - see https://github.com/tokio-rs/tokio/pull/7644#issuecomment-3328381344
-#[ignore]
+// Temporarily disabled due to a false positive in loom -
+// see https://github.com/tokio-rs/tokio/pull/7644#issuecomment-3328381344#[ignore]
 #[test]
 fn drop_and_cancel_token() {
     loom::model(|| {
@@ -154,7 +154,8 @@ fn drop_and_cancel_token() {
     });
 }
 
-// Temporarily disabled due to a false positive in loom - see https://github.com/tokio-rs/tokio/pull/7644#issuecomment-3328381344
+// Temporarily disabled due to a false positive in loom -
+// see https://github.com/tokio-rs/tokio/pull/7644#issuecomment-3328381344
 #[ignore]
 #[test]
 fn cancel_parent_and_child() {
