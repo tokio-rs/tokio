@@ -45,9 +45,11 @@ impl Handle {
     ///
     /// # Panics
     ///
-    /// When calling `Handle::enter` multiple times, the returned guards
-    /// **must** be dropped in the reverse order that they were acquired.
-    /// Failure to do so will result in a panic and possible memory leaks.
+    /// * When Runtime has been destroyed
+    ///
+    /// * When calling `Handle::enter` multiple times, the returned guards
+    ///   **must** be dropped in the reverse order that they were acquired.
+    ///   Failure to do so will result in a panic and possible memory leaks.
     ///
     /// # Examples
     ///
@@ -85,13 +87,23 @@ impl Handle {
     /// [`TcpStream`]: struct@crate::net::TcpStream
     /// [`tokio::spawn`]: fn@crate::spawn
     pub fn enter(&self) -> EnterGuard<'_> {
-        EnterGuard {
-            _guard: match context::try_set_current(&self.inner) {
-                Some(guard) => guard,
-                None => panic!("{}", crate::util::error::THREAD_LOCAL_DESTROYED_ERROR),
-            },
+        self.try_enter().unwrap_or_else(|e| panic!("{}", e))
+    }
+
+    /// Attempts to enter the runtime context
+    ///
+    /// Returns an error if Runtime has been destroyed
+    ///
+    /// Contrary to `enter`, this does not panic. However,
+    /// disordered dropping of multiple guards will still panic.
+    pub fn try_enter(&self) -> Result<EnterGuard<'_>, TryCurrentError> {
+        let Some(_guard) = context::try_set_current(&self.inner) else {
+            return Err(TryCurrentError::new_thread_local_destroyed());
+        };
+        Ok(EnterGuard {
+            _guard,
             _handle_lifetime: PhantomData,
-        }
+        })
     }
 
     /// Returns a `Handle` view over the currently running `Runtime`.
