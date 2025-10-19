@@ -54,6 +54,8 @@ pub async fn read(path: impl AsRef<Path>) -> io::Result<Vec<u8>> {
         target_os = "linux"
     ))]
     {
+        use crate::fs::read_uring;
+
         let handle = crate::runtime::Handle::current();
         let driver_handle = handle.inner.driver().io();
         if driver_handle.check_and_init()? {
@@ -62,41 +64,4 @@ pub async fn read(path: impl AsRef<Path>) -> io::Result<Vec<u8>> {
     }
 
     asyncify(move || std::fs::read(path)).await
-}
-
-#[cfg(all(
-    tokio_unstable,
-    feature = "io-uring",
-    feature = "rt",
-    feature = "fs",
-    target_os = "linux"
-))]
-async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
-    use crate::{fs::OpenOptions, runtime::driver::op::Op};
-    use std::os::fd::OwnedFd;
-
-    let file = OpenOptions::new().read(true).open(path).await?;
-
-    let size = file
-        .metadata()
-        .await
-        .map(|m| m.len() as usize)
-        .ok()
-        .unwrap_or(0);
-
-    let buf = Vec::with_capacity(size);
-
-    let fd: OwnedFd = file
-        .try_into_std()
-        .expect("unexpected in-flight operation detected")
-        .into();
-
-    let (read_size, mut buf) = Op::read(fd, buf)?.await?;
-
-    // SAFETY:
-    // 1. The buffer is initialized with `size` capacity
-    // 2. the read_size is the number of bytes read from the file
-    unsafe { buf.set_len(read_size as _) };
-
-    Ok(buf)
 }

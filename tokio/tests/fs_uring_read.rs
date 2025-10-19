@@ -62,7 +62,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
                 tokio::spawn(async move {
                     let bytes = read(path).await.unwrap();
 
-                    assert_eq!(bytes, vec![20; 2]);
+                    assert_eq!(bytes, vec![20; 1023]);
                 });
 
                 // Avoid busy looping.
@@ -99,7 +99,7 @@ fn read_many_files() {
                 let path = paths.get(i % NUM_FILES).unwrap().clone();
                 tracker.spawn(async move {
                     let bytes = read(path).await.unwrap();
-                    assert_eq!(bytes, vec![20; 2]);
+                    assert_eq!(bytes, vec![20; 1023]);
                 });
             }
             tracker.close();
@@ -110,6 +110,33 @@ fn read_many_files() {
     for rt in rt_combinations() {
         run(rt());
     }
+}
+
+#[test]
+fn read_small_large_files() {
+    let rt = multi_rt(256);
+    rt().block_on(async move {
+        let tracker = TaskTracker::new();
+
+        tracker.spawn(async move {
+            let (_tmp, path) = create_large_temp_file();
+
+            let bytes = read(path).await.unwrap();
+
+            assert_eq!(bytes, create_buf(5000));
+        });
+
+        tracker.spawn(async move {
+            let (_tmp, path) = create_small_temp_file();
+
+            let bytes = read(path).await.unwrap();
+
+            assert_eq!(bytes, create_buf(20));
+        });
+
+        tracker.close();
+        tracker.wait().await;
+    });
 }
 
 #[tokio::test]
@@ -145,11 +172,35 @@ fn create_tmp_files(num_files: usize) -> (Vec<NamedTempFile>, Vec<PathBuf>) {
     let mut files = Vec::with_capacity(num_files);
     for _ in 0..num_files {
         let mut tmp = NamedTempFile::new().unwrap();
-        let buf = vec![20; 2];
+        let buf = vec![20; 1023];
         tmp.write_all(&buf).unwrap();
         let path = tmp.path().to_path_buf();
         files.push((tmp, path));
     }
 
     files.into_iter().unzip()
+}
+
+fn create_large_temp_file() -> (NamedTempFile, PathBuf) {
+    let mut tmp = NamedTempFile::new().unwrap();
+    let buf = create_buf(5000);
+
+    tmp.write_all(&buf).unwrap();
+    let path = tmp.path().to_path_buf();
+
+    (tmp, path)
+}
+
+fn create_small_temp_file() -> (NamedTempFile, PathBuf) {
+    let mut tmp = NamedTempFile::new().unwrap();
+    let buf = create_buf(20);
+
+    tmp.write_all(&buf).unwrap();
+    let path = tmp.path().to_path_buf();
+
+    (tmp, path)
+}
+
+fn create_buf(length: usize) -> Vec<u8> {
+    (0..length).map(|i| i as u8).collect()
 }

@@ -1,22 +1,24 @@
 use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
+
 use io_uring::{opcode, types};
-use std::{
-    io,
-    os::fd::{AsRawFd, OwnedFd},
-};
+use std::io::{self, Error};
+use std::os::fd::{AsRawFd, OwnedFd};
 
 #[derive(Debug)]
 pub(crate) struct Read {
-    buf: Vec<u8>,
     fd: OwnedFd,
+    buf: Vec<u8>,
 }
 
 impl Completable for Read {
-    type Output = (u32, Vec<u8>);
-    fn complete(self, cqe: CqeResult) -> io::Result<Self::Output> {
-        let res = cqe.result?;
+    type Output = (io::Result<u32>, OwnedFd, Vec<u8>);
 
-        Ok((res, self.buf))
+    fn complete(self, cqe: CqeResult) -> Self::Output {
+        (cqe.result, self.fd, self.buf)
+    }
+
+    fn complete_with_error(self, err: Error) -> Self::Output {
+        (Err(err), self.fd, self.buf)
     }
 }
 
@@ -27,16 +29,26 @@ impl Cancellable for Read {
 }
 
 impl Op<Read> {
-    /// Submit a request to open a file.
-    pub(crate) fn read(fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Self> {
-        let buf_mut_ptr = buf.as_mut_ptr();
-        let cap = buf.capacity() as _;
+    // Submit a request to read a FD at given length and offset into a
+    // dynamic buffer with uinitialized memory. The read happens on unitialized
+    // buffer and no overwiting happens.
 
-        let read_op = opcode::Read::new(types::Fd(fd.as_raw_fd()), buf_mut_ptr, cap).build();
+    // SAFETY: The `len` of the amount to be read and the buffer that is passed
+    // should have capacity > len.
+    //
+    // If `len` read is higher than vector capacity then setting its length by
+    // the caller in terms of size_read can be unsound.
+    pub(crate) fn read(fd: OwnedFd, mut buf: Vec<u8>, len: u32, offset: u64) -> Self {
+        // don't overwrite on already written part
+        let written = buf.len();
+        let slice: &mut [u8] = &mut buf[written..];
+        let buf_mut_ptr = slice.as_mut_ptr();
+
+        let read_op = opcode::Read::new(types::Fd(fd.as_raw_fd()), buf_mut_ptr, len)
+            .offset(offset)
+            .build();
 
         // SAFETY: Parameters are valid for the entire duration of the operation
-        let op = unsafe { Op::new(read_op, Read { fd, buf }) };
-
-        Ok(op)
+        unsafe { Op::new(read_op, Read { fd, buf }) }
     }
 }
