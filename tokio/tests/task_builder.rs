@@ -1,12 +1,9 @@
 #![cfg(all(tokio_unstable, feature = "tracing"))]
 
 use std::rc::Rc;
-use tokio::{
-    task::{Builder, LocalSet},
-    test,
-};
+use tokio::task::{Builder, LocalSet};
 
-#[test]
+#[tokio::test]
 async fn spawn_with_name() {
     let result = Builder::new()
         .name("name")
@@ -17,7 +14,7 @@ async fn spawn_with_name() {
     assert_eq!(result.unwrap(), "task executed");
 }
 
-#[test]
+#[tokio::test]
 async fn spawn_blocking_with_name() {
     let result = Builder::new()
         .name("name")
@@ -28,7 +25,7 @@ async fn spawn_blocking_with_name() {
     assert_eq!(result.unwrap(), "task executed");
 }
 
-#[test]
+#[tokio::test]
 async fn spawn_local_with_name() {
     let unsend_data = Rc::new("task executed");
     let result = LocalSet::new()
@@ -44,7 +41,7 @@ async fn spawn_local_with_name() {
     assert_eq!(*result.unwrap(), "task executed");
 }
 
-#[test]
+#[tokio::test]
 async fn spawn_without_name() {
     let result = Builder::new()
         .spawn(async { "task executed" })
@@ -54,7 +51,7 @@ async fn spawn_without_name() {
     assert_eq!(result.unwrap(), "task executed");
 }
 
-#[test]
+#[tokio::test]
 async fn spawn_blocking_without_name() {
     let result = Builder::new()
         .spawn_blocking(|| "task executed")
@@ -64,7 +61,7 @@ async fn spawn_blocking_without_name() {
     assert_eq!(result.unwrap(), "task executed");
 }
 
-#[test]
+#[tokio::test]
 async fn spawn_local_without_name() {
     let unsend_data = Rc::new("task executed");
     let result = LocalSet::new()
