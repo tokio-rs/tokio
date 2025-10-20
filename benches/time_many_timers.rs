@@ -10,33 +10,18 @@ use std::future::{poll_fn, Future};
 use std::time::{Duration, Instant};
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use tokio::{runtime::Runtime, time::sleep};
+use tokio::time::sleep;
 
-const TIMER_COUNT: usize = 10_000;
+const TIMER_COUNT: usize = 1_000_000;
 
-fn build_runtime(workers: usize) -> Runtime {
-    if workers == 1 {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-    } else {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .worker_threads(workers)
-            .build()
-            .unwrap()
-    }
-}
-
-/// Returns (wall_clock_duration, per_task_durations)
-async fn create_and_drop_timers_instrumented(count: usize, workers: usize) -> (Duration, Vec<Duration>) {
-    let handles: Vec<_> = (0..workers)
+/// Returns (wall_clock_duration, task_durations)
+async fn create_and_drop_timers_instrumented(count: usize, concurrent_tasks: usize) -> Duration {
+    let handles: Vec<_> = (0..concurrent_tasks)
         .map(|_| {
             tokio::spawn(async move {
                 // Create all sleep futures
-                let mut sleeps = Vec::with_capacity(count / workers);
-                for _ in 0..count / workers {
+                let mut sleeps = Vec::with_capacity(count / concurrent_tasks);
+                for _ in 0..count / concurrent_tasks {
                     sleeps.push(Box::pin(sleep(Duration::from_secs(60))));
                 }
 
@@ -62,47 +47,44 @@ async fn create_and_drop_timers_instrumented(count: usize, workers: usize) -> (D
 
     let wall_clock_start = Instant::now();
 
-    let mut task_durations = Vec::with_capacity(workers);
+    let mut task_durations = Vec::with_capacity(concurrent_tasks);
     for handle in handles {
         task_durations.push(handle.await.unwrap());
     }
 
     let wall_clock = wall_clock_start.elapsed();
 
-    (wall_clock, task_durations)
+    wall_clock
 }
 
 fn bench_many_timers(c: &mut Criterion) {
     let mut group = c.benchmark_group("many_timers");
 
     // Single-threaded baseline
-    let runtime = build_runtime(1);
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
     group.bench_function("single_thread", |b| {
-        b.iter_custom(|iters| {
-            let (wall_clock, _task_durations) = runtime.block_on(async {
-                create_and_drop_timers_instrumented(TIMER_COUNT * iters as usize, 1).await
-            });
+        b.iter_custom(|_iters| {
+            let wall_clock = runtime
+                .block_on(async { create_and_drop_timers_instrumented(TIMER_COUNT, 1).await });
 
             wall_clock
         })
     });
 
     // Multi-threaded with 8 workers
-    let runtime_multi = build_runtime(8);
-    group.bench_function("multi_thread", |b| {
-        b.iter_custom(|iters| {
-            let (wall_clock, task_durations) = runtime_multi.block_on(async {
-                create_and_drop_timers_instrumented(TIMER_COUNT * iters as usize, 8).await
-            });
+    let runtime_multi = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(8)
+        .build()
+        .unwrap();
 
-            // Print variance stats to stderr
-            let min = task_durations.iter().min().unwrap();
-            let max = task_durations.iter().max().unwrap();
-            let range = max.saturating_sub(*min);
-            eprintln!(
-                "multi_thread: wall={:?}, min={:?}, max={:?}, range={:?}",
-                wall_clock, min, max, range
-            );
+    group.bench_function("multi_thread", |b| {
+        b.iter_custom(|_iters| {
+            let wall_clock = runtime_multi
+                .block_on(async { create_and_drop_timers_instrumented(TIMER_COUNT, 8).await });
 
             wall_clock
         })
@@ -111,9 +93,6 @@ fn bench_many_timers(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    many_timers,
-    bench_many_timers
-);
+criterion_group!(many_timers, bench_many_timers);
 
 criterion_main!(many_timers);
