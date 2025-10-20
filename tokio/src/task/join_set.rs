@@ -760,6 +760,7 @@ impl<'a, T: 'static> Builder<'a, T> {
     /// This method panics if it is called outside of a `LocalSet` or `LocalRuntime`.
     ///
     /// [`LocalSet`]: crate::task::LocalSet
+    /// [`LocalRuntime`]: crate::runtime::LocalRuntime
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
     pub fn spawn_local<F>(self, future: F) -> std::io::Result<AbortHandle>
