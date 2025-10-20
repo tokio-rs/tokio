@@ -177,7 +177,7 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// # Panics
     ///
-    /// This method panics if it is called outside of a `LocalSet`or `LocalRuntime`.
+    /// This method panics if it is called outside of a `LocalSet` or `LocalRuntime`.
     ///
     /// [`LocalSet`]: crate::task::LocalSet
     /// [`LocalRuntime`]: crate::runtime::LocalRuntime
@@ -748,8 +748,8 @@ impl<'a, T: 'static> Builder<'a, T> {
             .insert(self.builder.spawn_blocking_on(f, handle)?))
     }
 
-    /// Spawn the provided task on the current [`LocalSet`] with this builder's
-    /// settings, and store it in the [`JoinSet`].
+    /// Spawn the provided task on the current [`LocalSet`] or [`LocalRuntime`]
+    /// with this builder's settings, and store it in the [`JoinSet`].
     ///
     /// # Returns
     ///
@@ -757,9 +757,10 @@ impl<'a, T: 'static> Builder<'a, T> {
     ///
     /// # Panics
     ///
-    /// This method panics if it is called outside of a `LocalSet`.
+    /// This method panics if it is called outside of a `LocalSet` or `LocalRuntime`.
     ///
     /// [`LocalSet`]: crate::task::LocalSet
+    /// [`LocalRuntime`]: crate::runtime::LocalRuntime
     /// [`AbortHandle`]: crate::task::AbortHandle
     #[track_caller]
     pub fn spawn_local<F>(self, future: F) -> std::io::Result<AbortHandle>

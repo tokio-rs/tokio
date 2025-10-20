@@ -14,6 +14,34 @@ async fn spawn_with_name() {
     assert_eq!(result.unwrap(), "task executed");
 }
 
+#[tokio::test(flavor = "local")]
+async fn spawn_local_on_local_runtime() {
+    let result = Builder::new()
+        .spawn_local(async { "task executed" })
+        .unwrap()
+        .await;
+
+    assert_eq!(result.unwrap(), "task executed");
+}
+
+#[tokio::test]
+#[should_panic = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"]
+async fn spawn_local_panics_outside_local_set_or_local_runtime() {
+    let _ = Builder::new()
+        .spawn_local(async { "task executed" })
+        .unwrap()
+        .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"]
+async fn spawn_local_panics_in_multi_thread_runtime() {
+    let _ = Builder::new()
+        .spawn_local(async { "task executed" })
+        .unwrap()
+        .await;
+}
+
 #[tokio::test]
 async fn spawn_blocking_with_name() {
     let result = Builder::new()
