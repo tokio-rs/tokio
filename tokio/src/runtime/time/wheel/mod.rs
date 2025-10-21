@@ -5,6 +5,7 @@ pub(crate) use self::level::Expiration;
 use self::level::Level;
 
 mod entry;
+pub(crate) use entry::Cancelling as EntryCancelling;
 pub(crate) use entry::Handle as EntryHandle;
 pub(crate) use entry::State as EntryState;
 use entry::TransitionToPending;
@@ -106,6 +107,12 @@ impl Wheel {
 
         match hdl.transition_to_registered(cancel_tx, thread_id) {
             TransitionToRegistered::Success => {
+                eprintln!(
+                    "insert: {:?} => {:?}, level = {}",
+                    crate::loom::sync::Arc::as_ptr(&hdl.entry),
+                    std::thread::current().id(),
+                    level
+                );
                 unsafe {
                     self.levels[level].add_entry(hdl);
                 }
@@ -132,6 +139,11 @@ impl Wheel {
     /// * The entry is already registered in THIS wheel.
     pub(crate) unsafe fn remove(&mut self, hdl: EntryHandle) {
         if hdl.is_pending() {
+            eprintln!(
+                "rm_pending: {:?} => {:?}",
+                crate::loom::sync::Arc::as_ptr(&hdl.entry),
+                std::thread::current().id()
+            );
             self.pending.remove(hdl.into());
         } else {
             let deadline = hdl.deadline();
@@ -143,6 +155,12 @@ impl Wheel {
             );
 
             let level = self.level_for(deadline);
+            eprintln!(
+                "rm_reg: {:?} => {:?}, level = {}",
+                crate::loom::sync::Arc::as_ptr(&hdl.entry),
+                std::thread::current().id(),
+                level
+            );
             self.levels[level].remove_entry(hdl.clone());
         }
     }

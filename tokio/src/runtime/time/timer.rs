@@ -36,6 +36,18 @@ impl Drop for Timer {
     fn drop(&mut self) {
         if let Some(entry) = self.entry.take() {
             with_current_wheel(&self.sched_handle, |maybe_time_cx| {
+                let state = entry.state();
+
+                let thread_id = match state {
+                    EntryState::Unregistered => {
+                        entry.transition_to_cancelling();
+                        return;
+                    }
+                    EntryState::Registered(thread_id) | EntryState::Pending(thread_id) => thread_id,
+                    EntryState::Cancelling(..) => unreachable!(),
+                    EntryState::WokenUp => return,
+                };
+
                 let Ok(cur_thread_id) = context::thread_id() else {
                     // current thread is shutting down, we cannot determine the thread id,
                     // so we need to fallback to the cancellation queue.
@@ -44,21 +56,16 @@ impl Drop for Timer {
                 };
 
                 if let Some(TimeContext::Running { wheel, canc_tx: _ }) = maybe_time_cx {
-                    match entry.state() {
-                        // INVARIANT: `self.entry` is `Some` only after the timer is registered.
-                        EntryState::Unregistered => unreachable!(),
-                        EntryState::Registered(thread_id) | EntryState::Pending(thread_id)
-                            if thread_id == cur_thread_id =>
-                        {
-                            // Safety: we have verified that the entry is registered in this wheel.
-                            unsafe { wheel.remove(entry) };
+                    if thread_id == cur_thread_id {
+                        // Safety:
+                        // 1. entry is either in slots or pending list
+                        // 2. entry is registered in this thread
+                        unsafe {
+                            wheel.remove(entry);
                         }
-                        // thread_id doesn't match or entry is in WokenUp/Cancelling state
-                        EntryState::Registered(..) // entry is registered in a different thread's wheel
-                        | EntryState::Pending(..) // entry is registered in a different thread's wheel and is pending
-                        | EntryState::Cancelling // entry is already in cancellation queue, nothing to do
-                        | EntryState::WokenUp => (), // entry is already woken up, nothing to do
-                        }
+                    } else {
+                        entry.transition_to_cancelling();
+                    }
                 } else {
                     entry.transition_to_cancelling();
                 }

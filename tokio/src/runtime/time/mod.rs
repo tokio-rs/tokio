@@ -17,7 +17,7 @@ pub(crate) use source::TimeSource;
 
 mod wheel;
 cfg_rt_and_time! {
-    pub(crate) use wheel::{Insert, EntryHandle, EntryState};
+    pub(crate) use wheel::{Insert, EntryHandle, EntryState, EntryCancelling};
 }
 cfg_rt_or_time! {
     pub(crate) use wheel::cancellation_queue;
