@@ -74,6 +74,7 @@ fn cap_one() {
                 Poll::Pending => {
                     eprintln!("thread {th} dropping acquire while pending");
                     should_release = false;
+                    cx.waker().wake_by_ref();
                     Poll::Pending
                 }
             },
