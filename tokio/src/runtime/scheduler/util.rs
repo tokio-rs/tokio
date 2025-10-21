@@ -5,6 +5,15 @@ cfg_rt_and_time! {
         use crate::runtime::time::cancellation_queue::{Sender, Receiver};
         use std::time::Duration;
 
+        pub(crate) fn min_duration(a: Option<Duration>, b: Option<Duration>) -> Option<Duration> {
+            match (a, b) {
+                (Some(dur_a), Some(dur_b)) => Some(std::cmp::min(dur_a, dur_b)),
+                (Some(dur_a), None) => Some(dur_a),
+                (None, Some(dur_b)) => Some(dur_b),
+                (None, None) => None,
+            }
+        }
+
         pub(crate) fn insert_inject_timers(
             wheel: &mut Wheel,
             tx: &Sender,

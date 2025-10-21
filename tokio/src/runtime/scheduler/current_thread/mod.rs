@@ -514,38 +514,41 @@ impl Context {
             handle: &Handle,
             park_duration: Option<Duration>
         ) -> MaintainLocalTimer {
-            let (core, park_duration, auto_advance_duration) = {
-                let (core, (should_yield, next_timer)) =
-                    self.enter_with_time_context(core, |time_cx| {
-                        util::time::remove_cancelled_timers(&mut time_cx.wheel, &mut time_cx.canc_rx);
-                        let should_yield = util::time::insert_inject_timers(
-                            &mut time_cx.wheel,
-                            &time_cx.canc_tx,
-                            handle.take_remote_timers(),
-                        );
-                        let next_timer =
-                            util::time::next_expiration_time(&time_cx.wheel, &handle.driver);
-                        (should_yield, next_timer)
-                    });
+            let (core, (should_yield, next_timer)) =
+                self.enter_with_time_context(core, |time_cx| {
+                    util::time::remove_cancelled_timers(&mut time_cx.wheel, &mut time_cx.canc_rx);
+                    let should_yield = util::time::insert_inject_timers(
+                        &mut time_cx.wheel,
+                        &time_cx.canc_tx,
+                        handle.take_remote_timers(),
+                    );
+                    let next_timer =
+                        util::time::next_expiration_time(&time_cx.wheel, &handle.driver);
+                    (should_yield, next_timer)
+                });
 
-                if should_yield {
-                    (core, Some(Duration::from_millis(0)), None)
+            if should_yield {
+                MaintainLocalTimer {
+                    core,
+                    park_duration: Some(Duration::ZERO),
+                    auto_advance_duration: None,
+                }
+            } else {
+                let dur = util::time::min_duration(park_duration, next_timer);
+                if util::time::pre_auto_advance(&handle.driver, dur) {
+                    MaintainLocalTimer {
+                        core,
+                        park_duration: Some(Duration::ZERO),
+                        auto_advance_duration: dur,
+                    }
                 } else {
-                    let dur = match (next_timer, park_duration) {
-                        (Some(next_timer), Some(park_duration)) => Some(next_timer.min(park_duration)),
-                        (Some(next_timer), None) => Some(next_timer),
-                        (None, Some(park_duration)) => Some(park_duration),
-                        (None, None) => None,
-                    };
-                    if util::time::pre_auto_advance(&handle.driver, dur) {
-                        (core, Some(Duration::ZERO), dur)
-                    } else {
-                        (core, dur, None)
+                    MaintainLocalTimer {
+                        core,
+                        park_duration: dur,
+                        auto_advance_duration: None,
                     }
                 }
-            };
-
-            MaintainLocalTimer { core, park_duration, auto_advance_duration }
+            }
         }
 
         /// Maintain local timers after unparking the resource driver.
