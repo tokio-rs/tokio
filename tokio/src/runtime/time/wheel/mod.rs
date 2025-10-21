@@ -5,7 +5,9 @@ pub(crate) use self::level::Expiration;
 use self::level::Level;
 
 mod entry;
-pub(crate) use entry::Cancelling as EntryCancelling;
+cfg_rt_and_time! {
+    pub(crate) use entry::Cancelling as EntryCancelling;
+}
 pub(crate) use entry::Handle as EntryHandle;
 pub(crate) use entry::State as EntryState;
 use entry::TransitionToPending;
