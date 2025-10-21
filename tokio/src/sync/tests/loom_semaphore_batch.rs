@@ -48,6 +48,57 @@ fn basic_usage() {
 }
 
 #[test]
+fn cap_one() {
+    const NUM: usize = 4;
+
+    struct Shared {
+        semaphore: Semaphore,
+    }
+
+    async fn actor(shared: Arc<Shared>, n: usize) {
+        use futures::FutureExt;
+        let mut the_acquire = Some(Box::pin(shared.semaphore.acquire(1)));
+        poll_fn(|cx| match the_acquire.take() {
+            Some(mut acquire) => match acquire.poll_unpin(cx) {
+                Poll::Ready(Ok(_)) => Poll::Ready(()),
+                Poll::Ready(Err(_)) => Poll::Ready(()),
+                Poll::Pending if n % 2 == 0 => {
+                    the_acquire = Some(acquire);
+                    Poll::Pending
+                }
+                Poll::Pending => Poll::Pending,
+            },
+            None => Poll::Ready(()),
+        })
+        .await;
+
+        shared.semaphore.release(1);
+    }
+
+    static ITERS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    loom::model(|| {
+        dbg!(ITERS.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
+        let shared = Arc::new(Shared {
+            semaphore: Semaphore::new(1),
+        });
+        let mut tasks = Vec::new();
+        for n in 0..NUM {
+            let shared = shared.clone();
+
+            let th = thread::spawn(move || {
+                block_on(actor(shared, n));
+            });
+            tasks.push(th);
+        }
+
+        // block_on(actor(shared));
+        for task in tasks {
+            task.join().unwrap();
+        }
+    });
+}
+
+#[test]
 fn release() {
     loom::model(|| {
         let semaphore = Arc::new(Semaphore::new(1));
