@@ -59,29 +59,42 @@ fn cap_one() {
         use futures::FutureExt;
         let mut the_acquire = Some(Box::pin(shared.semaphore.acquire(1)));
         let mut should_release = true;
+        let th = n + 1;
         poll_fn(|cx| match the_acquire.take() {
             Some(mut acquire) => match acquire.poll_unpin(cx) {
-                Poll::Ready(Ok(_)) | Poll::Ready(Err(_)) => Poll::Ready(()),
+                Poll::Ready(Ok(_)) | Poll::Ready(Err(_)) => {
+                    eprintln!("thread {th} woken by semaphore");
+                    Poll::Ready(())
+                }
                 Poll::Pending if n % 2 == 0 => {
+                    eprintln!("thread {th} pending");
                     the_acquire = Some(acquire);
                     Poll::Pending
                 }
                 Poll::Pending => {
+                    eprintln!("thread {th} dropping acquire while pending");
                     should_release = false;
                     Poll::Pending
                 }
             },
-            None => Poll::Ready(()),
+            None => {
+                eprintln!("thread {th} completing after dropping semaphore");
+                Poll::Ready(())
+            }
         })
         .await;
         if should_release {
+            eprintln!("thread {th} release(1)");
             shared.semaphore.release(1);
         }
     }
 
-    static ITERS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    static ITERS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
     loom::model(|| {
-        dbg!(ITERS.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
+        eprintln!(
+            "\n\n~~~~~~~~ ITERATION {} ~~~~~~~~ \n\n",
+            ITERS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        );
         let shared = Arc::new(Shared {
             semaphore: Semaphore::new(1),
         });
