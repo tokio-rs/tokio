@@ -26,10 +26,11 @@
 //! ```
 
 use std::future::Future;
+use std::mem;
 use std::ops;
 use std::pin::Pin;
 use std::sync::{Arc, Condvar, Mutex};
-use std::task::{Context, Poll, Wake, Waker};
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use tokio_stream::Stream;
 
@@ -170,7 +171,7 @@ impl MockTask {
         F: FnOnce(&mut Context<'_>) -> R,
     {
         self.waker.clear();
-        let waker = self.clone().into_waker();
+        let waker = self.waker();
         let mut cx = Context::from_waker(&waker);
 
         f(&mut cx)
@@ -189,8 +190,11 @@ impl MockTask {
         Arc::strong_count(&self.waker)
     }
 
-    fn into_waker(self) -> Waker {
-        self.waker.into()
+    fn waker(&self) -> Waker {
+        unsafe {
+            let raw = to_raw(self.waker.clone());
+            Waker::from_raw(raw)
+        }
     }
 }
 
@@ -222,14 +226,8 @@ impl ThreadWaker {
             _ => unreachable!(),
         }
     }
-}
 
-impl Wake for ThreadWaker {
-    fn wake(self: Arc<Self>) {
-        self.wake_by_ref();
-    }
-
-    fn wake_by_ref(self: &Arc<Self>) {
+    fn wake(&self) {
         // First, try transitioning from IDLE -> NOTIFY, this does not require a lock.
         let mut state = self.state.lock().unwrap();
         let prev = *state;
@@ -248,4 +246,40 @@ impl Wake for ThreadWaker {
         assert_eq!(prev, SLEEP);
         self.condvar.notify_one();
     }
+}
+
+static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop_waker);
+
+unsafe fn to_raw(waker: Arc<ThreadWaker>) -> RawWaker {
+    RawWaker::new(Arc::into_raw(waker) as *const (), &VTABLE)
+}
+
+unsafe fn from_raw(raw: *const ()) -> Arc<ThreadWaker> {
+    Arc::from_raw(raw as *const ThreadWaker)
+}
+
+unsafe fn clone(raw: *const ()) -> RawWaker {
+    let waker = from_raw(raw);
+
+    // Increment the ref count
+    mem::forget(waker.clone());
+
+    to_raw(waker)
+}
+
+unsafe fn wake(raw: *const ()) {
+    let waker = from_raw(raw);
+    waker.wake();
+}
+
+unsafe fn wake_by_ref(raw: *const ()) {
+    let waker = from_raw(raw);
+    waker.wake();
+
+    // We don't actually own a reference to the unparker
+    mem::forget(waker);
+}
+
+unsafe fn drop_waker(raw: *const ()) {
+    let _ = from_raw(raw);
 }
