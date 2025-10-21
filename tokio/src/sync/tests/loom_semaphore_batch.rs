@@ -58,21 +58,25 @@ fn cap_one() {
     async fn actor(shared: Arc<Shared>, n: usize) {
         use futures::FutureExt;
         let mut the_acquire = Some(Box::pin(shared.semaphore.acquire(1)));
+        let mut should_release = true;
         poll_fn(|cx| match the_acquire.take() {
             Some(mut acquire) => match acquire.poll_unpin(cx) {
-                Poll::Ready(Ok(_)) => Poll::Ready(()),
-                Poll::Ready(Err(_)) => Poll::Ready(()),
+                Poll::Ready(Ok(_)) | Poll::Ready(Err(_)) => Poll::Ready(()),
                 Poll::Pending if n % 2 == 0 => {
                     the_acquire = Some(acquire);
                     Poll::Pending
                 }
-                Poll::Pending => Poll::Pending,
+                Poll::Pending => {
+                    should_release = false;
+                    Poll::Pending
+                }
             },
             None => Poll::Ready(()),
         })
         .await;
-
-        shared.semaphore.release(1);
+        if should_release {
+            shared.semaphore.release(1);
+        }
     }
 
     static ITERS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
