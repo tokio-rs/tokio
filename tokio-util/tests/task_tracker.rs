@@ -213,6 +213,24 @@ mod spawn {
 mod spawn_local {
     use super::*;
 
+    #[test]
+    #[should_panic(
+        expected = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"
+    )]
+    fn panic_outside_any_runtime() {
+        let tracker = TaskTracker::new();
+        tracker.spawn_local(async {});
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[should_panic(
+        expected = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"
+    )]
+    async fn panic_in_multi_thread_runtime() {
+        let tracker = TaskTracker::new();
+        tracker.spawn_local(async {});
+    }
+
     /// Spawn several tasks, and then close the [`TaskTracker`].
     #[tokio::test(flavor = "local")]
     async fn spawn_then_close() {
