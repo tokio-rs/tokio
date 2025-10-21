@@ -1070,6 +1070,13 @@ impl TcpStream {
     /// Successive calls return the same data. This is accomplished by passing
     /// `MSG_PEEK` as a flag to the underlying `recv` system call.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If the method is used as the event in a
+    /// [`tokio::select!`] statement and some other branch completes first,
+    /// then it is guranteed that no data was permanently read from the
+    /// stream's buffer.
+    ///
     /// # Examples
     ///
     /// ```no_run
