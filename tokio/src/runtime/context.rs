@@ -190,16 +190,6 @@ cfg_rt! {
             .unwrap_or_else(|_| (f.take().unwrap())(None))
     }
 
-    /// Attempts to register a timer with the current worker's local timer map.
-    /// Returns true if registered, false if no multi-threaded worker core available.
-    #[cfg(all(feature = "rt", feature = "rt-multi-thread"))]
-    pub(crate) fn try_register_timer(deadline: crate::time::Instant, waker: std::task::Waker) -> bool {
-        with_scheduler(|ctx| match ctx {
-            Some(scheduler::Context::MultiThread(ctx)) => ctx.register_timer(deadline.into(), waker),
-            _ => false,
-        })
-    }
-
     cfg_taskdump! {
         /// SAFETY: Callers of this function must ensure that trace frames always
         /// form a valid linked list.
