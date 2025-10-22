@@ -553,7 +553,7 @@ impl<T> Receiver<T> {
     /// capacity with [`Sender::reserve`].
     ///
     /// The capacity goes up when values are received, unless there are
-    /// existing, uncancelled calls to [`Sender::send`] or [`Sender::reserve`]
+    /// existing, non-cancelled calls to [`Sender::send`] or [`Sender::reserve`]
     /// which have returned [`Poll::Pending`]. While those calls exist, reading
     /// values from the [`Receiver`] gives access to a channel slot directly to
     /// those callers, in FIFO order, without modifying the capacity.
@@ -1517,7 +1517,7 @@ impl<T> Sender<T> {
     /// with [`reserve`].
     ///
     /// The capacity goes up when values are received, unless there are
-    /// existing, uncancelled calls to [`Sender::send`] or [`Sender::reserve`]
+    /// existing, non-cancelled calls to [`Sender::send`] or [`Sender::reserve`]
     /// which have returned [`Poll::Pending`]. While those calls exist, reading
     /// values from the [`Receiver`] gives access to a channel slot directly to
     /// those callers, in FIFO order, without modifying the capacity.
