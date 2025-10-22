@@ -128,7 +128,6 @@ impl Handle {
             state: Mutex::new(PrivState::Unregistered(waker.clone())),
             _pin: PhantomPinned,
         });
-        eprintln!("new: {:?}", Arc::as_ptr(&entry));
 
         Handle { entry }
     }
