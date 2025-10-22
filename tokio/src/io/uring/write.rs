@@ -15,9 +15,9 @@ pub(crate) struct Write {
 }
 
 impl Completable for Write {
-    type Output = (u32, OwnedBuf, OwnedFd);
-    fn complete(self, cqe: CqeResult) -> io::Result<Self::Output> {
-        Ok((cqe.result?, self.buf, self.fd))
+    type Output = (io::Result<u32>, OwnedBuf, OwnedFd);
+    fn complete(self, cqe: CqeResult) -> Self::Output {
+        (cqe.result, self.buf, self.fd)
     }
 }
 

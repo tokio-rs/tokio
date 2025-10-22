@@ -110,7 +110,7 @@ impl From<cqueue::Entry> for CqeResult {
 /// A trait that converts a CQE result into a usable value for each operation.
 pub(crate) trait Completable {
     type Output;
-    fn complete(self, cqe: CqeResult) -> io::Result<Self::Output>;
+    fn complete(self, cqe: CqeResult) -> Self::Output;
 }
 
 /// Extracts the `CancelData` needed to safely cancel an in-flight io_uring operation.
@@ -121,7 +121,7 @@ pub(crate) trait Cancellable {
 impl<T: Cancellable> Unpin for Op<T> {}
 
 impl<T: Cancellable + Completable + Send> Future for Op<T> {
-    type Output = io::Result<T::Output>;
+    type Output = T::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
@@ -133,8 +133,12 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                 let entry = entry_opt.take().expect("Entry must be present");
                 let waker = cx.waker().clone();
                 // SAFETY: entry is valid for the entire duration of the operation
-                let idx = unsafe { driver.register_op(entry, waker)? };
-                this.state = State::Polled(idx);
+                let idx = unsafe { driver.register_op(entry, waker) };
+
+                if let Ok(op_idx) = idx {
+                    this.state = State::Polled(op_idx);
+                }
+
                 Poll::Pending
             }
 
