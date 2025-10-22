@@ -1,4 +1,5 @@
 use super::{EntryHandle, EntryList};
+use std::ptr::NonNull;
 use std::{array, fmt};
 
 /// Wheel for a single level in the timer. This wheel contains 64 slots.
@@ -131,7 +132,7 @@ impl Level {
     pub(crate) unsafe fn remove_entry(&mut self, hdl: EntryHandle) {
         let slot = slot_for(hdl.deadline(), self.level);
 
-        unsafe { self.slot[slot].remove(hdl.into()) };
+        unsafe { self.slot[slot].remove(NonNull::from(&hdl)) };
         if self.slot[slot].is_empty() {
             // The bit is currently set
             debug_assert!(self.occupied & occupied_bit(slot) != 0);

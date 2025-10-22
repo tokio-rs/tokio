@@ -112,10 +112,10 @@ pub(crate) struct Handle {
     pub(crate) entry: Arc<Entry>,
 }
 
-impl From<Handle> for NonNull<Entry> {
-    fn from(handle: Handle) -> NonNull<Entry> {
-        let ptr = Arc::as_ptr(&handle.entry);
-        unsafe { NonNull::new_unchecked(ptr.cast_mut()) }
+impl From<&Handle> for NonNull<Entry> {
+    fn from(hdl: &Handle) -> Self {
+        // Safety: entry is in an `Arc`, so the pointer is valid.
+        unsafe { NonNull::new_unchecked(Arc::as_ptr(&hdl.entry) as *mut Entry) }
     }
 }
 

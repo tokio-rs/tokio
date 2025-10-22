@@ -18,6 +18,7 @@ pub(crate) mod cancellation_queue;
 use cancellation_queue::Sender;
 
 use std::array;
+use std::ptr::NonNull;
 
 /// Timing wheel implementation.
 ///
@@ -135,7 +136,7 @@ impl Wheel {
     /// * The entry is already registered in THIS wheel.
     pub(crate) unsafe fn remove(&mut self, hdl: EntryHandle) {
         if hdl.is_pending() {
-            self.pending.remove(hdl.into());
+            self.pending.remove(NonNull::from(&hdl));
         } else {
             let deadline = hdl.deadline();
             debug_assert!(
