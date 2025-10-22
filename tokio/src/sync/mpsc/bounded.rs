@@ -546,10 +546,18 @@ impl<T> Receiver<T> {
         self.chan.len()
     }
 
-    /// Returns the current capacity of the channel.
+    /// Returns the current number of reservations which can immediately be
+    /// returned from the channel.
     ///
     /// The capacity goes down when the sender sends a value by calling [`Sender::send`] or by reserving
-    /// capacity with [`Sender::reserve`]. The capacity goes up when values are received.
+    /// capacity with [`Sender::reserve`].
+    ///
+    /// The capacity goes up when values are received, unless there are
+    /// existing, uncancelled calls to [`Sender::send`] or [`Sender::reserve`]
+    /// which have returned [`Poll::Pending`]. While those calls exist, reading
+    /// values from the [`Receiver`] gives access to a channel slot directly to
+    /// those callers, in FIFO order, without modifying the capacity.
+    ///
     /// This is distinct from [`max_capacity`], which always returns buffer capacity initially
     /// specified when calling [`channel`].
     ///
@@ -1502,10 +1510,18 @@ impl<T> Sender<T> {
         self.chan.same_channel(&other.chan)
     }
 
-    /// Returns the current capacity of the channel.
+    /// Returns the current number of reservations which can immediately be
+    /// returned from the channel.
     ///
     /// The capacity goes down when sending a value by calling [`send`] or by reserving capacity
-    /// with [`reserve`]. The capacity goes up when values are received by the [`Receiver`].
+    /// with [`reserve`].
+    ///
+    /// The capacity goes up when values are received, unless there are
+    /// existing, uncancelled calls to [`Sender::send`] or [`Sender::reserve`]
+    /// which have returned [`Poll::Pending`]. While those calls exist, reading
+    /// values from the [`Receiver`] gives access to a channel slot directly to
+    /// those callers, in FIFO order, without modifying the capacity.
+    ///
     /// This is distinct from [`max_capacity`], which always returns buffer capacity initially
     /// specified when calling [`channel`]
     ///
