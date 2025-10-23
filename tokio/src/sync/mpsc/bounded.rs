@@ -555,8 +555,8 @@ impl<T> Receiver<T> {
     /// The capacity goes up when values are received, unless there are
     /// existing, non-cancelled calls to [`Sender::send`] or [`Sender::reserve`]
     /// which have returned [`Poll::Pending`]. While those calls exist, reading
-    /// values from the [`Receiver`] gives access to a channel slot directly to
-    /// those callers, in FIFO order, without modifying the capacity.
+    /// values from the [`Receiver`] transfers access to that capacity directly to
+    /// those callers, in FIFO order.
     ///
     /// This is distinct from [`max_capacity`], which always returns buffer capacity initially
     /// specified when calling [`channel`].
@@ -1519,11 +1519,11 @@ impl<T> Sender<T> {
     /// The capacity goes up when values are received, unless there are
     /// existing, non-cancelled calls to [`Sender::send`] or [`Sender::reserve`]
     /// which have returned [`Poll::Pending`]. While those calls exist, reading
-    /// values from the [`Receiver`] gives access to a channel slot directly to
-    /// those callers, in FIFO order, without modifying the capacity.
+    /// values from the [`Receiver`] transfers access to that capacity directly to
+    /// those callers, in FIFO order.
     ///
     /// This is distinct from [`max_capacity`], which always returns buffer capacity initially
-    /// specified when calling [`channel`]
+    /// specified when calling [`channel`].
     ///
     /// # Examples
     ///
