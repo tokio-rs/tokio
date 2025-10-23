@@ -792,8 +792,8 @@ impl<T> Sender<T> {
     /// capacity, then use the returned [`Permit`] to send the message.
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve`
-    /// complete in the order they were requested.  Cancelling a call to
-    /// `send` makes you lose your place in the queue.
+    /// are granted capacity in the order they were requested. Cancelling a
+    /// call to `send` makes you lose your place in the queue.
     ///
     /// # Examples
     ///
@@ -1095,8 +1095,8 @@ impl<T> Sender<T> {
     /// # Cancel safety
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve`
-    /// complete in the order they were requested.  Cancelling a call to
-    /// `reserve` makes you lose your place in the queue.
+    /// are granted capacity in the order they were requested. Cancelling a
+    /// call to `reserve` makes you lose your place in the queue.
     ///
     /// # Examples
     ///
@@ -1151,7 +1151,7 @@ impl<T> Sender<T> {
     /// # Cancel safety
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve_many`
-    /// complete in the order they were requested. Cancelling a call to
+    /// are granted capacity in the order they were requested. Cancelling a call to
     /// `reserve_many` makes you lose your place in the queue.
     ///
     /// # Examples
@@ -1214,8 +1214,8 @@ impl<T> Sender<T> {
     /// # Cancel safety
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve`
-    /// complete in the order they were requested.  Cancelling a call to
-    /// `reserve_owned` makes you lose your place in the queue.
+    /// are granted capacity in the order they were requested. Cancelling a
+    /// call to `reserve_owned` makes you lose your place in the queue.
     ///
     /// # Examples
     /// Sending a message using an [`OwnedPermit`]:
