@@ -1,17 +1,14 @@
 use crate::io::uring::open::Open;
 use crate::io::uring::write::Write;
 use crate::runtime::Handle;
+
 use io_uring::cqueue;
 use io_uring::squeue::Entry;
 use std::future::Future;
+use std::io::{self, Error};
+use std::mem;
 use std::pin::Pin;
-use std::task::Context;
-use std::task::Poll;
-use std::task::Waker;
-use std::{
-    io::{self, Error},
-    mem,
-};
+use std::task::{Context, Poll, Waker};
 
 // This field isn't accessed directly, but it holds cancellation data,
 // so `#[allow(dead_code)]` is needed.
@@ -115,9 +112,11 @@ pub(crate) trait Completable {
     type Output;
     fn complete(self, cqe: CqeResult) -> Self::Output;
 
-    // called only when registering operation failed, the error is embedded
-    // in the output type
-    fn register_op_failed(self, error: Error) -> Self::Output;
+    // This is used when you want to terminate an operation with an error.
+    //
+    // The `Op` type that implements this trait can return the passed error
+    // upstream by embedding it in the `Output`.
+    fn complete_with_error(self, error: Error) -> Self::Output;
 }
 
 /// Extracts the `CancelData` needed to safely cancel an in-flight io_uring operation.
@@ -141,14 +140,16 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                 let waker = cx.waker().clone();
 
                 // SAFETY: entry is valid for the entire duration of the operation
-                let idx = match unsafe { driver.register_op(entry, waker) } {
+                match unsafe { driver.register_op(entry, waker) } {
                     Ok(idx) => this.state = State::Polled(idx),
                     Err(err) => {
                         let data = this
                             .take_data()
                             .expect("Data must be present on Initialization");
 
-                        return Poll::Ready(data.register_op_failed(err));
+                        this.state = State::Complete;
+
+                        return Poll::Ready(data.complete_with_error(err));
                     }
                 };
 
