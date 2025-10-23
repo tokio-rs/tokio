@@ -121,7 +121,7 @@ pub(crate) trait Cancellable {
 impl<T: Cancellable> Unpin for Op<T> {}
 
 impl<T: Cancellable + Completable + Send> Future for Op<T> {
-    type Output = T::Output;
+    type Output = io::Result<T::Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
@@ -133,11 +133,9 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                 let entry = entry_opt.take().expect("Entry must be present");
                 let waker = cx.waker().clone();
                 // SAFETY: entry is valid for the entire duration of the operation
-                let idx = unsafe { driver.register_op(entry, waker) };
+                let idx = unsafe { driver.register_op(entry, waker)? };
 
-                if let Ok(op_idx) = idx {
-                    this.state = State::Polled(op_idx);
-                }
+                this.state = State::Polled(idx);
 
                 Poll::Pending
             }
@@ -170,7 +168,7 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                         let data = this
                             .take_data()
                             .expect("Data must be present on completion");
-                        Poll::Ready(data.complete(cqe.into()))
+                        Poll::Ready(Ok(data.complete(cqe.into())))
                     }
 
                     Lifecycle::Submitted => {
