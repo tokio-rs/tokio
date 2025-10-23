@@ -8,7 +8,10 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 use std::task::Waker;
-use std::{io, mem};
+use std::{
+    io::{self, Error},
+    mem,
+};
 
 // This field isn't accessed directly, but it holds cancellation data,
 // so `#[allow(dead_code)]` is needed.
@@ -111,6 +114,10 @@ impl From<cqueue::Entry> for CqeResult {
 pub(crate) trait Completable {
     type Output;
     fn complete(self, cqe: CqeResult) -> Self::Output;
+
+    // called only when registering operation failed, the error is embedded
+    // in the output type
+    fn register_op_failed(self, error: Error) -> Self::Output;
 }
 
 /// Extracts the `CancelData` needed to safely cancel an in-flight io_uring operation.
@@ -121,7 +128,7 @@ pub(crate) trait Cancellable {
 impl<T: Cancellable> Unpin for Op<T> {}
 
 impl<T: Cancellable + Completable + Send> Future for Op<T> {
-    type Output = io::Result<T::Output>;
+    type Output = T::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
@@ -132,10 +139,18 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
             State::Initialize(entry_opt) => {
                 let entry = entry_opt.take().expect("Entry must be present");
                 let waker = cx.waker().clone();
-                // SAFETY: entry is valid for the entire duration of the operation
-                let idx = unsafe { driver.register_op(entry, waker)? };
 
-                this.state = State::Polled(idx);
+                // SAFETY: entry is valid for the entire duration of the operation
+                let idx = match unsafe { driver.register_op(entry, waker) } {
+                    Ok(idx) => this.state = State::Polled(idx),
+                    Err(err) => {
+                        let data = this
+                            .take_data()
+                            .expect("Data must be present on Initialization");
+
+                        return Poll::Ready(data.register_op_failed(err));
+                    }
+                };
 
                 Poll::Pending
             }
@@ -168,7 +183,7 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                         let data = this
                             .take_data()
                             .expect("Data must be present on completion");
-                        Poll::Ready(Ok(data.complete(cqe.into())))
+                        Poll::Ready(data.complete(cqe.into()))
                     }
 
                     Lifecycle::Submitted => {

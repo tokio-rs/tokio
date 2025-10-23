@@ -4,7 +4,7 @@ use crate::{
 };
 use io_uring::{opcode, types};
 use std::{
-    io,
+    io::{self, Error},
     os::fd::{AsRawFd, OwnedFd},
 };
 
@@ -18,6 +18,10 @@ impl Completable for Write {
     type Output = (io::Result<u32>, OwnedBuf, OwnedFd);
     fn complete(self, cqe: CqeResult) -> Self::Output {
         (cqe.result, self.buf, self.fd)
+    }
+
+    fn register_op_failed(self, err: Error) -> Self::Output {
+        (Err(err), self.buf, self.fd)
     }
 }
 

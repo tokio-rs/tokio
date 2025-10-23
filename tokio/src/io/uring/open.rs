@@ -4,7 +4,12 @@ use crate::{
     runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op},
 };
 use io_uring::{opcode, types};
-use std::{ffi::CString, io, os::fd::FromRawFd, path::Path};
+use std::{
+    ffi::CString,
+    io::{self, Error},
+    os::fd::FromRawFd,
+    path::Path,
+};
 
 #[derive(Debug)]
 pub(crate) struct Open {
@@ -19,6 +24,10 @@ impl Completable for Open {
     fn complete(self, cqe: CqeResult) -> Self::Output {
         cqe.result
             .map(|fd| unsafe { crate::fs::File::from_raw_fd(fd as i32) })
+    }
+
+    fn register_op_failed(self, err: Error) -> Self::Output {
+        Err(err)
     }
 }
 
