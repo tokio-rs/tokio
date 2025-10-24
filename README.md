@@ -15,6 +15,7 @@ the Rust programming language. It is:
 [![Crates.io][crates-badge]][crates-url]
 [![MIT licensed][mit-badge]][mit-url]
 [![Build Status][actions-badge]][actions-url]
+[![Build Status][cirrus-badge]][cirrus-url]
 [![Discord chat][discord-badge]][discord-url]
 
 [crates-badge]: https://img.shields.io/crates/v/tokio.svg
@@ -23,6 +24,8 @@ the Rust programming language. It is:
 [mit-url]: https://github.com/tokio-rs/tokio/blob/master/LICENSE
 [actions-badge]: https://github.com/tokio-rs/tokio/workflows/CI/badge.svg
 [actions-url]: https://github.com/tokio-rs/tokio/actions?query=workflow%3ACI+branch%3Amaster
+[cirrus-badge]: https://api.cirrus-ci.com/github/tokio-rs/tokio.svg
+[cirrus-url]: https://cirrus-ci.com/github/tokio-rs/tokio
 [discord-badge]: https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=flat-square
 [discord-url]: https://discord.gg/tokio
 
