@@ -68,6 +68,8 @@ impl Handle {
 cfg_rt! {
     use crate::future::Future;
     use crate::loom::sync::Arc;
+    #[cfg(tokio_unstable)]
+    use crate::runtime::UserData;
     use crate::runtime::{blocking, task::{Id, SpawnLocation}};
     use crate::runtime::context;
     use crate::task::JoinHandle;
@@ -127,6 +129,20 @@ cfg_rt! {
 
                 #[cfg(feature = "rt-multi-thread")]
                 Handle::MultiThread(h) => multi_thread::Handle::spawn(h, future, id, spawned_at),
+            }
+        }
+
+        #[cfg(tokio_unstable)]
+        pub(crate) fn spawn_with_user_data<F>(&self, future: F, id: Id, spawned_at: SpawnLocation, user_data: UserData) -> JoinHandle<F::Output>
+        where
+            F: Future + Send + 'static,
+            F::Output: Send + 'static,
+        {
+            match self {
+                Handle::CurrentThread(h) => current_thread::Handle::spawn_with_user_data(h, future, id, spawned_at, user_data),
+
+                #[cfg(feature = "rt-multi-thread")]
+                Handle::MultiThread(h) => multi_thread::Handle::spawn_with_user_data(h, future, id, spawned_at, user_data),
             }
         }
 

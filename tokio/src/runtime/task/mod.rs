@@ -232,6 +232,9 @@ use std::panic::Location;
 use std::ptr::NonNull;
 use std::{fmt, mem};
 
+#[cfg(tokio_unstable)]
+use crate::runtime::task_hooks::UserData;
+
 /// An owned handle to the task, tracked by ref count.
 #[repr(transparent)]
 pub(crate) struct Task<S: 'static> {
@@ -330,6 +333,7 @@ cfg_rt! {
         scheduler: S,
         id: Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: UserData,
     ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
@@ -341,6 +345,8 @@ cfg_rt! {
             scheduler,
             id,
             spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
         );
         let task = Task {
             raw,
@@ -375,6 +381,8 @@ cfg_rt! {
             scheduler,
             id,
             spawned_at,
+            #[cfg(tokio_unstable)]
+            None,
         );
 
         // This transfers the ref-count of task and notified into an UnownedTask.
@@ -437,6 +445,12 @@ impl<S: 'static> Task<S> {
         unsafe { Header::get_spawn_location(self.raw.header_ptr()) }
     }
 
+    #[cfg(tokio_unstable)]
+    pub(crate) fn get_user_data(&self) -> UserData {
+        // Safety: The header pointer is valid.
+        unsafe { Header::get_user_data(self.raw.header_ptr()) }
+    }
+
     // Explicit `'task` and `'meta` lifetimes are necessary here, as otherwise,
     // the compiler infers the lifetimes to be the same, and considers the task
     // to be borrowed for the lifetime of the returned `TaskMeta`.
@@ -445,6 +459,8 @@ impl<S: 'static> Task<S> {
         crate::runtime::TaskMeta {
             id: self.id(),
             spawned_at: self.spawned_at().into(),
+            #[cfg(tokio_unstable)]
+            user_data: self.get_user_data(),
             _phantom: PhantomData,
         }
     }

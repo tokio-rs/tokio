@@ -5,6 +5,8 @@ use crate::runtime::scheduler::{self, Defer, Inject};
 use crate::runtime::task::{
     self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task, TaskHarnessScheduleHooks,
 };
+#[cfg(tokio_unstable)]
+use crate::runtime::UserData;
 use crate::runtime::{
     blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
 };
@@ -456,13 +458,49 @@ impl Handle {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
-
-        me.task_hooks.spawn(&TaskMeta {
+        Self::spawn_with_user_data(
+            me,
+            future,
             id,
             spawned_at,
+            #[cfg(tokio_unstable)]
+            None,
+        )
+    }
+
+    #[track_caller]
+    pub(crate) fn spawn_with_user_data<F>(
+        me: &Arc<Self>,
+        future: F,
+        id: crate::runtime::task::Id,
+        spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: UserData,
+    ) -> JoinHandle<F::Output>
+    where
+        F: crate::future::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        let task_meta = TaskMeta {
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
             _phantom: Default::default(),
-        });
+        };
+
+        #[cfg(not(tokio_unstable))]
+        {
+            me.task_hooks.spawn(&task_meta);
+        }
+
+        let (handle, notified) = me.shared.owned.bind(
+            future,
+            me.clone(),
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            me.task_hooks.spawn(&task_meta),
+        );
 
         if let Some(notified) = notified {
             me.schedule(notified);
@@ -488,16 +526,27 @@ impl Handle {
         F: crate::future::Future + 'static,
         F::Output: 'static,
     {
-        let (handle, notified) = me
-            .shared
-            .owned
-            .bind_local(future, me.clone(), id, spawned_at);
-
-        me.task_hooks.spawn(&TaskMeta {
+        let task_meta = TaskMeta {
             id,
             spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data: None,
             _phantom: Default::default(),
-        });
+        };
+
+        #[cfg(not(tokio_unstable))]
+        {
+            me.task_hooks.spawn(&task_meta);
+        }
+
+        let (handle, notified) = me.shared.owned.bind_local(
+            future,
+            me.clone(),
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            me.task_hooks.spawn(&task_meta),
+        );
 
         if let Some(notified) = notified {
             me.schedule(notified);
