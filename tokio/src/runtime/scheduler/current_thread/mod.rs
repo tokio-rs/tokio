@@ -1,4 +1,4 @@
-use crate::loom::sync::atomic::AtomicBool;
+use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
@@ -21,6 +21,12 @@ use std::task::Waker;
 use std::thread::ThreadId;
 use std::time::Duration;
 use std::{fmt, thread};
+
+cfg_time! {
+    use crate::runtime::scheduler::util;
+    use crate::runtime::time::EntryHandle;
+    use crate::loom::sync::Mutex;
+}
 
 /// Executes tasks on the current thread
 pub(crate) struct CurrentThread {
@@ -62,6 +68,9 @@ struct Core {
     /// Current tick
     tick: u32,
 
+    #[cfg(feature = "time")]
+    time_context: Option<crate::runtime::time::Context2>,
+
     /// Runtime driver
     ///
     /// The driver is removed before starting to park the thread
@@ -83,6 +92,12 @@ struct Shared {
     /// Remote run queue
     inject: Inject<Arc<Handle>>,
 
+    #[cfg(feature = "time")]
+    /// Timers pending to be registered.
+    /// This is used to register a timer but the [`Core`]
+    /// is not available in the current thread.
+    inject_timers: Mutex<Vec<EntryHandle>>,
+
     /// Collection of all active tasks spawned onto this executor.
     owned: OwnedTasks<Arc<Handle>>,
 
@@ -97,6 +112,9 @@ struct Shared {
 
     /// This scheduler only has one worker.
     worker_metrics: WorkerMetrics,
+
+    /// Indicates that the runtime is shutting down.
+    is_shutdown: AtomicBool,
 }
 
 /// Thread-local context.
@@ -152,11 +170,14 @@ impl CurrentThread {
             },
             shared: Shared {
                 inject: Inject::new(),
+                #[cfg(feature = "time")]
+                inject_timers: Mutex::new(Vec::new()),
                 owned: OwnedTasks::new(1),
                 woken: AtomicBool::new(false),
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),
                 worker_metrics,
+                is_shutdown: AtomicBool::new(false),
             },
             driver: driver_handle,
             blocking_spawner,
@@ -167,6 +188,8 @@ impl CurrentThread {
         let core = AtomicCell::new(Some(Box::new(Core {
             tasks: VecDeque::with_capacity(INITIAL_CAPACITY),
             tick: 0,
+            #[cfg(feature = "time")]
+            time_context: Some(crate::runtime::time::Context2::new()),
             driver: Some(driver),
             metrics: MetricsBatch::new(&handle.shared.worker_metrics),
             global_queue_interval,
@@ -266,6 +289,8 @@ impl CurrentThread {
             let core = shutdown2(core, handle);
             *context.core.borrow_mut() = Some(core);
         }
+
+        handle.shared.is_shutdown.store(true, Ordering::SeqCst);
     }
 }
 
@@ -275,7 +300,18 @@ fn shutdown2(mut core: Box<Core>, handle: &Handle) -> Box<Core> {
     // call returns.
     handle.shared.owned.close_and_shutdown_all(0);
 
-    // Drain local queue
+    #[cfg(feature = "time")]
+    {
+        let mut time_context = core.time_context.take().unwrap();
+        util::time::shutdown_local_timers(
+            &mut time_context.wheel,
+            &mut time_context.canc_rx,
+            handle.take_remote_timers(),
+            &handle.driver,
+        );
+        assert!(core.time_context.replace(time_context).is_none());
+    }
+    // Drain the local queue
     // We already shut down every task, so we just need to drop the task.
     while let Some(task) = core.next_local_task(handle) {
         drop(task);
@@ -387,12 +423,7 @@ impl Context {
             core.metrics.about_to_park();
             core.submit_metrics(handle);
 
-            let (c, ()) = self.enter(core, || {
-                driver.park(&handle.driver);
-                self.defer.wake();
-            });
-
-            core = c;
+            core = self.park_internal(core, handle, &mut driver, None);
 
             core.metrics.unparked();
             core.submit_metrics(handle);
@@ -413,13 +444,38 @@ impl Context {
 
         core.submit_metrics(handle);
 
-        let (mut core, ()) = self.enter(core, || {
-            driver.park_timeout(&handle.driver, Duration::from_millis(0));
-            self.defer.wake();
-        });
+        core = self.park_internal(core, handle, &mut driver, Some(Duration::from_millis(0)));
 
         core.driver = Some(driver);
         core
+    }
+
+    fn park_internal(
+        &self,
+        core: Box<Core>,
+        handle: &Handle,
+        driver: &mut Driver,
+        duration: Option<Duration>,
+    ) -> Box<Core> {
+        debug_assert!(core.driver.is_none());
+
+        let MaintainLocalTimer {
+            core,
+            park_duration: duration,
+            auto_advance_duration,
+        } = self.maintain_local_timers_before_parking(core, handle, duration);
+
+        let (core, ()) = self.enter(core, || {
+            if let Some(duration) = duration {
+                driver.park_timeout(&handle.driver, duration);
+            } else {
+                driver.park(&handle.driver);
+            }
+
+            self.defer.wake();
+        });
+
+        self.maintain_local_timers_after_parking(core, handle, auto_advance_duration)
     }
 
     fn enter<R>(&self, core: Box<Core>, f: impl FnOnce() -> R) -> (Box<Core>, R) {
@@ -439,6 +495,144 @@ impl Context {
     pub(crate) fn defer(&self, waker: &Waker) {
         self.defer.defer(waker);
     }
+
+    cfg_time! {
+        /// Maintain local timers before parking the resource driver.
+        ///
+        /// * Remove cancelled timers from the local timer wheel.
+        /// * Register remote timers to the local timer wheel.
+        /// * Adjust the park duration based on
+        ///   * the next timer expiration time.
+        ///   * whether auto-advancing is required (feature = "test-util").
+        ///
+        /// # Returns
+        ///
+        /// `(Box<Core>, park_duration, auto_advance_duration)`
+        fn maintain_local_timers_before_parking(
+            &self,
+            core: Box<Core>,
+            handle: &Handle,
+            park_duration: Option<Duration>
+        ) -> MaintainLocalTimer {
+            let (core, (should_yield, next_timer)) =
+                self.enter_with_time_context(core, |time_cx| {
+                    util::time::remove_cancelled_timers(&mut time_cx.wheel, &mut time_cx.canc_rx);
+                    let should_yield = util::time::insert_inject_timers(
+                        &mut time_cx.wheel,
+                        &time_cx.canc_tx,
+                        handle.take_remote_timers(),
+                    );
+                    let next_timer =
+                        util::time::next_expiration_time(&time_cx.wheel, &handle.driver);
+                    (should_yield, next_timer)
+                });
+
+            if should_yield {
+                MaintainLocalTimer {
+                    core,
+                    park_duration: Some(Duration::ZERO),
+                    auto_advance_duration: None,
+                }
+            } else {
+                let dur = util::time::min_duration(park_duration, next_timer);
+                if util::time::pre_auto_advance(&handle.driver, dur) {
+                    MaintainLocalTimer {
+                        core,
+                        park_duration: Some(Duration::ZERO),
+                        auto_advance_duration: dur,
+                    }
+                } else {
+                    MaintainLocalTimer {
+                        core,
+                        park_duration: dur,
+                        auto_advance_duration: None,
+                    }
+                }
+            }
+        }
+
+        /// Maintain local timers after unparking the resource driver.
+        ///
+        /// * Auto-advance time, if required (feature = "test-util").
+        /// * Process expired timers.
+        fn maintain_local_timers_after_parking(
+            &self,
+            core: Box<Core>,
+            handle: &Handle,
+            auto_advance_duration: Option<Duration>
+        ) -> Box<Core> {
+            let (core, ()) = self.enter_with_time_context(core, |time_cx| {
+                util::time::post_auto_advance(&handle.driver, auto_advance_duration);
+                util::time::process_expired_timers(&mut time_cx.wheel, &handle.driver);
+            });
+            core
+        }
+
+        /// Take out the time context from the core,
+        /// and then setup the [`Core`] to the thread-local [`Context`],
+        /// finally, run the provided closure `f` with the time context.
+        fn enter_with_time_context<F, R>(&self, mut core: Box<Core>, f: F) -> (Box<Core>, R)
+        where
+            F: FnOnce(&mut crate::runtime::time::Context2) -> R,
+        {
+            let mut time_cx = core.time_context.take().expect("time context missing");
+            let (mut core, ret) = self.enter(core, || {
+                f(&mut time_cx)
+            });
+            assert!(core.time_context.replace(time_cx).is_none());
+            (core, ret)
+        }
+
+        fn with_core<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(Option<&mut Core>) -> R,
+        {
+            let mut core = self.core.borrow_mut();
+            f(core.as_mut().map(|c| c.as_mut()))
+        }
+
+        pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(Option<crate::runtime::time::Context<'_>>) -> R,
+        {
+            self.with_core(|maybe_core| {
+                match maybe_core {
+                    Some(core) => {
+                        match core.time_context {
+                            Some(ref mut time_context) => {
+                                f(Some(crate::runtime::time::Context::Running {
+                                    wheel: &mut time_context.wheel,
+                                    canc_tx: &time_context.canc_tx,
+                                }))
+                            }
+                            None => f(None),
+                        }
+                    }
+                    None => f(None),
+                }
+            })
+        }
+    } // cfg_time!
+
+    cfg_not_time! {
+        fn maintain_local_timers_before_parking(
+            &self,
+            core: Box<Core>,
+            _handle: &Handle,
+            park_duration: Option<Duration>
+        ) -> MaintainLocalTimer {
+            MaintainLocalTimer { core, park_duration, auto_advance_duration: None }
+        }
+
+        fn maintain_local_timers_after_parking(
+            &self,
+            core: Box<Core>,
+            _handle: &Handle,
+            _auto_advance_duration: Option<Duration>
+        ) -> Box<Core> {
+            core
+        }
+    } // cfg_not_time!
 }
 
 // ===== impl Handle =====
@@ -583,6 +777,26 @@ impl Handle {
     pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
         assert_eq!(0, worker);
         &self.shared.worker_metrics
+    }
+
+    cfg_time! {
+        /// Push a timer handle from the remote thread.
+        pub(crate) fn push_remote_timer(&self, entry: EntryHandle) {
+            {
+                let mut inject_timers = self.shared.inject_timers.lock();
+                inject_timers.push(entry);
+            }
+            self.driver.unpark();
+        }
+
+        pub(crate) fn take_remote_timers(&self) -> Vec<EntryHandle> {
+            let mut inject_timers = self.shared.inject_timers.lock();
+            std::mem::take(&mut inject_timers)
+        }
+
+        pub(crate) fn is_shutdown(&self) -> bool {
+            self.shared.is_shutdown.load(Ordering::SeqCst)
+        }
     }
 }
 
@@ -847,4 +1061,11 @@ impl Drop for CoreGuard<'_> {
             self.scheduler.notify.notify_one();
         }
     }
+}
+
+/// Returned by [`Context::maintain_local_timers_before_parking`].
+struct MaintainLocalTimer {
+    core: Box<Core>,
+    park_duration: Option<Duration>,
+    auto_advance_duration: Option<Duration>,
 }

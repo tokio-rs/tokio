@@ -24,6 +24,8 @@ cfg_rt_multi_thread! {
     pub(crate) use multi_thread::MultiThread;
 }
 
+mod util;
+
 use crate::runtime::driver;
 
 #[derive(Debug, Clone)]
@@ -104,6 +106,31 @@ cfg_rt! {
 
                 #[cfg(feature = "rt-multi-thread")]
                 Handle::MultiThread(_) => false,
+            }
+        }
+
+        cfg_time! {
+            /// Returns true if both handles belong to the same runtime instance.
+            pub(crate) fn is_same_runtime(&self, other: &Handle) -> bool {
+                match (self, other) {
+                    (Handle::CurrentThread(a), Handle::CurrentThread(b)) => Arc::ptr_eq(a, b),
+                    #[cfg(feature = "rt-multi-thread")]
+                    (Handle::MultiThread(a), Handle::MultiThread(b)) => Arc::ptr_eq(a, b),
+                    #[cfg(feature = "rt-multi-thread")]
+                    _ => false, // different runtime types
+                }
+            }
+
+            /// Returns true if the runtime is shutting down.
+            pub(crate) fn is_shutdown(&self) -> bool {
+                match_flavor!(self, Handle(h) => h.is_shutdown())
+            }
+
+            /// Push a timer entry that was created outside of this runtime
+            /// into the runtime-global queue. The pushed timer will be
+            /// processed by a random worker thread.
+            pub(crate) fn push_remote_timer(&self, entry_hdl: crate::runtime::time::EntryHandle) {
+                match_flavor!(self, Handle(h) => h.push_remote_timer(entry_hdl))
             }
         }
 
@@ -245,6 +272,15 @@ cfg_rt! {
 
         pub(crate) fn defer(&self, waker: &Waker) {
             match_flavor!(self, Context(context) => context.defer(waker));
+        }
+
+        cfg_time! {
+            pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
+            where
+                F: FnOnce(Option<crate::runtime::time::Context<'_>>) -> R,
+            {
+                match_flavor!(self, Context(context) => context.with_wheel(f))
+            }
         }
 
         cfg_rt_multi_thread! {
