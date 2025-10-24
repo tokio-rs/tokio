@@ -82,12 +82,6 @@ impl Wheel {
     ///
     /// * `hdl`: The entry handle to insert into the wheel.
     ///
-    /// # Return
-    ///
-    /// * `true`: The entry was successfully inserted.
-    /// * `false`: the entry has already expired, in this case,
-    ///   the entry is not inserted into the wheel.
-    ///
     /// # Safety
     ///
     /// The caller must ensure:
@@ -300,6 +294,7 @@ fn level_for(elapsed: u64, when: u64) -> usize {
     significant / NUM_LEVELS
 }
 
+/// The return type of the [`Wheel::insert`] method.
 pub(crate) enum Insert {
     /// The entry was successfully inserted.
     Success,
