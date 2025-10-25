@@ -235,7 +235,9 @@ impl Inner {
                 let err = Arc::try_unwrap(err).expect("There are no other references.");
                 Err(err)
             }
-            Some(_) => {
+            Some(&mut Action::Write(_))
+            | Some(&mut Action::WriteError(_))
+            | Some(&mut Action::Wait(_)) => {
                 // Either waiting or expecting a write
                 Err(io::ErrorKind::WouldBlock.into())
             }
@@ -280,10 +282,8 @@ impl Inner {
                 Action::Wait(..) | Action::WriteError(..) => {
                     break;
                 }
-                _ => {}
+                Action::Read(_) | Action::ReadError(_) => (),
             }
-
-            // TODO: remove write
         }
 
         Ok(ret)
@@ -441,6 +441,7 @@ impl AsyncWrite for Mock {
                         panic!("unexpected WouldBlock {}", self.pmsg());
                     }
                 }
+                Ok(0) if buf.is_empty() => return Poll::Ready(Ok(0)),
                 Ok(0) => {
                     // TODO: Is this correct?
                     if !self.inner.actions.is_empty() {
@@ -494,7 +495,7 @@ impl Drop for Mock {
                 "There is still data left to write. {}",
                 self.pmsg()
             ),
-            _ => (),
+            Action::ReadError(_) | Action::WriteError(_) | Action::Wait(_) => (),
         });
     }
 }
