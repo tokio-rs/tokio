@@ -71,7 +71,7 @@ impl<T: 'static> Shared<T> {
         }
 
         // safety: only mutated with the lock held
-        let len = self.len.unsync_load();
+        let len = unsafe { self.len.unsync_load() };
         let task = task.into_raw();
 
         // The next pointer should already be null
@@ -95,7 +95,7 @@ impl<T: 'static> Shared<T> {
     ///
     /// Must be called with the same `Synced` instance returned by `Inject::new`
     pub(crate) unsafe fn pop(&self, synced: &mut Synced) -> Option<task::Notified<T>> {
-        self.pop_n(synced, 1).next()
+        unsafe { self.pop_n(synced, 1).next() }
     }
 
     /// Pop `n` values from the queue
@@ -110,7 +110,7 @@ impl<T: 'static> Shared<T> {
 
         // safety: All updates to the len atomic are guarded by the mutex. As
         // such, a non-atomic load followed by a store is safe.
-        let len = self.len.unsync_load();
+        let len = unsafe { self.len.unsync_load() };
         let n = cmp::min(n, len);
 
         // Decrement the count.

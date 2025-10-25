@@ -82,14 +82,18 @@ impl Context {
     where
         F: FnOnce(&Self) -> R,
     {
-        crate::runtime::context::with_trace(f)
+        unsafe { crate::runtime::context::with_trace(f) }
     }
 
+    /// SAFETY: Callers of this function must ensure that trace frames always
+    /// form a valid linked list.
     unsafe fn with_current_frame<F, R>(f: F) -> R
     where
         F: FnOnce(&Cell<Option<NonNull<Frame>>>) -> R,
     {
-        Self::try_with_current(|context| f(&context.active_frame)).expect(FAIL_NO_THREAD_LOCAL)
+        unsafe {
+            Self::try_with_current(|context| f(&context.active_frame)).expect(FAIL_NO_THREAD_LOCAL)
+        }
     }
 
     fn with_current_collector<F, R>(f: F) -> R
@@ -313,7 +317,8 @@ cfg_rt_multi_thread! {
 
         // clear the injection queue
         let mut synced = synced.lock();
-        while let Some(notified) = injection.pop(&mut synced.inject) {
+        // Safety: exactly the same safety requirements as `trace_multi_thread` function.
+        while let Some(notified) = unsafe { injection.pop(&mut synced.inject) } {
             dequeued.push(notified);
         }
 

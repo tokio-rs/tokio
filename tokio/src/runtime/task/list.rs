@@ -106,6 +106,7 @@ impl<S: 'static> OwnedTasks<S> {
     /// Bind a task that isn't safe to transfer across thread boundaries.
     ///
     /// # Safety
+    ///
     /// Only use this in `LocalRuntime` where the task cannot move
     pub(crate) unsafe fn bind_local<T>(
         &self,

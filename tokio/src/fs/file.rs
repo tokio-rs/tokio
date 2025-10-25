@@ -917,7 +917,9 @@ impl std::os::unix::io::AsFd for File {
 #[cfg(unix)]
 impl std::os::unix::io::FromRawFd for File {
     unsafe fn from_raw_fd(fd: std::os::unix::io::RawFd) -> Self {
-        StdFile::from_raw_fd(fd).into()
+        // Safety: exactly the same safety contract as
+        // `std::os::unix::io::FromRawFd::from_raw_fd`.
+        unsafe { StdFile::from_raw_fd(fd).into() }
     }
 }
 
@@ -942,7 +944,9 @@ cfg_windows! {
 
     impl FromRawHandle for File {
         unsafe fn from_raw_handle(handle: RawHandle) -> Self {
-            StdFile::from_raw_handle(handle).into()
+            // Safety: exactly the same safety contract as
+            // `FromRawHandle::from_raw_handle`.
+            unsafe { StdFile::from_raw_handle(handle).into() }
         }
     }
 }

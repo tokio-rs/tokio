@@ -255,7 +255,7 @@ impl<T> SetOnce<T> {
 
     // SAFETY: The SetOnce must not be empty.
     unsafe fn get_unchecked(&self) -> &T {
-        &*self.value.with(|ptr| (*ptr).as_ptr())
+        unsafe { &*self.value.with(|ptr| (*ptr).as_ptr()) }
     }
 
     /// Returns a reference to the value currently stored in the `SetOnce`, or

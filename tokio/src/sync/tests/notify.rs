@@ -12,15 +12,17 @@ fn notify_clones_waker_before_lock() {
 
     unsafe fn clone_w(data: *const ()) -> RawWaker {
         let ptr = data as *const Notify;
-        Arc::<Notify>::increment_strong_count(ptr);
+        unsafe {
+            Arc::<Notify>::increment_strong_count(ptr);
+        }
         // Or some other arbitrary code that shouldn't be executed while the
         // Notify wait list is locked.
-        (*ptr).notify_one();
+        unsafe { (*ptr).notify_one() };
         RawWaker::new(data, VTABLE)
     }
 
     unsafe fn drop_w(data: *const ()) {
-        drop(Arc::<Notify>::from_raw(data as *const Notify));
+        drop(unsafe { Arc::<Notify>::from_raw(data as *const Notify) });
     }
 
     unsafe fn wake(_data: *const ()) {
