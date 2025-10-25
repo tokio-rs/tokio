@@ -1,3 +1,4 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 /// Benchmark measuring timer lifecycle performance (Issue #6504)
 ///
 /// This benchmark creates many timers, polls them once to register with the timer
@@ -7,23 +8,55 @@
 /// The benchmark compares single-threaded vs multi-threaded performance to reveal
 /// contention in timer registration and deregistration.
 use std::future::{poll_fn, Future};
+use std::iter::repeat;
 use std::time::{Duration, Instant};
-
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tokio::time::sleep;
 
 const TIMER_COUNT: usize = 1_000_000;
 
-/// Returns (wall_clock_duration, task_durations)
+struct TimerDistribution {
+    duration: Duration,
+    percentage: f64,
+}
+
+const fn from_secs(s: u64) -> Duration {
+    Duration::from_secs(s)
+}
+
+const TIMER_DISTRIBUTIONS: &[TimerDistribution] = &[
+    TimerDistribution {
+        duration: from_secs(1),
+        percentage: 0.40,
+    },
+    TimerDistribution {
+        duration: from_secs(10),
+        percentage: 0.30,
+    },
+    TimerDistribution {
+        duration: from_secs(60),
+        percentage: 0.20,
+    },
+    TimerDistribution {
+        duration: from_secs(300),
+        percentage: 0.10,
+    },
+];
+
+/// Each timer is polled once to register, then dropped before firing.
 async fn create_and_drop_timers_instrumented(count: usize, concurrent_tasks: usize) -> Duration {
     let handles: Vec<_> = (0..concurrent_tasks)
         .map(|_| {
             tokio::spawn(async move {
-                // Create all sleep futures
-                let mut sleeps = Vec::with_capacity(count / concurrent_tasks);
-                for _ in 0..count / concurrent_tasks {
-                    sleeps.push(Box::pin(sleep(Duration::from_secs(60))));
-                }
+                // Create all sleep futures with realistic distribution
+                let sleeps: Vec<_> = TIMER_DISTRIBUTIONS
+                    .iter()
+                    .flat_map(|td| {
+                        repeat(td.duration).take((TIMER_COUNT as f64 * td.percentage) as usize)
+                    })
+                    .cycle()
+                    .take(count / concurrent_tasks)
+                    .map(|timeout| Box::pin(sleep(timeout)))
+                    .collect();
 
                 // Start timing - poll and drop (METERED)
                 let start = Instant::now();
@@ -47,14 +80,11 @@ async fn create_and_drop_timers_instrumented(count: usize, concurrent_tasks: usi
 
     let wall_clock_start = Instant::now();
 
-    let mut task_durations = Vec::with_capacity(concurrent_tasks);
     for handle in handles {
-        task_durations.push(handle.await.unwrap());
+        handle.await.unwrap();
     }
 
-    let wall_clock = wall_clock_start.elapsed();
-
-    wall_clock
+    wall_clock_start.elapsed()
 }
 
 fn bench_many_timers(c: &mut Criterion) {

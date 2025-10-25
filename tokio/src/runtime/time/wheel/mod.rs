@@ -234,6 +234,13 @@ impl Wheel {
                 debug_assert_eq!(unsafe { item.registered_when() }, expiration.deadline);
             }
 
+            // Check if timer has already been fired (e.g., by bucket path during reset).
+            // Also skip if timer was moved to buckets (stale wheel entry).
+            if !unsafe { item.might_be_registered() } || unsafe { item.is_in_buckets_unsafe() } {
+                // Timer was already fired or moved to buckets, skip it
+                continue;
+            }
+
             // Try to expire the entry; this is cheap (doesn't synchronize) if
             // the timer is not expired, and updates registered_when.
             match unsafe { item.mark_pending(expiration.deadline) } {
