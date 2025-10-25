@@ -305,11 +305,15 @@ impl Inner {
         Arc::into_raw(this) as *const ()
     }
 
+    /// # Safety
+    ///
+    /// The pointer must have been created by [`Self::into_raw`].
     unsafe fn from_raw(ptr: *const ()) -> Arc<Inner> {
-        Arc::from_raw(ptr as *const Inner)
+        unsafe { Arc::from_raw(ptr as *const Inner) }
     }
 }
 
+// TODO: Is this really a unsafe function?
 unsafe fn unparker_to_raw_waker(unparker: Arc<Inner>) -> RawWaker {
     RawWaker::new(
         Inner::into_raw(unparker),
@@ -317,23 +321,39 @@ unsafe fn unparker_to_raw_waker(unparker: Arc<Inner>) -> RawWaker {
     )
 }
 
+/// # Safety
+///
+/// The pointer must have been created by [`Inner::into_raw`].
 unsafe fn clone(raw: *const ()) -> RawWaker {
-    Arc::increment_strong_count(raw as *const Inner);
-    unparker_to_raw_waker(Inner::from_raw(raw))
+    unsafe {
+        Arc::increment_strong_count(raw as *const Inner);
+    }
+    unsafe { unparker_to_raw_waker(Inner::from_raw(raw)) }
 }
 
+/// # Safety
+///
+/// The pointer must have been created by [`Inner::into_raw`].
 unsafe fn drop_waker(raw: *const ()) {
-    drop(Inner::from_raw(raw));
+    drop(unsafe { Inner::from_raw(raw) });
 }
 
+/// # Safety
+///
+/// The pointer must have been created by [`Inner::into_raw`].
 unsafe fn wake(raw: *const ()) {
-    let unparker = Inner::from_raw(raw);
+    let unparker = unsafe { Inner::from_raw(raw) };
     unparker.unpark();
 }
 
+/// # Safety
+///
+/// The pointer must have been created by [`Inner::into_raw`].
 unsafe fn wake_by_ref(raw: *const ()) {
     let raw = raw as *const Inner;
-    (*raw).unpark();
+    unsafe {
+        (*raw).unpark();
+    }
 }
 
 #[cfg(loom)]

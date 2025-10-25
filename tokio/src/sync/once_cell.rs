@@ -244,12 +244,16 @@ impl<T> OnceCell<T> {
 
     // SAFETY: The OnceCell must not be empty.
     unsafe fn get_unchecked(&self) -> &T {
-        &*self.value.with(|ptr| (*ptr).as_ptr())
+        unsafe { &*self.value.with(|ptr| (*ptr).as_ptr()) }
     }
 
     // SAFETY: The OnceCell must not be empty.
     unsafe fn get_unchecked_mut(&mut self) -> &mut T {
-        &mut *self.value.with_mut(|ptr| (*ptr).as_mut_ptr())
+        // SAFETY:
+        //
+        // 1. The caller guarantees that the OnceCell is initialized.
+        // 2. The `&mut self` guarantees that there are no other references to the value.
+        unsafe { &mut *self.value.with_mut(|ptr| (*ptr).as_mut_ptr()) }
     }
 
     fn set_value(&self, value: T, permit: SemaphorePermit<'_>) -> &T {

@@ -91,7 +91,7 @@ impl Wheel {
         &mut self,
         item: TimerHandle,
     ) -> Result<u64, (TimerHandle, InsertError)> {
-        let when = item.sync_when();
+        let when = unsafe { item.sync_when() };
 
         if when <= self.elapsed {
             return Err((item, InsertError::Elapsed));

@@ -398,8 +398,11 @@ impl<S: 'static> Task<S> {
         }
     }
 
+    /// # Safety
+    ///
+    /// `ptr` must be a valid pointer to a [`Header`].
     unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
-        Task::new(RawTask::from_raw(ptr))
+        unsafe { Task::new(RawTask::from_raw(ptr)) }
     }
 
     #[cfg(all(
@@ -479,8 +482,11 @@ impl<S: 'static> Notified<S> {
 }
 
 impl<S: 'static> Notified<S> {
+    /// # Safety
+    ///
+    /// [`RawTask::ptr`] must be a valid pointer to a [`Header`].
     pub(crate) unsafe fn from_raw(ptr: RawTask) -> Notified<S> {
-        Notified(Task::new(ptr))
+        Notified(unsafe { Task::new(ptr) })
     }
 }
 
@@ -597,11 +603,11 @@ unsafe impl<S> linked_list::Link for Task<S> {
     }
 
     unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
-        Task::from_raw(ptr)
+        unsafe { Task::from_raw(ptr) }
     }
 
     unsafe fn pointers(target: NonNull<Header>) -> NonNull<linked_list::Pointers<Header>> {
-        self::core::Trailer::addr_of_owned(Header::get_trailer(target))
+        unsafe { self::core::Trailer::addr_of_owned(Header::get_trailer(target)) }
     }
 }
 

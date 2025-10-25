@@ -283,7 +283,9 @@ unsafe impl<'a> bytes::BufMut for ReadBuf<'a> {
 
     // SAFETY: The caller guarantees that at least `cnt` unfilled bytes have been initialized.
     unsafe fn advance_mut(&mut self, cnt: usize) {
-        self.assume_init(cnt);
+        unsafe {
+            self.assume_init(cnt);
+        }
         self.advance(cnt);
     }
 
@@ -311,16 +313,49 @@ impl fmt::Debug for ReadBuf<'_> {
     }
 }
 
+// TODO: This function looks very safe, consider remove the `unsafe` qualifier.
 unsafe fn slice_to_uninit_mut(slice: &mut [u8]) -> &mut [MaybeUninit<u8>] {
-    &mut *(slice as *mut [u8] as *mut [MaybeUninit<u8>])
+    // SAFETY:
+    //
+    // 1. `MaybeUninit<u8>` has the same memory layout as `u8`.
+    // 2. `*mut [u8] as *mut [MaybeUninit<u8>]` follows the
+    //    [Pointer-to-pointer cast].
+    //
+    // [Pointer-to-pointer cast]:
+    // https://doc.rust-lang.org/1.90.0/reference/expressions/operator-expr.html#r-expr.as.pointer
+    unsafe { &mut *(slice as *mut [u8] as *mut [MaybeUninit<u8>]) }
 }
 
+/// # Safety
+///
+/// The caller must ensure that `slice` is fully initialized.
 // TODO: This could use `MaybeUninit::slice_assume_init` when it is stable.
 unsafe fn slice_assume_init(slice: &[MaybeUninit<u8>]) -> &[u8] {
-    &*(slice as *const [MaybeUninit<u8>] as *const [u8])
+    // SAFETY:
+    //
+    // 1. `MaybeUninit<u8>` has the same memory layout as `u8`.
+    // 2. `*const [MaybeUninit<u8>] as *const [u8]` follows the
+    //    [Pointer-to-pointer cast].
+    // 3. The caller guarantees that `slice` is fully initialized.
+    //
+    // [Pointer-to-pointer cast]:
+    // https://doc.rust-lang.org/1.90.0/reference/expressions/operator-expr.html#r-expr.as.pointer
+    unsafe { &*(slice as *const [MaybeUninit<u8>] as *const [u8]) }
 }
 
 // TODO: This could use `MaybeUninit::slice_assume_init_mut` when it is stable.
+/// # Safety
+///
+/// The caller must ensure that `slice` is fully initialized.
 unsafe fn slice_assume_init_mut(slice: &mut [MaybeUninit<u8>]) -> &mut [u8] {
-    &mut *(slice as *mut [MaybeUninit<u8>] as *mut [u8])
+    // SAFETY:
+    //
+    // 1. `MaybeUninit<u8>` has the same memory layout as `u8`.
+    // 2. `*const [MaybeUninit<u8>] as *const [u8]` follows the
+    //    [Pointer-to-pointer cast].
+    // 3. The caller guarantees that `slice` is fully initialized.
+    //
+    // [Pointer-to-pointer cast]:
+    // https://doc.rust-lang.org/1.90.0/reference/expressions/operator-expr.html#r-expr.as.pointer
+    unsafe { &mut *(slice as *mut [MaybeUninit<u8>] as *mut [u8]) }
 }

@@ -474,6 +474,7 @@ impl Handle {
     /// Spawn a task which isn't safe to send across thread boundaries onto the runtime.
     ///
     /// # Safety
+    ///
     /// This should only be used when this is a `LocalRuntime` or in another case where the runtime
     /// provably cannot be driven from or moved to different threads from the one on which the task
     /// is spawned.
@@ -488,10 +489,12 @@ impl Handle {
         F: crate::future::Future + 'static,
         F::Output: 'static,
     {
-        let (handle, notified) = me
-            .shared
-            .owned
-            .bind_local(future, me.clone(), id, spawned_at);
+        // Safety: the caller guarantees that the this is only called on a `LocalRuntime`.
+        let (handle, notified) = unsafe {
+            me.shared
+                .owned
+                .bind_local(future, me.clone(), id, spawned_at)
+        };
 
         me.task_hooks.spawn(&TaskMeta {
             id,

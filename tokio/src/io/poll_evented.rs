@@ -171,7 +171,15 @@ feature! {
             loop {
                 let evt = ready!(self.registration.poll_read_ready(cx))?;
 
-                let b = &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]);
+                // SAFETY:
+                //
+                // 1. `MaybeUninit<u8>` has the same memory layout as `u8`.
+                // 2. `*mut [u8] as *mut [MaybeUninit<u8>]` follows the
+                //    [Pointer-to-pointer cast].
+                //
+                // [Pointer-to-pointer cast]:
+                // https://doc.rust-lang.org/1.90.0/reference/expressions/operator-expr.html#r-expr.as.pointer
+                let b = unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
                 // used only when the cfgs below apply
                 #[allow(unused_variables)]
@@ -213,7 +221,7 @@ feature! {
 
                         // Safety: We trust `TcpStream::read` to have filled up `n` bytes in the
                         // buffer.
-                        buf.assume_init(n);
+                        unsafe { buf.assume_init(n) };
                         buf.advance(n);
                         return Poll::Ready(Ok(()));
                     },
