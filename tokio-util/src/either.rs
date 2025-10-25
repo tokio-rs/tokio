@@ -212,7 +212,7 @@ where
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
     use tokio::io::{repeat, AsyncReadExt, Repeat};
