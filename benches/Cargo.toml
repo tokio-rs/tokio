@@ -96,5 +96,10 @@ name = "time_timeout"
 path = "time_timeout.rs"
 harness = false
 
+[[bench]]
+name = "time_many_timers"
+path = "time_many_timers.rs"
+harness = false
+
 [lints]
 workspace = true
