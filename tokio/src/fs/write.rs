@@ -72,7 +72,9 @@ async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
     let mut buf_offset: usize = 0;
     let mut file_offset: u64 = 0;
     while buf_offset < total {
-        let (n, _buf, _fd) = Op::write_at(fd, buf, buf_offset, file_offset)?.await?;
+        let (n, _buf, _fd) = Op::write_at(fd, buf, buf_offset, file_offset)?.await;
+        // TODO: handle EINT here
+        let n = n?;
         if n == 0 {
             return Err(io::ErrorKind::WriteZero.into());
         }
