@@ -7,7 +7,7 @@ use std::io;
 use std::io::prelude::*;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
-use std::task::{Context, Poll, ready};
+use std::task::{ready, Context, Poll};
 
 /// `T` should not implement _both_ Read and Write.
 #[derive(Debug)]
