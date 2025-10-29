@@ -124,9 +124,7 @@ impl<T, U> Framed<T, U> {
             },
         }
     }
-}
 
-impl<T, U> Framed<T, U> {
     /// Provides a [`Stream`] and [`Sink`] interface for reading and writing to this
     /// I/O object, using [`Decoder`] and [`Encoder`] to read and write the raw data.
     ///

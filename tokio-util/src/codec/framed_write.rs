@@ -61,9 +61,7 @@ impl<T, E> FramedWrite<T, E> {
             },
         }
     }
-}
 
-impl<T, E> FramedWrite<T, E> {
     /// Returns a reference to the underlying I/O stream wrapped by
     /// `FramedWrite`.
     ///

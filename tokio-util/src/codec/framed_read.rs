@@ -64,9 +64,7 @@ impl<T, D> FramedRead<T, D> {
             },
         }
     }
-}
 
-impl<T, D> FramedRead<T, D> {
     /// Returns a reference to the underlying I/O stream wrapped by
     /// `FramedRead`.
     ///
