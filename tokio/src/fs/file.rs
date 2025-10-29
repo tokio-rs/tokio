@@ -827,9 +827,9 @@ impl AsyncWrite for File {
                         if let Ok(handle) = Handle::try_current() {
                             if handle.inner.driver().io().check_and_init()? {
                                 task_join_handle = {
-                                    use crate::runtime::driver::op::Op;
+                                    use crate::{io::uring::utils::ArcFd, runtime::driver::op::Op};
 
-                                    let (std, buf) = data.take().unwrap();
+                                    let (std, mut buf) = data.take().unwrap();
                                     if let Some(seek) = seek {
                                         // we do std seek before a write, so we can always use u64::MAX (current cursor) for the file offset
                                         // seeking only modifies kernel metadata and does not block, so we can do it here
@@ -841,13 +841,28 @@ impl AsyncWrite for File {
                                         })?;
                                     }
 
-                                    let op = Op::write_at(std, buf, u64::MAX);
-
+                                    let mut fd: ArcFd = std;
                                     let handle = BoxedOp(Box::pin(async move {
-                                        let (r, buf, _fd) = op.await;
-                                        match r {
-                                            Ok(_n) => (Operation::Write(Ok(())), buf),
-                                            Err(e) => (Operation::Write(Err(e)), buf),
+                                        loop {
+                                            let op = Op::write_at(fd, buf, u64::MAX);
+                                            let (r, _buf, _fd) = op.await;
+                                            buf = _buf;
+                                            fd = _fd;
+                                            match r {
+                                                Ok(0) => {
+                                                    break (
+                                                        Operation::Write(Err(
+                                                            io::ErrorKind::WriteZero.into(),
+                                                        )),
+                                                        buf,
+                                                    );
+                                                }
+                                                Ok(_) if buf.is_empty() => {
+                                                    break (Operation::Write(Ok(())), buf);
+                                                }
+                                                Ok(_) => continue, // more to write
+                                                Err(e) => break (Operation::Write(Err(e)), buf),
+                                            }
                                         }
                                     }));
 
@@ -953,9 +968,9 @@ impl AsyncWrite for File {
                         if let Ok(handle) = Handle::try_current() {
                             if handle.inner.driver().io().check_and_init()? {
                                 task_join_handle = {
-                                    use crate::runtime::driver::op::Op;
+                                    use crate::{io::uring::utils::ArcFd, runtime::driver::op::Op};
 
-                                    let (std, buf) = data.take().unwrap();
+                                    let (std, mut buf) = data.take().unwrap();
                                     if let Some(seek) = seek {
                                         // we do std seek before a write, so we can always use u64::MAX (current cursor) for the file offset
                                         // seeking only modifies kernel metadata and does not block, so we can do it here
@@ -967,13 +982,28 @@ impl AsyncWrite for File {
                                         })?;
                                     }
 
-                                    let op = Op::write_at(std, buf, u64::MAX);
-
+                                    let mut fd: ArcFd = std;
                                     let handle = BoxedOp(Box::pin(async move {
-                                        let (r, buf, _fd) = op.await;
-                                        match r {
-                                            Ok(_n) => (Operation::Write(Ok(())), buf),
-                                            Err(e) => (Operation::Write(Err(e)), buf),
+                                        loop {
+                                            let op = Op::write_at(fd, buf, u64::MAX);
+                                            let (r, _buf, _fd) = op.await;
+                                            buf = _buf;
+                                            fd = _fd;
+                                            match r {
+                                                Ok(0) => {
+                                                    break (
+                                                        Operation::Write(Err(
+                                                            io::ErrorKind::WriteZero.into(),
+                                                        )),
+                                                        buf,
+                                                    );
+                                                }
+                                                Ok(_) if buf.is_empty() => {
+                                                    break (Operation::Write(Ok(())), buf);
+                                                }
+                                                Ok(_) => continue, // more to write
+                                                Err(e) => break (Operation::Write(Err(e)), buf),
+                                            }
                                         }
                                     }));
 
