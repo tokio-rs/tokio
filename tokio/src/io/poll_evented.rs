@@ -176,6 +176,7 @@ feature! {
                 // 1. `MaybeUninit<u8>` has the same memory layout as `u8`.
                 // 2. `*mut [u8] as *mut [MaybeUninit<u8>]` follows the
                 //    [Pointer-to-pointer cast].
+                // 3. the io resource never reads uninitialized data into the buffer.
                 //
                 // [Pointer-to-pointer cast]:
                 // https://doc.rust-lang.org/1.90.0/reference/expressions/operator-expr.html#r-expr.as.pointer

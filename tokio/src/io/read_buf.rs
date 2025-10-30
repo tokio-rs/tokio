@@ -313,7 +313,6 @@ impl fmt::Debug for ReadBuf<'_> {
     }
 }
 
-// TODO: This function looks very safe, consider remove the `unsafe` qualifier.
 unsafe fn slice_to_uninit_mut(slice: &mut [u8]) -> &mut [MaybeUninit<u8>] {
     // SAFETY:
     //
