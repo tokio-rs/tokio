@@ -13,7 +13,7 @@ macro_rules! generate_addr_of_methods {
         impl<$($gen)*> $struct_name {$(
             #[doc = "# Safety"]
             #[doc = ""]
-            #[doc = "The `self` pointer must be valid."]
+            #[doc = "The `me` pointer must be valid."]
             $(#[$attrs])*
             $vis unsafe fn $fn_name(me: ::core::ptr::NonNull<Self>) -> ::core::ptr::NonNull<$field_type> {
                 let me = me.as_ptr();
