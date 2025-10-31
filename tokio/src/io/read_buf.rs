@@ -316,10 +316,10 @@ impl fmt::Debug for ReadBuf<'_> {
 /// # Safety
 ///
 /// The caller must ensure that `slice` is fully initialized
-/// and never writes uninit bytes to the returned slice.
+/// and never writes uninitialized bytes to the returned slice.
 unsafe fn slice_to_uninit_mut(slice: &mut [u8]) -> &mut [MaybeUninit<u8>] {
     // SAFETY: `MaybeUninit<u8>` has the same memory layout as u8, and the caller
-    // promises to not write uninit bytes to the slice.
+    // promises to not write uninitialized bytes to the returned slice.
     unsafe { &mut *(slice as *mut [u8] as *mut [MaybeUninit<u8>]) }
 }
 
@@ -333,10 +333,10 @@ unsafe fn slice_assume_init(slice: &[MaybeUninit<u8>]) -> &[u8] {
     unsafe { &*(slice as *const [MaybeUninit<u8>] as *const [u8]) }
 }
 
-// TODO: This could use `MaybeUninit::slice_assume_init_mut` when it is stable.
 /// # Safety
 ///
 /// The caller must ensure that `slice` is fully initialized.
+// TODO: This could use `MaybeUninit::slice_assume_init_mut` when it is stable.
 unsafe fn slice_assume_init_mut(slice: &mut [MaybeUninit<u8>]) -> &mut [u8] {
     // SAFETY: `MaybeUninit<u8>` has the same memory layout as `u8`, and the caller
     // promises that `slice` is fully initialized.
