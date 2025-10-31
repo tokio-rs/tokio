@@ -593,6 +593,35 @@ macro_rules! cfg_not_trace {
     }
 }
 
+macro_rules! cfg_usdt {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(tokio_unstable, feature = "usdt"))]
+            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "usdt"))))]
+            $item
+        )*
+    };
+}
+
+macro_rules! cfg_not_usdt {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(not(tokio_unstable), not(feature = "usdt")))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_trace_or_usdt {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))))]
+            $item
+        )*
+    };
+}
+
 macro_rules! cfg_coop {
     ($($item:item)*) => {
         $(

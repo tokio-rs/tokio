@@ -1,6 +1,7 @@
 use crate::runtime::BOX_FUTURE_THRESHOLD;
 use crate::task::JoinHandle;
 use crate::util::trace::SpawnMeta;
+use crate::util::usdt;
 
 use std::future::Future;
 
@@ -200,6 +201,8 @@ cfg_rt! {
         ))]
         let future = task::trace::Trace::root(future);
         let id = task::Id::next();
+
+        usdt::start_task(usdt::TaskKind::Spawn, meta, id, std::mem::size_of::<T>());
         let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
         match context::with_current(|handle| handle.spawn(task, id, meta.spawned_at)) {

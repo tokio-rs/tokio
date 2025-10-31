@@ -3,6 +3,7 @@ use crate::runtime::task::core::{Cell, Core, Header, Trailer};
 use crate::runtime::task::state::{Snapshot, State};
 use crate::runtime::task::waker::waker_ref;
 use crate::runtime::task::{Id, JoinError, Notified, RawTask, Schedule, Task};
+use crate::util::usdt;
 
 #[cfg(tokio_unstable)]
 use crate::runtime::TaskMeta;
@@ -498,6 +499,8 @@ enum PollFuture {
 
 /// Cancels the task and store the appropriate error in the stage field.
 fn cancel_task<T: Future, S: Schedule>(core: &Core<T, S>) {
+    usdt::finish_task(core.task_id, usdt::TerminateKind::Cancelled);
+
     // Drop the future from a panic guard.
     let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         core.drop_future_or_output();
@@ -526,6 +529,8 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
         }
         impl<'a, T: Future, S: Schedule> Drop for Guard<'a, T, S> {
             fn drop(&mut self) {
+                usdt::finish_task(self.core.task_id, usdt::TerminateKind::Panicked);
+
                 // If the future panics on poll, we drop it inside the panic
                 // guard.
                 self.core.drop_future_or_output();

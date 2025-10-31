@@ -351,6 +351,7 @@
 //! Some feature flags are only available when specifying the `tokio_unstable` flag:
 //!
 //! - `tracing`: Enables tracing events.
+//! - `usdt`: Enables USDT probes.
 //!
 //! Likewise, some parts of the API are only available with the same flag:
 //!
@@ -498,6 +499,9 @@ compile_error!(
     "The `taskdump` feature is only currently supported on \
 linux, on `aarch64`, `x86` and `x86_64`."
 );
+
+#[cfg(all(not(tokio_unstable), feature = "usdt"))]
+compile_error!("The `usdt` feature requires `--cfg tokio_unstable`.");
 
 // Includes re-exports used by macros.
 //
