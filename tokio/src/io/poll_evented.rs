@@ -171,15 +171,6 @@ feature! {
             loop {
                 let evt = ready!(self.registration.poll_read_ready(cx))?;
 
-                // SAFETY:
-                //
-                // 1. `MaybeUninit<u8>` has the same memory layout as `u8`.
-                // 2. `*mut [u8] as *mut [MaybeUninit<u8>]` follows the
-                //    [Pointer-to-pointer cast].
-                // 3. the io resource never reads uninitialized data into the buffer.
-                //
-                // [Pointer-to-pointer cast]:
-                // https://doc.rust-lang.org/1.90.0/reference/expressions/operator-expr.html#r-expr.as.pointer
                 let b = unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
                 // used only when the cfgs below apply
