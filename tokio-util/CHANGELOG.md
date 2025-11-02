@@ -1,3 +1,33 @@
+# 0.7.17 (November 2nd, 2025)
+
+The MSRV is increased to 1.71.
+
+### Added
+
+- codec: add `{FramedRead,FramedWrite}::into_parts()` ([#7566])
+- time: add `#[track_caller]` to `FutureExt::timeout` ([#7588])
+- task: add `tokio_util::task::JoinQueue` ([#7590])
+
+### Changed
+
+- codec: remove unnecessary trait bounds on all Framed constructors ([#7716])
+
+### Documented
+
+- time: clarify the cancellation safety of the `DelayQueue` ([#7564])
+- docs: fix some docs links ([#7654])
+- task: simplify the example of `TaskTracker` ([#7657])
+- task: clarify the behavior of several `spawn_local` methods ([#7669])
+
+[#7564]: https://github.com/tokio-rs/tokio/pull/7564
+[#7566]: https://github.com/tokio-rs/tokio/pull/7566
+[#7588]: https://github.com/tokio-rs/tokio/pull/7588
+[#7590]: https://github.com/tokio-rs/tokio/pull/7590
+[#7654]: https://github.com/tokio-rs/tokio/pull/7654
+[#7657]: https://github.com/tokio-rs/tokio/pull/7657
+[#7669]: https://github.com/tokio-rs/tokio/pull/7669
+[#7716]: https://github.com/tokio-rs/tokio/pull/7716
+
 # 0.7.16 (August 3rd, 2025)
 
 ### Added
