@@ -1,8 +1,8 @@
 use crate::future::Future;
-#[cfg(tokio_unstable)]
-use crate::runtime::UserData;
 use crate::runtime::task::core::{Core, Trailer};
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
+#[cfg(tokio_unstable)]
+use crate::runtime::UserData;
 #[cfg(tokio_unstable)]
 use std::panic::Location;
 use std::ptr::NonNull;

@@ -747,7 +747,7 @@ impl Builder {
     /// [`on_before_task_poll`](crate::runtime::Builder::on_before_task_poll),
     /// [`on_after_task_poll`](crate::runtime::Builder::on_after_task_poll), and
     /// [`on_task_terminate`](crate::runtime::Builder::on_task_terminate).
-    /// 
+    ///
     /// The `crate::task::Builder::data` method can also be used to attach data to
     /// a specific task when spawning it.
     ///
