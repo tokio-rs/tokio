@@ -21,7 +21,6 @@ use tokio::{
 ///
 /// When the [`JoinQueue`] is dropped, all tasks in the [`JoinQueue`] are
 /// immediately aborted.
-#[derive(Debug)]
 pub struct JoinQueue<T>(VecDeque<AbortOnDropHandle<T>>);
 
 impl<T> JoinQueue<T> {
@@ -379,6 +378,14 @@ impl<T> JoinQueue<T> {
     }
 }
 
+impl<T> std::fmt::Debug for JoinQueue<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list()
+            .entries(self.0.iter().map(|jh| JoinHandle::id(jh.as_ref())))
+            .finish()
+    }
+}
+
 impl<T> Default for JoinQueue<T> {
     fn default() -> Self {
         Self::new()
@@ -399,5 +406,20 @@ where
             set.spawn(task);
         });
         set
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A simple type that does not implement [`std::fmt::Debug`].
+    struct NotDebug;
+
+    fn is_debug<T: std::fmt::Debug>() {}
+
+    #[test]
+    fn assert_debug() {
+        is_debug::<JoinQueue<NotDebug>>();
     }
 }
