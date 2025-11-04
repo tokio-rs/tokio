@@ -740,12 +740,16 @@ impl Builder {
     /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback
     /// being invoked immediately.
     ///
-    /// `f` must return an `Option<&'static dyn Any>`. A value returned by this callback
-    /// is attached to the task and can be retrieved using [`TaskMeta::get_data`] in
-    /// subsequent calls to other hooks for this task such as
+    /// `f` must return an `Option<&'static (dyn Any + Send + Sync)>`. The `Send + Sync`
+    /// traits are optional when not using feature `rt-multi-thread`. A value returned
+    /// by this callback is attached to the task and can be retrieved using
+    /// [`TaskMeta::get_data`] in subsequent calls to other hooks for this task such as
     /// [`on_before_task_poll`](crate::runtime::Builder::on_before_task_poll),
     /// [`on_after_task_poll`](crate::runtime::Builder::on_after_task_poll), and
     /// [`on_task_terminate`](crate::runtime::Builder::on_task_terminate).
+    /// 
+    /// The `crate::task::Builder::data` method can also be used to attach data to
+    /// a specific task when spawning it.
     ///
     /// This can be used for bookkeeping or monitoring purposes.
     ///
@@ -794,7 +798,7 @@ impl Builder {
     ///     .on_task_spawn(|meta| {
     ///         println!("spawning task {}", meta.id());
     ///         let meta = Box::new(YieldingTaskMetadata { yield_count: AtomicUsize::new(0) });
-    ///         Some(Box::leak(meta) as &dyn std::any::Any)
+    ///         Some(Box::leak(meta) as &(dyn std::any::Any + Send + Sync))
     ///     })
     ///     .on_after_task_poll(|meta| {
     ///         if let Some(data) = meta.get_data().and_then(|data| data.downcast_ref::<YieldingTaskMetadata>()) {

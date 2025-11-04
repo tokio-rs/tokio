@@ -1,8 +1,8 @@
 use crate::future::Future;
+#[cfg(tokio_unstable)]
+use crate::runtime::UserData;
 use crate::runtime::task::core::{Core, Trailer};
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
-#[cfg(tokio_unstable)]
-use std::any;
 #[cfg(tokio_unstable)]
 use std::panic::Location;
 use std::ptr::NonNull;
@@ -206,7 +206,7 @@ impl RawTask {
         scheduler: S,
         id: Id,
         _spawned_at: super::SpawnLocation,
-        #[cfg(tokio_unstable)] user_data: Option<&'static dyn any::Any>,
+        #[cfg(tokio_unstable)] user_data: UserData,
     ) -> RawTask
     where
         T: Future,

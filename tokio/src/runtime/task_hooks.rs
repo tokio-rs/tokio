@@ -116,5 +116,9 @@ pub(crate) type TaskSpawnCallback = std::sync::Arc<dyn Fn(&TaskMeta<'_>) -> User
 /// This type alias provides a cleaner interface for the user data parameter
 /// used throughout the task spawning system when the `tokio_unstable` feature
 /// is enabled.
+#[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+pub(crate) type UserDataValue = &'static (dyn Any + Send + Sync);
+#[cfg(all(tokio_unstable, not(feature = "rt-multi-thread")))]
+pub(crate) type UserDataValue = &'static dyn Any;
 #[cfg(tokio_unstable)]
-pub(crate) type UserData = Option<&'static dyn Any>;
+pub(crate) type UserData = Option<UserDataValue>;

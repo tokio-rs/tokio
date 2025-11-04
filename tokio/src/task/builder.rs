@@ -1,6 +1,6 @@
 #![allow(unreachable_pub)]
 #[cfg(tokio_unstable)]
-use crate::runtime::UserData;
+use crate::runtime::{UserData, UserDataValue};
 use crate::{
     runtime::{Handle, BOX_FUTURE_THRESHOLD},
     task::{JoinHandle, LocalSet},
@@ -64,6 +64,7 @@ use std::{future::Future, io, mem};
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 pub struct Builder<'a> {
     name: Option<&'a str>,
+    #[cfg(tokio_unstable)]
     user_data: UserData,
 }
 
@@ -77,12 +78,14 @@ impl<'a> Builder<'a> {
     pub fn name(&self, name: &'a str) -> Self {
         Self {
             name: Some(name),
+            #[cfg(tokio_unstable)]
             user_data: self.user_data,
         }
     }
 
     /// Assigns user data to the task which will be spawned.
-    pub fn data(self, data: &'static dyn std::any::Any) -> Self {
+    #[cfg(tokio_unstable)]
+    pub fn data(&self, data: UserDataValue) -> Self {
         Self {
             name: self.name,
             user_data: Some(data),
@@ -108,12 +111,14 @@ impl<'a> Builder<'a> {
             super::spawn::spawn_inner_with_user_data(
                 Box::pin(future),
                 SpawnMeta::new(self.name, fut_size),
+                #[cfg(tokio_unstable)]
                 self.user_data,
             )
         } else {
             super::spawn::spawn_inner_with_user_data(
                 future,
                 SpawnMeta::new(self.name, fut_size),
+                #[cfg(tokio_unstable)]
                 self.user_data,
             )
         })
