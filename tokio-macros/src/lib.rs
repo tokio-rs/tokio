@@ -282,7 +282,7 @@ use proc_macro::TokenStream;
 /// fn main() {
 ///     tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
-///         .unhandled_panic(UnhandledPanic::ShutdownRuntime)
+///         .unhandled_panic(tokio::runtime::UnhandledPanic::ShutdownRuntime)
 ///         .build()
 ///         .unwrap()
 ///         .block_on(async {
@@ -539,7 +539,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///         panic!("This panic will shutdown the runtime.");
 ///     }).await;
 /// }
-/// # #[cfg(not(tokio_unstable))]
+///
 /// # fn main() { }
 /// ```
 ///
@@ -560,7 +560,7 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///             }).await;
 ///         })
 /// }
-/// # #[cfg(not(tokio_unstable))]
+///
 /// # fn main() { }
 /// ```
 ///

@@ -35,10 +35,7 @@ pin_project! {
     }
 }
 
-impl<T, E> FramedWrite<T, E>
-where
-    T: AsyncWrite,
-{
+impl<T, E> FramedWrite<T, E> {
     /// Creates a new `FramedWrite` with the given `encoder`.
     pub fn new(inner: T, encoder: E) -> FramedWrite<T, E> {
         FramedWrite {
@@ -64,9 +61,7 @@ where
             },
         }
     }
-}
 
-impl<T, E> FramedWrite<T, E> {
     /// Returns a reference to the underlying I/O stream wrapped by
     /// `FramedWrite`.
     ///

@@ -313,7 +313,7 @@
 //! [`AsyncWrite`]: tokio::io::AsyncWrite
 //! [`Stream`]: futures_core::Stream
 //! [`Sink`]: futures_sink::Sink
-//! [`SinkExt`]: futures::sink::SinkExt
+//! [`SinkExt`]: https://docs.rs/futures/0.3/futures/sink/trait.SinkExt.html
 //! [`SinkExt::close`]: https://docs.rs/futures/0.3/futures/sink/trait.SinkExt.html#method.close
 //! [`FramedRead`]: struct@crate::codec::FramedRead
 //! [`FramedWrite`]: struct@crate::codec::FramedWrite

@@ -337,11 +337,11 @@
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
-//! - `parking_lot`: As a potential optimization, use the `_parking_lot_` crate's
+//! - `parking_lot`: As a potential optimization, use the [`parking_lot`] crate's
 //!   synchronization primitives internally. Also, this
 //!   dependency is necessary to construct some of our primitives
 //!   in a `const` context. `MSRV` may increase according to the
-//!   `_parking_lot_` release in use.
+//!   [`parking_lot`] release in use.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._
@@ -480,11 +480,14 @@ compile_error! {
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
-#[cfg(all(not(tokio_unstable), tokio_taskdump))]
-compile_error!("The `tokio_taskdump` feature requires `--cfg tokio_unstable`.");
+#[cfg(all(not(tokio_unstable), feature = "io-uring"))]
+compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");
+
+#[cfg(all(not(tokio_unstable), feature = "taskdump"))]
+compile_error!("The `taskdump` feature requires `--cfg tokio_unstable`.");
 
 #[cfg(all(
-    tokio_taskdump,
+    feature = "taskdump",
     not(doc),
     not(all(
         target_os = "linux",
@@ -492,7 +495,7 @@ compile_error!("The `tokio_taskdump` feature requires `--cfg tokio_unstable`.");
     ))
 ))]
 compile_error!(
-    "The `tokio_taskdump` feature is only currently supported on \
+    "The `taskdump` feature is only currently supported on \
 linux, on `aarch64`, `x86` and `x86_64`."
 );
 

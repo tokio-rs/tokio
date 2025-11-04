@@ -127,7 +127,10 @@ pub struct Receiver<T> {
 ///
 /// # Panics
 ///
-/// Panics if the buffer capacity is 0.
+/// Panics if the buffer capacity is 0, or too large. Currently the maximum
+/// capacity is [`Semaphore::MAX_PERMITS`].
+///
+/// [`Semaphore::MAX_PERMITS`]: crate::sync::Semaphore::MAX_PERMITS
 ///
 /// # Examples
 ///
@@ -860,7 +863,7 @@ impl<T> Sender<T> {
         self.chan.closed().await;
     }
 
-    /// Attempts to immediately send a message on this `Sender`
+    /// Attempts to immediately send a message on this `Sender`.
     ///
     /// This method differs from [`send`] by returning immediately if the channel's
     /// buffer is full or no receiver is waiting to acquire some data. Compared

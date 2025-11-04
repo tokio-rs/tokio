@@ -1,10 +1,13 @@
 use super::utils::cstr;
-use crate::{
-    fs::UringOpenOptions,
-    runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op},
-};
+
+use crate::fs::UringOpenOptions;
+use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
+
 use io_uring::{opcode, types};
-use std::{ffi::CString, io, os::fd::FromRawFd, path::Path};
+use std::ffi::CString;
+use std::io::{self, Error};
+use std::os::fd::FromRawFd;
+use std::path::Path;
 
 #[derive(Debug)]
 pub(crate) struct Open {
@@ -15,11 +18,14 @@ pub(crate) struct Open {
 }
 
 impl Completable for Open {
-    type Output = crate::fs::File;
-    fn complete(self, cqe: CqeResult) -> io::Result<Self::Output> {
-        let fd = cqe.result? as i32;
-        let file = unsafe { crate::fs::File::from_raw_fd(fd) };
-        Ok(file)
+    type Output = io::Result<crate::fs::File>;
+    fn complete(self, cqe: CqeResult) -> Self::Output {
+        cqe.result
+            .map(|fd| unsafe { crate::fs::File::from_raw_fd(fd as i32) })
+    }
+
+    fn complete_with_error(self, err: Error) -> Self::Output {
+        Err(err)
     }
 }
 

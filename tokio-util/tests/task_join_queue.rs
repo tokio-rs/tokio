@@ -359,3 +359,21 @@ async fn test_join_queue_try_join_next_with_id_disabled_coop() {
     assert_eq!(count, TASK_NUM);
     assert_eq!(joined, spawned);
 }
+
+#[test]
+#[should_panic(
+    expected = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"
+)]
+fn spawn_local_panic_outside_any_runtime() {
+    let mut queue = JoinQueue::new();
+    queue.spawn_local(async {});
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic(
+    expected = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"
+)]
+async fn spawn_local_panic_in_multi_thread_runtime() {
+    let mut queue = JoinQueue::new();
+    queue.spawn_local(async {});
+}
