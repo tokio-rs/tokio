@@ -116,17 +116,17 @@ impl AsyncRead for Receiver {
 
         let to_read = buf.remaining().min(inner.buf.remaining());
         if to_read == 0 {
-            return if inner.is_closed() {
-                Poll::Ready(Ok(()))
-            } else {
-                inner.register_receiver_waker(cx.waker());
-                let waker = inner.take_sender_waker();
-                drop(inner); // unlock before waking up
-                if let Some(waker) = waker {
-                    waker.wake();
-                }
-                Poll::Pending
-            };
+            if inner.is_closed() || buf.remaining() == 0 {
+                return Poll::Ready(Ok(()));
+            }
+
+            inner.register_receiver_waker(cx.waker());
+            let maybe_waker = inner.take_sender_waker();
+            drop(inner); // unlock before waking up
+            if let Some(waker) = maybe_waker {
+                waker.wake();
+            }
+            return Poll::Pending;
         }
 
         ready!(poll_proceed_and_make_progress(cx));
@@ -187,6 +187,10 @@ impl AsyncWrite for Sender {
             .expect("backpressure boundary overflow");
         let to_write = buf.len().min(free);
         if to_write == 0 {
+            if buf.is_empty() {
+                return Poll::Ready(Ok(0));
+            }
+
             inner.register_sender_waker(cx.waker());
             let waker = inner.take_receiver_waker();
             drop(inner); // unlock before waking up

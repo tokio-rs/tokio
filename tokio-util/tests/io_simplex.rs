@@ -2,8 +2,8 @@ use futures::pin_mut;
 use futures_test::task::noop_context;
 use std::task::Poll;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
-use tokio_test::assert_pending;
 use tokio_test::task::spawn;
+use tokio_test::{assert_pending, assert_ready};
 use tokio_util::io::simplex;
 
 /// Sanity check for single-threaded operation.
@@ -56,6 +56,27 @@ fn multi_thread() {
 
     jh0.join().unwrap();
     jh1.join().unwrap();
+}
+
+/// The `Receiver::poll_read` should return `Poll::Ready(Ok(()))`
+/// if the `ReadBuf` has zero remaining capacity.
+#[tokio::test]
+async fn read_buf_is_full() {
+    let (_tx, rx) = simplex::new(32);
+    let mut buf = ReadBuf::new(&mut []);
+    tokio::pin!(rx);
+    assert_ready!(rx.as_mut().poll_read(&mut noop_context(), &mut buf)).unwrap();
+    assert_eq!(buf.filled().len(), 0);
+}
+
+/// The `Sender::poll_write` should return `Poll::Ready(Ok(0))`
+/// if the input buffer has zero length.
+#[tokio::test]
+async fn write_buf_is_empty() {
+    let (tx, _rx) = simplex::new(32);
+    tokio::pin!(tx);
+    let n = assert_ready!(tx.as_mut().poll_write(&mut noop_context(), &[])).unwrap();
+    assert_eq!(n, 0);
 }
 
 /// The `Sender` should returns error if the `Receiver` has been dropped.
