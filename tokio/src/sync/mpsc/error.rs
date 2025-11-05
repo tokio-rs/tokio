@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::fmt;
 
-/// Error returned by the `Sender`.
+/// Error returned by [`Sender::send`](super::Sender::send).
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct SendError<T>(pub T);
 
