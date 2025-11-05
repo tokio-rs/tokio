@@ -117,6 +117,28 @@ async fn drop_sender_1() {
     assert_ready_err!(fut.poll(&mut noop_context()));
 }
 
+/// All following calls to `Sender::poll_write` and `Sender::poll_flush`
+/// should return error after `shutdown` has been called.
+#[tokio::test]
+async fn shutdown_sender_0() {
+    const MSG: &[u8] = b"Hello, world!";
+
+    let (mut tx, _rx) = simplex::new(32);
+    tx.shutdown().await.unwrap();
+
+    tx.write_all(MSG).await.unwrap_err();
+    tx.flush().await.unwrap_err();
+}
+
+/// The `Sender::poll_shutdown` should be called multiple times
+/// without error.
+#[tokio::test]
+async fn shutdown_sender_1() {
+    let (mut tx, _rx) = simplex::new(32);
+    tx.shutdown().await.unwrap();
+    tx.shutdown().await.unwrap();
+}
+
 /// Both `Sender` and `Receiver` should yield periodically
 /// in a tight-loop.
 #[tokio::test]

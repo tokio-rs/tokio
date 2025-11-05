@@ -218,16 +218,8 @@ impl AsyncWrite for Sender {
     /// until all bytes have been consumed.
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<IoResult<()>> {
         let mut inner = self.inner.lock().unwrap();
-
-        if inner.is_closed() {
-            Poll::Ready(Err(IoError::new(
-                IoErrorKind::BrokenPipe,
-                "simplex has already been shut down, cannot be shut down again",
-            )))
-        } else {
-            inner.close_sender();
-            Poll::Ready(Ok(()))
-        }
+        inner.close_sender();
+        Poll::Ready(Ok(()))
     }
 }
 
