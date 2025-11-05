@@ -14,7 +14,15 @@ impl Completable for Read {
     type Output = (io::Result<u32>, OwnedFd, Vec<u8>);
 
     fn complete(self, cqe: CqeResult) -> Self::Output {
-        (cqe.result, self.fd, self.buf)
+        let mut buf = self.buf;
+
+        if let Ok(len) = cqe.result {
+            let new_len = buf.len() + len as usize;
+            // SAFETY: Kernel read len bytes
+            unsafe { buf.set_len(new_len) };
+        }
+
+        (cqe.result, self.fd, buf)
     }
 
     fn complete_with_error(self, err: Error) -> Self::Output {
@@ -40,9 +48,8 @@ impl Op<Read> {
     // the caller in terms of size_read can be unsound.
     pub(crate) fn read(fd: OwnedFd, mut buf: Vec<u8>, len: u32, offset: u64) -> Self {
         // don't overwrite on already written part
-        let written = buf.len();
-        let slice: &mut [u8] = &mut buf[written..];
-        let buf_mut_ptr = slice.as_mut_ptr();
+        assert!(buf.spare_capacity_mut().len() <= len as usize);
+        let buf_mut_ptr = buf.spare_capacity_mut().as_mut_ptr().cast();
 
         let read_op = opcode::Read::new(types::Fd(fd.as_raw_fd()), buf_mut_ptr, len)
             .offset(offset)

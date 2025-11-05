@@ -112,31 +112,19 @@ fn read_many_files() {
     }
 }
 
-#[test]
-fn read_small_large_files() {
-    let rt = multi_rt(256);
-    rt().block_on(async move {
-        let tracker = TaskTracker::new();
+#[tokio::test]
+async fn read_small_large_files() {
+    let (_tmp, path) = create_large_temp_file();
 
-        tracker.spawn(async move {
-            let (_tmp, path) = create_large_temp_file();
+    let bytes = read(path).await.unwrap();
 
-            let bytes = read(path).await.unwrap();
+    assert_eq!(bytes, create_buf(5000));
 
-            assert_eq!(bytes, create_buf(5000));
-        });
+    let (_tmp, path) = create_small_temp_file();
 
-        tracker.spawn(async move {
-            let (_tmp, path) = create_small_temp_file();
+    let bytes = read(path).await.unwrap();
 
-            let bytes = read(path).await.unwrap();
-
-            assert_eq!(bytes, create_buf(20));
-        });
-
-        tracker.close();
-        tracker.wait().await;
-    });
+    assert_eq!(bytes, create_buf(20));
 }
 
 #[tokio::test]
