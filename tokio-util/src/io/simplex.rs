@@ -7,6 +7,7 @@ use bytes::BytesMut;
 use futures_core::ready;
 use std::io::Error as IoError;
 use std::io::ErrorKind as IoErrorKind;
+use std::io::IoSlice;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
@@ -241,6 +242,60 @@ impl AsyncWrite for Sender {
         }
 
         Poll::Ready(Ok(()))
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[IoSlice<'_>],
+    ) -> Poll<Result<usize, IoError>> {
+        let mut inner = self.inner.lock().unwrap();
+        if inner.is_closed() {
+            return Poll::Ready(Err(IoError::new(IoErrorKind::BrokenPipe, CLOSED_ERROR_MSG)));
+        }
+
+        let free = inner
+            .backpressure_boundary
+            .checked_sub(inner.buf.len())
+            .expect("backpressure boundary overflow");
+        if free == 0 {
+            inner.register_sender_waker(cx.waker());
+            let maybe_waker = inner.take_receiver_waker();
+            drop(inner); // unlock before waking up
+            if let Some(waker) = maybe_waker {
+                waker.wake();
+            }
+            return Poll::Pending;
+        }
+
+        let mut rem = free;
+        for buf in bufs {
+            if rem == 0 {
+                break;
+            }
+
+            let to_write = buf.len().min(rem);
+            if to_write == 0 {
+                assert_ne!(rem, 0);
+                assert_eq!(buf.len(), 0);
+                continue;
+            }
+
+            inner.buf.extend_from_slice(&buf[..to_write]);
+            rem -= to_write;
+        }
+
+        let waker = inner.take_receiver_waker();
+        drop(inner); // unlock before waking up
+        if let Some(waker) = waker {
+            waker.wake();
+        }
+
+        Poll::Ready(Ok(free - rem))
     }
 }
 

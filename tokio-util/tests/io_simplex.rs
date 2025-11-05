@@ -1,5 +1,6 @@
 use futures::pin_mut;
 use futures_test::task::noop_context;
+use std::io::IoSlice;
 use std::task::Poll;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 use tokio_test::task::spawn;
@@ -248,4 +249,88 @@ async fn cooperative_scheduling() {
         }
     }
     assert!(is_pending);
+}
+
+/// The capacity is exactly same as the total length of the vectored buffers.
+#[tokio::test]
+async fn poll_write_vectored_0() {
+    const MSG1: &[u8] = b"1";
+    const MSG2: &[u8] = b"22";
+    const MSG3: &[u8] = b"333";
+    const MSG_LEN: usize = MSG1.len() + MSG2.len() + MSG3.len();
+
+    let io_slices = &[IoSlice::new(MSG1), IoSlice::new(MSG2), IoSlice::new(MSG3)];
+
+    let (tx, mut rx) = simplex::new(MSG_LEN);
+    tokio::pin!(tx);
+    let res = tx.poll_write_vectored(&mut noop_context(), io_slices);
+    let n = assert_ready!(res).unwrap();
+    assert_eq!(n, MSG_LEN);
+    let mut buf = [0; MSG_LEN];
+    let n = rx.read_exact(&mut buf).await.unwrap();
+    assert_eq!(n, MSG_LEN);
+    assert_eq!(&buf, b"122333");
+}
+
+/// The capacity is smaller than the total length of the vectored buffers.
+#[tokio::test]
+async fn poll_write_vectored_1() {
+    const MSG1: &[u8] = b"1";
+    const MSG2: &[u8] = b"22";
+    const MSG3: &[u8] = b"333";
+    const CAPACITY: usize = MSG1.len() + MSG2.len() + 1;
+
+    let io_slices = &[IoSlice::new(MSG1), IoSlice::new(MSG2), IoSlice::new(MSG3)];
+
+    let (tx, mut rx) = simplex::new(CAPACITY);
+    tokio::pin!(tx);
+
+    // ==== The poll_write_vectored should write MSG1 and MSG2 fully, and MSG3 partially. ====
+    let res = tx.poll_write_vectored(&mut noop_context(), io_slices);
+    let n = assert_ready!(res).unwrap();
+    assert_eq!(n, CAPACITY);
+    let mut buf = [0; CAPACITY];
+    let n = rx.read_exact(&mut buf).await.unwrap();
+    assert_eq!(n, CAPACITY);
+    assert_eq!(&buf, b"1223");
+}
+
+/// There are two empty buffers in the vectored buffers.
+#[tokio::test]
+async fn poll_write_vectored_2() {
+    const MSG1: &[u8] = b"1";
+    const MSG2: &[u8] = b"";
+    const MSG3: &[u8] = b"22";
+    const MSG4: &[u8] = b"";
+    const MSG5: &[u8] = b"333";
+    const MSG_LEN: usize = MSG1.len() + MSG2.len() + MSG3.len() + MSG4.len() + MSG5.len();
+
+    let io_slices = &[
+        IoSlice::new(MSG1),
+        IoSlice::new(MSG2),
+        IoSlice::new(MSG3),
+        IoSlice::new(MSG4),
+        IoSlice::new(MSG5),
+    ];
+
+    let (tx, mut rx) = simplex::new(MSG_LEN);
+    tokio::pin!(tx);
+    let res = tx.poll_write_vectored(&mut noop_context(), io_slices);
+    let n = assert_ready!(res).unwrap();
+    assert_eq!(n, MSG_LEN);
+    let mut buf = [0; MSG_LEN];
+    let n = rx.read_exact(&mut buf).await.unwrap();
+    assert_eq!(n, MSG_LEN);
+    assert_eq!(&buf, b"122333");
+}
+
+/// The `Sender::poll_write_vectored` should return `Poll::Ready(Ok(0))`
+/// if all the input buffers have zero length.
+#[tokio::test]
+async fn poll_write_vectored_3() {
+    let io_slices = &[IoSlice::new(&[]), IoSlice::new(&[]), IoSlice::new(&[])];
+    let (tx, _rx) = simplex::new(32);
+    tokio::pin!(tx);
+    let n = assert_ready!(tx.poll_write_vectored(&mut noop_context(), io_slices)).unwrap();
+    assert_eq!(n, 0);
 }
