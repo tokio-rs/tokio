@@ -3,6 +3,7 @@ use futures_test::task::noop_context;
 use std::{future::Future, task::Poll};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 use tokio_test::{assert_pending, assert_ready_err};
+use tokio_test::task::spawn;
 use tokio_util::io::simplex;
 
 /// Sanity check for single-threaded operation.
@@ -137,6 +138,26 @@ async fn shutdown_sender_1() {
     let (mut tx, _rx) = simplex::new(32);
     tx.shutdown().await.unwrap();
     tx.shutdown().await.unwrap();
+}
+
+/// The `Sender::poll_shutdown` should wake up the `Receiver`
+#[tokio::test]
+async fn shutdown_sender_2() {
+    let (mut tx, mut rx) = simplex::new(32);
+
+    let mut buf = vec![];
+    let mut read_task = spawn(rx.read_to_end(&mut buf));
+    assert_pending!(read_task.poll());
+
+    tx.write_u8(1).await.unwrap();
+    assert_pending!(read_task.poll());
+
+    assert!(!read_task.is_woken());
+    tx.shutdown().await.unwrap();
+    assert!(read_task.is_woken());
+
+    read_task.await.unwrap();
+    assert_eq!(buf, vec![1]);
 }
 
 /// Both `Sender` and `Receiver` should yield periodically

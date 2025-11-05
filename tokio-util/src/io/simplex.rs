@@ -217,8 +217,15 @@ impl AsyncWrite for Sender {
     /// The [`Receiver`] can still be used to read remaining data
     /// until all bytes have been consumed.
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<IoResult<()>> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.close_sender();
+        let maybe_waker = {
+            let mut inner = self.inner.lock().unwrap();
+            inner.close_sender()
+        };
+
+        if let Some(waker) = maybe_waker {
+            waker.wake();
+        }
+
         Poll::Ready(Ok(()))
     }
 }
