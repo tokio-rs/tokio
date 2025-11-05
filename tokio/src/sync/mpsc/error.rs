@@ -77,7 +77,7 @@ impl<T> From<SendError<T>> for TrySendError<T> {
 
 // ===== TryRecvError =====
 
-/// Error returned by `try_recv`.
+/// Error returned by [`Receiver::try_recv`](super::Receiver::try_recv).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum TryRecvError {
     /// This **channel** is currently empty, but the **Sender**(s) have not yet
