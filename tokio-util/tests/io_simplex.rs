@@ -1,8 +1,8 @@
 use futures::pin_mut;
 use futures_test::task::noop_context;
-use std::{future::Future, task::Poll};
+use std::task::Poll;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
-use tokio_test::{assert_pending, assert_ready_err};
+use tokio_test::assert_pending;
 use tokio_test::task::spawn;
 use tokio_util::io::simplex;
 
@@ -58,30 +58,25 @@ fn multi_thread() {
     jh1.join().unwrap();
 }
 
-/// The `Sender` should returns error if the read half has been dropped.
+/// The `Sender` should returns error if the `Receiver` has been dropped.
 #[tokio::test]
 async fn drop_receiver_0() {
-    const MSG: &[u8] = b"Hello, world!";
-
     let (mut tx, rx) = simplex::new(32);
     drop(rx);
 
-    tx.write_all(MSG).await.unwrap_err();
+    tx.write_u8(1).await.unwrap_err();
 }
 
-/// The `Sender` should be woken up if the read half is dropped.
+/// The `Sender` should be woken up if the `Receiver` has been dropped.
 #[tokio::test]
 async fn drop_receiver_1() {
-    const MSG: &[u8] = b"Hello, world!";
-
-    // only set `1` capacity to make sure the write half will be blocked
-    // by the read half
     let (mut tx, rx) = simplex::new(1);
-    let fut = tx.write_all(MSG);
-    pin_mut!(fut);
-    assert_pending!(fut.as_mut().poll(&mut noop_context()));
+    let mut write_task = spawn(tx.write_u16(1));
+    assert_pending!(write_task.poll());
+
+    assert!(!write_task.is_woken());
     drop(rx);
-    assert_ready_err!(fut.poll(&mut noop_context()));
+    assert!(write_task.is_woken());
 }
 
 /// The `Receiver` should returns error if:
