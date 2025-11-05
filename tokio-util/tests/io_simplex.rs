@@ -102,20 +102,23 @@ async fn drop_sender_0() {
 /// The `Receiver` should be woken up if:
 ///
 /// - The `Sender` has been dropped.
-/// - AND there is no sufficient data to read.
+/// - AND there is still remaining data in the buffer.
 #[tokio::test]
 async fn drop_sender_1() {
-    const MSG: &[u8] = b"Hello, world!";
+    let (mut tx, mut rx) = simplex::new(2);
+    let mut buf = vec![];
+    let mut read_task = spawn(rx.read_to_end(&mut buf));
+    assert_pending!(read_task.poll());
 
-    // only set `1` capacity to make sure the write half will be blocked
-    // by the read half
-    let (tx, mut rx) = simplex::new(1);
-    let mut buf = [0u8; MSG.len()];
-    let fut = rx.read_exact(&mut buf);
-    pin_mut!(fut);
-    assert_pending!(fut.as_mut().poll(&mut noop_context()));
+    tx.write_u8(1).await.unwrap();
+    assert_pending!(read_task.poll());
+
+    assert!(!read_task.is_woken());
     drop(tx);
-    assert_ready_err!(fut.poll(&mut noop_context()));
+    assert!(read_task.is_woken());
+
+    read_task.await.unwrap();
+    assert_eq!(buf, vec![1]);
 }
 
 /// All following calls to `Sender::poll_write` and `Sender::poll_flush`

@@ -148,7 +148,14 @@ pub struct Sender {
 impl Drop for Sender {
     /// This also wakes up the [`Receiver`].
     fn drop(&mut self) {
-        self.inner.lock().unwrap().close_sender();
+        let maybe_waker = {
+            let mut inner = self.inner.lock().unwrap();
+            inner.close_sender()
+        };
+
+        if let Some(waker) = maybe_waker {
+            waker.wake();
+        }
     }
 }
 
