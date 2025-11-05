@@ -33,13 +33,13 @@ struct Inner {
 }
 
 impl Inner {
-    fn with_capacity(backpressure_boundary: usize) -> Self {
+    fn with_capacity(capacity: usize) -> Self {
         Self {
-            backpressure_boundary,
+            backpressure_boundary: capacity,
             is_closed: false,
             receiver_waker: None,
             sender_waker: None,
-            buf: BytesMut::with_capacity(backpressure_boundary),
+            buf: BytesMut::with_capacity(capacity),
         }
     }
 
@@ -236,7 +236,13 @@ impl AsyncWrite for Sender {
 /// The `capacity` parameter specifies the maximum number of bytes that can be
 /// stored in the channel without making the [`Sender::poll_write`]
 /// return [`Poll::Pending`].
+///
+/// # Panics
+///
+/// This function will panic if `capacity` is zero.
 pub fn new(capacity: usize) -> (Sender, Receiver) {
+    assert_ne!(capacity, 0, "capacity must be greater than zero");
+
     let inner = Arc::new(Mutex::new(Inner::with_capacity(capacity)));
     let tx = Sender {
         inner: Arc::clone(&inner),
