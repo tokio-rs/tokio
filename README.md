@@ -56,7 +56,7 @@ Make sure you activated the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.47.1", features = ["full"] }
+tokio = { version = "1.48.0", features = ["full"] }
 ```
 Then, on your main.rs:
 
@@ -186,12 +186,13 @@ When updating this, also update:
 
 Tokio will keep a rolling MSRV (minimum supported rust version) policy of **at
 least** 6 months. When increasing the MSRV, the new Rust version must have been
-released at least six months ago. The current MSRV is 1.70.
+released at least six months ago. The current MSRV is 1.71.
 
 Note that the MSRV is not increased automatically, and only as part of a minor
 release. The MSRV history for past minor releases can be found below:
 
- * 1.39 to now  - Rust 1.70
+ * 1.48 to now  - Rust 1.71
+ * 1.39 to 1.47 - Rust 1.70
  * 1.30 to 1.38 - Rust 1.63
  * 1.27 to 1.29 - Rust 1.56
  * 1.17 to 1.26 - Rust 1.49
@@ -224,7 +225,7 @@ If you wish to use a fixed minor release in your project, we recommend that you
 use an LTS release.
 
 To use a fixed minor version, you can specify the version with a tilde. For
-example, to specify that you wish to use the newest `1.32.x` patch release, you
+example, to specify that you wish to use the newest `1.43.x` patch release, you
 can use the following dependency specification:
 ```text
 tokio = { version = "~1.43", features = [...] }

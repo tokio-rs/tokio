@@ -64,21 +64,21 @@ macro_rules! doc {
         /// # Ok(())
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let res = tokio::try_join!(
-        ///         do_stuff_async(),
-        ///         more_async_work());
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let res = tokio::try_join!(
+        ///     do_stuff_async(),
+        ///     more_async_work());
         ///
-        ///     match res {
-        ///          Ok((first, second)) => {
-        ///              // do something with the values
-        ///          }
-        ///          Err(err) => {
-        ///             println!("processing failed; error = {}", err);
-        ///          }
+        /// match res {
+        ///     Ok((first, second)) => {
+        ///         // do something with the values
+        ///     }
+        ///     Err(err) => {
+        ///         println!("processing failed; error = {}", err);
         ///     }
         /// }
+        /// # }
         /// ```
         ///
         /// Using `try_join!` with spawned tasks.
@@ -104,20 +104,20 @@ macro_rules! doc {
         ///     }
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let handle1 = tokio::spawn(do_stuff_async());
-        ///     let handle2 = tokio::spawn(more_async_work());
-        ///     match tokio::try_join!(flatten(handle1), flatten(handle2)) {
-        ///         Ok(val) => {
-        ///             // do something with the values
-        ///         }
-        ///         Err(err) => {
-        ///             println!("Failed with {}.", err);
-        ///             # assert_eq!(err, "failed");
-        ///         }
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let handle1 = tokio::spawn(do_stuff_async());
+        /// let handle2 = tokio::spawn(more_async_work());
+        /// match tokio::try_join!(flatten(handle1), flatten(handle2)) {
+        ///     Ok(val) => {
+        ///         // do something with the values
+        ///     }
+        ///     Err(err) => {
+        ///         println!("Failed with {}.", err);
+        ///         # assert_eq!(err, "failed");
         ///     }
         /// }
+        /// # }
         /// ```
         /// Using the `biased;` mode to control polling order.
         ///
@@ -132,23 +132,23 @@ macro_rules! doc {
         /// # Ok(())
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let res = tokio::try_join!(
-        ///         biased;
-        ///         do_stuff_async(),
-        ///         more_async_work()
-        ///     );
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let res = tokio::try_join!(
+        ///     biased;
+        ///     do_stuff_async(),
+        ///     more_async_work()
+        /// );
         ///
-        ///     match res {
-        ///          Ok((first, second)) => {
-        ///              // do something with the values
-        ///          }
-        ///          Err(err) => {
-        ///             println!("processing failed; error = {}", err);
-        ///          }
+        /// match res {
+        ///     Ok((first, second)) => {
+        ///         // do something with the values
+        ///     }
+        ///     Err(err) => {
+        ///         println!("processing failed; error = {}", err);
         ///     }
         /// }
+        /// # }
         /// ```
         #[macro_export]
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
@@ -166,7 +166,7 @@ doc! {macro_rules! try_join {
     (@ {
         // Type of rotator that controls which inner future to start with
         // when polling our output future.
-        rotator=$rotator:ty;
+        rotator_select=$rotator_select:ty;
 
         // One `_` for each branch in the `try_join!` macro. This is not used once
         // normalization is complete.
@@ -179,7 +179,7 @@ doc! {macro_rules! try_join {
         $( ( $($skip:tt)* ) $e:expr, )*
 
     }) => {{
-        use $crate::macros::support::{maybe_done, poll_fn, Future, Pin};
+        use $crate::macros::support::{maybe_done, poll_fn, Future, Pin, RotatorSelect};
         use $crate::macros::support::Poll::{Ready, Pending};
 
         // Safety: nothing must be moved out of `futures`. This is to satisfy
@@ -196,14 +196,14 @@ doc! {macro_rules! try_join {
         // <https://internals.rust-lang.org/t/surprising-soundness-trouble-around-pollfn/17484>
         let mut futures = &mut futures;
 
-        const COUNT: u32 = $($total)*;
-
         // Each time the future created by poll_fn is polled, if not using biased mode,
         // a different future is polled first to ensure every future passed to try_join!
         // can make progress even if one of the futures consumes the whole budget.
-        let mut rotator = <$rotator>::default();
+        let mut rotator = <$rotator_select as RotatorSelect>::Rotator::<{$($total)*}>::default();
 
         poll_fn(move |cx| {
+            const COUNT: u32 = $($total)*;
+
             let mut is_pending = false;
             let mut to_run = COUNT;
 
@@ -264,17 +264,17 @@ doc! {macro_rules! try_join {
 
     // ===== Normalize =====
 
-    (@ { rotator=$rotator:ty;  ( $($s:tt)* ) ( $($n:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
-      $crate::try_join!(@{ rotator=$rotator; ($($s)* _) ($($n)* + 1) $($t)* ($($s)*) $e, } $($r)*)
+    (@ { rotator_select=$rotator_select:ty;  ( $($s:tt)* ) ( $($n:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
+      $crate::try_join!(@{ rotator_select=$rotator_select; ($($s)* _) ($($n)* + 1) $($t)* ($($s)*) $e, } $($r)*)
     };
 
     // ===== Entry point =====
     ( biased; $($e:expr),+ $(,)?) => {
-        $crate::try_join!(@{ rotator=$crate::macros::support::BiasedRotator;  () (0) } $($e,)*)
+        $crate::try_join!(@{ rotator_select=$crate::macros::support::SelectBiased;  () (0) } $($e,)*)
     };
 
     ( $($e:expr),+ $(,)?) => {
-        $crate::try_join!(@{ rotator=$crate::macros::support::Rotator<COUNT>; () (0) } $($e,)*)
+        $crate::try_join!(@{ rotator_select=$crate::macros::support::SelectNormal; () (0) } $($e,)*)
     };
 
     (biased;) => { async { Ok(()) }.await };

@@ -158,17 +158,17 @@ macro_rules! doc {
         ///     // more here
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     tokio::select! {
-        ///         _ = do_stuff_async() => {
-        ///             println!("do_stuff_async() completed first")
-        ///         }
-        ///         _ = more_async_work() => {
-        ///             println!("more_async_work() completed first")
-        ///         }
-        ///     };
-        /// }
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// tokio::select! {
+        ///     _ = do_stuff_async() => {
+        ///         println!("do_stuff_async() completed first")
+        ///     }
+        ///     _ = more_async_work() => {
+        ///         println!("more_async_work() completed first")
+        ///     }
+        /// };
+        /// # }
         /// ```
         ///
         /// Basic stream selecting.
@@ -176,18 +176,18 @@ macro_rules! doc {
         /// ```
         /// use tokio_stream::{self as stream, StreamExt};
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let mut stream1 = stream::iter(vec![1, 2, 3]);
-        ///     let mut stream2 = stream::iter(vec![4, 5, 6]);
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let mut stream1 = stream::iter(vec![1, 2, 3]);
+        /// let mut stream2 = stream::iter(vec![4, 5, 6]);
         ///
-        ///     let next = tokio::select! {
-        ///         v = stream1.next() => v.unwrap(),
-        ///         v = stream2.next() => v.unwrap(),
-        ///     };
+        /// let next = tokio::select! {
+        ///     v = stream1.next() => v.unwrap(),
+        ///     v = stream2.next() => v.unwrap(),
+        /// };
         ///
-        ///     assert!(next == 1 || next == 4);
-        /// }
+        /// assert!(next == 1 || next == 4);
+        /// # }
         /// ```
         ///
         /// Collect the contents of two streams. In this example, we rely on pattern
@@ -197,24 +197,24 @@ macro_rules! doc {
         /// ```
         /// use tokio_stream::{self as stream, StreamExt};
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let mut stream1 = stream::iter(vec![1, 2, 3]);
-        ///     let mut stream2 = stream::iter(vec![4, 5, 6]);
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let mut stream1 = stream::iter(vec![1, 2, 3]);
+        /// let mut stream2 = stream::iter(vec![4, 5, 6]);
         ///
-        ///     let mut values = vec![];
+        /// let mut values = vec![];
         ///
-        ///     loop {
-        ///         tokio::select! {
-        ///             Some(v) = stream1.next() => values.push(v),
-        ///             Some(v) = stream2.next() => values.push(v),
-        ///             else => break,
-        ///         }
+        /// loop {
+        ///     tokio::select! {
+        ///         Some(v) = stream1.next() => values.push(v),
+        ///         Some(v) = stream2.next() => values.push(v),
+        ///         else => break,
         ///     }
-        ///
-        ///     values.sort();
-        ///     assert_eq!(&[1, 2, 3, 4, 5, 6], &values[..]);
         /// }
+        ///
+        /// values.sort();
+        /// assert_eq!(&[1, 2, 3, 4, 5, 6], &values[..]);
+        /// # }
         /// ```
         ///
         /// Using the same future in multiple `select!` expressions can be done by passing
@@ -230,28 +230,28 @@ macro_rules! doc {
         /// use tokio_stream::{self as stream, StreamExt};
         /// use tokio::time::{self, Duration};
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let mut stream = stream::iter(vec![1, 2, 3]);
-        ///     let sleep = time::sleep(Duration::from_secs(1));
-        ///     tokio::pin!(sleep);
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let mut stream = stream::iter(vec![1, 2, 3]);
+        /// let sleep = time::sleep(Duration::from_secs(1));
+        /// tokio::pin!(sleep);
         ///
-        ///     loop {
-        ///         tokio::select! {
-        ///             maybe_v = stream.next() => {
-        ///                 if let Some(v) = maybe_v {
-        ///                     println!("got = {}", v);
-        ///                 } else {
-        ///                     break;
-        ///                 }
-        ///             }
-        ///             _ = &mut sleep => {
-        ///                 println!("timeout");
+        /// loop {
+        ///     tokio::select! {
+        ///         maybe_v = stream.next() => {
+        ///             if let Some(v) = maybe_v {
+        ///                 println!("got = {}", v);
+        ///             } else {
         ///                 break;
         ///             }
         ///         }
+        ///         _ = &mut sleep => {
+        ///             println!("timeout");
+        ///             break;
+        ///         }
         ///     }
         /// }
+        /// # }
         /// ```
         ///
         /// Joining two values using `select!`.
@@ -259,73 +259,73 @@ macro_rules! doc {
         /// ```
         /// use tokio::sync::oneshot;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let (tx1, mut rx1) = oneshot::channel();
-        ///     let (tx2, mut rx2) = oneshot::channel();
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let (tx1, mut rx1) = oneshot::channel();
+        /// let (tx2, mut rx2) = oneshot::channel();
         ///
-        ///     tokio::spawn(async move {
-        ///         tx1.send("first").unwrap();
-        ///     });
+        /// tokio::spawn(async move {
+        ///     tx1.send("first").unwrap();
+        /// });
         ///
-        ///     tokio::spawn(async move {
-        ///         tx2.send("second").unwrap();
-        ///     });
+        /// tokio::spawn(async move {
+        ///     tx2.send("second").unwrap();
+        /// });
         ///
-        ///     let mut a = None;
-        ///     let mut b = None;
+        /// let mut a = None;
+        /// let mut b = None;
         ///
-        ///     while a.is_none() || b.is_none() {
-        ///         tokio::select! {
-        ///             v1 = (&mut rx1), if a.is_none() => a = Some(v1.unwrap()),
-        ///             v2 = (&mut rx2), if b.is_none() => b = Some(v2.unwrap()),
-        ///         }
+        /// while a.is_none() || b.is_none() {
+        ///     tokio::select! {
+        ///         v1 = (&mut rx1), if a.is_none() => a = Some(v1.unwrap()),
+        ///         v2 = (&mut rx2), if b.is_none() => b = Some(v2.unwrap()),
         ///     }
-        ///
-        ///     let res = (a.unwrap(), b.unwrap());
-        ///
-        ///     assert_eq!(res.0, "first");
-        ///     assert_eq!(res.1, "second");
         /// }
+        ///
+        /// let res = (a.unwrap(), b.unwrap());
+        ///
+        /// assert_eq!(res.0, "first");
+        /// assert_eq!(res.1, "second");
+        /// # }
         /// ```
         ///
         /// Using the `biased;` mode to control polling order.
         ///
         /// ```
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let mut count = 0u8;
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let mut count = 0u8;
         ///
-        ///     loop {
-        ///         tokio::select! {
-        ///             // If you run this example without `biased;`, the polling order is
-        ///             // pseudo-random, and the assertions on the value of count will
-        ///             // (probably) fail.
-        ///             biased;
+        /// loop {
+        ///     tokio::select! {
+        ///         // If you run this example without `biased;`, the polling order is
+        ///         // pseudo-random, and the assertions on the value of count will
+        ///         // (probably) fail.
+        ///         biased;
         ///
-        ///             _ = async {}, if count < 1 => {
-        ///                 count += 1;
-        ///                 assert_eq!(count, 1);
-        ///             }
-        ///             _ = async {}, if count < 2 => {
-        ///                 count += 1;
-        ///                 assert_eq!(count, 2);
-        ///             }
-        ///             _ = async {}, if count < 3 => {
-        ///                 count += 1;
-        ///                 assert_eq!(count, 3);
-        ///             }
-        ///             _ = async {}, if count < 4 => {
-        ///                 count += 1;
-        ///                 assert_eq!(count, 4);
-        ///             }
+        ///         _ = async {}, if count < 1 => {
+        ///             count += 1;
+        ///             assert_eq!(count, 1);
+        ///         }
+        ///         _ = async {}, if count < 2 => {
+        ///             count += 1;
+        ///             assert_eq!(count, 2);
+        ///         }
+        ///         _ = async {}, if count < 3 => {
+        ///             count += 1;
+        ///             assert_eq!(count, 3);
+        ///         }
+        ///         _ = async {}, if count < 4 => {
+        ///             count += 1;
+        ///             assert_eq!(count, 4);
+        ///         }
         ///
-        ///             else => {
-        ///                 break;
-        ///             }
-        ///         };
-        ///     }
+        ///         else => {
+        ///             break;
+        ///         }
+        ///     };
         /// }
+        /// # }
         /// ```
         ///
         /// ## Avoid racy `if` preconditions
@@ -344,24 +344,24 @@ macro_rules! doc {
         ///     // do work
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let sleep = time::sleep(Duration::from_millis(50));
-        ///     tokio::pin!(sleep);
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let sleep = time::sleep(Duration::from_millis(50));
+        /// tokio::pin!(sleep);
         ///
-        ///     while !sleep.is_elapsed() {
-        ///         tokio::select! {
-        ///             _ = &mut sleep, if !sleep.is_elapsed() => {
-        ///                 println!("operation timed out");
-        ///             }
-        ///             _ = some_async_work() => {
-        ///                 println!("operation completed");
-        ///             }
+        /// while !sleep.is_elapsed() {
+        ///     tokio::select! {
+        ///         _ = &mut sleep, if !sleep.is_elapsed() => {
+        ///             println!("operation timed out");
+        ///         }
+        ///         _ = some_async_work() => {
+        ///             println!("operation completed");
         ///         }
         ///     }
-        ///
-        ///     panic!("This example shows how not to do it!");
         /// }
+        ///
+        /// panic!("This example shows how not to do it!");
+        /// # }
         /// ```
         ///
         /// In the above example, `sleep.is_elapsed()` may return `true` even if
@@ -380,23 +380,23 @@ macro_rules! doc {
         ///     // do work
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let sleep = time::sleep(Duration::from_millis(50));
-        ///     tokio::pin!(sleep);
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let sleep = time::sleep(Duration::from_millis(50));
+        /// tokio::pin!(sleep);
         ///
-        ///     loop {
-        ///         tokio::select! {
-        ///             _ = &mut sleep => {
-        ///                 println!("operation timed out");
-        ///                 break;
-        ///             }
-        ///             _ = some_async_work() => {
-        ///                 println!("operation completed");
-        ///             }
+        /// loop {
+        ///     tokio::select! {
+        ///         _ = &mut sleep => {
+        ///             println!("operation timed out");
+        ///             break;
+        ///         }
+        ///         _ = some_async_work() => {
+        ///             println!("operation completed");
         ///         }
         ///     }
         /// }
+        /// # }
         /// ```
         /// # Alternatives from the Ecosystem
         ///
@@ -437,22 +437,21 @@ macro_rules! doc {
         ///     // do work that is not cancel safe
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     // open our IO types
-        ///     let mut file = File;
-        ///     let mut channel = Channel;
-        ///     let mut socket = Socket;
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// // open our IO types
+        /// let mut file = File;
+        /// let mut channel = Channel;
+        /// let mut socket = Socket;
         ///
-        ///     loop {
-        ///         tokio::select! {
-        ///             _ = read_send(&mut file, &mut channel) => { /* ... */ },
-        ///             _data = socket.read_packet() => { /* ... */ }
-        ///             _ = futures::future::ready(()) => break
-        ///         }
+        /// loop {
+        ///     tokio::select! {
+        ///         _ = read_send(&mut file, &mut channel) => { /* ... */ },
+        ///         _data = socket.read_packet() => { /* ... */ }
+        ///         _ = futures::future::ready(()) => break
         ///     }
         /// }
-        ///
+        /// # }
         /// ```
         ///
         /// ### Moving to `merge`
@@ -487,32 +486,32 @@ macro_rules! doc {
         ///     Data(Vec<u8>),
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     // open our IO types
-        ///     let file = File;
-        ///     let channel = Channel;
-        ///     let socket = Socket;
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// // open our IO types
+        /// let file = File;
+        /// let channel = Channel;
+        /// let socket = Socket;
         ///
-        ///     let a = unfold((file, channel), |(mut file, mut channel)| async {
-        ///         read_send(&mut file, &mut channel).await;
-        ///         Some((Message::Sent, (file, channel)))
-        ///     });
-        ///     let b = unfold(socket, |mut socket| async {
-        ///         let data = socket.read_packet().await;
-        ///         Some((Message::Data(data), socket))
-        ///     });
-        ///     let c = tokio_stream::iter([Message::Stop]);
+        /// let a = unfold((file, channel), |(mut file, mut channel)| async {
+        ///     read_send(&mut file, &mut channel).await;
+        ///     Some((Message::Sent, (file, channel)))
+        /// });
+        /// let b = unfold(socket, |mut socket| async {
+        ///     let data = socket.read_packet().await;
+        ///     Some((Message::Data(data), socket))
+        /// });
+        /// let c = tokio_stream::iter([Message::Stop]);
         ///
-        ///     let mut s = pin!(a.merge(b).merge(c));
-        ///     while let Some(msg) = s.next().await {
-        ///         match msg {
-        ///             Message::Data(_data) => { /* ... */ }
-        ///             Message::Sent => continue,
-        ///             Message::Stop => break,
-        ///         }
+        /// let mut s = pin!(a.merge(b).merge(c));
+        /// while let Some(msg) = s.next().await {
+        ///     match msg {
+        ///         Message::Data(_data) => { /* ... */ }
+        ///         Message::Sent => continue,
+        ///         Message::Stop => break,
         ///     }
         /// }
+        /// # }
         /// ```
         ///
         /// ## Racing Futures
@@ -533,17 +532,17 @@ macro_rules! doc {
         /// ```
         /// use futures_concurrency::future::Race;
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let task_a = async { Ok("ok") };
-        ///     let task_b = async { Err("error") };
-        ///     let result = (task_a, task_b).race().await;
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let task_a = async { Ok("ok") };
+        /// let task_b = async { Err("error") };
+        /// let result = (task_a, task_b).race().await;
         ///
-        ///     match result {
-        ///         Ok(output) => println!("First task completed with: {output}"),
-        ///         Err(err) => eprintln!("Error occurred: {err}"),
-        ///     }
+        /// match result {
+        ///     Ok(output) => println!("First task completed with: {output}"),
+        ///     Err(err) => eprintln!("Error occurred: {err}"),
         /// }
+        /// # }
         /// ```
         #[macro_export]
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]

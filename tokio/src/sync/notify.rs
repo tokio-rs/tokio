@@ -56,22 +56,22 @@ type GuardedWaitList = GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::
 /// use tokio::sync::Notify;
 /// use std::sync::Arc;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let notify = Arc::new(Notify::new());
-///     let notify2 = notify.clone();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let notify = Arc::new(Notify::new());
+/// let notify2 = notify.clone();
 ///
-///     let handle = tokio::spawn(async move {
-///         notify2.notified().await;
-///         println!("received notification");
-///     });
+/// let handle = tokio::spawn(async move {
+///     notify2.notified().await;
+///     println!("received notification");
+/// });
 ///
-///     println!("sending notification");
-///     notify.notify_one();
+/// println!("sending notification");
+/// notify.notify_one();
 ///
-///     // Wait for task to receive notification.
-///     handle.await.unwrap();
-/// }
+/// // Wait for task to receive notification.
+/// handle.await.unwrap();
+/// # }
 /// ```
 ///
 /// Unbound multi-producer single-consumer (mpsc) channel.
@@ -548,19 +548,19 @@ impl Notify {
     /// use tokio::sync::Notify;
     /// use std::sync::Arc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let notify = Arc::new(Notify::new());
-    ///     let notify2 = notify.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let notify = Arc::new(Notify::new());
+    /// let notify2 = notify.clone();
     ///
-    ///     tokio::spawn(async move {
-    ///         notify2.notified().await;
-    ///         println!("received notification");
-    ///     });
+    /// tokio::spawn(async move {
+    ///     notify2.notified().await;
+    ///     println!("received notification");
+    /// });
     ///
-    ///     println!("sending notification");
-    ///     notify.notify_one();
-    /// }
+    /// println!("sending notification");
+    /// notify.notify_one();
+    /// # }
     /// ```
     pub fn notified(&self) -> Notified<'_> {
         // we load the number of times notify_waiters
@@ -594,21 +594,21 @@ impl Notify {
     /// use std::sync::Arc;
     /// use tokio::sync::Notify;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let notify = Arc::new(Notify::new());
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let notify = Arc::new(Notify::new());
     ///
-    ///     for _ in 0..10 {
-    ///         let notified = notify.clone().notified_owned();
-    ///         tokio::spawn(async move {
-    ///             notified.await;
-    ///             println!("received notification");
-    ///         });
-    ///     }
-    ///
-    ///     println!("sending notification");
-    ///     notify.notify_waiters();
+    /// for _ in 0..10 {
+    ///     let notified = notify.clone().notified_owned();
+    ///     tokio::spawn(async move {
+    ///         notified.await;
+    ///         println!("received notification");
+    ///     });
     /// }
+    ///
+    /// println!("sending notification");
+    /// notify.notify_waiters();
+    /// # }
     /// ```
     pub fn notified_owned(self: Arc<Self>) -> OwnedNotified {
         // we load the number of times notify_waiters
@@ -641,19 +641,19 @@ impl Notify {
     /// use tokio::sync::Notify;
     /// use std::sync::Arc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let notify = Arc::new(Notify::new());
-    ///     let notify2 = notify.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let notify = Arc::new(Notify::new());
+    /// let notify2 = notify.clone();
     ///
-    ///     tokio::spawn(async move {
-    ///         notify2.notified().await;
-    ///         println!("received notification");
-    ///     });
+    /// tokio::spawn(async move {
+    ///     notify2.notified().await;
+    ///     println!("received notification");
+    /// });
     ///
-    ///     println!("sending notification");
-    ///     notify.notify_one();
-    /// }
+    /// println!("sending notification");
+    /// notify.notify_one();
+    /// # }
     /// ```
     // Alias for old name in 0.x
     #[cfg_attr(docsrs, doc(alias = "notify"))]
@@ -722,31 +722,33 @@ impl Notify {
     /// use tokio::sync::Notify;
     /// use std::sync::Arc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let notify = Arc::new(Notify::new());
-    ///     let notify2 = notify.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let notify = Arc::new(Notify::new());
+    /// let notify2 = notify.clone();
     ///
-    ///     let notified1 = notify.notified();
-    ///     let notified2 = notify.notified();
+    /// let notified1 = notify.notified();
+    /// let notified2 = notify.notified();
     ///
-    ///     let handle = tokio::spawn(async move {
-    ///         println!("sending notifications");
-    ///         notify2.notify_waiters();
-    ///     });
+    /// let handle = tokio::spawn(async move {
+    ///     println!("sending notifications");
+    ///     notify2.notify_waiters();
+    /// });
     ///
-    ///     notified1.await;
-    ///     notified2.await;
-    ///     println!("received notifications");
-    /// }
+    /// notified1.await;
+    /// notified2.await;
+    /// println!("received notifications");
+    /// # }
     /// ```
     pub fn notify_waiters(&self) {
-        let mut waiters = self.waiters.lock();
+        self.lock_waiter_list().notify_waiters();
+    }
 
-        // The state must be loaded while the lock is held. The state may only
-        // transition out of WAITING while the lock is held.
-        let curr = self.state.load(SeqCst);
-
+    fn inner_notify_waiters<'a>(
+        &'a self,
+        curr: usize,
+        mut waiters: crate::loom::sync::MutexGuard<'a, LinkedList<Waiter, Waiter>>,
+    ) {
         if matches!(get_state(curr), EMPTY | NOTIFIED) {
             // There are no waiting tasks. All we need to do is increment the
             // number of times this method was called.
@@ -813,6 +815,20 @@ impl Notify {
         drop(waiters);
 
         wakers.wake_all();
+    }
+
+    pub(crate) fn lock_waiter_list(&self) -> NotifyGuard<'_> {
+        let guarded_waiters = self.waiters.lock();
+
+        // The state must be loaded while the lock is held. The state may only
+        // transition out of WAITING while the lock is held.
+        let current_state = self.state.load(SeqCst);
+
+        NotifyGuard {
+            guarded_notify: self,
+            guarded_waiters,
+            current_state,
+        }
     }
 }
 
@@ -1202,7 +1218,7 @@ impl NotifiedProject<'_> {
                     return Poll::Pending;
                 }
                 State::Waiting => {
-                    #[cfg(tokio_taskdump)]
+                    #[cfg(feature = "taskdump")]
                     if let Some(waker) = waker {
                         let mut ctx = Context::from_waker(waker);
                         std::task::ready!(crate::trace::trace_leaf(&mut ctx));
@@ -1296,7 +1312,7 @@ impl NotifiedProject<'_> {
                     drop(old_waker);
                 }
                 State::Done => {
-                    #[cfg(tokio_taskdump)]
+                    #[cfg(feature = "taskdump")]
                     if let Some(waker) = waker {
                         let mut ctx = Context::from_waker(waker);
                         std::task::ready!(crate::trace::trace_leaf(&mut ctx));
@@ -1374,3 +1390,20 @@ unsafe impl linked_list::Link for Waiter {
 }
 
 fn is_unpin<T: Unpin>() {}
+
+/// A guard that provides exclusive access to a `Notify`'s internal
+/// waiters list.
+///
+/// While this guard is held, the `Notify` instance's waiter list is locked.
+pub(crate) struct NotifyGuard<'a> {
+    guarded_notify: &'a Notify,
+    guarded_waiters: crate::loom::sync::MutexGuard<'a, WaitList>,
+    current_state: usize,
+}
+
+impl NotifyGuard<'_> {
+    pub(crate) fn notify_waiters(self) {
+        self.guarded_notify
+            .inner_notify_waiters(self.current_state, self.guarded_waiters);
+    }
+}

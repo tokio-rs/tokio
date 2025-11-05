@@ -33,18 +33,18 @@ use std::sync::Arc;
 /// ```
 /// use tokio::sync::{Semaphore, TryAcquireError};
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let semaphore = Semaphore::new(3);
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let semaphore = Semaphore::new(3);
 ///
-///     let a_permit = semaphore.acquire().await.unwrap();
-///     let two_permits = semaphore.acquire_many(2).await.unwrap();
+/// let a_permit = semaphore.acquire().await.unwrap();
+/// let two_permits = semaphore.acquire_many(2).await.unwrap();
 ///
-///     assert_eq!(semaphore.available_permits(), 0);
+/// assert_eq!(semaphore.available_permits(), 0);
 ///
-///     let permit_attempt = semaphore.try_acquire();
-///     assert_eq!(permit_attempt.err(), Some(TryAcquireError::NoPermits));
-/// }
+/// let permit_attempt = semaphore.try_acquire();
+/// assert_eq!(permit_attempt.err(), Some(TryAcquireError::NoPermits));
+/// # }
 /// ```
 ///
 /// ## Limit the number of simultaneously opened files in your program
@@ -61,6 +61,8 @@ use std::sync::Arc;
 /// file, the program will wait until a permit becomes available before
 /// proceeding to open another file.
 /// ```
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use std::io::Result;
 /// use tokio::fs::File;
 /// use tokio::sync::Semaphore;
@@ -74,6 +76,7 @@ use std::sync::Arc;
 ///     buffer.write_all(message).await?;
 ///     Ok(()) // Permit goes out of scope here, and is available again for acquisition
 /// }
+/// # }
 /// ```
 ///
 /// ## Limit the number of outgoing requests being sent at the same time
@@ -93,37 +96,37 @@ use std::sync::Arc;
 /// use std::sync::Arc;
 /// use tokio::sync::Semaphore;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     // Define maximum number of parallel requests.
-///     let semaphore = Arc::new(Semaphore::new(10));
-///     // Spawn many tasks that will send requests.
-///     let mut jhs = Vec::new();
-///     for task_id in 0..100 {
-///         let semaphore = semaphore.clone();
-///         let jh = tokio::spawn(async move {
-///             // Acquire permit before sending request.
-///             let _permit = semaphore.acquire().await.unwrap();
-///             // Send the request.
-///             let response = send_request(task_id).await;
-///             // Drop the permit after the request has been sent.
-///             drop(_permit);
-///             // Handle response.
-///             // ...
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// // Define maximum number of parallel requests.
+/// let semaphore = Arc::new(Semaphore::new(5));
+/// // Spawn many tasks that will send requests.
+/// let mut jhs = Vec::new();
+/// for task_id in 0..50 {
+///     let semaphore = semaphore.clone();
+///     let jh = tokio::spawn(async move {
+///         // Acquire permit before sending request.
+///         let _permit = semaphore.acquire().await.unwrap();
+///         // Send the request.
+///         let response = send_request(task_id).await;
+///         // Drop the permit after the request has been sent.
+///         drop(_permit);
+///         // Handle response.
+///         // ...
 ///
-///             response
-///         });
-///         jhs.push(jh);
-///     }
-///     // Collect responses from tasks.
-///     let mut responses = Vec::new();
-///     for jh in jhs {
-///         let response = jh.await.unwrap();
-///         responses.push(response);
-///     }
-///     // Process responses.
-///     // ...
+///         response
+///     });
+///     jhs.push(jh);
 /// }
+/// // Collect responses from tasks.
+/// let mut responses = Vec::new();
+/// for jh in jhs {
+///     let response = jh.await.unwrap();
+///     responses.push(response);
+/// }
+/// // Process responses.
+/// // ...
+/// # }
 /// # async fn send_request(task_id: usize) {
 /// #     // Send request.
 /// # }
@@ -144,6 +147,8 @@ use std::sync::Arc;
 /// (Since our semaphore is not a global variable — if it was, then `acquire` would be enough.)
 ///
 /// ```no_run
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use std::sync::Arc;
 /// use tokio::sync::Semaphore;
 /// use tokio::net::TcpListener;
@@ -173,6 +178,7 @@ use std::sync::Arc;
 /// }
 /// # async fn handle_connection(_socket: &mut tokio::net::TcpStream) {
 /// #   // Do work
+/// # }
 /// # }
 /// ```
 ///
@@ -370,20 +376,20 @@ use std::sync::Arc;
 ///     }
 /// }
 ///
-/// #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn _hidden() {}
 /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
-/// async fn main() {
-///     let capacity = 5;
-///     let update_interval = Duration::from_secs_f32(1.0 / capacity as f32);
-///     let bucket = TokenBucket::new(update_interval, capacity);
+/// # async fn main() {
+/// let capacity = 5;
+/// let update_interval = Duration::from_secs_f32(1.0 / capacity as f32);
+/// let bucket = TokenBucket::new(update_interval, capacity);
 ///
-///     for _ in 0..5 {
-///         bucket.acquire().await;
+/// for _ in 0..5 {
+///     bucket.acquire().await;
 ///
-///         // do the operation
-///     }
+///     // do the operation
 /// }
+/// # }
 /// ```
 ///
 /// [`PollSemaphore`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSemaphore.html
@@ -559,19 +565,19 @@ impl Semaphore {
     /// ```
     /// use tokio::sync::Semaphore;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let semaphore = Semaphore::new(2);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let semaphore = Semaphore::new(2);
     ///
-    ///     let permit_1 = semaphore.acquire().await.unwrap();
-    ///     assert_eq!(semaphore.available_permits(), 1);
+    /// let permit_1 = semaphore.acquire().await.unwrap();
+    /// assert_eq!(semaphore.available_permits(), 1);
     ///
-    ///     let permit_2 = semaphore.acquire().await.unwrap();
-    ///     assert_eq!(semaphore.available_permits(), 0);
+    /// let permit_2 = semaphore.acquire().await.unwrap();
+    /// assert_eq!(semaphore.available_permits(), 0);
     ///
-    ///     drop(permit_1);
-    ///     assert_eq!(semaphore.available_permits(), 1);
-    /// }
+    /// drop(permit_1);
+    /// assert_eq!(semaphore.available_permits(), 1);
+    /// # }
     /// ```
     ///
     /// [`AcquireError`]: crate::sync::AcquireError
@@ -612,13 +618,13 @@ impl Semaphore {
     /// ```
     /// use tokio::sync::Semaphore;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let semaphore = Semaphore::new(5);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let semaphore = Semaphore::new(5);
     ///
-    ///     let permit = semaphore.acquire_many(3).await.unwrap();
-    ///     assert_eq!(semaphore.available_permits(), 2);
-    /// }
+    /// let permit = semaphore.acquire_many(3).await.unwrap();
+    /// assert_eq!(semaphore.available_permits(), 2);
+    /// # }
     /// ```
     ///
     /// [`AcquireError`]: crate::sync::AcquireError
@@ -735,24 +741,24 @@ impl Semaphore {
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let semaphore = Arc::new(Semaphore::new(3));
-    ///     let mut join_handles = Vec::new();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let semaphore = Arc::new(Semaphore::new(3));
+    /// let mut join_handles = Vec::new();
     ///
-    ///     for _ in 0..5 {
-    ///         let permit = semaphore.clone().acquire_owned().await.unwrap();
-    ///         join_handles.push(tokio::spawn(async move {
-    ///             // perform task...
-    ///             // explicitly own `permit` in the task
-    ///             drop(permit);
-    ///         }));
-    ///     }
-    ///
-    ///     for handle in join_handles {
-    ///         handle.await.unwrap();
-    ///     }
+    /// for _ in 0..5 {
+    ///     let permit = semaphore.clone().acquire_owned().await.unwrap();
+    ///     join_handles.push(tokio::spawn(async move {
+    ///         // perform task...
+    ///         // explicitly own `permit` in the task
+    ///         drop(permit);
+    ///     }));
     /// }
+    ///
+    /// for handle in join_handles {
+    ///     handle.await.unwrap();
+    /// }
+    /// # }
     /// ```
     ///
     /// [`Arc`]: std::sync::Arc
@@ -796,24 +802,24 @@ impl Semaphore {
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let semaphore = Arc::new(Semaphore::new(10));
-    ///     let mut join_handles = Vec::new();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let semaphore = Arc::new(Semaphore::new(10));
+    /// let mut join_handles = Vec::new();
     ///
-    ///     for _ in 0..5 {
-    ///         let permit = semaphore.clone().acquire_many_owned(2).await.unwrap();
-    ///         join_handles.push(tokio::spawn(async move {
-    ///             // perform task...
-    ///             // explicitly own `permit` in the task
-    ///             drop(permit);
-    ///         }));
-    ///     }
-    ///
-    ///     for handle in join_handles {
-    ///         handle.await.unwrap();
-    ///     }
+    /// for _ in 0..5 {
+    ///     let permit = semaphore.clone().acquire_many_owned(2).await.unwrap();
+    ///     join_handles.push(tokio::spawn(async move {
+    ///         // perform task...
+    ///         // explicitly own `permit` in the task
+    ///         drop(permit);
+    ///     }));
     /// }
+    ///
+    /// for handle in join_handles {
+    ///     handle.await.unwrap();
+    /// }
+    /// # }
     /// ```
     ///
     /// [`Arc`]: std::sync::Arc
@@ -936,23 +942,23 @@ impl Semaphore {
     /// use std::sync::Arc;
     /// use tokio::sync::TryAcquireError;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let semaphore = Arc::new(Semaphore::new(1));
-    ///     let semaphore2 = semaphore.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let semaphore = Arc::new(Semaphore::new(1));
+    /// let semaphore2 = semaphore.clone();
     ///
-    ///     tokio::spawn(async move {
-    ///         let permit = semaphore.acquire_many(2).await;
-    ///         assert!(permit.is_err());
-    ///         println!("waiter received error");
-    ///     });
+    /// tokio::spawn(async move {
+    ///     let permit = semaphore.acquire_many(2).await;
+    ///     assert!(permit.is_err());
+    ///     println!("waiter received error");
+    /// });
     ///
-    ///     println!("closing semaphore");
-    ///     semaphore2.close();
+    /// println!("closing semaphore");
+    /// semaphore2.close();
     ///
-    ///     // Cannot obtain more permits
-    ///     assert_eq!(semaphore2.try_acquire().err(), Some(TryAcquireError::Closed))
-    /// }
+    /// // Cannot obtain more permits
+    /// assert_eq!(semaphore2.try_acquire().err(), Some(TryAcquireError::Closed))
+    /// # }
     /// ```
     pub fn close(&self) {
         self.ll_sem.close();

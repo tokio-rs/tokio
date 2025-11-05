@@ -1,3 +1,16 @@
+# 2.6.0 (Oct 14th, 2025)
+
+The MSRV is raised to 1.71.
+
+- msrv: increase MSRV to 1.71 ([#7658])
+- macros: add `local` runtime flavor ([#7375], [#7597])
+- macros: suppress `clippy::unwrap_in_result` in `#[tokio::main]` ([#7651])
+
+[#7375]: https://github.com/tokio-rs/tokio/pull/7375
+[#7597]: https://github.com/tokio-rs/tokio/pull/7597
+[#7651]: https://github.com/tokio-rs/tokio/pull/7651
+[#7658]: https://github.com/tokio-rs/tokio/pull/7658
+
 # 2.5.0 (Jan 8th, 2025)
 
 - macros: suppress `clippy::needless_return` in `#[tokio::main]` ([#6874])

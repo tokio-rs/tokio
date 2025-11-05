@@ -40,7 +40,7 @@ error: Failed to parse value of `flavor` as string.
 23 | #[tokio::test(flavor = 123)]
    |                        ^^^
 
-error: No such runtime flavor `foo`. The runtime flavors are `current_thread` and `multi_thread`.
+error: No such runtime flavor `foo`. The runtime flavors are `current_thread`, `local`, and `multi_thread`.
   --> tests/fail/macros_invalid_input.rs:26:24
    |
 26 | #[tokio::test(flavor = "foo")]
