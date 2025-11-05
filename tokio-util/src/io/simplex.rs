@@ -14,6 +14,8 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 type IoResult<T> = Result<T, IoError>;
 
+const CLOSED_ERROR_MSG: &str = "simplex has been closed";
+
 #[derive(Debug)]
 struct Inner {
     /// `poll_write` will return [`Poll::Pending`] if the backpressure boundary is reached
@@ -177,7 +179,7 @@ impl AsyncWrite for Sender {
         if inner.is_closed() {
             return Poll::Ready(Err(IoError::new(
                 IoErrorKind::BrokenPipe,
-                "simplex has been closed",
+                CLOSED_ERROR_MSG,
             )));
         }
 
@@ -221,7 +223,7 @@ impl AsyncWrite for Sender {
         if inner.is_closed() {
             Poll::Ready(Err(IoError::new(
                 IoErrorKind::BrokenPipe,
-                "simplex has been shut down",
+                CLOSED_ERROR_MSG,
             )))
         } else {
             Poll::Ready(Ok(()))
