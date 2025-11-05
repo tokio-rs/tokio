@@ -177,10 +177,7 @@ impl AsyncWrite for Sender {
         let mut inner = self.inner.lock().unwrap();
 
         if inner.is_closed() {
-            return Poll::Ready(Err(IoError::new(
-                IoErrorKind::BrokenPipe,
-                CLOSED_ERROR_MSG,
-            )));
+            return Poll::Ready(Err(IoError::new(IoErrorKind::BrokenPipe, CLOSED_ERROR_MSG)));
         }
 
         let free = inner
@@ -221,10 +218,7 @@ impl AsyncWrite for Sender {
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<IoResult<()>> {
         let inner = self.inner.lock().unwrap();
         if inner.is_closed() {
-            Poll::Ready(Err(IoError::new(
-                IoErrorKind::BrokenPipe,
-                CLOSED_ERROR_MSG,
-            )))
+            Poll::Ready(Err(IoError::new(IoErrorKind::BrokenPipe, CLOSED_ERROR_MSG)))
         } else {
             Poll::Ready(Ok(()))
         }

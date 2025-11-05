@@ -11,14 +11,31 @@ use tokio_util::io::simplex;
 async fn single_thread() {
     const N: usize = 64;
     const MSG: &[u8] = b"Hello, world!";
+    const CAPS: &[usize] = &[1, MSG.len() / 2, MSG.len() - 1, MSG.len(), MSG.len() + 1];
 
-    let (mut tx, mut rx) = simplex::new(32);
+    // test different buffer capacities to cover edge cases
+    for &capacity in CAPS {
+        let (mut tx, mut rx) = simplex::new(capacity);
 
-    for _ in 0..N {
-        tx.write_all(MSG).await.unwrap();
-        let mut buf = vec![0; MSG.len()];
-        rx.read_exact(&mut buf).await.unwrap();
-        assert_eq!(&buf[..], MSG);
+        for _ in 0..N {
+            let mut read = 0;
+            let mut write = 0;
+            let mut buf = [0; MSG.len()];
+
+            while read < MSG.len() || write < MSG.len() {
+                if write < MSG.len() {
+                    let n = tx.write(&MSG[write..]).await.unwrap();
+                    write += n;
+                }
+
+                if read < MSG.len() {
+                    let n = rx.read(&mut buf[read..]).await.unwrap();
+                    read += n;
+                }
+            }
+
+            assert_eq!(&buf[..], MSG);
+        }
     }
 }
 
@@ -31,31 +48,41 @@ fn multi_thread() {
 
     const N: usize = 64;
     const MSG: &[u8] = b"Hello, world!";
+    const CAPS: &[usize] = &[1, MSG.len() / 2, MSG.len() - 1, MSG.len(), MSG.len() + 1];
 
-    let (mut tx, mut rx) = simplex::new(32);
+    // test different buffer capacities to cover edge cases
+    for &capacity in CAPS {
+        let (mut tx, mut rx) = simplex::new(capacity);
 
-    let jh0 = thread::spawn(move || {
-        block_on(async {
-            let mut buf = vec![0; MSG.len()];
-            for _ in 0..N {
-                rx.read_exact(&mut buf).await.unwrap();
-                assert_eq!(&buf[..], MSG);
-                buf.clear();
-                buf.resize(MSG.len(), 0);
-            }
+        let jh0 = thread::spawn(move || {
+            block_on(async {
+                let mut buf = vec![0; MSG.len()];
+                for _ in 0..N {
+                    rx.read_exact(&mut buf).await.unwrap();
+                    assert_eq!(&buf[..], MSG);
+                    buf.clear();
+                    buf.resize(MSG.len(), 0);
+                }
+            });
         });
-    });
 
-    let jh1 = thread::spawn(move || {
-        block_on(async {
-            for _ in 0..N {
-                tx.write_all(MSG).await.unwrap();
-            }
+        let jh1 = thread::spawn(move || {
+            block_on(async {
+                for _ in 0..N {
+                    tx.write_all(MSG).await.unwrap();
+                }
+            });
         });
-    });
 
-    jh0.join().unwrap();
-    jh1.join().unwrap();
+        jh0.join().unwrap();
+        jh1.join().unwrap();
+    }
+}
+
+#[test]
+#[should_panic(expected = "capacity must be greater than zero")]
+fn zero_capacity() {
+    let _ = simplex::new(0);
 }
 
 /// The `Receiver::poll_read` should return `Poll::Ready(Ok(()))`
@@ -100,7 +127,7 @@ async fn drop_receiver_1() {
     assert!(write_task.is_woken());
 }
 
-/// The `Receiver` should returns error if:
+/// The `Receiver` should return error if:
 ///
 /// - The `Sender` has been dropped.
 /// - AND there is no remaining data in the buffer.
