@@ -120,6 +120,7 @@ async fn drop_sender_1() {
 /// Both `Sender` and `Receiver` should yield periodically
 /// in a tight-loop.
 #[tokio::test]
+#[cfg(feature = "rt")]
 async fn cooperative_scheduling() {
     // this magic number is copied from
     // https://github.com/tokio-rs/tokio/blob/925c614c89d0a26777a334612e2ed6ad0e7935c3/tokio/src/task/coop/mod.rs#L116

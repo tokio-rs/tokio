@@ -1,5 +1,7 @@
 //! Unidirectional byte-oriented channel.
 
+use crate::util::poll_proceed_and_make_progress;
+
 use bytes::Buf;
 use bytes::BytesMut;
 use futures_core::ready;
@@ -9,7 +11,6 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-use tokio::task::coop::poll_proceed;
 
 type IoResult<T> = Result<T, IoError>;
 
@@ -121,7 +122,7 @@ impl AsyncRead for Receiver {
             };
         }
 
-        ready!(poll_proceed(cx)).made_progress();
+        ready!(poll_proceed_and_make_progress(cx));
 
         buf.put_slice(&inner.buf[..to_read]);
         inner.buf.advance(to_read);
@@ -182,7 +183,7 @@ impl AsyncWrite for Sender {
         }
 
         // this is to avoid starving other tasks
-        ready!(poll_proceed(cx)).made_progress();
+        ready!(poll_proceed_and_make_progress(cx));
 
         inner.buf.extend_from_slice(&buf[..to_write]);
         let waker = inner.take_receiver_waker();
