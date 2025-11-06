@@ -4,13 +4,12 @@ use crate::runtime::scheduler::multi_thread::worker;
 use crate::runtime::task::{Notified, Task, TaskHarnessScheduleHooks};
 use crate::runtime::{
     blocking, driver,
-    task::{self, JoinHandle},
+    task::{self, JoinHandle, SpawnLocation},
     TaskHooks, TaskMeta,
 };
 use crate::util::RngSeedGenerator;
 
 use std::fmt;
-use std::panic::Location;
 
 mod metrics;
 
@@ -38,13 +37,17 @@ pub(crate) struct Handle {
 
 impl Handle {
     /// Spawns a future onto the thread pool
-    #[track_caller]
-    pub(crate) fn spawn<F>(me: &Arc<Self>, future: F, id: task::Id) -> JoinHandle<F::Output>
+    pub(crate) fn spawn<F>(
+        me: &Arc<Self>,
+        future: F,
+        id: task::Id,
+        spawned_at: SpawnLocation,
+    ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        Self::bind_new_task(me, future, id)
+        Self::bind_new_task(me, future, id, spawned_at)
     }
 
     pub(crate) fn shutdown(&self) {
@@ -52,16 +55,17 @@ impl Handle {
     }
 
     #[track_caller]
-    pub(super) fn bind_new_task<T>(me: &Arc<Self>, future: T, id: task::Id) -> JoinHandle<T::Output>
+    pub(super) fn bind_new_task<T>(
+        me: &Arc<Self>,
+        future: T,
+        id: task::Id,
+        spawned_at: SpawnLocation,
+    ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let spawned_at = Location::caller();
-        let (handle, notified) = me
-            .shared
-            .owned
-            .bind(future, me.clone(), id, spawned_at.into());
+        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
 
         me.task_hooks.spawn(&TaskMeta {
             id,

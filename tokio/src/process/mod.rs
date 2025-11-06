@@ -933,7 +933,7 @@ impl Command {
     #[inline]
     pub fn spawn_with(
         &mut self,
-        with: impl Fn(&mut StdCommand) -> io::Result<StdChild>,
+        with: impl FnOnce(&mut StdCommand) -> io::Result<StdChild>,
     ) -> io::Result<Child> {
         // On two lines to circumvent a mutable borrow check failure.
         let child = with(&mut self.std)?;
@@ -943,7 +943,7 @@ impl Command {
     /// Small indirection for the spawn implementations.
     ///
     /// This is introduced for [`Self::spawn`] and [`Self::spawn_with`] to use:
-    /// [`Self::spawn`] cannot depend directly on on [`Self::spawn_with`] since
+    /// [`Self::spawn`] cannot depend directly on [`Self::spawn_with`] since
     /// it is behind `tokio_unstable`. It also serves as a way to reduce
     /// monomorphization bloat by taking in an already-spawned child process
     /// instead of a command and custom spawn function.

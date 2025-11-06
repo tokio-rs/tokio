@@ -56,17 +56,17 @@ impl Tree {
         is_last: bool,
         prefix: &str,
     ) -> fmt::Result {
-        let root_fmt = format!("{}", root);
+        let root_fmt = format!("{root}");
 
         let current;
         let next;
 
         if is_last {
             current = format!("{prefix}└╼\u{a0}{root_fmt}");
-            next = format!("{}\u{a0}\u{a0}\u{a0}", prefix);
+            next = format!("{prefix}\u{a0}\u{a0}\u{a0}");
         } else {
             current = format!("{prefix}├╼\u{a0}{root_fmt}");
-            next = format!("{}│\u{a0}\u{a0}", prefix);
+            next = format!("{prefix}│\u{a0}\u{a0}");
         }
 
         write!(f, "{}", {

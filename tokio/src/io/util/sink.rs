@@ -37,13 +37,13 @@ cfg_io_util! {
     /// ```
     /// use tokio::io::{self, AsyncWriteExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let buffer = vec![1, 2, 3, 5, 8];
-    ///     let num_bytes = io::sink().write(&buffer).await?;
-    ///     assert_eq!(num_bytes, 5);
-    ///     Ok(())
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> io::Result<()> {
+    /// let buffer = vec![1, 2, 3, 5, 8];
+    /// let num_bytes = io::sink().write(&buffer).await?;
+    /// assert_eq!(num_bytes, 5);
+    /// Ok(())
+    /// # }
     /// ```
     pub fn sink() -> Sink {
         Sink { _p: () }

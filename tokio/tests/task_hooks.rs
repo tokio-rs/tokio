@@ -34,16 +34,14 @@ fn spawn_task_hook_fires() {
     let count_realized = count.load(Ordering::SeqCst);
     assert_eq!(
         TASKS, count_realized,
-        "Total number of spawned task hook invocations was incorrect, expected {TASKS}, got {}",
-        count_realized
+        "Total number of spawned task hook invocations was incorrect, expected {TASKS}, got {count_realized}"
     );
 
     let count_ids_realized = ids.lock().unwrap().len();
 
     assert_eq!(
         TASKS, count_ids_realized,
-        "Total number of spawned task hook invocations was incorrect, expected {TASKS}, got {}",
-        count_realized
+        "Total number of spawned task hook invocations was incorrect, expected {TASKS}, got {count_realized}"
     );
 }
 
@@ -100,16 +98,20 @@ fn task_hook_spawn_location_current_thread() {
 
     let task = runtime.spawn(async move { tokio::task::yield_now().await });
     runtime.block_on(async move {
+        // Spawn tasks using both `runtime.spawn(...)` and `tokio::spawn(...)`
+        // to ensure the correct location is captured in both code paths.
         task.await.unwrap();
+        tokio::spawn(async move {}).await.unwrap();
+
         // tick the runtime a bunch to close out tasks
         for _ in 0..ITERATIONS {
             tokio::task::yield_now().await;
         }
     });
 
-    assert_eq!(spawns.load(Ordering::SeqCst), 1);
+    assert_eq!(spawns.load(Ordering::SeqCst), 2);
     let poll_starts = poll_starts.load(Ordering::SeqCst);
-    assert!(poll_starts > 1);
+    assert!(poll_starts > 2);
     assert_eq!(poll_starts, poll_ends.load(Ordering::SeqCst));
 }
 
@@ -147,7 +149,10 @@ fn task_hook_spawn_location_multi_thread() {
 
     let task = runtime.spawn(async move { tokio::task::yield_now().await });
     runtime.block_on(async move {
+        // Spawn tasks using both `runtime.spawn(...)` and `tokio::spawn(...)`
+        // to ensure the correct location is captured in both code paths.
         task.await.unwrap();
+        tokio::spawn(async move {}).await.unwrap();
 
         // tick the runtime a bunch to close out tasks
         for _ in 0..ITERATIONS {
@@ -163,9 +168,9 @@ fn task_hook_spawn_location_multi_thread() {
     // `load(SeqCst)` because read-write-modify operations are guaranteed to
     // observe the latest value, while the load is not.
     // This avoids a race that may cause test flakiness.
-    assert_eq!(spawns.fetch_add(0, Ordering::SeqCst), 1);
+    assert_eq!(spawns.fetch_add(0, Ordering::SeqCst), 2);
     let poll_starts = poll_starts.fetch_add(0, Ordering::SeqCst);
-    assert!(poll_starts > 1);
+    assert!(poll_starts > 2);
     assert_eq!(poll_starts, poll_ends.fetch_add(0, Ordering::SeqCst));
 }
 
@@ -173,7 +178,7 @@ fn mk_spawn_location_hook(
     event: &'static str,
     count: &Arc<AtomicUsize>,
 ) -> impl Fn(&tokio::runtime::TaskMeta<'_>) {
-    let count = Arc::clone(&count);
+    let count = Arc::clone(count);
     move |data| {
         eprintln!("{event} ({:?}): {:?}", data.id(), data.spawned_at());
         // Assert that the spawn location is in this file.

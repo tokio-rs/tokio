@@ -1,7 +1,7 @@
 #![allow(unknown_lints, unexpected_cfgs)]
 #![cfg(all(
     tokio_unstable,
-    tokio_taskdump,
+    feature = "taskdump",
     target_os = "linux",
     any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
 ))]
@@ -92,8 +92,8 @@ async fn task_trace_self() {
     for line in good_line {
         let s = format!("{}:{}:", file!(), line);
         assert!(log.lock().unwrap().iter().any(|x| {
-            eprintln!("{}", x);
-            format!("{}", x).contains(&s)
+            eprintln!("{x}");
+            format!("{x}").contains(&s)
         }));
     }
     for line in bad_line {
@@ -102,6 +102,6 @@ async fn task_trace_self() {
             .lock()
             .unwrap()
             .iter()
-            .any(|x| format!("{}", x).contains(&s)));
+            .any(|x| format!("{x}").contains(&s)));
     }
 }

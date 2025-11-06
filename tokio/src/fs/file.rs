@@ -150,10 +150,7 @@ impl File {
     /// [`read_to_end`]: fn@crate::io::AsyncReadExt::read_to_end
     /// [`AsyncReadExt`]: trait@crate::io::AsyncReadExt
     pub async fn open(path: impl AsRef<Path>) -> io::Result<File> {
-        let path = path.as_ref().to_owned();
-        let std = asyncify(|| StdFile::open(path)).await?;
-
-        Ok(File::from_std(std))
+        Self::options().read(true).open(path).await
     }
 
     /// Opens a file in write-only mode.
@@ -188,9 +185,12 @@ impl File {
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn create(path: impl AsRef<Path>) -> io::Result<File> {
-        let path = path.as_ref().to_owned();
-        let std_file = asyncify(move || StdFile::create(path)).await?;
-        Ok(File::from_std(std_file))
+        Self::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .await
     }
 
     /// Opens a file in read-write mode.
@@ -465,7 +465,9 @@ impl File {
         self.inner.lock().await.complete_inflight().await;
         let std = self.std.clone();
         let std_file = asyncify(move || std.try_clone()).await?;
-        Ok(File::from_std(std_file))
+        let mut file = File::from_std(std_file);
+        file.set_max_buf_size(self.max_buf_size);
+        Ok(file)
     }
 
     /// Destructures `File` into a [`std::fs::File`]. This function is
@@ -507,6 +509,7 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    #[allow(clippy::result_large_err)]
     pub fn try_into_std(mut self) -> Result<StdFile, Self> {
         match Arc::try_unwrap(self.std) {
             Ok(file) => Ok(file),
@@ -577,6 +580,11 @@ impl File {
     /// ```
     pub fn set_max_buf_size(&mut self, max_buf_size: usize) {
         self.max_buf_size = max_buf_size;
+    }
+
+    /// Get the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.
+    pub fn max_buf_size(&self) -> usize {
+        self.max_buf_size
     }
 }
 

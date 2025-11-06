@@ -52,6 +52,8 @@ impl Handle {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// let rt = Runtime::new().unwrap();
@@ -60,12 +62,13 @@ impl Handle {
     /// tokio::spawn(async {
     ///     println!("Hello world!");
     /// });
+    /// # }
     /// ```
     ///
     /// Do **not** do the following, this shows a scenario that will result in a
     /// panic and possible memory leak.
     ///
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use tokio::runtime::Runtime;
     ///
     /// let rt1 = Runtime::new().unwrap();
@@ -106,6 +109,8 @@ impl Handle {
     /// block or function running on that runtime.
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use std::thread;
     /// # use tokio::runtime::Runtime;
     /// # fn dox() {
@@ -133,6 +138,7 @@ impl Handle {
     /// });
     /// # handle.join().unwrap();
     /// # });
+    /// # }
     /// # }
     /// ```
     #[track_caller]
@@ -170,6 +176,8 @@ impl Handle {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
@@ -182,6 +190,7 @@ impl Handle {
     /// handle.spawn(async {
     ///     println!("now running on a worker thread");
     /// });
+    /// # }
     /// # }
     /// ```
     #[track_caller]
@@ -204,6 +213,8 @@ impl Handle {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
@@ -217,6 +228,8 @@ impl Handle {
     ///     println!("now running on a worker thread");
     /// });
     /// # }
+    /// # }
+    /// ```
     #[track_caller]
     pub fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
@@ -249,13 +262,18 @@ impl Handle {
     ///
     /// # Panics
     ///
-    /// This function panics if the provided future panics, if called within an
-    /// asynchronous execution context, or if a timer future is executed on a runtime that has been
-    /// shut down.
+    /// This function will panic if any of the following conditions are met:
+    /// - The provided future panics.
+    /// - It is called from within an asynchronous context, such as inside
+    ///   [`Runtime::block_on`], `Handle::block_on`, or from a function annotated
+    ///   with [`tokio::main`].
+    /// - A timer future is executed on a runtime that has been shut down.
     ///
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// // Create the runtime
@@ -268,11 +286,14 @@ impl Handle {
     /// handle.block_on(async {
     ///     println!("hello");
     /// });
+    /// # }
     /// ```
     ///
     /// Or using `Handle::current`:
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Handle;
     ///
     /// #[tokio::main]
@@ -285,6 +306,25 @@ impl Handle {
     ///         });
     ///     });
     /// }
+    /// # }
+    /// ```
+    ///
+    /// `Handle::block_on` may be combined with [`task::block_in_place`] to
+    /// re-enter the async context of a multi-thread scheduler runtime:
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::task;
+    /// use tokio::runtime::Handle;
+    ///
+    /// # async fn docs() {
+    /// task::block_in_place(move || {
+    ///     Handle::current().block_on(async move {
+    ///         // do something async
+    ///     });
+    /// });
+    /// # }
+    /// # }
     /// ```
     ///
     /// [`JoinError`]: struct@crate::task::JoinError
@@ -296,6 +336,8 @@ impl Handle {
     /// [`tokio::fs`]: crate::fs
     /// [`tokio::net`]: crate::net
     /// [`tokio::time`]: crate::time
+    /// [`tokio::main`]: ../attr.main.html
+    /// [`task::block_in_place`]: crate::task::block_in_place
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let fut_size = mem::size_of::<F>();
@@ -310,7 +352,7 @@ impl Handle {
     fn block_on_inner<F: Future>(&self, future: F, _meta: SpawnMeta<'_>) -> F::Output {
         #[cfg(all(
             tokio_unstable,
-            tokio_taskdump,
+            feature = "taskdump",
             feature = "rt",
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
@@ -329,7 +371,7 @@ impl Handle {
     }
 
     #[track_caller]
-    pub(crate) fn spawn_named<F>(&self, future: F, _meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
+    pub(crate) fn spawn_named<F>(&self, future: F, meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
@@ -337,15 +379,15 @@ impl Handle {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(
             tokio_unstable,
-            tokio_taskdump,
+            feature = "taskdump",
             feature = "rt",
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
         ))]
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task", _meta, id.as_u64());
-        self.inner.spawn(future, id)
+        let future = crate::util::trace::task(future, "task", meta, id.as_u64());
+        self.inner.spawn(future, id, meta.spawned_at)
     }
 
     #[track_caller]
@@ -353,7 +395,7 @@ impl Handle {
     pub(crate) unsafe fn spawn_local_named<F>(
         &self,
         future: F,
-        _meta: SpawnMeta<'_>,
+        meta: SpawnMeta<'_>,
     ) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -362,15 +404,15 @@ impl Handle {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(
             tokio_unstable,
-            tokio_taskdump,
+            feature = "taskdump",
             feature = "rt",
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
         ))]
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(future, "task", _meta, id.as_u64());
-        self.inner.spawn_local(future, id)
+        let future = crate::util::trace::task(future, "task", meta, id.as_u64());
+        self.inner.spawn_local(future, id, meta.spawned_at)
     }
 
     /// Returns the flavor of the current `Runtime`.
@@ -387,12 +429,15 @@ impl Handle {
     /// ```
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::{Handle, RuntimeFlavor};
     ///
     /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
     /// async fn main() {
     ///   assert_eq!(RuntimeFlavor::MultiThread, Handle::current().runtime_flavor());
     /// }
+    /// # }
     /// ```
     pub fn runtime_flavor(&self) -> RuntimeFlavor {
         match self.inner {
@@ -514,19 +559,19 @@ cfg_taskdump! {
         /// ## Unstable Features
         ///
         /// This functionality is **unstable**, and requires both the
-        /// `tokio_unstable` and `tokio_taskdump` `cfg` flags to be set.
+        /// `--cfg tokio_unstable` and cargo feature `taskdump` to be set.
         ///
         /// You can do this by setting the `RUSTFLAGS` environment variable
         /// before invoking `cargo`; e.g.:
         /// ```bash
-        /// RUSTFLAGS="--cfg tokio_unstable --cfg tokio_taskdump" cargo run --example dump
+        /// RUSTFLAGS="--cfg tokio_unstable cargo run --example dump
         /// ```
         ///
         /// Or by [configuring][cargo-config] `rustflags` in
         /// `.cargo/config.toml`:
         /// ```text
         /// [build]
-        /// rustflags = ["--cfg", "tokio_unstable", "--cfg", "tokio_taskdump"]
+        /// rustflags = ["--cfg", "tokio_unstable"]
         /// ```
         ///
         /// [cargo-config]:
@@ -546,7 +591,7 @@ cfg_taskdump! {
         ///
         /// ## Performance
         ///
-        /// Although enabling the `tokio_taskdump` feature imposes virtually no
+        /// Although enabling the `taskdump` feature imposes virtually no
         /// additional runtime overhead, actually calling `Handle::dump` is
         /// expensive. The runtime must synchronize and pause its workers, then
         /// re-poll every task in a special tracing mode. Avoid requesting dumps

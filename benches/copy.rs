@@ -145,7 +145,7 @@ impl ChunkReader {
     fn new(chunk_size: usize, service_interval: Duration) -> Self {
         let mut service_intervals = interval(service_interval);
         service_intervals.set_missed_tick_behavior(MissedTickBehavior::Burst);
-        let data: Vec<u8> = std::iter::repeat(0).take(chunk_size).collect();
+        let data: Vec<u8> = std::iter::repeat_n(0, chunk_size).collect();
         Self {
             data,
             service_intervals,

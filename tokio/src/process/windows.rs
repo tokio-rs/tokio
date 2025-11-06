@@ -28,13 +28,12 @@ use std::os::windows::prelude::{AsRawHandle, IntoRawHandle, OwnedHandle, RawHand
 use std::pin::Pin;
 use std::process::Stdio;
 use std::process::{Child as StdChild, ExitStatus};
+use std::ptr::null_mut;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use windows_sys::{
-    Win32::Foundation::{
-        DuplicateHandle, BOOLEAN, DUPLICATE_SAME_ACCESS, HANDLE, INVALID_HANDLE_VALUE,
-    },
+    Win32::Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS, HANDLE, INVALID_HANDLE_VALUE},
     Win32::System::Threading::{
         GetCurrentProcess, RegisterWaitForSingleObject, UnregisterWaitEx, INFINITE,
         WT_EXECUTEINWAITTHREAD, WT_EXECUTEONLYONCE,
@@ -119,7 +118,7 @@ impl Future for Child {
             }
             let (tx, rx) = oneshot::channel();
             let ptr = Box::into_raw(Box::new(Some(tx)));
-            let mut wait_object = 0;
+            let mut wait_object = null_mut();
             let rc = unsafe {
                 RegisterWaitForSingleObject(
                     &mut wait_object,
@@ -162,7 +161,7 @@ impl Drop for Waiting {
     }
 }
 
-unsafe extern "system" fn callback(ptr: *mut std::ffi::c_void, _timer_fired: BOOLEAN) {
+unsafe extern "system" fn callback(ptr: *mut std::ffi::c_void, _timer_fired: bool) {
     let complete = &mut *(ptr as *mut Option<oneshot::Sender<()>>);
     let _ = complete.take().unwrap().send(());
 }

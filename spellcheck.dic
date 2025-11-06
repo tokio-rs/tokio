@@ -1,4 +1,4 @@
-306
+308
 &
 +
 <
@@ -75,6 +75,7 @@ CQE
 cqe's
 customizable
 Customizable
+Cygwin
 datagram
 Datagram
 datagrams
@@ -184,15 +185,16 @@ mut
 mutex
 Mutex
 Nagle
+namespace
 nonblocking
 nondecreasing
 noop
 ntasks
+NUMA
 ok
 oneshot
 ORed
 os
-overweighing
 parker
 parsers
 peekable

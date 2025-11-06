@@ -15,7 +15,6 @@ use std::{
 ///
 /// [aborts]: tokio::task::JoinHandle::abort
 #[must_use = "Dropping the handle aborts the task immediately"]
-#[derive(Debug)]
 pub struct AbortOnDropHandle<T>(JoinHandle<T>);
 
 impl<T> Drop for AbortOnDropHandle<T> {
@@ -58,6 +57,14 @@ impl<T> AbortOnDropHandle<T> {
     }
 }
 
+impl<T> std::fmt::Debug for AbortOnDropHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AbortOnDropHandle")
+            .field("id", &self.0.id())
+            .finish()
+    }
+}
+
 impl<T> Future for AbortOnDropHandle<T> {
     type Output = Result<T, JoinError>;
 
@@ -69,5 +76,20 @@ impl<T> Future for AbortOnDropHandle<T> {
 impl<T> AsRef<JoinHandle<T>> for AbortOnDropHandle<T> {
     fn as_ref(&self) -> &JoinHandle<T> {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A simple type that does not implement [`std::fmt::Debug`].
+    struct NotDebug;
+
+    fn is_debug<T: std::fmt::Debug>() {}
+
+    #[test]
+    fn assert_debug() {
+        is_debug::<AbortOnDropHandle<NotDebug>>();
     }
 }

@@ -68,7 +68,7 @@ impl Handle {
 cfg_rt! {
     use crate::future::Future;
     use crate::loom::sync::Arc;
-    use crate::runtime::{blocking, task::Id};
+    use crate::runtime::{blocking, task::{Id, SpawnLocation}};
     use crate::runtime::context;
     use crate::task::JoinHandle;
     use crate::util::RngSeedGenerator;
@@ -117,17 +117,16 @@ cfg_rt! {
             }
         }
 
-        #[track_caller]
-        pub(crate) fn spawn<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
+        pub(crate) fn spawn<F>(&self, future: F, id: Id, spawned_at: SpawnLocation) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
             match self {
-                Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id),
+                Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id, spawned_at),
 
                 #[cfg(feature = "rt-multi-thread")]
-                Handle::MultiThread(h) => multi_thread::Handle::spawn(h, future, id),
+                Handle::MultiThread(h) => multi_thread::Handle::spawn(h, future, id, spawned_at),
             }
         }
 
@@ -138,13 +137,13 @@ cfg_rt! {
         /// by the current thread.
         #[allow(irrefutable_let_patterns)]
         #[track_caller]
-        pub(crate) unsafe fn spawn_local<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
+        pub(crate) unsafe fn spawn_local<F>(&self, future: F, id: Id, spawned_at: SpawnLocation) -> JoinHandle<F::Output>
         where
             F: Future + 'static,
             F::Output: 'static,
         {
             if let Handle::CurrentThread(h) = self {
-                current_thread::Handle::spawn_local(h, future, id)
+                current_thread::Handle::spawn_local(h, future, id, spawned_at)
             } else {
                 panic!("Only current_thread and LocalSet have spawn_local internals implemented")
             }

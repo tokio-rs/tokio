@@ -20,9 +20,6 @@ R-loom-multi-thread:
 - tokio/src/runtime/task/*
 - tokio/src/runtime/task/**
 
-R-loom-multi-thread-alt:
-- tokio/src/runtime/scheduler/*
-- tokio/src/runtime/scheduler/multi_thread_alt/*
-- tokio/src/runtime/scheduler/multi_thread_alt/**
-- tokio/src/runtime/task/*
-- tokio/src/runtime/task/**
+R-loom-util:
+- tokio-util/src/*
+- tokio-util/src/**/*

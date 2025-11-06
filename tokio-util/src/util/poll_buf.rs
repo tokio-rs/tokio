@@ -18,7 +18,7 @@ use std::task::{ready, Context, Poll};
 /// use tokio_util::io::{StreamReader, poll_read_buf};
 /// use std::future::poll_fn;
 /// use std::pin::Pin;
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
 ///
 /// // Create a reader from an iterator. This particular reader will always be

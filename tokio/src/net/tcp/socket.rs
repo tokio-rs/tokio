@@ -252,7 +252,7 @@ impl TcpSocket {
     }
 
     /// Allows the socket to bind to an in-use port. Only available for unix systems
-    /// (excluding Solaris & Illumos).
+    /// (excluding Solaris, Illumos, and Cygwin).
     ///
     /// Behavior is platform specific. Refer to the target platform's
     /// documentation for more details.
@@ -296,7 +296,7 @@ impl TcpSocket {
     }
 
     /// Allows the socket to bind to an in-use port. Only available for unix systems
-    /// (excluding Solaris & Illumos).
+    /// (excluding Solaris, Illumos, and Cygwin).
     ///
     /// Behavior is platform specific. Refer to the target platform's
     /// documentation for more details.
@@ -450,7 +450,7 @@ impl TcpSocket {
     /// # }
     /// ```
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-        self.inner.set_nodelay(nodelay)
+        self.inner.set_tcp_nodelay(nodelay)
     }
 
     /// Gets the value of the `TCP_NODELAY` option on this socket.
@@ -472,7 +472,7 @@ impl TcpSocket {
     /// # }
     /// ```
     pub fn nodelay(&self) -> io::Result<bool> {
-        self.inner.nodelay()
+        self.inner.tcp_nodelay()
     }
 
     /// Gets the value of the `IP_TOS` option for this socket.
@@ -502,7 +502,7 @@ impl TcpSocket {
         ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
-        self.inner.tos()
+        self.inner.tos_v4()
     }
 
     /// Sets the value for the `IP_TOS` option on this socket.
@@ -531,7 +531,7 @@ impl TcpSocket {
         ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
-        self.inner.set_tos(tos)
+        self.inner.set_tos_v4(tos)
     }
 
     /// Gets the value for the `SO_BINDTODEVICE` option on this socket

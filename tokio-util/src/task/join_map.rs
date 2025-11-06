@@ -1,10 +1,10 @@
-use hashbrown::hash_map::RawEntryMut;
-use hashbrown::HashMap;
+use hashbrown::hash_table::Entry;
+use hashbrown::{HashMap, HashTable};
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::fmt;
 use std::future::Future;
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 use tokio::runtime::Handle;
 use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
@@ -29,10 +29,6 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 ///
 /// When the `JoinMap` is dropped, all tasks in the `JoinMap` are immediately aborted.
 ///
-/// **Note**: This type depends on Tokio's [unstable API][unstable]. See [the
-/// documentation on unstable features][unstable] for details on how to enable
-/// Tokio's unstable features.
-///
 /// # Examples
 ///
 /// Spawn multiple tasks and wait for them:
@@ -40,28 +36,28 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// ```
 /// use tokio_util::task::JoinMap;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut map = JoinMap::new();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut map = JoinMap::new();
 ///
-///     for i in 0..10 {
-///         // Spawn a task on the `JoinMap` with `i` as its key.
-///         map.spawn(i, async move { /* ... */ });
-///     }
-///
-///     let mut seen = [false; 10];
-///
-///     // When a task completes, `join_next` returns the task's key along
-///     // with its output.
-///     while let Some((key, res)) = map.join_next().await {
-///         seen[key] = true;
-///         assert!(res.is_ok(), "task {} completed successfully!", key);
-///     }
-///
-///     for i in 0..10 {
-///         assert!(seen[i]);
-///     }
+/// for i in 0..10 {
+///     // Spawn a task on the `JoinMap` with `i` as its key.
+///     map.spawn(i, async move { /* ... */ });
 /// }
+///
+/// let mut seen = [false; 10];
+///
+/// // When a task completes, `join_next` returns the task's key along
+/// // with its output.
+/// while let Some((key, res)) = map.join_next().await {
+///     seen[key] = true;
+///     assert!(res.is_ok(), "task {} completed successfully!", key);
+/// }
+///
+/// for i in 0..10 {
+///     assert!(seen[i]);
+/// }
+/// # }
 /// ```
 ///
 /// Cancel tasks based on their keys:
@@ -69,47 +65,40 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// ```
 /// use tokio_util::task::JoinMap;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut map = JoinMap::new();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut map = JoinMap::new();
 ///
-///     map.spawn("hello world", async move { /* ... */ });
-///     map.spawn("goodbye world", async move { /* ... */});
+/// map.spawn("hello world", std::future::ready(1));
+/// map.spawn("goodbye world", std::future::pending());
 ///
-///     // Look up the "goodbye world" task in the map and abort it.
-///     let aborted = map.abort("goodbye world");
+/// // Look up the "goodbye world" task in the map and abort it.
+/// let aborted = map.abort("goodbye world");
 ///
-///     // `JoinMap::abort` returns `true` if a task existed for the
-///     // provided key.
-///     assert!(aborted);
+/// // `JoinMap::abort` returns `true` if a task existed for the
+/// // provided key.
+/// assert!(aborted);
 ///
-///     while let Some((key, res)) = map.join_next().await {
-///         if key == "goodbye world" {
-///             // The aborted task should complete with a cancelled `JoinError`.
-///             assert!(res.unwrap_err().is_cancelled());
-///         } else {
-///             // Other tasks should complete normally.
-///             assert!(res.is_ok());
-///         }
+/// while let Some((key, res)) = map.join_next().await {
+///     if key == "goodbye world" {
+///         // The aborted task should complete with a cancelled `JoinError`.
+///         assert!(res.unwrap_err().is_cancelled());
+///     } else {
+///         // Other tasks should complete normally.
+///         assert_eq!(res.unwrap(), 1);
 ///     }
 /// }
+/// # }
 /// ```
 ///
 /// [`JoinSet`]: tokio::task::JoinSet
-/// [unstable]: tokio#unstable-features
 /// [abort]: fn@Self::abort
 /// [abort_matching]: fn@Self::abort_matching
 /// [contains]: fn@Self::contains_key
-#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
     /// A map of the [`AbortHandle`]s of the tasks spawned on this `JoinMap`,
-    /// indexed by their keys and task IDs.
-    ///
-    /// The [`Key`] type contains both the task's `K`-typed key provided when
-    /// spawning tasks, and the task's IDs. The IDs are stored here to resolve
-    /// hash collisions when looking up tasks based on their pre-computed hash
-    /// (as stored in the `hashes_by_task` map).
-    tasks_by_key: HashMap<Key<K>, AbortHandle, S>,
+    /// indexed by their keys.
+    tasks_by_key: HashTable<(K, AbortHandle)>,
 
     /// A map from task IDs to the hash of the key associated with that task.
     ///
@@ -123,21 +112,6 @@ pub struct JoinMap<K, V, S = RandomState> {
     /// The [`JoinSet`] that awaits the completion of tasks spawned on this
     /// `JoinMap`.
     tasks: JoinSet<V>,
-}
-
-/// A [`JoinMap`] key.
-///
-/// This holds both a `K`-typed key (the actual key as seen by the user), _and_
-/// a task ID, so that hash collisions between `K`-typed keys can be resolved
-/// using either `K`'s `Eq` impl *or* by checking the task IDs.
-///
-/// This allows looking up a task using either an actual key (such as when the
-/// user queries the map with a key), *or* using a task ID and a hash (such as
-/// when removing completed tasks from the map).
-#[derive(Debug)]
-struct Key<K> {
-    key: K,
-    id: Id,
 }
 
 impl<K, V> JoinMap<K, V> {
@@ -176,7 +150,7 @@ impl<K, V> JoinMap<K, V> {
     }
 }
 
-impl<K, V, S: Clone> JoinMap<K, V, S> {
+impl<K, V, S> JoinMap<K, V, S> {
     /// Creates an empty `JoinMap` which will use the given hash builder to hash
     /// keys.
     ///
@@ -212,7 +186,7 @@ impl<K, V, S: Clone> JoinMap<K, V, S> {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;
     /// use std::collections::hash_map::RandomState;
@@ -226,7 +200,7 @@ impl<K, V, S: Clone> JoinMap<K, V, S> {
     #[must_use]
     pub fn with_capacity_and_hasher(capacity: usize, hash_builder: S) -> Self {
         Self {
-            tasks_by_key: HashMap::with_capacity_and_hasher(capacity, hash_builder.clone()),
+            tasks_by_key: HashTable::with_capacity(capacity),
             hashes_by_task: HashMap::with_capacity_and_hasher(capacity, hash_builder),
             tasks: JoinSet::new(),
         }
@@ -371,8 +345,8 @@ where
         self.insert(key, task);
     }
 
-    /// Spawn the provided task on the current [`LocalSet`] and store it in this
-    /// `JoinMap` with the provided key.
+    /// Spawn the provided task on the current [`LocalSet`] or [`LocalRuntime`]
+    /// and store it in this `JoinMap` with the provided key.
     ///
     /// If a task previously existed in the `JoinMap` for this key, that task
     /// will be cancelled and replaced with the new one. The previous task will
@@ -381,9 +355,10 @@ where
     ///
     /// # Panics
     ///
-    /// This method panics if it is called outside of a `LocalSet`.
+    /// This method panics if it is called outside of a `LocalSet` or `LocalRuntime`.
     ///
     /// [`LocalSet`]: tokio::task::LocalSet
+    /// [`LocalRuntime`]: tokio::runtime::LocalRuntime
     /// [`join_next`]: Self::join_next
     #[track_caller]
     pub fn spawn_local<F>(&mut self, key: K, task: F)
@@ -415,33 +390,42 @@ where
         self.insert(key, task)
     }
 
-    fn insert(&mut self, key: K, abort: AbortHandle) {
-        let hash = self.hash(&key);
+    fn insert(&mut self, mut key: K, mut abort: AbortHandle) {
+        let hash_builder = self.hashes_by_task.hasher();
+        let hash = hash_builder.hash_one(&key);
         let id = abort.id();
-        let map_key = Key { id, key };
 
         // Insert the new key into the map of tasks by keys.
-        let entry = self
-            .tasks_by_key
-            .raw_entry_mut()
-            .from_hash(hash, |k| k.key == map_key.key);
+        let entry =
+            self.tasks_by_key
+                .entry(hash, |(k, _)| *k == key, |(k, _)| hash_builder.hash_one(k));
         match entry {
-            RawEntryMut::Occupied(mut occ) => {
+            Entry::Occupied(occ) => {
                 // There was a previous task spawned with the same key! Cancel
                 // that task, and remove its ID from the map of hashes by task IDs.
-                let Key { id: prev_id, .. } = occ.insert_key(map_key);
-                occ.insert(abort).abort();
-                let _prev_hash = self.hashes_by_task.remove(&prev_id);
+                (key, abort) = std::mem::replace(occ.into_mut(), (key, abort));
+
+                // Remove the old task ID.
+                let _prev_hash = self.hashes_by_task.remove(&abort.id());
                 debug_assert_eq!(Some(hash), _prev_hash);
+
+                // Associate the key's hash with the new task's ID, for looking up tasks by ID.
+                let _prev = self.hashes_by_task.insert(id, hash);
+                debug_assert!(_prev.is_none(), "no prior task should have had the same ID");
+
+                // Note: it's important to drop `key` and abort the task here.
+                // This defends against any panics during drop handling for causing inconsistent state.
+                abort.abort();
+                drop(key);
             }
-            RawEntryMut::Vacant(vac) => {
-                vac.insert(map_key, abort);
+            Entry::Vacant(vac) => {
+                vac.insert((key, abort));
+
+                // Associate the key's hash with this task's ID, for looking up tasks by ID.
+                let _prev = self.hashes_by_task.insert(id, hash);
+                debug_assert!(_prev.is_none(), "no prior task should have had the same ID");
             }
         };
-
-        // Associate the key's hash with this task's ID, for looking up tasks by ID.
-        let _prev = self.hashes_by_task.insert(id, hash);
-        debug_assert!(_prev.is_none(), "no prior task should have had the same ID");
     }
 
     /// Waits until one of the tasks in the map completes and returns its
@@ -512,12 +496,12 @@ where
     /// ```
     /// use tokio_util::task::JoinMap;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut map = JoinMap::new();
     ///
-    /// map.spawn("hello world", async move { /* ... */ });
-    /// map.spawn("goodbye world", async move { /* ... */});
+    /// map.spawn("hello world", std::future::ready(1));
+    /// map.spawn("goodbye world", std::future::pending());
     ///
     /// // Look up the "goodbye world" task in the map and abort it.
     /// map.abort("goodbye world");
@@ -528,7 +512,7 @@ where
     ///         assert!(res.unwrap_err().is_cancelled());
     ///     } else {
     ///         // Other tasks should complete normally.
-    ///         assert!(res.is_ok());
+    ///         assert_eq!(res.unwrap(), 1);
     ///     }
     /// }
     /// # }
@@ -538,7 +522,7 @@ where
     /// ```
     /// use tokio_util::task::JoinMap;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut map = JoinMap::new();
     ///
@@ -552,9 +536,9 @@ where
     /// assert!(!map.abort("goodbye universe"));
     /// # }
     /// ```
-    pub fn abort<Q: ?Sized>(&mut self, key: &Q) -> bool
+    pub fn abort<Q>(&mut self, key: &Q) -> bool
     where
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
         K: Borrow<Q>,
     {
         match self.get_by_key(key) {
@@ -623,7 +607,7 @@ where
         // Note: this method iterates over the tasks and keys *without* removing
         // any entries, so that the keys from aborted tasks can still be
         // returned when calling `join_next` in the future.
-        for (Key { ref key, .. }, task) in &self.tasks_by_key {
+        for (key, task) in &self.tasks_by_key {
             if predicate(key) {
                 task.abort();
             }
@@ -638,7 +622,7 @@ where
     /// [`join_next`]: fn@Self::join_next
     pub fn keys(&self) -> JoinMapKeys<'_, K, V> {
         JoinMapKeys {
-            iter: self.tasks_by_key.keys(),
+            iter: self.tasks_by_key.iter(),
             _value: PhantomData,
         }
     }
@@ -649,9 +633,9 @@ where
     /// call to [`join_next`], this method will still return `true`.
     ///
     /// [`join_next`]: fn@Self::join_next
-    pub fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
+    pub fn contains_key<Q>(&self, key: &Q) -> bool
     where
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
         K: Borrow<Q>,
     {
         self.get_by_key(key).is_some()
@@ -666,7 +650,7 @@ where
     /// [`join_next`]: fn@Self::join_next
     /// [task ID]: tokio::task::Id
     pub fn contains_task(&self, task: &Id) -> bool {
-        self.get_by_id(task).is_some()
+        self.hashes_by_task.contains_key(task)
     }
 
     /// Reserves capacity for at least `additional` more tasks to be spawned
@@ -690,7 +674,9 @@ where
     /// ```
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        self.tasks_by_key.reserve(additional);
+        self.tasks_by_key.reserve(additional, |(k, _)| {
+            self.hashes_by_task.hasher().hash_one(k)
+        });
         self.hashes_by_task.reserve(additional);
     }
 
@@ -701,7 +687,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;
     ///
@@ -716,7 +702,8 @@ where
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.hashes_by_task.shrink_to_fit();
-        self.tasks_by_key.shrink_to_fit();
+        self.tasks_by_key
+            .shrink_to_fit(|(k, _)| self.hashes_by_task.hasher().hash_one(k));
     }
 
     /// Shrinks the capacity of the map with a lower limit. It will drop
@@ -728,7 +715,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;
     ///
@@ -745,27 +732,19 @@ where
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.hashes_by_task.shrink_to(min_capacity);
-        self.tasks_by_key.shrink_to(min_capacity)
+        self.tasks_by_key.shrink_to(min_capacity, |(k, _)| {
+            self.hashes_by_task.hasher().hash_one(k)
+        })
     }
 
     /// Look up a task in the map by its key, returning the key and abort handle.
-    fn get_by_key<'map, Q: ?Sized>(&'map self, key: &Q) -> Option<(&'map Key<K>, &'map AbortHandle)>
+    fn get_by_key<'map, Q>(&'map self, key: &Q) -> Option<&'map (K, AbortHandle)>
     where
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
         K: Borrow<Q>,
     {
-        let hash = self.hash(key);
-        self.tasks_by_key
-            .raw_entry()
-            .from_hash(hash, |k| k.key.borrow() == key)
-    }
-
-    /// Look up a task in the map by its task ID, returning the key and abort handle.
-    fn get_by_id<'map>(&'map self, id: &Id) -> Option<(&'map Key<K>, &'map AbortHandle)> {
-        let hash = self.hashes_by_task.get(id)?;
-        self.tasks_by_key
-            .raw_entry()
-            .from_hash(*hash, |k| &k.id == id)
+        let hash = self.hashes_by_task.hasher().hash_one(key);
+        self.tasks_by_key.find(hash, |(k, _)| k.borrow() == key)
     }
 
     /// Remove a task from the map by ID, returning the key for that task.
@@ -776,27 +755,12 @@ where
         // Remove the entry for that hash.
         let entry = self
             .tasks_by_key
-            .raw_entry_mut()
-            .from_hash(hash, |k| k.id == id);
-        let (Key { id: _key_id, key }, handle) = match entry {
-            RawEntryMut::Occupied(entry) => entry.remove_entry(),
+            .find_entry(hash, |(_, abort)| abort.id() == id);
+        let (key, _) = match entry {
+            Ok(entry) => entry.remove().0,
             _ => return None,
         };
-        debug_assert_eq!(_key_id, id);
-        debug_assert_eq!(id, handle.id());
-        self.hashes_by_task.remove(&id);
         Some(key)
-    }
-
-    /// Returns the hash for a given key.
-    #[inline]
-    fn hash<Q: ?Sized>(&self, key: &Q) -> u64
-    where
-        Q: Hash,
-    {
-        let mut hasher = self.tasks_by_key.hasher().build_hasher();
-        key.hash(&mut hasher);
-        hasher.finish()
     }
 }
 
@@ -831,11 +795,11 @@ impl<K: fmt::Debug, V, S> fmt::Debug for JoinMap<K, V, S> {
         // printing the key and task ID pairs, without format the `Key` struct
         // itself or the `AbortHandle`, which would just format the task's ID
         // again.
-        struct KeySet<'a, K: fmt::Debug, S>(&'a HashMap<Key<K>, AbortHandle, S>);
-        impl<K: fmt::Debug, S> fmt::Debug for KeySet<'_, K, S> {
+        struct KeySet<'a, K: fmt::Debug>(&'a HashTable<(K, AbortHandle)>);
+        impl<K: fmt::Debug> fmt::Debug for KeySet<'_, K> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.debug_map()
-                    .entries(self.0.keys().map(|Key { key, id }| (key, id)))
+                    .entries(self.0.iter().map(|(key, abort)| (key, abort.id())))
                     .finish()
             }
         }
@@ -856,31 +820,10 @@ impl<K, V> Default for JoinMap<K, V> {
     }
 }
 
-// === impl Key ===
-
-impl<K: Hash> Hash for Key<K> {
-    // Don't include the task ID in the hash.
-    #[inline]
-    fn hash<H: Hasher>(&self, hasher: &mut H) {
-        self.key.hash(hasher);
-    }
-}
-
-// Because we override `Hash` for this type, we must also override the
-// `PartialEq` impl, so that all instances with the same hash are equal.
-impl<K: PartialEq> PartialEq for Key<K> {
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.key == other.key
-    }
-}
-
-impl<K: Eq> Eq for Key<K> {}
-
 /// An iterator over the keys of a [`JoinMap`].
 #[derive(Debug, Clone)]
 pub struct JoinMapKeys<'a, K, V> {
-    iter: hashbrown::hash_map::Keys<'a, Key<K>, AbortHandle>,
+    iter: hashbrown::hash_table::Iter<'a, (K, AbortHandle)>,
     /// To make it easier to change `JoinMap` in the future, keep V as a generic
     /// parameter.
     _value: PhantomData<&'a V>,
@@ -890,7 +833,7 @@ impl<'a, K, V> Iterator for JoinMapKeys<'a, K, V> {
     type Item = &'a K;
 
     fn next(&mut self) -> Option<&'a K> {
-        self.iter.next().map(|key| &key.key)
+        self.iter.next().map(|(key, _)| key)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

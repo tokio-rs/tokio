@@ -19,6 +19,8 @@ cfg_net! {
     ///
     /// A `TcpListener` can be turned into a `Stream` with [`TcpListenerStream`].
     ///
+    /// The socket will be closed when the value is dropped.
+    ///
     /// [`TcpListenerStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.TcpListenerStream.html
     ///
     /// # Errors
@@ -73,7 +75,7 @@ impl TcpListener {
         /// the addresses succeed in creating a listener, the error returned from
         /// the last attempt (the last address) is returned.
         ///
-        /// This function sets the `SO_REUSEADDR` option on the socket.
+        /// This function sets the `SO_REUSEADDR` option on the socket on Unix.
         ///
         /// To configure the socket before binding, you can use the [`TcpSocket`]
         /// type.
@@ -399,7 +401,7 @@ impl TryFrom<net::TcpListener> for TcpListener {
 
 impl fmt::Debug for TcpListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        (*self.io).fmt(f)
     }
 }
 
