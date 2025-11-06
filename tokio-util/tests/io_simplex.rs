@@ -237,7 +237,10 @@ async fn cooperative_scheduling() {
     let mut is_pending = false;
     let io_slices = &[IoSlice::new(&[0u8; 1])];
     for _ in 0..INITIAL_BUDGET + 1 {
-        match tx.as_mut().poll_write_vectored(&mut noop_context(), io_slices) {
+        match tx
+            .as_mut()
+            .poll_write_vectored(&mut noop_context(), io_slices)
+        {
             Poll::Pending => {
                 is_pending = true;
                 break;
