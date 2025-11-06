@@ -272,6 +272,8 @@ impl AsyncWrite for Sender {
             return Poll::Pending;
         }
 
+        ready!(poll_proceed_and_make_progress(cx));
+
         let mut rem = free;
         for buf in bufs {
             if rem == 0 {

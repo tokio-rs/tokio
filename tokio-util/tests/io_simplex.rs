@@ -232,6 +232,23 @@ async fn cooperative_scheduling() {
     }
     assert!(is_pending);
 
+    let (tx, _rx) = simplex::new(INITIAL_BUDGET * 2);
+    pin_mut!(tx);
+    let mut is_pending = false;
+    let io_slices = &[IoSlice::new(&[0u8; 1])];
+    for _ in 0..INITIAL_BUDGET + 1 {
+        match tx.as_mut().poll_write_vectored(&mut noop_context(), io_slices) {
+            Poll::Pending => {
+                is_pending = true;
+                break;
+            }
+            Poll::Ready(Ok(1)) => {}
+            Poll::Ready(Ok(n)) => panic!("wrote too many bytes: {n}"),
+            Poll::Ready(Err(e)) => panic!("{e}"),
+        }
+    }
+    assert!(is_pending);
+
     let (mut tx, rx) = simplex::new(INITIAL_BUDGET * 2);
     tx.write_all(&[0u8; INITIAL_BUDGET + 2]).await.unwrap();
     pin_mut!(rx);
