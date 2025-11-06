@@ -170,7 +170,7 @@ impl Drop for Sender {
 }
 
 impl AsyncWrite for Sender {
-    /// # Error
+    /// # Errors
     ///
     /// This method will return [`IoErrorKind::BrokenPipe`]
     /// if the channel has been closed.
@@ -212,7 +212,7 @@ impl AsyncWrite for Sender {
         Poll::Ready(Ok(to_write))
     }
 
-    /// # Error
+    /// # Errors
     ///
     /// This method will return [`IoErrorKind::BrokenPipe`]
     /// if the channel has been closed.
