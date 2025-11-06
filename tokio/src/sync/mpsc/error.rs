@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::fmt;
 
-/// Error returned by the `Sender`.
+/// Error returned by [`Sender::send`](super::Sender::send).
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct SendError<T>(pub T);
 
@@ -23,8 +23,7 @@ impl<T> Error for SendError<T> {}
 
 // ===== TrySendError =====
 
-/// This enumeration is the list of the possible error outcomes for the
-/// [`try_send`](super::Sender::try_send) method.
+/// Error returned by [`Sender::try_send`](super::Sender::try_send).
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum TrySendError<T> {
     /// The data could not be sent on the channel because the channel is
@@ -78,7 +77,7 @@ impl<T> From<SendError<T>> for TrySendError<T> {
 
 // ===== TryRecvError =====
 
-/// Error returned by `try_recv`.
+/// Error returned by [`Receiver::try_recv`](super::Receiver::try_recv).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum TryRecvError {
     /// This **channel** is currently empty, but the **Sender**(s) have not yet
@@ -122,7 +121,7 @@ cfg_time! {
     // ===== SendTimeoutError =====
 
     #[derive(PartialEq, Eq, Clone, Copy)]
-    /// Error returned by [`Sender::send_timeout`](super::Sender::send_timeout)].
+    /// Error returned by [`Sender::send_timeout`](super::Sender::send_timeout).
     pub enum SendTimeoutError<T> {
         /// The data could not be sent on the channel because the channel is
         /// full, and the timeout to send has elapsed.
