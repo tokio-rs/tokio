@@ -4,7 +4,7 @@ name = "tokio-util"
 # - Remove path dependencies
 # - Update CHANGELOG.md.
 # - Create "tokio-util-0.7.x" git tag.
-version = "0.7.16"
+version = "0.7.17"
 edition = "2021"
 rust-version = "1.71"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -56,6 +56,9 @@ futures = "0.3.0"
 futures-test = "0.3.5"
 parking_lot = "0.12.0"
 tempfile = "3.1.0"
+
+[target.'cfg(loom)'.dev-dependencies]
+loom = { version = "0.7", features = ["futures", "checkpoint"] }
 
 [package.metadata.docs.rs]
 all-features = true

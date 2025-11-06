@@ -863,7 +863,7 @@ impl<T> Sender<T> {
         self.chan.closed().await;
     }
 
-    /// Attempts to immediately send a message on this `Sender`
+    /// Attempts to immediately send a message on this `Sender`.
     ///
     /// This method differs from [`send`] by returning immediately if the channel's
     /// buffer is full or no receiver is waiting to acquire some data. Compared
