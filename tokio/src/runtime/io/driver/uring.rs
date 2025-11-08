@@ -194,6 +194,13 @@ impl Handle {
                     self.set_uring_state(State::Unsupported);
                     Ok(false)
                 }
+                // If we get EPERM, io-uring syscalls may be blocked (for example, by seccomp).
+                // In this case, we try to fall back to spawn_blocking for this and future operations.
+                // See also: https://github.com/tokio-rs/tokio/issues/7691
+                Err(e) if e.raw_os_error() == Some(libc::EPERM) => {
+                    self.set_uring_state(State::Unsupported);
+                    Ok(false)
+                }
                 // For other system errors, we just return it.
                 Err(e) => Err(e),
             },
