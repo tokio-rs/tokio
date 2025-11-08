@@ -1,8 +1,6 @@
 //! Utility for helping miri understand our exposed pointers.
 
 use std::marker::PhantomData;
-#[cfg(miri)]
-use {crate::loom::sync::Mutex, std::collections::BTreeMap};
 
 pub(crate) struct PtrExposeDomain<T> {
     _phantom: PhantomData<T>,
