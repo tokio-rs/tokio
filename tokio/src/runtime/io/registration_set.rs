@@ -118,6 +118,7 @@ impl RegistrationSet {
         // SAFETY: Pointers into an Arc are never null.
         let io = unsafe { NonNull::new_unchecked(Arc::as_ptr(io).cast_mut()) };
 
+        super::EXPOSE_IO.unexpose_provenance(io.as_ptr());
         let _ = synced.registrations.remove(io);
     }
 }
