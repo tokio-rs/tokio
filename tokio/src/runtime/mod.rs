@@ -436,6 +436,10 @@ cfg_rt! {
 
     mod task_hooks;
     pub(crate) use task_hooks::{TaskHooks, TaskCallback};
+    #[cfg(tokio_unstable)]
+    pub(crate) use task_hooks::{TaskSpawnCallback, UserData};
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(crate) use task_hooks::UserDataValue;
     cfg_unstable! {
         pub use task_hooks::TaskMeta;
     }

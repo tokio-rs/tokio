@@ -1,6 +1,8 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", tokio_unstable, target_has_atomic = "64"))]
 
+#[cfg(feature = "rt-multi-thread")]
+use std::any::Any;
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -23,6 +25,7 @@ fn spawn_task_hook_fires() {
             ids2.lock().unwrap().insert(data.id());
 
             count2.fetch_add(1, Ordering::SeqCst);
+            None
         })
         .build()
         .unwrap();
@@ -85,11 +88,11 @@ fn task_hook_spawn_location_current_thread() {
             "(current_thread) on_task_spawn",
             &spawns,
         ))
-        .on_before_task_poll(mk_spawn_location_hook(
+        .on_before_task_poll(mk_poll_location_hook(
             "(current_thread) on_before_task_poll",
             &poll_starts,
         ))
-        .on_after_task_poll(mk_spawn_location_hook(
+        .on_after_task_poll(mk_poll_location_hook(
             "(current_thread) on_after_task_poll",
             &poll_ends,
         ))
@@ -136,11 +139,11 @@ fn task_hook_spawn_location_multi_thread() {
             "(multi_thread) on_task_spawn",
             &spawns,
         ))
-        .on_before_task_poll(mk_spawn_location_hook(
+        .on_before_task_poll(mk_poll_location_hook(
             "(multi_thread) on_before_task_poll",
             &poll_starts,
         ))
-        .on_after_task_poll(mk_spawn_location_hook(
+        .on_after_task_poll(mk_poll_location_hook(
             "(multi_thread) on_after_task_poll",
             &poll_ends,
         ))
@@ -174,7 +177,32 @@ fn task_hook_spawn_location_multi_thread() {
     assert_eq!(poll_starts, poll_ends.fetch_add(0, Ordering::SeqCst));
 }
 
+#[cfg(feature = "rt-multi-thread")]
+type UserData = Option<&'static (dyn Any + Send + Sync)>;
+#[cfg(not(feature = "rt-multi-thread"))]
+type UserData = Option<&'static dyn Any>;
+
 fn mk_spawn_location_hook(
+    event: &'static str,
+    count: &Arc<AtomicUsize>,
+) -> impl Fn(&tokio::runtime::TaskMeta<'_>) -> UserData {
+    let count = Arc::clone(count);
+    move |data| {
+        eprintln!("{event} ({:?}): {:?}", data.id(), data.spawned_at());
+        // Assert that the spawn location is in this file.
+        // Don't make assertions about line number/column here, as these
+        // may change as new code is added to the test file...
+        assert_eq!(
+            data.spawned_at().file(),
+            file!(),
+            "incorrect spawn location in {event} hook",
+        );
+        count.fetch_add(1, Ordering::SeqCst);
+        None
+    }
+}
+
+fn mk_poll_location_hook(
     event: &'static str,
     count: &Arc<AtomicUsize>,
 ) -> impl Fn(&tokio::runtime::TaskMeta<'_>) {

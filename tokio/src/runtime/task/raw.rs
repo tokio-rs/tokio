@@ -2,6 +2,8 @@ use crate::future::Future;
 use crate::runtime::task::core::{Core, Trailer};
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
 #[cfg(tokio_unstable)]
+use crate::runtime::UserData;
+#[cfg(tokio_unstable)]
 use std::panic::Location;
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
@@ -204,6 +206,7 @@ impl RawTask {
         scheduler: S,
         id: Id,
         _spawned_at: super::SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: UserData,
     ) -> RawTask
     where
         T: Future,
@@ -216,6 +219,8 @@ impl RawTask {
             id,
             #[cfg(tokio_unstable)]
             _spawned_at.0,
+            #[cfg(tokio_unstable)]
+            user_data,
         ));
         let ptr = unsafe { NonNull::new_unchecked(ptr.cast()) };
 

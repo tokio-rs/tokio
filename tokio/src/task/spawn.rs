@@ -1,3 +1,5 @@
+#[cfg(tokio_unstable)]
+use crate::runtime::UserData;
 use crate::runtime::BOX_FUTURE_THRESHOLD;
 use crate::task::JoinHandle;
 use crate::util::trace::SpawnMeta;
@@ -185,6 +187,20 @@ cfg_rt! {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
+        spawn_inner_with_user_data(future, meta, #[cfg(tokio_unstable)] None)
+    }
+
+    #[track_caller]
+    pub(super) fn spawn_inner_with_user_data<T>(
+        future: T,
+        meta: SpawnMeta<'_>,
+        #[cfg(tokio_unstable)]
+        user_data: UserData,
+    ) -> JoinHandle<T::Output>
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+    {
         use crate::runtime::{context, task};
 
         #[cfg(all(
@@ -202,6 +218,13 @@ cfg_rt! {
         let id = task::Id::next();
         let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
+        #[cfg(tokio_unstable)]
+        match context::with_current(|handle| handle.spawn_with_user_data(task, id, meta.spawned_at, #[cfg(tokio_unstable)] user_data)) {
+            Ok(join_handle) => join_handle,
+            Err(e) => panic!("{}", e),
+        }
+
+        #[cfg(not(tokio_unstable))]
         match context::with_current(|handle| handle.spawn(task, id, meta.spawned_at)) {
             Ok(join_handle) => join_handle,
             Err(e) => panic!("{}", e),

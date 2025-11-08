@@ -3,7 +3,10 @@
 use crate::runtime::handle::Handle;
 use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback};
 #[cfg(tokio_unstable)]
-use crate::runtime::{metrics::HistogramConfiguration, LocalOptions, LocalRuntime, TaskMeta};
+use crate::runtime::{
+    metrics::HistogramConfiguration, LocalOptions, LocalRuntime, TaskMeta, TaskSpawnCallback,
+    UserData,
+};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use crate::runtime::blocking::BlockingPool;
@@ -89,6 +92,9 @@ pub struct Builder {
     pub(super) after_unpark: Option<Callback>,
 
     /// To run before each task is spawned.
+    #[cfg(tokio_unstable)]
+    pub(super) before_spawn: Option<TaskSpawnCallback>,
+    #[cfg(not(tokio_unstable))]
     pub(super) before_spawn: Option<TaskCallback>,
 
     /// To run before each poll
@@ -731,8 +737,19 @@ impl Builder {
     /// Executes function `f` just before a task is spawned.
     ///
     /// `f` is called within the Tokio context, so functions like
-    /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback being
-    /// invoked immediately.
+    /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback
+    /// being invoked immediately.
+    ///
+    /// `f` must return an `Option<&'static (dyn Any + Send + Sync)>`. The `Send + Sync`
+    /// traits are optional when not using feature `rt-multi-thread`. A value returned
+    /// by this callback is attached to the task and can be retrieved using
+    /// [`TaskMeta::get_data`] in subsequent calls to other hooks for this task such as
+    /// [`on_before_task_poll`](crate::runtime::Builder::on_before_task_poll),
+    /// [`on_after_task_poll`](crate::runtime::Builder::on_after_task_poll), and
+    /// [`on_task_terminate`](crate::runtime::Builder::on_task_terminate).
+    ///
+    /// The `crate::task::Builder::data` method can also be used to attach data to
+    /// a specific task when spawning it.
     ///
     /// This can be used for bookkeeping or monitoring purposes.
     ///
@@ -755,6 +772,7 @@ impl Builder {
     /// let runtime = runtime::Builder::new_current_thread()
     ///     .on_task_spawn(|_| {
     ///         println!("spawning task");
+    ///         None
     ///     })
     ///     .build()
     ///     .unwrap();
@@ -768,11 +786,53 @@ impl Builder {
     /// })
     /// # }
     /// ```
+    ///
+    /// ```
+    /// # use tokio::runtime;
+    /// # use std::sync::atomic::{AtomicUsize, Ordering};
+    /// # pub fn main() {
+    /// struct YieldingTaskMetadata {
+    ///     pub yield_count: AtomicUsize,
+    /// }
+    /// let runtime = runtime::Builder::new_current_thread()
+    ///     .on_task_spawn(|meta| {
+    ///         println!("spawning task {}", meta.id());
+    ///         let meta = Box::new(YieldingTaskMetadata { yield_count: AtomicUsize::new(0) });
+    ///         Some(Box::leak(meta) as &(dyn std::any::Any + Send + Sync))
+    ///     })
+    ///     .on_after_task_poll(|meta| {
+    ///         if let Some(data) = meta.get_data().and_then(|data| data.downcast_ref::<YieldingTaskMetadata>()) {
+    ///             println!("task {} yield count: {}", meta.id(), data.yield_count.fetch_add(1, Ordering::Relaxed));
+    ///         }
+    ///     })
+    ///     .on_task_terminate(|meta| {
+    ///         match meta.get_data().and_then(|data| data.downcast_ref::<YieldingTaskMetadata>()) {
+    ///             Some(data) => {
+    ///                 let yield_count = data.yield_count.load(Ordering::Relaxed);
+    ///                 println!("task {} total yield count: {}", meta.id(), yield_count);
+    ///                 assert!(yield_count == 64);
+    ///             },
+    ///             None => panic!("task has missing or incorrect user data"),
+    ///         }
+    ///     })
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// runtime.block_on(async {
+    ///     let _ = tokio::task::spawn(async {
+    ///         for _ in 0..64 {
+    ///             println!("yielding");
+    ///             tokio::task::yield_now().await;
+    ///         }
+    ///     }).await.unwrap();
+    /// })
+    /// # }
+    /// ```
     #[cfg(all(not(loom), tokio_unstable))]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_task_spawn<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
+        F: Fn(&TaskMeta<'_>) -> UserData + Send + Sync + 'static,
     {
         self.before_spawn = Some(std::sync::Arc::new(f));
         self

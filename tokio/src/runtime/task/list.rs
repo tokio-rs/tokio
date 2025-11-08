@@ -13,6 +13,8 @@ use crate::util::linked_list::{Link, LinkedList};
 use crate::util::sharded_list;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
+#[cfg(tokio_unstable)]
+use crate::runtime::task_hooks::UserData;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 
@@ -92,13 +94,21 @@ impl<S: 'static> OwnedTasks<S> {
         scheduler: S,
         id: super::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: UserData,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        );
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
@@ -113,13 +123,21 @@ impl<S: 'static> OwnedTasks<S> {
         scheduler: S,
         id: super::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: UserData,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        );
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
@@ -261,13 +279,21 @@ impl<S: 'static> LocalOwnedTasks<S> {
         scheduler: S,
         id: super::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: UserData,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        );
 
         unsafe {
             // safety: We just created the task, so we have exclusive access
