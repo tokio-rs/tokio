@@ -18,7 +18,7 @@ env:
   rust_stable: stable
   rust_nightly: nightly-2025-10-12
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2025-06-02
+  rust_miri_nightly: nightly-2025-11-09
   rust_clippy: '1.88'
   # When updating this, also update:
   # - README.md
