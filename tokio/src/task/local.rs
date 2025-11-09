@@ -1192,28 +1192,43 @@ impl task::Schedule for Arc<Shared> {
 }
 
 impl LocalState {
+    /// # Safety
+    ///
+    /// This method must only be called from the thread who
+    /// has the same [`ThreadId`] as [`Self::owner`].
     unsafe fn task_pop_front(&self) -> Option<task::Notified<Arc<Shared>>> {
         // The caller ensures it is called from the same thread that owns
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.local_queue.with_mut(|ptr| (*ptr).pop_front())
+        self.local_queue
+            .with_mut(|ptr| unsafe { (*ptr).pop_front() })
     }
 
+    /// # Safety
+    ///
+    /// This method must only be called from the thread who
+    /// has the same [`ThreadId`] as [`Self::owner`].
     unsafe fn task_push_back(&self, task: task::Notified<Arc<Shared>>) {
         // The caller ensures it is called from the same thread that owns
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.local_queue.with_mut(|ptr| (*ptr).push_back(task));
+        self.local_queue
+            .with_mut(|ptr| unsafe { (*ptr).push_back(task) });
     }
 
+    /// # Safety
+    ///
+    /// This method must only be called from the thread who
+    /// has the same [`ThreadId`] as [`Self::owner`].
     unsafe fn take_local_queue(&self) -> VecDeque<task::Notified<Arc<Shared>>> {
         // The caller ensures it is called from the same thread that owns
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.local_queue.with_mut(|ptr| std::mem::take(&mut (*ptr)))
+        self.local_queue
+            .with_mut(|ptr| std::mem::take(unsafe { &mut (*ptr) }))
     }
 
     unsafe fn task_remove(&self, task: &Task<Arc<Shared>>) -> Option<Task<Arc<Shared>>> {

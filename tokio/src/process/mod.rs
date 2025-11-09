@@ -750,7 +750,7 @@ impl Command {
     where
         F: FnMut() -> io::Result<()> + Send + Sync + 'static,
     {
-        self.std.pre_exec(f);
+        unsafe { self.std.pre_exec(f) };
         self
     }
 

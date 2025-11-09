@@ -1,4 +1,11 @@
 #![cfg_attr(not(feature = "full"), allow(dead_code))]
+// It doesn't make sense to enforce `unsafe_op_in_unsafe_fn` for this module because
+//
+// * The intrusive linked list naturally relies on unsafe operations.
+// * Excessive `unsafe {}` blocks hurt readability significantly.
+// TODO: replace with `#[expect(unsafe_op_in_unsafe_fn)]` after bumpping
+// the MSRV to 1.81.0.
+#![allow(unsafe_op_in_unsafe_fn)]
 
 //! An intrusive double linked list of data.
 //!
@@ -64,6 +71,8 @@ pub(crate) unsafe trait Link {
     /// stack as the argument. In particular, the method may not create an
     /// intermediate reference in the process of creating the resulting raw
     /// pointer.
+    ///
+    /// The `target` pointer must be valid.
     unsafe fn pointers(target: NonNull<Self::Target>) -> NonNull<Pointers<Self::Target>>;
 }
 

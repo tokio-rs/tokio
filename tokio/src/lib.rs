@@ -10,7 +10,7 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![deny(unused_must_use)]
+#![deny(unused_must_use, unsafe_op_in_unsafe_fn)]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))

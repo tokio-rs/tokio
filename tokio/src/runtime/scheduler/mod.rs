@@ -160,6 +160,7 @@ cfg_rt! {
         /// Spawn a local task
         ///
         /// # Safety
+        ///
         /// This should only be called in `LocalRuntime` if the runtime has been verified to be owned
         /// by the current thread.
         #[allow(irrefutable_let_patterns)]
@@ -170,7 +171,8 @@ cfg_rt! {
             F::Output: 'static,
         {
             if let Handle::CurrentThread(h) = self {
-                current_thread::Handle::spawn_local(h, future, id, spawned_at)
+                // Safety: caller guarantees that this is a `LocalRuntime`.
+                unsafe { current_thread::Handle::spawn_local(h, future, id, spawned_at) }
             } else {
                 panic!("Only current_thread and LocalSet have spawn_local internals implemented")
             }
