@@ -130,7 +130,7 @@ impl Wheel {
     /// * The entry is already registered in THIS wheel.
     pub(crate) unsafe fn remove(&mut self, hdl: EntryHandle) {
         if hdl.is_pending() {
-            self.pending.remove(NonNull::from(&hdl));
+            unsafe { self.pending.remove(NonNull::from(&hdl)) };
         } else {
             let deadline = hdl.deadline();
             debug_assert!(
@@ -141,7 +141,7 @@ impl Wheel {
             );
 
             let level = self.level_for(deadline);
-            self.levels[level].remove_entry(hdl.clone());
+            unsafe { self.levels[level].remove_entry(hdl.clone()) };
         }
     }
 

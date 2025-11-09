@@ -84,7 +84,9 @@ impl Sender {
     ///
     /// - `hdl` must not in any cancellation queue.
     pub(crate) unsafe fn send(&self, hdl: EntryHandle) {
-        self.inner.lock().push_front(hdl);
+        unsafe {
+            self.inner.lock().push_front(hdl);
+        }
     }
 }
 

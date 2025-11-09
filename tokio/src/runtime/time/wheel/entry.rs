@@ -63,7 +63,7 @@ unsafe impl linked_list::Link for Entry {
 
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
         Handle {
-            entry: Arc::from_raw(ptr.as_ptr()),
+            entry: unsafe { Arc::from_raw(ptr.as_ptr()) },
         }
     }
 
@@ -71,8 +71,8 @@ unsafe impl linked_list::Link for Entry {
         target: NonNull<Self::Target>,
     ) -> NonNull<linked_list::Pointers<Self::Target>> {
         let this = target.as_ptr();
-        let field = std::ptr::addr_of_mut!((*this).wheel_pointers);
-        NonNull::new_unchecked(field)
+        let field = unsafe { std::ptr::addr_of_mut!((*this).wheel_pointers) };
+        unsafe { NonNull::new_unchecked(field) }
     }
 }
 
@@ -94,7 +94,7 @@ unsafe impl linked_list::Link for CancellationQueueEntry {
 
     unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
         Handle {
-            entry: Arc::from_raw(ptr.as_ptr()),
+            entry: unsafe { Arc::from_raw(ptr.as_ptr()) },
         }
     }
 
@@ -102,8 +102,8 @@ unsafe impl linked_list::Link for CancellationQueueEntry {
         target: NonNull<Self::Target>,
     ) -> NonNull<linked_list::Pointers<Self::Target>> {
         let this = target.as_ptr();
-        let field = std::ptr::addr_of_mut!((*this).cancel_pointers);
-        NonNull::new_unchecked(field)
+        let field = unsafe { std::ptr::addr_of_mut!((*this).cancel_pointers) };
+        unsafe { NonNull::new_unchecked(field) }
     }
 }
 
