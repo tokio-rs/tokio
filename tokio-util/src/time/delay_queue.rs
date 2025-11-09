@@ -536,7 +536,7 @@ impl<T> DelayQueue<T> {
     /// [type]: #
     #[track_caller]
     pub fn insert_at(&mut self, value: T, when: Instant) -> Key {
-        assert!(self.slab.len() < MAX_ENTRIES, "max entries exceeded");
+        assert!(self.slab.len() <= MAX_ENTRIES, "max entries exceeded");
 
         // Normalize the deadline. Values cannot be set to expire in the past.
         let when = self.normalize_deadline(when);
