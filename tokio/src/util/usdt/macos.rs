@@ -154,7 +154,3 @@ global_asm!(
     typedefs = sym typedefs,
     stability = sym stability,
 );
-
-pub(crate) fn register_probes() -> std::io::Result<()> {
-    Ok(())
-}

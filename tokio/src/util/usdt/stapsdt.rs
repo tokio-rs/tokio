@@ -272,7 +272,3 @@ std::arch::global_asm!(
             .popsection
     .endif",
 );
-
-pub(crate) fn register_probes() -> std::io::Result<()> {
-    Ok(())
-}
