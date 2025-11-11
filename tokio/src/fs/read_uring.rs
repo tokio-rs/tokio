@@ -13,7 +13,8 @@ const PROBE_SIZE_U32: u32 = PROBE_SIZE as u32;
 
 // Max bytes we can read using io uring submission at a time
 // SAFETY: cannot be higher than u32::MAX for safe cast
-const MAX_READ_SIZE: usize = u32::MAX as usize;
+// Set to read max 64 blocks at time
+const MAX_READ_SIZE: usize = 64 * 1024 * 1024;
 
 pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
     let file = OpenOptions::new().read(true).open(path).await?;
