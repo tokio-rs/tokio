@@ -37,11 +37,15 @@ macro_rules! call_probe {
         // <https://github.com/cdkey/systemtap/blob/cbb34b7244ba60cb0904d61dc9167290855106aa/includes/sys/sdt.h#L240-L254>
         std::arch::asm!(
             "990:   nop",
-            // We deviate from what systemtap source code does here.
-            // This is to fix an issue with how gc-sections is implemented while linking.
-            // This problem seems to manifest only when monomorphising certain functions with many CGUs.
-            concat!(".pushsection .note.stapsdt, \"G\", \"note\", \".note.stapsdt.tokio.", $name, "\", comdat"),
-                    ".balign 4
+            // The `R` here means "retained". It prevents the linker from GC the note.
+            // This additionally means that the function containing the `nop` is also not GCd.
+            //
+            // This is not great, but without this we get notes that are not GCd but the functions
+            // they reference are GCd. This causes notes to have incorrect addresses.
+            //
+            // Ideally we'd use `"?"` but that's not working correctly.
+                    ".pushsection .note.stapsdt, \"R\", \"note\"
+                    .balign 4
                     .4byte 992f-991f, 994f-993f, 3
             991:
                     .asciz \"stapsdt\"
@@ -75,11 +79,15 @@ macro_rules! call_probe {
         // <https://github.com/cdkey/systemtap/blob/cbb34b7244ba60cb0904d61dc9167290855106aa/includes/sys/sdt.h#L240-L254>
         std::arch::asm!(
             "990:   nop",
-            // We deviate from what systemtap source code does here.
-            // This is to fix an issue with how gc-sections is implemented while linking.
-            // This problem seems to manifest only when monomorphising certain functions with many CGUs.
-            concat!(".pushsection .note.stapsdt, \"G\", \"note\", \".note.stapsdt.tokio.", $name, "\", comdat"),
-                    ".balign 4
+            // The `R` here means "retained". It prevents the linker from GC the note.
+            // This additionally means that the function containing the `nop` is also not GCd.
+            //
+            // This is not great, but without this we get notes that are not GCd but the functions
+            // they reference are GCd. This causes notes to have incorrect addresses.
+            //
+            // Ideally we'd use `"?"` but that's not working correctly.
+                    ".pushsection .note.stapsdt, \"R\", \"note\"
+                    .balign 4
                     .4byte 992f-991f, 994f-993f, 3
             991:
                     .asciz \"stapsdt\"
