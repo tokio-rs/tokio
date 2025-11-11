@@ -261,6 +261,18 @@ pub(crate) fn waker_wake(task_id: u64) {
     }
 }
 
+#[inline(always)]
+pub(crate) fn trace_root() {
+    unsafe {
+        call_probe!(
+            "trace-root",
+            x86_64: "",
+            aarch64: "",
+            semaphore = const 0,
+        );
+    }
+}
+
 std::arch::global_asm!(
     ".ifndef _.stapsdt.base
             .pushsection .stapsdt.base, \"aGR\", \"progbits\", .stapsdt.base, comdat

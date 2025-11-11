@@ -34,6 +34,8 @@ cfg_usdt! {
         "The `usdt` feature is only currently supported on linux/macos, on `aarch64` and `x86_64`."
     );
 
+    pub(crate) use usdt_impl::trace_root;
+
     cfg_rt! {
         use core::{
             pin::Pin,
@@ -129,6 +131,7 @@ cfg_usdt! {
 
 cfg_not_usdt! {
     #[inline]
+    pub(crate) fn trace_root() {}
 
     cfg_rt! {
         use crate::util::trace::SpawnMeta;

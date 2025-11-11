@@ -140,6 +140,16 @@ pub(crate) fn waker_wake(task_id: u64) {
     unsafe { __waker_wake(task_id) }
 }
 
+#[inline(always)]
+pub(crate) fn trace_root() {
+    extern "C" {
+        #[link_name = "__dtrace_probe$tokio$trace__root$v1"]
+        fn __trace_root();
+    }
+
+    unsafe { __trace_root() }
+}
+
 unsafe extern "C" {
     #[link_name = "__dtrace_stability$tokio$v1$1_1_0_1_1_0_1_1_0_1_1_0_1_1_0"]
     fn stability();

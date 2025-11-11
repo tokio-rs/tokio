@@ -581,6 +581,7 @@ mod trace {
         #[inline(always)]
         #[allow(dead_code)]
         pub(crate) fn trace_leaf(_: &mut std::task::Context<'_>) -> std::task::Poll<()> {
+            crate::util::usdt::trace_root();
             std::task::Poll::Ready(())
         }
     }
