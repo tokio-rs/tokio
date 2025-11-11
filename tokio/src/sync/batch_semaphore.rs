@@ -775,6 +775,6 @@ unsafe impl linked_list::Link for Waiter {
     }
 
     unsafe fn pointers(target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
-        Waiter::addr_of_pointers(target)
+        unsafe { Waiter::addr_of_pointers(target) }
     }
 }

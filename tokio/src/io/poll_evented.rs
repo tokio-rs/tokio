@@ -171,7 +171,7 @@ feature! {
             loop {
                 let evt = ready!(self.registration.poll_read_ready(cx))?;
 
-                let b = &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]);
+                let b = unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
                 // used only when the cfgs below apply
                 #[allow(unused_variables)]
@@ -213,7 +213,7 @@ feature! {
 
                         // Safety: We trust `TcpStream::read` to have filled up `n` bytes in the
                         // buffer.
-                        buf.assume_init(n);
+                        unsafe { buf.assume_init(n) };
                         buf.advance(n);
                         return Poll::Ready(Ok(()));
                     },
