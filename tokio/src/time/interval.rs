@@ -340,10 +340,12 @@ impl MissedTickBehavior {
     /// If a tick is missed, this method is called to determine when the next tick should happen.
     fn next_timeout(&self, timeout: Instant, now: Instant, period: Duration) -> Instant {
         match self {
-            Self::Burst => timeout + period,
-            Self::Delay => now + period,
+            Self::Burst => timeout
+                .checked_add(period)
+                .unwrap_or_else(Instant::far_future),
+            Self::Delay => now.checked_add(period).unwrap_or_else(Instant::far_future),
             Self::Skip => {
-                now + period
+                now.checked_add(period).unwrap_or_else(Instant::far_future)
                     - Duration::from_nanos(
                         ((now - timeout).as_nanos() % period.as_nanos())
                             .try_into()
@@ -475,7 +477,8 @@ impl Interval {
         // However, if a tick took excessively long and we are now behind,
         // schedule the next tick according to how the user specified with
         // `MissedTickBehavior`
-        let next = if now > timeout + Duration::from_millis(5) {
+
+        let next = if now.saturating_duration_since(timeout) > Duration::from_millis(5) {
             self.missed_tick_behavior
                 .next_timeout(timeout, now, self.period)
         } else {
