@@ -58,7 +58,7 @@ an asynchronous application.
 
 A basic TCP echo server with Tokio.
 
-Make sure you activated the full features of the tokio crate on Cargo.toml:
+Make sure you enable the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
@@ -109,7 +109,7 @@ More examples can be found [here][examples]. For a larger "real world" example, 
 [examples]: https://github.com/tokio-rs/tokio/tree/master/examples
 [mini-redis]: https://github.com/tokio-rs/mini-redis/
 
-To see a list of the available features flags that can be enabled, check our
+To see a list of the available feature flags that can be enabled, check our
 [docs][feature-flag-docs].
 
 ## Getting Help
@@ -257,5 +257,5 @@ This project is licensed under the [MIT license].
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in Tokio by you, shall be licensed as MIT, without any additional
+for inclusion in Tokio by you shall be licensed as MIT, without any additional
 terms or conditions.
