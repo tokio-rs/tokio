@@ -8,17 +8,17 @@
     target_os = "linux"
 ))]
 
-use futures::future::FutureExt;
+use futures::future::Future;
+use std::future::poll_fn;
 use std::io::Write;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::task::Poll;
 use std::time::Duration;
-use std::{future::poll_fn, path::PathBuf};
 use tempfile::NamedTempFile;
-use tokio::{
-    fs::read,
-    runtime::{Builder, Runtime},
-};
+use tokio::fs::read;
+use tokio::runtime::{Builder, Runtime};
+use tokio_test::assert_pending;
 use tokio_util::task::TaskTracker;
 
 fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
@@ -49,34 +49,38 @@ fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
     fn run(rt: Runtime) {
-        let (tx, rx) = mpsc::channel();
         let (done_tx, done_rx) = mpsc::channel();
-
         let (_tmp, path) = create_tmp_files(1);
+        // keep 100 permits
+        const N: i32 = 100;
         rt.spawn(async move {
             let path = path[0].clone();
 
             // spawning a bunch of uring operations.
-            loop {
+            let mut futs = vec![];
+
+            // spawning a bunch of uring operations.
+            for _ in 0..N {
                 let path = path.clone();
-                tokio::spawn(async move {
-                    let bytes = read(path).await.unwrap();
+                let mut fut = Box::pin(read(path));
 
-                    assert_eq!(bytes, vec![20; 1023]);
-                });
+                poll_fn(|cx| {
+                    assert_pending!(fut.as_mut().poll(cx));
+                    Poll::<()>::Pending
+                })
+                .await;
 
-                // Avoid busy looping.
-                tokio::task::yield_now().await;
+                futs.push(fut);
             }
+
+            tokio::task::yield_now().await;
         });
 
         std::thread::spawn(move || {
-            let rt: Runtime = rx.recv().unwrap();
             rt.shutdown_timeout(Duration::from_millis(300));
             done_tx.send(()).unwrap();
         });
 
-        tx.send(rt).unwrap();
         done_rx.recv().unwrap();
     }
 
@@ -130,17 +134,19 @@ async fn read_small_large_files() {
 #[tokio::test]
 async fn cancel_op_future() {
     let (_tmp_file, path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
+    let path = path[0].clone();
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    let handle = tokio::spawn(async move {
-        poll_fn(|cx| {
-            let fut = read(&path[0]);
 
+    let handle = tokio::spawn(async move {
+        let fut = read(path.clone());
+        tokio::pin!(fut);
+
+        poll_fn(move |cx| {
             // If io_uring is enabled (and not falling back to the thread pool),
             // the first poll should return Pending.
-            let _pending = Box::pin(fut).poll_unpin(cx);
-
-            tx.send(()).unwrap();
+            assert_pending!(fut.as_mut().poll(cx));
+            tx.send(true).unwrap();
 
             Poll::<()>::Pending
         })
@@ -148,7 +154,9 @@ async fn cancel_op_future() {
     });
 
     // Wait for the first poll
-    rx.recv().await.unwrap();
+
+    let val = rx.recv().await;
+    assert!(val.unwrap());
 
     handle.abort();
 

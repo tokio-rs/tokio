@@ -30,6 +30,16 @@ use std::{io, path::Path};
 ///
 /// [`ErrorKind::Interrupted`]: std::io::ErrorKind::Interrupted
 ///
+/// # io_uring support
+///
+/// On Linux, you can also use io_uring for executing system calls. To enable
+/// io_uring, you need to specify the `--cfg tokio_unstable` flag at compile time,
+/// enable the io-uring cargo feature, and set the `Builder::enable_io_uring`
+/// runtime option.
+///
+/// Support for io_uring is currently experimental, so its behavior may change
+/// or it may be removed in future versions.
+///
 /// # Examples
 ///
 /// ```no_run
