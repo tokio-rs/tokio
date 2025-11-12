@@ -27,8 +27,11 @@ pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
         .expect("unexpected in-flight operation detected")
         .into();
 
-    // extra single capacity for the whole size to fit without any reallocation
-    let buf = Vec::with_capacity(size_hint.unwrap_or(0));
+    let mut buf = Vec::new();
+
+    if let Some(size_hint) = size_hint {
+        buf.try_reserve(size_hint)?;
+    }
 
     read_to_end_uring(size_hint, fd, buf).await
 }
@@ -67,7 +70,6 @@ async fn read_to_end_uring(
 
             buf = r_buf;
             fd = r_fd;
-            offset += size_read as u64;
         }
 
         // buf is full, need more capacity
@@ -79,11 +81,11 @@ async fn read_to_end_uring(
         let buf_len = usize::min(buf.spare_capacity_mut().len(), MAX_READ_SIZE);
 
         // buf_len cannot be greater than u32::MAX because MAX_READ_SIZE
-        // is u32::MAX
-        let mut read_len = buf_len as u32;
+        // is less than u32::MAX
+        let read_len = buf_len as u32;
 
         // read into spare capacity
-        let (size_read, r_fd, r_buf) = op_read(fd, buf, &mut offset, &mut read_len).await?;
+        let (size_read, r_fd, r_buf) = op_read(fd, buf, &mut offset, read_len).await?;
 
         if size_read == 0 {
             return Ok(r_buf);
@@ -99,12 +101,12 @@ async fn small_probe_read(
     mut buf: Vec<u8>,
     offset: &mut u64,
 ) -> io::Result<(u32, OwnedFd, Vec<u8>)> {
-    let mut read_len = PROBE_SIZE_U32;
+    let read_len = PROBE_SIZE_U32;
 
     if buf.len() < PROBE_SIZE {
         buf.try_reserve(PROBE_SIZE)?;
 
-        return op_read(fd, buf, offset, &mut read_len).await;
+        return op_read(fd, buf, offset, read_len).await;
     }
 
     let mut temp_arr = [0; PROBE_SIZE];
@@ -116,8 +118,9 @@ async fn small_probe_read(
     // than PROBE_SIZE. So we can read into the discarded length
     buf.truncate(back_bytes_len);
 
-    let (size_read, r_fd, mut r_buf) = op_read(fd, buf, offset, &mut read_len).await?;
+    let (size_read, r_fd, mut r_buf) = op_read(fd, buf, offset, read_len).await?;
 
+    r_buf.try_reserve(PROBE_SIZE)?;
     r_buf.splice(back_bytes_len..back_bytes_len, temp_arr);
 
     Ok((size_read, r_fd, r_buf))
@@ -127,10 +130,10 @@ async fn op_read(
     mut fd: OwnedFd,
     mut buf: Vec<u8>,
     offset: &mut u64,
-    read_len: &mut u32,
+    mut read_len: u32,
 ) -> io::Result<(u32, OwnedFd, Vec<u8>)> {
     loop {
-        let (res, r_fd, r_buf) = Op::read(fd, buf, *read_len, *offset).await;
+        let (res, r_fd, r_buf) = Op::read(fd, buf, read_len, *offset).await;
 
         match res {
             Err(e) if e.kind() == ErrorKind::Interrupted => {
@@ -140,9 +143,9 @@ async fn op_read(
             Err(e) => return Err(e),
             Ok(size_read) => {
                 *offset += size_read as u64;
-                *read_len -= size_read;
+                read_len -= size_read;
 
-                if *read_len == 0 || size_read == 0 {
+                if read_len == 0 || size_read == 0 {
                     return Ok((size_read, r_fd, r_buf));
                 }
 
