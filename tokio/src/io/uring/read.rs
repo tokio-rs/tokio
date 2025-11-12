@@ -38,8 +38,8 @@ impl Cancellable for Read {
 
 impl Op<Read> {
     // Submit a request to read a FD at given length and offset into a
-    // dynamic buffer with uinitialized memory. The read happens on unitialized
-    // buffer and no overwiting happens.
+    // dynamic buffer with uninitialized memory. The read happens on unitialized
+    // buffer and no overwriting happens.
 
     // SAFETY: The `len` of the amount to be read and the buffer that is passed
     // should have capacity > len.
