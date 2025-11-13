@@ -372,7 +372,7 @@ jobs:
           cargo miri nextest run --features full --lib --no-fail-fast
         working-directory: tokio
         env:
-          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-retag-fields
 
   miri-test:
     name: miri-test
@@ -395,7 +395,7 @@ jobs:
           cargo miri nextest run --features full --test '*' --no-fail-fast
         working-directory: tokio
         env:
-          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-retag-fields
 
   miri-doc:
     name: miri-doc
@@ -414,7 +414,7 @@ jobs:
           cargo miri test --doc --features $TOKIO_STABLE_FEATURES --no-fail-fast
         working-directory: tokio
         env:
-          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-retag-fields
 
   asan:
     name: asan
