@@ -35,7 +35,7 @@ join-map = ["rt", "hashbrown"]
 __docs_rs = ["futures-util"]
 
 [dependencies]
-tokio = { version = "1.28.0", path = "../tokio", features = ["sync"] }
+tokio = { version = "1.44.0", path = "../tokio", features = ["sync"] }
 bytes = "1.5.0"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
