@@ -349,8 +349,7 @@ impl Handle {
     }
 }
 
-/// An error returned when trying to transition
-/// an being cancelled entry to the registered state.
+/// The result of the [`Handle::transition_to_registered`]` method.
 pub(crate) enum TransitionToRegistered {
     /// The entry is being cancelled, no need to register it.
     Success,
@@ -391,9 +390,11 @@ pub(crate) enum State {
 pub(crate) enum Cancelling {
     /// [`Entry`] is being cancelled, and is not in the timer wheel.
     Unregistered,
+
     /// [`Entry`] is being cancelled, and is registered in the timer wheel,
     /// but not in the pending list.
     Registered,
+
     /// [`Entry`] is being cancelled, and it registered in the timer wheel,
     /// and also in the pending list.
     Pending,
