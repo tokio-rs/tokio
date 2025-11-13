@@ -21,10 +21,9 @@ cfg_rt_and_time! {
         ) -> bool {
             use crate::runtime::time::Insert;
             let mut fired = false;
-            let thread_id = crate::runtime::context::thread_id().expect("should not be called during the thread shutdown");
             // process injected timers
             for hdl in inject {
-                match unsafe { wheel.insert(hdl.clone(), tx.clone(), thread_id) } {
+                match unsafe { wheel.insert(hdl.clone(), tx.clone()) } {
                     Insert::Success => {}
                     Insert::Elapsed => {
                         hdl.wake_unregistered();
@@ -44,7 +43,7 @@ cfg_rt_and_time! {
             for hdl in rx.recv_all() {
                 match hdl.state() {
                     // INVARIANT: unregistered entry should not be in the wheel.
-                    EntryState::Unregistered | EntryState::Registered(..) | EntryState::Pending(..) => unreachable!(),
+                    EntryState::Unregistered | EntryState::Registered | EntryState::Pending => unreachable!(),
                     EntryState::Cancelling(cancelling) => match cancelling {
                         EntryCancelling::Unregistered => (),
                         EntryCancelling::Registered | EntryCancelling::Pending => {

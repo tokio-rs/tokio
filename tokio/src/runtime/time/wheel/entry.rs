@@ -1,6 +1,5 @@
 use super::cancellation_queue::Sender;
 use crate::loom::sync::{Arc, Mutex};
-use crate::runtime::ThreadId;
 use crate::util::linked_list;
 
 use std::marker::PhantomPinned;
@@ -16,12 +15,12 @@ enum PrivState {
 
     /// The entry is registered to the timer wheel,
     /// but not in the pending queue of the timer wheel.
-    Registered(Sender, Waker, ThreadId),
+    Registered(Sender, Waker),
 
     /// The entry is in the pending queue of the timer wheel,
     /// and not in any wheel level, which means that
     /// the entry is reached its deadline and waiting to be woken up.
-    Pending(Sender, Waker, ThreadId),
+    Pending(Sender, Waker),
 
     /// The waker has been called, and the entry is no longer in the timer wheel
     /// (both each wheel level and the pending queue), which means that
@@ -192,7 +191,7 @@ impl Handle {
                     None
                 }
             }
-            PrivState::Registered(_, old_waker, _) => {
+            PrivState::Registered(_, old_waker) => {
                 if !old_waker.will_wake(waker) {
                     Some(std::mem::replace(old_waker, waker.clone()))
                 } else {
@@ -214,17 +213,13 @@ impl Handle {
         drop(old_waker);
     }
 
-    pub(crate) fn transition_to_registered(
-        &self,
-        cancel_tx: Sender,
-        thread_id: ThreadId,
-    ) -> TransitionToRegistered {
+    pub(crate) fn transition_to_registered(&self, cancel_tx: Sender) -> TransitionToRegistered {
         let mut lock = self.entry.state.lock();
         let state: &mut PrivState = &mut lock;
 
         let (new_state, ret) = match state {
             PrivState::Unregistered(waker) => {
-                let new_state = PrivState::Registered(cancel_tx, waker.clone(), thread_id);
+                let new_state = PrivState::Registered(cancel_tx, waker.clone());
                 (Some(new_state), TransitionToRegistered::Success)
             }
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
@@ -262,8 +257,8 @@ impl Handle {
         let (new_state, ret) = match state {
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
             PrivState::Unregistered(_) => panic!("corrupted state: State::Unregistered"),
-            PrivState::Registered(sender, waker, thread_id) => {
-                let new_state = PrivState::Pending(sender.clone(), waker.clone(), *thread_id);
+            PrivState::Registered(sender, waker) => {
+                let new_state = PrivState::Pending(sender.clone(), waker.clone());
                 (new_state, TransitionToPending::Success)
             }
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
@@ -279,7 +274,7 @@ impl Handle {
         // update the state and take back the old state
         let old_state = std::mem::replace(state, new_state);
 
-        if let PrivState::Registered(_sender, waker, _thread_id) = old_state {
+        if let PrivState::Registered(_sender, waker) = old_state {
             // unlock before dropping the old waker
             drop(lock);
             drop(waker);
@@ -296,14 +291,14 @@ impl Handle {
             PrivState::Unregistered(_) => {
                 *lock = PrivState::Cancelling(Cancelling::Unregistered);
             }
-            PrivState::Registered(ref tx, _, _) => {
+            PrivState::Registered(ref tx, _) => {
                 // Safety: entry is not in any cancellation queue
                 unsafe {
                     tx.send(self.clone());
                 }
                 *lock = PrivState::Cancelling(Cancelling::Registered);
             }
-            PrivState::Pending(ref tx, _, _) => {
+            PrivState::Pending(ref tx, _) => {
                 // Safety: entry is not in any cancellation queue
                 unsafe {
                     tx.send(self.clone());
@@ -324,8 +319,8 @@ impl Handle {
         let lock = self.entry.state.lock();
         match &*lock {
             PrivState::Unregistered(_) => State::Unregistered,
-            PrivState::Registered(_, _, thread_id) => State::Registered(*thread_id),
-            PrivState::Pending(_, _, thread_id) => State::Pending(*thread_id),
+            PrivState::Registered(..) => State::Registered,
+            PrivState::Pending(..) => State::Pending,
             PrivState::WokenUp => State::WokenUp,
             PrivState::Cancelling(cancelling) => State::Cancelling(*cancelling),
         }
@@ -333,7 +328,7 @@ impl Handle {
 
     pub(crate) fn is_pending(&self) -> bool {
         match self.state() {
-            State::Pending(_) => true,
+            State::Pending => true,
             State::Cancelling(cancelling) => match cancelling {
                 Cancelling::Unregistered => unreachable!(),
                 Cancelling::Registered => false,
@@ -383,8 +378,8 @@ pub(crate) enum TransitionToPending {
 #[derive(Clone, Copy)]
 pub(crate) enum State {
     Unregistered,
-    Registered(ThreadId),
-    Pending(ThreadId),
+    Registered,
+    Pending,
     WokenUp,
 
     /// The [`Handle`] has been sent to the [`Sender`].

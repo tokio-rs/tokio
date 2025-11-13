@@ -1,5 +1,4 @@
-use super::wheel::{EntryHandle, EntryState};
-use crate::runtime::context;
+use super::wheel::EntryHandle;
 use crate::runtime::scheduler::Handle as SchedulerHandle;
 use crate::runtime::time::wheel::Insert;
 use crate::runtime::time::Context as TimeContext;
@@ -35,41 +34,7 @@ impl std::fmt::Debug for Timer {
 impl Drop for Timer {
     fn drop(&mut self) {
         if let Some(entry) = self.entry.take() {
-            with_current_wheel(&self.sched_handle, |maybe_time_cx| {
-                let state = entry.state();
-
-                let thread_id = match state {
-                    EntryState::Unregistered => {
-                        entry.transition_to_cancelling();
-                        return;
-                    }
-                    EntryState::Registered(thread_id) | EntryState::Pending(thread_id) => thread_id,
-                    EntryState::Cancelling(..) => unreachable!(),
-                    EntryState::WokenUp => return,
-                };
-
-                let Ok(cur_thread_id) = context::thread_id() else {
-                    // current thread is shutting down, we cannot determine the thread id,
-                    // so we need to fallback to the cancellation queue.
-                    entry.transition_to_cancelling();
-                    return;
-                };
-
-                if let Some(TimeContext::Running { wheel, canc_tx: _ }) = maybe_time_cx {
-                    if thread_id == cur_thread_id {
-                        // Safety:
-                        // 1. entry is either in slots or pending list
-                        // 2. entry is registered in this thread
-                        unsafe {
-                            wheel.remove(entry);
-                        }
-                    } else {
-                        entry.transition_to_cancelling();
-                    }
-                } else {
-                    entry.transition_to_cancelling();
-                }
-            });
+            entry.transition_to_cancelling();
         }
     }
 }
@@ -100,12 +65,11 @@ impl Timer {
         with_current_wheel(&this.sched_handle, |maybe_time_cx| {
             let deadline = deadline_to_tick(&this.sched_handle, this.deadline);
             let hdl = EntryHandle::new(deadline, cx.waker());
-            let thread_id = context::thread_id().ok();
 
-            match (maybe_time_cx, thread_id) {
-                (Some(TimeContext::Running { wheel, canc_tx }), Some(thread_id)) => {
+            match maybe_time_cx {
+                Some(TimeContext::Running { wheel, canc_tx }) => {
                     // Safety: the entry is not registered yet
-                    match unsafe { wheel.insert(hdl.clone(), canc_tx.clone(), thread_id) } {
+                    match unsafe { wheel.insert(hdl.clone(), canc_tx.clone()) } {
                         Insert::Success => {
                             this.entry = Some(hdl);
                             Poll::Pending
@@ -115,7 +79,7 @@ impl Timer {
                     }
                 }
                 #[cfg(feature = "rt-multi-thread")]
-                (Some(TimeContext::Shutdown), _) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
+                Some(TimeContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
                 _ => {
                     this.entry = Some(hdl.clone());
                     push_from_remote(&this.sched_handle, hdl);

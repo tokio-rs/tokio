@@ -1,5 +1,4 @@
 mod level;
-use crate::runtime::ThreadId;
 
 pub(crate) use self::level::Expiration;
 use self::level::Level;
@@ -87,12 +86,7 @@ impl Wheel {
     /// The caller must ensure:
     ///
     /// * The entry is not already registered in ANY wheel.
-    pub(crate) unsafe fn insert(
-        &mut self,
-        hdl: EntryHandle,
-        cancel_tx: Sender,
-        thread_id: ThreadId,
-    ) -> Insert {
+    pub(crate) unsafe fn insert(&mut self, hdl: EntryHandle, cancel_tx: Sender) -> Insert {
         let deadline = hdl.deadline();
 
         if deadline <= self.elapsed {
@@ -102,7 +96,7 @@ impl Wheel {
         // Get the level at which the entry should be stored
         let level = self.level_for(deadline);
 
-        match hdl.transition_to_registered(cancel_tx, thread_id) {
+        match hdl.transition_to_registered(cancel_tx) {
             TransitionToRegistered::Success => {
                 unsafe {
                     self.levels[level].add_entry(hdl);
