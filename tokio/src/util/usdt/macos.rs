@@ -34,111 +34,113 @@
 
 use std::arch::global_asm;
 
-#[inline(always)]
-pub(super) fn task_details(task_id: u64, name: &str, file: &str, line: u32, col: u32) {
-    unsafe extern "C" {
-        #[link_name = "__dtrace_isenabled$tokio$task__details$v1"]
-        fn task_details_enabled() -> i32;
+cfg_rt!(
+    #[inline(always)]
+    pub(super) fn task_details(task_id: u64, name: &str, file: &str, line: u32, col: u32) {
+        unsafe extern "C" {
+            #[link_name = "__dtrace_isenabled$tokio$task__details$v1"]
+            fn task_details_enabled() -> i32;
 
-        #[link_name = "__dtrace_probe$tokio$task__details$v1$75696e7436345f74$63686172202a$63686172202a$75696e7433325f74$75696e7433325f74"]
-        #[cold]
-        fn __task_details(
-            task_id: u64,
-            name: *const core::ffi::c_char,
-            file: *const core::ffi::c_char,
-            line: u32,
-            col: u32,
-        );
-    }
-
-    if unsafe { task_details_enabled() } != 0 {
-        // add nul bytes
-        let name0 = [name.as_bytes(), b"\0"].concat();
-        let file0 = [file.as_bytes(), b"\0"].concat();
-
-        unsafe {
-            __task_details(
-                task_id,
-                name0.as_ptr() as *const std::ffi::c_char,
-                file0.as_ptr() as *const std::ffi::c_char,
-                line,
-                col,
+            #[link_name = "__dtrace_probe$tokio$task__details$v1$75696e7436345f74$63686172202a$63686172202a$75696e7433325f74$75696e7433325f74"]
+            #[cold]
+            fn __task_details(
+                task_id: u64,
+                name: *const core::ffi::c_char,
+                file: *const core::ffi::c_char,
+                line: u32,
+                col: u32,
             );
         }
-    }
-}
 
-#[inline(always)]
-pub(super) fn task_start(task_id: u64, spawned: u8, size: usize, original_size: usize) {
-    extern "C" {
-        #[link_name = "__dtrace_probe$tokio$task__start$v1$75696e7436345f74$75696e74385f74$75696e747074725f74$75696e747074725f74"]
-        fn __task_start(task_id: u64, kind: u8, size: usize, original_size: usize);
-    }
+        if unsafe { task_details_enabled() } != 0 {
+            // add nul bytes
+            let name0 = [name.as_bytes(), b"\0"].concat();
+            let file0 = [file.as_bytes(), b"\0"].concat();
 
-    unsafe {
-        __task_start(task_id, spawned, size, original_size);
-    }
-}
-
-#[inline(always)]
-pub(super) fn task_poll_start(task_id: u64) {
-    extern "C" {
-        #[link_name = "__dtrace_probe$tokio$task__poll__start$v1$75696e7436345f74"]
-        fn __task_poll_start(task_id: core::ffi::c_ulonglong);
+            unsafe {
+                __task_details(
+                    task_id,
+                    name0.as_ptr() as *const std::ffi::c_char,
+                    file0.as_ptr() as *const std::ffi::c_char,
+                    line,
+                    col,
+                );
+            }
+        }
     }
 
-    unsafe { __task_poll_start(task_id) }
-}
+    #[inline(always)]
+    pub(super) fn task_start(task_id: u64, spawned: u8, size: usize, original_size: usize) {
+        extern "C" {
+            #[link_name = "__dtrace_probe$tokio$task__start$v1$75696e7436345f74$75696e74385f74$75696e747074725f74$75696e747074725f74"]
+            fn __task_start(task_id: u64, kind: u8, size: usize, original_size: usize);
+        }
 
-#[inline(always)]
-pub(super) fn task_poll_end(task_id: u64) {
-    extern "C" {
-        #[link_name = "__dtrace_probe$tokio$task__poll__end$v1$75696e7436345f74"]
-        fn __task_poll_end(task_id: core::ffi::c_ulonglong);
+        unsafe {
+            __task_start(task_id, spawned, size, original_size);
+        }
     }
 
-    unsafe { __task_poll_end(task_id) }
-}
+    #[inline(always)]
+    pub(super) fn task_poll_start(task_id: u64) {
+        extern "C" {
+            #[link_name = "__dtrace_probe$tokio$task__poll__start$v1$75696e7436345f74"]
+            fn __task_poll_start(task_id: core::ffi::c_ulonglong);
+        }
 
-#[inline(always)]
-pub(crate) fn task_terminate(task_id: u64, reason: u8) {
-    extern "C" {
-        #[link_name = "__dtrace_probe$tokio$task__terminate$v1$75696e7436345f74$75696e74385f74"]
-        fn __task_terminate(task_id: core::ffi::c_ulonglong, reason: core::ffi::c_uchar);
+        unsafe { __task_poll_start(task_id) }
     }
 
-    unsafe { __task_terminate(task_id, reason) }
-}
+    #[inline(always)]
+    pub(super) fn task_poll_end(task_id: u64) {
+        extern "C" {
+            #[link_name = "__dtrace_probe$tokio$task__poll__end$v1$75696e7436345f74"]
+            fn __task_poll_end(task_id: core::ffi::c_ulonglong);
+        }
 
-#[inline(always)]
-pub(crate) fn waker_clone(task_id: u64) {
-    extern "C" {
-        #[link_name = "__dtrace_probe$tokio$waker__clone$v1$75696e7436345f74"]
-        fn __waker_clone(task_id: core::ffi::c_ulonglong);
+        unsafe { __task_poll_end(task_id) }
     }
 
-    unsafe { __waker_clone(task_id) }
-}
+    #[inline(always)]
+    pub(crate) fn task_terminate(task_id: u64, reason: u8) {
+        extern "C" {
+            #[link_name = "__dtrace_probe$tokio$task__terminate$v1$75696e7436345f74$75696e74385f74"]
+            fn __task_terminate(task_id: core::ffi::c_ulonglong, reason: core::ffi::c_uchar);
+        }
 
-#[inline(always)]
-pub(crate) fn waker_drop(task_id: u64) {
-    extern "C" {
-        #[link_name = "__dtrace_probe$tokio$waker__drop$v1$75696e7436345f74"]
-        fn __waker_drop(task_id: core::ffi::c_ulonglong);
+        unsafe { __task_terminate(task_id, reason) }
     }
 
-    unsafe { __waker_drop(task_id) }
-}
+    #[inline(always)]
+    pub(crate) fn waker_clone(task_id: u64) {
+        extern "C" {
+            #[link_name = "__dtrace_probe$tokio$waker__clone$v1$75696e7436345f74"]
+            fn __waker_clone(task_id: core::ffi::c_ulonglong);
+        }
 
-#[inline(always)]
-pub(crate) fn waker_wake(task_id: u64) {
-    extern "C" {
-        #[link_name = "__dtrace_probe$tokio$waker__wake$v1$75696e7436345f74"]
-        fn __waker_wake(task_id: core::ffi::c_ulonglong);
+        unsafe { __waker_clone(task_id) }
     }
 
-    unsafe { __waker_wake(task_id) }
-}
+    #[inline(always)]
+    pub(crate) fn waker_drop(task_id: u64) {
+        extern "C" {
+            #[link_name = "__dtrace_probe$tokio$waker__drop$v1$75696e7436345f74"]
+            fn __waker_drop(task_id: core::ffi::c_ulonglong);
+        }
+
+        unsafe { __waker_drop(task_id) }
+    }
+
+    #[inline(always)]
+    pub(crate) fn waker_wake(task_id: u64) {
+        extern "C" {
+            #[link_name = "__dtrace_probe$tokio$waker__wake$v1$75696e7436345f74"]
+            fn __waker_wake(task_id: core::ffi::c_ulonglong);
+        }
+
+        unsafe { __waker_wake(task_id) }
+    }
+);
 
 #[inline(always)]
 pub(crate) fn trace_root() {
