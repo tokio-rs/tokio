@@ -6,7 +6,9 @@ provider tokio {
     probe task__poll__start(uint64_t);
     probe task__poll__end(uint64_t);
 
-    probe task__waker__clone(uint64_t);
-    probe task__waker__drop(uint64_t);
-    probe task__waker__wake(uint64_t);
+    probe waker__clone(uint64_t);
+    probe waker__drop(uint64_t);
+    probe waker__wake(uint64_t);
+
+    probe trace__root();
 };
