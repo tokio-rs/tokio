@@ -1,6 +1,7 @@
-use crate::task::Id;
-
 cfg_rt! {
+    use crate::task::Id;
+    use crate::util::trace::SpawnMeta;
+
     #[repr(u8)]
     pub(crate) enum TaskKind {
         #[allow(dead_code)]
@@ -43,8 +44,6 @@ cfg_usdt! {
         };
         use pin_project_lite::pin_project;
         use std::future::Future;
-
-        use crate::util::trace::SpawnMeta;
 
         pub(crate) use usdt_impl::{waker_clone, waker_wake, waker_drop};
 
@@ -134,8 +133,6 @@ cfg_not_usdt! {
     pub(crate) fn trace_root() {}
 
     cfg_rt! {
-        use crate::util::trace::SpawnMeta;
-
         #[inline]
         pub(crate) fn start_task(_kind: TaskKind, _meta: SpawnMeta<'_>, _id: Id, _size: usize) {}
 
