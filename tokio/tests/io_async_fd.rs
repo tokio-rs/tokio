@@ -479,8 +479,6 @@ async fn multiple_waiters() {
 }
 
 #[tokio::test]
-// Block on https://github.com/rust-lang/miri/issues/4374
-#[cfg_attr(miri, ignore)]
 async fn poll_fns() {
     let (a, b) = socketpair();
     let afd_a = Arc::new(AsyncFd::new(a).unwrap());

@@ -51,6 +51,7 @@ pub(crate) mod sync {
     // internal use. Note however that some are not _currently_ named by
     // consuming code.
 
+    // Not using parking_lot in Miri due to <https://github.com/Amanieu/parking_lot/issues/477>.
     #[cfg(all(feature = "parking_lot", not(miri)))]
     #[allow(unused_imports)]
     pub(crate) use crate::loom::std::parking_lot::{
