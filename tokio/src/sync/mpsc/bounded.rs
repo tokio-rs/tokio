@@ -546,10 +546,18 @@ impl<T> Receiver<T> {
         self.chan.len()
     }
 
-    /// Returns the current capacity of the channel.
+    /// Returns the current number of reservations which can immediately be
+    /// returned from the channel.
     ///
     /// The capacity goes down when the sender sends a value by calling [`Sender::send`] or by reserving
-    /// capacity with [`Sender::reserve`]. The capacity goes up when values are received.
+    /// capacity with [`Sender::reserve`].
+    ///
+    /// The capacity goes up when values are received, unless there are
+    /// existing, non-cancelled calls to [`Sender::send`] or [`Sender::reserve`]
+    /// which have returned [`Poll::Pending`]. While those calls exist, reading
+    /// values from the [`Receiver`] transfers access to that capacity directly to
+    /// those callers, in FIFO order.
+    ///
     /// This is distinct from [`max_capacity`], which always returns buffer capacity initially
     /// specified when calling [`channel`].
     ///
@@ -784,8 +792,8 @@ impl<T> Sender<T> {
     /// capacity, then use the returned [`Permit`] to send the message.
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve`
-    /// complete in the order they were requested.  Cancelling a call to
-    /// `send` makes you lose your place in the queue.
+    /// are granted capacity in the order they were requested. Cancelling a
+    /// call to `send` makes you lose your place in the queue.
     ///
     /// # Examples
     ///
@@ -1087,8 +1095,8 @@ impl<T> Sender<T> {
     /// # Cancel safety
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve`
-    /// complete in the order they were requested.  Cancelling a call to
-    /// `reserve` makes you lose your place in the queue.
+    /// are granted capacity in the order they were requested. Cancelling a
+    /// call to `reserve` makes you lose your place in the queue.
     ///
     /// # Examples
     ///
@@ -1143,7 +1151,7 @@ impl<T> Sender<T> {
     /// # Cancel safety
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve_many`
-    /// complete in the order they were requested. Cancelling a call to
+    /// are granted capacity in the order they were requested. Cancelling a call to
     /// `reserve_many` makes you lose your place in the queue.
     ///
     /// # Examples
@@ -1206,8 +1214,8 @@ impl<T> Sender<T> {
     /// # Cancel safety
     ///
     /// This channel uses a queue to ensure that calls to `send` and `reserve`
-    /// complete in the order they were requested.  Cancelling a call to
-    /// `reserve_owned` makes you lose your place in the queue.
+    /// are granted capacity in the order they were requested. Cancelling a
+    /// call to `reserve_owned` makes you lose your place in the queue.
     ///
     /// # Examples
     /// Sending a message using an [`OwnedPermit`]:
@@ -1502,12 +1510,20 @@ impl<T> Sender<T> {
         self.chan.same_channel(&other.chan)
     }
 
-    /// Returns the current capacity of the channel.
+    /// Returns the current number of reservations which can immediately be
+    /// returned from the channel.
     ///
     /// The capacity goes down when sending a value by calling [`send`] or by reserving capacity
-    /// with [`reserve`]. The capacity goes up when values are received by the [`Receiver`].
+    /// with [`reserve`].
+    ///
+    /// The capacity goes up when values are received, unless there are
+    /// existing, non-cancelled calls to [`Sender::send`] or [`Sender::reserve`]
+    /// which have returned [`Poll::Pending`]. While those calls exist, reading
+    /// values from the [`Receiver`] transfers access to that capacity directly to
+    /// those callers, in FIFO order.
+    ///
     /// This is distinct from [`max_capacity`], which always returns buffer capacity initially
-    /// specified when calling [`channel`]
+    /// specified when calling [`channel`].
     ///
     /// # Examples
     ///
