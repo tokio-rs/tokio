@@ -19,6 +19,7 @@ use crate::runtime::task::JoinHandle;
 use crate::runtime::BOX_FUTURE_THRESHOLD;
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 use crate::util::trace::SpawnMeta;
+use crate::util::usdt;
 
 use std::future::Future;
 use std::marker::PhantomData;
@@ -359,9 +360,12 @@ impl Handle {
         ))]
         let future = super::task::trace::Trace::root(future);
 
+        #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+        let id = super::task::Id::next();
+        #[cfg(all(tokio_unstable, feature = "usdt"))]
+        let future = usdt::block_on(future, _meta, id);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future =
-            crate::util::trace::task(future, "block_on", _meta, super::task::Id::next().as_u64());
+        let future = crate::util::trace::task(future, "block_on", _meta, id.as_u64());
 
         // Enter the runtime context. This sets the current driver handles and
         // prevents blocking an existing runtime.
@@ -385,6 +389,7 @@ impl Handle {
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
         ))]
         let future = super::task::trace::Trace::root(future);
+        usdt::start_task(usdt::TaskKind::Spawn, meta, id, std::mem::size_of::<F>());
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", meta, id.as_u64());
         self.inner.spawn(future, id, meta.spawned_at)
@@ -414,6 +419,12 @@ impl Handle {
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
         ))]
         let future = super::task::trace::Trace::root(future);
+        usdt::start_task(
+            usdt::TaskKind::SpawnLocal,
+            meta,
+            id,
+            std::mem::size_of::<F>(),
+        );
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", meta, id.as_u64());
         unsafe { self.inner.spawn_local(future, id, meta.spawned_at) }
