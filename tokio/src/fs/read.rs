@@ -30,6 +30,16 @@ use std::{io, path::Path};
 ///
 /// [`ErrorKind::Interrupted`]: std::io::ErrorKind::Interrupted
 ///
+/// # io_uring support
+///
+/// On Linux, you can also use io_uring for executing system calls. To enable
+/// io_uring, you need to specify the `--cfg tokio_unstable` flag at compile time,
+/// enable the io-uring cargo feature, and set the `Builder::enable_io_uring`
+/// runtime option.
+///
+/// Support for io_uring is currently experimental, so its behavior may change
+/// or it may be removed in future versions.
+///
 /// # Examples
 ///
 /// ```no_run
@@ -45,5 +55,23 @@ use std::{io, path::Path};
 /// ```
 pub async fn read(path: impl AsRef<Path>) -> io::Result<Vec<u8>> {
     let path = path.as_ref().to_owned();
+
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux"
+    ))]
+    {
+        use crate::fs::read_uring;
+
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+        if driver_handle.check_and_init()? {
+            return read_uring(&path).await;
+        }
+    }
+
     asyncify(move || std::fs::read(path)).await
 }
