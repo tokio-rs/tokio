@@ -1058,6 +1058,7 @@ jobs:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
+          RUSTDOCFLAGS: -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-stream
         run: cargo test -p tokio-stream --target ${{ matrix.target }} --features time,net,io-util,sync
