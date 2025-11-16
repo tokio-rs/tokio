@@ -68,6 +68,9 @@ cfg_net! {
     ///     socket.set_reuseaddr(true)?;
     ///     socket.bind(addr)?;
     ///
+    ///     // Note: the actual backlog used by `TcpListener::bind` is platform-dependent,
+    ///     // as Tokio relies on Mio's default backlog value configuration. The `1024` here is only
+    ///     // illustrative and does not reflect the real value used.
     ///     let listener = socket.listen(1024)?;
     /// # drop(listener);
     ///
