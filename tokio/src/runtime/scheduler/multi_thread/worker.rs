@@ -973,18 +973,15 @@ impl Context {
     cfg_not_time! {
         fn maintain_local_timers_before_parking(
             &self,
-            core: Box<Core>,
             park_duration: Option<Duration>
         ) -> MaintainLocalTimer {
-            MaintainLocalTimer { core, park_duration, auto_advance_duration: None }
+            MaintainLocalTimer { park_duration, auto_advance_duration: None }
         }
 
         fn maintain_local_timers_after_parking(
             &self,
-            core: Box<Core>,
             _auto_advance_duration: Option<Duration>
         ) {
-            core
         }
     } // cfg_not_time!
 }

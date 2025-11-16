@@ -136,6 +136,21 @@ pub(crate) fn budget<R>(f: impl FnOnce(&Cell<coop::Budget>) -> R) -> Result<R, A
 }
 
 cfg_rt! {
+    use crate::runtime::ThreadId;
+
+    pub(crate) fn thread_id() -> Result<ThreadId, AccessError> {
+        CONTEXT.try_with(|ctx| {
+            match ctx.thread_id.get() {
+                Some(id) => id,
+                None => {
+                    let id = ThreadId::next();
+                    ctx.thread_id.set(Some(id));
+                    id
+                }
+            }
+        })
+    }
+
     pub(crate) fn set_current_task_id(id: Option<Id>) -> Option<Id> {
         CONTEXT.try_with(|ctx| ctx.current_task_id.replace(id)).unwrap_or(None)
     }
@@ -181,26 +196,5 @@ cfg_rt! {
         pub(crate) unsafe fn with_trace<R>(f: impl FnOnce(&trace::Context) -> R) -> Option<R> {
             CONTEXT.try_with(|c| f(&c.trace)).ok()
         }
-    }
-}
-
-cfg_rt_or_time! {
-    use crate::runtime::ThreadId;
-
-    pub(crate) fn thread_id() -> Result<ThreadId, AccessError> {
-        #[cfg(not(feature = "rt"))]
-        panic!("thread_id() called without the 'rt' feature enabled");
-
-        #[cfg(feature = "rt")]
-        CONTEXT.try_with(|ctx| {
-            match ctx.thread_id.get() {
-                Some(id) => id,
-                None => {
-                    let id = ThreadId::next();
-                    ctx.thread_id.set(Some(id));
-                    id
-                }
-            }
-        })
     }
 }

@@ -471,9 +471,7 @@ cfg_rt! {
 
     /// After thread starts / before thread stops
     type Callback = std::sync::Arc<dyn Fn() + Send + Sync>;
-}
 
-cfg_rt_or_time! {
     mod thread_id;
     pub(crate) use thread_id::ThreadId;
 }

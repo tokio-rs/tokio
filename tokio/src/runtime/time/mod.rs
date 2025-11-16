@@ -18,12 +18,12 @@ pub(crate) use source::TimeSource;
 mod wheel;
 cfg_rt_and_time! {
     pub(crate) use wheel::{Insert, EntryHandle, EntryState, EntryCancelling};
-    pub(crate) use wheel::TransitionToWakingUp as EntryTransitionToWakingUp;
 }
 cfg_rt_or_time! {
     pub(crate) use wheel::cancellation_queue;
     pub(crate) use wheel::WakeQueue;
     pub(crate) use wheel::Wheel;
+    pub(crate) use wheel::TransitionToWakingUp as EntryTransitionToWakingUp;
 }
 
 cfg_test_util! {
