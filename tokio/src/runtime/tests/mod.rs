@@ -77,7 +77,7 @@ cfg_not_loom! {
     mod inject;
     mod queue;
 
-    #[cfg(not(miri))]
+    #[cfg(not(miri))] // takes a really long time with miri
     mod task_combinations;
 
     #[cfg(miri)]
