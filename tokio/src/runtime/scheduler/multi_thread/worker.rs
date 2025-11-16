@@ -983,7 +983,7 @@ impl Context {
             &self,
             core: Box<Core>,
             _auto_advance_duration: Option<Duration>
-        ) -> Box<Core> {
+        ) {
             core
         }
     } // cfg_not_time!

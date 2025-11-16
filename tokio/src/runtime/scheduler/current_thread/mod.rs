@@ -472,7 +472,7 @@ impl Context {
 
             self.defer.wake();
 
-            self.maintain_local_timers_after_parking(handle, auto_advance_duration)
+            self.maintain_local_timers_after_parking(handle, auto_advance_duration);
         });
 
         core
@@ -631,10 +631,9 @@ impl Context {
 
         fn maintain_local_timers_after_parking(
             &self,
-            core: Box<Core>,
             _handle: &Handle,
             _auto_advance_duration: Option<Duration>
-        ) -> Box<Core> {
+        ) {
             core
         }
     } // cfg_not_time!
