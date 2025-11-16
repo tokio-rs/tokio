@@ -35,16 +35,13 @@ macro_rules! call_probe {
     ) => {
         // <https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation>
         // <https://github.com/cdkey/systemtap/blob/cbb34b7244ba60cb0904d61dc9167290855106aa/includes/sys/sdt.h#L240-L254>
+        //
+        // The note section `o` flag and the named labels here are significant to ensure
+        // that the note is discarded or retained with the nop as a unit. Either both
+        // are discarded or both are retained.
         std::arch::asm!(
-            "990:   nop",
-            // The `R` here means "retained". It prevents the linker from GC the note.
-            // This additionally means that the function containing the `nop` is also not GCd.
-            //
-            // This is not great, but without this we get notes that are not GCd but the functions
-            // they reference are GCd. This causes notes to have incorrect addresses.
-            //
-            // Ideally we'd use `"?"` but that's not working correctly.
-                    ".pushsection .note.stapsdt, \"R\", \"note\"
+            ".Lprobe_{label}:   nop
+                    .pushsection .note.stapsdt, \"o\", \"note\", .Lprobe_{label}
                     .balign 4
                     .4byte 992f-991f, 994f-993f, 3
             991:
@@ -52,7 +49,7 @@ macro_rules! call_probe {
             992:
                     .balign 4
             993:
-                    .8byte 990b
+                    .8byte .Lprobe_{label}
                     .8byte _.stapsdt.base
                     .8byte {semaphore}
                     .asciz \"tokio\"",
@@ -62,6 +59,8 @@ macro_rules! call_probe {
                     .balign 4
                     .popsection",
             $($args)*
+            // nasty hack to get a unique label name.
+            label = label {},
             options(att_syntax, readonly, nostack, preserves_flags),
         );
     };
@@ -77,16 +76,13 @@ macro_rules! call_probe {
     ) => {
         // <https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation>
         // <https://github.com/cdkey/systemtap/blob/cbb34b7244ba60cb0904d61dc9167290855106aa/includes/sys/sdt.h#L240-L254>
+        //
+        // The note section `o` flag and the named labels here are significant to ensure
+        // that the note is discarded or retained with the nop as a unit. Either both
+        // are discarded or both are retained.
         std::arch::asm!(
-            "990:   nop",
-            // The `R` here means "retained". It prevents the linker from GC the note.
-            // This additionally means that the function containing the `nop` is also not GCd.
-            //
-            // This is not great, but without this we get notes that are not GCd but the functions
-            // they reference are GCd. This causes notes to have incorrect addresses.
-            //
-            // Ideally we'd use `"?"` but that's not working correctly.
-                    ".pushsection .note.stapsdt, \"R\", \"note\"
+            ".Lprobe_{label}:   nop
+                    .pushsection .note.stapsdt, \"o\", \"note\", .Lprobe_{label}
                     .balign 4
                     .4byte 992f-991f, 994f-993f, 3
             991:
@@ -94,7 +90,7 @@ macro_rules! call_probe {
             992:
                     .balign 4
             993:
-                    .8byte 990b
+                    .8byte .Lprobe_{label}
                     .8byte _.stapsdt.base
                     .8byte {semaphore}
                     .asciz \"tokio\"",
@@ -104,6 +100,8 @@ macro_rules! call_probe {
                     .balign 4
                     .popsection",
             $($args)*
+            // nasty hack to get a unique label name.
+            label = label {},
             options(readonly, nostack, preserves_flags),
         );
     };
