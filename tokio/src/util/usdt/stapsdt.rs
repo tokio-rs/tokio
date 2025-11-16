@@ -24,6 +24,7 @@
 //! into a seperate function and marking it as `#[cold]` or `#[inline(never)]`.
 //! This ensures the hot path (probe is disabled) doesn't need to skip over a large
 //! number of instructions, and the branch predictor can make better predictions.
+#![allow(named_asm_labels)]
 
 #[cfg(target_arch = "x86_64")]
 macro_rules! call_probe {
