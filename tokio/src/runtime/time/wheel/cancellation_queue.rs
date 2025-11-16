@@ -10,12 +10,6 @@ struct Inner {
     list: EntryList,
 }
 
-/// Safety: [`Inner`] is protected by [`Mutex`].
-unsafe impl Send for Inner {}
-
-/// Safety: [`Inner`] is protected by [`Mutex`].
-unsafe impl Sync for Inner {}
-
 impl Drop for Inner {
     fn drop(&mut self) {
         // consume all entries
@@ -34,7 +28,7 @@ impl Inner {
     ///
     /// Behavior is undefined if any of the following conditions are violated:
     ///
-    /// - `hdl` must not in any [`super::cancellation_queue`], and also mus not in any [`WakeQueue`].
+    /// - `hdl` must not in any [`super::cancellation_queue`], and also mus not in any [`super::WakeQueue`].
     unsafe fn push_front(&mut self, hdl: EntryHandle) {
         self.list.push_front(hdl);
     }
@@ -70,12 +64,6 @@ impl Inner {
 pub(crate) struct Sender {
     inner: Arc<Mutex<Inner>>,
 }
-
-/// Safety: [`Inner`] is protected by [`Mutex`].
-unsafe impl Send for Sender {}
-
-/// Safety: [`Inner`] is protected by [`Mutex`].
-unsafe impl Sync for Sender {}
 
 impl Sender {
     /// # Safety

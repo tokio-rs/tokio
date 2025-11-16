@@ -10,12 +10,6 @@ pub(crate) struct WakeQueue {
     list: EntryList,
 }
 
-/// Safety: [`WakeQueue`] is protected by [`Mutex`].
-unsafe impl Send for WakeQueue {}
-
-/// Safety: [`WakeQueue`] is protected by [`Mutex`].
-unsafe impl Sync for WakeQueue {}
-
 impl Drop for WakeQueue {
     fn drop(&mut self) {
         // drain all entries without waking them up
