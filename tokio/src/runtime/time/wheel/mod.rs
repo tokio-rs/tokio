@@ -11,10 +11,15 @@ pub(crate) use entry::Handle as EntryHandle;
 pub(crate) use entry::State as EntryState;
 use entry::TransitionToPending;
 use entry::TransitionToRegistered;
-use entry::{CancellationQueueEntry, Entry, EntryList};
+pub(crate) use entry::TransitionToWakingUp;
+use entry::{CancellationQueueEntry, WakeQueueEntry};
+use entry::{Entry, EntryList};
 
 pub(crate) mod cancellation_queue;
 use cancellation_queue::Sender;
+
+mod wake_queue;
+pub(crate) use wake_queue::WakeQueue;
 
 use std::array;
 use std::ptr::NonNull;

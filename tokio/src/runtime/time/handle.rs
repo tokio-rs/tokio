@@ -1,4 +1,5 @@
-use crate::runtime::time::{TimeSource, Wheel};
+use crate::runtime::time::EntryTransitionToWakingUp;
+use crate::runtime::time::{TimeSource, WakeQueue, Wheel};
 use std::fmt;
 
 cfg_test_util! {
@@ -21,7 +22,12 @@ pub(crate) struct Handle {
 }
 
 impl Handle {
-    pub(crate) fn process_at_time(&self, wheel: &mut Wheel, mut now: u64) {
+    pub(crate) fn process_at_time(
+        &self,
+        wheel: &mut Wheel,
+        mut now: u64,
+        wake_queue: &mut WakeQueue,
+    ) {
         if now < wheel.elapsed() {
             // Time went backwards! This normally shouldn't happen as the Rust language
             // guarantees that an Instant is monotonic, but can happen when running
@@ -33,8 +39,19 @@ impl Handle {
         }
 
         while let Some(hdl) = wheel.poll(now) {
-            unsafe {
-                hdl.wake();
+            match hdl.transition_to_waking_up() {
+                EntryTransitionToWakingUp::Success => {
+                    // Safety:
+                    //
+                    // 1. this entry is not in the timer wheel
+                    // 2. AND this entry is not in any cancellation queue
+                    unsafe {
+                        wake_queue.push_front(hdl);
+                    }
+                }
+                EntryTransitionToWakingUp::Cancelling => {
+                    // cancellation happens concurrently, no need to wake
+                }
             }
         }
     }
@@ -44,7 +61,9 @@ impl Handle {
         // Advance time forward to the end of time.
         // This will ensure that all timers are fired.
         let max_tick = u64::MAX;
-        self.process_at_time(wheel, max_tick);
+        let mut wake_queue = WakeQueue::new();
+        self.process_at_time(wheel, max_tick, &mut wake_queue);
+        wake_queue.wake_all();
     }
 
     /// Returns the time source associated with this handle.

@@ -9,6 +9,7 @@ use futures::task::noop_waker_ref;
 use crate::loom::thread;
 use crate::runtime::time::timer::with_current_wheel;
 use crate::runtime::time::Context as TimeContext;
+use crate::runtime::time::WakeQueue;
 use crate::runtime::Handle;
 use crate::sync::oneshot;
 
@@ -46,17 +47,21 @@ async fn fire_all_timers(handle: &Handle, exit_rx: oneshot::Receiver<()>) {
             break;
         }
 
+        let mut wake_queue = WakeQueue::new();
+
         // In the `block_on` context, we can get the current wheel
         // fire all timers.
         with_current_wheel(&handle.inner, |maybe_wheel| match maybe_wheel {
             Some(TimeContext::Running { wheel, .. }) => {
                 let time = handle.inner.driver().time();
-                time.process_at_time(wheel, u64::MAX);
+                time.process_at_time(wheel, u64::MAX, &mut wake_queue);
             }
             #[cfg(feature = "rt-multi-thread")]
             Some(TimeContext::Shutdown) => panic!("runtime is shutting down"),
             None => panic!("no current wheel"),
         });
+
+        wake_queue.wake_all();
 
         thread::yield_now();
     }
@@ -65,15 +70,19 @@ async fn fire_all_timers(handle: &Handle, exit_rx: oneshot::Receiver<()>) {
 // This function must be called inside the `rt.block_on`.
 fn process_at_time(handle: &Handle, at: u64) {
     let handle = &handle.inner;
+    let mut wake_queue = WakeQueue::new();
+
     with_current_wheel(handle, |maybe_wheel| match maybe_wheel {
         Some(TimeContext::Running { wheel, .. }) => {
             let time = handle.driver().time();
-            time.process_at_time(wheel, at);
+            time.process_at_time(wheel, at, &mut wake_queue);
         }
         #[cfg(feature = "rt-multi-thread")]
         Some(TimeContext::Shutdown) => panic!("runtime is shutting down"),
         None => panic!("no current wheel"),
     });
+
+    wake_queue.wake_all();
 }
 
 fn rt(start_paused: bool) -> crate::runtime::Runtime {

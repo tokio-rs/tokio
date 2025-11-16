@@ -25,6 +25,7 @@ use std::{fmt, thread};
 cfg_time! {
     use crate::runtime::scheduler::util;
     use crate::runtime::time::EntryHandle;
+    use crate::runtime::time::WakeQueue;
     use crate::loom::sync::Mutex;
 }
 
@@ -69,7 +70,7 @@ struct Core {
     tick: u32,
 
     #[cfg(feature = "time")]
-    time_context: Option<crate::runtime::time::Context2>,
+    time_context: crate::runtime::time::Context2,
 
     /// Runtime driver
     ///
@@ -189,7 +190,7 @@ impl CurrentThread {
             tasks: VecDeque::with_capacity(INITIAL_CAPACITY),
             tick: 0,
             #[cfg(feature = "time")]
-            time_context: Some(crate::runtime::time::Context2::new()),
+            time_context: crate::runtime::time::Context2::new(),
             driver: Some(driver),
             metrics: MetricsBatch::new(&handle.shared.worker_metrics),
             global_queue_interval,
@@ -302,14 +303,12 @@ fn shutdown2(mut core: Box<Core>, handle: &Handle) -> Box<Core> {
 
     #[cfg(feature = "time")]
     {
-        let mut time_context = core.time_context.take().unwrap();
         util::time::shutdown_local_timers(
-            &mut time_context.wheel,
-            &mut time_context.canc_rx,
+            &mut core.time_context.wheel,
+            &mut core.time_context.canc_rx,
             handle.take_remote_timers(),
             &handle.driver,
         );
-        assert!(core.time_context.replace(time_context).is_none());
     }
     // Drain the local queue
     // We already shut down every task, so we just need to drop the task.
@@ -459,13 +458,12 @@ impl Context {
     ) -> Box<Core> {
         debug_assert!(core.driver.is_none());
 
-        let MaintainLocalTimer {
-            core,
-            park_duration: duration,
-            auto_advance_duration,
-        } = self.maintain_local_timers_before_parking(core, handle, duration);
-
         let (core, ()) = self.enter(core, || {
+            let MaintainLocalTimer {
+                park_duration: duration,
+                auto_advance_duration,
+            } = self.maintain_local_timers_before_parking(handle, duration);
+
             if let Some(duration) = duration {
                 driver.park_timeout(&handle.driver, duration);
             } else {
@@ -473,9 +471,11 @@ impl Context {
             }
 
             self.defer.wake();
+
+            self.maintain_local_timers_after_parking(handle, auto_advance_duration)
         });
 
-        self.maintain_local_timers_after_parking(core, handle, auto_advance_duration)
+        core
     }
 
     fn enter<R>(&self, core: Box<Core>, f: impl FnOnce() -> R) -> (Box<Core>, R) {
@@ -510,26 +510,42 @@ impl Context {
         /// `(Box<Core>, park_duration, auto_advance_duration)`
         fn maintain_local_timers_before_parking(
             &self,
-            core: Box<Core>,
             handle: &Handle,
             park_duration: Option<Duration>
         ) -> MaintainLocalTimer {
-            let (core, (should_yield, next_timer)) =
-                self.enter_with_time_context(core, |time_cx| {
-                    util::time::remove_cancelled_timers(&mut time_cx.wheel, &mut time_cx.canc_rx);
-                    let should_yield = util::time::insert_inject_timers(
-                        &mut time_cx.wheel,
-                        &time_cx.canc_tx,
-                        handle.take_remote_timers(),
-                    );
-                    let next_timer =
-                        util::time::next_expiration_time(&time_cx.wheel, &handle.driver);
-                    (should_yield, next_timer)
-                });
+            let mut wake_queue = WakeQueue::new();
+
+            let (should_yield, next_timer) = context::with_scheduler(|maybe_cx| {
+                use scheduler::Context::CurrentThread;
+
+                match maybe_cx {
+                    Some(CurrentThread(cx)) if std::ptr::eq(Arc::as_ptr(&cx.handle), handle) => {
+                        let mut maybe_core = cx.core.borrow_mut();
+                        let core = maybe_core.as_mut().expect("core missing");
+                        let time_cx = &mut core.time_context;
+
+                        util::time::remove_cancelled_timers(&mut time_cx.wheel, &mut time_cx.canc_rx);
+                        util::time::insert_inject_timers(
+                            &mut time_cx.wheel,
+                            &time_cx.canc_tx,
+                            handle.take_remote_timers(),
+                            &mut wake_queue,
+                        );
+                        let should_yield = !wake_queue.is_empty();
+
+                        let next_timer =
+                            util::time::next_expiration_time(&time_cx.wheel, &handle.driver);
+
+                        (should_yield, next_timer)
+                    }
+                    _bad_cx => panic!("function is not called within the exact same runtime context"),
+                }
+            });
+
+            wake_queue.wake_all();
 
             if should_yield {
                 MaintainLocalTimer {
-                    core,
                     park_duration: Some(Duration::ZERO),
                     auto_advance_duration: None,
                 }
@@ -537,13 +553,11 @@ impl Context {
                 let dur = util::time::min_duration(park_duration, next_timer);
                 if util::time::pre_auto_advance(&handle.driver, dur) {
                     MaintainLocalTimer {
-                        core,
                         park_duration: Some(Duration::ZERO),
                         auto_advance_duration: dur,
                     }
                 } else {
                     MaintainLocalTimer {
-                        core,
                         park_duration: dur,
                         auto_advance_duration: None,
                     }
@@ -557,30 +571,28 @@ impl Context {
         /// * Process expired timers.
         fn maintain_local_timers_after_parking(
             &self,
-            core: Box<Core>,
             handle: &Handle,
             auto_advance_duration: Option<Duration>
-        ) -> Box<Core> {
-            let (core, ()) = self.enter_with_time_context(core, |time_cx| {
-                util::time::post_auto_advance(&handle.driver, auto_advance_duration);
-                util::time::process_expired_timers(&mut time_cx.wheel, &handle.driver);
-            });
-            core
-        }
+        ) {
+            let mut wake_queue = WakeQueue::new();
 
-        /// Take out the time context from the core,
-        /// and then setup the [`Core`] to the thread-local [`Context`],
-        /// finally, run the provided closure `f` with the time context.
-        fn enter_with_time_context<F, R>(&self, mut core: Box<Core>, f: F) -> (Box<Core>, R)
-        where
-            F: FnOnce(&mut crate::runtime::time::Context2) -> R,
-        {
-            let mut time_cx = core.time_context.take().expect("time context missing");
-            let (mut core, ret) = self.enter(core, || {
-                f(&mut time_cx)
+            context::with_scheduler(|maybe_cx| {
+                use scheduler::Context::CurrentThread;
+
+                match maybe_cx {
+                    Some(CurrentThread(cx)) if std::ptr::eq(Arc::as_ptr(&cx.handle), handle) => {
+                        let mut maybe_core = cx.core.borrow_mut();
+                        let core = maybe_core.as_mut().expect("core missing");
+                        let time_cx = &mut core.time_context;
+
+                        util::time::post_auto_advance(&handle.driver, auto_advance_duration);
+                        util::time::process_expired_timers(&mut time_cx.wheel, &handle.driver, &mut wake_queue);
+                    }
+                    _bad_cx => panic!("function is not called within the exact same runtime context"),
+                }
             });
-            assert!(core.time_context.replace(time_cx).is_none());
-            (core, ret)
+
+            wake_queue.wake_all();
         }
 
         fn with_core<F, R>(&self, f: F) -> R
@@ -597,17 +609,10 @@ impl Context {
         {
             self.with_core(|maybe_core| {
                 match maybe_core {
-                    Some(core) => {
-                        match core.time_context {
-                            Some(ref mut time_context) => {
-                                f(Some(crate::runtime::time::Context::Running {
-                                    wheel: &mut time_context.wheel,
-                                    canc_tx: &time_context.canc_tx,
-                                }))
-                            }
-                            None => f(None),
-                        }
-                    }
+                    Some(core) => f(Some(crate::runtime::time::Context::Running {
+                        wheel: &mut core.time_context.wheel,
+                        canc_tx: &core.time_context.canc_tx,
+                    })),
                     None => f(None),
                 }
             })
@@ -1068,7 +1073,6 @@ impl Drop for CoreGuard<'_> {
 
 /// Returned by [`Context::maintain_local_timers_before_parking`].
 struct MaintainLocalTimer {
-    core: Box<Core>,
     park_duration: Option<Duration>,
     auto_advance_duration: Option<Duration>,
 }

@@ -1,8 +1,10 @@
 cfg_rt_and_time! {
     pub(crate) mod time {
         use crate::runtime::{scheduler::driver};
-        use crate::runtime::time::{EntryHandle, EntryState, EntryCancelling, Wheel};
+        use crate::runtime::time::{Wheel, WakeQueue};
+        use crate::runtime::time::{EntryHandle, EntryState, EntryCancelling};
         use crate::runtime::time::cancellation_queue::{Sender, Receiver};
+        use crate::runtime::time::EntryTransitionToWakingUp;
         use std::time::Duration;
 
         pub(crate) fn min_duration(a: Option<Duration>, b: Option<Duration>) -> Option<Duration> {
@@ -18,22 +20,33 @@ cfg_rt_and_time! {
             wheel: &mut Wheel,
             tx: &Sender,
             inject: Vec<EntryHandle>,
-        ) -> bool {
+            wake_queue: &mut WakeQueue,
+        ) {
             use crate::runtime::time::Insert;
-            let mut fired = false;
+
             // process injected timers
             for hdl in inject {
                 match unsafe { wheel.insert(hdl.clone(), tx.clone()) } {
                     Insert::Success => {}
                     Insert::Elapsed => {
-                        hdl.wake_unregistered();
-                        fired = true;
+                        match hdl.transition_to_waking_up_unregistered() {
+                            EntryTransitionToWakingUp::Success => {
+                                // Safety:
+                                //
+                                // 1. this entry is not in the timer wheel
+                                // 2. AND this entry is not in any cancellation queue
+                                unsafe {
+                                    wake_queue.push_front(hdl);
+                                }
+                            }
+                            EntryTransitionToWakingUp::Cancelling => {
+                                // cancellation happens concurrently, no need to wake
+                            }
+                        }
                     }
                     Insert::Cancelling => {}
                 }
             }
-
-            fired
         }
 
         pub(crate) fn remove_cancelled_timers(
@@ -42,8 +55,10 @@ cfg_rt_and_time! {
         ) {
             for hdl in rx.recv_all() {
                 match hdl.state() {
-                    // INVARIANT: unregistered entry should not be in the wheel.
-                    EntryState::Unregistered | EntryState::Registered | EntryState::Pending => unreachable!(),
+                    // INVARIANT: the state always be transitioned to Cancelling before being sent to cancellation queue
+                    state @ (EntryState::Unregistered | EntryState::Registered | EntryState::Pending | EntryState::WakingUp) => {
+                        panic!("corrupted state: {state:#?}");
+                    }
                     EntryState::Cancelling(cancelling) => match cancelling {
                         EntryCancelling::Unregistered => (),
                         EntryCancelling::Registered | EntryCancelling::Pending => {
@@ -55,7 +70,8 @@ cfg_rt_and_time! {
                             }
                         }
                     }
-                    EntryState::WokenUp => unreachable!(),
+                    // INVARIANT: the state always be transitioned to Cancelling before being sent to cancellation queue
+                    EntryState::WokenUp => panic!("corrupted state: `EntryState::WokenUp`"),
                 }
             }
         }
@@ -146,6 +162,7 @@ cfg_rt_and_time! {
         pub(crate) fn process_expired_timers(
             wheel: &mut Wheel,
             drv_hdl: &driver::Handle,
+            wake_queue: &mut WakeQueue,
         ) {
             drv_hdl.with_time(|maybe_time_hdl| {
                 let Some(time_hdl) = maybe_time_hdl else {
@@ -157,7 +174,7 @@ cfg_rt_and_time! {
                 let time_source = time_hdl.time_source();
 
                 let now = time_source.now(clock);
-                time_hdl.process_at_time(wheel, now);
+                time_hdl.process_at_time(wheel, now, wake_queue);
             });
         }
 
@@ -176,10 +193,26 @@ cfg_rt_and_time! {
                 remove_cancelled_timers(wheel, rx);
                 time_hdl.shutdown(wheel);
 
+                let mut wake_queue = WakeQueue::new();
                 // simply wake all unregistered timers
                 for hdl in inject {
-                    hdl.wake_unregistered();
+                    match hdl.transition_to_waking_up_unregistered() {
+                        EntryTransitionToWakingUp::Success => {
+                            // Safety:
+                            //
+                            // 1. this entry is not in the timer wheel
+                            // 2. AND this entry is not in any cancellation queue
+                            unsafe {
+                                wake_queue.push_front(hdl);
+                            }
+                        }
+                        EntryTransitionToWakingUp::Cancelling => {
+                            // cancellation happens concurrently, no need to wake
+                        }
+                    }
                 }
+
+                wake_queue.wake_all();
             });
         }
     }
