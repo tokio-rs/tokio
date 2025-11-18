@@ -136,7 +136,7 @@ where
     }
 }
 
-#[cfg(test)]
+#[cfg(all(not(target_os = "wasi"), test))]
 pub(super) fn with_current_time_context2<F, R>(hdl: &SchedulerHandle, f: F) -> R
 where
     F: FnOnce(Option<&mut crate::runtime::time::Context2>) -> R,
