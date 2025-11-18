@@ -285,7 +285,7 @@ cfg_rt! {
             }
 
 
-            #[cfg(all(not(target_family = "wasm"), test))]
+            #[cfg(all(not(target_os = "wasi"), test))]
             pub(crate) fn with_time_context2<F, R>(&self, f: F) -> R
             where
                 F: FnOnce(Option<&mut crate::runtime::time::Context2>) -> R,
