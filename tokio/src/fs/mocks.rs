@@ -153,7 +153,7 @@ where
 {
     let (tx, rx) = oneshot::channel();
 
-    let _ = crate::spawn(async move {
+    let _task = crate::spawn(async move {
         let res = f.await;
         let _ = tx.send(res);
     });
