@@ -18,14 +18,12 @@ struct State {
 
 #[derive(Debug)]
 pub(crate) struct Entry {
-    /// The intrusive pointers used by [`super::Wheel::levels`].
-    wheel_pointers: linked_list::Pointers<Entry>,
-
     /// The intrusive pointer used by [`super::cancellation_queue`].
     cancel_pointers: linked_list::Pointers<Entry>,
 
     /// The intrusive pointer used by any of the following queues:
     ///
+    /// - [`super::Level::slot`]
     /// - [`super::RegistrationQueue`]
     /// - [`super::WakeQueue`]
     extra_pointers: linked_list::Pointers<Entry>,
@@ -61,14 +59,14 @@ unsafe impl linked_list::Link for Entry {
         target: NonNull<Self::Target>,
     ) -> NonNull<linked_list::Pointers<Self::Target>> {
         let this = target.as_ptr();
-        let field = unsafe { std::ptr::addr_of_mut!((*this).wheel_pointers) };
+        let field = unsafe { std::ptr::addr_of_mut!((*this).extra_pointers) };
         unsafe { NonNull::new_unchecked(field) }
     }
 }
 
 /// An ZST to allow [`super::registration_queue`] to utilize the [`Entry::extra_pointers`]
 /// by impl [`linked_list::Link`] as we cannot impl it on [`Entry`]
-/// directly due to the conflicting implementations used by [`Entry::wheel_pointers`].
+/// directly due to the conflicting implementations.
 ///
 /// This type should never be constructed.
 pub(super) struct RegistrationQueueEntry;
@@ -99,7 +97,7 @@ unsafe impl linked_list::Link for RegistrationQueueEntry {
 
 /// An ZST to allow [`super::cancellation_queue`] to utilize the [`Entry::cancel_pointers`]
 /// by impl [`linked_list::Link`] as we cannot impl it on [`Entry`]
-/// directly due to the conflicting implementations used by [`Entry::wheel_pointers`].
+/// directly due to the conflicting implementations.
 ///
 /// This type should never be constructed.
 pub(super) struct CancellationQueueEntry;
@@ -130,7 +128,7 @@ unsafe impl linked_list::Link for CancellationQueueEntry {
 
 /// An ZST to allow [`super::WakeQueue`] to utilize the [`Entry::extra_pointers`]
 /// by impl [`linked_list::Link`] as we cannot impl it on [`Entry`]
-/// directly due to the conflicting implementations used by [`Entry::wheel_pointers`].
+/// directly due to the conflicting implementations.
 ///
 /// This type should never be constructed.
 pub(super) struct WakeQueueEntry;
@@ -181,7 +179,6 @@ impl Handle {
         };
 
         let entry = Arc::new(Entry {
-            wheel_pointers: linked_list::Pointers::new(),
             cancel_pointers: linked_list::Pointers::new(),
             extra_pointers: linked_list::Pointers::new(),
             deadline,
