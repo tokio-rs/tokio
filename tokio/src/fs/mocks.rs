@@ -156,7 +156,7 @@ where
         let _ = tx.send(res);
     });
 
-    Some(JoinHandle { rx })
+    JoinHandle { rx }
 }
 
 impl<T> Future for JoinHandle<T> {
