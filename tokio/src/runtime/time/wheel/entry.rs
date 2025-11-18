@@ -18,11 +18,14 @@ struct State {
 
 #[derive(Debug)]
 pub(crate) struct Entry {
-    /// The intrusive pointers used by timer wheel.
+    /// The intrusive pointers used by [`super::Wheel::levels`].
     wheel_pointers: linked_list::Pointers<Entry>,
 
-    /// The intrusive pointer used by either [`CancellationQueueEntry`].
-    /// or [`WakeQueueEntry`].
+    /// The intrusive pointer used by any of the following queues:
+    ///
+    /// - [`super::RegistrationQueue`]
+    /// - [`super::cancellation_queue`]
+    /// - [`super::WakeQueue`]
     extra_pointers: linked_list::Pointers<Entry>,
 
     /// The tick when this entry is scheduled to expire.
