@@ -30,6 +30,13 @@ use crate::blocking::{spawn_blocking, spawn_mandatory_blocking};
 #[cfg(not(test))]
 use std::fs::File as StdFile;
 
+cfg_io_uring! {
+    #[cfg(test)]
+    use super::mocks::spawn;
+    #[cfg(not(test))]
+    use crate::spawn;
+}
+
 /// A reference to an open file on the filesystem.
 ///
 /// This is a specialized version of [`std::fs::File`] for usage from the
@@ -848,7 +855,7 @@ impl AsyncWrite for File {
                                     }
 
                                     let mut fd: ArcFd = std;
-                                    let handle = crate::spawn(async move {
+                                    let handle = spawn(async move {
                                         loop {
                                             let op = Op::write_at(fd, buf, u64::MAX);
                                             let (r, _buf, _fd) = op.await;
@@ -1082,7 +1089,7 @@ impl Inner {
                         }
 
                         let mut fd: ArcFd = std;
-                        let handle = crate::spawn(async move {
+                        let handle = spawn(async move {
                             loop {
                                 let op = Op::write_at(fd, buf, u64::MAX);
                                 let (r, _buf, _fd) = op.await;
