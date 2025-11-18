@@ -21,10 +21,12 @@ pub(crate) struct Entry {
     /// The intrusive pointers used by [`super::Wheel::levels`].
     wheel_pointers: linked_list::Pointers<Entry>,
 
+    /// The intrusive pointer used by [`super::cancellation_queue`].
+    cancel_pointers: linked_list::Pointers<Entry>,
+
     /// The intrusive pointer used by any of the following queues:
     ///
     /// - [`super::RegistrationQueue`]
-    /// - [`super::cancellation_queue`]
     /// - [`super::WakeQueue`]
     extra_pointers: linked_list::Pointers<Entry>,
 
@@ -95,7 +97,7 @@ unsafe impl linked_list::Link for RegistrationQueueEntry {
     }
 }
 
-/// An ZST to allow [`super::cancellation_queue`] to utilize the [`Entry::extra_pointers`]
+/// An ZST to allow [`super::cancellation_queue`] to utilize the [`Entry::cancel_pointers`]
 /// by impl [`linked_list::Link`] as we cannot impl it on [`Entry`]
 /// directly due to the conflicting implementations used by [`Entry::wheel_pointers`].
 ///
@@ -121,7 +123,7 @@ unsafe impl linked_list::Link for CancellationQueueEntry {
         target: NonNull<Self::Target>,
     ) -> NonNull<linked_list::Pointers<Self::Target>> {
         let this = target.as_ptr();
-        let field = unsafe { std::ptr::addr_of_mut!((*this).extra_pointers) };
+        let field = unsafe { std::ptr::addr_of_mut!((*this).cancel_pointers) };
         unsafe { NonNull::new_unchecked(field) }
     }
 }
@@ -180,6 +182,7 @@ impl Handle {
 
         let entry = Arc::new(Entry {
             wheel_pointers: linked_list::Pointers::new(),
+            cancel_pointers: linked_list::Pointers::new(),
             extra_pointers: linked_list::Pointers::new(),
             deadline,
             state: Mutex::new(state),
@@ -229,11 +232,13 @@ impl Handle {
 
     pub(crate) fn cancel(&self) {
         let mut lock = self.entry.state.lock();
-        lock.cancelled = true;
-        if let Some(cancel_tx) = lock.cancel_tx.take() {
-            drop(lock);
-            unsafe {
-                cancel_tx.send(self.clone());
+        if !lock.cancelled {
+            lock.cancelled = true;
+            if let Some(cancel_tx) = lock.cancel_tx.take() {
+                drop(lock);
+                unsafe {
+                    cancel_tx.send(self.clone());
+                }
             }
         }
     }
