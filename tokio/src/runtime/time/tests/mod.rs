@@ -7,8 +7,8 @@ use std::{task::Context, time::Duration};
 use futures::task::noop_waker_ref;
 
 use crate::loom::thread;
-use crate::runtime::time::timer::with_current_wheel;
-use crate::runtime::time::Context as TimeContext;
+use crate::runtime::scheduler::util::time::process_registration_queue;
+use crate::runtime::time::timer::with_current_time_context2;
 use crate::runtime::time::WakeQueue;
 use crate::runtime::Handle;
 use crate::sync::oneshot;
@@ -51,14 +51,18 @@ async fn fire_all_timers(handle: &Handle, exit_rx: oneshot::Receiver<()>) {
 
         // In the `block_on` context, we can get the current wheel
         // fire all timers.
-        with_current_wheel(&handle.inner, |maybe_wheel| match maybe_wheel {
-            Some(TimeContext::Running { wheel, .. }) => {
-                let time = handle.inner.driver().time();
-                time.process_at_time(wheel, u64::MAX, &mut wake_queue);
-            }
-            #[cfg(feature = "rt-multi-thread")]
-            Some(TimeContext::Shutdown) => panic!("runtime is shutting down"),
-            None => panic!("no current wheel"),
+        with_current_time_context2(&handle.inner, |maybe_time_cx2| {
+            let time_cx2 = maybe_time_cx2.unwrap();
+
+            process_registration_queue(
+                &mut time_cx2.registration_queue,
+                &mut time_cx2.wheel,
+                &time_cx2.canc_tx,
+                &mut wake_queue,
+            );
+
+            let time = handle.inner.driver().time();
+            time.process_at_time(&mut time_cx2.wheel, u64::MAX, &mut wake_queue);
         });
 
         wake_queue.wake_all();
@@ -70,19 +74,22 @@ async fn fire_all_timers(handle: &Handle, exit_rx: oneshot::Receiver<()>) {
 // This function must be called inside the `rt.block_on`.
 fn process_at_time(handle: &Handle, at: u64) {
     let handle = &handle.inner;
-    let mut wake_queue = WakeQueue::new();
 
-    with_current_wheel(handle, |maybe_wheel| match maybe_wheel {
-        Some(TimeContext::Running { wheel, .. }) => {
-            let time = handle.driver().time();
-            time.process_at_time(wheel, at, &mut wake_queue);
-        }
-        #[cfg(feature = "rt-multi-thread")]
-        Some(TimeContext::Shutdown) => panic!("runtime is shutting down"),
-        None => panic!("no current wheel"),
+    with_current_time_context2(handle, |maybe_time_cx2| {
+        let time_cx2 = maybe_time_cx2.unwrap();
+
+        let mut wake_queue = WakeQueue::new();
+        process_registration_queue(
+            &mut time_cx2.registration_queue,
+            &mut time_cx2.wheel,
+            &time_cx2.canc_tx,
+            &mut wake_queue,
+        );
+
+        let time = handle.driver().time();
+        time.process_at_time(&mut time_cx2.wheel, at, &mut wake_queue);
+        wake_queue.wake_all();
     });
-
-    wake_queue.wake_all();
 }
 
 fn rt(start_paused: bool) -> crate::runtime::Runtime {

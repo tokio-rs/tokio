@@ -1,4 +1,4 @@
-use super::{Entry, EntryHandle, EntryState};
+use super::{Entry, EntryHandle};
 use crate::runtime::time::wheel::WakeQueueEntry;
 use crate::util::linked_list;
 
@@ -49,16 +49,7 @@ impl WakeQueue {
     /// - The waker panics while waking the entry.
     pub(crate) fn wake_all(mut self) {
         while let Some(hdl) = self.list.pop_front() {
-            match hdl.state() {
-                EntryState::Unregistered => hdl.wake_unregistered(),
-                state @ (EntryState::Registered | EntryState::Pending) => {
-                    panic!("corrupted state: {state:#?}");
-                }
-                EntryState::WakingUp => hdl.wake(),
-                // cancellation happens concurrently, no need to wake
-                EntryState::Cancelling(_) => (),
-                EntryState::WokenUp => panic!("corrupted state: woken up entry in wake queue"),
-            }
+            hdl.wake();
         }
     }
 }

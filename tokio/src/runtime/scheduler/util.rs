@@ -2,9 +2,9 @@ cfg_rt_and_time! {
     pub(crate) mod time {
         use crate::runtime::{scheduler::driver};
         use crate::runtime::time::{Wheel, WakeQueue};
-        use crate::runtime::time::{EntryHandle, EntryState, EntryCancelling};
+        use crate::runtime::time::EntryHandle;
+        use crate::runtime::time::RegistrationQueue;
         use crate::runtime::time::cancellation_queue::{Sender, Receiver};
-        use crate::runtime::time::EntryTransitionToWakingUp;
         use std::time::Duration;
 
         pub(crate) fn min_duration(a: Option<Duration>, b: Option<Duration>) -> Option<Duration> {
@@ -16,35 +16,42 @@ cfg_rt_and_time! {
             }
         }
 
+        pub(crate) fn process_registration_queue(
+            registration_queue: &mut RegistrationQueue,
+            wheel: &mut Wheel,
+            tx: &Sender,
+            wake_queue: &mut WakeQueue,
+        ) {
+            while let Some(hdl) = registration_queue.pop_front() {
+                if hdl.deadline() <= wheel.elapsed() {
+                    unsafe {
+                        wake_queue.push_front(hdl);
+                    }
+                } else {
+                    // Safety: the entry is not registered yet
+                    unsafe {
+                        wheel.insert(hdl, tx.clone());
+                    }
+                }
+            }
+        }
+
         pub(crate) fn insert_inject_timers(
             wheel: &mut Wheel,
             tx: &Sender,
             inject: Vec<EntryHandle>,
             wake_queue: &mut WakeQueue,
         ) {
-            use crate::runtime::time::Insert;
-
-            // process injected timers
             for hdl in inject {
-                match unsafe { wheel.insert(hdl.clone(), tx.clone()) } {
-                    Insert::Success => {}
-                    Insert::Elapsed => {
-                        match hdl.transition_to_waking_up_unregistered() {
-                            EntryTransitionToWakingUp::Success => {
-                                // Safety:
-                                //
-                                // 1. this entry is not in the timer wheel
-                                // 2. AND this entry is not in any cancellation queue
-                                unsafe {
-                                    wake_queue.push_front(hdl);
-                                }
-                            }
-                            EntryTransitionToWakingUp::Cancelling => {
-                                // cancellation happens concurrently, no need to wake
-                            }
-                        }
+                if hdl.deadline() <= wheel.elapsed() {
+                    unsafe {
+                        wake_queue.push_front(hdl);
                     }
-                    Insert::Cancelling => {}
+                } else {
+                    // Safety: the entry is not registered yet
+                    unsafe {
+                        wheel.insert(hdl, tx.clone());
+                    }
                 }
             }
         }
@@ -54,24 +61,13 @@ cfg_rt_and_time! {
             rx: &mut Receiver,
         ) {
             for hdl in rx.recv_all() {
-                match hdl.state() {
-                    // INVARIANT: the state always be transitioned to Cancelling before being sent to cancellation queue
-                    state @ (EntryState::Unregistered | EntryState::Registered | EntryState::Pending | EntryState::WakingUp) => {
-                        panic!("corrupted state: {state:#?}");
+                debug_assert!(hdl.is_cancelled());
+
+                if hdl.deadline() > wheel.elapsed() {
+                    // Safety: the entry is registered in THIS wheel
+                    unsafe {
+                        wheel.remove(hdl);
                     }
-                    EntryState::Cancelling(cancelling) => match cancelling {
-                        EntryCancelling::Unregistered => (),
-                        EntryCancelling::Registered | EntryCancelling::Pending => {
-                            // Safety:
-                            // 1. entry is either in slot or pending list
-                            // 2. `rx` ensures that the entry is registered in this thread.
-                            unsafe {
-                                wheel.remove(hdl);
-                            }
-                        }
-                    }
-                    // INVARIANT: the state always be transitioned to Cancelling before being sent to cancellation queue
-                    EntryState::WokenUp => panic!("corrupted state: `EntryState::WokenUp`"),
                 }
             }
         }
@@ -196,18 +192,9 @@ cfg_rt_and_time! {
                 let mut wake_queue = WakeQueue::new();
                 // simply wake all unregistered timers
                 for hdl in inject {
-                    match hdl.transition_to_waking_up_unregistered() {
-                        EntryTransitionToWakingUp::Success => {
-                            // Safety:
-                            //
-                            // 1. this entry is not in the timer wheel
-                            // 2. AND this entry is not in any cancellation queue
-                            unsafe {
-                                wake_queue.push_front(hdl);
-                            }
-                        }
-                        EntryTransitionToWakingUp::Cancelling => {
-                            // cancellation happens concurrently, no need to wake
+                    if !hdl.is_cancelled() {
+                        unsafe {
+                            wake_queue.push_front(hdl);
                         }
                     }
                 }

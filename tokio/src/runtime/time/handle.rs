@@ -1,4 +1,3 @@
-use crate::runtime::time::EntryTransitionToWakingUp;
 use crate::runtime::time::{TimeSource, WakeQueue, Wheel};
 use std::fmt;
 
@@ -38,22 +37,7 @@ impl Handle {
             now = wheel.elapsed();
         }
 
-        while let Some(hdl) = wheel.poll(now) {
-            match hdl.transition_to_waking_up() {
-                EntryTransitionToWakingUp::Success => {
-                    // Safety:
-                    //
-                    // 1. this entry is not in the timer wheel
-                    // 2. AND this entry is not in any cancellation queue
-                    unsafe {
-                        wake_queue.push_front(hdl);
-                    }
-                }
-                EntryTransitionToWakingUp::Cancelling => {
-                    // cancellation happens concurrently, no need to wake
-                }
-            }
-        }
+        wheel.take_expired(now, wake_queue);
     }
 
     pub(crate) fn shutdown(&self, wheel: &mut Wheel) {

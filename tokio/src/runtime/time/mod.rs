@@ -17,13 +17,13 @@ pub(crate) use source::TimeSource;
 
 mod wheel;
 cfg_rt_and_time! {
-    pub(crate) use wheel::{Insert, EntryHandle, EntryState, EntryCancelling};
+    pub(crate) use wheel::EntryHandle;
 }
 cfg_rt_or_time! {
     pub(crate) use wheel::cancellation_queue;
+    pub(crate) use wheel::RegistrationQueue;
     pub(crate) use wheel::WakeQueue;
     pub(crate) use wheel::Wheel;
-    pub(crate) use wheel::TransitionToWakingUp as EntryTransitionToWakingUp;
 }
 
 cfg_test_util! {
@@ -144,10 +144,8 @@ cfg_rt_or_time! {
     pub(crate) enum Context<'a> {
         /// The runtime is running, we can access it.
         Running {
-            /// the local time wheel
-            wheel: &'a mut Wheel,
-            /// channel to push timers that are pending cancellation
-            canc_tx: &'a cancellation_queue::Sender,
+            registration_queue: &'a mut RegistrationQueue,
+            elapsed: u64,
         },
         #[cfg(feature = "rt-multi-thread")]
         /// The runtime is shutting down, no timers can be registered.
@@ -158,6 +156,7 @@ cfg_rt_or_time! {
     /// fire/cancel timers.
     pub(crate) struct Context2 {
         pub(crate) wheel: Wheel,
+        pub(crate) registration_queue: RegistrationQueue,
         pub(crate) canc_tx: cancellation_queue::Sender,
         pub(crate) canc_rx: cancellation_queue::Receiver,
     }
@@ -167,6 +166,7 @@ cfg_rt_or_time! {
             let (canc_tx, canc_rx) = cancellation_queue::new();
             Self {
                 wheel: Wheel::new(),
+                registration_queue: RegistrationQueue::new(),
                 canc_tx,
                 canc_rx,
             }

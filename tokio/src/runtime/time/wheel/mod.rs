@@ -4,16 +4,12 @@ pub(crate) use self::level::Expiration;
 use self::level::Level;
 
 mod entry;
-cfg_rt_and_time! {
-    pub(crate) use entry::Cancelling as EntryCancelling;
-}
 pub(crate) use entry::Handle as EntryHandle;
-pub(crate) use entry::State as EntryState;
-use entry::TransitionToPending;
-use entry::TransitionToRegistered;
-pub(crate) use entry::TransitionToWakingUp;
-use entry::{CancellationQueueEntry, WakeQueueEntry};
+use entry::{CancellationQueueEntry, RegistrationQueueEntry, WakeQueueEntry};
 use entry::{Entry, EntryList};
+
+mod registration_queue;
+pub(crate) use registration_queue::RegistrationQueue;
 
 pub(crate) mod cancellation_queue;
 use cancellation_queue::Sender;
@@ -22,7 +18,6 @@ mod wake_queue;
 pub(crate) use wake_queue::WakeQueue;
 
 use std::array;
-use std::ptr::NonNull;
 
 /// Timing wheel implementation.
 ///
@@ -51,9 +46,6 @@ pub(crate) struct Wheel {
     /// * ~ 4 hr slots / ~ 12 day range
     /// * ~ 12 day slots / ~ 2 yr range
     levels: Box<[Level; NUM_LEVELS]>,
-
-    /// Entries queued for firing
-    pending: EntryList,
 }
 
 /// Number of levels. Each level has 64 slots. By using 6 levels with 64 slots
@@ -70,7 +62,6 @@ impl Wheel {
         Wheel {
             elapsed: 0,
             levels: Box::new(array::from_fn(Level::new)),
-            pending: EntryList::new(),
         }
     }
 
@@ -91,33 +82,25 @@ impl Wheel {
     /// The caller must ensure:
     ///
     /// * The entry is not already registered in ANY wheel.
-    pub(crate) unsafe fn insert(&mut self, hdl: EntryHandle, cancel_tx: Sender) -> Insert {
+    pub(crate) unsafe fn insert(&mut self, hdl: EntryHandle, cancel_tx: Sender) {
         let deadline = hdl.deadline();
 
-        if deadline <= self.elapsed {
-            return Insert::Elapsed;
-        }
+        assert!(deadline > self.elapsed);
+
+        hdl.register_cancel_tx(cancel_tx);
 
         // Get the level at which the entry should be stored
         let level = self.level_for(deadline);
-
-        match hdl.transition_to_registered(cancel_tx) {
-            TransitionToRegistered::Success => {
-                unsafe {
-                    self.levels[level].add_entry(hdl);
-                }
-
-                debug_assert!({
-                    self.levels[level]
-                        .next_expiration(self.elapsed)
-                        .map(|e| e.deadline >= self.elapsed)
-                        .unwrap_or(true)
-                });
-
-                Insert::Success
-            }
-            TransitionToRegistered::Cancelling => Insert::Cancelling,
+        unsafe {
+            self.levels[level].add_entry(hdl);
         }
+
+        debug_assert!({
+            self.levels[level]
+                .next_expiration(self.elapsed)
+                .map(|e| e.deadline >= self.elapsed)
+                .unwrap_or(true)
+        });
     }
 
     /// Removes `item` from the timing wheel.
@@ -128,32 +111,24 @@ impl Wheel {
     ///
     /// * The entry is already registered in THIS wheel.
     pub(crate) unsafe fn remove(&mut self, hdl: EntryHandle) {
-        if hdl.is_pending() {
-            unsafe { self.pending.remove(NonNull::from(&hdl)) };
-        } else {
-            let deadline = hdl.deadline();
-            debug_assert!(
-                self.elapsed <= deadline,
-                "elapsed={}; deadline={}",
-                self.elapsed,
-                deadline
-            );
+        let deadline = hdl.deadline();
+        debug_assert!(
+            self.elapsed <= deadline,
+            "elapsed={}; deadline={}",
+            self.elapsed,
+            deadline
+        );
 
-            let level = self.level_for(deadline);
-            unsafe { self.levels[level].remove_entry(hdl.clone()) };
-        }
+        let level = self.level_for(deadline);
+        unsafe { self.levels[level].remove_entry(hdl.clone()) };
     }
 
     /// Advances the timer up to the instant represented by `now`.
-    pub(crate) fn poll(&mut self, now: u64) -> Option<EntryHandle> {
+    pub(crate) fn take_expired(&mut self, now: u64, wake_queue: &mut WakeQueue) {
         loop {
-            if let Some(hdl) = self.pending.pop_back() {
-                return Some(hdl);
-            }
-
             match self.next_expiration() {
                 Some(ref expiration) if expiration.deadline <= now => {
-                    self.process_expiration(expiration);
+                    self.process_expiration(expiration, wake_queue);
 
                     self.set_elapsed(expiration.deadline);
                 }
@@ -167,21 +142,10 @@ impl Wheel {
                 }
             }
         }
-
-        self.pending.pop_back()
     }
 
     /// Returns the instant at which the next timeout expires.
     fn next_expiration(&self) -> Option<Expiration> {
-        if !self.pending.is_empty() {
-            // Expire immediately as we have things pending firing
-            return Some(Expiration {
-                level: 0,
-                slot: 0,
-                deadline: self.elapsed,
-            });
-        }
-
         // Check all levels
         for (level_num, level) in self.levels.iter().enumerate() {
             if let Some(expiration) = level.next_expiration(self.elapsed) {
@@ -221,7 +185,11 @@ impl Wheel {
     /// time and the expiration time.  for each in that population either
     /// queue it for notification (in the case of the last level) or tier
     /// it down to the next level (in all other cases).
-    pub(crate) fn process_expiration(&mut self, expiration: &Expiration) {
+    pub(crate) fn process_expiration(
+        &mut self,
+        expiration: &Expiration,
+        wake_queue: &mut WakeQueue,
+    ) {
         // Note that we need to take _all_ of the entries off the list before
         // processing any of them. This is important because it's possible that
         // those entries might need to be reinserted into the same slot.
@@ -239,15 +207,17 @@ impl Wheel {
                 debug_assert_eq!(hdl.deadline(), expiration.deadline);
             }
 
-            match hdl.transition_to_pending(expiration.deadline) {
-                TransitionToPending::Success => self.pending.push_front(hdl),
-                TransitionToPending::NotElapsed(when) => {
-                    let level = level_for(expiration.deadline, when);
-                    unsafe {
-                        self.levels[level].add_entry(hdl);
-                    }
+            let deadline = hdl.deadline();
+
+            if deadline > expiration.deadline {
+                let level = level_for(expiration.deadline, deadline);
+                unsafe {
+                    self.levels[level].add_entry(hdl);
                 }
-                TransitionToPending::Cancelling => {}
+            } else {
+                unsafe {
+                    wake_queue.push_front(hdl);
+                }
             }
         }
     }
@@ -291,19 +261,6 @@ fn level_for(elapsed: u64, when: u64) -> usize {
     let significant = 63 - leading_zeros;
 
     significant / NUM_LEVELS
-}
-
-/// The return type of the [`Wheel::insert`] method.
-pub(crate) enum Insert {
-    /// The entry was successfully inserted.
-    Success,
-
-    /// The entry has already expired, in this case,
-    /// the entry is not inserted into the wheel.
-    Elapsed,
-
-    /// The entry is being cancelled, no need to register it.
-    Cancelling,
 }
 
 #[cfg(all(test, not(loom)))]

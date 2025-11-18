@@ -9,41 +9,11 @@ use std::task::Waker;
 pub(crate) type EntryList = linked_list::LinkedList<Entry, Entry>;
 
 #[derive(Debug)]
-enum PrivState {
-    /// A pure new entry, and it MIGHT be in the inject timer queue.
-    Unregistered(Waker),
-
-    /// The [`Entry`] is registered in the timer wheel,
-    ///
-    /// - The [`Entry::wheel_pointers`] is currently in use by [`super::Level::slot`].
-    /// - The [`Entry::extra_pointers`] is NOT currently in use.
-    Registered(Sender, Waker),
-
-    /// The [`Entry`] is expired AND in the [`super::Wheel::pending`],
-    ///
-    /// - The [`Entry::wheel_pointers`] is currently in use by [`super::Wheel::pending`].
-    /// - The [`Entry::extra_pointers`] is NOT currently in use.
-    Pending(Sender, Waker),
-
-    /// The [`Entry`] is taken out from the [`super::Wheel::pending`] and in
-    /// the [`super::WakeQueue`],
-    ///
-    /// - The [`Entry::wheel_pointers`] is NOT currently in use.
-    /// - The [`Entry::extra_pointers`] is currently in use by [`super::WakeQueue`].
-    WakingUp(Waker),
-
-    /// The waker has been called, and the entry is not in timer wheel, and not in cancellation queue,
-    /// and also not in wake queue.
-    ///
-    /// - The [`Entry::wheel_pointers`] is NOT currently in use.
-    /// - The [`Entry::extra_pointers`] is NOT currently in use.
-    WokenUp,
-
-    /// The [`Entry`] is in the cancellation queue,
-    ///
-    /// - The [`Entry::wheel_pointers`] is MAYBE in use by [`super::Level::slot`] or [`super::Wheel::pending`].
-    /// - The [`Entry::extra_pointers`] is currently in use by [`super::cancellation_queue`].
-    Cancelling(Cancelling),
+struct State {
+    cancelled: bool,
+    woken_up: bool,
+    waker: Option<Waker>,
+    cancel_tx: Option<Sender>,
 }
 
 #[derive(Debug)]
@@ -58,7 +28,7 @@ pub(crate) struct Entry {
     /// The tick when this entry is scheduled to expire.
     deadline: u64,
 
-    state: Mutex<PrivState>,
+    state: Mutex<State>,
 
     /// Make the type `!Unpin` to prevent LLVM from emitting
     /// the `noalias` attribute for mutable references.
@@ -87,6 +57,37 @@ unsafe impl linked_list::Link for Entry {
     ) -> NonNull<linked_list::Pointers<Self::Target>> {
         let this = target.as_ptr();
         let field = unsafe { std::ptr::addr_of_mut!((*this).wheel_pointers) };
+        unsafe { NonNull::new_unchecked(field) }
+    }
+}
+
+/// An ZST to allow [`super::registration_queue`] to utilize the [`Entry::extra_pointers`]
+/// by impl [`linked_list::Link`] as we cannot impl it on [`Entry`]
+/// directly due to the conflicting implementations used by [`Entry::wheel_pointers`].
+///
+/// This type should never be constructed.
+pub(super) struct RegistrationQueueEntry;
+
+// Safety: `Entry` is always in an `Arc`.
+unsafe impl linked_list::Link for RegistrationQueueEntry {
+    type Handle = Handle;
+    type Target = Entry;
+
+    fn as_raw(hdl: &Self::Handle) -> NonNull<Self::Target> {
+        unsafe { NonNull::new_unchecked(Arc::as_ptr(&hdl.entry).cast_mut()) }
+    }
+
+    unsafe fn from_raw(ptr: NonNull<Self::Target>) -> Self::Handle {
+        Handle {
+            entry: unsafe { Arc::from_raw(ptr.as_ptr()) },
+        }
+    }
+
+    unsafe fn pointers(
+        target: NonNull<Self::Target>,
+    ) -> NonNull<linked_list::Pointers<Self::Target>> {
+        let this = target.as_ptr();
+        let field = unsafe { std::ptr::addr_of_mut!((*this).extra_pointers) };
         unsafe { NonNull::new_unchecked(field) }
     }
 }
@@ -166,12 +167,19 @@ impl From<&Handle> for NonNull<Entry> {
 }
 
 impl Handle {
-    pub(crate) fn new(deadline: u64, waker: &Waker) -> Self {
+    pub(crate) fn new(deadline: u64, waker: Waker) -> Self {
+        let state = State {
+            cancelled: false,
+            woken_up: false,
+            waker: Some(waker),
+            cancel_tx: None,
+        };
+
         let entry = Arc::new(Entry {
             wheel_pointers: linked_list::Pointers::new(),
             extra_pointers: linked_list::Pointers::new(),
             deadline,
-            state: Mutex::new(PrivState::Unregistered(waker.clone())),
+            state: Mutex::new(state),
             _pin: PhantomPinned,
         });
 
@@ -181,259 +189,49 @@ impl Handle {
     /// Wake the entry if it is already in the pending queue of the timer wheel.
     pub(crate) fn wake(&self) {
         let mut lock = self.entry.state.lock();
-        match &*lock {
+
+        if !lock.cancelled {
+            lock.woken_up = true;
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (PrivState::Unregistered(..)
-            | PrivState::Registered(..)
-            | PrivState::Pending(..)) => {
-                panic!("corrupted state: {state:#?}")
-            }
-            PrivState::WakingUp(..) => {
-                let old_state = std::mem::replace(&mut *lock, PrivState::WokenUp);
-                // Since state has been updated, no need to hold the lock.
-                drop(lock);
-                if let PrivState::WakingUp(waker) = old_state {
-                    waker.wake();
-                } else {
-                    unreachable!()
-                }
-            }
-            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            PrivState::WokenUp => panic!("corrupted state: `State::WokenUp`"),
-            // no need to wake up cancelling entry
-            PrivState::Cancelling { .. } => (),
-        }
-    }
-
-    /// Wake the entry if it has already elapsed before registering to the timer wheel.
-    pub(crate) fn wake_unregistered(&self) {
-        let mut lock = self.entry.state.lock();
-        match &*lock {
-            PrivState::Unregistered(_waker) => {
-                let old_state = std::mem::replace(&mut *lock, PrivState::WokenUp);
-                // Since state has been updated, no need to hold the lock.
-                drop(lock);
-                if let PrivState::Unregistered(old_waker) = old_state {
-                    old_waker.wake();
-                } else {
-                    unreachable!()
-                }
-            }
-            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (PrivState::Registered(..)
-            | PrivState::WokenUp
-            | PrivState::Pending(..)
-            | PrivState::WakingUp(..)) => {
-                panic!("corrupted state: {state:#?}")
-            }
-            // don't wake up cancelling entries
-            PrivState::Cancelling { .. } => (),
-        }
-    }
-
-    pub(crate) fn register_waker(&self, waker: &Waker) {
-        let mut lock = self.entry.state.lock();
-        let old_waker = match &mut *lock {
-            PrivState::Unregistered(old_waker) => {
-                if !old_waker.will_wake(waker) {
-                    Some(std::mem::replace(old_waker, waker.clone()))
-                } else {
-                    None
-                }
-            }
-            PrivState::Registered(_, old_waker) => {
-                if !old_waker.will_wake(waker) {
-                    Some(std::mem::replace(old_waker, waker.clone()))
-                } else {
-                    None
-                }
-            }
-            PrivState::Pending(_, old_waker, ..) => {
-                if !old_waker.will_wake(waker) {
-                    Some(std::mem::replace(old_waker, waker.clone()))
-                } else {
-                    None
-                }
-            }
-            PrivState::WakingUp(old_waker) => {
-                if !old_waker.will_wake(waker) {
-                    Some(std::mem::replace(old_waker, waker.clone()))
-                } else {
-                    None
-                }
-            }
-            PrivState::WokenUp | PrivState::Cancelling { .. } => None, // no need to update the waker
-        };
-
-        // unlock before dropping the old waker
-        drop(lock);
-        drop(old_waker);
-    }
-
-    pub(crate) fn transition_to_registered(&self, cancel_tx: Sender) -> TransitionToRegistered {
-        let mut lock = self.entry.state.lock();
-        let state: &mut PrivState = &mut lock;
-
-        let (new_state, ret) = match state {
-            PrivState::Unregistered(waker) => {
-                let new_state = PrivState::Registered(cancel_tx, waker.clone());
-                (Some(new_state), TransitionToRegistered::Success)
-            }
-            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (PrivState::Registered(..)
-            | PrivState::Pending(..)
-            | PrivState::WakingUp(..)
-            | PrivState::WokenUp) => {
-                panic!("corrupted state: {state:#?}")
-            }
-            PrivState::Cancelling(cancelling) => match cancelling {
-                Cancelling::Unregistered => (None, TransitionToRegistered::Cancelling),
-                Cancelling::Registered | Cancelling::Pending => unreachable!(),
-            },
-        };
-
-        if let Some(new_state) = new_state {
-            // update the state and take back the old state
-            let old_state = std::mem::replace(state, new_state);
-
-            // unlock before dropping the old waker
+            let waker = lock
+                .waker
+                .take()
+                .expect("waker must be present when waking up");
+            // unlock before calling waker
             drop(lock);
-
-            // this also drops the old waker if the variant contains it.
-            drop(old_state);
+            waker.wake();
         }
-
-        ret
     }
 
-    pub(crate) fn transition_to_pending(&self, not_after: u64) -> TransitionToPending {
-        if self.entry.deadline > not_after {
-            return TransitionToPending::NotElapsed(self.entry.deadline);
+    pub(crate) fn register_cancel_tx(&self, cancel_tx: Sender) {
+        let mut lock = self.entry.state.lock();
+        if !lock.cancelled && !lock.woken_up {
+            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
+            assert!(
+                lock.cancel_tx.replace(cancel_tx).is_none(),
+                "cancel_tx is already registered"
+            );
         }
-
-        let mut lock = self.entry.state.lock();
-        let state: &mut PrivState = &mut lock;
-
-        let (new_state, ret) = match state {
-            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            PrivState::Unregistered(_) => panic!("corrupted state: State::Unregistered"),
-            PrivState::Registered(sender, waker) => {
-                let new_state = PrivState::Pending(sender.clone(), waker.clone());
-                (new_state, TransitionToPending::Success)
-            }
-            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (PrivState::Pending(..) | PrivState::WakingUp(..) | PrivState::WokenUp) => {
-                panic!("corrupted state: {state:#?}")
-            }
-            PrivState::Cancelling { .. } => {
-                let new_state = PrivState::Cancelling(Cancelling::Pending);
-                (new_state, TransitionToPending::Cancelling)
-            }
-        };
-
-        // update the state and take back the old state
-        let old_state = std::mem::replace(state, new_state);
-
-        // unlock before dropping the old waker
-        drop(lock);
-
-        // this also drops the old waker if the variant contains it.
-        drop(old_state);
-
-        ret
     }
 
-    pub(crate) fn transition_to_waking_up(&self) -> TransitionToWakingUp {
+    pub(crate) fn register_waker(&self, waker: Waker) {
         let mut lock = self.entry.state.lock();
-
-        let old_state = match &*lock {
-            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (PrivState::Unregistered(..) | PrivState::Registered(..)) => {
-                panic!("corrupted state: {state:#?}")
-            }
-            PrivState::Pending(_cancel_tx, waker) => {
-                let new_state = PrivState::WakingUp(waker.clone());
-                std::mem::replace(&mut *lock, new_state)
-            }
-            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (PrivState::WakingUp(..) | PrivState::WokenUp) => {
-                panic!("corrupted state: {state:#?}")
-            }
-            PrivState::Cancelling { .. } => {
-                // no need to transition cancelling entry
-                return TransitionToWakingUp::Cancelling;
-            }
-        };
-
-        // unlock before dropping the old waker
-        drop(lock);
-
-        // this also drops the old waker if the variant contains it.
-        drop(old_state);
-
-        TransitionToWakingUp::Success
+        if !lock.cancelled && !lock.woken_up {
+            let maybe_old_waker = lock.waker.replace(waker);
+            // unlock before calling waker
+            drop(lock);
+            drop(maybe_old_waker);
+        }
     }
 
-    pub(crate) fn transition_to_waking_up_unregistered(&self) -> TransitionToWakingUp {
+    pub(crate) fn cancel(&self) {
         let mut lock = self.entry.state.lock();
-
-        let old_state = match &*lock {
-            PrivState::Unregistered(waker) => {
-                let waker = waker.clone();
-                std::mem::replace(&mut *lock, PrivState::WakingUp(waker))
+        lock.cancelled = true;
+        if let Some(cancel_tx) = lock.cancel_tx.take() {
+            drop(lock);
+            unsafe {
+                cancel_tx.send(self.clone());
             }
-            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            state @ (PrivState::Registered(..)
-            | PrivState::WokenUp
-            | PrivState::Pending(..)
-            | PrivState::WakingUp(..)) => {
-                panic!("corrupted state: {state:#?}")
-            }
-            PrivState::Cancelling { .. } => {
-                // no need to transition cancelling entry
-                return TransitionToWakingUp::Cancelling;
-            }
-        };
-
-        // unlock before dropping the old waker
-        drop(lock);
-
-        // this also drops the old waker if the variant contains it.
-        drop(old_state);
-
-        TransitionToWakingUp::Success
-    }
-
-    pub(crate) fn transition_to_cancelling(&self) {
-        let mut lock = self.entry.state.lock();
-
-        match *lock {
-            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            PrivState::Unregistered(_) => {
-                *lock = PrivState::Cancelling(Cancelling::Unregistered);
-            }
-            PrivState::Registered(ref tx, _) => {
-                // Safety: entry is not in any cancellation queue
-                unsafe {
-                    tx.send(self.clone());
-                }
-                *lock = PrivState::Cancelling(Cancelling::Registered);
-            }
-            PrivState::Pending(ref tx, _) => {
-                // Safety: entry is not in any cancellation queue
-                unsafe {
-                    tx.send(self.clone());
-                }
-                *lock = PrivState::Cancelling(Cancelling::Pending);
-            }
-            PrivState::WakingUp(..) => {
-                // Do nothing, this is because both `WakeQueue` and `CancellationQueue`
-                // use the same `extra_pointers` field in `Entry`. We cannot put the entry
-                // into both queues at the same time due to the nature of intrusive linked list.
-            }
-            PrivState::WokenUp => (), // dropping and waking up happen concurrently
-            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            PrivState::Cancelling(..) => panic!("should not be called twice"),
         }
     }
 
@@ -441,32 +239,14 @@ impl Handle {
         self.entry.deadline
     }
 
-    pub(crate) fn state(&self) -> State {
-        let lock = self.entry.state.lock();
-        match &*lock {
-            PrivState::Unregistered(_) => State::Unregistered,
-            PrivState::Registered(..) => State::Registered,
-            PrivState::Pending(..) => State::Pending,
-            PrivState::WakingUp(..) => State::WakingUp,
-            PrivState::WokenUp => State::WokenUp,
-            PrivState::Cancelling(cancelling) => State::Cancelling(*cancelling),
-        }
-    }
-
-    pub(crate) fn is_pending(&self) -> bool {
-        match self.state() {
-            State::Pending => true,
-            State::Cancelling(cancelling) => match cancelling {
-                Cancelling::Unregistered => unreachable!(),
-                Cancelling::Registered => false,
-                Cancelling::Pending => true,
-            },
-            _ => false,
-        }
-    }
-
     pub(crate) fn is_woken_up(&self) -> bool {
-        matches!(*self.entry.state.lock(), PrivState::WokenUp)
+        let lock = self.entry.state.lock();
+        lock.woken_up
+    }
+
+    pub(crate) fn is_cancelled(&self) -> bool {
+        let lock = self.entry.state.lock();
+        lock.cancelled
     }
 
     #[cfg(test)]
@@ -474,77 +254,4 @@ impl Handle {
     pub(crate) fn inner_strong_count(&self) -> usize {
         Arc::strong_count(&self.entry)
     }
-}
-
-/// The result of the [`Handle::transition_to_registered`]` method.
-pub(crate) enum TransitionToRegistered {
-    /// The entry is being cancelled, no need to register it.
-    Success,
-
-    /// The entry is being cancelled,
-    /// no need to transition it to the registered state.
-    Cancelling,
-}
-
-/// The result of the [`Handle::transition_to_pending`]` method.
-pub(crate) enum TransitionToPending {
-    /// The entry was successfully transitioned
-    /// to the pending state.
-    Success,
-
-    /// The entry doesn't reached its deadline yet,
-    /// and the tick when it should be woken up is returned.
-    NotElapsed(u64),
-
-    /// The entry is being cancelled,
-    /// no need to transition it to the pending state.
-    Cancelling,
-}
-
-/// The result of the [`Handle::transition_to_waking_up`]` method.
-pub(crate) enum TransitionToWakingUp {
-    /// The entry was successfully transitioned
-    /// to the waking up state.
-    Success,
-
-    /// The entry is being cancelled,
-    /// no need to transition it to the waking up state.
-    Cancelling,
-}
-
-/// Public representation of the [`PrivState`]
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum State {
-    /// Same as [`PrivState::Unregistered`]
-    Unregistered,
-
-    /// Same as [`PrivState::Registered`]
-    Registered,
-
-    /// Same as [`PrivState::Pending`]
-    Pending,
-
-    /// Same as [`PrivState::WakingUp`]
-    WakingUp,
-
-    /// Same as [`PrivState::WokenUp`]
-    WokenUp,
-
-    /// Same as [`PrivState::Cancelling`]
-    Cancelling(Cancelling),
-}
-
-#[derive(Debug, Clone, Copy)]
-/// Possible variants of the [`State::Cancelling`]
-pub(crate) enum Cancelling {
-    /// [`Entry`] is being cancelled, and is not in the timer wheel.
-    Unregistered,
-
-    /// [`Entry`] is being cancelled, and is registered in the timer wheel,
-    /// but not in the pending list.
-    Registered,
-
-    /// [`Entry`] is being cancelled, and it registered in the timer wheel,
-    /// and also in the pending list.
-    Pending,
 }

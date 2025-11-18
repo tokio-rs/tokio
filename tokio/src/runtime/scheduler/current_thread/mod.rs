@@ -524,13 +524,19 @@ impl Context {
                         let core = maybe_core.as_mut().expect("core missing");
                         let time_cx = &mut core.time_context;
 
-                        util::time::remove_cancelled_timers(&mut time_cx.wheel, &mut time_cx.canc_rx);
+                        util::time::process_registration_queue(
+                            &mut time_cx.registration_queue,
+                            &mut time_cx.wheel,
+                            &time_cx.canc_tx,
+                            &mut wake_queue,
+                        );
                         util::time::insert_inject_timers(
                             &mut time_cx.wheel,
                             &time_cx.canc_tx,
                             handle.take_remote_timers(),
                             &mut wake_queue,
                         );
+                        util::time::remove_cancelled_timers(&mut time_cx.wheel, &mut time_cx.canc_rx);
                         let should_yield = !wake_queue.is_empty();
 
                         let next_timer =
@@ -603,15 +609,28 @@ impl Context {
             f(core.as_mut().map(|c| c.as_mut()))
         }
 
-        pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
+        #[cfg(test)]
+        pub(crate) fn with_time_context2<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(Option<&mut crate::runtime::time::Context2>) -> R,
+        {
+            self.with_core(|maybe_core| {
+                match maybe_core {
+                    Some(core) => f(Some(&mut core.time_context)),
+                    None => f(None),
+                }
+            })
+        }
+
+        pub(crate) fn with_registration_queue<F, R>(&self, f: F) -> R
         where
             F: FnOnce(Option<crate::runtime::time::Context<'_>>) -> R,
         {
             self.with_core(|maybe_core| {
                 match maybe_core {
                     Some(core) => f(Some(crate::runtime::time::Context::Running {
-                        wheel: &mut core.time_context.wheel,
-                        canc_tx: &core.time_context.canc_tx,
+                        registration_queue: &mut core.time_context.registration_queue,
+                        elapsed: core.time_context.wheel.elapsed(),
                     })),
                     None => f(None),
                 }

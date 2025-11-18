@@ -24,7 +24,7 @@ cfg_rt_multi_thread! {
     pub(crate) use multi_thread::MultiThread;
 }
 
-mod util;
+pub(crate) mod util;
 
 use crate::runtime::driver;
 
@@ -277,11 +277,20 @@ cfg_rt! {
         }
 
         cfg_time! {
-            pub(crate) fn with_wheel<F, R>(&self, f: F) -> R
+            pub(crate) fn with_registration_queue<F, R>(&self, f: F) -> R
             where
                 F: FnOnce(Option<crate::runtime::time::Context<'_>>) -> R,
             {
-                match_flavor!(self, Context(context) => context.with_wheel(f))
+                match_flavor!(self, Context(context) => context.with_registration_queue(f))
+            }
+
+
+            #[cfg(test)]
+            pub(crate) fn with_time_context2<F, R>(&self, f: F) -> R
+            where
+                F: FnOnce(Option<&mut crate::runtime::time::Context2>) -> R,
+            {
+                match_flavor!(self, Context(context) => context.with_time_context2(f))
             }
         }
 
