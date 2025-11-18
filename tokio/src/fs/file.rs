@@ -137,7 +137,6 @@ cfg_io_uring! {
 
     impl<T> Future for BoxedOp<T> {
         type Output = T;
-
         fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             self.0.as_mut().poll(cx)
         }
@@ -809,89 +808,9 @@ impl AsyncWrite for File {
                     let std = me.std.clone();
 
                     #[allow(unused_mut)]
-                    let mut data = Some((std, buf));
+                    let mut task_join_handle = inner.poll_write_inner((std, buf), seek)?;
 
-                    let mut task_join_handle = None;
-
-                    #[cfg(all(
-                        tokio_unstable,
-                        feature = "io-uring",
-                        feature = "rt",
-                        feature = "fs",
-                        target_os = "linux"
-                    ))]
-                    {
-                        use crate::runtime::Handle;
-
-                        // Handle not present in some tests?
-                        if let Ok(handle) = Handle::try_current() {
-                            if handle.inner.driver().io().check_and_init()? {
-                                task_join_handle = {
-                                    use crate::{io::uring::utils::ArcFd, runtime::driver::op::Op};
-
-                                    let (std, mut buf) = data.take().unwrap();
-                                    if let Some(seek) = seek {
-                                        // we do std seek before a write, so we can always use u64::MAX (current cursor) for the file offset
-                                        // seeking only modifies kernel metadata and does not block, so we can do it here
-                                        (&*std).seek(seek).map_err(|e| {
-                                            io::Error::new(
-                                                e.kind(),
-                                                format!("failed to seek before write: {e}"),
-                                            )
-                                        })?;
-                                    }
-
-                                    let mut fd: ArcFd = std;
-                                    let handle = BoxedOp(Box::pin(async move {
-                                        loop {
-                                            let op = Op::write_at(fd, buf, u64::MAX);
-                                            let (r, _buf, _fd) = op.await;
-                                            buf = _buf;
-                                            fd = _fd;
-                                            match r {
-                                                Ok(0) => {
-                                                    break (
-                                                        Operation::Write(Err(
-                                                            io::ErrorKind::WriteZero.into(),
-                                                        )),
-                                                        buf,
-                                                    );
-                                                }
-                                                Ok(_) if buf.is_empty() => {
-                                                    break (Operation::Write(Ok(())), buf);
-                                                }
-                                                Ok(_) => continue, // more to write
-                                                Err(e) => break (Operation::Write(Err(e)), buf),
-                                            }
-                                        }
-                                    }));
-
-                                    Some(JoinHandleInner::Async(handle))
-                                };
-                            }
-                        }
-                    }
-
-                    if let Some((std, mut buf)) = data {
-                        task_join_handle = {
-                            let handle = spawn_mandatory_blocking(move || {
-                                let res = if let Some(seek) = seek {
-                                    (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
-                                } else {
-                                    buf.write_to(&mut &*std)
-                                };
-
-                                (Operation::Write(res), buf)
-                            })
-                            .ok_or_else(|| {
-                                io::Error::new(io::ErrorKind::Other, "background task failed")
-                            })?;
-
-                            Some(JoinHandleInner::Blocking(handle))
-                        };
-                    }
-
-                    inner.state = State::Busy(task_join_handle.unwrap());
+                    inner.state = State::Busy(task_join_handle);
 
                     return Poll::Ready(Ok(n));
                 }
@@ -1177,6 +1096,92 @@ impl Inner {
             Operation::Write(res) => Poll::Ready(res),
             Operation::Seek(_) => Poll::Ready(Ok(())),
         }
+    }
+
+    fn poll_write_inner(
+        &self,
+        data: (Arc<StdFile>, Buf),
+        seek: Option<SeekFrom>,
+    ) -> io::Result<JoinHandleInner<(Operation, Buf)>> {
+        #[allow(unused_mut)]
+        let mut data = Some(data);
+        let mut task_join_handle = None;
+
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux"
+        ))]
+        {
+            use crate::runtime::Handle;
+
+            // Handle not present in some tests?
+            if let Ok(handle) = Handle::try_current() {
+                if handle.inner.driver().io().check_and_init()? {
+                    task_join_handle = {
+                        use crate::{io::uring::utils::ArcFd, runtime::driver::op::Op};
+
+                        let (std, mut buf) = data.take().unwrap();
+                        if let Some(seek) = seek {
+                            // we do std seek before a write, so we can always use u64::MAX (current cursor) for the file offset
+                            // seeking only modifies kernel metadata and does not block, so we can do it here
+                            (&*std).seek(seek).map_err(|e| {
+                                io::Error::new(
+                                    e.kind(),
+                                    format!("failed to seek before write: {e}"),
+                                )
+                            })?;
+                        }
+
+                        let mut fd: ArcFd = std;
+                        let handle = BoxedOp(Box::pin(async move {
+                            loop {
+                                let op = Op::write_at(fd, buf, u64::MAX);
+                                let (r, _buf, _fd) = op.await;
+                                buf = _buf;
+                                fd = _fd;
+                                match r {
+                                    Ok(0) => {
+                                        break (
+                                            Operation::Write(Err(io::ErrorKind::WriteZero.into())),
+                                            buf,
+                                        );
+                                    }
+                                    Ok(_) if buf.is_empty() => {
+                                        break (Operation::Write(Ok(())), buf);
+                                    }
+                                    Ok(_) => continue, // more to write
+                                    Err(e) => break (Operation::Write(Err(e)), buf),
+                                }
+                            }
+                        }));
+
+                        Some(JoinHandleInner::Async(handle))
+                    };
+                }
+            }
+        }
+
+        if let Some((std, mut buf)) = data {
+            task_join_handle = {
+                let handle = spawn_mandatory_blocking(move || {
+                    let res = if let Some(seek) = seek {
+                        (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
+                    } else {
+                        buf.write_to(&mut &*std)
+                    };
+
+                    (Operation::Write(res), buf)
+                })
+                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "background task failed"))?;
+
+                Some(JoinHandleInner::Blocking(handle))
+            };
+        }
+
+        Ok(task_join_handle.unwrap())
     }
 }
 
