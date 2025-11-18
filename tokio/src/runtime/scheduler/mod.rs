@@ -284,7 +284,6 @@ cfg_rt! {
                 match_flavor!(self, Context(context) => context.with_registration_queue(f))
             }
 
-
             #[cfg(all(not(target_os = "wasi"), test))]
             pub(crate) fn with_time_context2<F, R>(&self, f: F) -> R
             where
