@@ -107,60 +107,7 @@ struct Inner {
 #[derive(Debug)]
 enum State {
     Idle(Option<Buf>),
-    Busy(JoinHandleInner<(Operation, Buf)>),
-}
-
-#[derive(Debug)]
-enum JoinHandleInner<T> {
-    Blocking(JoinHandle<T>),
-    #[cfg(all(
-        tokio_unstable,
-        feature = "io-uring",
-        feature = "rt",
-        feature = "fs",
-        target_os = "linux"
-    ))]
-    Async(BoxedOp<T>),
-}
-
-cfg_io_uring! {
-    struct BoxedOp<T>(Pin<Box<dyn Future<Output = T> + Send + Sync + 'static>>);
-
-    impl<T> std::fmt::Debug for BoxedOp<T> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            // format of BoxedFuture(T::type_name())
-            f.debug_tuple("BoxedFuture")
-                .field(&std::any::type_name::<T>())
-                .finish()
-        }
-    }
-
-    impl<T> Future for BoxedOp<T> {
-        type Output = T;
-        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            self.0.as_mut().poll(cx)
-        }
-    }
-}
-
-impl Future for JoinHandleInner<(Operation, Buf)> {
-    type Output = io::Result<(Operation, Buf)>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match self.get_mut() {
-            JoinHandleInner::Blocking(ref mut jh) => Pin::new(jh)
-                .poll(cx)
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "background task failed")),
-            #[cfg(all(
-                tokio_unstable,
-                feature = "io-uring",
-                feature = "rt",
-                feature = "fs",
-                target_os = "linux"
-            ))]
-            JoinHandleInner::Async(ref mut jh) => Pin::new(jh).poll(cx).map(Ok),
-        }
-    }
+    Busy(JoinHandle<(Operation, Buf)>),
 }
 
 #[derive(Debug)]
@@ -452,7 +399,7 @@ impl File {
 
         let std = self.std.clone();
 
-        inner.state = State::Busy(JoinHandleInner::Blocking(spawn_blocking(move || {
+        inner.state = State::Busy(spawn_blocking(move || {
             let res = if let Some(seek) = seek {
                 (&*std).seek(seek).and_then(|_| std.set_len(size))
             } else {
@@ -462,7 +409,7 @@ impl File {
 
             // Return the result as a seek
             (Operation::Seek(res), buf)
-        })));
+        }));
 
         let (op, buf) = match inner.state {
             State::Idle(_) => unreachable!(),
@@ -666,14 +613,13 @@ impl AsyncRead for File {
                     let std = me.std.clone();
 
                     let max_buf_size = cmp::min(dst.remaining(), me.max_buf_size);
-                    inner.state =
-                        State::Busy(JoinHandleInner::Blocking(spawn_blocking(move || {
-                            // SAFETY: the `Read` implementation of `std` does not
-                            // read from the buffer it is borrowing and correctly
-                            // reports the length of the data written into the buffer.
-                            let res = unsafe { buf.read_from(&mut &*std, max_buf_size) };
-                            (Operation::Read(res), buf)
-                        })));
+                    inner.state = State::Busy(spawn_blocking(move || {
+                        // SAFETY: the `Read` implementation of `std` does not
+                        // read from the buffer it is borrowing and correctly
+                        // reports the length of the data written into the buffer.
+                        let res = unsafe { buf.read_from(&mut &*std, max_buf_size) };
+                        (Operation::Read(res), buf)
+                    }));
                 }
                 State::Busy(ref mut rx) => {
                     let (op, mut buf) = ready!(Pin::new(rx).poll(cx))?;
@@ -739,10 +685,10 @@ impl AsyncSeek for File {
 
                 let std = me.std.clone();
 
-                inner.state = State::Busy(JoinHandleInner::Blocking(spawn_blocking(move || {
+                inner.state = State::Busy(spawn_blocking(move || {
                     let res = (&*std).seek(pos);
                     (Operation::Seek(res), buf)
-                })));
+                }));
                 Ok(())
             }
         }
@@ -871,7 +817,7 @@ impl AsyncWrite for File {
                     #[allow(unused_mut)]
                     let mut data = Some((std, buf));
 
-                    let mut task_join_handle = None;
+                    let mut task_join_handle: Option<JoinHandle<_>> = None;
 
                     #[cfg(all(
                         tokio_unstable,
@@ -902,13 +848,16 @@ impl AsyncWrite for File {
                                     }
 
                                     let mut fd: ArcFd = std;
-                                    let handle = BoxedOp(Box::pin(async move {
+                                    let handle = crate::spawn(async move {
                                         loop {
                                             let op = Op::write_at(fd, buf, u64::MAX);
                                             let (r, _buf, _fd) = op.await;
                                             buf = _buf;
                                             fd = _fd;
                                             match r {
+                                                Ok(_) if buf.is_empty() => {
+                                                    break (Operation::Write(Ok(())), buf);
+                                                }
                                                 Ok(0) => {
                                                     break (
                                                         Operation::Write(Err(
@@ -917,23 +866,20 @@ impl AsyncWrite for File {
                                                         buf,
                                                     );
                                                 }
-                                                Ok(_) if buf.is_empty() => {
-                                                    break (Operation::Write(Ok(())), buf);
-                                                }
                                                 Ok(_) => continue, // more to write
                                                 Err(e) => break (Operation::Write(Err(e)), buf),
                                             }
                                         }
-                                    }));
+                                    });
 
-                                    Some(JoinHandleInner::Async(handle))
+                                    Some(handle)
                                 };
                             }
                         }
                     }
 
                     if let Some((std, mut buf)) = data {
-                        task_join_handle = Some(JoinHandleInner::Blocking(
+                        task_join_handle = Some(
                             spawn_mandatory_blocking(move || {
                                 let res = if let Some(seek) = seek {
                                     (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
@@ -946,7 +892,7 @@ impl AsyncWrite for File {
                             .ok_or_else(|| {
                                 io::Error::new(io::ErrorKind::Other, "background task failed")
                             })?,
-                        ));
+                        );
                     }
 
                     inner.state = State::Busy(task_join_handle.unwrap());
@@ -1102,7 +1048,7 @@ impl Inner {
         &self,
         data: (Arc<StdFile>, Buf),
         seek: Option<SeekFrom>,
-    ) -> io::Result<JoinHandleInner<(Operation, Buf)>> {
+    ) -> io::Result<JoinHandle<(Operation, Buf)>> {
         #[allow(unused_mut)]
         let mut data = Some(data);
         let mut task_join_handle = None;
@@ -1136,29 +1082,30 @@ impl Inner {
                         }
 
                         let mut fd: ArcFd = std;
-                        let handle = BoxedOp(Box::pin(async move {
+                        let handle = crate::spawn(async move {
                             loop {
                                 let op = Op::write_at(fd, buf, u64::MAX);
                                 let (r, _buf, _fd) = op.await;
                                 buf = _buf;
                                 fd = _fd;
                                 match r {
+                                    Ok(_) if buf.is_empty() => {
+                                        break (Operation::Write(Ok(())), buf);
+                                    }
                                     Ok(0) => {
                                         break (
                                             Operation::Write(Err(io::ErrorKind::WriteZero.into())),
                                             buf,
                                         );
                                     }
-                                    Ok(_) if buf.is_empty() => {
-                                        break (Operation::Write(Ok(())), buf);
-                                    }
+
                                     Ok(_) => continue, // more to write
                                     Err(e) => break (Operation::Write(Err(e)), buf),
                                 }
                             }
-                        }));
+                        });
 
-                        Some(JoinHandleInner::Async(handle))
+                        Some(handle)
                     };
                 }
             }
@@ -1177,7 +1124,7 @@ impl Inner {
                 })
                 .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "background task failed"))?;
 
-                Some(JoinHandleInner::Blocking(handle))
+                Some(handle)
             };
         }
 

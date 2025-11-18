@@ -41,8 +41,7 @@ impl Cancellable for Write {
 }
 
 impl Op<Write> {
-    /// Issue a write that starts at `buf_offset` within `buf` and writes some bytes
-    /// into `file` at `file_offset`.
+    /// Issue a write at `file_offset` from the provided `buf`. To use current file cursor, set `file_offset` to `-1` or `u64::MAX`.
     pub(crate) fn write_at(fd: ArcFd, buf: blocking::Buf, file_offset: u64) -> Self {
         // There is a cap on how many bytes we can write in a single uring write operation.
         // ref: https://github.com/axboe/liburing/discussions/497

@@ -45,8 +45,6 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
         let handle = crate::runtime::Handle::current();
         let driver_handle = handle.inner.driver().io();
         if driver_handle.check_and_init()? {
-            use crate::io::blocking;
-
             let mut buf = blocking::Buf::with_capacity(contents.as_ref().len());
             buf.copy_from(contents.as_ref(), contents.as_ref().len());
             return write_uring(path, buf).await;
