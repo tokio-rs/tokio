@@ -608,7 +608,7 @@ impl Context {
             let mut core = self.core.borrow_mut();
             f(core.as_mut().map(|c| c.as_mut()))
         }
-        
+
         #[cfg_attr(target_family = "wasm", allow(dead_code))]
         #[cfg(test)]
         pub(crate) fn with_time_context2<F, R>(&self, f: F) -> R
