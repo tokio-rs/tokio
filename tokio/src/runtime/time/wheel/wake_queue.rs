@@ -34,19 +34,12 @@ impl WakeQueue {
     ///
     /// Behavior is undefined if any of the following conditions are violated:
     ///
-    /// - `hdl` must not in any [`super::cancellation_queue`], and also mus not in any [`WakeQueue`].
+    /// - [`Entry::extra_pointers`] of `hdl` must not being used.
     pub(crate) unsafe fn push_front(&mut self, hdl: EntryHandle) {
         self.list.push_front(hdl);
     }
 
     /// Wakes all entries in the wake queue.
-    ///
-    /// # Panics
-    ///
-    /// This function panics on any of the following conditions:
-    ///
-    /// - The entry state is in-consistent (i.e., `WokenUp` state in the wake queue).
-    /// - The waker panics while waking the entry.
     pub(crate) fn wake_all(mut self) {
         while let Some(hdl) = self.list.pop_front() {
             hdl.wake();

@@ -30,7 +30,7 @@ impl RegistrationQueue {
     ///
     /// Behavior is undefined if any of the following conditions are violated:
     ///
-    /// - `hdl` must not in any [`super::cancellation_queue`], and also mus not in any [`WakeQueue`].
+    /// - [`Entry::extra_pointers`] of `hdl` must not being used.
     pub(crate) unsafe fn push_front(&mut self, hdl: EntryHandle) {
         self.list.push_front(hdl);
     }
