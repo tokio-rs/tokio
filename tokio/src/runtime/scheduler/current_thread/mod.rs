@@ -609,8 +609,7 @@ impl Context {
             f(core.as_mut().map(|c| c.as_mut()))
         }
 
-        #[cfg_attr(target_family = "wasm", allow(dead_code))]
-        #[cfg(test)]
+        #[cfg(all(not(target_os = "wasi"), test))]
         pub(crate) fn with_time_context2<F, R>(&self, f: F) -> R
         where
             F: FnOnce(Option<&mut crate::runtime::time::Context2>) -> R,
