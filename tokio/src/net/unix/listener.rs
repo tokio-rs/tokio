@@ -1,5 +1,6 @@
 use crate::io::{Interest, PollEvented};
 use crate::net::unix::{SocketAddr, UnixStream};
+use crate::util::check_socket_for_blocking;
 
 use std::fmt;
 use std::io;
@@ -106,6 +107,10 @@ impl UnixListener {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Passing a listener in blocking mode is always erroneous,
+    /// and the behavior in that case may change in the future.
+    /// For example, it could panic.
+    ///
     /// [`set_nonblocking`]: std::os::unix::net::UnixListener::set_nonblocking
     ///
     /// # Examples
@@ -133,6 +138,8 @@ impl UnixListener {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
     pub fn from_std(listener: net::UnixListener) -> io::Result<UnixListener> {
+        check_socket_for_blocking(&listener)?;
+
         let listener = mio::net::UnixListener::from_std(listener);
         let io = PollEvented::new(listener)?;
         Ok(UnixListener { io })
@@ -223,7 +230,7 @@ impl TryFrom<std::os::unix::net::UnixListener> for UnixListener {
 
 impl fmt::Debug for UnixListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        (*self.io).fmt(f)
     }
 }
 

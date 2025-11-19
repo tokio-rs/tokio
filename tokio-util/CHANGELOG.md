@@ -1,3 +1,121 @@
+# 0.7.17 (November 2nd, 2025)
+
+The MSRV is increased to 1.71.
+
+### Added
+
+- codec: add `{FramedRead,FramedWrite}::into_parts()` ([#7566])
+- time: add `#[track_caller]` to `FutureExt::timeout` ([#7588])
+- task: add `tokio_util::task::JoinQueue` ([#7590])
+
+### Changed
+
+- codec: remove unnecessary trait bounds on all Framed constructors ([#7716])
+
+### Documented
+
+- time: clarify the cancellation safety of the `DelayQueue` ([#7564])
+- docs: fix some docs links ([#7654])
+- task: simplify the example of `TaskTracker` ([#7657])
+- task: clarify the behavior of several `spawn_local` methods ([#7669])
+
+[#7564]: https://github.com/tokio-rs/tokio/pull/7564
+[#7566]: https://github.com/tokio-rs/tokio/pull/7566
+[#7588]: https://github.com/tokio-rs/tokio/pull/7588
+[#7590]: https://github.com/tokio-rs/tokio/pull/7590
+[#7654]: https://github.com/tokio-rs/tokio/pull/7654
+[#7657]: https://github.com/tokio-rs/tokio/pull/7657
+[#7669]: https://github.com/tokio-rs/tokio/pull/7669
+[#7716]: https://github.com/tokio-rs/tokio/pull/7716
+
+# 0.7.16 (August 3rd, 2025)
+
+### Added
+
+- codec: add `FramedWrite::with_capacity` ([#7493])
+- future: add adapters of `CancellationToken` for `FutureExt` ([#7475])
+- sync: add `DropGuardRef` for `CancellationToken` ([#7407])
+- task: add `AbortOnDropHandle::detach` ([#7400])
+- task: stabilise `JoinMap` ([#7075])
+
+### Changed
+
+- codec: also apply capacity to read buffer in `Framed::with_capacity` ([#7500])
+- sync: make `CancellationToken::run_until_cancelled` biased towards the token ([#7462])
+- task: remove raw-entry feature from hashbrown dep ([#7252])
+
+### Documented
+
+- compat: add more documentation to `tokio_util::compat` ([#7279])
+- sync: improve docs of `tokio_util::sync::CancellationToken` ([#7408])
+
+[#7075]: https://github.com/tokio-rs/tokio/pull/7075
+[#7252]: https://github.com/tokio-rs/tokio/pull/7252
+[#7279]: https://github.com/tokio-rs/tokio/pull/7279
+[#7400]: https://github.com/tokio-rs/tokio/pull/7400
+[#7407]: https://github.com/tokio-rs/tokio/pull/7407
+[#7408]: https://github.com/tokio-rs/tokio/pull/7408
+[#7462]: https://github.com/tokio-rs/tokio/pull/7462
+[#7475]: https://github.com/tokio-rs/tokio/pull/7475
+[#7493]: https://github.com/tokio-rs/tokio/pull/7493
+[#7500]: https://github.com/tokio-rs/tokio/pull/7500
+
+# 0.7.15 (April 23rd, 2025)
+
+### Fixed
+
+- task: properly handle removed entries in `JoinMap` ([#7264])
+
+### Updated
+
+- deps: update hashbrown to 0.15 ([#7219])
+
+### Documented
+
+- task: explicitly state that `TaskTracker` does not abort tasks on Drop ([#7223])
+
+[#7219]: https://github.com/tokio-rs/tokio/pull/7219
+[#7223]: https://github.com/tokio-rs/tokio/pull/7223
+[#7264]: https://github.com/tokio-rs/tokio/pull/7264
+
+# 0.7.14 (March 12th, 2025)
+
+### Added
+
+- io: add `get_ref` and `get_mut` for `SyncIoBridge` ([#7128])
+- io: add `read_exact_arc` ([#7165])
+- sync: add `CancellationToken::run_until_cancelled_owned` ([#7081])
+
+### Changed
+
+- codec: optimize buffer reserve for `AnyDelimiterCodec::encode` ([#7188])
+- either: enable `Either` to use underlying `AsyncWrite` implementation ([#7025])
+
+### Fixed
+
+- codec: fix typo in API docs ([#7044])
+- util: fix example in `StreamReader` docs ([#7167])
+
+### Documented
+
+- io: add docs for `SyncIoBridge` with examples and alternatives ([#6815])
+
+### Internal
+
+- io: clean up buffer casts ([#7142])
+- task: run `spawn_pinned` tests with miri ([#7023])
+
+[#6815]: https://github.com/tokio-rs/tokio/pull/6815
+[#7023]: https://github.com/tokio-rs/tokio/pull/7023
+[#7025]: https://github.com/tokio-rs/tokio/pull/7025
+[#7044]: https://github.com/tokio-rs/tokio/pull/7044
+[#7081]: https://github.com/tokio-rs/tokio/pull/7081
+[#7128]: https://github.com/tokio-rs/tokio/pull/7128
+[#7142]: https://github.com/tokio-rs/tokio/pull/7142
+[#7165]: https://github.com/tokio-rs/tokio/pull/7165
+[#7167]: https://github.com/tokio-rs/tokio/pull/7167
+[#7188]: https://github.com/tokio-rs/tokio/pull/7188
+
 # 0.7.13 (December 4th, 2024)
 
 ### Fixed

@@ -12,10 +12,6 @@ use std::time::Duration;
 cfg_rt_multi_thread! {
     use crate::runtime::Builder;
     use crate::runtime::scheduler::MultiThread;
-
-    cfg_unstable! {
-        use crate::runtime::scheduler::MultiThreadAlt;
-    }
 }
 
 /// The Tokio runtime.
@@ -117,10 +113,6 @@ pub enum RuntimeFlavor {
     CurrentThread,
     /// The flavor that executes tasks across multiple threads.
     MultiThread,
-    /// The flavor that executes tasks across multiple threads.
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
-    MultiThreadAlt,
 }
 
 /// The runtime scheduler is either a multi-thread or a current-thread executor.
@@ -132,10 +124,6 @@ pub(super) enum Scheduler {
     /// Execute tasks across multiple threads.
     #[cfg(feature = "rt-multi-thread")]
     MultiThread(MultiThread),
-
-    /// Execute tasks across multiple threads.
-    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-    MultiThreadAlt(MultiThreadAlt),
 }
 
 impl Runtime {
@@ -196,6 +184,8 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// let rt = Runtime::new()
@@ -204,6 +194,7 @@ impl Runtime {
     /// let handle = rt.handle();
     ///
     /// // Use the handle...
+    /// # }
     /// ```
     pub fn handle(&self) -> &Handle {
         &self.handle
@@ -226,6 +217,8 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
@@ -236,6 +229,7 @@ impl Runtime {
     /// rt.spawn(async {
     ///     println!("now running on a worker thread");
     /// });
+    /// # }
     /// # }
     /// ```
     #[track_caller]
@@ -259,6 +253,8 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// # fn dox() {
@@ -269,6 +265,7 @@ impl Runtime {
     /// rt.spawn_blocking(|| {
     ///     println!("now running on a worker thread");
     /// });
+    /// # }
     /// # }
     /// ```
     #[track_caller]
@@ -321,6 +318,8 @@ impl Runtime {
     /// # Examples
     ///
     /// ```no_run
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// // Create the runtime
@@ -330,6 +329,7 @@ impl Runtime {
     /// rt.block_on(async {
     ///     println!("hello");
     /// });
+    /// # }
     /// ```
     ///
     /// [handle]: fn@Handle::block_on
@@ -347,7 +347,7 @@ impl Runtime {
     fn block_on_inner<F: Future>(&self, future: F, _meta: SpawnMeta<'_>) -> F::Output {
         #[cfg(all(
             tokio_unstable,
-            tokio_taskdump,
+            feature = "taskdump",
             feature = "rt",
             target_os = "linux",
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
@@ -368,8 +368,6 @@ impl Runtime {
             Scheduler::CurrentThread(exec) => exec.block_on(&self.handle.inner, future),
             #[cfg(feature = "rt-multi-thread")]
             Scheduler::MultiThread(exec) => exec.block_on(&self.handle.inner, future),
-            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-            Scheduler::MultiThreadAlt(exec) => exec.block_on(&self.handle.inner, future),
         }
     }
 
@@ -386,6 +384,8 @@ impl Runtime {
     /// # Example
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     /// use tokio::task::JoinHandle;
     ///
@@ -408,6 +408,7 @@ impl Runtime {
     ///     // Wait for the task before we end the test.
     ///     rt.block_on(handle).unwrap();
     /// }
+    /// # }
     /// ```
     pub fn enter(&self) -> EnterGuard<'_> {
         self.handle.enter()
@@ -421,7 +422,8 @@ impl Runtime {
     /// # Examples
     ///
     /// ```
-    /// # if cfg!(miri) { return } // Miri reports error when main thread terminated without waiting all remaining threads.
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
@@ -429,6 +431,7 @@ impl Runtime {
     /// use std::time::Duration;
     ///
     /// fn main() {
+    /// #  if cfg!(miri) { return } // Miri reports error when main thread terminated without waiting all remaining threads.
     ///    let runtime = Runtime::new().unwrap();
     ///
     ///    runtime.block_on(async move {
@@ -439,6 +442,7 @@ impl Runtime {
     ///
     ///    runtime.shutdown_timeout(Duration::from_millis(100));
     /// }
+    /// # }
     /// ```
     pub fn shutdown_timeout(mut self, duration: Duration) {
         // Wakeup and shutdown all the worker threads
@@ -462,6 +466,8 @@ impl Runtime {
     /// This function is equivalent to calling `shutdown_timeout(Duration::from_nanos(0))`.
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     ///
     /// fn main() {
@@ -473,6 +479,7 @@ impl Runtime {
     ///        inner_runtime.shutdown_background();
     ///    });
     /// }
+    /// # }
     /// ```
     pub fn shutdown_background(self) {
         self.shutdown_timeout(Duration::from_nanos(0));
@@ -485,7 +492,6 @@ impl Runtime {
     }
 }
 
-#[allow(clippy::single_match)] // there are comments in the error branch, so we don't want if-let
 impl Drop for Runtime {
     fn drop(&mut self) {
         match &mut self.scheduler {
@@ -497,12 +503,6 @@ impl Drop for Runtime {
             }
             #[cfg(feature = "rt-multi-thread")]
             Scheduler::MultiThread(multi_thread) => {
-                // The threaded scheduler drops its tasks on its worker threads, which is
-                // already in the runtime's context.
-                multi_thread.shutdown(&self.handle.inner);
-            }
-            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-            Scheduler::MultiThreadAlt(multi_thread) => {
                 // The threaded scheduler drops its tasks on its worker threads, which is
                 // already in the runtime's context.
                 multi_thread.shutdown(&self.handle.inner);

@@ -51,10 +51,7 @@ impl<T: Stack> Level<T> {
     pub(crate) fn next_expiration(&self, now: u64) -> Option<Expiration> {
         // Use the `occupied` bit field to get the index of the next slot that
         // needs to be processed.
-        let slot = match self.next_occupied_slot(now) {
-            Some(slot) => slot,
-            None => return None,
-        };
+        let slot = self.next_occupied_slot(now)?;
 
         // From the slot index, calculate the `Instant` at which it needs to be
         // processed. This value *must* be in the future with respect to `now`.

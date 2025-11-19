@@ -1,16 +1,76 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "rt", tokio_unstable))]
+#![cfg(feature = "join-map")]
 
+use std::panic::AssertUnwindSafe;
+
+use futures::future::{pending, FutureExt};
 use tokio::sync::oneshot;
+use tokio::task::LocalSet;
 use tokio::time::Duration;
 use tokio_util::task::JoinMap;
-
-use futures::future::FutureExt;
 
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap()
+}
+
+// Spawn `N` tasks that return their index (`i`).
+fn spawn_index_tasks(map: &mut JoinMap<usize, usize>, n: usize, on: Option<&LocalSet>) {
+    for i in 0..n {
+        let rc = std::rc::Rc::new(i);
+        match on {
+            None => map.spawn_local(i, async move { *rc }),
+            Some(local) => map.spawn_local_on(i, async move { *rc }, local),
+        };
+    }
+}
+
+// Spawn `N` “pending” tasks that own a `oneshot::Sender`.
+// When the task is aborted the sender is dropped, which is observed
+// via the returned `Receiver`s.
+fn spawn_pending_tasks(
+    map: &mut JoinMap<usize, ()>,
+    receivers: &mut Vec<oneshot::Receiver<()>>,
+    n: usize,
+    on: Option<&LocalSet>,
+) {
+    for i in 0..n {
+        let (tx, rx) = oneshot::channel::<()>();
+        receivers.push(rx);
+
+        let fut = async move {
+            pending::<()>().await;
+            drop(tx);
+        };
+        match on {
+            None => map.spawn_local(i, fut),
+            Some(local) => map.spawn_local_on(i, fut, local),
+        };
+    }
+}
+
+/// Await every task in JoinMap and assert every task returns its own key.
+async fn drain_joinmap_and_assert(mut map: JoinMap<usize, usize>, n: usize) {
+    let mut seen = vec![false; n];
+    while let Some((k, res)) = map.join_next().await {
+        let v = res.expect("task panicked");
+        assert_eq!(k, v);
+        seen[v] = true;
+    }
+    assert!(seen.into_iter().all(|b| b));
+    assert!(map.is_empty());
+}
+
+// Await every receiver and assert they all return `Err` because the
+// corresponding sender (inside an aborted task) was dropped.
+async fn await_receivers_and_assert(receivers: Vec<oneshot::Receiver<()>>) {
+    for rx in receivers {
+        assert!(
+            rx.await.is_err(),
+            "task should have been aborted and sender dropped"
+        );
+    }
 }
 
 #[tokio::test(start_paused = true)]
@@ -24,7 +84,7 @@ async fn test_with_sleep() {
     map.detach_all();
     assert_eq!(map.len(), 0);
 
-    assert!(matches!(map.join_next().await, None));
+    assert!(map.join_next().await.is_none());
 
     for i in 0..10 {
         map.spawn(i, async move {
@@ -43,7 +103,7 @@ async fn test_with_sleep() {
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(map.join_next().await, None));
+    assert!(map.join_next().await.is_none());
 
     // Do it again.
     for i in 0..10 {
@@ -62,7 +122,7 @@ async fn test_with_sleep() {
     for was_seen in &seen {
         assert!(was_seen);
     }
-    assert!(matches!(map.join_next().await, None));
+    assert!(map.join_next().await.is_none());
 }
 
 #[tokio::test]
@@ -248,7 +308,7 @@ async fn join_map_coop() {
     loop {
         match map.join_next().now_or_never() {
             Some(Some((key, Ok(i)))) => assert_eq!(key, i),
-            Some(Some((key, Err(err)))) => panic!("failed[{}]: {}", key, err),
+            Some(Some((key, Err(err)))) => panic!("failed[{key}]: {err}"),
             None => {
                 coop_count += 1;
                 tokio::task::yield_now().await;
@@ -295,5 +355,317 @@ async fn abort_all() {
     assert_eq!(map.len(), 0);
     for was_seen in &seen {
         assert!(was_seen);
+    }
+}
+
+#[tokio::test]
+async fn duplicate_keys() {
+    let mut map = JoinMap::new();
+    map.spawn(1, async { 1 });
+    map.spawn(1, async { 2 });
+
+    assert_eq!(map.len(), 1);
+
+    let (key, res) = map.join_next().await.unwrap();
+    assert_eq!(key, 1);
+    assert_eq!(res.unwrap(), 2);
+
+    assert!(map.join_next().await.is_none());
+}
+
+#[tokio::test]
+async fn duplicate_keys2() {
+    let (send, recv) = oneshot::channel::<()>();
+
+    let mut map = JoinMap::new();
+    map.spawn(1, async { 1 });
+    map.spawn(1, async {
+        recv.await.unwrap();
+        2
+    });
+
+    assert_eq!(map.len(), 1);
+
+    tokio::select! {
+        biased;
+        res = map.join_next() => match res {
+            Some((_key, res)) => panic!("Task {res:?} exited."),
+            None => panic!("Phantom task completion."),
+        },
+        () = tokio::task::yield_now() => {},
+    }
+
+    send.send(()).unwrap();
+
+    let (key, res) = map.join_next().await.unwrap();
+    assert_eq!(key, 1);
+    assert_eq!(res.unwrap(), 2);
+
+    assert!(map.join_next().await.is_none());
+}
+
+#[cfg_attr(not(panic = "unwind"), ignore)]
+#[tokio::test]
+async fn duplicate_keys_drop() {
+    #[derive(Hash, Debug, PartialEq, Eq)]
+    struct Key;
+    impl Drop for Key {
+        fn drop(&mut self) {
+            panic!("drop called for key");
+        }
+    }
+
+    let (send, recv) = oneshot::channel::<()>();
+
+    let mut map = JoinMap::new();
+
+    map.spawn(Key, async { recv.await.unwrap() });
+
+    // replace the task, force it to drop the key and abort the task
+    // we should expect it to panic when dropping the key.
+    let _ = std::panic::catch_unwind(AssertUnwindSafe(|| map.spawn(Key, async {}))).unwrap_err();
+
+    // don't panic when this key drops.
+    let (key, _) = map.join_next().await.unwrap();
+    std::mem::forget(key);
+
+    // original task should have been aborted, so the sender should be dangling.
+    assert!(send.is_closed());
+
+    assert!(map.join_next().await.is_none());
+}
+
+mod spawn_local {
+    use super::*;
+
+    #[test]
+    #[should_panic(
+        expected = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"
+    )]
+    fn panic_outside_any_runtime() {
+        let mut map = JoinMap::new();
+        map.spawn_local((), async {});
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[should_panic(
+        expected = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"
+    )]
+    async fn panic_in_multi_thread_runtime() {
+        let mut map = JoinMap::new();
+        map.spawn_local((), async {});
+    }
+
+    #[cfg(tokio_unstable)]
+    mod local_runtime {
+        use super::*;
+
+        /// Spawn several tasks, and then join all tasks.
+        #[tokio::test(flavor = "local")]
+        async fn spawn_then_join_next() {
+            const N: usize = 8;
+
+            let mut map = JoinMap::new();
+            spawn_index_tasks(&mut map, N, None);
+
+            assert!(map.join_next().now_or_never().is_none());
+            drain_joinmap_and_assert(map, N).await;
+        }
+
+        /// Spawn several pending-forever tasks, and then shutdown the [`JoinMap`].
+        #[tokio::test(flavor = "local")]
+        async fn spawn_then_shutdown() {
+            const N: usize = 8;
+
+            let mut map = JoinMap::new();
+            let mut receivers = Vec::new();
+
+            spawn_pending_tasks(&mut map, &mut receivers, N, None);
+            assert!(map.join_next().now_or_never().is_none());
+
+            map.shutdown().await;
+            assert!(map.is_empty());
+            await_receivers_and_assert(receivers).await;
+        }
+
+        /// Spawn several pending-forever tasks, and then drop the [`JoinMap`].
+        #[tokio::test(flavor = "local")]
+        async fn spawn_then_drop() {
+            const N: usize = 8;
+
+            let mut map = JoinMap::new();
+            let mut receivers = Vec::new();
+
+            spawn_pending_tasks(&mut map, &mut receivers, N, None);
+            assert!(map.join_next().now_or_never().is_none());
+
+            drop(map);
+            await_receivers_and_assert(receivers).await;
+        }
+    }
+
+    mod local_set {
+        use super::*;
+
+        /// Spawn several tasks, and then join all tasks.
+        #[tokio::test(flavor = "current_thread")]
+        async fn spawn_then_join_next() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+
+            local
+                .run_until(async move {
+                    let mut map = JoinMap::new();
+                    spawn_index_tasks(&mut map, N, None);
+                    drain_joinmap_and_assert(map, N).await;
+                })
+                .await;
+        }
+
+        /// Spawn several pending-forever tasks, and then shutdown the [`JoinMap`].
+        #[tokio::test(flavor = "current_thread")]
+        async fn spawn_then_shutdown() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+
+            local
+                .run_until(async {
+                    let mut map = JoinMap::new();
+                    let mut receivers = Vec::new();
+
+                    spawn_pending_tasks(&mut map, &mut receivers, N, None);
+                    assert!(map.join_next().now_or_never().is_none());
+
+                    map.shutdown().await;
+                    assert!(map.is_empty());
+                    await_receivers_and_assert(receivers).await;
+                })
+                .await;
+        }
+
+        /// Spawn several pending-forever tasks, and then drop the [`JoinMap`].
+        #[tokio::test(flavor = "current_thread")]
+        async fn spawn_then_drop() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+
+            local
+                .run_until(async {
+                    let mut map = JoinMap::new();
+                    let mut receivers = Vec::new();
+
+                    spawn_pending_tasks(&mut map, &mut receivers, N, None);
+                    assert!(map.join_next().now_or_never().is_none());
+
+                    drop(map);
+                    await_receivers_and_assert(receivers).await;
+                })
+                .await;
+        }
+    }
+}
+
+mod spawn_local_on {
+    use super::*;
+
+    #[cfg(tokio_unstable)]
+    mod local_runtime {
+        use super::*;
+
+        /// Spawn several tasks, and then join all tasks.
+        #[tokio::test(flavor = "local")]
+        async fn spawn_then_join_next() {
+            const N: usize = 8;
+
+            let local = LocalSet::new();
+            let mut map = JoinMap::new();
+
+            spawn_index_tasks(&mut map, N, Some(&local));
+            assert!(map.join_next().now_or_never().is_none());
+
+            local
+                .run_until(async move {
+                    drain_joinmap_and_assert(map, N).await;
+                })
+                .await;
+        }
+    }
+
+    mod local_set {
+        use super::*;
+
+        /// Spawn several tasks, and then join all tasks.
+        #[tokio::test(flavor = "current_thread")]
+        async fn spawn_then_join_next() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+            let mut pending_map = JoinMap::new();
+
+            spawn_index_tasks(&mut pending_map, N, Some(&local));
+            assert!(pending_map.join_next().now_or_never().is_none());
+
+            local
+                .run_until(async move {
+                    drain_joinmap_and_assert(pending_map, N).await;
+                })
+                .await;
+        }
+
+        /// Spawn several pending-forever tasks, and then shutdown the [`JoinMap`].
+        #[tokio::test(flavor = "current_thread")]
+        async fn spawn_then_shutdown() {
+            const N: usize = 8;
+            let local = LocalSet::new();
+            let mut map = JoinMap::new();
+            let mut receivers = Vec::new();
+
+            spawn_pending_tasks(&mut map, &mut receivers, N, Some(&local));
+            assert!(map.join_next().now_or_never().is_none());
+
+            local
+                .run_until(async move {
+                    map.shutdown().await;
+                    assert!(map.is_empty());
+                    await_receivers_and_assert(receivers).await;
+                })
+                .await;
+        }
+
+        /// Spawn several pending-forever tasks and then drop the [`JoinMap`]
+        /// before the `LocalSet` is driven and while the `LocalSet` is already driven.
+        #[tokio::test(flavor = "current_thread")]
+        async fn spawn_then_drop() {
+            const N: usize = 8;
+
+            {
+                let local = LocalSet::new();
+                let mut map = JoinMap::new();
+                let mut receivers = Vec::new();
+
+                spawn_pending_tasks(&mut map, &mut receivers, N, Some(&local));
+                assert!(map.join_next().now_or_never().is_none());
+
+                drop(map);
+                local
+                    .run_until(async move { await_receivers_and_assert(receivers).await })
+                    .await;
+            }
+
+            {
+                let local = LocalSet::new();
+                let mut map = JoinMap::new();
+                let mut receivers = Vec::new();
+
+                spawn_pending_tasks(&mut map, &mut receivers, N, Some(&local));
+                assert!(map.join_next().now_or_never().is_none());
+
+                local
+                    .run_until(async move {
+                        drop(map);
+                        await_receivers_and_assert(receivers).await;
+                    })
+                    .await;
+            }
+        }
     }
 }

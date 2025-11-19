@@ -129,7 +129,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -171,8 +171,9 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
+    ///
     /// use tokio_stream::{self as stream, StreamExt};
     ///
     /// let mut stream = stream::iter(vec![Ok(1), Ok(2), Err("nope")]);
@@ -203,7 +204,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -239,7 +240,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -283,7 +284,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -418,7 +419,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -454,7 +455,7 @@ pub trait StreamExt: Stream {
     ///
     /// # Examples
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -514,7 +515,10 @@ pub trait StreamExt: Stream {
     ///     }
     /// }
     ///
+    /// # /*
     /// #[tokio::main]
+    /// # */
+    /// # #[tokio::main(flavor = "current_thread")]
     /// async fn main() {
     ///     let mut stream = Alternate { state: 0 };
     ///
@@ -551,7 +555,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -580,7 +584,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -606,7 +610,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -637,7 +641,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     /// let mut stream = stream::iter(vec![1,2,3,4,1]).skip_while(|x| *x < 3);
@@ -680,7 +684,7 @@ pub trait StreamExt: Stream {
     /// Basic usage:
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -695,7 +699,7 @@ pub trait StreamExt: Stream {
     /// Stopping at the first `false`:
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -739,7 +743,7 @@ pub trait StreamExt: Stream {
     /// Basic usage:
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -754,7 +758,7 @@ pub trait StreamExt: Stream {
     /// Stopping at the first `true`:
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     ///
@@ -787,21 +791,21 @@ pub trait StreamExt: Stream {
     /// ```
     /// use tokio_stream::{self as stream, StreamExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let one = stream::iter(vec![1, 2, 3]);
-    ///     let two = stream::iter(vec![4, 5, 6]);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let one = stream::iter(vec![1, 2, 3]);
+    /// let two = stream::iter(vec![4, 5, 6]);
     ///
-    ///     let mut stream = one.chain(two);
+    /// let mut stream = one.chain(two);
     ///
-    ///     assert_eq!(stream.next().await, Some(1));
-    ///     assert_eq!(stream.next().await, Some(2));
-    ///     assert_eq!(stream.next().await, Some(3));
-    ///     assert_eq!(stream.next().await, Some(4));
-    ///     assert_eq!(stream.next().await, Some(5));
-    ///     assert_eq!(stream.next().await, Some(6));
-    ///     assert_eq!(stream.next().await, None);
-    /// }
+    /// assert_eq!(stream.next().await, Some(1));
+    /// assert_eq!(stream.next().await, Some(2));
+    /// assert_eq!(stream.next().await, Some(3));
+    /// assert_eq!(stream.next().await, Some(4));
+    /// assert_eq!(stream.next().await, Some(5));
+    /// assert_eq!(stream.next().await, Some(6));
+    /// assert_eq!(stream.next().await, None);
+    /// # }
     /// ```
     fn chain<U>(self, other: U) -> Chain<Self, U>
     where
@@ -823,7 +827,7 @@ pub trait StreamExt: Stream {
     /// # Examples
     /// Basic usage:
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, *};
     ///
@@ -874,16 +878,16 @@ pub trait StreamExt: Stream {
     /// ```
     /// use tokio_stream::{self as stream, StreamExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let doubled: Vec<i32> =
-    ///         stream::iter(vec![1, 2, 3])
-    ///             .map(|x| x * 2)
-    ///             .collect()
-    ///             .await;
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let doubled: Vec<i32> =
+    ///     stream::iter(vec![1, 2, 3])
+    ///         .map(|x| x * 2)
+    ///         .collect()
+    ///         .await;
     ///
-    ///     assert_eq!(vec![2, 4, 6], doubled);
-    /// }
+    /// assert_eq!(vec![2, 4, 6], doubled);
+    /// # }
     /// ```
     ///
     /// Collecting a stream of `Result` values
@@ -891,26 +895,26 @@ pub trait StreamExt: Stream {
     /// ```
     /// use tokio_stream::{self as stream, StreamExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     // A stream containing only `Ok` values will be collected
-    ///     let values: Result<Vec<i32>, &str> =
-    ///         stream::iter(vec![Ok(1), Ok(2), Ok(3)])
-    ///             .collect()
-    ///             .await;
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// // A stream containing only `Ok` values will be collected
+    /// let values: Result<Vec<i32>, &str> =
+    ///     stream::iter(vec![Ok(1), Ok(2), Ok(3)])
+    ///         .collect()
+    ///         .await;
     ///
-    ///     assert_eq!(Ok(vec![1, 2, 3]), values);
+    /// assert_eq!(Ok(vec![1, 2, 3]), values);
     ///
-    ///     // A stream containing `Err` values will return the first error.
-    ///     let results = vec![Ok(1), Err("no"), Ok(2), Ok(3), Err("nein")];
+    /// // A stream containing `Err` values will return the first error.
+    /// let results = vec![Ok(1), Err("no"), Ok(2), Ok(3), Err("nein")];
     ///
-    ///     let values: Result<Vec<i32>, &str> =
-    ///         stream::iter(results)
-    ///             .collect()
-    ///             .await;
+    /// let values: Result<Vec<i32>, &str> =
+    ///     stream::iter(results)
+    ///         .collect()
+    ///         .await;
     ///
-    ///     assert_eq!(Err("no"), values);
-    /// }
+    /// assert_eq!(Err("no"), values);
+    /// # }
     /// ```
     fn collect<T>(self) -> Collect<Self, T>
     where
@@ -945,7 +949,7 @@ pub trait StreamExt: Stream {
     /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     /// use std::time::Duration;
@@ -1031,7 +1035,7 @@ pub trait StreamExt: Stream {
     /// Suppose we have a stream `int_stream` that yields 3 numbers (1, 2, 3):
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
     /// use std::time::Duration;

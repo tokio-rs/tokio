@@ -502,7 +502,7 @@ impl Semaphore {
                 .as_ref()
                 .map_or(true, |waker| !waker.will_wake(cx.waker()))
             {
-                old_waker = std::mem::replace(waker, Some(cx.waker().clone()));
+                old_waker = waker.replace(cx.waker().clone());
             }
         });
 
@@ -775,6 +775,6 @@ unsafe impl linked_list::Link for Waiter {
     }
 
     unsafe fn pointers(target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
-        Waiter::addr_of_pointers(target)
+        unsafe { Waiter::addr_of_pointers(target) }
     }
 }

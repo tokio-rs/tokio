@@ -17,7 +17,7 @@ fn do_work(rng: &mut impl RngCore) -> u32 {
     use std::fmt::Write;
     let mut message = String::new();
     for i in 1..=10 {
-        let _ = write!(&mut message, " {i}={}", rng.gen::<f64>());
+        let _ = write!(&mut message, " {i}={}", rng.random::<f64>());
     }
     message
         .as_bytes()

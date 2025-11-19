@@ -647,6 +647,51 @@ fn test_nested_block_in_place_with_block_on_between() {
     }
 }
 
+#[test]
+fn yield_now_in_block_in_place() {
+    let rt = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        tokio::spawn(async {
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(tokio::task::yield_now());
+            })
+        })
+        .await
+        .unwrap()
+    })
+}
+
+#[test]
+fn mutex_in_block_in_place() {
+    const BUDGET: usize = 128;
+
+    let rt = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let lock = tokio::sync::Mutex::new(0);
+
+        tokio::spawn(async move {
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    for i in 0..(BUDGET + 1) {
+                        let mut guard = lock.lock().await;
+                        *guard = i;
+                    }
+                });
+            })
+        })
+        .await
+        .unwrap();
+    })
+}
+
 // Testing the tuning logic is tricky as it is inherently timing based, and more
 // of a heuristic than an exact behavior. This test checks that the interval
 // changes over time based on load factors. There are no assertions, completion

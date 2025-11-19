@@ -1,7 +1,8 @@
 use super::Handle;
+use crate::runtime::WorkerMetrics;
 
 cfg_unstable_metrics! {
-    use crate::runtime::{SchedulerMetrics, WorkerMetrics};
+    use crate::runtime::SchedulerMetrics;
 }
 
 impl Handle {
@@ -15,6 +16,10 @@ impl Handle {
 
     pub(crate) fn injection_queue_depth(&self) -> usize {
         self.shared.injection_queue_depth()
+    }
+
+    pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
+        &self.shared.worker_metrics[worker]
     }
 
     cfg_unstable_metrics! {
@@ -37,10 +42,6 @@ impl Handle {
 
         pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
             &self.shared.scheduler_metrics
-        }
-
-        pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
-            &self.shared.worker_metrics[worker]
         }
 
         pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {

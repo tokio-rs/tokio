@@ -17,20 +17,20 @@ pin_project! {
     /// ```
     /// use tokio_stream::{StreamExt, StreamMap, StreamNotifyClose};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut map = StreamMap::new();
-    ///     let stream = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
-    ///     let stream2 = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
-    ///     map.insert(0, stream);
-    ///     map.insert(1, stream2);
-    ///     while let Some((key, val)) = map.next().await {
-    ///         match val {
-    ///             Some(val) => println!("got {val:?} from stream {key:?}"),
-    ///             None => println!("stream {key:?} closed"),
-    ///         }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut map = StreamMap::new();
+    /// let stream = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
+    /// let stream2 = StreamNotifyClose::new(tokio_stream::iter(vec![0, 1]));
+    /// map.insert(0, stream);
+    /// map.insert(1, stream2);
+    /// while let Some((key, val)) = map.next().await {
+    ///     match val {
+    ///         Some(val) => println!("got {val:?} from stream {key:?}"),
+    ///         None => println!("stream {key:?} closed"),
     ///     }
     /// }
+    /// # }
     /// ```
     #[must_use = "streams do nothing unless polled"]
     pub struct StreamNotifyClose<S> {

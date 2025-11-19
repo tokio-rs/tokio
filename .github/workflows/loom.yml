@@ -29,7 +29,7 @@ jobs:
     if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-sync') || (github.base_ref == null))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@master
         with:
@@ -45,7 +45,7 @@ jobs:
     if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-time-driver') || (github.base_ref == null))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@master
         with:
@@ -61,7 +61,7 @@ jobs:
     if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-current-thread') || (github.base_ref == null))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@master
         with:
@@ -84,39 +84,30 @@ jobs:
           - scope: loom_multi_thread::group_c
           - scope: loom_multi_thread::group_d
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
       - name: loom ${{ matrix.scope }}
-        run: cargo test --lib --release --features full -- $SCOPE
+        run: cargo test --lib --release --features full -- --nocapture $SCOPE
         working-directory: tokio
         env:
           SCOPE: ${{ matrix.scope }}
 
-  loom-multi-thread-alt:
-    name: loom ALT multi-thread scheduler
+  loom-util:
+    name: loom tokio-util
     # base_ref is null when it's not a pull request
-    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-multi-thread-alt') || (github.base_ref == null))
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-util') || (github.base_ref == null))
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - scope: loom_multi_thread_alt::group_a
-          - scope: loom_multi_thread_alt::group_b
-          - scope: loom_multi_thread_alt::group_c
-          - scope: loom_multi_thread_alt::group_d
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@master
         with:
             toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
-      - name: loom ${{ matrix.scope }}
-        run: cargo test --lib --release --features full -- $SCOPE
-        working-directory: tokio
-        env:
-          SCOPE: ${{ matrix.scope }}
+      - name: run tests
+        run: cargo test --lib --release --features full -- --nocapture
+        working-directory: tokio-util

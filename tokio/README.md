@@ -1,3 +1,9 @@
+
+
+*[The TokioConf 2026 Call For Talk Proposals is now open](https://tokio.rs/blog/2025-09-26-announcing-tokio-conf-cfp)*
+
+---
+
 # Tokio
 
 A runtime for writing reliable, asynchronous, and slim applications with
@@ -39,7 +45,7 @@ level, it provides a few major components:
 
 * A multithreaded, work-stealing based task [scheduler].
 * A reactor backed by the operating system's event queue (epoll, kqueue,
-  IOCP, etc...).
+  IOCP, etc.).
 * Asynchronous [TCP and UDP][net] sockets.
 
 These components provide the runtime components necessary for building
@@ -52,11 +58,11 @@ an asynchronous application.
 
 A basic TCP echo server with Tokio.
 
-Make sure you activated the full features of the tokio crate on Cargo.toml:
+Make sure you enable the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.43.0", features = ["full"] }
+tokio = { version = "1.48.0", features = ["full"] }
 ```
 Then, on your main.rs:
 
@@ -103,7 +109,7 @@ More examples can be found [here][examples]. For a larger "real world" example, 
 [examples]: https://github.com/tokio-rs/tokio/tree/master/examples
 [mini-redis]: https://github.com/tokio-rs/mini-redis/
 
-To see a list of the available features flags that can be enabled, check our
+To see a list of the available feature flags that can be enabled, check our
 [docs][feature-flag-docs].
 
 ## Getting Help
@@ -186,12 +192,13 @@ When updating this, also update:
 
 Tokio will keep a rolling MSRV (minimum supported rust version) policy of **at
 least** 6 months. When increasing the MSRV, the new Rust version must have been
-released at least six months ago. The current MSRV is 1.70.
+released at least six months ago. The current MSRV is 1.71.
 
 Note that the MSRV is not increased automatically, and only as part of a minor
 release. The MSRV history for past minor releases can be found below:
 
- * 1.39 to now  - Rust 1.70
+ * 1.48 to now  - Rust 1.71
+ * 1.39 to 1.47 - Rust 1.70
  * 1.30 to 1.38 - Rust 1.63
  * 1.27 to 1.29 - Rust 1.56
  * 1.17 to 1.26 - Rust 1.49
@@ -216,18 +223,18 @@ warrants a patch release with a fix for the bug, it will be backported and
 released as a new patch release for each LTS minor version. Our current LTS
 releases are:
 
- * `1.38.x` - LTS release until July 2025. (MSRV 1.63)
  * `1.43.x` - LTS release until March 2026. (MSRV 1.70)
+ * `1.47.x` - LTS release until September 2026. (MSRV 1.70)
 
 Each LTS release will continue to receive backported fixes for at least a year.
 If you wish to use a fixed minor release in your project, we recommend that you
 use an LTS release.
 
 To use a fixed minor version, you can specify the version with a tilde. For
-example, to specify that you wish to use the newest `1.32.x` patch release, you
+example, to specify that you wish to use the newest `1.43.x` patch release, you
 can use the following dependency specification:
 ```text
-tokio = { version = "~1.38", features = [...] }
+tokio = { version = "~1.43", features = [...] }
 ```
 
 ### Previous LTS releases
@@ -239,6 +246,7 @@ tokio = { version = "~1.38", features = [...] }
  * `1.25.x` - LTS release until March 2024.
  * `1.32.x` - LTS release until September 2024.
  * `1.36.x` - LTS release until March 2025.
+ * `1.38.x` - LTS release until July 2025.
 
 ## License
 
@@ -249,5 +257,5 @@ This project is licensed under the [MIT license].
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in Tokio by you, shall be licensed as MIT, without any additional
+for inclusion in Tokio by you shall be licensed as MIT, without any additional
 terms or conditions.

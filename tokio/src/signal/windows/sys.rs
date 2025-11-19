@@ -4,7 +4,7 @@ use std::sync::Once;
 use crate::signal::registry::{globals, EventId, EventInfo, Init, Storage};
 use crate::signal::RxFuture;
 
-use windows_sys::Win32::Foundation::BOOL;
+use windows_sys::core::BOOL;
 use windows_sys::Win32::System::Console as console;
 
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
@@ -157,9 +157,9 @@ mod tests {
         if event_requires_infinite_sleep_in_handler(signum) {
             // Those events will enter an infinite loop in `handler`, so
             // we need to run them on a separate thread
-            std::thread::spawn(move || super::handler(signum));
+            std::thread::spawn(move || unsafe { super::handler(signum) });
         } else {
-            super::handler(signum);
+            unsafe { super::handler(signum) };
         }
     }
 

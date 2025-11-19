@@ -62,7 +62,7 @@ use crate::runtime::scheduler::multi_thread::{
     idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
 use crate::runtime::scheduler::{inject, Defer, Lock};
-use crate::runtime::task::{OwnedTasks, TaskHarnessScheduleHooks};
+use crate::runtime::task::OwnedTasks;
 use crate::runtime::{blocking, driver, scheduler, task, Config, SchedulerMetrics, WorkerMetrics};
 use crate::runtime::{context, TaskHooks};
 use crate::task::coop;
@@ -225,15 +225,12 @@ pub(crate) struct Launch(Vec<Arc<Worker>>);
 /// to stop processing.
 type RunResult = Result<Box<Core>, ()>;
 
-/// A task handle
-type Task = task::Task<Arc<Handle>>;
-
 /// A notified task handle
 type Notified = task::Notified<Arc<Handle>>;
 
 /// Value picked out of thin-air. Running the LIFO slot a handful of times
 /// seems sufficient to benefit from locality. More than 3 times probably is
-/// overweighing. The value can be tuned in the future with data that shows
+/// over-weighting. The value can be tuned in the future with data that shows
 /// improvements.
 const MAX_LIFO_POLLS_PER_TICK: usize = 3;
 
@@ -571,7 +568,7 @@ impl Context {
 
     fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
         #[cfg(tokio_unstable)]
-        let task_id = task.task_id();
+        let task_meta = task.task_meta();
 
         let task = self.worker.handle.shared.owned.assert_owner(task);
 
@@ -595,12 +592,15 @@ impl Context {
             // Unlike the poll time above, poll start callback is attached to the task id,
             // so it is tightly associated with the actual poll invocation.
             #[cfg(tokio_unstable)]
-            self.worker.handle.task_hooks.poll_start_callback(task_id);
+            self.worker
+                .handle
+                .task_hooks
+                .poll_start_callback(&task_meta);
 
             task.run();
 
             #[cfg(tokio_unstable)]
-            self.worker.handle.task_hooks.poll_stop_callback(task_id);
+            self.worker.handle.task_hooks.poll_stop_callback(&task_meta);
 
             let mut lifo_polls = 0;
 
@@ -666,15 +666,18 @@ impl Context {
                 let task = self.worker.handle.shared.owned.assert_owner(task);
 
                 #[cfg(tokio_unstable)]
-                let task_id = task.task_id();
+                let task_meta = task.task_meta();
 
                 #[cfg(tokio_unstable)]
-                self.worker.handle.task_hooks.poll_start_callback(task_id);
+                self.worker
+                    .handle
+                    .task_hooks
+                    .poll_start_callback(&task_meta);
 
                 task.run();
 
                 #[cfg(tokio_unstable)]
-                self.worker.handle.task_hooks.poll_stop_callback(task_id);
+                self.worker.handle.task_hooks.poll_stop_callback(&task_meta);
             }
         })
     }
@@ -782,12 +785,13 @@ impl Context {
     }
 
     pub(crate) fn defer(&self, waker: &Waker) {
-        self.defer.defer(waker);
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn get_worker_index(&self) -> usize {
-        self.worker.index
+        if self.core.borrow().is_none() {
+            // If there is no core, then the worker is currently in a block_in_place. In this case,
+            // we cannot use the defer queue as we aren't really in the current runtime.
+            waker.wake_by_ref();
+        } else {
+            self.defer.defer(waker);
+        }
     }
 }
 
@@ -1044,27 +1048,6 @@ impl Worker {
     /// Returns a reference to the scheduler's injection queue.
     fn inject(&self) -> &inject::Shared<Arc<Handle>> {
         &self.handle.shared.inject
-    }
-}
-
-// TODO: Move `Handle` impls into handle.rs
-impl task::Schedule for Arc<Handle> {
-    fn release(&self, task: &Task) -> Option<Task> {
-        self.shared.owned.remove(task)
-    }
-
-    fn schedule(&self, task: Notified) {
-        self.schedule_task(task, false);
-    }
-
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
-        }
-    }
-
-    fn yield_now(&self, task: Notified) {
-        self.schedule_task(task, true);
     }
 }
 

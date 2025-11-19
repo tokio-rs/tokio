@@ -7,7 +7,7 @@ impl Handle {
         let trace_status = &self.shared.trace_status;
 
         // If a dump is in progress, block.
-        trace_status.start_trace_request(&self).await;
+        trace_status.start_trace_request(self).await;
 
         let result = loop {
             if let Some(result) = trace_status.take_result() {
@@ -19,7 +19,7 @@ impl Handle {
         };
 
         // Allow other queued dumps to proceed.
-        trace_status.end_trace_request(&self).await;
+        trace_status.end_trace_request(self).await;
 
         result
     }

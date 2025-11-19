@@ -3,6 +3,8 @@ cfg_macros! {
 
     pub use std::future::poll_fn;
 
+    pub use crate::macros::join::{BiasedRotator, Rotator, RotatorSelect, SelectNormal, SelectBiased};
+
     #[doc(hidden)]
     pub fn thread_rng_n(n: u32) -> u32 {
         crate::runtime::context::thread_rng_n(n)

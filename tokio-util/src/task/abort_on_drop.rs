@@ -5,6 +5,7 @@ use tokio::task::{AbortHandle, JoinError, JoinHandle};
 
 use std::{
     future::Future,
+    mem::ManuallyDrop,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -14,7 +15,6 @@ use std::{
 ///
 /// [aborts]: tokio::task::JoinHandle::abort
 #[must_use = "Dropping the handle aborts the task immediately"]
-#[derive(Debug)]
 pub struct AbortOnDropHandle<T>(JoinHandle<T>);
 
 impl<T> Drop for AbortOnDropHandle<T> {
@@ -46,6 +46,23 @@ impl<T> AbortOnDropHandle<T> {
     pub fn abort_handle(&self) -> AbortHandle {
         self.0.abort_handle()
     }
+
+    /// Cancels aborting on drop and returns the original [`JoinHandle`].
+    pub fn detach(self) -> JoinHandle<T> {
+        // Avoid invoking `AbortOnDropHandle`'s `Drop` impl
+        let this = ManuallyDrop::new(self);
+        // SAFETY: `&this.0` is a reference, so it is certainly initialized, and
+        // it won't be double-dropped because it's in a `ManuallyDrop`
+        unsafe { std::ptr::read(&this.0) }
+    }
+}
+
+impl<T> std::fmt::Debug for AbortOnDropHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AbortOnDropHandle")
+            .field("id", &self.0.id())
+            .finish()
+    }
 }
 
 impl<T> Future for AbortOnDropHandle<T> {
@@ -59,5 +76,20 @@ impl<T> Future for AbortOnDropHandle<T> {
 impl<T> AsRef<JoinHandle<T>> for AbortOnDropHandle<T> {
     fn as_ref(&self) -> &JoinHandle<T> {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A simple type that does not implement [`std::fmt::Debug`].
+    struct NotDebug;
+
+    fn is_debug<T: std::fmt::Debug>() {}
+
+    #[test]
+    fn assert_debug() {
+        is_debug::<AbortOnDropHandle<NotDebug>>();
     }
 }

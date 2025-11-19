@@ -68,7 +68,7 @@ async fn fifo_simple_send() -> io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn fifo_simple_send_sender_first() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
@@ -134,7 +134,7 @@ async fn fifo_multiple_writes() -> io::Result<()> {
 /// Checks behavior of a resilient reader (Receiver in O_RDWR access mode)
 /// with writers sequentially opening and closing a FIFO.
 #[tokio::test]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn fifo_resilient_reader() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
@@ -469,7 +469,7 @@ async fn anon_pipe_simple_send() -> io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
+#[cfg_attr(miri, ignore)] // No `pidfd_spawnp` in miri.
 async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
     use tokio::process::Command;
 
@@ -520,7 +520,6 @@ async fn anon_pipe_from_owned_fd() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn anon_pipe_into_nonblocking_fd() -> std::io::Result<()> {
     let (tx, rx) = pipe::pipe()?;
 
@@ -534,7 +533,6 @@ async fn anon_pipe_into_nonblocking_fd() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn anon_pipe_into_blocking_fd() -> std::io::Result<()> {
     let (tx, rx) = pipe::pipe()?;
 

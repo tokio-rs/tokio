@@ -9,14 +9,14 @@
 //!
 //! To see this server in action, you can run this in one terminal:
 //!
-//!     cargo run --example echo
+//!     cargo run --example echo-tcp
 //!
 //! and in another terminal you can run:
 //!
-//!     cargo run --example connect 127.0.0.1:8080
+//!     cargo run --example connect-tcp 127.0.0.1:8080
 //!
-//! Each line you type in to the `connect` terminal should be echo'd back to
-//! you! If you open up multiple terminals running the `connect` example you
+//! Each line you type in to the `connect-tcp` terminal should be echo'd back to
+//! you! If you open up multiple terminals running the `connect-tcp` example you
 //! should be able to see them all make progress simultaneously.
 
 #![warn(rust_2018_idioms)]

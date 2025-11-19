@@ -63,7 +63,7 @@ async fn paused_time_stress_run() -> Vec<Duration> {
     let mut times = vec![];
     let start = Instant::now();
     for _ in 0..10_000 {
-        let sleep = rng.gen_range(Duration::from_secs(0)..Duration::from_secs(1));
+        let sleep = rng.random_range(Duration::from_secs(0)..Duration::from_secs(1));
         time::sleep(sleep).await;
         times.push(start.elapsed());
     }

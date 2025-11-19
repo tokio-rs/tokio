@@ -7,6 +7,7 @@ cfg_not_wasi! {
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
 use crate::net::tcp::split::{split, ReadHalf, WriteHalf};
 use crate::net::tcp::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
+use crate::util::check_socket_for_blocking;
 
 use std::fmt;
 use std::io;
@@ -173,6 +174,10 @@ impl TcpStream {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Passing a listener in blocking mode is always erroneous,
+    /// and the behavior in that case may change in the future.
+    /// For example, it could panic.
+    ///
     /// [`set_nonblocking`]: std::net::TcpStream::set_nonblocking
     ///
     /// # Examples
@@ -200,6 +205,8 @@ impl TcpStream {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
     pub fn from_std(stream: std::net::TcpStream) -> io::Result<TcpStream> {
+        check_socket_for_blocking(&stream)?;
+
         let io = mio::net::TcpStream::from_std(stream);
         let io = PollEvented::new(io)?;
         Ok(TcpStream { io })
@@ -213,7 +220,6 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use std::error::Error;
     /// use std::io::Read;
     /// use tokio::net::TcpListener;
@@ -222,6 +228,7 @@ impl TcpStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
     ///     let mut data = [0u8; 12];
     /// #   if false {
     ///     let listener = TcpListener::bind("127.0.0.1:34254").await?;
@@ -1105,8 +1112,16 @@ impl TcpStream {
     /// This function will cause all pending and future I/O on the specified
     /// portions to return immediately with an appropriate value (see the
     /// documentation of `Shutdown`).
+    ///
+    /// Remark: this function transforms `Err(std::io::ErrorKind::NotConnected)` to `Ok(())`.
+    /// It does this to abstract away OS specific logic and to prevent a race condition between
+    /// this function call and the OS closing this socket because of external events (e.g. TCP reset).
+    /// See <https://github.com/tokio-rs/tokio/issues/4665> for more information.
     pub(super) fn shutdown_std(&self, how: Shutdown) -> io::Result<()> {
-        self.io.shutdown(how)
+        match self.io.shutdown(how) {
+            Err(err) if err.kind() == std::io::ErrorKind::NotConnected => Ok(()),
+            result => result,
+        }
     }
 
     /// Gets the value of the `TCP_NODELAY` option on this socket.
@@ -1153,6 +1168,81 @@ impl TcpStream {
     /// ```
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
         self.io.set_nodelay(nodelay)
+    }
+
+    /// Gets the value of the `TCP_QUICKACK` option on this socket.
+    ///
+    /// For more information about this option, see [`TcpStream::set_quickack`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    /// stream.quickack()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "fuchsia",
+        target_os = "cygwin",
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "android",
+            target_os = "fuchsia",
+            target_os = "cygwin"
+        )))
+    )]
+    pub fn quickack(&self) -> io::Result<bool> {
+        socket2::SockRef::from(self).tcp_quickack()
+    }
+
+    /// Enable or disable `TCP_QUICKACK`.
+    ///
+    /// This flag causes Linux to eagerly send `ACK`s rather than delaying them.
+    /// Linux may reset this flag after further operations on the socket.
+    ///
+    /// See [`man 7 tcp`](https://man7.org/linux/man-pages/man7/tcp.7.html) and
+    /// [TCP delayed acknowledgment](https://en.wikipedia.org/wiki/TCP_delayed_acknowledgment)
+    /// for more information.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::TcpStream;
+    ///
+    /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+    ///
+    /// stream.set_quickack(true)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "fuchsia",
+        target_os = "cygwin",
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "linux",
+            target_os = "android",
+            target_os = "fuchsia",
+            target_os = "cygwin"
+        )))
+    )]
+    pub fn set_quickack(&self, quickack: bool) -> io::Result<()> {
+        socket2::SockRef::from(self).set_tcp_quickack(quickack)
     }
 
     cfg_not_wasi! {
@@ -1368,7 +1458,14 @@ impl AsyncWrite for TcpStream {
 
 impl fmt::Debug for TcpStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        // skip PollEvented noise
+        (*self.io).fmt(f)
+    }
+}
+
+impl AsRef<Self> for TcpStream {
+    fn as_ref(&self) -> &Self {
+        self
     }
 }
 

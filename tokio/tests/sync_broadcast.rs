@@ -565,13 +565,11 @@ fn sender_len() {
 #[test]
 #[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
 fn sender_len_random() {
-    use rand::Rng;
-
     let (tx, mut rx1) = broadcast::channel(16);
     let mut rx2 = tx.subscribe();
 
     for _ in 0..1000 {
-        match rand::thread_rng().gen_range(0..4) {
+        match rand::random_range(0..4) {
             0 => {
                 let _ = rx1.try_recv();
             }
@@ -707,4 +705,18 @@ fn broadcast_sender_closed_with_extra_subscribe() {
     drop(rx4);
     assert!(task3.is_woken());
     assert_ready!(task3.poll());
+}
+
+#[tokio::test]
+async fn broadcast_sender_new_must_be_closed() {
+    let capacity = 1;
+    let tx: broadcast::Sender<()> = broadcast::Sender::new(capacity);
+
+    let mut task = task::spawn(tx.closed());
+    assert_ready!(task.poll());
+
+    let _rx = tx.subscribe();
+
+    let mut task2 = task::spawn(tx.closed());
+    assert_pending!(task2.poll());
 }

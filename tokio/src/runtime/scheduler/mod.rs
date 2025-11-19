@@ -9,6 +9,8 @@ cfg_rt! {
     pub(crate) use inject::Inject;
 
     use crate::runtime::TaskHooks;
+
+    use crate::runtime::WorkerMetrics;
 }
 
 cfg_rt_multi_thread! {
@@ -20,11 +22,6 @@ cfg_rt_multi_thread! {
 
     pub(crate) mod multi_thread;
     pub(crate) use multi_thread::MultiThread;
-
-    cfg_unstable! {
-        pub(crate) mod multi_thread_alt;
-        pub(crate) use multi_thread_alt::MultiThread as MultiThreadAlt;
-    }
 }
 
 use crate::runtime::driver;
@@ -36,9 +33,6 @@ pub(crate) enum Handle {
 
     #[cfg(feature = "rt-multi-thread")]
     MultiThread(Arc<multi_thread::Handle>),
-
-    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-    MultiThreadAlt(Arc<multi_thread_alt::Handle>),
 
     // TODO: This is to avoid triggering "dead code" warnings many other places
     // in the codebase. Remove this during a later cleanup
@@ -53,9 +47,6 @@ pub(super) enum Context {
 
     #[cfg(feature = "rt-multi-thread")]
     MultiThread(multi_thread::Context),
-
-    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-    MultiThreadAlt(multi_thread_alt::Context),
 }
 
 impl Handle {
@@ -68,9 +59,6 @@ impl Handle {
             #[cfg(feature = "rt-multi-thread")]
             Handle::MultiThread(ref h) => &h.driver,
 
-            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-            Handle::MultiThreadAlt(ref h) => &h.driver,
-
             #[cfg(not(feature = "rt"))]
             Handle::Disabled => unreachable!(),
         }
@@ -80,7 +68,7 @@ impl Handle {
 cfg_rt! {
     use crate::future::Future;
     use crate::loom::sync::Arc;
-    use crate::runtime::{blocking, task::Id};
+    use crate::runtime::{blocking, task::{Id, SpawnLocation}};
     use crate::runtime::context;
     use crate::task::JoinHandle;
     use crate::util::RngSeedGenerator;
@@ -93,9 +81,6 @@ cfg_rt! {
 
                 #[cfg(feature = "rt-multi-thread")]
                 $ty::MultiThread($h) => $e,
-
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                $ty::MultiThreadAlt($h) => $e,
             }
         }
     }
@@ -119,9 +104,6 @@ cfg_rt! {
 
                 #[cfg(feature = "rt-multi-thread")]
                 Handle::MultiThread(_) => false,
-
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Handle::MultiThreadAlt(_) => false,
             }
         }
 
@@ -132,41 +114,38 @@ cfg_rt! {
 
                 #[cfg(feature = "rt-multi-thread")]
                 Handle::MultiThread(_) => false,
-
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Handle::MultiThreadAlt(_) => false,
             }
         }
 
-        pub(crate) fn spawn<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
+        pub(crate) fn spawn<F>(&self, future: F, id: Id, spawned_at: SpawnLocation) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
             match self {
-                Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id),
+                Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id, spawned_at),
 
                 #[cfg(feature = "rt-multi-thread")]
-                Handle::MultiThread(h) => multi_thread::Handle::spawn(h, future, id),
-
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Handle::MultiThreadAlt(h) => multi_thread_alt::Handle::spawn(h, future, id),
+                Handle::MultiThread(h) => multi_thread::Handle::spawn(h, future, id, spawned_at),
             }
         }
 
         /// Spawn a local task
         ///
         /// # Safety
+        ///
         /// This should only be called in `LocalRuntime` if the runtime has been verified to be owned
         /// by the current thread.
         #[allow(irrefutable_let_patterns)]
-        pub(crate) unsafe fn spawn_local<F>(&self, future: F, id: Id) -> JoinHandle<F::Output>
+        #[track_caller]
+        pub(crate) unsafe fn spawn_local<F>(&self, future: F, id: Id, spawned_at: SpawnLocation) -> JoinHandle<F::Output>
         where
             F: Future + 'static,
             F::Output: 'static,
         {
             if let Handle::CurrentThread(h) = self {
-                current_thread::Handle::spawn_local(h, future, id)
+                // Safety: caller guarantees that this is a `LocalRuntime`.
+                unsafe { current_thread::Handle::spawn_local(h, future, id, spawned_at) }
             } else {
                 panic!("Only current_thread and LocalSet have spawn_local internals implemented")
             }
@@ -178,9 +157,6 @@ cfg_rt! {
 
                 #[cfg(feature = "rt-multi-thread")]
                 Handle::MultiThread(ref h) => h.shutdown(),
-
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Handle::MultiThreadAlt(ref h) => h.shutdown(),
             }
         }
 
@@ -201,19 +177,6 @@ cfg_rt! {
                 Handle::CurrentThread(h) => &h.task_hooks,
                 #[cfg(feature = "rt-multi-thread")]
                 Handle::MultiThread(h) => &h.task_hooks,
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Handle::MultiThreadAlt(h) => &h.task_hooks,
-            }
-        }
-
-        cfg_rt_multi_thread! {
-            cfg_unstable! {
-                pub(crate) fn expect_multi_thread_alt(&self) -> &Arc<multi_thread_alt::Handle> {
-                    match self {
-                        Handle::MultiThreadAlt(handle) => handle,
-                        _ => panic!("not a `MultiThreadAlt` handle"),
-                    }
-                }
             }
         }
     }
@@ -224,8 +187,6 @@ cfg_rt! {
                 Handle::CurrentThread(_) => 1,
                 #[cfg(feature = "rt-multi-thread")]
                 Handle::MultiThread(handle) => handle.num_workers(),
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Handle::MultiThreadAlt(handle) => handle.num_workers(),
             }
         }
 
@@ -236,10 +197,14 @@ cfg_rt! {
         pub(crate) fn injection_queue_depth(&self) -> usize {
             match_flavor!(self, Handle(handle) => handle.injection_queue_depth())
         }
+
+        pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
+            match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
+        }
     }
 
     cfg_unstable_metrics! {
-        use crate::runtime::{SchedulerMetrics, WorkerMetrics};
+        use crate::runtime::SchedulerMetrics;
 
         impl Handle {
             cfg_64bit_metrics! {
@@ -258,10 +223,6 @@ cfg_rt! {
 
             pub(crate) fn scheduler_metrics(&self) -> &SchedulerMetrics {
                 match_flavor!(self, Handle(handle) => handle.scheduler_metrics())
-            }
-
-            pub(crate) fn worker_metrics(&self, worker: usize) -> &WorkerMetrics {
-                match_flavor!(self, Handle(handle) => handle.worker_metrics(worker))
             }
 
             pub(crate) fn worker_local_queue_depth(&self, worker: usize) -> usize {
@@ -294,16 +255,6 @@ cfg_rt! {
                 match self {
                     Context::MultiThread(context) => context,
                     _ => panic!("expected `MultiThread::Context`")
-                }
-            }
-
-            cfg_unstable! {
-                #[track_caller]
-                pub(crate) fn expect_multi_thread_alt(&self) -> &multi_thread_alt::Context {
-                    match self {
-                        Context::MultiThreadAlt(context) => context,
-                        _ => panic!("expected `MultiThreadAlt::Context`")
-                    }
                 }
             }
         }

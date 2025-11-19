@@ -31,6 +31,8 @@ use std::time::Duration;
 /// # Examples
 ///
 /// ```
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use tokio::runtime::Builder;
 ///
 /// fn main() {
@@ -44,6 +46,7 @@ use std::time::Duration;
 ///
 ///     // use runtime ...
 /// }
+/// # }
 /// ```
 pub struct Builder {
     /// Runtime type
@@ -114,8 +117,6 @@ pub struct Builder {
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(super) event_interval: u32,
 
-    pub(super) local_queue_capacity: usize,
-
     /// When true, the multi-threade scheduler LIFO slot should not be used.
     ///
     /// This option should only be exposed as unstable.
@@ -154,6 +155,8 @@ cfg_unstable! {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime::{self, UnhandledPanic};
         ///
         /// # pub fn main() {
@@ -175,6 +178,7 @@ cfg_unstable! {
         ///     // The second task completes normally
         ///     assert!(task2.await.is_ok());
         /// })
+        /// # }
         /// # }
         /// ```
         ///
@@ -222,8 +226,6 @@ pub(crate) enum Kind {
     CurrentThread,
     #[cfg(feature = "rt-multi-thread")]
     MultiThread,
-    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-    MultiThreadAlt,
 }
 
 impl Builder {
@@ -253,26 +255,6 @@ impl Builder {
     pub fn new_multi_thread() -> Builder {
         // The number `61` is fairly arbitrary. I believe this value was copied from golang.
         Builder::new(Kind::MultiThread, 61)
-    }
-
-    cfg_unstable! {
-        /// Returns a new builder with the alternate multi thread scheduler
-        /// selected.
-        ///
-        /// The alternate multi threaded scheduler is an in-progress
-        /// candidate to replace the existing multi threaded scheduler. It
-        /// currently does not scale as well to 16+ processors.
-        ///
-        /// This runtime flavor is currently **not considered production
-        /// ready**.
-        ///
-        /// Configuration methods can be chained on the return value.
-        #[cfg(feature = "rt-multi-thread")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
-        pub fn new_multi_thread_alt() -> Builder {
-            // The number `61` is fairly arbitrary. I believe this value was copied from golang.
-            Builder::new(Kind::MultiThreadAlt, 61)
-        }
     }
 
     /// Returns a new runtime builder initialized with default configuration
@@ -326,12 +308,6 @@ impl Builder {
             global_queue_interval: None,
             event_interval,
 
-            #[cfg(not(loom))]
-            local_queue_capacity: 256,
-
-            #[cfg(loom)]
-            local_queue_capacity: 4,
-
             seed_generator: RngSeedGenerator::new(RngSeed::new()),
 
             #[cfg(tokio_unstable)]
@@ -354,12 +330,15 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime;
     ///
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .enable_all()
     ///     .build()
     ///     .unwrap();
+    /// # }
     /// ```
     pub fn enable_all(&mut self) -> &mut Self {
         #[cfg(any(
@@ -368,6 +347,16 @@ impl Builder {
             all(unix, feature = "signal")
         ))]
         self.enable_io();
+
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        self.enable_io_uring();
+
         #[cfg(feature = "time")]
         self.enable_time();
 
@@ -392,6 +381,8 @@ impl Builder {
     /// ## Multi threaded runtime with 4 threads
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime;
     ///
     /// // This will spawn a work-stealing runtime with 4 worker threads.
@@ -401,6 +392,7 @@ impl Builder {
     ///     .unwrap();
     ///
     /// rt.spawn(async move {});
+    /// # }
     /// ```
     ///
     /// ## Current thread runtime (will only run on the current thread via `Runtime::block_on`)
@@ -445,6 +437,15 @@ impl Builder {
     ///
     /// The default value is 512.
     ///
+    /// # Queue Behavior
+    ///
+    /// When a blocking task is submitted, it will be inserted into a queue. If available, one of
+    /// the idle threads will be notified to run the task. Otherwise, if the threshold set by this
+    /// method has not been reached, a new thread will be spawned. If no idle thread is available
+    /// and no more threads are allowed to be spawned, the task will remain in the queue until one
+    /// of the busy threads pick it up. Note that since the queue does not apply any backpressure,
+    /// it could potentially grow unbounded.
+    ///
     /// # Panics
     ///
     /// This will panic if `val` is not larger than `0`.
@@ -477,12 +478,15 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_name("my-pool")
     ///     .build();
+    /// # }
     /// # }
     /// ```
     pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
@@ -498,6 +502,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # use std::sync::atomic::{AtomicUsize, Ordering};
     /// # pub fn main() {
@@ -508,6 +514,7 @@ impl Builder {
     ///        format!("my-pool-{}", id)
     ///     })
     ///     .build();
+    /// # }
     /// # }
     /// ```
     pub fn thread_name_fn<F>(&mut self, f: F) -> &mut Self
@@ -529,12 +536,15 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_stack_size(32 * 1024)
     ///     .build();
+    /// # }
     /// # }
     /// ```
     pub fn thread_stack_size(&mut self, val: usize) -> &mut Self {
@@ -550,6 +560,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -557,6 +569,7 @@ impl Builder {
     ///         println!("thread started");
     ///     })
     ///     .build();
+    /// # }
     /// # }
     /// ```
     #[cfg(not(loom))]
@@ -575,6 +588,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -582,6 +597,7 @@ impl Builder {
     ///         println!("thread stopping");
     ///     })
     ///     .build();
+    /// # }
     /// # }
     /// ```
     #[cfg(not(loom))]
@@ -607,6 +623,8 @@ impl Builder {
     ///
     /// ## Multithreaded executor
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use std::sync::Arc;
     /// # use std::sync::atomic::{AtomicBool, Ordering};
     /// # use tokio::runtime;
@@ -632,6 +650,7 @@ impl Builder {
     /// runtime.block_on(async {
     ///    barrier.wait().await;
     /// })
+    /// # }
     /// # }
     /// ```
     /// ## Current thread executor
@@ -683,6 +702,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -695,6 +716,7 @@ impl Builder {
     ///    tokio::task::yield_now().await;
     ///    println!("Hello from Tokio!");
     /// })
+    /// # }
     /// # }
     /// ```
     #[cfg(not(loom))]
@@ -771,6 +793,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use std::sync::{atomic::AtomicUsize, Arc};
     /// # use tokio::task::yield_now;
     /// # pub fn main() {
@@ -789,8 +813,10 @@ impl Builder {
     /// let _ = rt.block_on(task);
     ///
     /// # }
+    /// # }
     /// ```
     #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_before_task_poll<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
@@ -814,6 +840,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use std::sync::{atomic::AtomicUsize, Arc};
     /// # use tokio::task::yield_now;
     /// # pub fn main() {
@@ -832,8 +860,10 @@ impl Builder {
     /// let _ = rt.block_on(task);
     ///
     /// # }
+    /// # }
     /// ```
     #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_after_task_poll<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
@@ -898,6 +928,8 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Builder;
     ///
     /// let rt  = Builder::new_multi_thread().build().unwrap();
@@ -905,62 +937,61 @@ impl Builder {
     /// rt.block_on(async {
     ///     println!("Hello from the Tokio runtime");
     /// });
+    /// # }
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_runtime(),
             #[cfg(feature = "rt-multi-thread")]
             Kind::MultiThread => self.build_threaded_runtime(),
-            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-            Kind::MultiThreadAlt => self.build_alt_threaded_runtime(),
         }
     }
 
-    /// Creates the configured `LocalRuntime`.
+    /// Creates the configured [`LocalRuntime`].
     ///
-    /// The returned `LocalRuntime` instance is ready to spawn tasks.
+    /// The returned [`LocalRuntime`] instance is ready to spawn tasks.
     ///
     /// # Panics
-    /// This will panic if `current_thread` is not the selected runtime flavor.
-    /// All other runtime flavors are unsupported by [`LocalRuntime`].
     ///
-    /// [`LocalRuntime`]: [crate::runtime::LocalRuntime]
+    /// This will panic if the runtime is configured with [`new_multi_thread()`].
+    ///
+    /// [`new_multi_thread()`]: Builder::new_multi_thread
     ///
     /// # Examples
     ///
     /// ```
-    /// use tokio::runtime::Builder;
+    /// use tokio::runtime::{Builder, LocalOptions};
     ///
-    /// let rt  = Builder::new_current_thread().build_local(&mut Default::default()).unwrap();
+    /// let rt = Builder::new_current_thread()
+    ///     .build_local(LocalOptions::default())
+    ///     .unwrap();
     ///
-    /// rt.block_on(async {
+    /// rt.spawn_local(async {
     ///     println!("Hello from the Tokio runtime");
     /// });
     /// ```
     #[allow(unused_variables, unreachable_patterns)]
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
-    pub fn build_local(&mut self, options: &LocalOptions) -> io::Result<LocalRuntime> {
+    pub fn build_local(&mut self, options: LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
-            _ => panic!("Only current_thread is supported when building a local runtime"),
+            #[cfg(feature = "rt-multi-thread")]
+            Kind::MultiThread => panic!("multi_thread is not supported for LocalRuntime"),
         }
     }
 
-    fn get_cfg(&self, workers: usize) -> driver::Cfg {
+    fn get_cfg(&self) -> driver::Cfg {
         driver::Cfg {
             enable_pause_time: match self.kind {
                 Kind::CurrentThread => true,
                 #[cfg(feature = "rt-multi-thread")]
                 Kind::MultiThread => false,
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Kind::MultiThreadAlt => false,
             },
             enable_io: self.enable_io,
             enable_time: self.enable_time,
             start_paused: self.start_paused,
             nevents: self.nevents,
-            workers,
         }
     }
 
@@ -972,12 +1003,15 @@ impl Builder {
     /// # Example
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # use std::time::Duration;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .thread_keep_alive(Duration::from_millis(100))
     ///     .build();
+    /// # }
     /// # }
     /// ```
     pub fn thread_keep_alive(&mut self, duration: Duration) -> &mut Self {
@@ -997,8 +1031,10 @@ impl Builder {
     /// tasks. Setting the interval to a smaller value increases the fairness of the scheduler,
     /// at the cost of more synchronization overhead. That can be beneficial for prioritizing
     /// getting started on new work, especially if tasks frequently yield rather than complete
-    /// or await on further I/O. Conversely, a higher value prioritizes existing work, and
-    /// is a good choice when most tasks quickly complete polling.
+    /// or await on further I/O. Setting the interval to `1` will prioritize the global queue and
+    /// tasks from the local queue will be executed only if the global queue is empty.
+    /// Conversely, a higher value prioritizes existing work, and is a good choice when most
+    /// tasks quickly complete polling.
     ///
     /// [the module documentation]: crate::runtime#multi-threaded-runtime-behavior-at-the-time-of-writing
     ///
@@ -1009,11 +1045,14 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .global_queue_interval(31)
     ///     .build();
+    /// # }
     /// # }
     /// ```
     #[track_caller]
@@ -1043,11 +1082,14 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
     ///     .event_interval(31)
     ///     .build();
+    /// # }
     /// # }
     /// ```
     pub fn event_interval(&mut self, val: u32) -> &mut Self {
@@ -1153,12 +1195,15 @@ impl Builder {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
         ///     .disable_lifo_slot()
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         ///
         /// [tokio-rs/tokio-metrics]: https://github.com/tokio-rs/tokio-metrics
@@ -1223,6 +1268,8 @@ impl Builder {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
@@ -1235,6 +1282,7 @@ impl Builder {
         /// # assert_eq!(m.poll_time_histogram_num_buckets(), 10);
         /// # assert_eq!(m.poll_time_histogram_bucket_range(0), us(0)..us(100));
         /// # assert_eq!(m.poll_time_histogram_bucket_range(1), us(100)..us(200));
+        /// # }
         /// ```
         ///
         /// [`Handle::metrics()`]: crate::runtime::Handle::metrics
@@ -1269,6 +1317,8 @@ impl Builder {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime::{self, HistogramScale};
         ///
         /// # #[allow(deprecated)]
@@ -1277,6 +1327,7 @@ impl Builder {
         ///     .metrics_poll_count_histogram_scale(HistogramScale::Log)
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_scale(&mut self, histogram_scale: crate::runtime::HistogramScale) -> &mut Self {
@@ -1293,6 +1344,8 @@ impl Builder {
         /// # Examples
         /// Configure a [`LogHistogram`] with [default configuration]:
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
         ///
@@ -1303,10 +1356,13 @@ impl Builder {
         ///     )
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         ///
         /// Configure a linear histogram with 100 buckets, each 10μs wide
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         /// use std::time::Duration;
         /// use tokio::runtime::HistogramConfiguration;
@@ -1318,6 +1374,7 @@ impl Builder {
         ///     )
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         ///
         /// Configure a [`LogHistogram`] with the following settings:
@@ -1325,6 +1382,8 @@ impl Builder {
         /// - Max error of 0.1
         /// - No more than 1024 buckets
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use std::time::Duration;
         /// use tokio::runtime;
         /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
@@ -1342,6 +1401,7 @@ impl Builder {
         ///     )
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         ///
         /// When migrating from the legacy histogram ([`HistogramScale::Log`]) and wanting
@@ -1391,6 +1451,8 @@ impl Builder {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         /// use std::time::Duration;
         ///
@@ -1400,6 +1462,7 @@ impl Builder {
         ///     .metrics_poll_count_histogram_resolution(Duration::from_micros(100))
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_resolution(&mut self, resolution: Duration) -> &mut Self {
@@ -1426,6 +1489,8 @@ impl Builder {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         ///
         /// # #[allow(deprecated)]
@@ -1434,18 +1499,11 @@ impl Builder {
         ///     .metrics_poll_count_histogram_buckets(15)
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         #[deprecated(note = "use `metrics_poll_time_histogram_configuration`")]
         pub fn metrics_poll_count_histogram_buckets(&mut self, buckets: usize) -> &mut Self {
             self.metrics_poll_count_histogram.legacy_mut(|b|b.num_buckets = buckets);
-            self
-        }
-    }
-
-    cfg_loom! {
-        pub(crate) fn local_queue_capacity(&mut self, value: usize) -> &mut Self {
-            assert!(value.is_power_of_two());
-            self.local_queue_capacity = value;
             self
         }
     }
@@ -1486,7 +1544,7 @@ impl Builder {
         use crate::runtime::scheduler;
         use crate::runtime::Config;
 
-        let (driver, driver_handle) = driver::Driver::new(self.get_cfg(1))?;
+        let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
@@ -1516,7 +1574,6 @@ impl Builder {
                 after_termination: self.after_termination.clone(),
                 global_queue_interval: self.global_queue_interval,
                 event_interval: self.event_interval,
-                local_queue_capacity: self.local_queue_capacity,
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
@@ -1594,15 +1651,43 @@ cfg_time! {
         /// # Examples
         ///
         /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::runtime;
         ///
         /// let rt = runtime::Builder::new_multi_thread()
         ///     .enable_time()
         ///     .build()
         ///     .unwrap();
+        /// # }
         /// ```
         pub fn enable_time(&mut self) -> &mut Self {
             self.enable_time = true;
+            self
+        }
+    }
+}
+
+cfg_io_uring! {
+    impl Builder {
+        /// Enables the tokio's io_uring driver.
+        ///
+        /// Doing this enables using io_uring operations on the runtime.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_io_uring()
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        #[cfg_attr(docsrs, doc(cfg(feature = "io-uring")))]
+        pub fn enable_io_uring(&mut self) -> &mut Self {
+            // Currently, the uring flag is equivalent to `enable_io`.
+            self.enable_io = true;
             self
         }
     }
@@ -1642,7 +1727,7 @@ cfg_rt_multi_thread! {
 
             let worker_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
-            let (driver, driver_handle) = driver::Driver::new(self.get_cfg(worker_threads))?;
+            let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
             // Create the blocking pool
             let blocking_pool =
@@ -1670,7 +1755,6 @@ cfg_rt_multi_thread! {
                     after_termination: self.after_termination.clone(),
                     global_queue_interval: self.global_queue_interval,
                     event_interval: self.event_interval,
-                    local_queue_capacity: self.local_queue_capacity,
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
@@ -1686,54 +1770,6 @@ cfg_rt_multi_thread! {
             launch.launch();
 
             Ok(Runtime::from_parts(Scheduler::MultiThread(scheduler), handle, blocking_pool))
-        }
-
-        cfg_unstable! {
-            fn build_alt_threaded_runtime(&mut self) -> io::Result<Runtime> {
-                use crate::loom::sys::num_cpus;
-                use crate::runtime::{Config, runtime::Scheduler};
-                use crate::runtime::scheduler::MultiThreadAlt;
-
-                let worker_threads = self.worker_threads.unwrap_or_else(num_cpus);
-                let (driver, driver_handle) = driver::Driver::new(self.get_cfg(worker_threads))?;
-
-                // Create the blocking pool
-                let blocking_pool =
-                    blocking::create_blocking_pool(self, self.max_blocking_threads + worker_threads);
-                let blocking_spawner = blocking_pool.spawner().clone();
-
-                // Generate a rng seed for this runtime.
-                let seed_generator_1 = self.seed_generator.next_generator();
-                let seed_generator_2 = self.seed_generator.next_generator();
-
-                let (scheduler, handle) = MultiThreadAlt::new(
-                    worker_threads,
-                    driver,
-                    driver_handle,
-                    blocking_spawner,
-                    seed_generator_2,
-                    Config {
-                        before_park: self.before_park.clone(),
-                        after_unpark: self.after_unpark.clone(),
-                        before_spawn: self.before_spawn.clone(),
-                        after_termination: self.after_termination.clone(),
-                        #[cfg(tokio_unstable)]
-                        before_poll: self.before_poll.clone(),
-                        #[cfg(tokio_unstable)]
-                        after_poll: self.after_poll.clone(),
-                        global_queue_interval: self.global_queue_interval,
-                        event_interval: self.event_interval,
-                        local_queue_capacity: self.local_queue_capacity,
-                        #[cfg(tokio_unstable)]
-                        unhandled_panic: self.unhandled_panic.clone(),
-                        disable_lifo_slot: self.disable_lifo_slot,
-                        seed_generator: seed_generator_1,
-                        metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
-                    },
-                );
-
-                Ok(Runtime::from_parts(Scheduler::MultiThreadAlt(scheduler), handle, blocking_pool))
-            }
         }
     }
 }

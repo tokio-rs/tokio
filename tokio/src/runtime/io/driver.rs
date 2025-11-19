@@ -2,6 +2,11 @@
 cfg_signal_internal_and_unix! {
     mod signal;
 }
+cfg_io_uring! {
+    mod uring;
+    use uring::UringContext;
+    use crate::loom::sync::atomic::AtomicUsize;
+}
 
 use crate::io::interest::Interest;
 use crate::io::ready::Ready;
@@ -45,6 +50,24 @@ pub(crate) struct Handle {
     waker: mio::Waker,
 
     pub(crate) metrics: IoDriverMetrics,
+
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    pub(crate) uring_context: Mutex<UringContext>,
+
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    pub(crate) uring_state: AtomicUsize,
 }
 
 #[derive(Debug)]
@@ -112,6 +135,22 @@ impl Driver {
             #[cfg(not(target_os = "wasi"))]
             waker,
             metrics: IoDriverMetrics::default(),
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            ))]
+            uring_context: Mutex::new(UringContext::new()),
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            ))]
+            uring_state: AtomicUsize::new(0),
         };
 
         Ok((driver, handle))
@@ -181,6 +220,19 @@ impl Driver {
 
                 ready_count += 1;
             }
+        }
+
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        {
+            let mut guard = handle.get_uring().lock();
+            let ctx = &mut *guard;
+            ctx.dispatch_completions();
         }
 
         handle.metrics.incr_ready_count_by(ready_count);

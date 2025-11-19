@@ -249,7 +249,7 @@ use std::future::Future;
 use std::io;
 use std::path::Path;
 use std::pin::Pin;
-use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
+use std::process::{Child as StdChild, Command as StdCommand, ExitStatus, Output, Stdio};
 use std::task::{ready, Context, Poll};
 
 #[cfg(unix)]
@@ -750,7 +750,7 @@ impl Command {
     where
         F: FnMut() -> io::Result<()> + Send + Sync + 'static,
     {
-        self.std.pre_exec(f);
+        unsafe { self.std.pre_exec(f) };
         self
     }
 
@@ -810,7 +810,6 @@ impl Command {
     /// Basic usage:
     ///
     /// ```no_run
-    /// # if cfg!(miri) { return } // No `pidfd_spawnp` in miri.
     /// use tokio::process::Command;
     ///
     /// async fn run_ls() -> std::process::ExitStatus {
@@ -860,8 +859,98 @@ impl Command {
     /// On Unix platforms this method will fail with `std::io::ErrorKind::WouldBlock`
     /// if the system process limit is reached (which includes other applications
     /// running on the system).
+    #[inline]
     pub fn spawn(&mut self) -> io::Result<Child> {
-        imp::spawn_child(&mut self.std).map(|spawned_child| Child {
+        // On two lines to circumvent a mutable borrow check failure.
+        let child = self.std.spawn()?;
+        self.build_child(child)
+    }
+
+    /// Executes the command as a child process with a custom spawning function,
+    /// returning a handle to it.
+    ///
+    /// This is identical to [`Self::spawn`] in every aspect except the spawn:
+    /// here, it is customizable through the `with` parameter instead of
+    /// defaulting to the usual spawn. In fact, [`Self::spawn`] is just
+    /// [`Self::spawn_with`] with [`StdCommand::spawn`].
+    ///
+    /// This is useful mostly under Windows for now, since the platform exposes
+    /// special APIs to configure child processes when spawning them with various
+    /// attributes that customize the exact behavior of the spawn operation.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```no_run
+    /// # async fn test() { // allow using await
+    /// use std::process::Stdio;
+    ///
+    /// let output = tokio::process::Command::new("ls")
+    ///     .stdin(Stdio::null())
+    ///     .stdout(Stdio::piped())
+    ///     .stderr(Stdio::piped())
+    ///     .spawn_with(std::process::Command::spawn)
+    ///     .unwrap()
+    ///     .wait_with_output()
+    ///     .await
+    ///     .unwrap();
+    /// # }
+    /// ```
+    ///
+    /// Actually customizing the spawn under Windows:
+    ///
+    /// ```ignore
+    /// #![feature(windows_process_extensions_raw_attribute)]
+    /// # #[cfg(windows)]   // Windows-only nightly APIs are used here.
+    /// # async fn test() { // Allow using await.
+    /// use std::os::windows::process::{CommandExt, ProcThreadAttributeList};
+    /// use std::process::Stdio;
+    /// use tokio::process::Command;
+    ///
+    /// let parent = Command::new("cmd").spawn().unwrap();
+    /// let parent_process_handle = parent.raw_handle();
+    ///
+    /// const PROC_THREAD_ATTRIBUTE_PARENT_PROCESS: usize = 0x00020000;
+    /// let attribute_list = ProcThreadAttributeList::build()
+    ///     .attribute(PROC_THREAD_ATTRIBUTE_PARENT_PROCESS, &parent_process_handle)
+    ///     .finish()
+    ///     .unwrap();
+    ///
+    /// let _output = Command::new("ls")
+    ///     .stdin(Stdio::null())
+    ///     .stdout(Stdio::piped())
+    ///     .stderr(Stdio::piped())
+    ///     .spawn_with(|cmd| cmd.spawn_with_attributes(&attribute_list))
+    ///     .unwrap()
+    ///     .wait_with_output()
+    ///     .await
+    ///     .unwrap();
+    /// # }
+    /// ```
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    #[inline]
+    pub fn spawn_with(
+        &mut self,
+        with: impl FnOnce(&mut StdCommand) -> io::Result<StdChild>,
+    ) -> io::Result<Child> {
+        // On two lines to circumvent a mutable borrow check failure.
+        let child = with(&mut self.std)?;
+        self.build_child(child)
+    }
+
+    /// Small indirection for the spawn implementations.
+    ///
+    /// This is introduced for [`Self::spawn`] and [`Self::spawn_with`] to use:
+    /// [`Self::spawn`] cannot depend directly on [`Self::spawn_with`] since
+    /// it is behind `tokio_unstable`. It also serves as a way to reduce
+    /// monomorphization bloat by taking in an already-spawned child process
+    /// instead of a command and custom spawn function.
+    fn build_child(&self, child: StdChild) -> io::Result<Child> {
+        let spawned_child = imp::build_child(child)?;
+
+        Ok(Child {
             child: FusedChild::Child(ChildDropGuard {
                 inner: spawned_child.child,
                 kill_on_drop: self.kill_on_drop,
@@ -1164,7 +1253,12 @@ impl Child {
 
     /// Forces the child to exit.
     ///
-    /// This is equivalent to sending a `SIGKILL` on unix platforms.
+    /// This is equivalent to sending a `SIGKILL` on unix platforms
+    /// followed by [`wait`](Child::wait).
+    ///
+    /// Note: std version of [`Child::kill`](std::process::Child::kill) does not `wait`.
+    /// For an equivalent of `Child::kill` in the standard library,
+    /// use [`start_kill`](Child::start_kill).
     ///
     /// # Examples
     ///
@@ -1252,7 +1346,6 @@ impl Child {
     /// This function is cancel safe.
     ///
     /// ```
-    /// # if cfg!(miri) { return } // No `pidfd_spawnp` in miri.
     /// # #[cfg(not(unix))]fn main(){}
     /// # #[cfg(unix)]
     /// use tokio::io::AsyncWriteExt;
@@ -1264,6 +1357,7 @@ impl Child {
     /// # #[cfg(unix)]
     /// #[tokio::main]
     /// async fn main() {
+    /// #   if cfg!(miri) { return; } // No `pidfd_spawnp` in miri.
     ///     let mut child = Command::new("cat")
     ///         .stdin(Stdio::piped())
     ///         .spawn()
