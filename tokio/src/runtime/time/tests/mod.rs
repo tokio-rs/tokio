@@ -2,8 +2,6 @@
 
 use std::future::poll_fn;
 use std::{task::Context, time::Duration};
-
-#[cfg(not(loom))]
 use futures::task::noop_waker_ref;
 
 use crate::loom::thread;
@@ -14,6 +12,8 @@ use crate::runtime::Handle;
 use crate::sync::oneshot;
 
 use super::Timer;
+
+const EVENT_INTERVAL: u32 = 1;
 
 fn block_on<T>(f: impl std::future::Future<Output = T>) -> T {
     #[cfg(loom)]
@@ -41,6 +41,7 @@ async fn fire_all_timers(handle: &Handle, exit_rx: oneshot::Receiver<()>) {
     loop {
         // Keep the worker thread busy, so that it can process injected
         // timers.
+        assert_eq!(EVENT_INTERVAL, 1);
         crate::task::yield_now().await;
         if !exit_rx.is_empty() {
             // break the loop if the thread is exiting
@@ -95,10 +96,14 @@ fn process_at_time(handle: &Handle, at: u64) {
 fn rt(start_paused: bool) -> crate::runtime::Runtime {
     crate::runtime::Builder::new_current_thread()
         .enable_time()
-        .event_interval(1)
+        .event_interval(EVENT_INTERVAL)
         .start_paused(start_paused)
         .build()
         .unwrap()
+}
+
+fn noop_cx() -> Context<'static> {
+    Context::from_waker(noop_waker_ref())
 }
 
 #[test]
@@ -145,10 +150,10 @@ fn drop_timer() {
 
             let _ = entry
                 .as_mut()
-                .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+                .poll_elapsed(&mut noop_cx());
             let _ = entry
                 .as_mut()
-                .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+                .poll_elapsed(&mut noop_cx());
             exit_tx.send(()).unwrap();
         });
 
@@ -178,7 +183,7 @@ fn change_waker() {
 
             let _ = entry
                 .as_mut()
-                .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+                .poll_elapsed(&mut noop_cx());
 
             // At this point, we cannot let worker thread to wake up
             // the timer because the waker is a noop.
@@ -245,11 +250,10 @@ fn poll_process_levels() {
             process_at_time(handle, t);
 
             for (deadline, future) in entries.iter_mut().enumerate() {
-                let mut context = Context::from_waker(noop_waker_ref());
                 if deadline <= t as usize {
-                    assert!(future.as_mut().poll_elapsed(&mut context).is_ready());
+                    assert!(future.as_mut().poll_elapsed(&mut noop_cx()).is_ready());
                 } else {
-                    assert!(future.as_mut().poll_elapsed(&mut context).is_pending());
+                    assert!(future.as_mut().poll_elapsed(&mut noop_cx()).is_pending());
                 }
             }
         }
@@ -275,5 +279,124 @@ fn poll_process_levels_targeted() {
         assert!(e1.as_mut().poll_elapsed(&mut context).is_pending());
         process_at_time(handle, 192);
         process_at_time(handle, 192);
+    })
+}
+
+#[test]
+fn cancel_in_the_same_rt() {
+    model(|| {
+        let rt = rt(false);
+
+        rt.block_on(async {
+            let handle = rt.handle();
+            let mut timer = Box::pin(Timer::new(
+                handle.inner.clone(),
+                handle.inner.driver().clock().now() + Duration::from_secs(1),
+            ));
+            let poll = timer.as_mut().poll_elapsed(&mut noop_cx());
+            assert!(poll.is_pending());
+            drop(timer);
+
+            // Since the event interval is 1, yield 3 times to ensure
+            // the registration queue and cancellation queue are processed.
+            assert_eq!(EVENT_INTERVAL, 1);
+            crate::task::yield_now().await;
+            crate::task::yield_now().await;
+            crate::task::yield_now().await;
+        });
+    })
+}
+
+#[test]
+fn cancel_in_the_different_rt() {
+    model(|| {
+        let rt1 = rt(false);
+        let rt2 = rt(false);
+
+        let timer = rt1.block_on(async {
+            let handle = rt1.handle();
+            let mut timer = Box::pin(Timer::new(
+                handle.inner.clone(),
+                handle.inner.driver().clock().now() + Duration::from_secs(1),
+            ));
+            let poll = timer.as_mut().poll_elapsed(&mut noop_cx());
+            assert!(poll.is_pending());
+            timer
+        });
+
+        rt2.block_on(async {
+            drop(timer);
+        });
+
+        rt1.block_on(async {
+            // Since the event interval is 1, yield 3 times to ensure
+            // the registration queue and cancellation queue are processed.
+            assert_eq!(EVENT_INTERVAL, 1);
+            crate::task::yield_now().await;
+            crate::task::yield_now().await;
+            crate::task::yield_now().await;
+        });
+    })
+}
+
+#[test]
+fn cancel_outside_of_rt() {
+    model(|| {
+        let rt = rt(false);
+
+        let timer = rt.block_on(async {
+            let handle = rt.handle();
+            let mut timer = Box::pin(Timer::new(
+                handle.inner.clone(),
+                handle.inner.driver().clock().now() + Duration::from_secs(1),
+            ));
+            let poll = timer.as_mut().poll_elapsed(&mut noop_cx());
+            assert!(poll.is_pending());
+            timer
+        });
+
+        drop(timer);
+
+        rt.block_on(async {
+            // Since the event interval is 1, yield 3 times to ensure
+            // the registration queue and cancellation queue are processed.
+            assert_eq!(EVENT_INTERVAL, 1);
+            crate::task::yield_now().await;
+            crate::task::yield_now().await;
+            crate::task::yield_now().await;
+        });
+    })
+}
+
+#[test]
+fn cancel_in_different_thread() {
+    model(|| {
+        let rt = rt(false);
+
+        let timer = rt.block_on(async {
+            let handle = rt.handle();
+            let mut timer = Box::pin(Timer::new(
+                handle.inner.clone(),
+                handle.inner.driver().clock().now() + Duration::from_secs(1),
+            ));
+            let poll = timer.as_mut().poll_elapsed(&mut noop_cx());
+            assert!(poll.is_pending());
+            timer
+        });
+
+        let jh = thread::spawn(move || {
+            drop(timer);
+        });
+
+        rt.block_on(async {
+            // Since the event interval is 1, yield 3 times to ensure
+            // the registration queue and cancellation queue are processed.
+            assert_eq!(EVENT_INTERVAL, 1);
+            crate::task::yield_now().await;
+            crate::task::yield_now().await;
+            crate::task::yield_now().await;
+        });
+
+        jh.join().unwrap();
     })
 }
