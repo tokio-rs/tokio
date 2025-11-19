@@ -95,3 +95,19 @@ jobs:
         working-directory: tokio
         env:
           SCOPE: ${{ matrix.scope }}
+
+  loom-util:
+    name: loom tokio-util
+    # base_ref is null when it's not a pull request
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-util') || (github.base_ref == null))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      - name: run tests
+        run: cargo test --lib --release --features full -- --nocapture
+        working-directory: tokio-util

@@ -68,6 +68,9 @@ cfg_net! {
     ///     socket.set_reuseaddr(true)?;
     ///     socket.bind(addr)?;
     ///
+    ///     // Note: the actual backlog used by `TcpListener::bind` is platform-dependent,
+    ///     // as Tokio relies on Mio's default backlog value configuration. The `1024` here is only
+    ///     // illustrative and does not reflect the real value used.
     ///     let listener = socket.listen(1024)?;
     /// # drop(listener);
     ///
@@ -836,7 +839,9 @@ cfg_unix! {
         /// The caller is responsible for ensuring that the socket is in
         /// non-blocking mode.
         unsafe fn from_raw_fd(fd: RawFd) -> TcpSocket {
-            let inner = socket2::Socket::from_raw_fd(fd);
+            // Safety: exactly the same safety requirements as the
+            // `FromRawFd::from_raw_fd` trait method.
+            let inner = unsafe { socket2::Socket::from_raw_fd(fd) };
             TcpSocket { inner }
         }
     }
@@ -875,7 +880,7 @@ cfg_windows! {
         /// The caller is responsible for ensuring that the socket is in
         /// non-blocking mode.
         unsafe fn from_raw_socket(socket: RawSocket) -> TcpSocket {
-            let inner = socket2::Socket::from_raw_socket(socket);
+            let inner = unsafe { socket2::Socket::from_raw_socket(socket) };
             TcpSocket { inner }
         }
     }
