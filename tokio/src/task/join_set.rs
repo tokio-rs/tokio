@@ -656,6 +656,8 @@ where
 /// # Examples
 ///
 /// ```
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use tokio::task::JoinSet;
 ///
 /// #[tokio::main]
@@ -674,6 +676,7 @@ where
 ///         assert!(seen[i]);
 ///     }
 /// }
+/// # }
 /// ```
 impl<T, F> std::iter::Extend<F> for JoinSet<T>
 where
@@ -681,7 +684,10 @@ where
     F: Send + 'static,
     T: Send + 'static,
 {
-    fn extend<I: IntoIterator<Item = F>>(&mut self, iter: I) {
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = F>,
+    {
         iter.into_iter().for_each(|task| {
             self.spawn(task);
         });
