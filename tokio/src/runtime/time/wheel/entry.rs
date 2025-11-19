@@ -23,9 +23,25 @@ pub(crate) struct Entry {
 
     /// The intrusive pointer used by any of the following queues:
     ///
-    /// - [`super::Level::slot`]
-    /// - [`super::RegistrationQueue`]
-    /// - [`super::WakeQueue`]
+    /// - [`Wheel`]
+    /// - [`RegistrationQueue`]
+    /// - [`WakeQueue`]
+    ///
+    /// We can guarantee that this pointer is only used by one of the above
+    /// at any given time. See below for the journey of this pointer.
+    ///
+    /// Initially, this pointer is used by the [`RegistrationQueue`].
+    ///
+    /// And then, before parking the resource driver,
+    /// the scheduler removes the entry from the [`RegistrationQueue`]
+    /// [`RegistrationQueue`] and insert it into the [`Wheel`].
+    ///
+    /// Finally, after parking the resource driver, the scheduler removes
+    /// the entry from the [`Wheel`] and insert it into the [`WakeQueue`].
+    ///
+    /// [`RegistrationQueue`]: super::RegistrationQueue
+    /// [`Wheel`]: super::Wheel
+    /// [`WakeQueue`]: super::WakeQueue
     extra_pointers: linked_list::Pointers<Entry>,
 
     /// The tick when this entry is scheduled to expire.
@@ -209,11 +225,9 @@ impl Handle {
     pub(crate) fn register_cancel_tx(&self, cancel_tx: Sender) {
         let mut lock = self.entry.state.lock();
         if !lock.cancelled && !lock.woken_up {
+            let old_tx = lock.cancel_tx.replace(cancel_tx);
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            assert!(
-                lock.cancel_tx.replace(cancel_tx).is_none(),
-                "cancel_tx is already registered"
-            );
+            assert!(old_tx.is_none(), "cancel_tx is already registered");
         }
     }
 
@@ -233,6 +247,9 @@ impl Handle {
             lock.cancelled = true;
             if let Some(cancel_tx) = lock.cancel_tx.take() {
                 drop(lock);
+
+                // Safety: we can guarantee that `self` is not in any cancellation queue
+                // because the `self.cancelled` was just set to `true`.
                 unsafe {
                     cancel_tx.send(self.clone());
                 }
