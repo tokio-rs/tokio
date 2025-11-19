@@ -27,8 +27,6 @@ pub(crate) mod metric_atomics;
     // rt and signal use `Notify`, which requires `WakeList`.
     feature = "rt",
     feature = "signal",
-    // time driver uses `WakeList` in `Handle::process_at_time`.
-    feature = "time",
 ))]
 mod wake_list;
 #[cfg(any(
@@ -38,7 +36,6 @@ mod wake_list;
     feature = "fs",
     feature = "rt",
     feature = "signal",
-    feature = "time",
 ))]
 pub(crate) use wake_list::WakeList;
 

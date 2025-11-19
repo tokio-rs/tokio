@@ -8,7 +8,7 @@ use crate::runtime::driver::{self, Driver};
 use crate::util::TryLock;
 
 use std::sync::atomic::Ordering::SeqCst;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[cfg(loom)]
 use crate::runtime::park::CURRENT_THREAD_PARK_COUNT;
@@ -70,12 +70,16 @@ impl Parker {
         self.inner.park(handle);
     }
 
+    /// Parks the current thread for up to `duration`.
+    ///
+    /// This function tries to acquire the driver lock. If it succeeds, it
+    /// parks using the driver. Otherwise, it fails back to using a condvar,
+    /// unless the duration is zero, in which case it returns immediately.
     pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
-        // Only parking with zero is supported...
-        assert_eq!(duration, Duration::from_millis(0));
-
         if let Some(mut driver) = self.inner.shared.driver.try_lock() {
-            driver.park_timeout(handle, duration);
+            self.inner.park_driver(&mut driver, handle, Some(duration));
+        } else if !duration.is_zero() {
+            self.inner.park_condvar(Some(duration));
         } else {
             // https://github.com/tokio-rs/tokio/issues/6536
             // Hacky, but it's just for loom tests. The counter gets incremented during
@@ -124,13 +128,20 @@ impl Inner {
         }
 
         if let Some(mut driver) = self.shared.driver.try_lock() {
-            self.park_driver(&mut driver, handle);
+            self.park_driver(&mut driver, handle, None);
         } else {
-            self.park_condvar();
+            self.park_condvar(None);
         }
     }
 
-    fn park_condvar(&self) {
+    /// Parks the current thread using a condvar for up to `duration`.
+    ///
+    /// If `duration` is `None`, parks indefinitely until notified.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `duration` is `Some` and the duration is zero.
+    fn park_condvar(&self, duration: Option<Duration>) {
         // Otherwise we need to coordinate going to sleep
         let mut m = self.mutex.lock();
 
@@ -154,10 +165,40 @@ impl Inner {
             Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
 
-        loop {
-            m = self.condvar.wait(m).unwrap();
+        let timeout_at = duration.map(|d| {
+            Instant::now()
+                .checked_add(d)
+                // best effort to avoid overflow and still provide a usable timeout
+                .unwrap_or(Instant::now() + Duration::from_secs(1))
+        });
 
-            if self
+        loop {
+            let is_timeout;
+            (m, is_timeout) = match timeout_at {
+                Some(timeout_at) => {
+                    let dur = timeout_at.saturating_duration_since(Instant::now());
+                    if !dur.is_zero() {
+                        // Ideally, we would use `condvar.wait_timeout_until` here, but it is not available
+                        // in `loom`. So we manually compute the timeout.
+                        let (m, res) = self.condvar.wait_timeout(m, dur).unwrap();
+                        (m, res.timed_out())
+                    } else {
+                        (m, true)
+                    }
+                }
+                None => (self.condvar.wait(m).unwrap(), false),
+            };
+
+            if is_timeout {
+                match self.state.swap(EMPTY, SeqCst) {
+                    PARKED_CONDVAR => return, // timed out, and no notification received
+                    NOTIFIED => return,       // notification and timeout happened concurrently
+                    actual @ (PARKED_DRIVER | EMPTY) => {
+                        panic!("inconsistent park_timeout state, actual = {actual}")
+                    }
+                    invalid => panic!("invalid park_timeout state, actual = {invalid}"),
+                }
+            } else if self
                 .state
                 .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
                 .is_ok()
@@ -170,7 +211,19 @@ impl Inner {
         }
     }
 
-    fn park_driver(&self, driver: &mut Driver, handle: &driver::Handle) {
+    fn park_driver(
+        &self,
+        driver: &mut Driver,
+        handle: &driver::Handle,
+        duration: Option<Duration>,
+    ) {
+        if duration.as_ref().is_some_and(Duration::is_zero) {
+            // zero duration doesn't actually park the thread, it just
+            // polls the I/O events, timers, etc.
+            driver.park_timeout(handle, Duration::ZERO);
+            return;
+        }
+
         match self
             .state
             .compare_exchange(EMPTY, PARKED_DRIVER, SeqCst, SeqCst)
@@ -191,7 +244,12 @@ impl Inner {
             Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
 
-        driver.park(handle);
+        if let Some(duration) = duration {
+            debug_assert_ne!(duration, Duration::ZERO);
+            driver.park_timeout(handle, duration);
+        } else {
+            driver.park(handle);
+        }
 
         match self.state.swap(EMPTY, SeqCst) {
             NOTIFIED => {}      // got a notification, hurray!
