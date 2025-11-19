@@ -1,8 +1,8 @@
 #![cfg(not(target_os = "wasi"))]
 
+use futures::task::noop_waker_ref;
 use std::future::poll_fn;
 use std::{task::Context, time::Duration};
-use futures::task::noop_waker_ref;
 
 use crate::loom::thread;
 use crate::runtime::scheduler::util::time::process_registration_queue;
@@ -148,12 +148,8 @@ fn drop_timer() {
             );
             pin!(entry);
 
-            let _ = entry
-                .as_mut()
-                .poll_elapsed(&mut noop_cx());
-            let _ = entry
-                .as_mut()
-                .poll_elapsed(&mut noop_cx());
+            let _ = entry.as_mut().poll_elapsed(&mut noop_cx());
+            let _ = entry.as_mut().poll_elapsed(&mut noop_cx());
             exit_tx.send(()).unwrap();
         });
 
@@ -181,9 +177,7 @@ fn change_waker() {
             );
             pin!(entry);
 
-            let _ = entry
-                .as_mut()
-                .poll_elapsed(&mut noop_cx());
+            let _ = entry.as_mut().poll_elapsed(&mut noop_cx());
 
             // At this point, we cannot let worker thread to wake up
             // the timer because the waker is a noop.
