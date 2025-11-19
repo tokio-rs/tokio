@@ -4,7 +4,6 @@ use std::num::NonZeroU64;
 pub(crate) struct ThreadId(NonZeroU64);
 
 impl ThreadId {
-    #[cfg_attr(not(feature = "rt"), expect(dead_code))]
     pub(crate) fn next() -> Self {
         use crate::loom::sync::atomic::{Ordering::Relaxed, StaticAtomicU64};
 
