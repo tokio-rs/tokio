@@ -211,14 +211,11 @@ impl Handle {
 
         if !lock.cancelled {
             lock.woken_up = true;
-            // don't unlock — poisoning the `Mutex` stops others from using the bad state.
-            let waker = lock
-                .waker
-                .take()
-                .expect("waker must be present when waking up");
-            // unlock before calling waker
-            drop(lock);
-            waker.wake();
+            if let Some(waker) = lock.waker.take() {
+                // unlock before calling waker
+                drop(lock);
+                waker.wake();
+            }
         }
     }
 
