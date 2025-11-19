@@ -416,8 +416,8 @@ async fn extend() {
         seen[idx] = true;
     }
 
-    for i in 0..10 {
-        assert!(seen[i]);
+    for s in &seen {
+        assert!(s);
     }
 }
 
