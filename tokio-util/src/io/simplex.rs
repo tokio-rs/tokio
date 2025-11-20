@@ -1,6 +1,6 @@
 //! Unidirectional byte-oriented channel.
 
-use crate::util::poll_proceed_and_make_progress;
+use crate::util::poll_proceed;
 
 use bytes::Buf;
 use bytes::BytesMut;
@@ -46,19 +46,17 @@ impl Inner {
         }
     }
 
-    fn register_receiver_waker(&mut self, waker: &Waker) {
+    fn register_receiver_waker(&mut self, waker: &Waker) -> Option<Waker> {
         match self.receiver_waker.as_mut() {
-            Some(old) if old.will_wake(waker) => {}
-            Some(old) => old.clone_from(waker),
-            None => self.receiver_waker = Some(waker.clone()),
+            Some(old) if old.will_wake(waker) => None,
+            _ => self.receiver_waker.replace(waker.clone()),
         }
     }
 
-    fn register_sender_waker(&mut self, waker: &Waker) {
+    fn register_sender_waker(&mut self, waker: &Waker) -> Option<Waker> {
         match self.sender_waker.as_mut() {
-            Some(old) if old.will_wake(waker) => {}
-            Some(old) => old.clone_from(waker),
-            None => self.sender_waker = Some(waker.clone()),
+            Some(old) if old.will_wake(waker) => None,
+            _ => self.sender_waker.replace(waker.clone()),
         }
     }
 
@@ -115,6 +113,8 @@ impl AsyncRead for Receiver {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<IoResult<()>> {
+        let coop = ready!(poll_proceed(cx));
+
         let mut inner = self.inner.lock().unwrap();
 
         let to_read = buf.remaining().min(inner.buf.remaining());
@@ -123,24 +123,30 @@ impl AsyncRead for Receiver {
                 return Poll::Ready(Ok(()));
             }
 
-            inner.register_receiver_waker(cx.waker());
+            let old_waker = inner.register_receiver_waker(cx.waker());
             let maybe_waker = inner.take_sender_waker();
-            drop(inner); // unlock before waking up
+
+            // unlock before waking up and dropping old waker
+            drop(inner);
+            drop(old_waker);
             if let Some(waker) = maybe_waker {
                 waker.wake();
             }
             return Poll::Pending;
         }
 
-        ready!(poll_proceed_and_make_progress(cx));
+        // this is to avoid starving other tasks
+        coop.made_progress();
 
         buf.put_slice(&inner.buf[..to_read]);
         inner.buf.advance(to_read);
+
         let waker = inner.take_sender_waker();
         drop(inner); // unlock before waking up
         if let Some(waker) = waker {
             waker.wake();
         }
+
         Poll::Ready(Ok(()))
     }
 }
@@ -175,6 +181,8 @@ impl AsyncWrite for Sender {
     /// This method will return [`IoErrorKind::BrokenPipe`]
     /// if the channel has been closed.
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<IoResult<usize>> {
+        let coop = ready!(poll_proceed(cx));
+
         let mut inner = self.inner.lock().unwrap();
 
         if inner.is_closed() {
@@ -191,24 +199,30 @@ impl AsyncWrite for Sender {
                 return Poll::Ready(Ok(0));
             }
 
-            inner.register_sender_waker(cx.waker());
+            let old_waker = inner.register_sender_waker(cx.waker());
             let waker = inner.take_receiver_waker();
-            drop(inner); // unlock before waking up
+
+            // unlock before waking up and dropping old waker
+            drop(inner);
+            drop(old_waker);
             if let Some(waker) = waker {
                 waker.wake();
             }
+
             return Poll::Pending;
         }
 
         // this is to avoid starving other tasks
-        ready!(poll_proceed_and_make_progress(cx));
+        coop.made_progress();
 
         inner.buf.extend_from_slice(&buf[..to_write]);
+
         let waker = inner.take_receiver_waker();
         drop(inner); // unlock before waking up
         if let Some(waker) = waker {
             waker.wake();
         }
+
         Poll::Ready(Ok(to_write))
     }
 
@@ -253,6 +267,8 @@ impl AsyncWrite for Sender {
         cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
     ) -> Poll<Result<usize, IoError>> {
+        let coop = ready!(poll_proceed(cx));
+
         let mut inner = self.inner.lock().unwrap();
         if inner.is_closed() {
             return Poll::Ready(Err(IoError::new(IoErrorKind::BrokenPipe, CLOSED_ERROR_MSG)));
@@ -263,16 +279,21 @@ impl AsyncWrite for Sender {
             .checked_sub(inner.buf.len())
             .expect("backpressure boundary overflow");
         if free == 0 {
-            inner.register_sender_waker(cx.waker());
+            let old_waker = inner.register_sender_waker(cx.waker());
             let maybe_waker = inner.take_receiver_waker();
-            drop(inner); // unlock before waking up
+
+            // unlock before waking up and dropping old waker
+            drop(inner);
+            drop(old_waker);
             if let Some(waker) = maybe_waker {
                 waker.wake();
             }
+
             return Poll::Pending;
         }
 
-        ready!(poll_proceed_and_make_progress(cx));
+        // this is to avoid starving other tasks
+        coop.made_progress();
 
         let mut rem = free;
         for buf in bufs {
