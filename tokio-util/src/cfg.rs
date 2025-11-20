@@ -60,6 +60,15 @@ macro_rules! cfg_rt {
     }
 }
 
+macro_rules! cfg_not_rt {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(feature = "rt"))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_time {
     ($($item:item)*) => {
         $(
