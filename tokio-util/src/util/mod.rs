@@ -26,6 +26,6 @@ cfg_not_rt! {
 
     #[cfg_attr(not(feature = "io"), allow(unused))]
     pub(crate) fn poll_proceed(_cx: &mut Context<'_>) -> Poll<RestoreOnPending> {
-        Poll::Ready(())
+        Poll::Ready(RestoreOnPending)
     }
 }
