@@ -115,7 +115,7 @@ cfg_usdt! {
                 usdt_impl::task_poll_start(this.task_id.as_u64());
                 let guard = Guard(*this.task_id);
                 let res = this.inner.poll(cx);
-                drop(guard);
+                std::mem::forget(guard);
                 usdt_impl::task_poll_end(this.task_id.as_u64());
 
                 if res.is_ready() {

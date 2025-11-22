@@ -1117,7 +1117,7 @@ jobs:
       - name: check-external-types
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
-          RUSTDOCFLAGS: --cfg tokio_unstable ${{ matrix.extra_flags }}
+          RUSTDOCFLAGS: --cfg tokio_unstable
         run: cargo check-external-types --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
         working-directory: tokio
 
