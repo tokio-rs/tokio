@@ -441,7 +441,7 @@ cfg_rt! {
                 ))]
                 let future = task::trace::Trace::root(future);
                 let id = task::Id::next();
-                usdt::start_task(usdt::TaskKind::Spawn, meta, id, std::mem::size_of::<F>());
+                usdt::start_task(usdt::TaskKind::SpawnLocal, meta, id, std::mem::size_of::<F>());
                 let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
                 // safety: we have verified that this is a `LocalRuntime` owned by the current thread

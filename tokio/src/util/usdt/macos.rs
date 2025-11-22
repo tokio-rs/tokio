@@ -70,14 +70,14 @@ cfg_rt!(
     }
 
     #[inline(always)]
-    pub(super) fn task_start(task_id: u64, spawned: u8, size: usize, original_size: usize) {
+    pub(super) fn task_start(task_id: u64, kind: u8, size: usize, original_size: usize) {
         extern "C" {
             #[link_name = "__dtrace_probe$tokio$task__start$v1$75696e7436345f74$75696e74385f74$75696e747074725f74$75696e747074725f74"]
             fn __task_start(task_id: u64, kind: u8, size: usize, original_size: usize);
         }
 
         unsafe {
-            __task_start(task_id, spawned, size, original_size);
+            __task_start(task_id, kind, size, original_size);
         }
     }
 
@@ -102,7 +102,7 @@ cfg_rt!(
     }
 
     #[inline(always)]
-    pub(crate) fn task_terminate(task_id: u64, reason: u8) {
+    pub(super) fn task_terminate(task_id: u64, reason: u8) {
         extern "C" {
             #[link_name = "__dtrace_probe$tokio$task__terminate$v1$75696e7436345f74$75696e74385f74"]
             fn __task_terminate(task_id: core::ffi::c_ulonglong, reason: core::ffi::c_uchar);
