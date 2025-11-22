@@ -27,6 +27,9 @@ use tokio::net::TcpListener;
 use std::env;
 use std::error::Error;
 
+const DEFAULT_ADDR: &str = "127.0.0.1:8080";
+const BUFFER_SIZE: usize = 4096;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Allow passing an address to listen on as the first argument of this
@@ -34,7 +37,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // 127.0.0.1:8080 for connections.
     let addr = env::args()
         .nth(1)
-        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
+        .unwrap_or_else(|| DEFAULT_ADDR.to_string());
 
     // Next up we create a TCP listener which will listen for incoming
     // connections. This TCP listener is bound to the address we determined
@@ -44,7 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         // Asynchronously wait for an inbound socket.
-        let (mut socket, _) = listener.accept().await?;
+        let (mut socket, addr) = listener.accept().await?;
 
         // And this is where much of the magic of this server happens. We
         // crucially want all clients to make progress concurrently, rather than
@@ -55,23 +58,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // which will allow all of our clients to be processed concurrently.
 
         tokio::spawn(async move {
-            let mut buf = vec![0; 1024];
+            let mut buf = vec![0; BUFFER_SIZE];
 
             // In a loop, read data from the socket and write the data back.
             loop {
-                let n = socket
-                    .read(&mut buf)
-                    .await
-                    .expect("failed to read data from socket");
-
-                if n == 0 {
-                    return;
+                match socket.read(&mut buf).await {
+                    Ok(0) => {
+                        // Connection closed by peer
+                        return;
+                    }
+                    Ok(n) => {
+                        // Write the data back. If writing fails, log the error and exit.
+                        if let Err(e) = socket.write_all(&buf[0..n]).await {
+                            eprintln!("Failed to write to socket {}: {}", addr, e);
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to read from socket {}: {}", addr, e);
+                        return;
+                    }
                 }
-
-                socket
-                    .write_all(&buf[0..n])
-                    .await
-                    .expect("failed to write data to socket");
             }
         });
     }

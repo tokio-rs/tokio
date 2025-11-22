@@ -39,6 +39,8 @@ use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+const DEFAULT_ADDR: &str = "127.0.0.1:6142";
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
@@ -70,7 +72,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let addr = env::args()
         .nth(1)
-        .unwrap_or_else(|| "127.0.0.1:6142".to_string());
+        .unwrap_or_else(|| DEFAULT_ADDR.to_string());
 
     // Bind a TCP listener to the socket address.
     //
@@ -88,9 +90,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // Spawn our handler to be run asynchronously.
         tokio::spawn(async move {
-            tracing::debug!("accepted connection");
+            tracing::debug!("accepted connection from {}", addr);
             if let Err(e) = process(state, stream, addr).await {
-                tracing::info!("an error occurred; error = {:?}", e);
+                tracing::warn!("Connection from {} failed: {:?}", addr, e);
             }
         });
     }
@@ -138,11 +140,25 @@ impl Shared {
 
     /// Send a `LineCodec` encoded message to every peer, except
     /// for the sender.
+    ///
+    /// This function also cleans up disconnected peers automatically.
     async fn broadcast(&mut self, sender: SocketAddr, message: &str) {
-        for peer in self.peers.iter_mut() {
-            if *peer.0 != sender {
-                let _ = peer.1.send(message.into());
+        let mut failed_peers = Vec::new();
+        let message = message.to_string(); // Clone once for all sends
+
+        for (addr, tx) in self.peers.iter() {
+            if *addr != sender {
+                if tx.send(message.clone()).is_err() {
+                    // Receiver has been dropped, mark for removal
+                    failed_peers.push(*addr);
+                }
             }
+        }
+
+        // Clean up disconnected peers
+        for addr in failed_peers {
+            self.peers.remove(&addr);
+            tracing::debug!("Removed disconnected peer: {}", addr);
         }
     }
 }
@@ -203,7 +219,10 @@ async fn process(
         tokio::select! {
             // A message was received from a peer. Send it to the current user.
             Some(msg) = peer.rx.recv() => {
-                peer.lines.send(&msg).await?;
+                if let Err(e) = peer.lines.send(&msg).await {
+                    tracing::error!("Failed to send message to {}: {:?}", username, e);
+                    break;
+                }
             }
             result = peer.lines.next() => match result {
                 // A message was received from the current user, we should
@@ -221,6 +240,7 @@ async fn process(
                         username,
                         e
                     );
+                    break;
                 }
                 // The stream has been exhausted.
                 None => break,

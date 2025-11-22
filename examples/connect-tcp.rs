@@ -58,7 +58,7 @@ pub async fn connect(
             //BytesMut into Bytes
             Ok(i) => future::ready(Some(i.freeze())),
             Err(e) => {
-                println!("failed to read from socket; error={e}");
+                eprintln!("failed to read from socket; error={e}");
                 future::ready(None)
             }
         })
