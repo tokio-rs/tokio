@@ -142,32 +142,27 @@ fn cancel_in_the_different_thread() {
         }
 
         // this thread cancel all handles concurrently
-        let jh1 = thread::spawn(move || {
+        let jh = thread::spawn(move || {
             // cancel all handles
             for hdl in hdls {
                 hdl.cancel();
             }
         });
 
-        // this thread process the cancellation queue concurrently
-        let jh2 = thread::spawn(move || {
-            let mut wake_queue = WakeQueue::new();
-            for hdl in cancel_rx.recv_all() {
-                unsafe {
-                    wake_queue.push_front(hdl);
-                }
-            }
-            wake_queue.wake_all();
-
-            assert!(counts.into_iter().all(|c| c.get() == 0));
-        });
-
-        // the current thread drain the registration queue concurrently
+        // cancellation queue concurrently
         while let Some(hdl) = reg_queue.pop_front() {
             drop(hdl);
         }
 
-        jh1.join().unwrap();
-        jh2.join().unwrap();
+        let mut wake_queue = WakeQueue::new();
+        for hdl in cancel_rx.recv_all() {
+            unsafe {
+                wake_queue.push_front(hdl);
+            }
+        }
+        wake_queue.wake_all();
+        assert!(counts.into_iter().all(|c| c.get() == 0));
+
+        jh.join().unwrap();
     })
 }
