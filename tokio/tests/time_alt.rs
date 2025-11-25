@@ -83,22 +83,18 @@ fn timeout() {
 
             // timeout outside of the worker threads
             let now = Instant::now();
-            tokio::time::timeout(
-                Duration::from_millis(10),
-                std::future::pending::<()>(),
-            )
-            .await.expect_err("timeout should occur");
+            tokio::time::timeout(Duration::from_millis(10), std::future::pending::<()>())
+                .await
+                .expect_err("timeout should occur");
             assert!(now.elapsed() >= Duration::from_millis(10));
 
             for _ in 0..N {
                 let jh = tokio::spawn(async move {
                     let now = Instant::now();
                     // timeout inside of the worker threads
-                    tokio::time::timeout(
-                        Duration::from_millis(10),
-                        std::future::pending::<()>(),
-                    )
-                    .await.expect_err("timeout should occur");
+                    tokio::time::timeout(Duration::from_millis(10), std::future::pending::<()>())
+                        .await
+                        .expect_err("timeout should occur");
                     assert!(now.elapsed() >= Duration::from_millis(10));
                 });
                 jhs.push(jh);
