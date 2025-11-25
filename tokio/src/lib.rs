@@ -351,6 +351,7 @@
 //! Some feature flags are only available when specifying the `tokio_unstable` flag:
 //!
 //! - `tracing`: Enables tracing events.
+//! - `usdt`: Enables USDT probes.
 //!
 //! Likewise, some parts of the API are only available with the same flag:
 //!
@@ -499,6 +500,9 @@ compile_error!(
 linux, on `aarch64`, `x86` and `x86_64`."
 );
 
+#[cfg(all(not(tokio_unstable), feature = "usdt"))]
+compile_error!("The `usdt` feature requires `--cfg tokio_unstable`.");
+
 // Includes re-exports used by macros.
 //
 // This module is not intended to be part of the public API. In general, any
@@ -577,6 +581,7 @@ mod trace {
         #[inline(always)]
         #[allow(dead_code)]
         pub(crate) fn trace_leaf(_: &mut std::task::Context<'_>) -> std::task::Poll<()> {
+            crate::util::usdt::trace_root();
             std::task::Poll::Ready(())
         }
     }

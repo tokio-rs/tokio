@@ -24,7 +24,7 @@ use crate::runtime::context;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule, TaskHarnessScheduleHooks};
-use crate::util::linked_list;
+use crate::util::{linked_list, usdt};
 
 use std::num::NonZeroU64;
 #[cfg(tokio_unstable)]
@@ -371,11 +371,13 @@ impl<T: Future, S: Schedule> Core<T, S> {
                 let future = unsafe { Pin::new_unchecked(future) };
 
                 let _guard = TaskIdGuard::enter(self.task_id);
+                let _usdt_guard = crate::util::usdt::PollGuard::new(self.task_id);
                 future.poll(&mut cx)
             })
         };
 
         if res.is_ready() {
+            usdt::finish_task(self.task_id, usdt::TerminateKind::Success);
             self.drop_future_or_output();
         }
 
