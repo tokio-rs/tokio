@@ -13,7 +13,7 @@ use std::future::poll_fn;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc;
-use std::task::Poll;
+use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio::fs::read;
@@ -142,10 +142,10 @@ async fn cancel_op_future() {
         let fut = read(path.clone());
         tokio::pin!(fut);
 
-        poll_fn(move |cx| {
+        poll_fn(move |_| {
             // If io_uring is enabled (and not falling back to the thread pool),
             // the first poll should return Pending.
-            assert_pending!(fut.as_mut().poll(cx));
+            assert_pending!(fut.as_mut().poll(&mut Context::from_waker(Waker::noop())));
             tx.send(true).unwrap();
 
             Poll::<()>::Pending

@@ -41,14 +41,14 @@ async fn read_to_end_uring(mut fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Vec<
     let start_cap = buf.capacity();
 
     loop {
-        if buf.len() == buf.capacity() && buf.capacity() == start_cap && buf.len() > PROBE_SIZE {
+        if buf.len() == buf.capacity() && buf.capacity() == start_cap && buf.len() >= PROBE_SIZE {
             // The buffer might be an exact fit. Let's read into a probe buffer
             // and see if it returns `Ok(0)`. If so, we've avoided an
             // unnecessary increasing of the capacity. But if not, append the
             // probe buffer to the primary buffer and let its capacity grow.
-            let (size_read, r_fd, r_buf) = small_probe_read(fd, buf, &mut offset).await?;
+            let (r_fd, r_buf, is_eof) = small_probe_read(fd, buf, &mut offset).await?;
 
-            if size_read == 0 {
+            if is_eof {
                 return Ok(r_buf);
             }
 
@@ -69,9 +69,9 @@ async fn read_to_end_uring(mut fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Vec<
         let read_len = u32::try_from(buf_len).expect("buf_len must always fit in u32");
 
         // read into spare capacity
-        let (size_read, r_fd, r_buf) = op_read(fd, buf, &mut offset, read_len).await?;
+        let (r_fd, r_buf, is_eof) = op_read(fd, buf, &mut offset, read_len).await?;
 
-        if size_read == 0 {
+        if is_eof {
             return Ok(r_buf);
         }
 
@@ -84,7 +84,7 @@ async fn small_probe_read(
     fd: OwnedFd,
     mut buf: Vec<u8>,
     offset: &mut u64,
-) -> io::Result<(u32, OwnedFd, Vec<u8>)> {
+) -> io::Result<(OwnedFd, Vec<u8>, bool)> {
     let read_len = PROBE_SIZE_U32;
 
     let mut temp_arr = [0; PROBE_SIZE];
@@ -97,21 +97,25 @@ async fn small_probe_read(
     // than PROBE_SIZE. So we can read into the discarded length
     buf.truncate(back_bytes_len);
 
-    let (size_read, r_fd, mut r_buf) = op_read(fd, buf, offset, read_len).await?;
+    let (r_fd, mut r_buf, is_eof) = op_read(fd, buf, offset, read_len).await?;
     // If `size_read` returns zero due to reasons such as buffer's exact fit,
     // then this `try_reserve` does not perform allocation.
     r_buf.try_reserve(PROBE_SIZE)?;
     r_buf.splice(back_bytes_len..back_bytes_len, temp_arr);
 
-    Ok((size_read, r_fd, r_buf))
+    Ok((r_fd, r_buf, is_eof))
 }
 
+// Takes a amount of length to read and reads until we exhaust the given length
+// to read or EOF reached.
+//
+// Returns size_read, the result and EOF reached or not
 async fn op_read(
     mut fd: OwnedFd,
     mut buf: Vec<u8>,
     offset: &mut u64,
-    mut read_len: u32,
-) -> io::Result<(u32, OwnedFd, Vec<u8>)> {
+    read_len: u32,
+) -> io::Result<(OwnedFd, Vec<u8>, bool)> {
     loop {
         let (res, r_fd, r_buf) = Op::read(fd, buf, read_len, *offset).await;
 
@@ -123,14 +127,8 @@ async fn op_read(
             Err(e) => return Err(e),
             Ok(size_read) => {
                 *offset += size_read as u64;
-                read_len -= size_read;
 
-                if read_len == 0 || size_read == 0 {
-                    return Ok((size_read, r_fd, r_buf));
-                }
-
-                buf = r_buf;
-                fd = r_fd;
+                return Ok((r_fd, r_buf, size_read == 0));
             }
         }
     }
