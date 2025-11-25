@@ -1,16 +1,15 @@
-use super::{Entry, EntryHandle};
-use crate::runtime::time::wheel::WakeQueueEntry;
+use super::{Entry, EntryHandle, RegistrationQueueEntry};
 use crate::util::linked_list;
 
-type EntryList = linked_list::LinkedList<WakeQueueEntry, Entry>;
+type EntryList = linked_list::LinkedList<RegistrationQueueEntry, Entry>;
 
-/// A queue of entries that need to be woken up.
+/// A queue of entries that need to be registered in the timer wheel.
 #[derive(Debug)]
-pub(crate) struct WakeQueue {
+pub(crate) struct RegistrationQueue {
     list: EntryList,
 }
 
-impl Drop for WakeQueue {
+impl Drop for RegistrationQueue {
     fn drop(&mut self) {
         // drain all entries without waking them up
         while let Some(hdl) = self.list.pop_front() {
@@ -19,15 +18,11 @@ impl Drop for WakeQueue {
     }
 }
 
-impl WakeQueue {
+impl RegistrationQueue {
     pub(crate) fn new() -> Self {
         Self {
             list: EntryList::new(),
         }
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.list.is_empty()
     }
 
     /// # Safety
@@ -39,10 +34,10 @@ impl WakeQueue {
         self.list.push_front(hdl);
     }
 
-    /// Wakes all entries in the wake queue.
-    pub(crate) fn wake_all(mut self) {
-        while let Some(hdl) = self.list.pop_front() {
-            hdl.wake();
-        }
+    pub(crate) fn pop_front(&mut self) -> Option<EntryHandle> {
+        self.list.pop_front()
     }
 }
+
+#[cfg(test)]
+mod tests;

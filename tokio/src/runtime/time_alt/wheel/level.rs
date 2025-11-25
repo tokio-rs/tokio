@@ -1,6 +1,6 @@
-use crate::runtime::time::{EntryList, TimerHandle, TimerShared};
-
-use std::{array, fmt, ptr::NonNull};
+use super::{EntryHandle, EntryList};
+use std::ptr::NonNull;
+use std::{array, fmt};
 
 /// Wheel for a single level in the timer. This wheel contains 64 slots.
 pub(crate) struct Level {
@@ -119,18 +119,20 @@ impl Level {
         Some(slot)
     }
 
-    pub(crate) unsafe fn add_entry(&mut self, item: TimerHandle) {
-        let slot = slot_for(unsafe { item.registered_when() }, self.level);
+    pub(crate) unsafe fn add_entry(&mut self, hdl: EntryHandle) {
+        // Safety: the associated entry must be valid.
+        let deadline = hdl.deadline();
+        let slot = slot_for(deadline, self.level);
 
-        self.slot[slot].push_front(item);
+        self.slot[slot].push_front(hdl);
 
         self.occupied |= occupied_bit(slot);
     }
 
-    pub(crate) unsafe fn remove_entry(&mut self, item: NonNull<TimerShared>) {
-        let slot = slot_for(unsafe { item.as_ref().registered_when() }, self.level);
+    pub(crate) unsafe fn remove_entry(&mut self, hdl: EntryHandle) {
+        let slot = slot_for(hdl.deadline(), self.level);
 
-        unsafe { self.slot[slot].remove(item) };
+        unsafe { self.slot[slot].remove(NonNull::from(&hdl)) };
         if self.slot[slot].is_empty() {
             // The bit is currently set
             debug_assert!(self.occupied & occupied_bit(slot) != 0);

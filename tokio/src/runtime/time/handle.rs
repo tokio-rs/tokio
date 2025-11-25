@@ -1,69 +1,34 @@
-use crate::runtime::time::{TimeSource, WakeQueue, Wheel};
+use crate::runtime::time::TimeSource;
 use std::fmt;
-
-cfg_test_util! {
-    use crate::loom::sync::Arc;
-    use crate::loom::sync::atomic::{AtomicBool, Ordering};
-}
 
 /// Handle to time driver instance.
 pub(crate) struct Handle {
     pub(super) time_source: TimeSource,
-
-    // When `true`, a call to `park_timeout` should immediately return and time
-    // should not advance. One reason for this to be `true` is if the task
-    // passed to `Runtime::block_on` called `task::yield_now()`.
-    //
-    // While it may look racy, it only has any effect when the clock is paused
-    // and pausing the clock is restricted to a single-threaded runtime.
-    #[cfg(feature = "test-util")]
-    pub(super) did_wake: Arc<AtomicBool>,
+    pub(super) inner: super::Inner,
 }
 
 impl Handle {
-    pub(crate) fn process_at_time(
-        &self,
-        wheel: &mut Wheel,
-        mut now: u64,
-        wake_queue: &mut WakeQueue,
-    ) {
-        if now < wheel.elapsed() {
-            // Time went backwards! This normally shouldn't happen as the Rust language
-            // guarantees that an Instant is monotonic, but can happen when running
-            // Linux in a VM on a Windows host due to std incorrectly trusting the
-            // hardware clock to be monotonic.
-            //
-            // See <https://github.com/tokio-rs/tokio/issues/3619> for more information.
-            now = wheel.elapsed();
-        }
-
-        wheel.take_expired(now, wake_queue);
-    }
-
-    pub(crate) fn shutdown(&self, wheel: &mut Wheel) {
-        // self.is_shutdown.store(true, Ordering::SeqCst);
-        // Advance time forward to the end of time.
-        // This will ensure that all timers are fired.
-        let max_tick = u64::MAX;
-        let mut wake_queue = WakeQueue::new();
-        self.process_at_time(wheel, max_tick, &mut wake_queue);
-        wake_queue.wake_all();
-    }
-
     /// Returns the time source associated with this handle.
     pub(crate) fn time_source(&self) -> &TimeSource {
         &self.time_source
     }
 
+    /// Checks whether the driver has been shutdown.
+    pub(super) fn is_shutdown(&self) -> bool {
+        self.inner.is_shutdown()
+    }
+
     /// Track that the driver is being unparked
     pub(crate) fn unpark(&self) {
         #[cfg(feature = "test-util")]
-        self.did_wake.store(true, Ordering::SeqCst);
-    }
-
-    cfg_test_util! {
-        pub(crate) fn did_wake(&self) -> bool {
-            self.did_wake.swap(false, Ordering::SeqCst)
+        match self.inner {
+            super::Inner::Traditional { ref did_wake, .. } => {
+                did_wake.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            super::Inner::Alternative { ref did_wake, .. } => {
+                did_wake.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
         }
     }
 }

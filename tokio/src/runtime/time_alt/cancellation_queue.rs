@@ -1,6 +1,5 @@
-use super::{Entry, EntryHandle};
+use super::{CancellationQueueEntry, Entry, EntryHandle};
 use crate::loom::sync::{Arc, Mutex};
-use crate::runtime::time::wheel::CancellationQueueEntry;
 use crate::util::linked_list;
 
 type EntryList = linked_list::LinkedList<CancellationQueueEntry, Entry>;

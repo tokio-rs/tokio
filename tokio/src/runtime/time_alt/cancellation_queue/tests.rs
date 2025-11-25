@@ -92,8 +92,6 @@ fn drop_iter_should_not_leak_memory() {
 
         drop(rx.recv_all());
 
-        for hdl in hdls {
-            assert_eq!(hdl.inner_strong_count(), 1);
-        }
+        assert!(hdls.into_iter().all(|hdl| hdl.inner_strong_count() == 1));
     });
 }

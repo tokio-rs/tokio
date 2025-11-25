@@ -1,3 +1,2 @@
-cfg_rt_and_time! {
-    pub(crate) mod time;
-}
+#[cfg(all(tokio_unstable, feature = "time", feature = "rt-multi-thread"))]
+pub(in crate::runtime) mod time_alt;

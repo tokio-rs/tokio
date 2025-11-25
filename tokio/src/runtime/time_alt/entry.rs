@@ -6,7 +6,7 @@ use std::marker::PhantomPinned;
 use std::ptr::NonNull;
 use std::task::Waker;
 
-pub(crate) type EntryList = linked_list::LinkedList<Entry, Entry>;
+pub(super) type EntryList = linked_list::LinkedList<Entry, Entry>;
 
 #[derive(Debug)]
 struct State {

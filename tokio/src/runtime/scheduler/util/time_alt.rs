@@ -1,8 +1,6 @@
 use crate::runtime::scheduler::driver;
-use crate::runtime::time::cancellation_queue::{Receiver, Sender};
-use crate::runtime::time::EntryHandle;
-use crate::runtime::time::RegistrationQueue;
-use crate::runtime::time::{WakeQueue, Wheel};
+use crate::runtime::time_alt::cancellation_queue::{Receiver, Sender};
+use crate::runtime::time_alt::{EntryHandle, RegistrationQueue, WakeQueue, Wheel};
 use std::time::Duration;
 
 pub(crate) fn min_duration(a: Option<Duration>, b: Option<Duration>) -> Option<Duration> {
@@ -120,7 +118,7 @@ pub(crate) fn process_expired_timers(
         let time_source = time_hdl.time_source();
 
         let now = time_source.now(clock);
-        time_hdl.process_at_time(wheel, now, wake_queue);
+        time_hdl.process_at_time_alt(wheel, now, wake_queue);
     });
 }
 
@@ -137,7 +135,7 @@ pub(crate) fn shutdown_local_timers(
         };
 
         remove_cancelled_timers(wheel, rx);
-        time_hdl.shutdown(wheel);
+        time_hdl.shutdown_alt(wheel);
 
         let mut wake_queue = WakeQueue::new();
         // simply wake all unregistered timers

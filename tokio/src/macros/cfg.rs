@@ -94,6 +94,7 @@ macro_rules! cfg_atomic_waker_impl {
                 feature = "process",
                 feature = "rt",
                 feature = "signal",
+                feature = "time",
             ))]
             #[cfg(not(loom))]
             $item
@@ -705,30 +706,6 @@ macro_rules! cfg_io_uring {
                 feature = "rt",
                 feature = "fs",
                 target_os = "linux",
-            ))]
-            $item
-        )*
-    };
-}
-
-macro_rules! cfg_rt_and_time{
-    ($($item:item)*) => {
-        $(
-            #[cfg(all(
-                feature = "rt",
-                feature = "time",
-            ))]
-            $item
-        )*
-    };
-}
-
-macro_rules! cfg_rt_or_time{
-    ($($item:item)*) => {
-        $(
-            #[cfg(any(
-                feature = "rt",
-                feature = "time",
             ))]
             $item
         )*

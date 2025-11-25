@@ -444,7 +444,8 @@ impl Interval {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let instant = poll_fn(|cx| self.poll_tick(cx));
 
-        instant.await
+        let r = instant.await;
+        r
     }
 
     /// Polls for the next instant in the interval to be reached.
@@ -484,7 +485,10 @@ impl Interval {
                 .unwrap_or_else(Instant::far_future)
         };
 
-        self.delay.as_mut().reset(next);
+        // When we arrive here, the internal delay returned `Poll::Ready`.
+        // Reset the delay but do not register it. It should be registered with
+        // the next call to [`poll_tick`].
+        self.delay.as_mut().reset_without_reregister(next);
 
         // Return the time when we were scheduled to tick
         Poll::Ready(timeout)

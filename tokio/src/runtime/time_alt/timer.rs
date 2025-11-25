@@ -1,6 +1,5 @@
-use super::wheel::EntryHandle;
+use super::{EntryHandle, TempLocalContext};
 use crate::runtime::scheduler::Handle as SchedulerHandle;
-use crate::runtime::time::Context as TimeContext;
 use crate::time::Instant;
 
 use std::pin::Pin;
@@ -61,16 +60,16 @@ impl Timer {
     fn register(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         let this = self.get_mut();
 
-        with_current_registration_queue(&this.sched_handle, |maybe_time_cx| {
+        with_current_temp_local_context(&this.sched_handle, |maybe_time_cx| {
             let deadline = deadline_to_tick(&this.sched_handle, this.deadline);
 
             match maybe_time_cx {
-                Some(TimeContext::Running {
+                Some(TempLocalContext::Running {
                     registration_queue: _,
                     elapsed,
                 }) if deadline <= elapsed => Poll::Ready(()),
 
-                Some(TimeContext::Running {
+                Some(TempLocalContext::Running {
                     registration_queue,
                     elapsed: _,
                 }) => {
@@ -82,7 +81,7 @@ impl Timer {
                     Poll::Pending
                 }
                 #[cfg(feature = "rt-multi-thread")]
-                Some(TimeContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
+                Some(TempLocalContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
 
                 _ => {
                     let hdl = EntryHandle::new(deadline, cx.waker().clone());
@@ -104,11 +103,25 @@ impl Timer {
             None => self.register(cx),
         }
     }
+
+    pub(crate) fn scheduler_handle(&self) -> &SchedulerHandle {
+        &self.sched_handle
+    }
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(crate) fn driver(&self) -> &crate::runtime::time::Handle {
+        self.sched_handle.driver().time()
+    }
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    pub(crate) fn clock(&self) -> &crate::time::Clock {
+        self.sched_handle.driver().clock()
+    }
 }
 
-fn with_current_registration_queue<F, R>(hdl: &SchedulerHandle, f: F) -> R
+fn with_current_temp_local_context<F, R>(hdl: &SchedulerHandle, f: F) -> R
 where
-    F: FnOnce(Option<TimeContext<'_>>) -> R,
+    F: FnOnce(Option<TempLocalContext<'_>>) -> R,
 {
     #[cfg(not(feature = "rt"))]
     {
@@ -129,43 +142,43 @@ where
             f(None)
         } else {
             context::with_scheduler(|maybe_cx| match maybe_cx {
-                Some(cx) => cx.with_registration_queue(f),
+                Some(cx) => cx.with_time_temp_local_context(f),
                 None => f(None),
             })
         }
     }
 }
 
-#[cfg(all(not(target_os = "wasi"), test))]
-pub(super) fn with_current_time_context2<F, R>(hdl: &SchedulerHandle, f: F) -> R
-where
-    F: FnOnce(Option<&mut crate::runtime::time::Context2>) -> R,
-{
-    #[cfg(not(feature = "rt"))]
-    {
-        let (_, _) = (hdl, f);
-        panic!("Tokio runtime is not enabled, cannot access the current wheel");
-    }
+// #[cfg(all(not(target_os = "wasi"), test))]
+// pub(super) fn with_current_local_context<F, R>(hdl: &SchedulerHandle, f: F) -> R
+// where
+//     F: FnOnce(Option<&mut super::LocalContext>) -> R,
+// {
+//     #[cfg(not(feature = "rt"))]
+//     {
+//         let (_, _) = (hdl, f);
+//         panic!("Tokio runtime is not enabled, cannot access the current wheel");
+//     }
 
-    #[cfg(feature = "rt")]
-    {
-        use crate::runtime::context;
+//     #[cfg(feature = "rt")]
+//     {
+//         use crate::runtime::context;
 
-        let is_same_rt =
-            context::with_current(|cur_hdl| cur_hdl.is_same_runtime(hdl)).unwrap_or_default();
+//         let is_same_rt =
+//             context::with_current(|cur_hdl| cur_hdl.is_same_runtime(hdl)).unwrap_or_default();
 
-        if !is_same_rt {
-            // We don't want to create the timer in one runtime,
-            // but register it in a different runtime's timer wheel.
-            f(None)
-        } else {
-            context::with_scheduler(|maybe_cx| match maybe_cx {
-                Some(cx) => cx.with_time_context2(f),
-                None => f(None),
-            })
-        }
-    }
-}
+//         if !is_same_rt {
+//             // We don't want to create the timer in one runtime,
+//             // but register it in a different runtime's timer wheel.
+//             f(None)
+//         } else {
+//             context::with_scheduler(|maybe_cx| match maybe_cx {
+//                 Some(cx) => cx.with_time_local_context(f),
+//                 None => f(None),
+//             })
+//         }
+//     }
+// }
 
 fn push_from_remote(sched_hdl: &SchedulerHandle, entry_hdl: EntryHandle) {
     #[cfg(not(feature = "rt"))]
