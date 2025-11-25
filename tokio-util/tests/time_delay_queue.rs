@@ -3,7 +3,7 @@
 #![cfg(feature = "full")]
 
 use futures::StreamExt;
-use tokio::time::{self, sleep, Duration, Instant};
+use tokio::time::{self, sleep, sleep_until, Duration, Instant};
 use tokio_test::{assert_pending, assert_ready, task};
 use tokio_util::time::DelayQueue;
 
@@ -81,6 +81,8 @@ async fn single_short_delay() {
     assert!(!queue.is_woken());
 
     sleep(ms(5)).await;
+
+    assert!(queue.is_woken());
 
     let entry = assert_ready_some!(poll!(queue));
     assert_eq!(*entry.get_ref(), "foo");
@@ -219,7 +221,7 @@ async fn reset_much_later() {
 
     sleep(ms(20)).await;
 
-    assert_ready_some!(poll!(queue));
+    assert!(queue.is_woken());
 }
 
 // Reproduces tokio-rs/tokio#849.
@@ -246,7 +248,7 @@ async fn reset_twice() {
 
     sleep(ms(20)).await;
 
-    assert_ready_some!(poll!(queue));
+    assert!(queue.is_woken());
 }
 
 /// Regression test: Given an entry inserted with a deadline in the past, so
@@ -410,6 +412,8 @@ async fn expire_first_key_when_reset_to_expire_earlier() {
 
     sleep(ms(100)).await;
 
+    assert!(queue.is_woken());
+
     let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "one");
 }
@@ -431,6 +435,8 @@ async fn expire_second_key_when_reset_to_expire_earlier() {
 
     sleep(ms(100)).await;
 
+    assert!(queue.is_woken());
+
     let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "two");
 }
@@ -450,6 +456,8 @@ async fn reset_first_expiring_item_to_expire_later() {
 
     queue.reset_at(&one, now + ms(300));
     sleep(ms(250)).await;
+
+    assert!(queue.is_woken());
 
     let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "two");
@@ -515,6 +523,43 @@ async fn insert_after_ready_poll() {
 }
 
 #[tokio::test]
+async fn reset_later_after_slot_starts() {
+    time::pause();
+
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    let foo = queue.insert_at("foo", now + ms(100));
+
+    assert_pending!(poll!(queue));
+
+    sleep_until(now + Duration::from_millis(80)).await;
+
+    assert!(!queue.is_woken());
+
+    // At this point the queue hasn't been polled, so `elapsed` on the wheel
+    // for the queue is still at 0 and hence the 1ms resolution slots cover
+    // [0-64).  Resetting the time on the entry to 120 causes it to get put in
+    // the [64-128) slot.  As the queue knows that the first entry is within
+    // that slot, but doesn't know when, it must wake immediately to advance
+    // the wheel.
+    queue.reset_at(&foo, now + ms(120));
+    assert!(queue.is_woken());
+
+    assert_pending!(poll!(queue));
+
+    sleep_until(now + Duration::from_millis(119)).await;
+    assert!(!queue.is_woken());
+
+    sleep(ms(1)).await;
+    assert!(queue.is_woken());
+
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
+    assert_eq!(entry, "foo");
+}
+
+#[tokio::test]
 async fn reset_inserted_expired() {
     time::pause();
 
@@ -537,6 +582,43 @@ async fn reset_inserted_expired() {
     assert_eq!(entry, "foo");
 
     assert_eq!(queue.len(), 0);
+}
+
+#[tokio::test]
+async fn reset_earlier_after_slot_starts() {
+    time::pause();
+
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    let foo = queue.insert_at("foo", now + ms(200));
+
+    assert_pending!(poll!(queue));
+
+    sleep_until(now + Duration::from_millis(80)).await;
+
+    assert!(!queue.is_woken());
+
+    // At this point the queue hasn't been polled, so `elapsed` on the wheel
+    // for the queue is still at 0 and hence the 1ms resolution slots cover
+    // [0-64).  Resetting the time on the entry to 120 causes it to get put in
+    // the [64-128) slot.  As the queue knows that the first entry is within
+    // that slot, but doesn't know when, it must wake immediately to advance
+    // the wheel.
+    queue.reset_at(&foo, now + ms(120));
+    assert!(queue.is_woken());
+
+    assert_pending!(poll!(queue));
+
+    sleep_until(now + Duration::from_millis(119)).await;
+    assert!(!queue.is_woken());
+
+    sleep(ms(1)).await;
+    assert!(queue.is_woken());
+
+    let entry = assert_ready_some!(poll!(queue)).into_inner();
+    assert_eq!(entry, "foo");
 }
 
 #[tokio::test]
