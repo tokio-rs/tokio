@@ -444,8 +444,7 @@ impl Interval {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let instant = poll_fn(|cx| self.poll_tick(cx));
 
-        let r = instant.await;
-        r
+        instant.await
     }
 
     /// Polls for the next instant in the interval to be reached.

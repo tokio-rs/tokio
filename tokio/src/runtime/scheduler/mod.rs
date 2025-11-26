@@ -304,17 +304,6 @@ cfg_rt! {
             }
         }
 
-        // #[cfg(all(tokio_unstable, feature = "time", feature = "rt-multi-thread", not(target_os = "wasi"), test))]
-        // pub(crate) fn with_time_local_context<F, R>(&self, f: F) -> R
-        // where
-        //     F: FnOnce(Option<&mut crate::runtime::time_alt::LocalContext>) -> R,
-        // {
-        //     match self {
-        //         Context::CurrentThread(_) => panic!("the alternative timer implementation is not supported on CurrentThread runtime"),
-        //         Context::MultiThread(context) => context.with_time_local_context(f),
-        //     }
-        // }
-
         cfg_rt_multi_thread! {
             #[track_caller]
             pub(crate) fn expect_multi_thread(&self) -> &multi_thread::Context {

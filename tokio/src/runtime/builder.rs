@@ -378,6 +378,8 @@ impl Builder {
     /// This option only applies to multi-threaded runtimes. Attempting to use
     /// this option with any other runtime type will have no effect.
     ///
+    /// [Click here to share your experience with the alternative timer](https://github.com/tokio-rs/tokio/issues/7745)
+    ///
     /// # Examples
     ///
     /// ```

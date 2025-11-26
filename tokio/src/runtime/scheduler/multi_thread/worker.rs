@@ -989,17 +989,6 @@ impl Context {
         }
     }
 
-    // #[cfg(all(tokio_unstable, feature = "time", not(target_os = "wasi"), test))]
-    // pub(crate) fn with_time_local_context<F, R>(&self, f: F) -> R
-    // where
-    //     F: FnOnce(Option<&mut time_alt::LocalContext>) -> R,
-    // {
-    //     self.with_core(|maybe_core| match maybe_core {
-    //         Some(core) => f(Some(&mut core.time_context)),
-    //         None => f(None),
-    //     })
-    // }
-
     #[cfg(all(tokio_unstable, feature = "time"))]
     pub(crate) fn with_time_temp_local_context<F, R>(&self, f: F) -> R
     where
@@ -1353,7 +1342,7 @@ impl Handle {
 
     #[cfg(all(tokio_unstable, feature = "time"))]
     pub(crate) fn push_remote_timer(&self, hdl: time_alt::EntryHandle) {
-        assert_eq!(self.timer_flavor, TimerFlavor::Alternative,);
+        assert_eq!(self.timer_flavor, TimerFlavor::Alternative);
         {
             let mut synced = self.shared.synced.lock();
             synced.inject_timers.push(hdl);
@@ -1363,7 +1352,7 @@ impl Handle {
 
     #[cfg(all(tokio_unstable, feature = "time"))]
     pub(crate) fn take_remote_timers(&self) -> Vec<time_alt::EntryHandle> {
-        assert_eq!(self.timer_flavor, TimerFlavor::Alternative,);
+        assert_eq!(self.timer_flavor, TimerFlavor::Alternative);
         // It's ok to lost the race, as another worker is
         // draining the inject_timers.
         match self.shared.synced.try_lock() {

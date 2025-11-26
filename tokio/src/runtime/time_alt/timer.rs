@@ -149,37 +149,6 @@ where
     }
 }
 
-// #[cfg(all(not(target_os = "wasi"), test))]
-// pub(super) fn with_current_local_context<F, R>(hdl: &SchedulerHandle, f: F) -> R
-// where
-//     F: FnOnce(Option<&mut super::LocalContext>) -> R,
-// {
-//     #[cfg(not(feature = "rt"))]
-//     {
-//         let (_, _) = (hdl, f);
-//         panic!("Tokio runtime is not enabled, cannot access the current wheel");
-//     }
-
-//     #[cfg(feature = "rt")]
-//     {
-//         use crate::runtime::context;
-
-//         let is_same_rt =
-//             context::with_current(|cur_hdl| cur_hdl.is_same_runtime(hdl)).unwrap_or_default();
-
-//         if !is_same_rt {
-//             // We don't want to create the timer in one runtime,
-//             // but register it in a different runtime's timer wheel.
-//             f(None)
-//         } else {
-//             context::with_scheduler(|maybe_cx| match maybe_cx {
-//                 Some(cx) => cx.with_time_local_context(f),
-//                 None => f(None),
-//             })
-//         }
-//     }
-// }
-
 fn push_from_remote(sched_hdl: &SchedulerHandle, entry_hdl: EntryHandle) {
     #[cfg(not(feature = "rt"))]
     {
