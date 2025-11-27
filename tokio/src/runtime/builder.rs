@@ -1,7 +1,9 @@
 #![cfg_attr(loom, allow(unused_imports))]
 
 use crate::runtime::handle::Handle;
-use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback};
+use crate::runtime::{
+    blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback, TimerFlavor,
+};
 #[cfg(tokio_unstable)]
 use crate::runtime::{metrics::HistogramConfiguration, LocalOptions, LocalRuntime, TaskMeta};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
@@ -133,6 +135,8 @@ pub struct Builder {
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
+
+    timer_flavor: TimerFlavor,
 }
 
 cfg_unstable! {
@@ -318,6 +322,8 @@ impl Builder {
             metrics_poll_count_histogram: HistogramBuilder::default(),
 
             disable_lifo_slot: false,
+
+            timer_flavor: TimerFlavor::Traditional,
         }
     }
 
@@ -360,6 +366,41 @@ impl Builder {
         #[cfg(feature = "time")]
         self.enable_time();
 
+        self
+    }
+
+    /// Enables the alternative timer implementation, which is disabled by default.
+    ///
+    /// The alternative timer implementation is an unstable feature that may
+    /// provide better performance on multi-threaded runtimes with a large number
+    /// of worker threads.
+    ///
+    /// This option only applies to multi-threaded runtimes. Attempting to use
+    /// this option with any other runtime type will have no effect.
+    ///
+    /// [Click here to share your experience with the alternative timer](https://github.com/tokio-rs/tokio/issues/7745)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///   .enable_alt_timer()
+    ///   .build()
+    ///   .unwrap();
+    /// # }
+    /// ```
+    #[cfg(all(tokio_unstable, feature = "time", feature = "rt-multi-thread"))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(tokio_unstable, feature = "time", feature = "rt-multi-thread")))
+    )]
+    pub fn enable_alt_timer(&mut self) -> &mut Self {
+        self.enable_time();
+        self.timer_flavor = TimerFlavor::Alternative;
         self
     }
 
@@ -992,6 +1033,7 @@ impl Builder {
             enable_time: self.enable_time,
             start_paused: self.start_paused,
             nevents: self.nevents,
+            timer_flavor: self.timer_flavor,
         }
     }
 
@@ -1544,7 +1586,9 @@ impl Builder {
         use crate::runtime::scheduler;
         use crate::runtime::Config;
 
-        let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+        let mut cfg = self.get_cfg();
+        cfg.timer_flavor = TimerFlavor::Traditional;
+        let (driver, driver_handle) = driver::Driver::new(cfg)?;
 
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
@@ -1761,6 +1805,7 @@ cfg_rt_multi_thread! {
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 },
+                self.timer_flavor,
             );
 
             let handle = Handle { inner: scheduler::Handle::MultiThread(handle) };
