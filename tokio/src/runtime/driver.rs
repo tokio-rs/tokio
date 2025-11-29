@@ -40,6 +40,7 @@ pub(crate) struct Cfg {
     pub(crate) enable_pause_time: bool,
     pub(crate) start_paused: bool,
     pub(crate) nevents: usize,
+    pub(crate) timer_flavor: crate::runtime::TimerFlavor,
 }
 
 impl Driver {
@@ -48,7 +49,8 @@ impl Driver {
 
         let clock = create_clock(cfg.enable_pause_time, cfg.start_paused);
 
-        let (time_driver, time_handle) = create_time_driver(cfg.enable_time, io_stack, &clock);
+        let (time_driver, time_handle) =
+            create_time_driver(cfg.enable_time, cfg.timer_flavor, io_stack, &clock);
 
         Ok((
             Self { inner: time_driver },
@@ -111,6 +113,14 @@ impl Handle {
             self.time
                 .as_ref()
                 .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
+        }
+
+        #[cfg(tokio_unstable)]
+        pub(crate) fn with_time<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(Option<&crate::runtime::time::Handle>) -> R,
+        {
+            f(self.time.as_ref())
         }
 
         pub(crate) fn clock(&self) -> &Clock {
@@ -281,6 +291,7 @@ cfg_time! {
         Enabled {
             driver: crate::runtime::time::Driver,
         },
+        EnabledAlt(IoStack),
         Disabled(IoStack),
     }
 
@@ -293,13 +304,21 @@ cfg_time! {
 
     fn create_time_driver(
         enable: bool,
+        timer_flavor: crate::runtime::TimerFlavor,
         io_stack: IoStack,
         clock: &Clock,
     ) -> (TimeDriver, TimeHandle) {
         if enable {
-            let (driver, handle) = crate::runtime::time::Driver::new(io_stack, clock);
-
-            (TimeDriver::Enabled { driver }, Some(handle))
+            match timer_flavor {
+                crate::runtime::TimerFlavor::Traditional => {
+                    let (driver, handle) = crate::runtime::time::Driver::new(io_stack, clock);
+                    (TimeDriver::Enabled { driver }, Some(handle))
+                }
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                crate::runtime::TimerFlavor::Alternative => {
+                    (TimeDriver::EnabledAlt(io_stack), Some(crate::runtime::time::Driver::new_alt(clock)))
+                }
+            }
         } else {
             (TimeDriver::Disabled(io_stack), None)
         }
@@ -309,6 +328,7 @@ cfg_time! {
         pub(crate) fn park(&mut self, handle: &Handle) {
             match self {
                 TimeDriver::Enabled { driver, .. } => driver.park(handle),
+                TimeDriver::EnabledAlt(v) => v.park(handle),
                 TimeDriver::Disabled(v) => v.park(handle),
             }
         }
@@ -316,6 +336,7 @@ cfg_time! {
         pub(crate) fn park_timeout(&mut self, handle: &Handle, duration: Duration) {
             match self {
                 TimeDriver::Enabled { driver } => driver.park_timeout(handle, duration),
+                TimeDriver::EnabledAlt(v) => v.park_timeout(handle, duration),
                 TimeDriver::Disabled(v) => v.park_timeout(handle, duration),
             }
         }
@@ -323,6 +344,7 @@ cfg_time! {
         pub(crate) fn shutdown(&mut self, handle: &Handle) {
             match self {
                 TimeDriver::Enabled { driver } => driver.shutdown(handle),
+                TimeDriver::EnabledAlt(v) => v.shutdown(handle),
                 TimeDriver::Disabled(v) => v.shutdown(handle),
             }
         }
@@ -341,6 +363,7 @@ cfg_not_time! {
 
     fn create_time_driver(
         _enable: bool,
+        _timer_flavor: crate::runtime::TimerFlavor,
         io_stack: IoStack,
         _clock: &Clock,
     ) -> (TimeDriver, TimeHandle) {
