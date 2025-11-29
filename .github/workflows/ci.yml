@@ -18,7 +18,7 @@ env:
   rust_stable: stable
   rust_nightly: nightly-2025-10-12
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2025-11-09
+  rust_miri_nightly: nightly-2025-11-13
   rust_clippy: '1.88'
   # When updating this, also update:
   # - README.md
@@ -372,7 +372,7 @@ jobs:
           cargo miri nextest run --features full --lib --no-fail-fast
         working-directory: tokio
         env:
-          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
 
   miri-test:
     name: miri-test
@@ -395,7 +395,7 @@ jobs:
           cargo miri nextest run --features full --test '*' --no-fail-fast
         working-directory: tokio
         env:
-          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
 
   miri-doc:
     name: miri-doc
@@ -414,7 +414,7 @@ jobs:
           cargo miri test --doc --features $TOKIO_STABLE_FEATURES --no-fail-fast
         working-directory: tokio
         env:
-          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance -Zmiri-retag-fields
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
 
   asan:
     name: asan
