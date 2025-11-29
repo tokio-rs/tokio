@@ -18,10 +18,9 @@ use std::fmt::Debug;
 /// the slab must be passed into each function allowing the implementation to
 /// lookup timer entries.
 ///
-/// See [`Driver`] documentation for some implementation notes.
+/// See `Driver` documentation for some implementation notes.
 ///
 /// [`DelayQueue`]: crate::time::DelayQueue
-/// [`Driver`]: tokio::runtime::time::Driver
 #[derive(Debug)]
 pub(crate) struct Wheel<T> {
     /// The number of milliseconds elapsed since the wheel started.
