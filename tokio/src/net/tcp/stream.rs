@@ -1283,14 +1283,15 @@ impl TcpStream {
         /// details, please see:
         ///
         /// > Volumes of communications have been devoted the the intricacies of `SO_LINGER` versus
-        /// > non-blocking (`O_NONBLOCK`) sockets. From what I can tell, the final word is: don’t
+        /// > non-blocking (`O_NONBLOCK`) sockets. From what I can tell, the final word is: don't
         /// > do it. Rely on the `shutdown()`-followed-by-`read()`-eof technique instead.
         /// >
-        /// > From [The ultimate SO_LINGER page, or: why is my tcp not reliable](https://blog.netherlabs.nl/articles/2009/01/18/the-ultimate-so_linger-page-or-why-is-my-tcp-not-reliable)
+        /// > From [The ultimate `SO_LINGER` page, or: why is my tcp not reliable](https://blog.netherlabs.nl/articles/2009/01/18/the-ultimate-so_linger-page-or-why-is-my-tcp-not-reliable)
         ///
         /// # Examples
         ///
         /// ```no_run
+        /// # #![allow(deprecated)]
         /// use tokio::net::TcpStream;
         ///
         /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
