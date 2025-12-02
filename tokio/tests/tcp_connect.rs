@@ -181,6 +181,7 @@ mod linux {
     use std::{net, thread};
 
     #[tokio::test]
+    #[expect(deprecated)] // set_linger is deprecated
     fn poll_hup() {
         let addr = assert_ok!("127.0.0.1:0".parse());
         let mut srv = assert_ok!(TcpListener::bind(&addr));
