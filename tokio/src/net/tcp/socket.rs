@@ -424,7 +424,7 @@ impl TcpSocket {
     /// incorrect as it leads to blocking the thread when the socket is closed. For more details,
     /// please see:
     ///
-    /// > Volumes of communications have been devoted the the intricacies of `SO_LINGER` versus
+    /// > Volumes of communications have been devoted to the intricacies of `SO_LINGER` versus
     /// > non-blocking (`O_NONBLOCK`) sockets. From what I can tell, the final word is: don't do
     /// > it. Rely on the `shutdown()`-followed-by-`read()`-eof technique instead.
     /// >
