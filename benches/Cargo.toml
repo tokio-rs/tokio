@@ -96,5 +96,10 @@ name = "time_timeout"
 path = "time_timeout.rs"
 harness = false
 
+[[bench]]
+name = "spawn_blocking"
+path = "spawn_blocking.rs"
+harness = false
+
 [lints]
 workspace = true
