@@ -6,6 +6,8 @@
 mod pool;
 pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
 
+mod sharded_queue;
+
 cfg_fs! {
     pub(crate) use pool::spawn_mandatory_blocking;
 }
