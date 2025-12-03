@@ -916,7 +916,7 @@ pub trait StreamExt: Stream {
     /// assert_eq!(Err("no"), values);
     /// # }
     /// ```
-    fn collect<T>(self) -> Collect<Self, T>
+    fn collect<T>(self) -> Collect<Self, T, T::InternalCollection>
     where
         T: FromStream<Self::Item>,
         Self: Sized,
