@@ -33,6 +33,7 @@ async fn shutdown() {
 }
 
 #[tokio::test]
+#[expect(deprecated)] // set_linger is deprecated
 async fn shutdown_after_tcp_reset() {
     let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
