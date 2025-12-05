@@ -1,5 +1,7 @@
+use crate::fs::read_uring::MAX_READ_SIZE;
 use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
 
+use io_uring::squeue::Flags;
 use io_uring::{opcode, types};
 use std::io::{self, Error};
 use std::os::fd::{AsRawFd, OwnedFd};
@@ -23,6 +25,10 @@ impl Completable for Read {
         }
 
         (cqe.result, self.fd, buf)
+    }
+
+    fn complete_batch(self, _: Vec<CqeResult>) -> Self::Output {
+        (Ok(0), self.fd, self.buf)
     }
 
     fn complete_with_error(self, err: Error) -> Self::Output {
@@ -57,5 +63,30 @@ impl Op<Read> {
 
         // SAFETY: Parameters are valid for the entire duration of the operation
         unsafe { Op::new(read_op, Read { fd, buf }) }
+    }
+
+    pub(crate) fn read_batch(fd: OwnedFd, mut buf: Vec<u8>, len: u32, offset: u64) -> Self {
+        let entries = {
+            // total number of batch entries to read the file completly
+            let mut batch_entries = Vec::new();
+
+            for start in (0..len).step_by(MAX_READ_SIZE) {
+                let end = (start + MAX_READ_SIZE as u32).min(len); // clamp to len for the final chunk
+                let len = end - start;
+
+                let buf_mut_ptr = buf.spare_capacity_mut().as_mut_ptr().cast();
+
+                let op = opcode::Read::new(types::Fd(fd.as_raw_fd()), buf_mut_ptr, len)
+                    .offset(start as u64)
+                    .build()
+                    .flags(Flags::IO_LINK);
+
+                batch_entries.push(op);
+            }
+
+            batch_entries
+        };
+
+        unsafe { Op::batch(entries, Read { fd, buf }) }
     }
 }

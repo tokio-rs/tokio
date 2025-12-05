@@ -51,8 +51,6 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
     fn run(rt: Runtime) {
         let (done_tx, done_rx) = mpsc::channel();
         let (_tmp, path) = create_tmp_files(1);
-        // keep 100 permits
-        const N: i32 = 100;
         rt.spawn(async move {
             let path = path[0].clone();
 
@@ -114,6 +112,33 @@ fn read_many_files() {
     for rt in rt_combinations() {
         run(rt());
     }
+}
+
+#[test]
+fn read_small_large_files() {
+    let rt = multi_rt(256);
+    rt().block_on(async move {
+        let tracker = TaskTracker::new();
+
+        tracker.spawn(async move {
+            let (_tmp, path) = create_large_temp_file();
+
+            let bytes = read(path).await.unwrap();
+
+            assert_eq!(bytes, create_buf(5000));
+        });
+
+        tracker.spawn(async move {
+            let (_tmp, path) = create_small_temp_file();
+
+            let bytes = read(path).await.unwrap();
+
+            assert_eq!(bytes, create_buf(20));
+        });
+
+        tracker.close();
+        tracker.wait().await;
+    });
 }
 
 #[tokio::test]
