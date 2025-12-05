@@ -145,6 +145,22 @@ where
     Some(JoinHandle { rx })
 }
 
+#[allow(dead_code)]
+pub(super) fn spawn<F>(f: F) -> JoinHandle<F::Output>
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    let (tx, rx) = oneshot::channel();
+
+    let _task = crate::spawn(async move {
+        let res = f.await;
+        let _ = tx.send(res);
+    });
+
+    JoinHandle { rx }
+}
+
 impl<T> Future for JoinHandle<T> {
     type Output = Result<T, io::Error>;
 
