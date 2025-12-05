@@ -106,10 +106,9 @@ async fn small_probe_read(
     Ok((r_fd, r_buf, is_eof))
 }
 
-// Takes a amount of length to read and reads until we exhaust the given length
-// to read or EOF reached.
+// Takes a amount of length to read and returns a singluar read in the buffer
 //
-// Returns size_read, the result and EOF reached or not
+// Returns the file descriptor, buffer and EOF reached or not
 async fn op_read(
     mut fd: OwnedFd,
     mut buf: Vec<u8>,
