@@ -52,11 +52,7 @@ When releasing a new version of a crate, follow these steps:
    bin/publish <NAME OF CRATE> <VERSION>
    ```
 
-   Your editor and prompt you to edit a message for the tag. Copy the changelog
+   Your editor will prompt you to edit a message for the tag. Copy the changelog
    entry for that release version into your editor and close the window.
 
 [keep-a-changelog]: https://github.com/olivierlacan/keep-a-changelog/blob/master/CHANGELOG.md
-[unit-tests]: https://doc.rust-lang.org/rust-by-example/testing/unit_testing.html
-[integration-tests]: https://doc.rust-lang.org/rust-by-example/testing/integration_testing.html
-[documentation-tests]: https://doc.rust-lang.org/rust-by-example/testing/doc_testing.html
-[conditional-compilation]: https://doc.rust-lang.org/reference/conditional-compilation.html

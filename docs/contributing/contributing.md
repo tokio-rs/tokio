@@ -3,6 +3,16 @@
 This guide will help you get started. **Do not let this guide intimidate you**.
 It should be considered a map to help you navigate the process.
 
+## Quick start
+
+If you are unsure where to begin, use the following guides:
+
+- Want to report or triage a bug? Start with [Contributing in Issues](contributing-in-issues.md).
+- Looking for something to work on? Filter issues by [`E-help-wanted`](https://github.com/tokio-rs/tokio/labels/E-help-wanted).
+- Planning to submit a PR? Read [Pull Requests](pull-requests.md) for the full workflow and required checks.
+- Want to understand what the labels on issues mean? See [Keeping track of issues and PRs](keeping-track-of-issues-and-prs.md).
+- Interested in code review or release engineering? See [Reviewing Pull Requests](reviewing-pull-requests.md) and [Releasing](releasing.md).
+
 ## Table of Contents
 
 - [Contributing in Issues](contributing-in-issues.md)
@@ -24,7 +34,7 @@ It should be considered a map to help you navigate the process.
     - [Discuss and update](pull-requests.md#discuss-and-update)
     - [Commit Squashing](pull-requests.md#commit-squashing)
 - [Reviewing Pull Requests](reviewing-pull-requests.md)
-    - [Review a bit at a time.](reviewing-pull-requests.md#review-a-bit-at-a-time)
+    - [Review a bit at a time](reviewing-pull-requests.md#review-a-bit-at-a-time)
     - [Be aware of the person behind the code](reviewing-pull-requests.md#be-aware-of-the-person-behind-the-code)
     - [Abandoned or Stalled Pull Requests](reviewing-pull-requests.md#abandoned-or-stalled-pull-requests)
 - [Keeping track of issues and PRs](keeping-track-of-issues-and-prs.md)
@@ -34,9 +44,3 @@ It should be considered a map to help you navigate the process.
     - [Module](keeping-track-of-issues-and-prs.md#module)
     - [Topic](keeping-track-of-issues-and-prs.md#topic)
 - [Releasing](releasing.md)
-
-
-
-
-
-

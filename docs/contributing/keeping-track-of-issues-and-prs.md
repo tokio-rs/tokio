@@ -28,7 +28,7 @@ The area label describes the crates relevant to this issue or PR.
   GitHub Actions or code quality.
 - **C-feature-request** This is a feature request. Implementations of feature
   requests use `C-enhancement` instead.
-- **C-feature-accepted** If you submit a PR for this feature request, we wont
+- **C-feature-accepted** If you submit a PR for this feature request, we won't
   close it with the reason "we don't want this". Issues with this label should
   also have the `C-feature-request` label.
 - **C-musing** Stuff like tracking issues or roadmaps. "musings about a better

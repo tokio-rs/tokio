@@ -23,14 +23,14 @@ cargo check --all-features
 cargo test --all-features
 ```
 
-Note: there are some features that are not supported in every system, so you might
+**NOTE**: there are some features that are not supported in every system, so you might
 need to specify which features you want to pass to cargo (e.g., `cargo check --features=full,io-uring`)
 
 Ideally, you should use the same version of clippy as the one used in CI
 (defined by `env.rust_clippy` in [ci.yml][ci.yml]), because newer versions
 might have new lints:
 
-[ci.yml]: .github/workflows/ci.yml
+[ci.yml]: ../../.github/workflows/ci.yml
 
 <!--
 When updating this, also update:
@@ -101,7 +101,7 @@ MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-strict-provenance" \
 
 ### Performing spellcheck on tokio codebase
 
-You can perform spell-check on tokio codebase. For details of how to use the spellcheck tool, feel free to visit
+You can perform a spell-check on the Tokio codebase. For details of how to use the spellcheck tool, feel free to visit
 https://github.com/drahnr/cargo-spellcheck
 ```
 # First install the spell-check plugin
@@ -129,7 +129,7 @@ and [documentation tests][documentation-tests].
 
 Tokio uses [conditional compilation attributes][conditional-compilation]
 throughout the codebase, to modify rustc's behavior. Code marked with such
-attributes can be enabled using RUSTFLAGS and RUSTDOCFLAGS environment
+attributes can be enabled using `RUSTFLAGS` and `RUSTDOCFLAGS` environment
 variables. One of the most prevalent flags passed in these variables is
 the `--cfg` option. To run tests in a particular file, check first what
 options #![cfg] declaration defines for that file.
@@ -187,68 +187,37 @@ Same as with integration tests, when writing a documentation test, the full
 `tokio` crate is available. This is especially useful for getting access to the
 runtime to run the example.
 
-The documentation tests will be visible from both the crate specific
+The documentation tests will be visible from both the crate-specific
 documentation **and** the `tokio` facade documentation via the re-export. The
 example should be written from the point of view of a user that is using the
 `tokio` crate. As such, the example should use the API via the facade and not by
 directly referencing the crate.
 
-The type level example for `tokio_timer::Timeout` provides a good example of a
+The type level example for `tokio::time::timeout` provides a good example of a
 documentation test:
 
 ```
-/// // import the `timeout` function, usually this is done
-/// // with `use tokio::prelude::*`
-/// use tokio::prelude::FutureExt;
-/// use futures::Stream;
-/// use futures::sync::mpsc;
+/// Create a new `Timeout` set to expire in 10 milliseconds.
+///
+/// ```rust
+/// use tokio::time::timeout;
+/// use tokio::sync::oneshot;
+///
 /// use std::time::Duration;
 ///
-/// # fn main() {
-/// let (tx, rx) = mpsc::unbounded();
-/// # tx.unbounded_send(()).unwrap();
-/// # drop(tx);
-///
-/// let process = rx.for_each(|item| {
-///     // do something with `item`
-/// # drop(item);
-/// # Ok(())
-/// });
-///
-/// # tokio::runtime::current_thread::block_on_all(
-/// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
-/// process.timeout(Duration::from_millis(10))
-/// # ).unwrap();
-/// # }
-```
-
-Given that this is a *type* level documentation test and the primary way users
-of `tokio` will create an instance of `Timeout` is by using
-`FutureExt::timeout`, this is how the documentation test is structured.
-
-Lines that start with `/// #` are removed when the documentation is generated.
-They are only there to get the test to run. The `block_on_all` function is the
-easiest way to execute a future from a test.
-
-If this were a documentation test for the `Timeout::new` function, then the
-example would explicitly use `Timeout::new`. For example:
-
-```
-/// use tokio::timer::Timeout;
-/// use futures::Future;
-/// use futures::sync::oneshot;
-/// use std::time::Duration;
-///
-/// # fn main() {
+/// # async fn dox() {
 /// let (tx, rx) = oneshot::channel();
 /// # tx.send(()).unwrap();
 ///
-/// # tokio::runtime::current_thread::block_on_all(
 /// // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
-/// Timeout::new(rx, Duration::from_millis(10))
-/// # ).unwrap();
+/// if let Err(_) = timeout(Duration::from_millis(10), rx).await {
+///     println!("did not receive value within 10 ms");
+/// }
 /// # }
+/// ```
 ```
+
+Lines that start with `/// #` are removed when the documentation is generated.
 
 ### Benchmarks
 
@@ -345,7 +314,7 @@ From within GitHub, opening a new Pull Request will present you with a
 [template] that should be filled out. Please try to do your best at filling out
 the details, but feel free to skip parts if you're not sure what to put.
 
-[template]: .github/PULL_REQUEST_TEMPLATE.md
+[template]: ../../.github/PULL_REQUEST_TEMPLATE.md
 
 ### Discuss and update
 
@@ -370,3 +339,8 @@ squashed into one commit per logical change. Metadata will be added to the
 commit message (including links to the Pull Request, links to relevant issues,
 and the names of the reviewers). The commit history of your Pull Request,
 however, will stay intact on the Pull Request page.
+
+[integration-tests]: https://doc.rust-lang.org/rust-by-example/testing/integration_testing.html
+[unit-tests]: https://doc.rust-lang.org/rust-by-example/testing/unit_testing.html
+[documentation-tests]: https://doc.rust-lang.org/rust-by-example/testing/doc_testing.html
+[conditional-compilation]: https://doc.rust-lang.org/reference/conditional-compilation.html

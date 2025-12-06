@@ -29,7 +29,7 @@ having problems, you can [open a discussion] asking for help.
 In exchange for receiving help, we ask that you contribute back a documentation
 PR that helps others avoid the problems that you encountered.
 
-[open a discussion]: https://github.com/tokio-rs/tokio/discussions/new
+[open a discussion]: https://github.com/tokio-rs/tokio/discussions/new/choose
 
 ### Submitting a Bug Report
 
