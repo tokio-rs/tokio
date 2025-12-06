@@ -29,10 +29,8 @@ Reach out to us on the [Discord server] for any concern not covered in this guid
 
 ## LTS guarantees
 
-Tokio ≥1.0.0 comes with LTS guarantees:
-
-* A minimum of 5 years of maintenance.
-* A minimum of 3 years before a hypothetical 2.0 release.
+In Tokio ≥1.0.0, each LTS release comes with the guarantee of at least one year of
+backported fixes.
 
 The goal of these guarantees is to provide stability to the ecosystem.
 
