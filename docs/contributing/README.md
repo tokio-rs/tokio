@@ -11,7 +11,7 @@ If you are unsure where to begin, use the following guides:
 - Looking for something to work on? Filter issues by [`E-help-wanted`](https://github.com/tokio-rs/tokio/labels/E-help-wanted).
 - Planning to submit a PR? Read [Pull Requests](pull-requests.md) for the full workflow and required checks.
 - Want to understand what the labels on issues mean? See [Keeping track of issues and PRs](keeping-track-of-issues-and-prs.md).
-- Interested in code review or release engineering? See [Reviewing Pull Requests](reviewing-pull-requests.md) and [Releasing](releasing.md).
+- Interested in code review? See [Reviewing Pull Requests](reviewing-pull-requests.md).
 
 ## Table of Contents
 
