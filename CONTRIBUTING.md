@@ -9,9 +9,13 @@ use your help.
 
 **No contribution is too small and all contributions are valued.**
 
-To get started, see the [contributing guidelines].
+## Table of Contents
 
-[contributing guidelines]: ./docs/contributing.md
+  - [Contributing in Issues](#contributing-in-issues)
+  - [Pull Requests](#pull-requests)
+  - [Reviewing Pull Requests](#reviewing-pull-requests)
+  - [Keeping track of issues and PRs](#keeping-track-of-issues-and-prs)
+  - [Releasing](#releasing)
 
 ## Need Help?
 
