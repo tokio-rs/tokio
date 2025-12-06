@@ -9,21 +9,15 @@ use your help.
 
 **No contribution is too small and all contributions are valued.**
 
-## Table of Contents
+See the [contributing guidelines] to getting started.
 
-  - [Contributing in Issues](#contributing-in-issues)
-  - [Pull Requests](#pull-requests)
-  - [Reviewing Pull Requests](#reviewing-pull-requests)
-  - [Keeping track of issues and PRs](#keeping-track-of-issues-and-prs)
-  - [Releasing](#releasing)
+[contributing guidelines]: ./docs/contributing/contributing.md
 
 ## Need Help?
 
 Reach us out on the [Discord server] for any concern not covered in this guide.
 
 [Discord server]: https://discord.gg/tokio
-
-
 
 ## LTS guarantees
 

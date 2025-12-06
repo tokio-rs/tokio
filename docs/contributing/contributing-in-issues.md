@@ -1,11 +1,3 @@
-# Issues
-
-* [Contributing in Issues](#contributing-in-issues)
-* [Asking for General Help](#asking-for-general-help)
-* [Submitting a Bug Report](#submitting-a-bug-report)
-* [Triaging a Bug Report](#triaging-a-bug-report)
-* [Resolving a Bug Report](#resolving-a-bug-report)
- 
 ## Contributing in Issues
 
 For any issue, there are fundamentally three ways an individual can contribute:

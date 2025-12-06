@@ -46,13 +46,13 @@ The area label describes the crates relevant to this issue or PR.
   can do after reading the tutorial on our website.
 - **E-medium** This is not `E-easy` or `E-hard`.
 - **E-hard** This either involves very tricky code, is something we don't know
-  how to solve, or is difficult for some other reason.
+  how to solve, or is challenging for some other reason.
 - **E-needs-mvce** This bug is missing a minimal complete and verifiable
   example.
 
 The "E-" prefix is the same as used in the Rust compiler repository. Some
 issues are missing a difficulty rating, but feel free to ask on our Discord
-server if you want to know how difficult an issue likely is.
+server if you want to know how challenging an issue likely is.
 
 ### Module
 
