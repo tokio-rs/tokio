@@ -65,6 +65,7 @@ The module label provides a more fine grained categorization than **Area**.
 - **M-fs** The `tokio::fs` module.
 - **M-io** The `tokio::io` module.
 - **M-macros** Issues about any kind of macro.
+- **M-metrics** Things relevant to `tokio::runtime::metrics`.
 - **M-net** The `tokio::net` module.
 - **M-process** The `tokio::process` module.
 - **M-runtime** The `tokio::runtime` module.
@@ -73,6 +74,7 @@ The module label provides a more fine grained categorization than **Area**.
 - **M-task** The `tokio::task` module.
 - **M-time** The `tokio::time` module.
 - **M-tracing** Tracing support in Tokio.
+- **M-taskdump** Things relevant to taskdump.
 
 ### Topic
 

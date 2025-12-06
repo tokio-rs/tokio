@@ -10,7 +10,7 @@ use your help.
 
 See the [contributing guidelines] to get started.
 
-[contributing guidelines]: ./docs/contributing/contributing.md
+[contributing guidelines]: docs/contributing/README.md
 
 ## Code of Conduct
 
