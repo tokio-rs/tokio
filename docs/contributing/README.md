@@ -43,4 +43,3 @@ If you are unsure where to begin, use the following guides:
     - [Calls for participation](keeping-track-of-issues-and-prs.md#calls-for-participation)
     - [Module](keeping-track-of-issues-and-prs.md#module)
     - [Topic](keeping-track-of-issues-and-prs.md#topic)
-- [Releasing](releasing.md)
