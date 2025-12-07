@@ -1,0 +1,60 @@
+error[E0405]: cannot find trait `RotatorSelect` in this scope
+ --> tests/fail/macros_join.rs:7:24
+  |
+7 |         fn foo(_: impl RotatorSelect) {}
+  |                        ^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `Pending` in this scope
+  --> tests/fail/macros_join.rs:11:34
+   |
+11 |     let _ = tokio::join!(async { Pending });
+   |                                  ^^^^^^^ not found in this scope
+   |
+help: consider importing this unit variant
+   |
+ 1 + use std::task::Poll::Pending;
+   |
+
+error[E0425]: cannot find function, tuple struct or tuple variant `Ready` in this scope
+  --> tests/fail/macros_join.rs:14:34
+   |
+14 |     let _ = tokio::join!(async { Ready(0) });
+   |                                  ^^^^^ not found in this scope
+   |
+help: consider importing this tuple variant
+   |
+ 1 + use std::task::Poll::Ready;
+   |
+
+error[E0405]: cannot find trait `Future` in this scope
+  --> tests/fail/macros_join.rs:20:14
+   |
+20 |         impl Future for MyFuture {
+   |              ^^^^^^ not found in this scope
+   |
+help: consider importing this trait
+   |
+ 1 + use std::future::Future;
+   |
+
+error[E0433]: failed to resolve: use of undeclared type `Pin`
+  --> tests/fail/macros_join.rs:35:17
+   |
+35 |         let _ = Pin::new(&mut x);
+   |                 ^^^ use of undeclared type `Pin`
+   |
+help: consider importing this struct
+   |
+ 1 + use std::pin::Pin;
+   |
+
+error[E0425]: cannot find function `poll_fn` in this scope
+  --> tests/fail/macros_join.rs:40:17
+   |
+40 |         let _ = poll_fn(|_cx| todo!());
+   |                 ^^^^^^^ not found in this scope
+   |
+help: consider importing this function
+   |
+ 1 + use std::future::poll_fn;
+   |
