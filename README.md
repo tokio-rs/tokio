@@ -131,7 +131,7 @@ question. You can also ask your question on [the discussions page][discussions].
 you! We have a [contributing guide][guide] to help you get involved in the Tokio
 project.
 
-[guide]: https://github.com/tokio-rs/tokio/blob/master/CONTRIBUTING.md
+[guide]: https://github.com/tokio-rs/tokio/blob/master/docs/contributing/README.md
 
 ## Related Projects
 
