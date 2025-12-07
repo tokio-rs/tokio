@@ -389,4 +389,15 @@ impl<T, U> FramedParts<T, U> {
             _priv: (),
         }
     }
+
+    /// Create a new, default, `FramedParts` without encoder enforcement
+    pub fn new_parts(io: T, codec: U) -> FramedParts<T, U> {
+        FramedParts {
+            io,
+            codec,
+            read_buf: BytesMut::new(),
+            write_buf: BytesMut::new(),
+            _priv: (),
+        }
+    }
 }
