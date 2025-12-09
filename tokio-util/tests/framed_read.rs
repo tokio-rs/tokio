@@ -34,6 +34,7 @@ macro_rules! pin {
     };
 }
 
+// Should be equal to the INITIAL_CAPACITY from src/codec/framed_impl.rs
 const INITIAL_CAPACITY: usize = 8 * 1024;
 
 struct U32Decoder;
