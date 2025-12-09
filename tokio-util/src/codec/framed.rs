@@ -390,7 +390,10 @@ impl<T, U> FramedParts<T, U> {
         }
     }
 
-    /// Create a new, default, `FramedParts` without encoder enforcement
+    /// Create a new, default, `FramedParts` without requiring an encoder.
+    ///
+    /// This constructor is useful when you only need a decoder (e.g., for `FramedRead`)
+    /// and the codec doesn't implement `Encoder`.
     pub fn new_parts(io: T, codec: U) -> FramedParts<T, U> {
         FramedParts {
             io,
