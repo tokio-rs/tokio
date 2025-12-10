@@ -25,15 +25,12 @@ const NUM_SHARDS: usize = 16;
 struct Shard {
     /// The task queue for this shard.
     queue: Mutex<VecDeque<Task>>,
-    /// Number of tasks in this shard's queue. Used for fast empty checks.
-    len: AtomicUsize,
 }
 
 impl Shard {
     fn new() -> Self {
         Shard {
             queue: Mutex::new(VecDeque::new()),
-            len: AtomicUsize::new(0),
         }
     }
 
@@ -41,23 +38,12 @@ impl Shard {
     fn push(&self, task: Task) {
         let mut queue = self.queue.lock();
         queue.push_back(task);
-        // Store with Release to ensure the task is visible before len is updated
-        self.len.store(queue.len(), Release);
     }
 
     /// Try to pop a task from this shard's queue.
     fn pop(&self) -> Option<Task> {
-        // Fast path: check if empty without locking
-        if self.len.load(Acquire) == 0 {
-            return None;
-        }
-
         let mut queue = self.queue.lock();
-        let task = queue.pop_front();
-        if task.is_some() {
-            self.len.store(queue.len(), Release);
-        }
-        task
+        queue.pop_front()
     }
 }
 
@@ -161,7 +147,6 @@ impl ShardedQueue {
             loop {
                 let mut queue = shard.queue.lock();
                 if let Some(task) = queue.pop_front() {
-                    shard.len.store(queue.len(), Release);
                     drop(queue);
                     f(task);
                 } else {
