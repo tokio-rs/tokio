@@ -573,7 +573,7 @@ cfg_rt! {
     pub use handle::{EnterGuard, Handle, TryCurrentError};
 
     mod runtime;
-    pub use runtime::{Runtime, RuntimeFlavor};
+    pub use runtime::{Runtime, RuntimeFlavor, is_rt_shutdown_err};
 
     /// Boundary value to prevent stack overflow caused by a large-sized
     /// Future being placed in the stack.
