@@ -58,7 +58,7 @@ impl<R: AsyncRead> ReaderStream<R> {
     /// Convert an [`AsyncRead`] into a [`Stream`] with item type
     /// `Result<Bytes, std::io::Error>`.
     ///
-    /// The default capacity of this stream is 4096 bytes (4KiB).
+    /// The default capacity of this stream is 4096 bytes (4 KiB).
     ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`Stream`]: futures_core::Stream
