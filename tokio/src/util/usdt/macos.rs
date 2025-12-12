@@ -36,7 +36,7 @@ use std::arch::global_asm;
 
 cfg_rt!(
     #[inline(always)]
-    pub(super) fn task_details(task_id: u64, name: &str, file: &str, line: u32, col: u32) {
+    pub(super) fn task_details(task_id: u64, name: &str, file: &std::ffi::CStr, line: u32, col: u32) {
         unsafe extern "C" {
             #[link_name = "__dtrace_isenabled$tokio$task__details$v1"]
             fn task_details_enabled() -> i32;
@@ -55,13 +55,12 @@ cfg_rt!(
         if unsafe { task_details_enabled() } != 0 {
             // add nul bytes
             let name0 = [name.as_bytes(), b"\0"].concat();
-            let file0 = [file.as_bytes(), b"\0"].concat();
 
             unsafe {
                 __task_details(
                     task_id,
                     name0.as_ptr() as *const std::ffi::c_char,
-                    file0.as_ptr() as *const std::ffi::c_char,
+                    file.as_ptr(),
                     line,
                     col,
                 );

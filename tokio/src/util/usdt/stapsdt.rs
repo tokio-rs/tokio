@@ -136,12 +136,11 @@ cfg_rt!(
 
     // `inline(always)` is ok here since we only inline into `super::start_task` which is `inline(never)`
     #[inline(always)]
-    pub(super) fn task_details(task_id: u64, name: &str, file: &str, line: u32, col: u32) {
+    pub(super) fn task_details(task_id: u64, name: &str, file: &std::ffi::CStr, line: u32, col: u32) {
         #[cold]
-        fn task_details_inner(task_id: u64, name: &str, file: &str, line: u32, col: u32) {
+        fn task_details_inner(task_id: u64, name: &str, file: &std::ffi::CStr, line: u32, col: u32) {
             // add nul bytes
             let name0 = [name.as_bytes(), b"\0"].concat();
-            let file0 = [file.as_bytes(), b"\0"].concat();
 
             unsafe {
                 call_probe!(
@@ -151,7 +150,7 @@ cfg_rt!(
                     semaphore = sym __usdt_sema_tokio_task__details,
                     task_id = in(reg) task_id,
                     name = in(reg) name0.as_ptr(),
-                    file = in(reg) file0.as_ptr(),
+                    file = in(reg) file.as_ptr(),
                     line = in(reg) line,
                     col = in(reg) col,
                 );

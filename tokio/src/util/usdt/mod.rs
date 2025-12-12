@@ -48,12 +48,13 @@ cfg_usdt! {
         pub(crate) use usdt_impl::{waker_clone, waker_wake, waker_drop};
 
         #[inline(never)]
+        #[allow(clippy::incompatible_msrv)]
         pub(crate) fn start_task(kind: TaskKind, meta: SpawnMeta<'_>, id: Id, size: usize) {
             usdt_impl::task_start(id.as_u64(), kind as u8, size, meta.original_size);
             usdt_impl::task_details(
                 id.as_u64(),
                 meta.name.unwrap_or_default(),
-                meta.spawned_at.0.file(),
+                meta.spawned_at.0.file_as_c_str(),
                 meta.spawned_at.0.line(),
                 meta.spawned_at.0.column(),
             );
