@@ -296,7 +296,9 @@ impl Handle {
         source: &mut impl Source,
     ) -> io::Result<()> {
         // Deregister the source with the OS poller **first**
-        self.registry.deregister(source)?;
+        // Cleanup ALWAYS happens
+        let os_result = self.registry.deregister(source);
+        
 
         if self
             .registrations
@@ -306,6 +308,8 @@ impl Handle {
         }
 
         self.metrics.dec_fd_count();
+
+        os_result?; // Return error after cleanup
 
         Ok(())
     }

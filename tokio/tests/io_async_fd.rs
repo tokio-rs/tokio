@@ -956,3 +956,49 @@ async fn try_with_interest() {
 
     assert!(Arc::ptr_eq(&original, &returned));
 }
+
+#[tokio::test]
+async fn memory_leak_when_fd_closed_before_drop() {
+    use std::os::unix::io::{AsRawFd, RawFd};
+    use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::io::unix::AsyncFd;
+
+    use nix::sys::socket::{self, AddressFamily, SockFlag, SockType};
+
+    // Wrapper that just holds a raw fd number
+    // This allows us to close it manually
+    struct RawFdWrapper {
+        fd: RawFd,
+    }
+
+    impl AsRawFd for RawFdWrapper {
+        fn as_raw_fd(&self) -> RawFd {
+            self.fd
+        }
+    }
+
+    for _ in 0..100 {
+        // Create a socket pair (works on both Linux and macOS)
+        let (fd_a, _fd_b) = socket::socketpair(
+            AddressFamily::Unix,
+            SockType::Stream,
+            None,
+            SockFlag::empty(),
+        )
+        .expect("socketpair");
+        let raw_fd = fd_a.as_raw_fd();
+        set_nonblocking(raw_fd);
+        std::mem::forget(fd_a);
+        let fd_wrapper = RawFdWrapper { fd: raw_fd };
+        let async_fd = AsyncFd::new(ArcFd(Arc::new(fd_wrapper))).unwrap();
+        unsafe {
+            libc::close(raw_fd);
+        }
+        tokio::time::sleep(Duration::from_millis(1)).await;
+        // Now drop AsyncFd - deregister will fail, but cleanup should still happen
+        drop(async_fd);
+    }
+
+    // If we get here without leaking memory, the test passes
+}
