@@ -292,7 +292,7 @@ impl<T, S: Semaphore> Rx<T, S> {
         ready!(crate::trace::trace_leaf(cx));
 
         // Keep track of task budget
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
@@ -354,7 +354,7 @@ impl<T, S: Semaphore> Rx<T, S> {
         ready!(crate::trace::trace_leaf(cx));
 
         // Keep track of task budget
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         if limit == 0 {
             coop.made_progress();
@@ -439,6 +439,10 @@ impl<T, S: Semaphore> Rx<T, S> {
                             return Ok(value);
                         }
                         TryPopResult::Closed => return Err(TryRecvError::Disconnected),
+                        // If close() was called, an empty queue should report Disconnected.
+                        TryPopResult::Empty if rx_fields.rx_closed => {
+                            return Err(TryRecvError::Disconnected)
+                        }
                         TryPopResult::Empty => return Err(TryRecvError::Empty),
                         TryPopResult::Busy => {} // fall through
                     }

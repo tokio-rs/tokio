@@ -77,7 +77,7 @@ impl SlowHddWriter {
     ) -> std::task::Poll<Result<usize, std::io::Error>> {
         let service_res = self.as_mut().service_write(cx);
 
-        if service_res.is_pending() && self.blocking_rng.gen_bool(PROBABILITY_FLUSH_WAIT) {
+        if service_res.is_pending() && self.blocking_rng.random_bool(PROBABILITY_FLUSH_WAIT) {
             return Poll::Pending;
         }
         let available = self.buffer_size - self.buffer_used;
@@ -145,7 +145,7 @@ impl ChunkReader {
     fn new(chunk_size: usize, service_interval: Duration) -> Self {
         let mut service_intervals = interval(service_interval);
         service_intervals.set_missed_tick_behavior(MissedTickBehavior::Burst);
-        let data: Vec<u8> = std::iter::repeat(0).take(chunk_size).collect();
+        let data: Vec<u8> = std::iter::repeat_n(0, chunk_size).collect();
         Self {
             data,
             service_intervals,

@@ -141,11 +141,9 @@ impl Decoder for AnyDelimiterCodec {
             // there's no max_length set, we'll read to the end of the buffer.
             let read_to = cmp::min(self.max_length.saturating_add(1), buf.len());
 
-            let new_chunk_offset = buf[self.next_index..read_to].iter().position(|b| {
-                self.seek_delimiters
-                    .iter()
-                    .any(|delimiter| *b == *delimiter)
-            });
+            let new_chunk_offset = buf[self.next_index..read_to]
+                .iter()
+                .position(|b| self.seek_delimiters.contains(b));
 
             match (self.is_discarding, new_chunk_offset) {
                 (true, Some(offset)) => {
@@ -217,7 +215,7 @@ where
 
     fn encode(&mut self, chunk: T, buf: &mut BytesMut) -> Result<(), AnyDelimiterCodecError> {
         let chunk = chunk.as_ref();
-        buf.reserve(chunk.len() + 1);
+        buf.reserve(chunk.len() + self.sequence_writer.len());
         buf.put(chunk.as_bytes());
         buf.put(self.sequence_writer.as_ref());
 

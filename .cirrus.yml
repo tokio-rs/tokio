@@ -1,11 +1,13 @@
 only_if: $CIRRUS_TAG == '' && ($CIRRUS_PR != '' || $CIRRUS_BRANCH == 'master' || $CIRRUS_BRANCH =~ 'tokio-.*')
 auto_cancellation: $CIRRUS_BRANCH != 'master' && $CIRRUS_BRANCH !=~ 'tokio-.*'
 freebsd_instance:
-  image_family: freebsd-14-1
+  image_family: freebsd-14-3
 env:
   RUST_STABLE: stable
   RUST_NIGHTLY: nightly-2025-01-25
   RUSTFLAGS: -D warnings
+  # This excludes unstable features like io_uring, which require '--cfg tokio_unstable'.
+  TOKIO_STABLE_FEATURES: full,test-util
 
 # Test FreeBSD in a full VM on cirrus-ci.com.  Test the i686 target too, in the
 # same VM.  The binary will be built in 32-bit mode, but will execute on a
@@ -23,7 +25,16 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --all-features
+    - cargo test --all --features $TOKIO_STABLE_FEATURES
+    # Free the disk space before the next build,
+    # otherwise cirrus-ci complains about "No space left on device".
+    - cargo clean
+    # Enable all unstable features except `taskdump`, which is Linux-only.
+    - |
+      RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
+      RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" \
+        cargo test \
+          --features $TOKIO_STABLE_FEATURES,io-uring,tracing
 
 task:
   name: FreeBSD docs
@@ -40,7 +51,9 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo doc --lib --no-deps --all-features --document-private-items
+    # We use `--features $TOKIO_STABLE_FEATURES,io-uring,tracing` instead of
+    # `--all-features` to exclude `taskdump`, which is Linux-only.
+    - cargo doc --lib --no-deps --features $TOKIO_STABLE_FEATURES,io-uring,tracing --document-private-items
 
 task:
   name: FreeBSD 32-bit
@@ -55,4 +68,4 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --all-features --target i686-unknown-freebsd
+    - cargo test --all --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd

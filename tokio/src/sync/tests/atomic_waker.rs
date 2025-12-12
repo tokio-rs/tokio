@@ -39,6 +39,38 @@ fn wake_without_register() {
     assert!(!waker.is_woken());
 }
 
+#[test]
+#[cfg_attr(target_family = "wasm", ignore)] // threads not supported
+fn failed_wake_synchronizes() {
+    for _ in 0..1000 {
+        failed_wake_synchronizes_inner();
+    }
+}
+
+fn failed_wake_synchronizes_inner() {
+    use futures::task::noop_waker_ref;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static DID_SYNCHRONIZE: AtomicBool = AtomicBool::new(false);
+    DID_SYNCHRONIZE.store(false, Ordering::Relaxed);
+
+    let waker = AtomicWaker::new();
+    waker.register_by_ref(noop_waker_ref());
+
+    std::thread::scope(|s| {
+        let jh = s.spawn(|| {
+            DID_SYNCHRONIZE.store(true, Ordering::Relaxed);
+            waker.take_waker()
+        });
+
+        waker.take_waker();
+        waker.register_by_ref(noop_waker_ref());
+
+        let did_synchronize = DID_SYNCHRONIZE.load(Ordering::Relaxed);
+        let did_take = jh.join().unwrap().is_some();
+        assert!(did_synchronize || did_take);
+    });
+}
+
 #[cfg(panic = "unwind")]
 #[test]
 #[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding

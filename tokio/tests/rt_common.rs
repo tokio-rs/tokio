@@ -53,40 +53,6 @@ macro_rules! rt_test {
                     .into()
             }
         }
-
-        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
-        #[cfg(tokio_unstable)]
-        mod alt_threaded_scheduler_4_threads {
-            $($t)*
-
-            const NUM_WORKERS: usize = 4;
-
-            fn rt() -> Arc<Runtime> {
-                tokio::runtime::Builder::new_multi_thread()
-                    .worker_threads(4)
-                    .enable_all()
-                    .build()
-                    .unwrap()
-                    .into()
-            }
-        }
-
-        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
-        #[cfg(tokio_unstable)]
-        mod alt_threaded_scheduler_1_thread {
-            $($t)*
-
-            const NUM_WORKERS: usize = 1;
-
-            fn rt() -> Arc<Runtime> {
-                tokio::runtime::Builder::new_multi_thread()
-                    .worker_threads(1)
-                    .enable_all()
-                    .build()
-                    .unwrap()
-                    .into()
-            }
-        }
     }
 }
 
@@ -745,7 +711,25 @@ rt_test! {
     #[cfg_attr(miri, ignore)] // No `socket` in miri.
     fn yield_defers_until_park() {
         for _ in 0..10 {
-            if yield_defers_until_park_inner() {
+            if yield_defers_until_park_inner(false) {
+                // test passed
+                return;
+            }
+
+            // Wait a bit and run the test again.
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+
+        panic!("yield_defers_until_park is failing consistently");
+    }
+
+    /// Same as above, but with cooperative scheduling.
+    #[test]
+    #[cfg(not(target_os="wasi"))]
+    #[cfg_attr(miri, ignore)] // No `socket` in miri.
+    fn coop_yield_defers_until_park() {
+        for _ in 0..10 {
+            if yield_defers_until_park_inner(true) {
                 // test passed
                 return;
             }
@@ -760,9 +744,11 @@ rt_test! {
     /// Implementation of `yield_defers_until_park` test. Returns `true` if the
     /// test passed.
     #[cfg(not(target_os="wasi"))]
-    fn yield_defers_until_park_inner() -> bool {
+    fn yield_defers_until_park_inner(use_coop: bool) -> bool {
         use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
         use std::sync::Barrier;
+
+        const BUDGET: usize = 128;
 
         let rt = rt();
 
@@ -802,7 +788,15 @@ rt_test! {
                         // Yield until connected
                         let mut cnt = 0;
                         while !flag_clone.load(SeqCst){
-                            tokio::task::yield_now().await;
+                            if use_coop {
+                                // Consume a good chunk of budget, which should
+                                // force at least one yield.
+                                for _ in 0..BUDGET {
+                                    tokio::task::consume_budget().await;
+                                }
+                            } else {
+                                tokio::task::yield_now().await;
+                            }
                             cnt += 1;
 
                             if cnt >= 10 {

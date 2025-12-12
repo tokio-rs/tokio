@@ -40,7 +40,7 @@ use std::task::{self, ready, Poll, Waker};
 /// # `Stream` implementation
 ///
 /// Items are retrieved from the queue via [`DelayQueue::poll_expired`]. If no delays have
-/// expired, no items are returned. In this case, `Poll::Pending` is returned and the
+/// expired, no items are returned. In this case, [`Poll::Pending`] is returned and the
 /// current task is registered to be notified once the next item's delay has
 /// expired.
 ///
@@ -66,9 +66,13 @@ use std::task::{self, ready, Poll, Waker};
 /// Capacity can be checked using [`capacity`] and allocated preemptively by using
 /// the [`reserve`] method.
 ///
+/// # Cancellation safety
+///
+/// [`DelayQueue`]'s implementation of [`StreamExt::next`] is cancellation safe.
+///
 /// # Usage
 ///
-/// Using `DelayQueue` to manage cache entries.
+/// Using [`DelayQueue`] to manage cache entries.
 ///
 /// ```rust,no_run
 /// use tokio_util::time::{DelayQueue, delay_queue};
@@ -118,7 +122,8 @@ use std::task::{self, ready, Poll, Waker};
 /// [`insert`]: method@Self::insert
 /// [`insert_at`]: method@Self::insert_at
 /// [`Key`]: struct@Key
-/// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
+/// [`Stream`]: https://docs.rs/futures/0.3.31/futures/stream/trait.Stream.html
+/// [`StreamExt::next`]: https://docs.rs/tokio-stream/0.1.17/tokio_stream/trait.StreamExt.html#method.next
 /// [`poll_expired`]: method@Self::poll_expired
 /// [`Stream::poll_expired`]: method@Self::poll_expired
 /// [`DelayQueue`]: struct@DelayQueue
@@ -456,7 +461,7 @@ impl<T> DelayQueue<T> {
     /// # use tokio_util::time::DelayQueue;
     /// # use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::with_capacity(10);
     ///
@@ -512,7 +517,7 @@ impl<T> DelayQueue<T> {
     /// use tokio::time::{Duration, Instant};
     /// use tokio_util::time::DelayQueue;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert_at(
@@ -632,7 +637,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -687,7 +692,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -738,7 +743,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -836,7 +841,7 @@ impl<T> DelayQueue<T> {
     /// use tokio::time::{Duration, Instant};
     /// use tokio_util::time::DelayQueue;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -893,7 +898,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::with_capacity(10);
     ///
@@ -926,7 +931,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -978,7 +983,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -1009,7 +1014,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -1051,7 +1056,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
     /// assert_eq!(delay_queue.len(), 0);
@@ -1086,7 +1091,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -1116,7 +1121,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// assert!(delay_queue.is_empty());

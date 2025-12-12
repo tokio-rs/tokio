@@ -53,6 +53,8 @@ use tokio::{
 /// `TaskTracker`, this does not happen. Once tasks exit, they are immediately removed from the
 /// `TaskTracker`.
 ///
+/// Note that unlike [`JoinSet`], dropping a `TaskTracker` does not abort the tasks.
+///
 /// # Examples
 ///
 /// For more examples, please see the topic page on [graceful shutdown].
@@ -64,23 +66,23 @@ use tokio::{
 /// ```
 /// use tokio_util::task::TaskTracker;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let tracker = TaskTracker::new();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let tracker = TaskTracker::new();
 ///
-///     for i in 0..10 {
-///         tracker.spawn(async move {
-///             println!("Task {} is running!", i);
-///         });
-///     }
-///     // Once we spawned everything, we close the tracker.
-///     tracker.close();
-///
-///     // Wait for everything to finish.
-///     tracker.wait().await;
-///
-///     println!("This is printed after all of the tasks.");
+/// for i in 0..10 {
+///     tracker.spawn(async move {
+///         println!("Task {} is running!", i);
+///     });
 /// }
+/// // Once we spawned everything, we close the tracker.
+/// tracker.close();
+///
+/// // Wait for everything to finish.
+/// tracker.wait().await;
+///
+/// println!("This is printed after all of the tasks.");
+/// # }
 /// ```
 ///
 /// ## Wait for tasks to exit
@@ -90,6 +92,8 @@ use tokio::{
 /// ```
 /// use tokio_util::sync::CancellationToken;
 /// use tokio_util::task::TaskTracker;
+/// use tokio_util::time::FutureExt;
+///
 /// use tokio::time::{self, Duration};
 ///
 /// async fn background_task(num: u64) {
@@ -109,17 +113,18 @@ use tokio::{
 ///     for i in 0..10 {
 ///         let token = token.clone();
 ///         tracker.spawn(async move {
-///             // Use a `tokio::select!` to kill the background task if the token is
-///             // cancelled.
-///             tokio::select! {
-///                 () = background_task(i) => {
-///                     println!("Task {} exiting normally.", i);
-///                 },
-///                 () = token.cancelled() => {
+///             // Use a `with_cancellation_token_owned` to kill the background task
+///             // if the token is cancelled.
+///             match background_task(i)
+///                 .with_cancellation_token_owned(token)
+///                 .await
+///             {
+///                 Some(()) => println!("Task {} exiting normally.", i),
+///                 None => {
 ///                     // Do some cleanup before we really exit.
 ///                     time::sleep(Duration::from_millis(50)).await;
 ///                     println!("Task {} finished cleanup.", i);
-///                 },
+///                 }
 ///             }
 ///         });
 ///     }
@@ -396,11 +401,17 @@ impl TaskTracker {
         handle.spawn(self.track_future(task))
     }
 
-    /// Spawn the provided future on the current [`LocalSet`], and track it in this `TaskTracker`.
+    /// Spawn the provided future on the current [`LocalSet`] or [`LocalRuntime`]
+    /// and track it in this `TaskTracker`.
     ///
     /// This is equivalent to `tokio::task::spawn_local(tracker.track_future(task))`.
     ///
+    /// # Panics
+    ///
+    /// This method panics if it is called outside of a `LocalSet` or `LocalRuntime`.
+    ///
     /// [`LocalSet`]: tokio::task::LocalSet
+    /// [`LocalRuntime`]: tokio::runtime::LocalRuntime
     #[inline]
     #[track_caller]
     #[cfg(feature = "rt")]

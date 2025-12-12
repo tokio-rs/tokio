@@ -16,7 +16,7 @@ pin_project! {
     /// # Example
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> std::io::Result<()> {
     /// use tokio_stream::StreamExt;
     /// use tokio_util::io::ReaderStream;

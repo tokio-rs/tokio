@@ -21,21 +21,21 @@
 //! ```
 //! use tokio::sync::oneshot;
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     let (tx, rx) = oneshot::channel();
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
+//! let (tx, rx) = oneshot::channel();
 //!
-//!     tokio::spawn(async move {
-//!         if let Err(_) = tx.send(3) {
-//!             println!("the receiver dropped");
-//!         }
-//!     });
-//!
-//!     match rx.await {
-//!         Ok(v) => println!("got = {:?}", v),
-//!         Err(_) => println!("the sender dropped"),
+//! tokio::spawn(async move {
+//!     if let Err(_) = tx.send(3) {
+//!         println!("the receiver dropped");
 //!     }
+//! });
+//!
+//! match rx.await {
+//!     Ok(v) => println!("got = {:?}", v),
+//!     Err(_) => println!("the sender dropped"),
 //! }
+//! # }
 //! ```
 //!
 //! If the sender is dropped without sending, the receiver will fail with
@@ -44,19 +44,19 @@
 //! ```
 //! use tokio::sync::oneshot;
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     let (tx, rx) = oneshot::channel::<u32>();
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
+//! let (tx, rx) = oneshot::channel::<u32>();
 //!
-//!     tokio::spawn(async move {
-//!         drop(tx);
-//!     });
+//! tokio::spawn(async move {
+//!     drop(tx);
+//! });
 //!
-//!     match rx.await {
-//!         Ok(_) => panic!("This doesn't happen"),
-//!         Err(_) => println!("the sender dropped"),
-//!     }
+//! match rx.await {
+//!     Ok(_) => panic!("This doesn't happen"),
+//!     Err(_) => println!("the sender dropped"),
 //! }
+//! # }
 //! ```
 //!
 //! To use a `oneshot` channel in a `tokio::select!` loop, add `&mut` in front of
@@ -66,30 +66,30 @@
 //! use tokio::sync::oneshot;
 //! use tokio::time::{interval, sleep, Duration};
 //!
-//! #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn _doc() {}
 //! # #[tokio::main(flavor = "current_thread", start_paused = true)]
-//! async fn main() {
-//!     let (send, mut recv) = oneshot::channel();
-//!     let mut interval = interval(Duration::from_millis(100));
+//! # async fn main() {
+//! let (send, mut recv) = oneshot::channel();
+//! let mut interval = interval(Duration::from_millis(100));
 //!
-//!     # let handle =
-//!     tokio::spawn(async move {
-//!         sleep(Duration::from_secs(1)).await;
-//!         send.send("shut down").unwrap();
-//!     });
+//! # let handle =
+//! tokio::spawn(async move {
+//!     sleep(Duration::from_secs(1)).await;
+//!     send.send("shut down").unwrap();
+//! });
 //!
-//!     loop {
-//!         tokio::select! {
-//!             _ = interval.tick() => println!("Another 100ms"),
-//!             msg = &mut recv => {
-//!                 println!("Got message: {}", msg.unwrap());
-//!                 break;
-//!             }
+//! loop {
+//!     tokio::select! {
+//!         _ = interval.tick() => println!("Another 100ms"),
+//!         msg = &mut recv => {
+//!             println!("Got message: {}", msg.unwrap());
+//!             break;
 //!         }
 //!     }
-//!     # handle.await.unwrap();
 //! }
+//! # handle.await.unwrap();
+//! # }
 //! ```
 //!
 //! To use a `Sender` from a destructor, put it in an [`Option`] and call
@@ -110,17 +110,17 @@
 //!     }
 //! }
 //!
-//! #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn _doc() {}
 //! # #[tokio::main(flavor = "current_thread")]
-//! async fn main() {
-//!     let (send, recv) = oneshot::channel();
+//! # async fn main() {
+//! let (send, recv) = oneshot::channel();
 //!
-//!     let send_on_drop = SendOnDrop { sender: Some(send) };
-//!     drop(send_on_drop);
+//! let send_on_drop = SendOnDrop { sender: Some(send) };
+//! drop(send_on_drop);
 //!
-//!     assert_eq!(recv.await, Ok("I got dropped!"));
-//! }
+//! assert_eq!(recv.await, Ok("I got dropped!"));
+//! # }
 //! ```
 
 use crate::loom::cell::UnsafeCell;
@@ -147,21 +147,21 @@ use std::task::{ready, Context, Poll, Waker};
 /// ```
 /// use tokio::sync::oneshot;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, rx) = oneshot::channel();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, rx) = oneshot::channel();
 ///
-///     tokio::spawn(async move {
-///         if let Err(_) = tx.send(3) {
-///             println!("the receiver dropped");
-///         }
-///     });
-///
-///     match rx.await {
-///         Ok(v) => println!("got = {:?}", v),
-///         Err(_) => println!("the sender dropped"),
+/// tokio::spawn(async move {
+///     if let Err(_) = tx.send(3) {
+///         println!("the receiver dropped");
 ///     }
+/// });
+///
+/// match rx.await {
+///     Ok(v) => println!("got = {:?}", v),
+///     Err(_) => println!("the sender dropped"),
 /// }
+/// # }
 /// ```
 ///
 /// If the sender is dropped without sending, the receiver will fail with
@@ -170,19 +170,19 @@ use std::task::{ready, Context, Poll, Waker};
 /// ```
 /// use tokio::sync::oneshot;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, rx) = oneshot::channel::<u32>();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, rx) = oneshot::channel::<u32>();
 ///
-///     tokio::spawn(async move {
-///         drop(tx);
-///     });
+/// tokio::spawn(async move {
+///     drop(tx);
+/// });
 ///
-///     match rx.await {
-///         Ok(_) => panic!("This doesn't happen"),
-///         Err(_) => println!("the sender dropped"),
-///     }
+/// match rx.await {
+///     Ok(_) => panic!("This doesn't happen"),
+///     Err(_) => println!("the sender dropped"),
 /// }
+/// # }
 /// ```
 ///
 /// To use a `Sender` from a destructor, put it in an [`Option`] and call
@@ -203,17 +203,17 @@ use std::task::{ready, Context, Poll, Waker};
 ///     }
 /// }
 ///
-/// #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn _doc() {}
 /// # #[tokio::main(flavor = "current_thread")]
-/// async fn main() {
-///     let (send, recv) = oneshot::channel();
+/// # async fn main() {
+/// let (send, recv) = oneshot::channel();
 ///
-///     let send_on_drop = SendOnDrop { sender: Some(send) };
-///     drop(send_on_drop);
+/// let send_on_drop = SendOnDrop { sender: Some(send) };
+/// drop(send_on_drop);
 ///
-///     assert_eq!(recv.await, Ok("I got dropped!"));
-/// }
+/// assert_eq!(recv.await, Ok("I got dropped!"));
+/// # }
 /// ```
 ///
 /// [`Option`]: std::option::Option
@@ -248,21 +248,21 @@ pub struct Sender<T> {
 /// ```
 /// use tokio::sync::oneshot;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, rx) = oneshot::channel();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, rx) = oneshot::channel();
 ///
-///     tokio::spawn(async move {
-///         if let Err(_) = tx.send(3) {
-///             println!("the receiver dropped");
-///         }
-///     });
-///
-///     match rx.await {
-///         Ok(v) => println!("got = {:?}", v),
-///         Err(_) => println!("the sender dropped"),
+/// tokio::spawn(async move {
+///     if let Err(_) = tx.send(3) {
+///         println!("the receiver dropped");
 ///     }
+/// });
+///
+/// match rx.await {
+///     Ok(v) => println!("got = {:?}", v),
+///     Err(_) => println!("the sender dropped"),
 /// }
+/// # }
 /// ```
 ///
 /// If the sender is dropped without sending, the receiver will fail with
@@ -271,19 +271,19 @@ pub struct Sender<T> {
 /// ```
 /// use tokio::sync::oneshot;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, rx) = oneshot::channel::<u32>();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, rx) = oneshot::channel::<u32>();
 ///
-///     tokio::spawn(async move {
-///         drop(tx);
-///     });
+/// tokio::spawn(async move {
+///     drop(tx);
+/// });
 ///
-///     match rx.await {
-///         Ok(_) => panic!("This doesn't happen"),
-///         Err(_) => println!("the sender dropped"),
-///     }
+/// match rx.await {
+///     Ok(_) => panic!("This doesn't happen"),
+///     Err(_) => println!("the sender dropped"),
 /// }
+/// # }
 /// ```
 ///
 /// To use a `Receiver` in a `tokio::select!` loop, add `&mut` in front of the
@@ -293,30 +293,30 @@ pub struct Sender<T> {
 /// use tokio::sync::oneshot;
 /// use tokio::time::{interval, sleep, Duration};
 ///
-/// #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn _doc() {}
 /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
-/// async fn main() {
-///     let (send, mut recv) = oneshot::channel();
-///     let mut interval = interval(Duration::from_millis(100));
+/// # async fn main() {
+/// let (send, mut recv) = oneshot::channel();
+/// let mut interval = interval(Duration::from_millis(100));
 ///
-///     # let handle =
-///     tokio::spawn(async move {
-///         sleep(Duration::from_secs(1)).await;
-///         send.send("shut down").unwrap();
-///     });
+/// # let handle =
+/// tokio::spawn(async move {
+///     sleep(Duration::from_secs(1)).await;
+///     send.send("shut down").unwrap();
+/// });
 ///
-///     loop {
-///         tokio::select! {
-///             _ = interval.tick() => println!("Another 100ms"),
-///             msg = &mut recv => {
-///                 println!("Got message: {}", msg.unwrap());
-///                 break;
-///             }
+/// loop {
+///     tokio::select! {
+///         _ = interval.tick() => println!("Another 100ms"),
+///         msg = &mut recv => {
+///             println!("Got message: {}", msg.unwrap());
+///             break;
 ///         }
 ///     }
-///     # handle.await.unwrap();
 /// }
+/// # handle.await.unwrap();
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct Receiver<T> {
@@ -404,31 +404,51 @@ struct Inner<T> {
 struct Task(UnsafeCell<MaybeUninit<Waker>>);
 
 impl Task {
+    /// # Safety
+    ///
+    /// The caller must do the necessary synchronization to ensure that
+    /// the [`Self::0`] contains the valid [`Waker`] during the call.
     unsafe fn will_wake(&self, cx: &mut Context<'_>) -> bool {
-        self.with_task(|w| w.will_wake(cx.waker()))
+        unsafe { self.with_task(|w| w.will_wake(cx.waker())) }
     }
 
+    /// # Safety
+    ///
+    /// The caller must do the necessary synchronization to ensure that
+    /// the [`Self::0`] contains the valid [`Waker`] during the call.
     unsafe fn with_task<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&Waker) -> R,
     {
         self.0.with(|ptr| {
-            let waker: *const Waker = (*ptr).as_ptr();
-            f(&*waker)
+            let waker: *const Waker = unsafe { (*ptr).as_ptr() };
+            f(unsafe { &*waker })
         })
     }
 
+    /// # Safety
+    ///
+    /// The caller must do the necessary synchronization to ensure that
+    /// the [`Self::0`] contains the valid [`Waker`] during the call.
     unsafe fn drop_task(&self) {
         self.0.with_mut(|ptr| {
-            let ptr: *mut Waker = (*ptr).as_mut_ptr();
-            ptr.drop_in_place();
+            let ptr: *mut Waker = unsafe { (*ptr).as_mut_ptr() };
+            unsafe {
+                ptr.drop_in_place();
+            }
         });
     }
 
+    /// # Safety
+    ///
+    /// The caller must do the necessary synchronization to ensure that
+    /// the [`Self::0`] contains the valid [`Waker`] during the call.
     unsafe fn set_task(&self, cx: &mut Context<'_>) {
         self.0.with_mut(|ptr| {
-            let ptr: *mut Waker = (*ptr).as_mut_ptr();
-            ptr.write(cx.waker().clone());
+            let ptr: *mut Waker = unsafe { (*ptr).as_mut_ptr() };
+            unsafe {
+                ptr.write(cx.waker().clone());
+            }
         });
     }
 }
@@ -450,21 +470,21 @@ struct State(usize);
 /// ```
 /// use tokio::sync::oneshot;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, rx) = oneshot::channel();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, rx) = oneshot::channel();
 ///
-///     tokio::spawn(async move {
-///         if let Err(_) = tx.send(3) {
-///             println!("the receiver dropped");
-///         }
-///     });
-///
-///     match rx.await {
-///         Ok(v) => println!("got = {:?}", v),
-///         Err(_) => println!("the sender dropped"),
+/// tokio::spawn(async move {
+///     if let Err(_) = tx.send(3) {
+///         println!("the receiver dropped");
 ///     }
+/// });
+///
+/// match rx.await {
+///     Ok(v) => println!("got = {:?}", v),
+///     Err(_) => println!("the sender dropped"),
 /// }
+/// # }
 /// ```
 #[track_caller]
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
@@ -576,21 +596,21 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::oneshot;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = oneshot::channel();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = oneshot::channel();
     ///
-    ///     tokio::spawn(async move {
-    ///         if let Err(_) = tx.send(3) {
-    ///             println!("the receiver dropped");
-    ///         }
-    ///     });
-    ///
-    ///     match rx.await {
-    ///         Ok(v) => println!("got = {:?}", v),
-    ///         Err(_) => println!("the sender dropped"),
+    /// tokio::spawn(async move {
+    ///     if let Err(_) = tx.send(3) {
+    ///         println!("the receiver dropped");
     ///     }
+    /// });
+    ///
+    /// match rx.await {
+    ///     Ok(v) => println!("got = {:?}", v),
+    ///     Err(_) => println!("the sender dropped"),
     /// }
+    /// # }
     /// ```
     pub fn send(mut self, t: T) -> Result<(), T> {
         let inner = self.inner.take().unwrap();
@@ -652,17 +672,17 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::oneshot;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (mut tx, rx) = oneshot::channel::<()>();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (mut tx, rx) = oneshot::channel::<()>();
     ///
-    ///     tokio::spawn(async move {
-    ///         drop(rx);
-    ///     });
+    /// tokio::spawn(async move {
+    ///     drop(rx);
+    /// });
     ///
-    ///     tx.closed().await;
-    ///     println!("the receiver dropped");
-    /// }
+    /// tx.closed().await;
+    /// println!("the receiver dropped");
+    /// # }
     /// ```
     ///
     /// Paired with select
@@ -676,26 +696,26 @@ impl<T> Sender<T> {
     /// # "hello".to_string()
     /// }
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (mut tx, rx) = oneshot::channel();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (mut tx, rx) = oneshot::channel();
     ///
-    ///     tokio::spawn(async move {
-    ///         tokio::select! {
-    ///             _ = tx.closed() => {
-    ///                 // The receiver dropped, no need to do any further work
-    ///             }
-    ///             value = compute() => {
-    ///                 // The send can fail if the channel was closed at the exact same
-    ///                 // time as when compute() finished, so just ignore the failure.
-    ///                 let _ = tx.send(value);
-    ///             }
+    /// tokio::spawn(async move {
+    ///     tokio::select! {
+    ///         _ = tx.closed() => {
+    ///             // The receiver dropped, no need to do any further work
     ///         }
-    ///     });
+    ///         value = compute() => {
+    ///             // The send can fail if the channel was closed at the exact same
+    ///             // time as when compute() finished, so just ignore the failure.
+    ///             let _ = tx.send(value);
+    ///         }
+    ///     }
+    /// });
     ///
-    ///     // Wait for up to 10 seconds
-    ///     let _ = time::timeout(Duration::from_secs(10), rx).await;
-    /// }
+    /// // Wait for up to 10 seconds
+    /// let _ = time::timeout(Duration::from_secs(10), rx).await;
+    /// # }
     /// ```
     pub async fn closed(&mut self) {
         use std::future::poll_fn;
@@ -731,17 +751,17 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::oneshot;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = oneshot::channel();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = oneshot::channel();
     ///
-    ///     assert!(!tx.is_closed());
+    /// assert!(!tx.is_closed());
     ///
-    ///     drop(rx);
+    /// drop(rx);
     ///
-    ///     assert!(tx.is_closed());
-    ///     assert!(tx.send("never received").is_err());
-    /// }
+    /// assert!(tx.is_closed());
+    /// assert!(tx.send("never received").is_err());
+    /// # }
     /// ```
     pub fn is_closed(&self) -> bool {
         let inner = self.inner.as_ref().unwrap();
@@ -777,24 +797,24 @@ impl<T> Sender<T> {
     ///
     /// use std::future::poll_fn;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (mut tx, mut rx) = oneshot::channel::<()>();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (mut tx, mut rx) = oneshot::channel::<()>();
     ///
-    ///     tokio::spawn(async move {
-    ///         rx.close();
-    ///     });
+    /// tokio::spawn(async move {
+    ///     rx.close();
+    /// });
     ///
-    ///     poll_fn(|cx| tx.poll_closed(cx)).await;
+    /// poll_fn(|cx| tx.poll_closed(cx)).await;
     ///
-    ///     println!("the receiver dropped");
-    /// }
+    /// println!("the receiver dropped");
+    /// # }
     /// ```
     pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         ready!(crate::trace::trace_leaf(cx));
 
         // Keep track of task budget
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         let inner = self.inner.as_ref().unwrap();
 
@@ -882,22 +902,22 @@ impl<T> Receiver<T> {
     /// use tokio::sync::oneshot;
     /// use tokio::sync::oneshot::error::TryRecvError;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = oneshot::channel();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = oneshot::channel();
     ///
-    ///     assert!(!tx.is_closed());
+    /// assert!(!tx.is_closed());
     ///
-    ///     rx.close();
+    /// rx.close();
     ///
-    ///     assert!(tx.is_closed());
-    ///     assert!(tx.send("never received").is_err());
+    /// assert!(tx.is_closed());
+    /// assert!(tx.send("never received").is_err());
     ///
-    ///     match rx.try_recv() {
-    ///         Err(TryRecvError::Closed) => {}
-    ///         _ => unreachable!(),
-    ///     }
+    /// match rx.try_recv() {
+    ///     Err(TryRecvError::Closed) => {}
+    ///     _ => unreachable!(),
     /// }
+    /// # }
     /// ```
     ///
     /// Receive a value sent **before** calling `close`
@@ -905,17 +925,17 @@ impl<T> Receiver<T> {
     /// ```
     /// use tokio::sync::oneshot;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = oneshot::channel();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = oneshot::channel();
     ///
-    ///     assert!(tx.send("will receive").is_ok());
+    /// assert!(tx.send("will receive").is_ok());
     ///
-    ///     rx.close();
+    /// rx.close();
     ///
-    ///     let msg = rx.try_recv().unwrap();
-    ///     assert_eq!(msg, "will receive");
-    /// }
+    /// let msg = rx.try_recv().unwrap();
+    /// assert_eq!(msg, "will receive");
+    /// # }
     /// ```
     pub fn close(&mut self) {
         if let Some(inner) = self.inner.as_ref() {
@@ -928,6 +948,149 @@ impl<T> Receiver<T> {
                 rx_dropped.op = "override",
                 )
             });
+        }
+    }
+
+    /// Checks if this receiver is terminated.
+    ///
+    /// This function returns true if this receiver has already yielded a [`Poll::Ready`] result.
+    /// If so, this receiver should no longer be polled.
+    ///
+    /// # Examples
+    ///
+    /// Sending a value and polling it.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// use std::task::Poll;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = oneshot::channel();
+    ///
+    /// // A receiver is not terminated when it is initialized.
+    /// assert!(!rx.is_terminated());
+    ///
+    /// // A receiver is not terminated it is polled and is still pending.
+    /// let poll = futures::poll!(&mut rx);
+    /// assert_eq!(poll, Poll::Pending);
+    /// assert!(!rx.is_terminated());
+    ///
+    /// // A receiver is not terminated if a value has been sent, but not yet read.
+    /// tx.send(0).unwrap();
+    /// assert!(!rx.is_terminated());
+    ///
+    /// // A receiver *is* terminated after it has been polled and yielded a value.
+    /// assert_eq!((&mut rx).await, Ok(0));
+    /// assert!(rx.is_terminated());
+    /// # }
+    /// ```
+    ///
+    /// Dropping the sender.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = oneshot::channel::<()>();
+    ///
+    /// // A receiver is not immediately terminated when the sender is dropped.
+    /// drop(tx);
+    /// assert!(!rx.is_terminated());
+    ///
+    /// // A receiver *is* terminated after it has been polled and yielded an error.
+    /// let _ = (&mut rx).await.unwrap_err();
+    /// assert!(rx.is_terminated());
+    /// # }
+    /// ```
+    pub fn is_terminated(&self) -> bool {
+        self.inner.is_none()
+    }
+
+    /// Checks if a channel is empty.
+    ///
+    /// This method returns `true` if the channel has no messages.
+    ///
+    /// It is not necessarily safe to poll an empty receiver, which may have
+    /// already yielded a value. Use [`is_terminated()`][Self::is_terminated]
+    /// to check whether or not a receiver can be safely polled, instead.
+    ///
+    /// # Examples
+    ///
+    /// Sending a value.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = oneshot::channel();
+    /// assert!(rx.is_empty());
+    ///
+    /// tx.send(0).unwrap();
+    /// assert!(!rx.is_empty());
+    ///
+    /// let _ = (&mut rx).await;
+    /// assert!(rx.is_empty());
+    /// # }
+    /// ```
+    ///
+    /// Dropping the sender.
+    ///
+    /// ```
+    /// use tokio::sync::oneshot;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = oneshot::channel::<()>();
+    ///
+    /// // A channel is empty if the sender is dropped.
+    /// drop(tx);
+    /// assert!(rx.is_empty());
+    ///
+    /// // A closed channel still yields an error, however.
+    /// (&mut rx).await.expect_err("should yield an error");
+    /// assert!(rx.is_empty());
+    /// # }
+    /// ```
+    ///
+    /// Terminated channels are empty.
+    ///
+    /// ```should_panic,ignore-wasm
+    /// use tokio::sync::oneshot;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = oneshot::channel();
+    ///     tx.send(0).unwrap();
+    ///     let _ = (&mut rx).await;
+    ///
+    ///     // NB: an empty channel is not necessarily safe to poll!
+    ///     assert!(rx.is_empty());
+    ///     let _ = (&mut rx).await;
+    /// }
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        let Some(inner) = self.inner.as_ref() else {
+            // The channel has already terminated.
+            return true;
+        };
+
+        let state = State::load(&inner.state, Acquire);
+        if state.is_complete() {
+            // SAFETY: If `state.is_complete()` returns true, then the
+            // `VALUE_SENT` bit has been set and the sender side of the
+            // channel will no longer attempt to access the inner
+            // `UnsafeCell`. Therefore, it is now safe for us to access the
+            // cell.
+            //
+            // The channel is empty if it does not have a value.
+            unsafe { !inner.has_value() }
+        } else {
+            // The receiver closed the channel or no value has been sent yet.
+            true
         }
     }
 
@@ -959,24 +1122,24 @@ impl<T> Receiver<T> {
     /// use tokio::sync::oneshot;
     /// use tokio::sync::oneshot::error::TryRecvError;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = oneshot::channel();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = oneshot::channel();
     ///
-    ///     match rx.try_recv() {
-    ///         // The channel is currently empty
-    ///         Err(TryRecvError::Empty) => {}
-    ///         _ => unreachable!(),
-    ///     }
-    ///
-    ///     // Send a value
-    ///     tx.send("hello").unwrap();
-    ///
-    ///     match rx.try_recv() {
-    ///         Ok(value) => assert_eq!(value, "hello"),
-    ///         _ => unreachable!(),
-    ///     }
+    /// match rx.try_recv() {
+    ///     // The channel is currently empty
+    ///     Err(TryRecvError::Empty) => {}
+    ///     _ => unreachable!(),
     /// }
+    ///
+    /// // Send a value
+    /// tx.send("hello").unwrap();
+    ///
+    /// match rx.try_recv() {
+    ///      Ok(value) => assert_eq!(value, "hello"),
+    ///      _ => unreachable!(),
+    /// }
+    /// # }
     /// ```
     ///
     /// `try_recv` when the sender dropped before sending a value
@@ -985,18 +1148,18 @@ impl<T> Receiver<T> {
     /// use tokio::sync::oneshot;
     /// use tokio::sync::oneshot::error::TryRecvError;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = oneshot::channel::<()>();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = oneshot::channel::<()>();
     ///
-    ///     drop(tx);
+    /// drop(tx);
     ///
-    ///     match rx.try_recv() {
-    ///         // The channel will never receive a value.
-    ///         Err(TryRecvError::Closed) => {}
-    ///         _ => unreachable!(),
-    ///     }
+    /// match rx.try_recv() {
+    ///     // The channel will never receive a value.
+    ///     Err(TryRecvError::Closed) => {}
+    ///     _ => unreachable!(),
     /// }
+    /// # }
     /// ```
     pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         let result = if let Some(inner) = self.inner.as_ref() {
@@ -1046,6 +1209,8 @@ impl<T> Receiver<T> {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::thread;
     /// use tokio::sync::oneshot;
     ///
@@ -1060,6 +1225,7 @@ impl<T> Receiver<T> {
     ///     let _ = tx.send(10);
     ///     sync_code.join().unwrap();
     /// }
+    /// # }
     /// ```
     #[track_caller]
     #[cfg(feature = "sync")]
@@ -1106,10 +1272,10 @@ impl<T> Future for Receiver<T> {
 
         let ret = if let Some(inner) = self.as_ref().get_ref().inner.as_ref() {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx)))?;
+            let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx))).map_err(Into::into);
 
             #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-            let res = ready!(inner.poll_recv(cx))?;
+            let res = ready!(inner.poll_recv(cx)).map_err(Into::into);
 
             res
         } else {
@@ -1117,7 +1283,7 @@ impl<T> Future for Receiver<T> {
         };
 
         self.inner = None;
-        Ready(Ok(ret))
+        Ready(ret)
     }
 }
 
@@ -1142,7 +1308,7 @@ impl<T> Inner<T> {
     fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
         ready!(crate::trace::trace_leaf(cx));
         // Keep track of task budget
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         // Load the state
         let mut state = State::load(&self.state, Acquire);
@@ -1231,7 +1397,20 @@ impl<T> Inner<T> {
     /// If `VALUE_SENT` is not set, then only the sender may call this method;
     /// if it is set, then only the receiver may call this method.
     unsafe fn consume_value(&self) -> Option<T> {
-        self.value.with_mut(|ptr| (*ptr).take())
+        self.value.with_mut(|ptr| unsafe { (*ptr).take() })
+    }
+
+    /// Returns true if there is a value. This function does not check `state`.
+    ///
+    /// # Safety
+    ///
+    /// Calling this method concurrently on multiple threads will result in a
+    /// data race. The `VALUE_SENT` state bit is used to ensure that only the
+    /// sender *or* the receiver will call this method at a given point in time.
+    /// If `VALUE_SENT` is not set, then only the sender may call this method;
+    /// if it is set, then only the receiver may call this method.
+    unsafe fn has_value(&self) -> bool {
+        self.value.with(|ptr| unsafe { (*ptr).is_some() })
     }
 }
 

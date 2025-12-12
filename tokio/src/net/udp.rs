@@ -1,5 +1,6 @@
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
 use crate::net::{to_socket_addrs, ToSocketAddrs};
+use crate::util::check_socket_for_blocking;
 
 use std::fmt;
 use std::io;
@@ -134,12 +135,12 @@ impl UdpSocket {
     /// # Example
     ///
     /// ```no_run
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::UdpSocket;
     /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
+    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
     ///     let sock = UdpSocket::bind("0.0.0.0:8080").await?;
     ///     // use `sock`
     /// #   let _ = sock;
@@ -192,6 +193,10 @@ impl UdpSocket {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Passing a listener in blocking mode is always erroneous,
+    /// and the behavior in that case may change in the future.
+    /// For example, it could panic.
+    ///
     /// [`set_nonblocking`]: std::net::UdpSocket::set_nonblocking
     ///
     /// # Panics
@@ -220,6 +225,8 @@ impl UdpSocket {
     /// ```
     #[track_caller]
     pub fn from_std(socket: net::UdpSocket) -> io::Result<UdpSocket> {
+        check_socket_for_blocking(&socket)?;
+
         let io = mio::net::UdpSocket::from_std(socket);
         UdpSocket::new(io)
     }
@@ -296,12 +303,12 @@ impl UdpSocket {
     /// # Example
     ///
     /// ```
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::UdpSocket;
     ///
     /// # use std::{io, net::SocketAddr};
     /// # #[tokio::main]
     /// # async fn main() -> io::Result<()> {
+    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
     /// let addr = "0.0.0.0:8080".parse::<SocketAddr>().unwrap();
     /// let peer = "127.0.0.1:11100".parse::<SocketAddr>().unwrap();
     /// let sock = UdpSocket::bind(addr).await?;
@@ -1509,7 +1516,7 @@ impl UdpSocket {
     /// # Notes
     ///
     /// On Windows, if the data is larger than the buffer specified, the buffer
-    /// is filled with the first part of the data, and `peek_from` returns the error
+    /// is filled with the first part of the data, and peek returns the error
     /// `WSAEMSGSIZE(10040)`. The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
@@ -1554,7 +1561,6 @@ impl UdpSocket {
     }
 
     /// Receives data from the connected address, without removing it from the input queue.
-    /// On success, returns the sending address of the datagram.
     ///
     /// # Notes
     ///
@@ -1604,7 +1610,7 @@ impl UdpSocket {
             self.io.peek(b)
         }))?;
 
-        // Safety: We trust `recv` to have filled up `n` bytes in the buffer.
+        // Safety: We trust `peek` to have filled up `n` bytes in the buffer.
         unsafe {
             buf.assume_init(n);
         }
@@ -2021,7 +2027,7 @@ impl UdpSocket {
         ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
-        self.as_socket().tos()
+        self.as_socket().tos_v4()
     }
 
     /// Sets the value for the `IP_TOS` option on this socket.
@@ -2050,7 +2056,7 @@ impl UdpSocket {
         ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
-        self.as_socket().set_tos(tos)
+        self.as_socket().set_tos_v4(tos)
     }
 
     /// Gets the value for the `SO_BINDTODEVICE` option on this socket
@@ -2123,12 +2129,12 @@ impl UdpSocket {
     ///
     /// # Examples
     /// ```
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::UdpSocket;
     /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
+    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
     ///     // Create a socket
     ///     let socket = UdpSocket::bind("0.0.0.0:8080").await?;
     ///

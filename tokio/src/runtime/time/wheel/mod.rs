@@ -7,19 +7,17 @@ use self::level::Level;
 
 use std::{array, ptr::NonNull};
 
+use super::entry::STATE_DEREGISTERED;
 use super::EntryList;
 
 /// Timing wheel implementation.
 ///
-/// This type provides the hashed timing wheel implementation that backs `Timer`
-/// and `DelayQueue`.
+/// This type provides the hashed timing wheel implementation that backs
+/// [`Driver`].
 ///
-/// The structure is generic over `T: Stack`. This allows handling timeout data
-/// being stored on the heap or in a slab. In order to support the latter case,
-/// the slab must be passed into each function allowing the implementation to
-/// lookup timer entries.
+/// See [`Driver`] documentation for some implementation notes.
 ///
-/// See `Timer` documentation for some implementation notes.
+/// [`Driver`]: crate::runtime::time::Driver
 #[derive(Debug)]
 pub(crate) struct Wheel {
     /// The number of milliseconds elapsed since the wheel started.
@@ -90,7 +88,7 @@ impl Wheel {
         &mut self,
         item: TimerHandle,
     ) -> Result<u64, (TimerHandle, InsertError)> {
-        let when = item.sync_when();
+        let when = unsafe { item.sync_when() };
 
         if when <= self.elapsed {
             return Err((item, InsertError::Elapsed));
@@ -116,8 +114,8 @@ impl Wheel {
     /// Removes `item` from the timing wheel.
     pub(crate) unsafe fn remove(&mut self, item: NonNull<TimerShared>) {
         unsafe {
-            let when = item.as_ref().cached_when();
-            if when == u64::MAX {
+            let when = item.as_ref().registered_when();
+            if when == STATE_DEREGISTERED {
                 self.pending.remove(item);
             } else {
                 debug_assert!(
@@ -230,11 +228,11 @@ impl Wheel {
 
         while let Some(item) = entries.pop_back() {
             if expiration.level == 0 {
-                debug_assert_eq!(unsafe { item.cached_when() }, expiration.deadline);
+                debug_assert_eq!(unsafe { item.registered_when() }, expiration.deadline);
             }
 
             // Try to expire the entry; this is cheap (doesn't synchronize) if
-            // the timer is not expired, and updates cached_when.
+            // the timer is not expired, and updates registered_when.
             match unsafe { item.mark_pending(expiration.deadline) } {
                 Ok(()) => {
                     // Item was expired

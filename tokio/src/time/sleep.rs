@@ -1,4 +1,4 @@
-use crate::runtime::time::TimerEntry;
+use crate::runtime::Timer;
 use crate::time::{error::Error, Duration, Instant};
 use crate::util::trace;
 
@@ -28,11 +28,11 @@ use std::task::{self, ready, Poll};
 /// ```
 /// use tokio::time::{sleep_until, Instant, Duration};
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     sleep_until(Instant::now() + Duration::from_millis(100)).await;
-///     println!("100 ms have elapsed");
-/// }
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// sleep_until(Instant::now() + Duration::from_millis(100)).await;
+/// println!("100 ms have elapsed");
+/// # }
 /// ```
 ///
 /// See the documentation for the [`Sleep`] type for more examples.
@@ -76,8 +76,6 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 ///
 /// To run something regularly on a schedule, see [`interval`].
 ///
-/// The maximum duration for a sleep is 68719476734 milliseconds (approximately 2.2 years).
-///
 /// # Cancellation
 ///
 /// Canceling a sleep instance is done by dropping the returned future. No additional
@@ -90,11 +88,11 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 /// ```
 /// use tokio::time::{sleep, Duration};
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     sleep(Duration::from_millis(100)).await;
-///     println!("100 ms have elapsed");
-/// }
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// sleep(Duration::from_millis(100)).await;
+/// println!("100 ms have elapsed");
+/// # }
 /// ```
 ///
 /// See the documentation for the [`Sleep`] type for more examples.
@@ -145,11 +143,11 @@ pin_project! {
     /// ```
     /// use tokio::time::{sleep, Duration};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     sleep(Duration::from_millis(100)).await;
-    ///     println!("100 ms have elapsed");
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// sleep(Duration::from_millis(100)).await;
+    /// println!("100 ms have elapsed");
+    /// # }
     /// ```
     ///
     /// Use with [`select!`]. Pinning the `Sleep` with [`tokio::pin!`] is
@@ -157,20 +155,20 @@ pin_project! {
     /// ```no_run
     /// use tokio::time::{self, Duration, Instant};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let sleep = time::sleep(Duration::from_millis(10));
-    ///     tokio::pin!(sleep);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let sleep = time::sleep(Duration::from_millis(10));
+    /// tokio::pin!(sleep);
     ///
-    ///     loop {
-    ///         tokio::select! {
-    ///             () = &mut sleep => {
-    ///                 println!("timer elapsed");
-    ///                 sleep.as_mut().reset(Instant::now() + Duration::from_millis(50));
-    ///             },
-    ///         }
+    /// loop {
+    ///     tokio::select! {
+    ///         () = &mut sleep => {
+    ///             println!("timer elapsed");
+    ///             sleep.as_mut().reset(Instant::now() + Duration::from_millis(50));
+    ///         },
     ///     }
     /// }
+    /// # }
     /// ```
     /// Use in a struct with boxing. By pinning the `Sleep` with a `Box`, the
     /// `HasSleep` struct implements `Unpin`, even though `Sleep` does not.
@@ -229,7 +227,7 @@ pin_project! {
 
         // The link between the `Sleep` instance and the timer that drives it.
         #[pin]
-        entry: TimerEntry,
+        entry: Timer,
     }
 }
 
@@ -255,7 +253,7 @@ impl Sleep {
     ) -> Sleep {
         use crate::runtime::scheduler;
         let handle = scheduler::Handle::current();
-        let entry = TimerEntry::new(handle, deadline);
+        let entry = Timer::new(handle, deadline);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
             let handle = scheduler::Handle::current();
@@ -364,12 +362,30 @@ impl Sleep {
     /// without having it wake up the last task that polled it.
     pub(crate) fn reset_without_reregister(self: Pin<&mut Self>, deadline: Instant) {
         let mut me = self.project();
-        me.entry.as_mut().reset(deadline, false);
+        match me.entry.as_ref().flavor() {
+            crate::runtime::TimerFlavor::Traditional => {
+                me.entry.as_mut().reset(deadline, false);
+            }
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            crate::runtime::TimerFlavor::Alternative => {
+                let handle = me.entry.as_ref().scheduler_handle().clone();
+                me.entry.set(Timer::new(handle, deadline));
+            }
+        }
     }
 
     fn reset_inner(self: Pin<&mut Self>, deadline: Instant) {
         let mut me = self.project();
-        me.entry.as_mut().reset(deadline, true);
+        match me.entry.as_ref().flavor() {
+            crate::runtime::TimerFlavor::Traditional => {
+                me.entry.as_mut().reset(deadline, true);
+            }
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            crate::runtime::TimerFlavor::Alternative => {
+                let handle = me.entry.as_ref().scheduler_handle().clone();
+                me.entry.set(Timer::new(handle, deadline));
+            }
+        }
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
@@ -382,8 +398,8 @@ impl Sleep {
                 tracing::trace_span!("runtime.resource.async_op.poll");
 
             let duration = {
-                let clock = me.entry.clock();
-                let time_source = me.entry.driver().time_source();
+                let clock = me.entry.as_ref().clock();
+                let time_source = me.entry.as_ref().driver().time_source();
                 let now = time_source.now(clock);
                 let deadline_tick = time_source.deadline_to_tick(deadline);
                 deadline_tick.saturating_sub(now)
@@ -407,11 +423,11 @@ impl Sleep {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let coop = ready!(trace_poll_op!(
             "poll_elapsed",
-            crate::runtime::coop::poll_proceed(cx),
+            crate::task::coop::poll_proceed(cx),
         ));
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         let result = me.entry.poll_elapsed(cx).map(move |r| {
             coop.made_progress();

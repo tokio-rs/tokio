@@ -145,3 +145,27 @@ async fn poll_after_take_value_should_fail() {
     // Poll the future after `take_value` has been called
     fut.await;
 }
+
+#[tokio::test]
+async fn get_value() {
+    tokio::task_local! {
+        static KEY: u32
+    }
+
+    KEY.scope(1, async {
+        assert_eq!(KEY.get(), 1);
+        assert_eq!(KEY.try_get().unwrap(), 1);
+    })
+    .await;
+
+    let fut = KEY.scope(1, async {
+        let result = KEY.try_get();
+        // The task local value no longer exists.
+        assert!(result.is_err());
+    });
+    let mut fut = Box::pin(fut);
+    fut.as_mut().take_value();
+
+    // Poll the future after `take_value` has been called
+    fut.await;
+}

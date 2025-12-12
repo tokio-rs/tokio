@@ -68,6 +68,9 @@ cfg_net! {
     ///     socket.set_reuseaddr(true)?;
     ///     socket.bind(addr)?;
     ///
+    ///     // Note: the actual backlog used by `TcpListener::bind` is platform-dependent,
+    ///     // as Tokio relies on Mio's default backlog value configuration. The `1024` here is only
+    ///     // illustrative and does not reflect the real value used.
     ///     let listener = socket.listen(1024)?;
     /// # drop(listener);
     ///
@@ -79,9 +82,9 @@ cfg_net! {
     /// accessing the `RawFd`/`RawSocket` using [`AsRawFd`]/[`AsRawSocket`] and
     /// setting the option with a crate like [`socket2`].
     ///
-    /// [`RawFd`]: https://doc.rust-lang.org/std/os/unix/io/type.RawFd.html
+    /// [`RawFd`]: https://doc.rust-lang.org/std/os/fd/type.RawFd.html
     /// [`RawSocket`]: https://doc.rust-lang.org/std/os/windows/io/type.RawSocket.html
-    /// [`AsRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
+    /// [`AsRawFd`]: https://doc.rust-lang.org/std/os/fd/trait.AsRawFd.html
     /// [`AsRawSocket`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html
     /// [`socket2`]: https://docs.rs/socket2/
     #[cfg_attr(docsrs, doc(alias = "connect_std"))]
@@ -252,7 +255,7 @@ impl TcpSocket {
     }
 
     /// Allows the socket to bind to an in-use port. Only available for unix systems
-    /// (excluding Solaris & Illumos).
+    /// (excluding Solaris, Illumos, and Cygwin).
     ///
     /// Behavior is platform specific. Refer to the target platform's
     /// documentation for more details.
@@ -276,17 +279,27 @@ impl TcpSocket {
     ///     Ok(())
     /// }
     /// ```
-    #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]
+    #[cfg(all(
+        unix,
+        not(target_os = "solaris"),
+        not(target_os = "illumos"),
+        not(target_os = "cygwin"),
+    ))]
     #[cfg_attr(
         docsrs,
-        doc(cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos"))))
+        doc(cfg(all(
+            unix,
+            not(target_os = "solaris"),
+            not(target_os = "illumos"),
+            not(target_os = "cygwin"),
+        )))
     )]
     pub fn set_reuseport(&self, reuseport: bool) -> io::Result<()> {
         self.inner.set_reuse_port(reuseport)
     }
 
     /// Allows the socket to bind to an in-use port. Only available for unix systems
-    /// (excluding Solaris & Illumos).
+    /// (excluding Solaris, Illumos, and Cygwin).
     ///
     /// Behavior is platform specific. Refer to the target platform's
     /// documentation for more details.
@@ -311,10 +324,20 @@ impl TcpSocket {
     ///     Ok(())
     /// }
     /// ```
-    #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]
+    #[cfg(all(
+        unix,
+        not(target_os = "solaris"),
+        not(target_os = "illumos"),
+        not(target_os = "cygwin"),
+    ))]
     #[cfg_attr(
         docsrs,
-        doc(cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos"))))
+        doc(cfg(all(
+            unix,
+            not(target_os = "solaris"),
+            not(target_os = "illumos"),
+            not(target_os = "cygwin"),
+        )))
     )]
     pub fn reuseport(&self) -> io::Result<bool> {
         self.inner.reuse_port()
@@ -368,7 +391,7 @@ impl TcpSocket {
     ///
     /// Note that if [`set_recv_buffer_size`] has been called on this socket
     /// previously, the value returned by this function may not be the same as
-    /// the argument provided to `set_send_buffer_size`. This is for the
+    /// the argument provided to `set_recv_buffer_size`. This is for the
     /// following reasons:
     ///
     /// * Most operating systems have minimum and maximum allowed sizes for the
@@ -396,6 +419,17 @@ impl TcpSocket {
     ///
     /// If `SO_LINGER` is not specified, and the socket is closed, the system handles the call in a
     /// way that allows the process to continue as quickly as possible.
+    ///
+    /// This option is deprecated because setting `SO_LINGER` on a socket used with Tokio is always
+    /// incorrect as it leads to blocking the thread when the socket is closed. For more details,
+    /// please see:
+    ///
+    /// > Volumes of communications have been devoted to the intricacies of `SO_LINGER` versus
+    /// > non-blocking (`O_NONBLOCK`) sockets. From what I can tell, the final word is: don't do
+    /// > it. Rely on the `shutdown()`-followed-by-`read()`-eof technique instead.
+    /// >
+    /// > From [The ultimate `SO_LINGER` page, or: why is my tcp not reliable](https://blog.netherlabs.nl/articles/2009/01/18/the-ultimate-so_linger-page-or-why-is-my-tcp-not-reliable)
+    #[deprecated = "`SO_LINGER` causes the socket to block the thread on drop"]
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.inner.set_linger(dur)
     }
@@ -430,7 +464,7 @@ impl TcpSocket {
     /// # }
     /// ```
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-        self.inner.set_nodelay(nodelay)
+        self.inner.set_tcp_nodelay(nodelay)
     }
 
     /// Gets the value of the `TCP_NODELAY` option on this socket.
@@ -452,7 +486,7 @@ impl TcpSocket {
     /// # }
     /// ```
     pub fn nodelay(&self) -> io::Result<bool> {
-        self.inner.nodelay()
+        self.inner.tcp_nodelay()
     }
 
     /// Gets the value of the `IP_TOS` option for this socket.
@@ -482,7 +516,7 @@ impl TcpSocket {
         ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
-        self.inner.tos()
+        self.inner.tos_v4()
     }
 
     /// Sets the value for the `IP_TOS` option on this socket.
@@ -511,7 +545,7 @@ impl TcpSocket {
         ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
-        self.inner.set_tos(tos)
+        self.inner.set_tos_v4(tos)
     }
 
     /// Gets the value for the `SO_BINDTODEVICE` option on this socket
@@ -743,12 +777,12 @@ impl TcpSocket {
     /// # Examples
     ///
     /// ```
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::TcpSocket;
     /// use socket2::{Domain, Socket, Type};
     ///
     /// #[tokio::main]
     /// async fn main() -> std::io::Result<()> {
+    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
     ///     let socket2_socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
     ///     socket2_socket.set_nonblocking(true)?;
     ///
@@ -816,7 +850,9 @@ cfg_unix! {
         /// The caller is responsible for ensuring that the socket is in
         /// non-blocking mode.
         unsafe fn from_raw_fd(fd: RawFd) -> TcpSocket {
-            let inner = socket2::Socket::from_raw_fd(fd);
+            // Safety: exactly the same safety requirements as the
+            // `FromRawFd::from_raw_fd` trait method.
+            let inner = unsafe { socket2::Socket::from_raw_fd(fd) };
             TcpSocket { inner }
         }
     }
@@ -855,7 +891,7 @@ cfg_windows! {
         /// The caller is responsible for ensuring that the socket is in
         /// non-blocking mode.
         unsafe fn from_raw_socket(socket: RawSocket) -> TcpSocket {
-            let inner = socket2::Socket::from_raw_socket(socket);
+            let inner = unsafe { socket2::Socket::from_raw_socket(socket) };
             TcpSocket { inner }
         }
     }

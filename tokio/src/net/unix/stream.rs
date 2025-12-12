@@ -3,6 +3,7 @@ use crate::net::unix::split::{split, ReadHalf, WriteHalf};
 use crate::net::unix::split_owned::{split_owned, OwnedReadHalf, OwnedWriteHalf};
 use crate::net::unix::ucred::{self, UCred};
 use crate::net::unix::SocketAddr;
+use crate::util::check_socket_for_blocking;
 
 use std::fmt;
 use std::future::poll_fn;
@@ -791,6 +792,10 @@ impl UnixStream {
     /// will block the thread, which will cause unexpected behavior.
     /// Non-blocking mode can be set using [`set_nonblocking`].
     ///
+    /// Passing a listener in blocking mode is always erroneous,
+    /// and the behavior in that case may change in the future.
+    /// For example, it could panic.
+    ///
     /// [`set_nonblocking`]: std::os::unix::net::UnixStream::set_nonblocking
     ///
     /// # Examples
@@ -818,6 +823,8 @@ impl UnixStream {
     /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     #[track_caller]
     pub fn from_std(stream: net::UnixStream) -> io::Result<UnixStream> {
+        check_socket_for_blocking(&stream)?;
+
         let stream = mio::net::UnixStream::from_std(stream);
         let io = PollEvented::new(stream)?;
 
@@ -833,7 +840,6 @@ impl UnixStream {
     /// # Examples
     ///
     /// ```
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use std::error::Error;
     /// use std::io::Read;
     /// use tokio::net::UnixListener;
@@ -842,6 +848,7 @@ impl UnixStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
+    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
     ///     let dir = tempfile::tempdir().unwrap();
     ///     let bind_path = dir.path().join("bind_path");
     ///
@@ -967,7 +974,7 @@ impl UnixStream {
     /// Unlike [`split`], the owned halves can be moved to separate tasks, however
     /// this comes at the cost of a heap allocation.
     ///
-    /// **Note:** Dropping the write half will shut down the write half of the
+    /// **Note:** Dropping the write half will only shut down the write half of the
     /// stream. This is equivalent to calling [`shutdown()`] on the `UnixStream`.
     ///
     /// [`split`]: Self::split()
@@ -1065,7 +1072,13 @@ impl UnixStream {
 
 impl fmt::Debug for UnixStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        (*self.io).fmt(f)
+    }
+}
+
+impl AsRef<Self> for UnixStream {
+    fn as_ref(&self) -> &Self {
+        self
     }
 }
 

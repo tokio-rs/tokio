@@ -502,7 +502,7 @@ impl Semaphore {
                 .as_ref()
                 .map_or(true, |waker| !waker.will_wake(cx.waker()))
             {
-                old_waker = std::mem::replace(waker, Some(cx.waker().clone()));
+                old_waker = waker.replace(cx.waker().clone());
             }
         });
 
@@ -591,11 +591,11 @@ impl Future for Acquire<'_> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let coop = ready!(trace_poll_op!(
             "poll_acquire",
-            crate::runtime::coop::poll_proceed(cx),
+            crate::task::coop::poll_proceed(cx),
         ));
 
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         let result = match semaphore.poll_acquire(cx, needed, node, *queued) {
             Poll::Pending => {
@@ -775,6 +775,6 @@ unsafe impl linked_list::Link for Waiter {
     }
 
     unsafe fn pointers(target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
-        Waiter::addr_of_pointers(target)
+        unsafe { Waiter::addr_of_pointers(target) }
     }
 }

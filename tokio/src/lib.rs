@@ -10,7 +10,7 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![deny(unused_must_use)]
+#![deny(unused_must_use, unsafe_op_in_unsafe_fn)]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
@@ -194,6 +194,8 @@
 //! [`thread_keep_alive`]: crate::runtime::Builder::thread_keep_alive()
 //!
 //! ```
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! #[tokio::main]
 //! async fn main() {
 //!     // This is running on a core thread.
@@ -208,6 +210,7 @@
 //!     // panic.
 //!     blocking_task.await.unwrap();
 //! }
+//! # }
 //! ```
 //!
 //! If your code is CPU-bound and you wish to limit the number of threads used
@@ -266,6 +269,8 @@
 //! A simple TCP echo server:
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::net::TcpListener;
 //! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!
@@ -300,9 +305,10 @@
 //!         });
 //!     }
 //! }
+//! # }
 //! ```
 //!
-//! ## Feature flags
+//! # Feature flags
 //!
 //! Tokio uses a set of [feature flags] to reduce the amount of compiled code. It
 //! is possible to just enable certain features over others. By default, Tokio
@@ -316,31 +322,31 @@
 //!
 //! - `full`: Enables all features listed below except `test-util` and `tracing`.
 //! - `rt`: Enables `tokio::spawn`, the current-thread scheduler,
-//!         and non-scheduler utilities.
+//!   and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `io-util`: Enables the IO based `Ext` traits.
 //! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
 //! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and
-//!          `UdpSocket`, as well as (on Unix-like systems) `AsyncFd` and (on
-//!          FreeBSD) `PollAio`.
+//!   `UdpSocket`, as well as (on Unix-like systems) `AsyncFd` and (on
+//!   FreeBSD) `PollAio`.
 //! - `time`: Enables `tokio::time` types and allows the schedulers to enable
-//!           the built in timer.
+//!   the built in timer.
 //! - `process`: Enables `tokio::process` types.
 //! - `macros`: Enables `#[tokio::main]` and `#[tokio::test]` macros.
 //! - `sync`: Enables all `tokio::sync` types.
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
-//! - `parking_lot`: As a potential optimization, use the `_parking_lot_` crate's
-//!                  synchronization primitives internally. Also, this
-//!                  dependency is necessary to construct some of our primitives
-//!                  in a `const` context. `MSRV` may increase according to the
-//!                  `_parking_lot_` release in use.
+//! - `parking_lot`: As a potential optimization, use the [`parking_lot`] crate's
+//!   synchronization primitives internally. Also, this
+//!   dependency is necessary to construct some of our primitives
+//!   in a `const` context. `MSRV` may increase according to the
+//!   [`parking_lot`] release in use.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._
 //!
-//! ### Unstable features
+//! ## Unstable features
 //!
 //! Some feature flags are only available when specifying the `tokio_unstable` flag:
 //!
@@ -392,7 +398,7 @@
 //! [unstable features]: https://internals.rust-lang.org/t/feature-request-unstable-opt-in-non-transitive-crate-features/16193#why-not-a-crate-feature-2
 //! [feature flags]: https://doc.rust-lang.org/cargo/reference/manifest.html#the-features-section
 //!
-//! ## Supported platforms
+//! # Supported platforms
 //!
 //! Tokio currently guarantees support for the following platforms:
 //!
@@ -418,7 +424,7 @@
 //!
 //! [mio-supported]: https://crates.io/crates/mio#platforms
 //!
-//! ### `WASM` support
+//! ## `WASM` support
 //!
 //! Tokio has some limited support for the `WASM` platform. Without the
 //! `tokio_unstable` flag, the following features are supported:
@@ -440,7 +446,7 @@
 //! immediately instead of blocking forever. On platforms that don't support
 //! time, this means that the runtime can never be idle in any way.
 //!
-//! ### Unstable `WASM` support
+//! ## Unstable `WASM` support
 //!
 //! Tokio also has unstable support for some additional `WASM` features. This
 //! requires the use of the `tokio_unstable` flag.
@@ -474,11 +480,14 @@ compile_error! {
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
-#[cfg(all(not(tokio_unstable), tokio_taskdump))]
-compile_error!("The `tokio_taskdump` feature requires `--cfg tokio_unstable`.");
+#[cfg(all(not(tokio_unstable), feature = "io-uring"))]
+compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");
+
+#[cfg(all(not(tokio_unstable), feature = "taskdump"))]
+compile_error!("The `taskdump` feature requires `--cfg tokio_unstable`.");
 
 #[cfg(all(
-    tokio_taskdump,
+    feature = "taskdump",
     not(doc),
     not(all(
         target_os = "linux",
@@ -486,7 +495,7 @@ compile_error!("The `tokio_taskdump` feature requires `--cfg tokio_unstable`.");
     ))
 ))]
 compile_error!(
-    "The `tokio_taskdump` feature is only currently supported on \
+    "The `taskdump` feature is only currently supported on \
 linux, on `aarch64`, `x86` and `x86_64`."
 );
 

@@ -148,7 +148,7 @@ impl Registration {
     ) -> Poll<io::Result<ReadyEvent>> {
         ready!(crate::trace::trace_leaf(cx));
         // Keep track of task budget
-        let coop = ready!(crate::runtime::coop::poll_proceed(cx));
+        let coop = ready!(crate::task::coop::poll_proceed(cx));
         let ev = ready!(self.shared.poll_readiness(cx, direction));
 
         if ev.is_shutdown {
@@ -219,7 +219,7 @@ impl Registration {
         loop {
             let event = self.readiness(interest).await?;
 
-            let coop = std::future::poll_fn(crate::runtime::coop::poll_proceed).await;
+            let coop = std::future::poll_fn(crate::task::coop::poll_proceed).await;
 
             match f() {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {

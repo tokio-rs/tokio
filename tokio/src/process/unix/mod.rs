@@ -66,11 +66,11 @@ impl Kill for StdChild {
 
 cfg_not_has_const_mutex_new! {
     fn get_orphan_queue() -> &'static OrphanQueueImpl<StdChild> {
-        use crate::util::once_cell::OnceCell;
+        use std::sync::OnceLock;
 
-        static ORPHAN_QUEUE: OnceCell<OrphanQueueImpl<StdChild>> = OnceCell::new();
+        static ORPHAN_QUEUE: OnceLock<OrphanQueueImpl<StdChild>> = OnceLock::new();
 
-        ORPHAN_QUEUE.get(OrphanQueueImpl::new)
+        ORPHAN_QUEUE.get_or_init(OrphanQueueImpl::new)
     }
 }
 
@@ -115,8 +115,7 @@ impl fmt::Debug for Child {
     }
 }
 
-pub(crate) fn spawn_child(cmd: &mut std::process::Command) -> io::Result<SpawnedChild> {
-    let mut child = cmd.spawn()?;
+pub(crate) fn build_child(mut child: StdChild) -> io::Result<SpawnedChild> {
     let stdin = child.stdin.take().map(stdio).transpose()?;
     let stdout = child.stdout.take().map(stdio).transpose()?;
     let stderr = child.stderr.take().map(stdio).transpose()?;
@@ -199,13 +198,13 @@ impl<T: IntoRawFd> From<T> for Pipe {
     }
 }
 
-impl<'a> io::Read for &'a Pipe {
+impl io::Read for &Pipe {
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
         (&self.fd).read(bytes)
     }
 }
 
-impl<'a> io::Write for &'a Pipe {
+impl io::Write for &Pipe {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         (&self.fd).write(bytes)
     }

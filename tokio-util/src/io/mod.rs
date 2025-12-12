@@ -18,6 +18,9 @@ mod sink_writer;
 mod stream_reader;
 
 cfg_io_util! {
+    mod read_arc;
+    pub use self::read_arc::read_exact_arc;
+
     mod sync_bridge;
     pub use self::sync_bridge::SyncIoBridge;
 }

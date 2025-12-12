@@ -39,14 +39,8 @@ pub(crate) mod rand {
 
     pub(crate) fn seed() -> u64 {
         let rand_state = RandomState::new();
-
-        let mut hasher = rand_state.build_hasher();
-
         // Hash some unique-ish data to generate some new state
-        COUNTER.fetch_add(1, Relaxed).hash(&mut hasher);
-
-        // Get the seed
-        hasher.finish()
+        rand_state.hash_one(COUNTER.fetch_add(1, Relaxed))
     }
 }
 
@@ -57,6 +51,7 @@ pub(crate) mod sync {
     // internal use. Note however that some are not _currently_ named by
     // consuming code.
 
+    // Not using parking_lot in Miri due to <https://github.com/Amanieu/parking_lot/issues/477>.
     #[cfg(all(feature = "parking_lot", not(miri)))]
     #[allow(unused_imports)]
     pub(crate) use crate::loom::std::parking_lot::{
