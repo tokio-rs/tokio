@@ -298,7 +298,6 @@ impl Handle {
         // Deregister the source with the OS poller **first**
         // Cleanup ALWAYS happens
         let os_result = self.registry.deregister(source);
-        
 
         if self
             .registrations
