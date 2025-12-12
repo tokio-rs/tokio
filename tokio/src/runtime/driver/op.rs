@@ -9,6 +9,7 @@ use std::future::Future;
 use std::io::{self, Error};
 use std::mem;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
 // This field isn't accessed directly, but it holds cancellation data,
@@ -34,7 +35,7 @@ pub(crate) enum Lifecycle {
     Cancelled(
         // This field isn't accessed directly, but it holds cancellation data,
         // so `#[allow(dead_code)]` is needed.
-        #[allow(dead_code)] CancelData,
+        #[allow(dead_code)] Arc<CancelData>,
     ),
 
     /// The operation has completed with a single cqe result
@@ -42,8 +43,13 @@ pub(crate) enum Lifecycle {
 }
 
 pub(crate) enum State {
+    // Single operation state
     Initialize(Option<Entry>),
     Polled(usize),
+    // Batch operation state
+    InitalizeBatch(Vec<Entry>),
+    PolledBatch(Vec<usize>),
+    // Batch or single operation is completed
     Complete,
 }
 
@@ -54,6 +60,10 @@ pub(crate) struct Op<T: Cancellable> {
     state: State,
     // Per operation data.
     data: Option<T>,
+    // indexes of slab of registered operation
+    indexes: Vec<usize>,
+    // Completed CQEs stored for checking batch completion
+    completed: Vec<CqeResult>,
 }
 
 impl<T: Cancellable> Op<T> {
@@ -63,12 +73,28 @@ impl<T: Cancellable> Op<T> {
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     pub(crate) unsafe fn new(entry: Entry, data: T) -> Self {
         let handle = Handle::current();
+
         Self {
             handle,
             data: Some(data),
             state: State::Initialize(Some(entry)),
+            indexes: Vec::new(),
+            completed: Vec::new(),
         }
     }
+
+    pub(crate) unsafe fn batch(entries: Vec<Entry>, data: T) -> Self {
+        let handle = Handle::current();
+
+        Self {
+            handle,
+            data: Some(data),
+            state: State::InitalizeBatch(entries),
+            indexes: Vec::new(),
+            completed: Vec::new(),
+        }
+    }
+
     pub(crate) fn take_data(&mut self) -> Option<T> {
         self.data.take()
     }
@@ -78,16 +104,25 @@ impl<T: Cancellable> Drop for Op<T> {
     fn drop(&mut self) {
         match self.state {
             // We've already dropped this Op.
-            State::Complete => (),
-            // We will cancel this Op.
-            State::Polled(index) => {
-                let data = self.take_data();
-                let handle = &mut self.handle;
-                handle.inner.driver().io().cancel_op(index, data);
-            }
+            State::Complete => return,
             // This Op has not been polled yet.
             // We don't need to do anything here.
-            State::Initialize(_) => (),
+            State::Initialize(_) | State::InitalizeBatch(_) => return,
+            _ => (),
+        }
+
+        let data = self.take_data();
+        let handle = &mut self.handle;
+
+        match &self.state {
+            // We will cancel this Op.
+            State::Polled(index) => {
+                handle.inner.driver().io().cancel_op(*index, data);
+            }
+            State::PolledBatch(ids) => {
+                handle.inner.driver().io().cancel_batched_op(ids, data);
+            }
+            _ => (),
         }
     }
 }
@@ -112,7 +147,11 @@ impl From<cqueue::Entry> for CqeResult {
 /// A trait that converts a CQE result into a usable value for each operation.
 pub(crate) trait Completable {
     type Output;
+    // Called when a single operation is completed with single CQE
     fn complete(self, cqe: CqeResult) -> Self::Output;
+
+    // Called when a batch operation is completed with multiple CQEs
+    fn complete_batch(self, cqes: Vec<CqeResult>) -> Self::Output;
 
     // This is used when you want to terminate an operation with an error.
     //
@@ -154,6 +193,80 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                         return Poll::Ready(data.complete_with_error(err));
                     }
                 };
+
+                Poll::Pending
+            }
+
+            State::InitalizeBatch(entries) => {
+                let waker = cx.waker().clone();
+
+                // SAFETY: entry is valid for the entire duration of the operation
+                match unsafe { driver.register_batch(entries, waker) } {
+                    Ok(ids) => {
+                        this.indexes = ids.clone();
+                        this.state = State::PolledBatch(ids)
+                    }
+                    Err(err) => {
+                        let data = this
+                            .take_data()
+                            .expect("Data must be present on Initalization");
+
+                        this.state = State::Complete;
+
+                        return Poll::Ready(data.complete_with_error(err));
+                    }
+                };
+
+                Poll::Pending
+            }
+
+            State::PolledBatch(ids) => {
+                let mut ctx = driver.get_uring().lock();
+                let completed = &mut this.completed;
+
+                for idx in ids.iter() {
+                    let lifecycle = ctx.ops.get_mut(*idx).expect("Lifecycle must be present");
+
+                    match mem::replace(lifecycle, Lifecycle::Submitted) {
+                        // Only replace the stored waker if it wouldn't wake the new one
+                        Lifecycle::Waiting(prev) if !prev.will_wake(cx.waker()) => {
+                            let waker = cx.waker().clone();
+                            *lifecycle = Lifecycle::Waiting(waker);
+                        }
+
+                        Lifecycle::Waiting(prev) => {
+                            *lifecycle = Lifecycle::Waiting(prev);
+                        }
+
+                        Lifecycle::Completed(cqe) => {
+                            // Clean up and complete the future
+                            ctx.remove_op(*idx);
+                            completed.push(cqe.into());
+                        }
+
+                        Lifecycle::Submitted => {
+                            unreachable!("Submitted lifecycle should never be seen here");
+                        }
+
+                        Lifecycle::Cancelled(_) => {
+                            unreachable!("Cancelled lifecycle should never be seen here");
+                        }
+                    }
+                }
+
+                if ctx.check_slab_entry(ids) {
+                    this.state = State::Complete;
+                    drop(ctx);
+
+                    let cqes = &mut this.completed;
+                    let completed = std::mem::take(cqes);
+
+                    let data = this
+                        .take_data()
+                        .expect("Data must be present on completion");
+
+                    return Poll::Ready(data.complete_batch(completed));
+                }
 
                 Poll::Pending
             }
