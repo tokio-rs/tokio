@@ -4,10 +4,10 @@ cfg_rt! {
     #[derive(Copy, Clone)]
     pub(crate) struct SpawnMeta<'a> {
         /// The name of the task
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
         pub(crate) name: Option<&'a str>,
         /// The original size of the future or function being spawned
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
         pub(crate) original_size: usize,
         /// The source code location where the task was spawned.
         ///
@@ -19,7 +19,7 @@ cfg_rt! {
 
     impl<'a> SpawnMeta<'a> {
         /// Create new spawn meta with a name and original size (before possible auto-boxing)
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
         #[track_caller]
         pub(crate) fn new(name: Option<&'a str>, original_size: usize) -> Self {
             Self {
@@ -33,13 +33,13 @@ cfg_rt! {
         /// Create a new unnamed spawn meta with the original size (before possible auto-boxing)
         #[track_caller]
         pub(crate) fn new_unnamed(original_size: usize) -> Self {
-            #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+            #[cfg(not(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))))]
             let _original_size = original_size;
 
             Self {
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
                 name: None,
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
                 original_size,
                 spawned_at: crate::runtime::task::SpawnLocation::capture(),
                 _pd: PhantomData,

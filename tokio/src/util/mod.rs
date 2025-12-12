@@ -84,6 +84,7 @@ cfg_rt_multi_thread! {
 }
 
 pub(crate) mod trace;
+pub(crate) mod usdt;
 
 #[cfg(feature = "fs")]
 pub(crate) mod typeid;
