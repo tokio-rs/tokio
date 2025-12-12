@@ -82,39 +82,17 @@ pub(super) fn vtable<T: Future, S: Schedule>() -> &'static Vtable {
 /// <https://users.rust-lang.org/t/custom-vtables-with-integers/78508>
 struct OffsetHelper<T, S>(T, S);
 impl<T: Future, S: Schedule> OffsetHelper<T, S> {
-    // Pass `size_of`/`align_of` as arguments rather than calling them directly
-    // inside `get_trailer_offset` because trait bounds on generic parameters
-    // of const fn are unstable on our MSRV.
-    const TRAILER_OFFSET: usize = get_trailer_offset(
-        std::mem::size_of::<Header>(),
-        std::mem::size_of::<Core<T, S>>(),
-        std::mem::align_of::<Core<T, S>>(),
-        std::mem::align_of::<Trailer>(),
-    );
+    const TRAILER_OFFSET: usize = get_trailer_offset::<Header, Core<T, S>, Trailer>();
 
     // The `scheduler` is the first field of `Core`, so it has the same
     // offset as `Core`.
-    const SCHEDULER_OFFSET: usize = get_core_offset(
-        std::mem::size_of::<Header>(),
-        std::mem::align_of::<Core<T, S>>(),
-    );
+    const SCHEDULER_OFFSET: usize = get_core_offset::<Header, Core<T, S>>();
 
-    const ID_OFFSET: usize = get_id_offset(
-        std::mem::size_of::<Header>(),
-        std::mem::align_of::<Core<T, S>>(),
-        std::mem::size_of::<S>(),
-        std::mem::align_of::<Id>(),
-    );
+    const ID_OFFSET: usize = get_id_offset::<Header, Core<T, S>, S, Id>();
 
     #[cfg(tokio_unstable)]
-    const SPAWN_LOCATION_OFFSET: usize = get_spawn_location_offset(
-        std::mem::size_of::<Header>(),
-        std::mem::align_of::<Core<T, S>>(),
-        std::mem::size_of::<S>(),
-        std::mem::align_of::<Id>(),
-        std::mem::size_of::<Id>(),
-        std::mem::align_of::<&'static Location<'static>>(),
-    );
+    const SPAWN_LOCATION_OFFSET: usize =
+        get_spawn_location_offset::<Header, Core<T, S>, S, Id, &'static Location<'static>>();
 }
 
 /// Compute the offset of the `Trailer` field in `Cell<T, S>` using the
@@ -122,13 +100,11 @@ impl<T: Future, S: Schedule> OffsetHelper<T, S> {
 ///
 /// Pseudo-code for the `#[repr(C)]` algorithm can be found here:
 /// <https://doc.rust-lang.org/reference/type-layout.html#reprc-structs>
-const fn get_trailer_offset(
-    header_size: usize,
-    core_size: usize,
-    core_align: usize,
-    trailer_align: usize,
-) -> usize {
-    let mut offset = header_size;
+const fn get_trailer_offset<T1, T2, T3>() -> usize {
+    let mut offset = std::mem::size_of::<T1>();
+    let core_size = std::mem::size_of::<T2>();
+    let core_align = std::mem::align_of::<T2>();
+    let trailer_align = std::mem::align_of::<T3>();
 
     let core_misalign = offset % core_align;
     if core_misalign > 0 {
@@ -149,8 +125,9 @@ const fn get_trailer_offset(
 ///
 /// Pseudo-code for the `#[repr(C)]` algorithm can be found here:
 /// <https://doc.rust-lang.org/reference/type-layout.html#reprc-structs>
-const fn get_core_offset(header_size: usize, core_align: usize) -> usize {
-    let mut offset = header_size;
+const fn get_core_offset<T1, T2>() -> usize {
+    let mut offset = std::mem::size_of::<T1>();
+    let core_align = std::mem::align_of::<T2>();
 
     let core_misalign = offset % core_align;
     if core_misalign > 0 {
@@ -165,13 +142,11 @@ const fn get_core_offset(header_size: usize, core_align: usize) -> usize {
 ///
 /// Pseudo-code for the `#[repr(C)]` algorithm can be found here:
 /// <https://doc.rust-lang.org/reference/type-layout.html#reprc-structs>
-const fn get_id_offset(
-    header_size: usize,
-    core_align: usize,
-    scheduler_size: usize,
-    id_align: usize,
-) -> usize {
-    let mut offset = get_core_offset(header_size, core_align);
+const fn get_id_offset<T1, T2, T3, T4>() -> usize {
+    let mut offset = get_core_offset::<T1, T2>();
+    let scheduler_size = std::mem::size_of::<T3>();
+    let id_align = std::mem::align_of::<T4>();
+
     offset += scheduler_size;
 
     let id_misalign = offset % id_align;
@@ -188,15 +163,11 @@ const fn get_id_offset(
 /// Pseudo-code for the `#[repr(C)]` algorithm can be found here:
 /// <https://doc.rust-lang.org/reference/type-layout.html#reprc-structs>
 #[cfg(tokio_unstable)]
-const fn get_spawn_location_offset(
-    header_size: usize,
-    core_align: usize,
-    scheduler_size: usize,
-    id_align: usize,
-    id_size: usize,
-    spawn_location_align: usize,
-) -> usize {
-    let mut offset = get_id_offset(header_size, core_align, scheduler_size, id_align);
+const fn get_spawn_location_offset<T1, T2, T3, T4, T5>() -> usize {
+    let mut offset = get_id_offset::<T1, T2, T3, T4>();
+    let id_size = std::mem::size_of::<T4>();
+    let spawn_location_align = std::mem::align_of::<T5>();
+
     offset += id_size;
 
     let spawn_location_misalign = offset % spawn_location_align;
