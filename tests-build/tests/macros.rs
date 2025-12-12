@@ -19,6 +19,12 @@ fn compile_fail_full() {
     t.compile_fail("tests/fail/macros_dead_code.rs");
 
     #[cfg(feature = "full")]
+    t.compile_fail("tests/fail/macros_join.rs");
+
+    #[cfg(feature = "full")]
+    t.compile_fail("tests/fail/macros_try_join.rs");
+
+    #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_type_mismatch.rs");
 
     #[cfg(all(feature = "rt", not(feature = "full")))]
