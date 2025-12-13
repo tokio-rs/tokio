@@ -1,9 +1,3 @@
-
-
-*[The TokioConf 2026 Call For Talk Proposals is now open](https://tokio.rs/blog/2025-09-26-announcing-tokio-conf-cfp)*
-
----
-
 # Tokio
 
 A runtime for writing reliable, asynchronous, and slim applications with
