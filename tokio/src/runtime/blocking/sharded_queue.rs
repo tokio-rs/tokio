@@ -173,11 +173,11 @@ impl ShardedQueue {
         }
 
         // Wait for notification or timeout
-        let result = self.condvar.wait_timeout(guard, timeout).unwrap();
-        let timed_out = result.1.timed_out();
+        let (guard, wait_timeout_result) = self.condvar.wait_timeout(guard, timeout).unwrap();
+        let timed_out = wait_timeout_result.timed_out();
 
         // Drop the lock before doing further work
-        drop(result.0);
+        drop(guard);
 
         if self.is_shutdown() {
             return WaitResult::Shutdown;
