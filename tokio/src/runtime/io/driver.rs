@@ -320,22 +320,23 @@ impl Handle {
     }
 }
 
-
 /// TEST PURPOSE RELATED TO PR #7773
 #[cfg(feature = "full")]
 impl Handle {
     /// Returns the number of pending registrations (test-only, not part of public API)
     #[doc(hidden)]
+    #[allow(unreachable_pub)]
     pub fn pending_registration_count(&self) -> usize {
         self.registrations.pending_release_count()
     }
     /// Returns the total number of registrations in the main list (test-only)
     #[doc(hidden)]
+    #[allow(unreachable_pub)]
     pub fn total_registration_count(&self) -> usize {
-        self.registrations.total_registration_count(&mut self.synced.lock())
+        self.registrations
+            .total_registration_count(&mut self.synced.lock())
     }
 }
-
 
 impl fmt::Debug for Handle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

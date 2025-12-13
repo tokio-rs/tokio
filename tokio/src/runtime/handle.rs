@@ -493,12 +493,14 @@ impl Handle {
 impl Handle {
     /// Returns the number of pending registrations (test-only, not part of public API)
     #[doc(hidden)]
+    #[allow(unreachable_pub)]
     pub fn io_pending_registration_count(&self) -> usize {
         self.inner.driver().io().pending_registration_count()
     }
 
     /// Returns the total number of registrations in the main list (test-only, not part of public API)
     #[doc(hidden)]
+    #[allow(unreachable_pub)]
     pub fn io_total_registration_count(&self) -> usize {
         self.inner.driver().io().total_registration_count()
     }
@@ -507,8 +509,6 @@ impl Handle {
 impl std::panic::UnwindSafe for Handle {}
 
 impl std::panic::RefUnwindSafe for Handle {}
-
-
 
 cfg_taskdump! {
     impl Handle {

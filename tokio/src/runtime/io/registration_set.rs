@@ -64,19 +64,19 @@ impl RegistrationSet {
         // Count by temporarily draining the list, then restoring it
         // This is safe for test purposes
         let mut items = Vec::new();
-        
+
         // Drain all items
         while let Some(item) = synced.registrations.pop_back() {
             items.push(item);
         }
-        
+
         let count = items.len();
-        
+
         // Restore items in reverse order (since we popped from back)
         for item in items.into_iter().rev() {
             synced.registrations.push_front(item);
         }
-        
+
         count
     }
 
