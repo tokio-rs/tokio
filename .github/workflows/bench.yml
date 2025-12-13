@@ -13,10 +13,8 @@ jobs:
           - ct_spawn
     steps:
       - uses: actions/checkout@v5
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Install Valgrind
-        uses: taiki-e/install-action@valgrind
+      - run: sudo apt-get update && sudo apt-get install -y valgrind
 
       - uses: taiki-e/install-action@cargo-binstall
       - name: Install gungraun-runner
@@ -31,7 +29,7 @@ jobs:
         run: cargo bench --bench ${{ matrix.bench }} | tee output.txt
         working-directory: benches
 
-       # Download previous benchmark result from cache (if exists)
+        # Download previous benchmark result from cache (if exists)
       - name: Download previous benchmark data
         uses: actions/cache@v4
         with:
@@ -41,9 +39,10 @@ jobs:
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
-          tool: 'cargo'
-          output-file-path: output.txt
-           # Where the previous data file is stored
+          tool: "cargo"
+          output-file-path:
+            output.txt
+            # Where the previous data file is stored
           external-data-json-path: ./cache/benchmark-data.json
           # Workflow will fail when an alert happens
           fail-on-alert: true
