@@ -296,7 +296,8 @@ impl Handle {
         source: &mut impl Source,
     ) -> io::Result<()> {
         // Deregister the source with the OS poller **first**
-        self.registry.deregister(source)?;
+        // Cleanup ALWAYS happens
+        let os_result = self.registry.deregister(source);
 
         if self
             .registrations
@@ -307,6 +308,8 @@ impl Handle {
 
         self.metrics.dec_fd_count();
 
+        os_result?; // Return error after cleanup
+
         Ok(())
     }
 
@@ -314,6 +317,24 @@ impl Handle {
         if self.registrations.needs_release() {
             self.registrations.release(&mut self.synced.lock());
         }
+    }
+}
+
+/// TEST PURPOSE RELATED TO PR #7773
+#[cfg(feature = "full")]
+impl Handle {
+    /// Returns the number of pending registrations (test-only, not part of public API)
+    #[doc(hidden)]
+    #[allow(unreachable_pub)]
+    pub fn pending_registration_count(&self) -> usize {
+        self.registrations.pending_release_count()
+    }
+    /// Returns the total number of registrations in the main list (test-only)
+    #[doc(hidden)]
+    #[allow(unreachable_pub)]
+    pub fn total_registration_count(&self) -> usize {
+        self.registrations
+            .total_registration_count(&mut self.synced.lock())
     }
 }
 

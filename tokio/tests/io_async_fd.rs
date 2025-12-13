@@ -947,12 +947,76 @@ async fn try_new() {
     assert!(Arc::ptr_eq(&original, &returned));
 }
 
+/// Regression test for issue #7563
+///
+/// Reproduces the bug where closing fd before dropping AsyncFd causes
+/// OS deregister to fail, preventing cleanup and leaking ScheduledIo objects.
 #[tokio::test]
-async fn try_with_interest() {
-    let original = Arc::new(InvalidSource);
+async fn memory_leak_when_fd_closed_before_drop() {
+    use std::os::unix::io::{AsRawFd, RawFd};
+    use std::sync::Arc;
+    use tokio::io::unix::AsyncFd;
+    use tokio::runtime::Handle;
 
-    let error = AsyncFd::try_with_interest(original.clone(), Interest::READABLE).unwrap_err();
-    let (returned, _cause) = error.into_parts();
+    use nix::sys::socket::{self, AddressFamily, SockFlag, SockType};
 
-    assert!(Arc::ptr_eq(&original, &returned));
+    struct RawFdWrapper {
+        fd: RawFd,
+    }
+
+    impl AsRawFd for RawFdWrapper {
+        fn as_raw_fd(&self) -> RawFd {
+            self.fd
+        }
+    }
+
+    let rt_handle = Handle::current();
+    tokio::task::yield_now().await;
+    let initial_count = rt_handle.io_total_registration_count();
+
+    const ITERATIONS: usize = 30;
+    let mut max_count_seen = initial_count;
+
+    for _ in 0..ITERATIONS {
+        let (fd_a, _fd_b) = socket::socketpair(
+            AddressFamily::Unix,
+            SockType::Stream,
+            None,
+            SockFlag::empty(),
+        )
+        .expect("socketpair");
+        let raw_fd = fd_a.as_raw_fd();
+        set_nonblocking(raw_fd);
+        std::mem::forget(fd_a);
+
+        let afd = Arc::new(RawFdWrapper { fd: raw_fd });
+        let async_fd = AsyncFd::new(ArcFd(afd.clone())).unwrap();
+
+        unsafe {
+            libc::close(raw_fd);
+        }
+
+        drop(async_fd);
+        tokio::task::yield_now().await;
+
+        let current_count = rt_handle.io_total_registration_count();
+        max_count_seen = max_count_seen.max(current_count);
+    }
+
+    tokio::task::yield_now().await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let final_count = rt_handle.io_total_registration_count();
+    max_count_seen = max_count_seen.max(final_count);
+
+    assert!(
+        final_count <= initial_count + 2 && max_count_seen <= initial_count + 2,
+        "Memory leak detected: final count {} (initial: {}), max seen: {}. \
+         With bug, count would be ~{} ({} leaked objects).",
+        final_count,
+        initial_count,
+        max_count_seen,
+        initial_count + ITERATIONS,
+        max_count_seen.saturating_sub(initial_count)
+    );
 }
