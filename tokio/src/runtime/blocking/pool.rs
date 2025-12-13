@@ -575,10 +575,10 @@ impl Inner {
 
         // Drain remaining tasks if shutting down
         if self.queue.is_shutdown() {
-            self.queue.drain(|task| {
+            while let Some(task) = self.queue.pop(preferred_shard) {
                 self.metrics.dec_queue_depth();
                 task.shutdown_or_run_if_mandatory();
-            });
+            }
         }
 
         // Thread exit
