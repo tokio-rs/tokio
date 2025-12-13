@@ -1,0 +1,52 @@
+name: benchmark
+on:
+  push:
+    branches: [master]
+
+jobs:
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        bench:
+          - ct_spawn
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install Valgrind
+        uses: taiki-e/install-action@valgrind
+
+      - uses: taiki-e/install-action@cargo-binstall
+      - name: Install gungraun-runner
+        run: |
+          version=$(cargo metadata --format-version=1 |\
+            jq '.packages[] | select(.name == "gungraun").version' |\
+            tr -d '"'
+          )
+          cargo binstall --no-confirm gungraun-runner --version $version
+
+      - name: Run ct benchmarks
+        run: cargo bench --bench ${{ matrix.bench }} | tee output.txt
+        working-directory: benches
+
+       # Download previous benchmark result from cache (if exists)
+      - name: Download previous benchmark data
+        uses: actions/cache@v4
+        with:
+          path: ./cache
+          key: ${{ runner.os }}-benchmark
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'cargo'
+          output-file-path: output.txt
+           # Where the previous data file is stored
+          external-data-json-path: ./cache/benchmark-data.json
+          # Workflow will fail when an alert happens
+          fail-on-alert: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: true
+          auto-push: true
