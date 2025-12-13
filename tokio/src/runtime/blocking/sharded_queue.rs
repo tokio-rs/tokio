@@ -138,24 +138,6 @@ impl ShardedQueue {
         None
     }
 
-    /// Drain all tasks from the queue, calling the provided closure on each.
-    pub(super) fn drain<F>(&self, mut f: F)
-    where
-        F: FnMut(Task),
-    {
-        for shard in &self.shards {
-            loop {
-                let mut queue = shard.queue.lock();
-                if let Some(task) = queue.pop_front() {
-                    drop(queue);
-                    f(task);
-                } else {
-                    break;
-                }
-            }
-        }
-    }
-
     /// Set the shutdown flag and wake all workers.
     pub(super) fn shutdown(&self) {
         self.shutdown.store(true, Release);
