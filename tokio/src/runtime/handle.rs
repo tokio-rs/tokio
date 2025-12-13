@@ -491,12 +491,6 @@ impl Handle {
 /// TEST PURPOSE RELATED TO PR #7773
 #[cfg(feature = "full")]
 impl Handle {
-    /// Returns a reference to the IO driver handle (test-only, not part of public API)
-    #[doc(hidden)]
-    pub(crate) fn io_driver(&self) -> &crate::runtime::io::Handle {
-        self.inner.driver().io()
-    }
-
     /// Returns the number of pending registrations (test-only, not part of public API)
     #[doc(hidden)]
     pub fn io_pending_registration_count(&self) -> usize {
