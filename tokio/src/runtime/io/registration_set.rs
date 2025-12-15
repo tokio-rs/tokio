@@ -73,7 +73,7 @@ impl RegistrationSet {
         let count = items.len();
 
         // Restore items in reverse order (since we popped from back)
-        for item in items.into_iter().rev() {
+        for item in items.into_iter() {
             synced.registrations.push_front(item);
         }
 
