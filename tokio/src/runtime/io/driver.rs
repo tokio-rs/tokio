@@ -329,7 +329,7 @@ impl Handle {
     pub fn pending_registration_count(&self) -> usize {
         self.registrations.pending_release_count()
     }
-    /// Returns the total number of registrations in the main list (test-only)
+    /// Returns the total number of registrations in the main list (test-only, not part of public API)
     #[doc(hidden)]
     #[allow(unreachable_pub)]
     pub fn total_registration_count(&self) -> usize {
