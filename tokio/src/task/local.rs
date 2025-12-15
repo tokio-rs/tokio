@@ -936,7 +936,7 @@ cfg_unstable! {
         /// [unstable]: crate#unstable-features
         /// [`Id`]: struct@crate::runtime::Id
         pub fn id(&self) -> runtime::Id {
-            self.context.shared.local_state.owned.id.into()
+            runtime::Id::new(self.context.shared.local_state.owned.id)
         }
     }
 }
