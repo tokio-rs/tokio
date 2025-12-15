@@ -947,6 +947,18 @@ async fn try_new() {
     assert!(Arc::ptr_eq(&original, &returned));
 }
 
+
+#[tokio::test]
+async fn try_with_interest() {
+    let original = Arc::new(InvalidSource);
+
+    let error = AsyncFd::try_with_interest(original.clone(), Interest::READABLE).unwrap_err();
+    let (returned, _cause) = error.into_parts();
+
+    assert!(Arc::ptr_eq(&original, &returned));
+}
+
+
 /// Regression test for issue #7563
 ///
 /// Reproduces the bug where closing fd before dropping AsyncFd causes
