@@ -953,9 +953,6 @@ async fn try_new() {
 /// OS deregister to fail, preventing cleanup and leaking ScheduledIo objects.
 #[tokio::test]
 async fn memory_leak_when_fd_closed_before_drop() {
-    use std::os::unix::io::{AsRawFd, RawFd};
-    use std::sync::Arc;
-    use tokio::io::unix::AsyncFd;
     use tokio::runtime::Handle;
 
     use nix::sys::socket::{self, AddressFamily, SockFlag, SockType};
