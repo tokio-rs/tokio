@@ -947,7 +947,6 @@ async fn try_new() {
     assert!(Arc::ptr_eq(&original, &returned));
 }
 
-
 #[tokio::test]
 async fn try_with_interest() {
     let original = Arc::new(InvalidSource);
@@ -957,7 +956,6 @@ async fn try_with_interest() {
 
     assert!(Arc::ptr_eq(&original, &returned));
 }
-
 
 /// Regression test for issue #7563
 ///
