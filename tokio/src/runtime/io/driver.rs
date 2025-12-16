@@ -321,7 +321,7 @@ impl Handle {
 }
 
 /// Internal test methods for PR #7773
-/// These methods are only available with the __internal_test feature flag
+/// These methods are only available with the `__internal_test` feature flag
 /// and are not part of the public API. They may change without notice.
 #[cfg(feature = "__internal_test")]
 impl Handle {
