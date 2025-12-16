@@ -27,25 +27,16 @@ jobs:
 
       - name: Run ct benchmarks
         run: cargo bench --bench ${{ matrix.bench }} | tee output.txt
-        working-directory: benches
-
-        # Download previous benchmark result from cache (if exists)
-      - name: Download previous benchmark data
-        uses: actions/cache@v4
-        with:
-          path: ./cache
-          key: ${{ runner.os }}-benchmark
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: "cargo"
-          output-file-path:
-            output.txt
-            # Where the previous data file is stored
-          external-data-json-path: ./cache/benchmark-data.json
-          # Workflow will fail when an alert happens
-          fail-on-alert: true
+          output-file-path: output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment-on-alert: true
           auto-push: true
+          fail-on-alert: true
+          # Show alert if performance drops > 15% 
+          alert-threshold: '150%' #TODO: TBD
+          comment-on-alert: true
+          #TODO: alert tokio maintainers?
