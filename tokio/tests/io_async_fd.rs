@@ -962,17 +962,17 @@ async fn try_with_interest() {
 /// Reproduces the bug where closing fd before dropping AsyncFd causes
 /// OS deregister to fail, preventing cleanup and leaking ScheduledIo objects.
 ///
-/// Note: This test requires the `__internal_test` feature flag to access
+/// Note: This test requires the `integration_test` feature flag to access
 /// internal registration counting methods. Run with:
 /// ```sh
-/// cargo test --test io_async_fd --features __internal_test memory_leak_when_fd_closed_before_drop
+/// cargo test --test io_async_fd --features integration_test memory_leak_when_fd_closed_before_drop
 /// ```
 ///
 /// The test verifies that registration counts don't grow over iterations,
 /// which would indicate a memory leak. On Linux with epoll, the leak is
 /// detectable; on macOS, the test still exercises the code path.
 #[tokio::test]
-#[cfg(feature = "__internal_test")]
+#[cfg(feature = "integration_test")]
 async fn memory_leak_when_fd_closed_before_drop() {
     use tokio::runtime::Handle;
 

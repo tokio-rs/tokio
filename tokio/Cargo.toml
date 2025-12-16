@@ -85,9 +85,9 @@ sync = []
 test-util = ["rt", "sync", "time"]
 time = []
 
-# Internal test-only feature. Not part of public API. Subject to change without notice.
-# Used for internal testing infrastructure.
-__internal_test = []
+# Integration test-only feature. Not part of public API. Subject to change without notice.
+# Used for integration testing infrastructure.
+integration_test = []
 
 # Unstable feature. Requires `--cfg tokio_unstable` to enable.
 io-uring = ["dep:io-uring", "libc", "mio/os-poll", "mio/os-ext", "dep:slab"]
