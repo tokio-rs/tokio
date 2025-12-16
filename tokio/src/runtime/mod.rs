@@ -545,10 +545,6 @@ cfg_rt! {
     mod builder;
     pub use self::builder::Builder;
     cfg_unstable! {
-        mod id;
-        #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-        pub use id::Id;
-
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
 
@@ -574,6 +570,10 @@ cfg_rt! {
 
     mod runtime;
     pub use runtime::{Runtime, RuntimeFlavor};
+
+    mod id;
+    pub use id::Id;
+
 
     /// Boundary value to prevent stack overflow caused by a large-sized
     /// Future being placed in the stack.
