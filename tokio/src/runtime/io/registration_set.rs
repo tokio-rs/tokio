@@ -53,13 +53,16 @@ impl RegistrationSet {
         self.num_pending_release.load(Acquire) != 0
     }
 
-    /// TEST PURPOSE RELATED TO PR #7773
-    #[cfg(feature = "full")]
+    /// Internal test method for PR #7773
+    /// Returns the number of pending registrations (internal test-only method)
+    #[cfg(feature = "__internal_test")]
     pub(super) fn pending_release_count(&self) -> usize {
         self.num_pending_release.load(Acquire)
     }
-    /// TEST PURPOSE RELATED TO PR #7773
-    #[cfg(feature = "full")]
+
+    /// Internal test method for PR #7773
+    /// Returns the total number of registrations in the main list (internal test-only method)
+    #[cfg(feature = "__internal_test")]
     pub(super) fn total_registration_count(&self, synced: &mut Synced) -> usize {
         // Count by temporarily draining the list, then restoring it
         // This is safe for test purposes

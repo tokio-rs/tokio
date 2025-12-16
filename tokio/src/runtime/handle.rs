@@ -488,21 +488,21 @@ impl Handle {
     }
 }
 
-/// TEST PURPOSE RELATED TO PR #7773
-#[cfg(feature = "full")]
-impl Handle {
-    /// Returns the number of pending registrations (test-only, not part of public API)
-    #[doc(hidden)]
-    #[allow(unreachable_pub)]
-    pub fn io_pending_registration_count(&self) -> usize {
-        self.inner.driver().io().pending_registration_count()
-    }
+cfg_io_driver! {
+    /// Internal test methods for PR #7773
+    /// These methods are only available with the __internal_test feature flag
+    /// and are not part of the public API. They may change without notice.
+    #[cfg(feature = "__internal_test")]
+    impl Handle {
+        /// Returns the number of pending I/O registrations (internal test-only method)
+        pub fn io_pending_registration_count(&self) -> usize {
+            self.inner.driver().io().pending_registration_count()
+        }
 
-    /// Returns the total number of registrations in the main list (test-only, not part of public API)
-    #[doc(hidden)]
-    #[allow(unreachable_pub)]
-    pub fn io_total_registration_count(&self) -> usize {
-        self.inner.driver().io().total_registration_count()
+        /// Returns the total number of I/O registrations (internal test-only method)
+        pub fn io_total_registration_count(&self) -> usize {
+            self.inner.driver().io().total_registration_count()
+        }
     }
 }
 

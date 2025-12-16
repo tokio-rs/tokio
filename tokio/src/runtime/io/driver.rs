@@ -320,19 +320,26 @@ impl Handle {
     }
 }
 
-/// TEST PURPOSE RELATED TO PR #7773
-#[cfg(feature = "full")]
+/// Internal test methods for PR #7773
+/// These methods are only available with the __internal_test feature flag
+/// and are not part of the public API. They may change without notice.
+#[cfg(feature = "__internal_test")]
 impl Handle {
-    /// Returns the number of pending registrations (test-only, not part of public API)
-    #[doc(hidden)]
-    #[allow(unreachable_pub)]
-    pub fn pending_registration_count(&self) -> usize {
+    /// Returns the number of pending registrations (internal test-only method)
+    ///
+    /// # Warning
+    /// This method is NOT part of the public API and is subject to change
+    /// without notice. It should only be used for internal testing.
+    pub(crate) fn pending_registration_count(&self) -> usize {
         self.registrations.pending_release_count()
     }
-    /// Returns the total number of registrations in the main list (test-only, not part of public API)
-    #[doc(hidden)]
-    #[allow(unreachable_pub)]
-    pub fn total_registration_count(&self) -> usize {
+
+    /// Returns the total number of registrations in the main list (internal test-only method)
+    ///
+    /// # Warning
+    /// This method is NOT part of the public API and is subject to change
+    /// without notice. It should only be used for internal testing.
+    pub(crate) fn total_registration_count(&self) -> usize {
         self.registrations
             .total_registration_count(&mut self.synced.lock())
     }
