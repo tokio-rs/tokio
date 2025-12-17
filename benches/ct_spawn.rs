@@ -28,10 +28,10 @@ fn spawn(runtime: Runtime) {
     });
 }
 
-fn spawn10(runtime: Runtime) {
+fn spawn100(runtime: Runtime) {
     runtime.block_on(async {
-        let mut handles = Vec::with_capacity(10);
-        for _ in 0..10 {
+        let mut handles = Vec::with_capacity(100);
+        for _ in 0..100 {
             handles.push(tokio::spawn(work()));
         }
         for handle in handles {
@@ -50,13 +50,13 @@ fn spawn_rt(runtime: Runtime) {
 #[library_benchmark]
 #[bench::basic(setup = single_rt)]
 #[bench::threaded(setup = multi_rt)]
-fn spawn_rt_10(runtime: Runtime) {
-    black_box(spawn10(runtime));
+fn spawn_rt_100(runtime: Runtime) {
+    black_box(spawn100(runtime));
 }
 
 library_benchmark_group!(
     name = group;
-    benchmarks = spawn_rt,spawn_rt_10
+    benchmarks = spawn_rt,spawn_rt_100
 );
 
 main!(library_benchmark_groups = group);
