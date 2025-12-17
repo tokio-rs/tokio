@@ -36,7 +36,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           fail-on-alert: true
-          # Show alert if performance drops > 15% 
           alert-threshold: '150%' #TODO: TBD
           comment-on-alert: true
           #TODO: alert tokio maintainers?
