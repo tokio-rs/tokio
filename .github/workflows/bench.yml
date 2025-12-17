@@ -1,7 +1,11 @@
 name: benchmark
 on:
   push:
-    branches: [master]
+    branches:
+      - master
+  pull_request: #TODO: remove after testing
+    branches:
+      - master
 
 jobs:
   benchmark:
