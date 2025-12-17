@@ -29,17 +29,20 @@ jobs:
           )
           cargo binstall --no-confirm gungraun-runner --version $version
 
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Run ct benchmarks
         run: cargo bench --bench ${{ matrix.bench }} | tee output.txt
 
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          tool: "cargo"
-          output-file-path: output.txt
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          fail-on-alert: true
-          alert-threshold: '150%' #TODO: TBD
-          comment-on-alert: true
-          #TODO: alert tokio maintainers?
+      # - name: Store benchmark result
+      #   uses: benchmark-action/github-action-benchmark@v1
+      #   with:
+      #     tool: "cargo"
+      #     output-file-path: output.txt
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     auto-push: true
+      #     fail-on-alert: true
+      #     alert-threshold: '150%' #TODO: TBD
+      #     comment-on-alert: true
+      #     #TODO: alert tokio maintainers?
