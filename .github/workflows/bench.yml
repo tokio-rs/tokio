@@ -43,7 +43,7 @@ jobs:
           jq '[.[] | {
           name: .id,
           unit: "instructions",
-          value: .profiles[0].summaries.total.summary.Callgrind["Ir"].metrics.Both[0].Int
+          value: .profiles[0].summaries.total.summary.Callgrind.Ir.metrics.Left.Int
           }]' output.json > benchmark-results.json
 
       - name: Store benchmark result
