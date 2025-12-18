@@ -32,7 +32,7 @@ jobs:
       - name: Download previous benchmark data
         uses: actions/cache@v4
         with:
-          path: .cache
+          path: ./cache
           key: ${{ runner.os }}-benchmark-${{ matrix.bench }}
 
       - name: Run benchmarks
