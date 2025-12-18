@@ -243,6 +243,13 @@ pub struct Sender<T> {
 ///
 /// [`Future`]: trait@std::future::Future
 ///
+/// # Cancellation safety
+///
+/// The `Receiver` is cancel safe. If it is used as the event in a
+/// [`tokio::select!`](crate::select) statement and some other branch
+/// completes first, it is guaranteed that no message was received on this
+/// channel.
+///
 /// # Examples
 ///
 /// ```
