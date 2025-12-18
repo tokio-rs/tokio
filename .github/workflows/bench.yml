@@ -3,13 +3,6 @@ on:
   push:
     branches:
       - master
-  pull_request: #TODO: remove after testing
-    branches:
-      - master
-
-permissions:
-    contents: read
-    pull-requests: write
 
 jobs:
   benchmark:
@@ -59,6 +52,6 @@ jobs:
           external-data-json-path: ./cache/benchmark-results.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # Alert if performance regresses by more than 10%
-          alert-threshold: "100%" #TODO: set this back to 110%
+          alert-threshold: "110%"
           comment-on-alert: true
           fail-on-alert: false
