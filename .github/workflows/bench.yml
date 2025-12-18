@@ -7,6 +7,10 @@ on:
     branches:
       - master
 
+permissions:
+    contents: read
+    pull-requests: write
+
 jobs:
   benchmark:
     name: Benchmark
