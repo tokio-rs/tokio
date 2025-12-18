@@ -29,14 +29,11 @@ jobs:
           )
           cargo binstall --no-confirm gungraun-runner --version $version
 
-      - name: Cache
-        uses: Swatinem/rust-cache@v2
+      - name: Download previous benchmark data
+        uses: actions/cache@v4
+        with:
+          path: target/gungraun
+          key: ${{ runner.os }}-benchmark-${{ matrix.bench }}
 
       - name: Run ct benchmarks
-        run: cargo bench --bench ${{ matrix.bench }} | tee output.txt
-
-      - name: Store benchmark result
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmarks-results
-          path: output.txt
+        run: cargo bench --bench ${{ matrix.bench }}
