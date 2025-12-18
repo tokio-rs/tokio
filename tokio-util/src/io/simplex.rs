@@ -85,6 +85,13 @@ impl Inner {
 
 /// Receiver of the simplex channel.
 ///
+/// # Cancellation safety
+///
+/// The `Receiver` is cancel safe. If it is used as the event in a
+/// [`tokio::select!`](macro@tokio::select) statement and some other branch
+/// completes first, it is guaranteed that no bytes were received on this
+/// channel.
+///
 /// You can still read the remaining data from the buffer
 /// even if the write half has been dropped.
 /// See [`Sender::poll_shutdown`] and [`Sender::drop`] for more details.
@@ -153,7 +160,14 @@ impl AsyncRead for Receiver {
 
 /// Sender of the simplex channel.
 ///
-/// ## Shutdown
+/// # Cancellation safety
+///
+/// The `Sender` is cancel safe. If it is used as the event in a
+/// [`tokio::select!`](macro@tokio::select) statement and some other branch
+/// completes first, it is guaranteed that no bytes were sent on this
+/// channel.
+///
+/// # Shutdown
 ///
 /// See [`Sender::poll_shutdown`].
 #[derive(Debug)]
