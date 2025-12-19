@@ -699,6 +699,19 @@ test!(multicast_ttl_v4, set_multicast_ttl_v4(40));
 
 test!(IPv6 multicast_loop_v6, set_multicast_loop_v6(false));
 
+#[cfg(any(
+    target_os = "android",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "fuchsia",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "cygwin",
+))]
+test!(IPv6 tclass_v6, set_tclass_v6(96));
+
 test!(IPv4 ttl, set_ttl(40));
 
 #[cfg(not(any(

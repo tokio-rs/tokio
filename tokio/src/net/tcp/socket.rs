@@ -489,6 +489,79 @@ impl TcpSocket {
         self.inner.tcp_nodelay()
     }
 
+    /// Gets the value of the `IPV6_TCLASS` option for this socket.
+    ///
+    /// For more information about this option, see [`set_tclass_v6`].
+    ///
+    /// [`set_tclass_v6`]: Self::set_tclass_v6
+    // https://docs.rs/socket2/0.6.1/src/socket2/sys/unix.rs.html#2541
+    #[cfg(any(
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "fuchsia",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "cygwin",
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "android",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "fuchsia",
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "netbsd",
+            target_os = "openbsd",
+            target_os = "cygwin",
+        )))
+    )]
+    pub fn tclass_v6(&self) -> io::Result<u32> {
+        self.inner.tclass_v6()
+    }
+
+    /// Sets the value for the `IPV6_TCLASS` option on this socket.
+    ///
+    /// Specifies the traffic class field that is used in every packet
+    /// sent from this socket.
+    ///
+    /// # Note
+    ///
+    /// This may not have any effect on IPv4 sockets.
+    // https://docs.rs/socket2/0.6.1/src/socket2/sys/unix.rs.html#2566
+    #[cfg(any(
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "fuchsia",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "cygwin",
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "android",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "fuchsia",
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "netbsd",
+            target_os = "openbsd",
+            target_os = "cygwin",
+        )))
+    )]
+    pub fn set_tclass_v6(&self, tclass: u32) -> io::Result<()> {
+        self.inner.set_tclass_v6(tclass)
+    }
+
     /// Gets the value of the `IP_TOS` option for this socket.
     ///
     /// For more information about this option, see [`set_tos_v4`].

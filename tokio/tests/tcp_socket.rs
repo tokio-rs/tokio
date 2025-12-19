@@ -162,6 +162,19 @@ test!(
 
 test!(nodelay, set_nodelay(true));
 
+#[cfg(any(
+    target_os = "android",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "fuchsia",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "cygwin",
+))]
+test!(IPv6 tclass_v6, set_tclass_v6(96));
+
 #[cfg(not(any(
     target_os = "fuchsia",
     target_os = "redox",
