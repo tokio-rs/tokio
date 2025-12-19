@@ -1908,7 +1908,7 @@ impl UdpSocket {
     ///
     /// # Note
     ///
-    /// This may not have any affect on IPv6 sockets.
+    /// This may not have any effect on IPv6 sockets.
     pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
         self.io.set_multicast_loop_v4(on)
     }
@@ -1930,7 +1930,7 @@ impl UdpSocket {
     ///
     /// # Note
     ///
-    /// This may not have any affect on IPv6 sockets.
+    /// This may not have any effect on IPv6 sockets.
     pub fn set_multicast_ttl_v4(&self, ttl: u32) -> io::Result<()> {
         self.io.set_multicast_ttl_v4(ttl)
     }
@@ -1950,7 +1950,7 @@ impl UdpSocket {
     ///
     /// # Note
     ///
-    /// This may not have any affect on IPv4 sockets.
+    /// This may not have any effect on IPv4 sockets.
     pub fn set_multicast_loop_v6(&self, on: bool) -> io::Result<()> {
         self.io.set_multicast_loop_v6(on)
     }
