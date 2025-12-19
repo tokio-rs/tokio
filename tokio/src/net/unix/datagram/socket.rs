@@ -5,6 +5,8 @@ use crate::util::check_socket_for_blocking;
 use std::fmt;
 use std::io;
 use std::net::Shutdown;
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::net;
 use std::path::Path;
@@ -396,7 +398,8 @@ impl UnixDatagram {
     where
         P: AsRef<Path>,
     {
-        let socket = mio::net::UnixDatagram::bind(path)?;
+        let addr = SocketAddr::from_path(path)?.0;
+        let socket = mio::net::UnixDatagram::bind_addr(&addr)?;
         UnixDatagram::new(socket)
     }
 
@@ -571,6 +574,11 @@ impl UnixDatagram {
     /// The `send` method may be used to send data to the specified address.
     /// `recv` and `recv_from` will only receive data from that address.
     ///
+    /// # Limitations
+    ///
+    /// This method currently does not allow specifying Linux abstract
+    /// namespace paths.
+    ///
     /// # Examples
     /// ```
     /// # use std::error::Error;
@@ -605,6 +613,16 @@ impl UnixDatagram {
     /// # }
     /// ```
     pub fn connect<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
+        //FIXME: Convert this to `mio::net::UnixDatagram::connect_addr` once
+        //       that is supported by MIO
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if path.as_ref().as_os_str().as_bytes().starts_with(b"\0") {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "UnixDatagram::connect(): abstract paths currently unsupported",
+            ));
+        }
+
         self.io.connect(path)
     }
 
@@ -694,6 +712,11 @@ impl UnixDatagram {
 
     /// Tries to send a datagram to the peer without waiting.
     ///
+    /// # Limitations
+    ///
+    /// This method currently does not allow specifying Linux abstract
+    /// namespace paths.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -733,6 +756,16 @@ impl UnixDatagram {
     where
         P: AsRef<Path>,
     {
+        //FIXME: Convert this to `mio::net::UnixDatagram::send_to_addr` once
+        //       that is supported by MIO
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if target.as_ref().as_os_str().as_bytes().starts_with(b"\0") {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "UnixDatagram::try_send_to(): abstract paths currently unsupported",
+            ));
+        }
+
         self.io
             .registration()
             .try_io(Interest::WRITABLE, || self.io.send_to(buf, target))
@@ -1066,6 +1099,11 @@ impl UnixDatagram {
     /// [`tokio::select!`](crate::select) statement and some other branch
     /// completes first, then it is guaranteed that the message was not sent.
     ///
+    /// # Limitations
+    ///
+    /// This method currently does not allow specifying Linux abstract
+    /// namespace paths.
+    ///
     /// # Examples
     /// ```
     /// # use std::error::Error;
@@ -1102,6 +1140,16 @@ impl UnixDatagram {
     where
         P: AsRef<Path>,
     {
+        //FIXME: Convert this to `mio::net::UnixDatagram::send_to_addr` once
+        //       that is supported by MIO
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if target.as_ref().as_os_str().as_bytes().starts_with(b"\0") {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "UnixDatagram::send_to(): abstract paths currently unsupported",
+            ));
+        }
+
         self.io
             .registration()
             .async_io(Interest::WRITABLE, || self.io.send_to(buf, target.as_ref()))
@@ -1205,6 +1253,11 @@ impl UnixDatagram {
     /// `Waker` from the `Context` passed to the most recent call will be scheduled to
     /// receive a wakeup.
     ///
+    /// # Limitations
+    ///
+    /// This method currently does not allow specifying Linux abstract
+    /// namespace paths.
+    ///
     /// # Return value
     ///
     /// The function returns:
@@ -1225,6 +1278,16 @@ impl UnixDatagram {
     where
         P: AsRef<Path>,
     {
+        //FIXME: Convert this to `mio::net::UnixDatagram::send_to_addr` once
+        //       that is supported by MIO
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if target.as_ref().as_os_str().as_bytes().starts_with(b"\0") {
+            return Poll::Ready(Err(io::Error::new(
+                io::ErrorKind::Other,
+                "UnixDatagram::send_to(): abstract paths currently unsupported",
+            )));
+        }
+
         self.io
             .registration()
             .poll_write_io(cx, || self.io.send_to(buf, target.as_ref()))
