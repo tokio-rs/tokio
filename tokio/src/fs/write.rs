@@ -1,3 +1,11 @@
+#[cfg(all(
+    tokio_unstable,
+    feature = "io-uring",
+    feature = "rt",
+    feature = "fs",
+    target_os = "linux"
+))]
+use crate::io::blocking;
 use crate::{fs::asyncify, util::as_ref::OwnedBuf};
 
 use std::{io, path::Path};
@@ -25,7 +33,6 @@ use std::{io, path::Path};
 /// ```
 pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Result<()> {
     let path = path.as_ref();
-    let contents = crate::util::as_ref::upgrade(contents);
 
     #[cfg(all(
         tokio_unstable,
@@ -38,10 +45,13 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
         let handle = crate::runtime::Handle::current();
         let driver_handle = handle.inner.driver().io();
         if driver_handle.check_and_init()? {
-            return write_uring(path, contents).await;
+            let mut buf = blocking::Buf::with_capacity(contents.as_ref().len());
+            buf.copy_from(contents.as_ref(), contents.as_ref().len());
+            return write_uring(path, buf).await;
         }
     }
 
+    let contents = crate::util::as_ref::upgrade(contents);
     write_spawn_blocking(path, contents).await
 }
 
@@ -52,9 +62,9 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
     feature = "fs",
     target_os = "linux"
 ))]
-async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
-    use crate::{fs::OpenOptions, runtime::driver::op::Op};
-    use std::os::fd::OwnedFd;
+async fn write_uring(path: &Path, mut buf: blocking::Buf) -> io::Result<()> {
+    use crate::{fs::OpenOptions, io::uring::utils::ArcFd, runtime::driver::op::Op};
+    use std::sync::Arc;
 
     let file = OpenOptions::new()
         .write(true)
@@ -63,16 +73,14 @@ async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
         .open(path)
         .await?;
 
-    let mut fd: OwnedFd = file
-        .try_into_std()
-        .expect("unexpected in-flight operation detected")
-        .into();
+    let mut fd: ArcFd = Arc::new(
+        file.try_into_std()
+            .expect("unexpected in-flight operation detected"),
+    );
 
-    let total: usize = buf.as_ref().len();
-    let mut buf_offset: usize = 0;
     let mut file_offset: u64 = 0;
-    while buf_offset < total {
-        let (n, _buf, _fd) = Op::write_at(fd, buf, buf_offset, file_offset)?.await;
+    while !buf.is_empty() {
+        let (n, _buf, _fd) = Op::write_at(fd, buf, file_offset).await;
         // TODO: handle EINT here
         let n = n?;
         if n == 0 {
@@ -81,7 +89,6 @@ async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
 
         buf = _buf;
         fd = _fd;
-        buf_offset += n as usize;
         file_offset += n as u64;
     }
 

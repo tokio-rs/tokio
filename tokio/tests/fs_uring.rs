@@ -14,6 +14,9 @@ use std::task::Poll;
 use std::time::Duration;
 use std::{future::poll_fn, path::PathBuf};
 use tempfile::NamedTempFile;
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncSeekExt;
+use tokio::io::AsyncWriteExt;
 use tokio::{
     fs::OpenOptions,
     runtime::{Builder, Runtime},
@@ -143,6 +146,41 @@ async fn cancel_op_future() {
 
     let res = handle.await.unwrap_err();
     assert!(res.is_cancelled());
+}
+
+#[tokio::test]
+async fn test_file_write() {
+    let (_tmp_file, path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
+
+    let mut file = OpenOptions::new().write(true).open(&path[0]).await.unwrap();
+
+    let data = b"hello io_uring";
+    file.write_all(data).await.unwrap();
+}
+
+#[tokio::test]
+async fn test_file_write_seek() {
+    let (_tmp_file, path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .read(true)
+        .open(&path[0])
+        .await
+        .unwrap();
+
+    let data = b"hello uring";
+    file.write_all(data).await.unwrap();
+
+    file.seek(std::io::SeekFrom::Start(6)).await.unwrap();
+
+    let data2 = b"world";
+    file.write_all(data2).await.unwrap();
+
+    let mut content = vec![0u8; 11];
+    file.seek(std::io::SeekFrom::Start(0)).await.unwrap();
+    file.read_exact(&mut content).await.unwrap();
+    assert_eq!(&content, b"hello world");
 }
 
 fn create_tmp_files(num_files: usize) -> (Vec<NamedTempFile>, Vec<PathBuf>) {

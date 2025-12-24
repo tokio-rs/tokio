@@ -234,6 +234,25 @@ impl Buf {
         &self.buf[self.pos..]
     }
 
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux"
+    ))]
+    pub(crate) fn advance(&mut self, n: usize) {
+        if n > self.len() {
+            panic!("advance past end of buffer");
+        }
+
+        self.pos += n;
+        if self.pos == self.buf.len() {
+            self.buf.truncate(0);
+            self.pos = 0;
+        }
+    }
+
     /// # Safety
     ///
     /// `rd` must not read from the buffer `read` is borrowing and must correctly
