@@ -1031,21 +1031,21 @@ jobs:
         run: cargo test -p tokio --target ${{ matrix.target }} --features full
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
-          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-util full
         run: cargo test -p tokio-util --target ${{ matrix.target }} --features full
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
-          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-stream
         run: cargo test -p tokio-stream --target ${{ matrix.target }} --features time,net,io-util,sync
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
-          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
       - name: test tests-integration --features wasi-rt
@@ -1062,7 +1062,7 @@ jobs:
         if: matrix.target == 'wasm32-wasip1-threads'
         working-directory: tests-integration
         env:
-          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -S threads=y --"
+          CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
   check-external-types:
