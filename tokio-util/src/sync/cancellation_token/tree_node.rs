@@ -42,9 +42,8 @@
 //! Specifically, through invariant #2, we know that we always have to lock a parent
 //! before its child.
 //!
-use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::loom::sync::{Arc, Mutex, MutexGuard};
+use crate::loom::sync::{Arc, AtomicBool, Mutex, MutexGuard, Ordering};
 
 /// A node of the cancellation tree structure
 ///
