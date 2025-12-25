@@ -34,6 +34,7 @@ impl RngSeedGenerator {
 
         let s = rng.fastrand();
         let r = rng.fastrand();
+        drop(rng);
 
         RngSeed::from_pair(s, r)
     }

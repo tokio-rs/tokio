@@ -368,8 +368,6 @@ impl<'a, T> EntryInOneOfTheLists<'a, T> {
         self.set.length -= 1;
 
         {
-            let mut lock = self.set.lists.lock();
-
             // Safety: We are holding the lock so there is no race, and we will
             // remove the entry afterwards to uphold invariants.
             let old_my_list = self.entry.my_list.with_mut(|ptr| unsafe {
@@ -378,6 +376,7 @@ impl<'a, T> EntryInOneOfTheLists<'a, T> {
                 old_my_list
             });
 
+            let mut lock = self.set.lists.lock();
             let list = match old_my_list {
                 List::Idle => &mut lock.idle,
                 List::Notified => &mut lock.notified,
@@ -390,6 +389,7 @@ impl<'a, T> EntryInOneOfTheLists<'a, T> {
                 // list.
                 list.remove(ListEntry::as_raw(&self.entry)).unwrap();
             }
+            drop(lock);
         }
 
         // By setting `my_list` to `Neither`, we have taken ownership of the
@@ -430,6 +430,7 @@ impl<T> Drop for IdleNotifiedSet<T> {
             let lock = self.lists.lock();
             assert!(lock.idle.is_empty());
             assert!(lock.notified.is_empty());
+            drop(lock);
         }
     }
 }

@@ -63,8 +63,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
     /// Removes the last element from a list specified by `shard_id` and returns it, or None if it is
     /// empty.
     pub(crate) fn pop_back(&self, shard_id: usize) -> Option<L::Handle> {
-        let mut lock = self.shard_inner(shard_id);
-        let node = lock.pop_back();
+        let node = self.shard_inner(shard_id).pop_back();
         if node.is_some() {
             self.count.decrement();
         }
