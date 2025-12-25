@@ -310,8 +310,7 @@ impl File {
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn sync_all(&self) -> io::Result<()> {
-        let mut inner = self.inner.lock().await;
-        inner.complete_inflight().await;
+        self.inner.lock().await.complete_inflight().await;
 
         let std = self.std.clone();
         asyncify(move || std.sync_all()).await
@@ -345,8 +344,7 @@ impl File {
     /// [`write_all`]: fn@crate::io::AsyncWriteExt::write_all
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn sync_data(&self) -> io::Result<()> {
-        let mut inner = self.inner.lock().await;
-        inner.complete_inflight().await;
+        self.inner.lock().await.complete_inflight().await;
 
         let std = self.std.clone();
         asyncify(move || std.sync_data()).await
@@ -418,12 +416,15 @@ impl File {
 
         inner.state = State::Idle(Some(buf));
 
-        match op {
+        let final_res = match op {
             Operation::Seek(res) => res.map(|pos| {
                 inner.pos = pos;
             }),
             _ => unreachable!(),
-        }
+        };
+        drop(inner);
+
+        final_res
     }
 
     /// Queries metadata about the underlying file.
