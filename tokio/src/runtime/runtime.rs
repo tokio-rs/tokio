@@ -545,7 +545,7 @@ fn display_eq(d: impl std::fmt::Display, s: &str) -> bool {
     fmt_eq.remainder.is_empty() && !fmt_eq.unequal
 }
 
-/// Checks whether the given error was emitted by tokio when shutting down its runtime.
+/// Checks whether the given error was emitted by Tokio when shutting down its runtime.
 pub fn is_rt_shutdown_err(err: &io::Error) -> bool {
     if let Some(inner) = err.get_ref() {
         err.kind() == io::ErrorKind::Other
