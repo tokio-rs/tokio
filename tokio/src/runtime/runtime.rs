@@ -4,6 +4,8 @@ use crate::runtime::scheduler::CurrentThread;
 use crate::runtime::{context, EnterGuard, Handle};
 use crate::task::JoinHandle;
 use crate::util::trace::SpawnMeta;
+#[cfg(all(tokio_unstable, feature = "usdt"))]
+use crate::util::usdt;
 
 use std::future::Future;
 use std::mem;
@@ -354,13 +356,12 @@ impl Runtime {
         ))]
         let future = super::task::trace::Trace::root(future);
 
+        #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+        let id = crate::runtime::task::Id::next();
+        #[cfg(all(tokio_unstable, feature = "usdt"))]
+        let future = usdt::block_on(future, _meta, id);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(
-            future,
-            "block_on",
-            _meta,
-            crate::runtime::task::Id::next().as_u64(),
-        );
+        let future = crate::util::trace::task(future, "block_on", _meta, id.as_u64());
 
         let _enter = self.enter();
 

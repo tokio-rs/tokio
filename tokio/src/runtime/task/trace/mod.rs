@@ -160,6 +160,8 @@ impl Trace {
 // internal implementation details of this crate).
 #[inline(never)]
 pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
+    crate::util::usdt::trace_root();
+
     // Safety: We don't manipulate the current context's active frame.
     let did_trace = unsafe {
         Context::try_with_current(|context_cell| {

@@ -319,7 +319,7 @@ cfg_rt! {
 
     pub use crate::runtime::task::{Id, id, try_id};
 
-    cfg_trace! {
+    cfg_trace_or_usdt! {
         mod builder;
         pub use builder::Builder;
     }

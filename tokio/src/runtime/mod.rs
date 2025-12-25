@@ -534,7 +534,7 @@ cfg_rt! {
     #[cfg_attr(target_os = "wasi", allow(unused_imports))]
     pub(crate) use blocking::spawn_blocking;
 
-    cfg_trace! {
+    cfg_trace_or_usdt! {
         pub(crate) use blocking::Mandatory;
     }
 
