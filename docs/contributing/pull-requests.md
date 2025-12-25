@@ -222,7 +222,8 @@ Lines that start with `/// #` are removed when the documentation is generated.
 ### Benchmarks
 
 You can run benchmarks locally for the changes you've made to the tokio codebase.
-Tokio currently uses [Criterion](https://github.com/bheisler/criterion.rs) for wall-time benchmakrs and [Gungraun](https://github.com/gungraun/gungraun)
+Tokio currently uses [Criterion](https://github.com/bheisler/criterion.rs)
+for wall-time benchmakrs and [Gungraun](https://github.com/gungraun/gungraun)
 for deterministic benchmarks in the CI.
 
 To run a benchmark against the changes you have made, for example, you can run;
@@ -234,8 +235,9 @@ cd benches
 cargo bench
 
 # Run Gungraun benchmarks
+# NOTE: Gungraun is based on Valgrind. Make sure Valgrind is installed on your system,
+# or use Docker if your platform does not support it.
 cargo bench --bench ct_spawn
-NOTE: Gungraun is based on Valgrind. Make sure Valgrind is installed on your system, or use Docker if your platform doesn't support it.
 
 # Run all tests in the `benches/fs.rs` file
 cargo bench --bench fs
