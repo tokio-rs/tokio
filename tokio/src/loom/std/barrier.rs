@@ -143,6 +143,7 @@ impl Barrier {
         } else {
             lock.count = 0;
             lock.generation_id = lock.generation_id.wrapping_add(1);
+            drop(lock);
             self.cvar.notify_all();
             BarrierWaitResult(true)
         }
@@ -186,6 +187,7 @@ impl Barrier {
         } else {
             lock.count = 0;
             lock.generation_id = lock.generation_id.wrapping_add(1);
+            drop(lock);
             self.cvar.notify_all();
             Some(BarrierWaitResult(true))
         }
