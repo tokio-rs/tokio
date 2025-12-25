@@ -8,6 +8,8 @@ jobs:
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest
+    env:
+      BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
     strategy:
       matrix:
         bench:
@@ -26,32 +28,7 @@ jobs:
           )
           cargo binstall --no-confirm gungraun-runner --version $version
 
-      - name: Download previous benchmark data
-        uses: actions/cache@v4
-        with:
-          path: ./cache
-          key: ${{ runner.os }}-benchmark-${{ matrix.bench }}
-
-      - name: Run benchmarks
-        run: cargo bench --bench ${{ matrix.bench }} -- --output-format=json | jq -s | tee output.json
-
-      - name: Convert summary to benchmark format
+      - uses: bencherdev/bencher@main
+      - name: Run Bencher
         run: |
-          jq '[.[] | {
-          name: .id,
-          unit: "instructions",
-          value: .profiles[0].summaries.total.summary.Callgrind.Ir.metrics.Left.Int
-          }]' output.json > benchmark-results.json
-
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          tool: "customSmallerIsBetter" # This is because github action doesn't support gungraun format with cargo tool
-          output-file-path: benchmark-results.json
-          # Previous results
-          external-data-json-path: ./cache/benchmark-results.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          # Alert if performance regresses by more than 10%
-          alert-threshold: "110%"
-          comment-on-alert: true
-          fail-on-alert: false
+          bencher run --adapter rust_gungraun --err "cargo bench --bench ${{ matrix.bench }}"
