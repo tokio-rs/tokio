@@ -296,7 +296,8 @@ impl Handle {
         source: &mut impl Source,
     ) -> io::Result<()> {
         // Deregister the source with the OS poller **first**
-        self.registry.deregister(source)?;
+        // Cleanup ALWAYS happens
+        let os_result = self.registry.deregister(source);
 
         if self
             .registrations
@@ -307,6 +308,8 @@ impl Handle {
 
         self.metrics.dec_fd_count();
 
+        os_result?; // Return error after cleanup
+
         Ok(())
     }
 
@@ -314,6 +317,31 @@ impl Handle {
         if self.registrations.needs_release() {
             self.registrations.release(&mut self.synced.lock());
         }
+    }
+}
+
+/// Internal test methods for PR #7773
+/// These methods are only available with the `integration_test` feature flag
+/// and are not part of the public API. They may change without notice.
+#[cfg(feature = "integration_test")]
+impl Handle {
+    /// Returns the number of pending registrations (internal test-only method)
+    ///
+    /// # Warning
+    /// This method is NOT part of the public API and is subject to change
+    /// without notice. It should only be used for internal testing.
+    pub(crate) fn pending_registration_count(&self) -> usize {
+        self.registrations.pending_release_count()
+    }
+
+    /// Returns the total number of registrations in the main list (internal test-only method)
+    ///
+    /// # Warning
+    /// This method is NOT part of the public API and is subject to change
+    /// without notice. It should only be used for internal testing.
+    pub(crate) fn total_registration_count(&self) -> usize {
+        self.registrations
+            .total_registration_count(&mut self.synced.lock())
     }
 }
 
