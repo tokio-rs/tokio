@@ -2,8 +2,11 @@ use std::{io, os::unix::fs::OpenOptionsExt};
 
 #[cfg(test)]
 use super::mock_open_options::MockOpenOptions as StdOpenOptions;
+use crate::runtime::driver::op::Op;
 #[cfg(not(test))]
 use std::fs::OpenOptions as StdOpenOptions;
+use std::os::fd::OwnedFd;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub(crate) struct UringOpenOptions {
@@ -106,6 +109,10 @@ impl UringOpenOptions {
             (true, true, false) => libc::O_CREAT | libc::O_TRUNC,
             (_, _, true) => libc::O_CREAT | libc::O_EXCL,
         })
+    }
+
+    pub(crate) async fn open(&self, path: &Path) -> io::Result<OwnedFd> {
+        Op::open(path, self)?.await
     }
 }
 
