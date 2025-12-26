@@ -54,7 +54,7 @@ use std::{io, path::Path};
 /// }
 /// ```
 pub async fn read(path: impl AsRef<Path>) -> io::Result<Vec<u8>> {
-    let path = path.as_ref().to_owned();
+    let path = path.as_ref();
 
     #[cfg(all(
         tokio_unstable,
@@ -69,9 +69,14 @@ pub async fn read(path: impl AsRef<Path>) -> io::Result<Vec<u8>> {
         let handle = crate::runtime::Handle::current();
         let driver_handle = handle.inner.driver().io();
         if driver_handle.check_and_init()? {
-            return read_uring(&path).await;
+            return read_uring(path).await;
         }
     }
 
+    read_spawn_blocking(path).await
+}
+
+async fn read_spawn_blocking(path: &Path) -> io::Result<Vec<u8>> {
+    let path = path.to_owned();
     asyncify(move || std::fs::read(path)).await
 }
