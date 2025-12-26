@@ -416,15 +416,12 @@ impl File {
 
         inner.state = State::Idle(Some(buf));
 
-        let final_res = match op {
+        match op {
             Operation::Seek(res) => res.map(|pos| {
                 inner.pos = pos;
             }),
             _ => unreachable!(),
-        };
-        drop(inner);
-
-        final_res
+        }
     }
 
     /// Queries metadata about the underlying file.
