@@ -1,7 +1,7 @@
-use crate::io::uring::open::Open;
 use crate::io::uring::read::Read;
 use crate::io::uring::write::Write;
 use crate::runtime::Handle;
+use std::ffi::CString;
 
 use io_uring::cqueue;
 use io_uring::squeue::Entry;
@@ -16,9 +16,9 @@ use std::task::{Context, Poll, Waker};
 #[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) enum CancelData {
-    Open(Open),
     Write(Write),
     Read(Read),
+    CString(CString),
 }
 
 #[derive(Debug)]

@@ -31,7 +31,7 @@ impl Completable for Open {
 
 impl Cancellable for Open {
     fn cancel(self) -> CancelData {
-        CancelData::Open(self)
+        CancelData::CString(self.path)
     }
 }
 
