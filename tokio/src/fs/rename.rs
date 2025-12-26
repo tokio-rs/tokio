@@ -10,8 +10,30 @@ use std::path::Path;
 ///
 /// This is an async version of [`std::fs::rename`].
 pub async fn rename(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
-    let from = from.as_ref().to_owned();
-    let to = to.as_ref().to_owned();
+    let from = from.as_ref();
+    let to = to.as_ref();
 
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    {
+        use crate::runtime::driver::op::Op;
+
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+        if driver_handle.check_and_init()? {
+            return Op::rename(from, to)?.await;
+        }
+    }
+
+    rename_blocking(from, to).await
+}
+
+async fn rename_blocking(from: &Path, to: &Path) -> io::Result<()> {
+    let [from, to] = [from, to].map(Path::to_owned);
     asyncify(move || std::fs::rename(from, to)).await
 }
