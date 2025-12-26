@@ -47,20 +47,14 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
 
 cfg_io_uring! {
     async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
-        use crate::{fs::OpenOptions, runtime::driver::op::Op};
-        use std::os::fd::OwnedFd;
+        use crate::{fs::UringOpenOptions, runtime::driver::op::Op};
 
-        let file = OpenOptions::new()
+        let mut fd = UringOpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
             .open(path)
             .await?;
-
-        let mut fd: OwnedFd = file
-            .try_into_std()
-            .expect("unexpected in-flight operation detected")
-            .into();
 
         let total: usize = buf.as_ref().len();
         let mut buf_offset: usize = 0;

@@ -106,6 +106,15 @@ impl From<MockFile> for OwnedFd {
     }
 }
 
+#[cfg(all(test, unix))]
+impl From<OwnedFd> for MockFile {
+    #[inline]
+    fn from(file: OwnedFd) -> MockFile {
+        use std::os::fd::IntoRawFd;
+        unsafe { MockFile::from_raw_fd(IntoRawFd::into_raw_fd(file)) }
+    }
+}
+
 tokio_thread_local! {
     static QUEUE: RefCell<VecDeque<Box<dyn FnOnce() + Send>>> = RefCell::new(VecDeque::new())
 }
