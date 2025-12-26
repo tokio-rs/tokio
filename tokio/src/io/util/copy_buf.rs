@@ -36,7 +36,7 @@ cfg_io_util! {
     /// # When to use async alternatives instead of `SyncIoBridge`
     ///
     /// If you are looking to use [`std::io::copy`] with a synchronous consumer
-    /// (like a hasher or compressor), consider using async alternatives instead of
+    /// (like a `hasher` or compressor), consider using async alternatives instead of
     /// wrapping the reader with [`SyncIoBridge`]. See the [`SyncIoBridge`]
     /// documentation for detailed examples and guidance on hashing, compression,
     /// and data parsing.
