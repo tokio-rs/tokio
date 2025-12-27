@@ -128,14 +128,12 @@ impl Wheel {
             .iter()
             .enumerate()
             .find_map(|(level_num, level)| {
-                let expiration = level.next_expiration(self.elapsed);
-                if let Some(expiration) = &expiration {
-                    // There cannot be any expirations at a higher level that
-                    // happen before this one.
-                    debug_assert!(self.no_expirations_before(level_num + 1, expiration.deadline));
-                }
+                let expiration = level.next_expiration(self.elapsed)?;
+                // There cannot be any expirations at a higher level that happen
+                // before this one.
+                debug_assert!(self.no_expirations_before(level_num + 1, expiration.deadline));
 
-                expiration
+                Some(expiration)
             })
     }
 
@@ -150,7 +148,7 @@ impl Wheel {
         self.levels[start_level..]
             .iter()
             .flat_map(|level| level.next_expiration(self.elapsed))
-            .all(|e2| before < e2.deadline)
+            .all(|e2| before <= e2.deadline)
     }
 
     /// iteratively find entries that are between the wheel's current
