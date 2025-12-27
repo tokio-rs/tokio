@@ -129,11 +129,14 @@ impl Wheel {
             .iter()
             .enumerate()
             .find_map(|(level_num, level)| {
-                level.next_expiration(self.elapsed).inspect(|expiration| {
+                let expiration = level.next_expiration(self.elapsed);
+                if let Some(expiration) = &expiration {
                     // There cannot be any expirations at a higher level that happen
                     // before this one.
                     debug_assert!(self.no_expirations_before(level_num + 1, expiration.deadline));
-                })
+                }
+
+                expiration
             })
     }
 
