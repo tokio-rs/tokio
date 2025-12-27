@@ -494,9 +494,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     //
     // We don't do this for the main function as it should only be used once so
     // there will be no benefit.
-    // We don't do this for the main function as it should only be used once so
-    // there will be no benefit.
-    let output_type = match &input.sig.output {
+  ;  let output_type = match &input.sig.output {
         // For functions with no return value syn doesn't print anything,
         // but that doesn't work as `Output` for our boxed `Future`, so
         // default to `()` (the same type as the function output).
@@ -511,10 +509,10 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
             let body: ::core::pin::Pin<&mut dyn ::core::future::Future<Output = #output_type>> = body;
         }
     } else {
-        //force typecheck without runtime overhead 
+        // force typecheck without runtime overhead 
         quote! {
             let body = async #body;
-            //identity function that constraints the future's output type to ensure better error messages 
+            // identity function that constraints the future's output type to ensure better error messages 
             let body = {
                 fn check_output<F: ::core::future::Future<Output = #output_type>>(f: F) -> F { f }
                 check_output(body)
