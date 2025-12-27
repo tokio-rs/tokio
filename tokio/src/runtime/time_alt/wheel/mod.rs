@@ -150,7 +150,7 @@ impl Wheel {
         self.levels[start_level..]
             .iter()
             .flat_map(|level| level.next_expiration(self.elapsed))
-            .all(|e2| e2.deadline < before)
+            .all(|e2| before < e2.deadline)
     }
 
     /// iteratively find entries that are between the wheel's current
