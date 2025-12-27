@@ -115,10 +115,9 @@ impl Wheel {
 
             self.set_elapsed(expiration.deadline);
         }
-        // in this case the poll did not indicate an expiration
-        // _and_ we were not able to find a next expiration in
-        // the current list of timers.  advance to the poll's
-        // current time and do nothing else.
+        // in this case the poll did not indicate an expiration _and_ we were
+        // not able to find a next expiration in the current list of timers.
+        // Advance to the poll's current time and do nothing else.
         self.set_elapsed(now);
     }
 
@@ -131,8 +130,8 @@ impl Wheel {
             .find_map(|(level_num, level)| {
                 let expiration = level.next_expiration(self.elapsed);
                 if let Some(expiration) = &expiration {
-                    // There cannot be any expirations at a higher level that happen
-                    // before this one.
+                    // There cannot be any expirations at a higher level that
+                    // happen before this one.
                     debug_assert!(self.no_expirations_before(level_num + 1, expiration.deadline));
                 }
 
