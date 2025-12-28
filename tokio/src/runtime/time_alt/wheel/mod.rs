@@ -115,9 +115,6 @@ impl Wheel {
 
             self.set_elapsed(expiration.deadline);
         }
-        // in this case the poll did not indicate an expiration _and_ we were
-        // not able to find a next expiration in the current list of timers.
-        // Advance to the poll's current time and do nothing else.
         self.set_elapsed(now);
     }
 
