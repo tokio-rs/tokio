@@ -238,7 +238,7 @@ impl Runtime {
     /// ```
     /// # #[cfg(not(target_family = "wasm"))]
     /// # {
-    /// use tokio::runtime::Runtime;
+    /// use tokio::runtime;
     ///
     /// # fn dox() {
     /// // Create the runtime

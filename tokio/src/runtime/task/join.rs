@@ -178,7 +178,7 @@ cfg_rt! {
     /// # #[cfg(not(target_family = "wasm"))]
     /// # {
     /// use tokio::task;
-    /// use tokio::runtime::Runtime;
+    /// use tokio::runtime;
     ///
     /// # async fn doc() {
     ///
