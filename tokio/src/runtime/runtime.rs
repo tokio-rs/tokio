@@ -206,9 +206,9 @@ impl Runtime {
     /// thread pool. The thread pool is then responsible for polling the future
     /// until it completes.
     ///
-    /// The provided future will start running in the background immediately
-    /// when `spawn` is called, even if you don't await the returned
-    /// `JoinHandle`.
+    /// In a non blocking env, the provided future will start running in the background
+    /// immediately when `spawn` is called, even if you don't await the returned
+    /// [`JoinHandle`].
     ///
     /// See [module level][mod] documentation for more details.
     ///
@@ -229,6 +229,29 @@ impl Runtime {
     /// rt.spawn(async {
     ///     println!("now running on a worker thread");
     /// });
+    /// # }
+    /// # }
+    /// ```
+    ///
+    /// Example with current thread (blocking)
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::runtime::Runtime;
+    ///
+    /// # fn dox() {
+    /// // Create the runtime
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// // Spawn a future onto the runtime
+    /// let handle = rt.spawn(async {
+    ///     println!("now running on a worker thread");
+    /// });
+    ///
+    /// rt.block_on(handle);
     /// # }
     /// # }
     /// ```

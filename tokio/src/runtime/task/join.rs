@@ -152,6 +152,49 @@ cfg_rt! {
     /// # }
     /// ```
     ///
+    /// Creation from [`crate::runtime::Runtime::spawn`] (with the `rt-multi-thread` feature):
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::task;
+    /// use tokio::runtime::Runtime;
+    ///
+    /// # async fn doc() {
+    ///
+    /// let rt = Runtime::new()
+    ///     .unwrap();
+    ///
+    /// let join_handle: task::JoinHandle<_> = rt.spawn(async {
+    ///     // some work here
+    /// });
+    /// # }
+    /// # }
+    /// ```
+    ///
+    /// Creation from [`crate::runtime::Runtime::spawn`] (with the `rt` feature):
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::task;
+    /// use tokio::runtime::Runtime;
+    ///
+    /// # async fn doc() {
+    ///
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// let join_handle: task::JoinHandle<_> = rt.spawn(async {
+    ///     // some work here
+    /// });
+    ///
+    /// rt.block_on(join_handle).unwrap();
+    /// # }
+    /// # }
+    /// ```
+    ///
     /// [`task::spawn`]: crate::task::spawn()
     /// [`task::spawn_blocking`]: crate::task::spawn_blocking
     /// [`std::thread::JoinHandle`]: std::thread::JoinHandle
