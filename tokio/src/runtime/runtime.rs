@@ -206,7 +206,7 @@ impl Runtime {
     /// thread pool. The thread pool is then responsible for polling the future
     /// until it completes.
     ///
-    /// In a non blocking env, the provided future will start running in the background
+    /// In a non blocking environment, the provided future will start running in the background
     /// immediately when `spawn` is called, even if you don't await the returned
     /// [`JoinHandle`].
     ///
@@ -251,7 +251,7 @@ impl Runtime {
     ///     println!("now running on a worker thread");
     /// });
     ///
-    /// rt.block_on(handle);
+    /// rt.block_on(handle).unwrap();
     /// # }
     /// # }
     /// ```
