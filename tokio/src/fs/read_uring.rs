@@ -88,7 +88,7 @@ async fn small_probe_read(
     let read_len = PROBE_SIZE_U32;
 
     let mut temp_arr = [0; PROBE_SIZE];
-    // we don't call this function if buffer's length < PROBE_SIZE
+    // we don't call this function if the buffer's length < PROBE_SIZE
     let back_bytes_len = buf.len() - PROBE_SIZE;
 
     temp_arr.copy_from_slice(&buf[back_bytes_len..]);
@@ -98,7 +98,7 @@ async fn small_probe_read(
     buf.truncate(back_bytes_len);
 
     let (r_fd, mut r_buf, is_eof) = op_read(fd, buf, offset, read_len).await?;
-    // If `size_read` returns zero due to reasons such as buffer's exact fit,
+    // If `size_read` returns zero due to reasons such as the buffer's exact fit,
     // then this `try_reserve` does not perform allocation.
     r_buf.try_reserve(PROBE_SIZE)?;
     r_buf.splice(back_bytes_len..back_bytes_len, temp_arr);
@@ -106,7 +106,7 @@ async fn small_probe_read(
     Ok((r_fd, r_buf, is_eof))
 }
 
-// Takes a amount of length to read and returns a singluar read in the buffer
+// Takes a length to read and returns a single read in the buffer
 //
 // Returns the file descriptor, buffer and EOF reached or not
 async fn op_read(

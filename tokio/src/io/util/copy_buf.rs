@@ -33,8 +33,17 @@ cfg_io_util! {
     /// with no extra buffer allocation, since [`AsyncBufRead`] allow access
     /// to the reader's inner buffer.
     ///
+    /// # When to use async alternatives instead of `SyncIoBridge`
+    ///
+    /// If you are looking to use [`std::io::copy`] with a synchronous consumer
+    /// (like a `hasher` or compressor), consider using async alternatives instead of
+    /// wrapping the reader with [`SyncIoBridge`]. See the [`SyncIoBridge`]
+    /// documentation for detailed examples and guidance on hashing, compression,
+    /// and data parsing.
+    ///
     /// [`tokio::io::copy`]: crate::io::copy
     /// [`AsyncBufRead`]: crate::io::AsyncBufRead
+    /// [`SyncIoBridge`]: https://docs.rs/tokio-util/latest/tokio_util/io/struct.SyncIoBridge.html
     ///
     /// # Errors
     ///
