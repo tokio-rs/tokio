@@ -34,8 +34,11 @@ cfg_not_rt! {
         }
     }
 
+    enum Never {}
+
     pub(crate) struct JoinHandle<R> {
         _p: std::marker::PhantomData<R>,
+        never: Never,
     }
 
     unsafe impl<T: Send> Send for JoinHandle<T> {}
@@ -45,7 +48,7 @@ cfg_not_rt! {
         type Output = Result<R, std::io::Error>;
 
         fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-            unreachable!()
+            match self.never {}
         }
     }
 
@@ -53,8 +56,8 @@ cfg_not_rt! {
     where
         T: fmt::Debug,
     {
-        fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-            fmt.debug_struct("JoinHandle").finish()
+        fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self.never {}
         }
     }
 
