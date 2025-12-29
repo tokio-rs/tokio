@@ -200,7 +200,7 @@ impl Runtime {
         &self.handle
     }
 
-    /// Spawns a future onto the Tokio runtime and return a [`JoinHandle`].
+    /// Spawns a future onto the Tokio runtime.
     ///
     /// This spawns the given future onto the runtime's executor, usually a
     /// thread pool. The thread pool is then responsible for polling the future
