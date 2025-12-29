@@ -321,9 +321,9 @@ impl Handle {
 }
 
 /// Internal test methods for PR #7773
-/// These methods are only available with the `integration_test` feature flag
+/// These methods are only available with `--cfg tokio_unstable`
 /// and are not part of the public API. They may change without notice.
-#[cfg(feature = "integration_test")]
+#[cfg(tokio_unstable)]
 impl Handle {
     /// Returns the number of pending registrations (internal test-only method)
     ///
