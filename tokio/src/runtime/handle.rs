@@ -164,9 +164,8 @@ impl Handle {
     /// thread pool. The thread pool is then responsible for polling the future
     /// until it completes.
     ///
-    /// The provided future will start running in the background immediately
-    /// when `spawn` is called, even if you don't await the returned
-    /// `JoinHandle`.
+    /// Executes the given future. Depending on the current [`Runtime`](crate::runtime::Runtime),
+    /// it may start immediately in the background or require blocking on the [`JoinHandle`].
     ///
     /// See [module level][mod] documentation for more details.
     ///

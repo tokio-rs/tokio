@@ -6,16 +6,17 @@ use std::future::Future;
 
 cfg_rt! {
     /// Spawns a new asynchronous task, returning a
-    /// [`JoinHandle`](JoinHandle) for it.
+    /// [`crate::task::JoinHandle`](JoinHandle) for it.
     ///
     /// The provided future will start running in the background immediately
     /// when `spawn` is called, even if you don't await the returned
-    /// `JoinHandle`.
+    /// [`crate::task::JoinHandle`].
     ///
     /// Spawning a task enables the task to execute concurrently to other tasks. The
     /// spawned task may execute on the current thread, or it may be sent to a
     /// different thread to be executed. The specifics depend on the current
-    /// [`Runtime`](crate::runtime::Runtime) configuration.
+    /// [`Runtime`](crate::runtime::Runtime) configuration - it may start immediately in
+    /// the background or require blocking on the [`crate::task::JoinHandle`].
     ///
     /// It is guaranteed that spawn will not synchronously poll the task being spawned.
     /// This means that calling spawn while holding a lock does not pose a risk of
