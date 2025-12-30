@@ -165,7 +165,7 @@ impl Handle {
     /// until it completes.
     ///
     /// Executes the given future. Depending on the current [`Runtime`](crate::runtime::Runtime),
-    /// it may start immediately in the background or require blocking on the [`JoinHandle`].
+    /// it may start immediately in the background or require blocking on the [JoinHandle].
     ///
     /// See [module level][mod] documentation for more details.
     ///
