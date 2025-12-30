@@ -206,7 +206,7 @@ impl Runtime {
     /// thread pool. The thread pool is then responsible for polling the future
     /// until it completes.
     ///
-    /// Executes the given future. Depending on the current [`Runtime`] configuration,
+    /// Executes the given future. Depending on the current [Runtime] configuration,
     /// it may start immediately in the background or require blocking on the [`JoinHandle`].
     ///
     /// See [module level][mod] documentation for more details.
