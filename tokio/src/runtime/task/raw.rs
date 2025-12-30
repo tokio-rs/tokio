@@ -281,9 +281,9 @@ impl RawTask {
 
     /// Safety: `dst` must be a `*mut Poll<super::Result<T::Output>>` where `T`
     /// is the future stored by the task.
-    pub(super) unsafe fn try_read_output(self, dst: *mut (), waker: &Waker) {
+    pub(super) unsafe fn try_read_output<O>(self, dst: *mut Poll<super::Result<O>>, waker: &Waker) {
         let vtable = self.header().vtable;
-        (vtable.try_read_output)(self.ptr, dst, waker);
+        (vtable.try_read_output)(self.ptr, dst as *mut _, waker);
     }
 
     pub(super) fn drop_join_handle_slow(self) {

@@ -339,8 +339,7 @@ impl<T> Future for JoinHandle<T> {
         //
         // The type of `T` must match the task's output type.
         unsafe {
-            self.raw
-                .try_read_output(&mut ret as *mut _ as *mut (), cx.waker());
+            self.raw.try_read_output(&mut ret, cx.waker());
         }
 
         if ret.is_ready() {
