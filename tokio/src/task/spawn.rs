@@ -6,7 +6,7 @@ use std::future::Future;
 
 cfg_rt! {
     /// Spawns a new asynchronous task, returning a
-    /// [`JoinHandle`](crate::task::JoinHandle) for it.
+    /// [JoinHandle] for it.
     ///
     /// The provided future will start running in the background immediately
     /// when `spawn` is called, even if you don't await the returned
