@@ -16,7 +16,7 @@ cfg_rt! {
     /// spawned task may execute on the current thread, or it may be sent to a
     /// different thread to be executed. The specifics depend on the current
     /// [`Runtime`](crate::runtime::Runtime) configuration - it may start immediately in
-    /// the background or require blocking on the [`JoinHandle`](crate::task::JoinHandle).
+    /// the background or require blocking on the [JoinHandle].
     ///
     /// It is guaranteed that spawn will not synchronously poll the task being spawned.
     /// This means that calling spawn while holding a lock does not pose a risk of
