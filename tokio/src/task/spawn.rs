@@ -10,7 +10,7 @@ cfg_rt! {
     ///
     /// The provided future will start running in the background immediately
     /// when `spawn` is called, even if you don't await the returned
-    /// [`JoinHandle`](crate::task::JoinHandle).
+    /// [JoinHandle].
     ///
     /// Spawning a task enables the task to execute concurrently to other tasks. The
     /// spawned task may execute on the current thread, or it may be sent to a
