@@ -150,6 +150,8 @@ several other libraries, including:
 
 * [`loom`]: A testing tool for concurrent Rust code.
 
+* [`salvo`]: A powerful web framework built with a simplified design.
+
 [`axum`]: https://github.com/tokio-rs/axum
 [`warp`]: https://github.com/seanmonstar/warp
 [`hyper`]: https://github.com/hyperium/hyper
@@ -159,6 +161,7 @@ several other libraries, including:
 [`tracing`]: https://github.com/tokio-rs/tracing
 [`mio`]: https://github.com/tokio-rs/mio
 [`bytes`]: https://github.com/tokio-rs/bytes
+[`salvo`]: https://github.com/salvo-rs/salvo
 
 ## Changelog
 
