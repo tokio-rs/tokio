@@ -199,7 +199,7 @@ where
     /// Care should be taken to not tamper with the underlying stream of data
     /// coming in as it may corrupt the stream of frames otherwise being worked
     /// with.
-    pub const fn get_ref(&self) -> &T {
+    pub fn get_ref(&self) -> &T {
         &self.socket
     }
 
@@ -219,7 +219,7 @@ where
     ///
     /// Note that care should be taken to not tamper with the underlying codec
     /// as it may corrupt the stream of frames otherwise being worked with.
-    pub const fn codec(&self) -> &C {
+    pub fn codec(&self) -> &C {
         &self.codec
     }
 
@@ -233,7 +233,7 @@ where
     }
 
     /// Returns a reference to the read buffer.
-    pub const fn read_buffer(&self) -> &BytesMut {
+    pub fn read_buffer(&self) -> &BytesMut {
         &self.rd
     }
 

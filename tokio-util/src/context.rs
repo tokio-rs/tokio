@@ -116,7 +116,7 @@ impl<F> TokioContext<F> {
     /// rt2.block_on(fut);
     /// # }
     /// ```
-    pub fn new(future: F, handle: Handle) -> TokioContext<F> {
+    pub const fn new(future: F, handle: Handle) -> TokioContext<F> {
         TokioContext {
             inner: future,
             handle,

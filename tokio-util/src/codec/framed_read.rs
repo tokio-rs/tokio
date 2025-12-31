@@ -71,7 +71,7 @@ impl<T, D> FramedRead<T, D> {
     /// Note that care should be taken to not tamper with the underlying stream
     /// of data coming in as it may corrupt the stream of frames otherwise
     /// being worked with.
-    pub const fn get_ref(&self) -> &T {
+    pub fn get_ref(&self) -> &T {
         &self.inner.inner
     }
 
@@ -105,7 +105,7 @@ impl<T, D> FramedRead<T, D> {
     }
 
     /// Returns a reference to the underlying decoder.
-    pub const fn decoder(&self) -> &D {
+    pub fn decoder(&self) -> &D {
         &self.inner.codec
     }
 
@@ -141,7 +141,7 @@ impl<T, D> FramedRead<T, D> {
     }
 
     /// Returns a reference to the read buffer.
-    pub const fn read_buffer(&self) -> &BytesMut {
+    pub fn read_buffer(&self) -> &BytesMut {
         &self.inner.state.buffer
     }
 
