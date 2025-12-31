@@ -132,21 +132,6 @@ async fn read_small_large_files() {
 }
 
 #[tokio::test]
-async fn read_small_large_files() {
-    let (_tmp, path) = create_large_temp_file();
-
-    let bytes = read(path).await.unwrap();
-
-    assert_eq!(bytes, create_buf(5000));
-
-    let (_tmp, path) = create_small_temp_file();
-
-    let bytes = read(path).await.unwrap();
-
-    assert_eq!(bytes, create_buf(20));
-}
-
-#[tokio::test]
 async fn cancel_op_future() {
     let (_tmp_file, path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
     let path = path[0].clone();
