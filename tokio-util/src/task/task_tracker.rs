@@ -205,10 +205,10 @@ pin_project! {
 
 impl TaskTrackerInner {
     #[inline]
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             state: AtomicUsize::new(0),
-            on_last_exit: Notify::new(),
+            on_last_exit: Notify::const_new(),
         }
     }
 

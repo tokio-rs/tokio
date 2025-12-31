@@ -171,7 +171,7 @@ impl<T, U> Framed<T, U> {
     /// Note that care should be taken to not tamper with the underlying stream
     /// of data coming in as it may corrupt the stream of frames otherwise
     /// being worked with.
-    pub fn get_ref(&self) -> &T {
+    pub const fn get_ref(&self) -> &T {
         &self.inner.inner
     }
 
@@ -200,7 +200,7 @@ impl<T, U> Framed<T, U> {
     ///
     /// Note that care should be taken to not tamper with the underlying codec
     /// as it may corrupt the stream of frames otherwise being worked with.
-    pub fn codec(&self) -> &U {
+    pub const fn codec(&self) -> &U {
         &self.inner.codec
     }
 
@@ -243,7 +243,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Returns a reference to the read buffer.
-    pub fn read_buffer(&self) -> &BytesMut {
+    pub const fn read_buffer(&self) -> &BytesMut {
         &self.inner.state.read.buffer
     }
 
@@ -253,7 +253,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Returns a reference to the write buffer.
-    pub fn write_buffer(&self) -> &BytesMut {
+    pub const fn write_buffer(&self) -> &BytesMut {
         &self.inner.state.write.buffer
     }
 
@@ -263,7 +263,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Returns backpressure boundary
-    pub fn backpressure_boundary(&self) -> usize {
+    pub const fn backpressure_boundary(&self) -> usize {
         self.inner.state.write.backpressure_boundary
     }
 
