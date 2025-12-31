@@ -985,7 +985,7 @@ impl Builder {
     /// assert_eq!(&frame[..], b"hello world");
     /// # }
     /// ```
-    pub fn new_codec(&self) -> LengthDelimitedCodec {
+    pub const fn new_codec(&self) -> LengthDelimitedCodec {
         let mut builder = *self;
 
         builder.adjust_max_frame_len();
