@@ -68,7 +68,7 @@ impl<T, E> FramedWrite<T, E> {
     /// Note that care should be taken to not tamper with the underlying stream
     /// of data coming in as it may corrupt the stream of frames otherwise
     /// being worked with.
-    pub fn get_ref(&self) -> &T {
+    pub const fn get_ref(&self) -> &T {
         &self.inner.inner
     }
 
@@ -102,7 +102,7 @@ impl<T, E> FramedWrite<T, E> {
     }
 
     /// Returns a reference to the underlying encoder.
-    pub fn encoder(&self) -> &E {
+    pub const fn encoder(&self) -> &E {
         &self.inner.codec
     }
 
@@ -138,7 +138,7 @@ impl<T, E> FramedWrite<T, E> {
     }
 
     /// Returns a reference to the write buffer.
-    pub fn write_buffer(&self) -> &BytesMut {
+    pub const fn write_buffer(&self) -> &BytesMut {
         &self.inner.state.buffer
     }
 
@@ -148,7 +148,7 @@ impl<T, E> FramedWrite<T, E> {
     }
 
     /// Returns backpressure boundary
-    pub fn backpressure_boundary(&self) -> usize {
+    pub const fn backpressure_boundary(&self) -> usize {
         self.inner.state.backpressure_boundary
     }
 

@@ -124,7 +124,7 @@ impl<F> TokioContext<F> {
     }
 
     /// Obtain a reference to the handle inside this `TokioContext`.
-    pub fn handle(&self) -> &Handle {
+    pub const fn handle(&self) -> &Handle {
         &self.handle
     }
 

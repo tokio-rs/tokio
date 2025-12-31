@@ -1303,13 +1303,13 @@ impl<T> Default for Stack<T> {
 }
 
 impl Key {
-    pub(crate) fn new(index: usize) -> Key {
+    pub(crate) const fn new(index: usize) -> Key {
         Key { index }
     }
 }
 
 impl KeyInternal {
-    pub(crate) fn new(index: usize) -> KeyInternal {
+    pub(crate) const fn new(index: usize) -> KeyInternal {
         KeyInternal { index }
     }
 }
@@ -1328,7 +1328,7 @@ impl From<KeyInternal> for Key {
 
 impl<T> Expired<T> {
     /// Returns a reference to the inner value.
-    pub fn get_ref(&self) -> &T {
+    pub const fn get_ref(&self) -> &T {
         &self.data
     }
 
@@ -1343,12 +1343,12 @@ impl<T> Expired<T> {
     }
 
     /// Returns the deadline that the expiration was set to.
-    pub fn deadline(&self) -> Instant {
+    pub const fn deadline(&self) -> Instant {
         self.deadline
     }
 
     /// Returns the key that the expiration is indexed by.
-    pub fn key(&self) -> Key {
+    pub const fn key(&self) -> Key {
         self.key
     }
 }
