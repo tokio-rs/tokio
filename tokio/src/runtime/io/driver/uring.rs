@@ -262,6 +262,11 @@ impl Handle {
             submit_or_remove(ctx)?;
         }
 
+        // Ensure that the completion queue is not full before submitting the entry.
+        while ctx.ring_mut().completion().is_full() {
+            ctx.dispatch_completions();
+        }
+
         submit_or_remove(ctx)?;
 
         Ok(indexes)

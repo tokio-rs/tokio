@@ -31,37 +31,21 @@ pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
 
     if let Some(size_hint) = size_hint {
         buf.try_reserve(size_hint)?;
-
-        println!("{:?}", size_hint);
     }
 
     read_to_end_batch(fd, buf).await
 }
 
-async fn read_to_end_batch(fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Vec<u8>> {
+async fn read_to_end_batch(fd: OwnedFd, buf: Vec<u8>) -> io::Result<Vec<u8>> {
     let file_len = buf.capacity();
+    let batch_size = 128;
 
+    // try reading in batch if we have substantial capacity
     if file_len > MAX_READ_SIZE {
-        let (res, r_fd, mut r_buf) = Op::read_batch(fd, buf, file_len).await;
-
-        if let CqeResult::Batch(cqes) = res {
-            let mut written_len = 0;
-
-            for cqe in cqes {
-                if let Ok(entry) = cqe {
-                    written_len += entry as usize;
-                    if entry != MAX_READ_SIZE as u32 {
-                        println!("short read");
-                    }
-                } else {
-                    println!("{:?}", "err");
-                }
-            }
-
-            unsafe { r_buf.set_len(written_len) }
+        match Op::read_batch_size(fd, buf, file_len, batch_size).await {
+            Ok(buf) => Ok(buf),
+            Err((r_fd, r_buf)) => read_to_end(r_fd, r_buf).await,
         }
-
-        Ok(r_buf)
     } else {
         read_to_end(fd, buf).await
     }

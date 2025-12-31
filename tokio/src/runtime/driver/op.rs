@@ -46,7 +46,7 @@ pub(crate) enum State {
     Initialize(Option<squeue::Entry>),
     Polled(usize),
     // Batch operation state
-    InitalizeBatch(Vec<squeue::Entry>),
+    InitializeBatch(Vec<squeue::Entry>),
     PolledBatch(Vec<usize>),
     // Batch or single operation is completed
     Complete,
@@ -88,7 +88,7 @@ impl<T: Cancellable> Op<T> {
         Self {
             handle,
             data: Some(data),
-            state: State::InitalizeBatch(entries),
+            state: State::InitializeBatch(entries),
             indexes: Vec::new(),
             completed: Vec::new(),
         }
@@ -106,7 +106,7 @@ impl<T: Cancellable> Drop for Op<T> {
             State::Complete => return,
             // This Op has not been polled yet.
             // We don't need to do anything here.
-            State::Initialize(_) | State::InitalizeBatch(_) => return,
+            State::Initialize(_) | State::InitializeBatch(_) => return,
             _ => (),
         }
 
@@ -185,7 +185,7 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                 Poll::Pending
             }
 
-            State::InitalizeBatch(entries) => {
+            State::InitializeBatch(entries) => {
                 let waker = cx.waker().clone();
 
                 // SAFETY: entry is valid for the entire duration of the operation
