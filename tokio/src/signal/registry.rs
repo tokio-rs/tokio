@@ -96,6 +96,8 @@ impl<S: Storage> Registry<S> {
     ///
     /// Returns `true` if an event was delivered to at least one listener.
     fn broadcast(&self) -> bool {
+        // https://github.com/rust-lang/rust-clippy/issues/3351
+        #[allow(clippy::unnecessary_fold)]
         self.storage
             .iter()
             // Any signal of this kind arrived since we checked last?
