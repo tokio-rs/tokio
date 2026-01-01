@@ -19,24 +19,32 @@ use std::sync::Once;
 use std::task::{Context, Poll};
 
 #[cfg(not(any(target_os = "linux", target_os = "illumos")))]
-pub(crate) type OsStorage = [SignalInfo; 34];
+pub(crate) struct OsStorage([SignalInfo; 33]);
 
 #[cfg(any(target_os = "linux", target_os = "illumos"))]
-pub(crate) type OsStorage = Box<[SignalInfo]>;
+pub(crate) struct OsStorage(Box<[SignalInfo]>);
+
+impl OsStorage {
+    fn get(&self, id: EventId) -> Option<&SignalInfo> {
+        self.0.get(id - 1)
+    }
+}
 
 impl Init for OsStorage {
     fn init() -> Self {
         // There are reliable signals ranging from 1 to 33 available on every Unix platform.
         #[cfg(not(any(target_os = "linux", target_os = "illumos")))]
-        return std::array::from_fn(|_| SignalInfo::default());
+        let inner = std::array::from_fn(|_| SignalInfo::default());
 
         // On Linux and illumos, there are additional real-time signals
         // available. (This is also likely true on Solaris, but this should be
         // verified before being enabled.)
         #[cfg(any(target_os = "linux", target_os = "illumos"))]
-        return std::iter::repeat_with(SignalInfo::default)
-            .take(libc::SIGRTMAX() as usize + 1)
+        let inner = std::iter::repeat_with(SignalInfo::default)
+            .take(libc::SIGRTMAX() as usize)
             .collect();
+
+        Self(inner)
     }
 }
 
@@ -49,7 +57,7 @@ impl Storage for OsStorage {
     where
         F: FnMut(&'a EventInfo),
     {
-        self.iter().map(|si| &si.event_info).for_each(f);
+        self.0.iter().map(|si| &si.event_info).for_each(f);
     }
 }
 
@@ -271,7 +279,7 @@ fn action(globals: &'static Globals, signal: libc::c_int) {
 /// returning any error along the way if that fails.
 fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     let signal = signal.0;
-    if signal < 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
+    if signal <= 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
         return Err(Error::new(
             ErrorKind::Other,
             format!("Refusing to register signal {signal}"),
