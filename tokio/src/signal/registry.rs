@@ -48,7 +48,7 @@ impl Storage for Vec<EventInfo> {
         self.get(id)
     }
 
-    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+    fn iter(&self) -> Self::Iter<'_> {
         self.as_slice().iter()
     }
 }

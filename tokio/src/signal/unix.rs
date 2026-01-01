@@ -45,7 +45,7 @@ impl Storage for OsStorage {
         self.get(id).map(|si| &si.event_info)
     }
 
-    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+    fn iter(&self) -> Self::Iter<'_> {
         self.as_ref().iter().map(|si| &si.event_info)
     }
 }

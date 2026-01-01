@@ -78,7 +78,7 @@ impl Storage for OsStorage {
         }
     }
 
-    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+    fn iter(&self) -> Self::Iter<'_> {
         [
             &self.ctrl_break,
             &self.ctrl_close,
