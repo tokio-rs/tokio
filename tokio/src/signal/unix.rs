@@ -39,7 +39,7 @@ impl Init for OsStorage {
 }
 
 impl Storage for OsStorage {
-    type Iter<'a> = iter::Map<slice::Iter<'a, SignalInfo>, fn(&'a SignalInfo) -> &'a EventInfo>;
+    type Iter<'a> = iter::Map<slice::Iter<'a, SignalInfo>, fn(&SignalInfo) -> &EventInfo>;
 
     fn event_info(&self, id: EventId) -> Option<&EventInfo> {
         self.get(id).map(|si| &si.event_info)
