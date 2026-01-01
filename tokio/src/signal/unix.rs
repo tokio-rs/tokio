@@ -22,29 +22,21 @@ use std::task::{Context, Poll};
 #[cfg(not(any(target_os = "linux", target_os = "illumos")))]
 pub(crate) type OsStorage = [SignalInfo; 34];
 
-#[cfg(not(any(target_os = "linux", target_os = "illumos")))]
-impl Init for OsStorage {
-    fn init() -> Self {
-        use std::array;
-
-        array::from_fn(|_| SignalInfo::default())
-    }
-}
-
 // On Linux and illumos, there are additional real-time signals available.
 // (This is also likely true on Solaris, but this should be verified before
 // being enabled.)
 #[cfg(any(target_os = "linux", target_os = "illumos"))]
 pub(crate) type OsStorage = Box<[SignalInfo]>;
 
-#[cfg(any(target_os = "linux", target_os = "illumos"))]
 impl Init for OsStorage {
     fn init() -> Self {
-        use std::iter;
+        #[cfg(not(any(target_os = "linux", target_os = "illumos")))]
+        return std::array::from_fn(|_| SignalInfo::default());
 
-        iter::repeat_with(SignalInfo::default)
+        #[cfg(any(target_os = "linux", target_os = "illumos"))]
+        return std::iter::repeat_with(SignalInfo::default)
             .take(libc::SIGRTMAX() as usize + 1)
-            .collect()
+            .collect();
     }
 }
 
