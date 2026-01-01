@@ -1,3 +1,4 @@
+use std::array;
 use std::io;
 use std::sync::Once;
 
@@ -48,7 +49,7 @@ fn event_requires_infinite_sleep_in_handler(signum: u32) -> bool {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct OsStorage {
     ctrl_break: EventInfo,
     ctrl_close: EventInfo,
@@ -59,17 +60,13 @@ pub(crate) struct OsStorage {
 
 impl Init for OsStorage {
     fn init() -> Self {
-        Self {
-            ctrl_break: Default::default(),
-            ctrl_close: Default::default(),
-            ctrl_c: Default::default(),
-            ctrl_logoff: Default::default(),
-            ctrl_shutdown: Default::default(),
-        }
+        Self::default()
     }
 }
 
 impl Storage for OsStorage {
+    type Iter<'a> = array::IntoIter<&'a EventInfo, 5>;
+
     fn event_info(&self, id: EventId) -> Option<&EventInfo> {
         match u32::try_from(id) {
             Ok(console::CTRL_BREAK_EVENT) => Some(&self.ctrl_break),
@@ -81,24 +78,24 @@ impl Storage for OsStorage {
         }
     }
 
-    fn for_each<'a, F>(&'a self, mut f: F)
-    where
-        F: FnMut(&'a EventInfo),
-    {
-        f(&self.ctrl_break);
-        f(&self.ctrl_close);
-        f(&self.ctrl_c);
-        f(&self.ctrl_logoff);
-        f(&self.ctrl_shutdown);
+    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+        [
+            &self.ctrl_break,
+            &self.ctrl_close,
+            &self.ctrl_c,
+            &self.ctrl_logoff,
+            &self.ctrl_shutdown,
+        ]
+        .into_iter()
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct OsExtraData {}
 
 impl Init for OsExtraData {
     fn init() -> Self {
-        Self {}
+        Self::default()
     }
 }
 

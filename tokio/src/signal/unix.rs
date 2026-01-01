@@ -14,6 +14,8 @@ use crate::sync::watch;
 
 use mio::net::UnixStream;
 use std::io::{self, Error, ErrorKind, Write};
+use std::iter;
+use std::slice;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
@@ -37,15 +39,14 @@ impl Init for OsStorage {
 }
 
 impl Storage for OsStorage {
+    type Iter<'a> = iter::Map<slice::Iter<'a, SignalInfo>, fn(&'a SignalInfo) -> &'a EventInfo>;
+
     fn event_info(&self, id: EventId) -> Option<&EventInfo> {
         self.get(id).map(|si| &si.event_info)
     }
 
-    fn for_each<'a, F>(&'a self, f: F)
-    where
-        F: FnMut(&'a EventInfo),
-    {
-        self.iter().map(|si| &si.event_info).for_each(f);
+    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+        self.as_ref().iter().map(|si| &si.event_info)
     }
 }
 
@@ -55,11 +56,17 @@ pub(crate) struct OsExtraData {
     pub(crate) receiver: UnixStream,
 }
 
-impl Init for OsExtraData {
-    fn init() -> Self {
+impl Default for OsExtraData {
+    fn default() -> Self {
         let (receiver, sender) = UnixStream::pair().expect("failed to create UnixStream");
 
         Self { sender, receiver }
+    }
+}
+
+impl Init for OsExtraData {
+    fn init() -> Self {
+        Self::default()
     }
 }
 

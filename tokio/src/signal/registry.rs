@@ -2,6 +2,7 @@ use crate::signal::os::{OsExtraData, OsStorage};
 use crate::sync::watch;
 
 use std::ops;
+use std::slice;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
@@ -28,25 +29,27 @@ impl Default for EventInfo {
 
 /// An interface for retrieving the `EventInfo` for a particular `eventId`.
 pub(crate) trait Storage {
+    /// Which kind of iterator are we turning into?
+    type Iter<'a>: Iterator<Item = &'a EventInfo>
+    where
+        Self: 'a;
+
     /// Gets the `EventInfo` for `id` if it exists.
     fn event_info(&self, id: EventId) -> Option<&EventInfo>;
 
-    /// Invokes `f` once for each defined `EventInfo` in this storage.
-    fn for_each<'a, F>(&'a self, f: F)
-    where
-        F: FnMut(&'a EventInfo);
+    /// Creates an iterator over this storage.
+    fn iter<'a>(&'a self) -> Self::Iter<'a>;
 }
 
 impl Storage for Vec<EventInfo> {
+    type Iter<'a> = slice::Iter<'a, EventInfo>;
+
     fn event_info(&self, id: EventId) -> Option<&EventInfo> {
         self.get(id)
     }
 
-    fn for_each<'a, F>(&'a self, f: F)
-    where
-        F: FnMut(&'a EventInfo),
-    {
-        self.iter().for_each(f);
+    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+        self.as_slice().iter()
     }
 }
 
@@ -93,20 +96,12 @@ impl<S: Storage> Registry<S> {
     ///
     /// Returns `true` if an event was delivered to at least one listener.
     fn broadcast(&self) -> bool {
-        let mut did_notify = false;
-        self.storage.for_each(|event_info| {
+        self.storage
+            .iter()
             // Any signal of this kind arrived since we checked last?
-            if !event_info.pending.swap(false, Ordering::SeqCst) {
-                return;
-            }
-
+            .filter(|event_info| event_info.pending.swap(false, Ordering::SeqCst))
             // Ignore errors if there are no listeners
-            if event_info.tx.send(()).is_ok() {
-                did_notify = true;
-            }
-        });
-
-        did_notify
+            .fold(false, |_, event_info| event_info.tx.send(()).is_ok())
     }
 }
 
