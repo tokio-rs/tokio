@@ -480,24 +480,6 @@ impl Handle {
     }
 }
 
-cfg_io_driver! {
-    /// Internal test methods for PR #7773
-    /// These methods are only available with `--cfg tokio_unstable`
-    /// and are not part of the public API. They may change without notice.
-    #[cfg(tokio_unstable)]
-    impl Handle {
-        /// Returns the number of pending I/O registrations (internal test-only method)
-        pub fn io_pending_registration_count(&self) -> usize {
-            self.inner.driver().io().pending_registration_count()
-        }
-
-        /// Returns the total number of I/O registrations (internal test-only method)
-        pub fn io_total_registration_count(&self) -> usize {
-            self.inner.driver().io().total_registration_count()
-        }
-    }
-}
-
 impl std::panic::UnwindSafe for Handle {}
 
 impl std::panic::RefUnwindSafe for Handle {}

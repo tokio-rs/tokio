@@ -53,36 +53,6 @@ impl RegistrationSet {
         self.num_pending_release.load(Acquire) != 0
     }
 
-    /// Internal test method for PR #7773
-    /// Returns the number of pending registrations (internal test-only method)
-    #[cfg(tokio_unstable)]
-    pub(super) fn pending_release_count(&self) -> usize {
-        self.num_pending_release.load(Acquire)
-    }
-
-    /// Internal test method for PR #7773
-    /// Returns the total number of registrations in the main list (internal test-only method)
-    #[cfg(tokio_unstable)]
-    pub(super) fn total_registration_count(&self, synced: &mut Synced) -> usize {
-        // Count by temporarily draining the list, then restoring it
-        // This is safe for test purposes
-        let mut items = Vec::new();
-
-        // Drain all items
-        while let Some(item) = synced.registrations.pop_back() {
-            items.push(item);
-        }
-
-        let count = items.len();
-
-        // Restore items in reverse order (since we popped from back)
-        for item in items.into_iter() {
-            synced.registrations.push_front(item);
-        }
-
-        count
-    }
-
     pub(super) fn allocate(&self, synced: &mut Synced) -> io::Result<Arc<ScheduledIo>> {
         if synced.is_shutdown {
             return Err(io::Error::new(

@@ -320,31 +320,6 @@ impl Handle {
     }
 }
 
-/// Internal test methods for PR #7773
-/// These methods are only available with `--cfg tokio_unstable`
-/// and are not part of the public API. They may change without notice.
-#[cfg(tokio_unstable)]
-impl Handle {
-    /// Returns the number of pending registrations (internal test-only method)
-    ///
-    /// # Warning
-    /// This method is NOT part of the public API and is subject to change
-    /// without notice. It should only be used for internal testing.
-    pub(crate) fn pending_registration_count(&self) -> usize {
-        self.registrations.pending_release_count()
-    }
-
-    /// Returns the total number of registrations in the main list (internal test-only method)
-    ///
-    /// # Warning
-    /// This method is NOT part of the public API and is subject to change
-    /// without notice. It should only be used for internal testing.
-    pub(crate) fn total_registration_count(&self) -> usize {
-        self.registrations
-            .total_registration_count(&mut self.synced.lock())
-    }
-}
-
 impl fmt::Debug for Handle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Handle")
