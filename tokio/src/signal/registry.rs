@@ -101,7 +101,8 @@ impl<S: Storage> Registry<S> {
             // Any signal of this kind arrived since we checked last?
             .filter(|event_info| event_info.pending.swap(false, Ordering::SeqCst))
             // Ignore errors if there are no listeners
-            .fold(false, |_, event_info| event_info.tx.send(()).is_ok())
+            .map(|event_info| event_info.tx.send(()).is_ok())
+            .fold(false, |acc, success| acc || success)
     }
 }
 
