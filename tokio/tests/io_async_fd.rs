@@ -1087,3 +1087,88 @@ async fn memory_leak_lsan_only() {
     tokio::time::sleep(Duration::from_millis(100)).await;
     // No assertions - just let LSan check at exit
 }
+
+/// Memory leak test using RSS (Resident Set Size) monitoring
+/// This test checks if memory usage grows significantly after many iterations
+/// Works on Linux only (reads /proc/self/statm)
+#[tokio::test]
+#[cfg(target_os = "linux")]
+async fn memory_leak_rss_check() {
+    use std::os::unix::io::{AsRawFd, RawFd};
+    use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::io::unix::AsyncFd;
+
+    use nix::sys::socket::{self, AddressFamily, SockFlag, SockType};
+
+    fn get_rss_kb() -> usize {
+        let status = std::fs::read_to_string("/proc/self/statm").unwrap();
+        let parts: Vec<&str> = status.split_whitespace().collect();
+        // Second field is RSS in pages, multiply by 4 for KB (assuming 4KB pages)
+        parts[1].parse::<usize>().unwrap() * 4
+    }
+
+    struct RawFdWrapper {
+        fd: RawFd,
+    }
+
+    impl AsRawFd for RawFdWrapper {
+        fn as_raw_fd(&self) -> RawFd {
+            self.fd
+        }
+    }
+
+    // Warm up - let runtime stabilize
+    for _ in 0..100 {
+        tokio::task::yield_now().await;
+    }
+
+    let rss_before = get_rss_kb();
+
+    const ITERATIONS: usize = 5000;
+
+    // Run many iterations to trigger the leak
+    for _ in 0..ITERATIONS {
+        let (fd_a, _fd_b) = socket::socketpair(
+            AddressFamily::Unix,
+            SockType::Stream,
+            None,
+            SockFlag::empty(),
+        )
+        .unwrap();
+
+        let raw_fd = fd_a.as_raw_fd();
+        set_nonblocking(raw_fd);
+        std::mem::forget(fd_a);
+
+        let wrapper = Arc::new(RawFdWrapper { fd: raw_fd });
+        let async_fd = AsyncFd::new(ArcFd(wrapper)).unwrap();
+
+        // Close fd before dropping AsyncFd - this triggers the bug
+        unsafe {
+            libc::close(raw_fd);
+        }
+
+        drop(async_fd);
+    }
+
+    // Let things settle
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::task::yield_now().await;
+
+    let rss_after = get_rss_kb();
+    let growth = rss_after.saturating_sub(rss_before);
+
+    // Each ScheduledIo is roughly 200-300 bytes
+    // 5000 iterations * 256 bytes = ~1.25MB leaked if bug exists
+    // Allow up to 512KB for normal allocations/noise
+    assert!(
+        growth < 512,
+        "Memory leak detected: RSS grew by {}KB after {} iterations \
+         (before: {}KB, after: {}KB). Expected less than 512KB growth.",
+        growth,
+        ITERATIONS,
+        rss_before,
+        rss_after
+    );
+}
