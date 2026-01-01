@@ -1128,7 +1128,7 @@ impl<T> Sender<T> {
     /// A [`PermitIterator`] is returned to track the reserved capacity.
     /// You can call this [`Iterator`] until it is exhausted to
     /// get a [`Permit`] and then call [`Permit::send`]. This function is similar to
-    /// [`try_reserve_many`] except it awaits for the slots to become available.
+    /// [`try_reserve_many`] except it waits for the slots to become available.
     ///
     /// If the channel is closed, the function returns a [`SendError`].
     ///
