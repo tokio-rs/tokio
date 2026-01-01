@@ -1034,11 +1034,7 @@ async fn memory_leak_rss_check() {
     // Allow up to 512KB for normal allocations/noise
     assert!(
         growth < 512,
-        "Memory leak detected: RSS grew by {}KB after {} iterations \
-         (before: {}KB, after: {}KB). Expected less than 512KB growth.",
-        growth,
-        ITERATIONS,
-        rss_before,
-        rss_after
+        "Memory leak detected: RSS grew by {growth}KB after {ITERATIONS} iterations \
+         (before: {rss_before}KB, after: {rss_after}KB). Expected less than 512KB growth.",
     );
 }
