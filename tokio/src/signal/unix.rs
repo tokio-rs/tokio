@@ -20,21 +20,25 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
 
+#[cfg(not(any(target_os = "linux", target_os = "illumos")))]
+pub(crate) type OsStorage = [SignalInfo; 34];
+
+#[cfg(any(target_os = "linux", target_os = "illumos"))]
 pub(crate) type OsStorage = Box<[SignalInfo]>;
 
 impl Init for OsStorage {
     fn init() -> Self {
         // There are reliable signals ranging from 1 to 33 available on every Unix platform.
         #[cfg(not(any(target_os = "linux", target_os = "illumos")))]
-        let possible = 0..=33;
+        return std::array::from_fn(|_| SignalInfo::default());
 
         // On Linux and illumos, there are additional real-time signals
         // available. (This is also likely true on Solaris, but this should be
         // verified before being enabled.)
         #[cfg(any(target_os = "linux", target_os = "illumos"))]
-        let possible = 0..=libc::SIGRTMAX();
-
-        possible.map(|_| SignalInfo::default()).collect()
+        return iter::repeat_with(SignalInfo::default)
+            .take(libc::SIGRTMAX() as usize + 1)
+            .collect();
     }
 }
 
