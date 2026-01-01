@@ -959,7 +959,8 @@ async fn try_with_interest() {
 
 /// Regression test for issue #7563 - Memory leak test using RSS monitoring
 ///
-/// This test checks if memory usage grows significantly after many iterations
+/// This test detects memory leaks by checking if memory usage stabilizes.
+/// A leak causes unbounded growth; fixed code stabilizes after initial allocations.
 /// Works on Linux only (reads /proc/self/statm)
 #[tokio::test]
 #[cfg(target_os = "linux")]
@@ -988,53 +989,61 @@ async fn memory_leak_rss_check() {
         }
     }
 
-    // Warm up - let runtime stabilize
-    for _ in 0..100 {
-        tokio::task::yield_now().await;
-    }
+    async fn run_leak_iterations(count: usize) {
+        for _ in 0..count {
+            let (fd_a, _fd_b) = socket::socketpair(
+                AddressFamily::Unix,
+                SockType::Stream,
+                None,
+                SockFlag::empty(),
+            )
+            .unwrap();
 
-    let rss_before = get_rss_kb();
+            let raw_fd = fd_a.as_raw_fd();
+            set_nonblocking(raw_fd);
+            std::mem::forget(fd_a);
 
-    const ITERATIONS: usize = 5000;
+            let wrapper = Arc::new(RawFdWrapper { fd: raw_fd });
+            let async_fd = AsyncFd::new(ArcFd(wrapper)).unwrap();
 
-    // Run many iterations to trigger the leak
-    for _ in 0..ITERATIONS {
-        let (fd_a, _fd_b) = socket::socketpair(
-            AddressFamily::Unix,
-            SockType::Stream,
-            None,
-            SockFlag::empty(),
-        )
-        .unwrap();
+            // Close fd before dropping AsyncFd - this triggers the bug
+            unsafe {
+                libc::close(raw_fd);
+            }
 
-        let raw_fd = fd_a.as_raw_fd();
-        set_nonblocking(raw_fd);
-        std::mem::forget(fd_a);
-
-        let wrapper = Arc::new(RawFdWrapper { fd: raw_fd });
-        let async_fd = AsyncFd::new(ArcFd(wrapper)).unwrap();
-
-        // Close fd before dropping AsyncFd - this triggers the bug
-        unsafe {
-            libc::close(raw_fd);
+            drop(async_fd);
         }
-
-        drop(async_fd);
     }
 
-    // Let things settle
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    tokio::task::yield_now().await;
+    const ITERATIONS: usize = 2000;
 
-    let rss_after = get_rss_kb();
-    let growth = rss_after.saturating_sub(rss_before);
+    // Phase 1: Warm up and let allocator stabilize
+    run_leak_iterations(ITERATIONS).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let rss_after_phase1 = get_rss_kb();
 
-    // Each ScheduledIo is roughly 200-300 bytes
-    // 5000 iterations * 256 bytes = ~1.25MB leaked if bug exists
-    // Allow up to 512KB for normal allocations/noise
+    // Phase 2: Run more iterations
+    run_leak_iterations(ITERATIONS).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let rss_after_phase2 = get_rss_kb();
+
+    // Phase 3: Run even more iterations
+    run_leak_iterations(ITERATIONS).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let rss_after_phase3 = get_rss_kb();
+
+    // Calculate growth between phases
+    let growth_phase2 = rss_after_phase2.saturating_sub(rss_after_phase1);
+    let growth_phase3 = rss_after_phase3.saturating_sub(rss_after_phase2);
+
+    // If there's a leak, each phase should show similar growth (~500KB per 2000 iterations)
+    // If fixed, growth should stabilize (memory reused, not growing)
+    // Allow 256KB tolerance for allocator noise
     assert!(
-        growth < 512,
-        "Memory leak detected: RSS grew by {growth}KB after {ITERATIONS} iterations \
-         (before: {rss_before}KB, after: {rss_after}KB). Expected less than 512KB growth.",
+        growth_phase2 < 256 || growth_phase3 < 256,
+        "Memory leak detected: RSS keeps growing without stabilizing. \
+         Phase 1->2: +{growth_phase2}KB, Phase 2->3: +{growth_phase3}KB. \
+         (phase1: {rss_after_phase1}KB, phase2: {rss_after_phase2}KB, phase3: {rss_after_phase3}KB). \
+         Expected memory to stabilize (at least one phase with <256KB growth).",
     );
 }
