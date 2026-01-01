@@ -1,4 +1,4 @@
-use io_uring::{squeue::Entry, IoUring};
+use io_uring::{squeue::Entry, IoUring, Probe};
 use mio::unix::SourceFd;
 use slab::Slab;
 
@@ -38,6 +38,7 @@ impl State {
 
 pub(crate) struct UringContext {
     pub(crate) uring: Option<io_uring::IoUring>,
+    pub(crate) probe: io_uring::Probe,
     pub(crate) ops: slab::Slab<Lifecycle>,
 }
 
@@ -46,6 +47,7 @@ impl UringContext {
         Self {
             ops: Slab::new(),
             uring: None,
+            probe: Probe::new(),
         }
     }
 
@@ -55,6 +57,10 @@ impl UringContext {
 
     pub(crate) fn ring_mut(&mut self) -> &mut io_uring::IoUring {
         self.uring.as_mut().expect("io_uring not initialized")
+    }
+
+    pub(crate) fn is_opcode_supported(&self, opcode: u8) -> bool {
+        self.probe.is_supported(opcode)
     }
 
     /// Perform `io_uring_setup` system call, and Returns true if this
@@ -68,7 +74,18 @@ impl UringContext {
             return Ok(false);
         }
 
-        self.uring.replace(IoUring::new(DEFAULT_RING_SIZE)?);
+        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
+
+        match uring.submitter().register_probe(&mut self.probe) {
+            Ok(_) => {}
+            Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {
+                // The kernel does not support IORING_REGISTER_PROBE.
+                return Err(io::Error::from_raw_os_error(libc::ENOSYS));
+            }
+            Err(e) => return Err(e),
+        }
+
+        self.uring.replace(uring);
 
         Ok(true)
     }
@@ -182,12 +199,19 @@ impl Handle {
     }
 
     /// Check if the io_uring context is initialized. If not, it will try to initialize it.
-    pub(crate) fn check_and_init(&self) -> io::Result<bool> {
+    /// Then, check if the provided opcode is supported.
+    ///
+    /// If both the context initialization succeeds and the opcode is supported,
+    /// this returns `Ok(true)`.
+    /// If either io_uring is unsupported or the opcode is unsupported,
+    /// this returns `Ok(false)`.
+    /// An error is returned if an io_uring syscall returns an unexpected error value.
+    pub(crate) fn check_and_init(&self, opcode: u8) -> io::Result<bool> {
         match State::from_usize(self.uring_state.load(Ordering::Acquire)) {
-            State::Uninitialized => match self.try_init() {
-                Ok(()) => {
+            State::Uninitialized => match self.try_init_and_check_opcode(opcode) {
+                Ok(opcode_supported) => {
                     self.set_uring_state(State::Initialized);
-                    Ok(true)
+                    Ok(opcode_supported)
                 }
                 // If the system doesn't support io_uring, we set the state to Unsupported.
                 Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => {
@@ -205,18 +229,19 @@ impl Handle {
                 Err(e) => Err(e),
             },
             State::Unsupported => Ok(false),
-            State::Initialized => Ok(true),
+            State::Initialized => Ok(self.get_uring().lock().is_opcode_supported(opcode)),
         }
     }
 
     /// Initialize the io_uring context if it hasn't been initialized yet.
-    fn try_init(&self) -> io::Result<()> {
+    /// Then, check whether the given opcode is supported.
+    fn try_init_and_check_opcode(&self, opcode: u8) -> io::Result<bool> {
         let mut guard = self.get_uring().lock();
         if guard.try_init()? {
             self.add_uring_source(guard.ring().as_raw_fd())?;
         }
 
-        Ok(())
+        Ok(guard.is_opcode_supported(opcode))
     }
 
     /// Register an operation with the io_uring.
@@ -231,7 +256,7 @@ impl Handle {
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> io::Result<usize> {
         // Note: Maybe this check can be removed if upstream callers consistently use `check_and_init`.
-        if !self.check_and_init()? {
+        if !self.check_and_init(entry.get_opcode() as u8)? {
             return Err(io::Error::from_raw_os_error(libc::ENOSYS));
         }
 
