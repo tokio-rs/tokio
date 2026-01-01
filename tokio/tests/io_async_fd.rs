@@ -1038,3 +1038,52 @@ async fn memory_leak_when_fd_closed_before_drop() {
         max_count_seen.saturating_sub(initial_count)
     );
 }
+
+/// Simple test for LSan - no counting, just run the leak-inducing code
+/// Run with: RUSTFLAGS="-Zsanitizer=leak" cargo +nightly test --features full --test io_async_fd memory_leak_lsan_only
+#[tokio::test]
+async fn memory_leak_lsan_only() {
+    use std::os::unix::io::{AsRawFd, RawFd};
+    use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::io::unix::AsyncFd;
+
+    use nix::sys::socket::{self, AddressFamily, SockFlag, SockType};
+
+    struct RawFdWrapper {
+        fd: RawFd,
+    }
+
+    impl AsRawFd for RawFdWrapper {
+        fn as_raw_fd(&self) -> RawFd {
+            self.fd
+        }
+    }
+
+    // Run many iterations to create many leaked objects
+    for _ in 0..1000 {
+        let (fd_a, _fd_b) = socket::socketpair(
+            AddressFamily::Unix,
+            SockType::Stream,
+            None,
+            SockFlag::empty(),
+        )
+        .unwrap();
+
+        let raw_fd = fd_a.as_raw_fd();
+        set_nonblocking(raw_fd);
+        std::mem::forget(fd_a);
+
+        let wrapper = Arc::new(RawFdWrapper { fd: raw_fd });
+        let async_fd = AsyncFd::new(ArcFd(wrapper)).unwrap();
+
+        unsafe {
+            libc::close(raw_fd);
+        }
+
+        drop(async_fd);
+    }
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    // No assertions - just let LSan check at exit
+}
