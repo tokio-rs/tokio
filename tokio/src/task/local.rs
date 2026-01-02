@@ -8,7 +8,7 @@ use crate::runtime::task::{
 use crate::runtime::{context, ThreadId, BOX_FUTURE_THRESHOLD};
 use crate::sync::AtomicWaker;
 use crate::util::trace::SpawnMeta;
-use crate::util::RcCell;
+use crate::util::{usdt, RcCell};
 
 use std::cell::Cell;
 use std::collections::VecDeque;
@@ -440,6 +440,7 @@ cfg_rt! {
                 ))]
                 let future = task::trace::Trace::root(future);
                 let id = task::Id::next();
+                usdt::start_task(usdt::TaskKind::SpawnLocal, meta, id, std::mem::size_of::<F>());
                 let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
                 // safety: we have verified that this is a `LocalRuntime` owned by the current thread
@@ -1034,6 +1035,12 @@ impl Context {
         F::Output: 'static,
     {
         let id = crate::runtime::task::Id::next();
+        usdt::start_task(
+            usdt::TaskKind::SpawnLocal,
+            meta,
+            id,
+            std::mem::size_of::<F>(),
+        );
         let future = crate::util::trace::task(future, "local", meta, id.as_u64());
 
         // Safety: called from the thread that owns the `LocalSet`

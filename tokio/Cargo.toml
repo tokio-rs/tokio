@@ -88,6 +88,8 @@ time = []
 io-uring = ["dep:io-uring", "libc", "mio/os-poll", "mio/os-ext", "dep:slab"]
 # Unstable feature. Requires `--cfg tokio_unstable` to enable.
 taskdump = ["dep:backtrace"]
+# Unstable feature. Requires `--cfg tokio_unstable` to enable.
+usdt = []
 
 [dependencies]
 tokio-macros = { version = "~2.6.0", path = "../tokio-macros", optional = true }

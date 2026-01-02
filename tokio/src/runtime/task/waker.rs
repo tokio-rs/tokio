@@ -67,12 +67,43 @@ cfg_not_trace! {
     }
 }
 
+cfg_usdt! {
+    macro_rules! usdt {
+        ($header:expr, $op:expr) => {
+            let id = Header::get_id($header).as_u64();
+            match $op {
+                "clone" => crate::util::usdt::waker_clone(id),
+                "drop" => crate::util::usdt::waker_drop(id),
+                "wake" => {
+                    crate::util::usdt::waker_wake(id);
+                    crate::util::usdt::waker_drop(id);
+                }
+                "wake_by_ref" => crate::util::usdt::waker_wake(id),
+                _ => {}
+            }
+        }
+    }
+}
+
+cfg_not_usdt! {
+    macro_rules! usdt {
+        ($header:expr, $op:expr) => {
+            // noop
+            let _ = &$header;
+        }
+    }
+}
+
 unsafe fn clone_waker(ptr: *const ()) -> RawWaker {
     // Safety: `ptr` was created from a `Header` pointer in function `waker_ref`.
     let header = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
-    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_unsafe))]
+    #[cfg_attr(
+        not(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))),
+        allow(unused_unsafe)
+    )]
     unsafe {
         trace!(header, "waker.clone");
+        usdt!(header, "clone");
     }
     unsafe { header.as_ref() }.state.ref_inc();
     raw_waker(header)
@@ -82,9 +113,13 @@ unsafe fn drop_waker(ptr: *const ()) {
     // Safety: `ptr` was created from a `Header` pointer in function `waker_ref`.
     let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
     // TODO; replace to #[expect(unused_unsafe)] after bumping MSRV to 1.81.0.
-    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_unsafe))]
+    #[cfg_attr(
+        not(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))),
+        allow(unused_unsafe)
+    )]
     unsafe {
         trace!(ptr, "waker.drop");
+        usdt!(ptr, "drop");
     }
     let raw = unsafe { RawTask::from_raw(ptr) };
     raw.drop_reference();
@@ -94,9 +129,13 @@ unsafe fn wake_by_val(ptr: *const ()) {
     // Safety: `ptr` was created from a `Header` pointer in function `waker_ref`.
     let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
     // TODO; replace to #[expect(unused_unsafe)] after bumping MSRV to 1.81.0.
-    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_unsafe))]
+    #[cfg_attr(
+        not(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))),
+        allow(unused_unsafe)
+    )]
     unsafe {
         trace!(ptr, "waker.wake");
+        usdt!(ptr, "wake");
     }
     let raw = unsafe { RawTask::from_raw(ptr) };
     raw.wake_by_val();
@@ -107,9 +146,13 @@ unsafe fn wake_by_ref(ptr: *const ()) {
     // Safety: `ptr` was created from a `Header` pointer in function `waker_ref`.
     let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
     // TODO; replace to #[expect(unused_unsafe)] after bumping MSRV to 1.81.0.
-    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_unsafe))]
+    #[cfg_attr(
+        not(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))),
+        allow(unused_unsafe)
+    )]
     unsafe {
         trace!(ptr, "waker.wake_by_ref");
+        usdt!(ptr, "wake_by_ref");
     }
     let raw = unsafe { RawTask::from_raw(ptr) };
     raw.wake_by_ref();

@@ -69,8 +69,11 @@ pub struct JoinSet<T> {
 /// than on the current default runtime.
 ///
 /// [`task::Builder`]: crate::task::Builder
-#[cfg(all(tokio_unstable, feature = "tracing"))]
-#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+#[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))))
+)]
 #[must_use = "builders do nothing unless used to spawn a task"]
 pub struct Builder<'a, T> {
     joinset: &'a mut JoinSet<T>,
@@ -117,8 +120,11 @@ impl<T: 'static> JoinSet<T> {
     ///     Ok(())
     /// }
     /// ```
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+    #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))))
+    )]
     pub fn build_task(&mut self) -> Builder<'_, T> {
         Builder {
             builder: super::Builder::new(),
@@ -696,8 +702,11 @@ where
 
 // === impl Builder ===
 
-#[cfg(all(tokio_unstable, feature = "tracing"))]
-#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+#[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))))
+)]
 impl<'a, T: 'static> Builder<'a, T> {
     /// Assigns a name to the task which will be spawned.
     pub fn name(self, name: &'a str) -> Self {
@@ -839,8 +848,11 @@ impl<'a, T: 'static> Builder<'a, T> {
 
 // Manual `Debug` impl so that `Builder` is `Debug` regardless of whether `T` is
 // `Debug`.
-#[cfg(all(tokio_unstable, feature = "tracing"))]
-#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+#[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))))
+)]
 impl<'a, T> fmt::Debug for Builder<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("join_set::Builder")

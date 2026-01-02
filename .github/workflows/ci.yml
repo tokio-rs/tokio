@@ -258,6 +258,9 @@ jobs:
           # only Linux supports io_uring
           - { os: ubuntu-latest, extra_features: io-uring }
           - { os: macos-latest, extra_features: "" }
+          # only Linux and macOS support usdt
+          - { os: ubuntu-latest, extra_features: usdt }
+          - { os: macos-latest, extra_features: usdt }
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
@@ -493,9 +496,9 @@ jobs:
       matrix:
         target:
           - name: x86_64-unknown-haiku
-            exclude_features: "taskdump" # taskdump is only available on Linux
+            exclude_features: "taskdump,usdt" # taskdump,usdt are only available on Linux
 #         - name: armv7-sony-vita-newlibeabihf
-#           exclude_features: "process,signal,rt-process-signal,full,taskdump"
+#           exclude_features: "process,signal,rt-process-signal,full,taskdump,usdt"
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_nightly }}
@@ -527,7 +530,7 @@ jobs:
             os: ubuntu-24.04-arm
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-24.04-arm
-            extra_features: "io-uring,taskdump"
+            extra_features: "io-uring,taskdump,usdt"
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
     steps:
@@ -577,7 +580,7 @@ jobs:
             os: ubuntu-24.04-arm
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-24.04-arm
-            extra_features: "io-uring,taskdump"
+            extra_features: "io-uring,taskdump,usdt"
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
     steps:
@@ -671,7 +674,8 @@ jobs:
       # https://github.com/tokio-rs/tokio/issues/5373
       - name: Check
         # We use `--skip io-uring` since io-uring crate doesn't provide a binding for the i686 target.
-        run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --skip io-uring --depth 2 --keep-going
+        # We use `--skip usdt` since usdt is not supported on the i686 target.
+        run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --skip io-uring --skip usdt --depth 2 --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -684,11 +688,11 @@ jobs:
         include:
           - name: ""
             rustflags: ""
-            exclude_features: "io-uring,taskdump"
+            exclude_features: "io-uring,taskdump,usdt"
           - name: "--unstable"
             rustflags: "--cfg tokio_unstable -Dwarnings"
-            exclude_features: "io-uring,taskdump"
-          - name: "--unstable io-uring,taskdump"
+            exclude_features: "io-uring,taskdump,usdt"
+          - name: "--unstable io-uring,taskdump,usdt"
             rustflags: "--cfg tokio_unstable -Dwarnings"
             exclude_features: ""
     steps:
@@ -1092,11 +1096,11 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            # Windows neither supports io-uring nor taskdump.
+            # Windows neither supports io-uring nor taskdump nor usdt.
             extra_features: "tracing"
           - os: ubuntu-latest
             # includes all unstable features.
-            extra_features: "tracing,io-uring,taskdump"
+            extra_features: "tracing,io-uring,taskdump,usdt"
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ matrix.rust }}
