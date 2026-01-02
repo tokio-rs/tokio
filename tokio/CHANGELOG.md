@@ -1,3 +1,11 @@
+# 1.43.4 (January 3rd, 2026)
+
+### Fixed
+
+* sync: return `TryRecvError::Disconnected` from `Receiver::try_recv` after `Receiver::close` ([#7686])
+
+[#7686]: https://github.com/tokio-rs/tokio/pull/7686
+
 # 1.43.3 (October 14th, 2025)
 
 ### Fixed
