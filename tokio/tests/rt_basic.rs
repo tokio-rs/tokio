@@ -365,13 +365,13 @@ mod unstable {
             .unwrap();
 
         let rt = Arc::new(rt);
-        let mut ths = vec![];
+        let mut threads = vec![];
         let (tx, rx) = mpsc::channel();
 
         for _ in 0..N {
             let rt = rt.clone();
             let tx = tx.clone();
-            ths.push(std::thread::spawn(move || {
+            threads.push(std::thread::spawn(move || {
                 rt.block_on(async {
                     tx.send(()).unwrap();
                     futures::future::pending::<()>().await;
@@ -387,8 +387,8 @@ mod unstable {
             panic!("boom");
         });
 
-        for th in ths {
-            assert!(th.join().is_err());
+        for thread in threads {
+            assert!(thread.join().is_err());
         }
     }
 

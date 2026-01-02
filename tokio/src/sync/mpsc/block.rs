@@ -170,7 +170,7 @@ impl<T> Block<T> {
         // 2. The `UnsafeCell` always give us a valid pointer to the value.
         let value = self.values[offset].with(|ptr| unsafe { ptr::read(ptr) });
 
-        // Safety: the redy bit is set, so the value has been initialized.
+        // Safety: the ready bit is set, so the value has been initialized.
         Some(Read::Value(unsafe { value.assume_init() }))
     }
 

@@ -644,3 +644,81 @@ async fn poll_ready() {
         }
     }
 }
+
+/// Macro to create a simple test to set and get a socket option.
+macro_rules! test {
+    // Test using the `arg`ument as expected return value.
+    ($( #[ $attr: meta ] )* $get_fn: ident, $set_fn: ident ( $arg: expr ) ) => {
+        test!($( #[$attr] )* $get_fn, $set_fn($arg), $arg);
+    };
+    ($( #[ $attr: meta ] )* $get_fn: ident, $set_fn: ident ( $arg: expr ), $expected: expr ) => {
+        #[tokio::test]
+        $( #[$attr] )*
+        async fn $get_fn() {
+            test!(__ "127.0.0.1:0", $get_fn, $set_fn($arg), $expected);
+            #[cfg(not(target_os = "vita"))]
+            test!(__ "[::1]:0", $get_fn, $set_fn($arg), $expected);
+        }
+    };
+    // Only test using a IPv4 socket.
+    (IPv4 $get_fn: ident, $set_fn: ident ( $arg: expr ) ) => {
+        #[tokio::test]
+        async fn $get_fn() {
+            test!(__ "127.0.0.1:0", $get_fn, $set_fn($arg), $arg);
+        }
+    };
+    // Only test using a IPv6 socket.
+    (IPv6 $get_fn: ident, $set_fn: ident ( $arg: expr ) ) => {
+        #[tokio::test]
+        async fn $get_fn() {
+            test!(__ "[::1]:0", $get_fn, $set_fn($arg), $arg);
+        }
+    };
+
+    // Internal to this macro.
+    (__ $addr: literal, $get_fn: ident, $set_fn: ident ( $arg: expr ), $expected: expr ) => {
+        let socket = UdpSocket::bind($addr).await.expect("failed to create `UdpSocket`");
+
+        let initial = socket.$get_fn().expect("failed to get initial value");
+        let arg = $arg;
+        assert_ne!(initial, arg, "initial value and argument are the same");
+
+        socket.$set_fn(arg).expect("failed to set option");
+        let got = socket.$get_fn().expect("failed to get value");
+        let expected = $expected;
+        assert_eq!(got, expected, "set and get values differ");
+    };
+}
+
+test!(broadcast, set_broadcast(true));
+
+test!(IPv4 multicast_loop_v4, set_multicast_loop_v4(false));
+
+#[cfg(target_os = "linux")] // broken on non-Linux platforms https://github.com/rust-lang/socket2/pull/630
+test!(multicast_ttl_v4, set_multicast_ttl_v4(40));
+
+test!(IPv6 multicast_loop_v6, set_multicast_loop_v6(false));
+
+#[cfg(any(
+    target_os = "android",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "fuchsia",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "cygwin",
+))]
+test!(IPv6 tclass_v6, set_tclass_v6(96));
+
+test!(IPv4 ttl, set_ttl(40));
+
+#[cfg(not(any(
+    target_os = "fuchsia",
+    target_os = "redox",
+    target_os = "solaris",
+    target_os = "illumos",
+    target_os = "haiku"
+)))]
+test!(IPv4 tos_v4, set_tos_v4(96));

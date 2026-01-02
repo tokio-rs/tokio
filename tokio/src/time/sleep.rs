@@ -449,7 +449,7 @@ impl Future for Sleep {
     //
     // - AtCapacity: this is a pathological case where far too many
     //   sleep instances have been scheduled.
-    // - Shutdown: No timer has been setup, which is a mis-use error.
+    // - Shutdown: No timer has been setup, which is a misuse error.
     //
     // Both cases are extremely rare, and pretty accurately fit into
     // "logic errors", so we just panic in this case. A user couldn't

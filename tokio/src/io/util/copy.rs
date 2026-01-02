@@ -241,10 +241,18 @@ cfg_io_util! {
     /// [`AsyncBufRead`]. You can use `copy_buf` with [`BufReader`] to change the
     /// buffer capacity.
     ///
+    /// # When to use async alternatives instead of `SyncIoBridge`
+    ///
+    /// If you are looking to use [`std::io::copy`] with a synchronous consumer
+    /// (like a `hasher` or compressor), consider using async alternatives instead of
+    /// wrapping the reader with [`SyncIoBridge`].
+    /// See the [`SyncIoBridge`] documentation for detailed examples and guidance.
+    ///
     /// [std]: std::io::copy
     /// [`copy_buf`]: crate::io::copy_buf
     /// [`AsyncBufRead`]: crate::io::AsyncBufRead
     /// [`BufReader`]: crate::io::BufReader
+    /// [`SyncIoBridge`]: https://docs.rs/tokio-util/latest/tokio_util/io/struct.SyncIoBridge.html
     ///
     /// # Errors
     ///
