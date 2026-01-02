@@ -1,3 +1,9 @@
+# 1.47.3 (Januar 3rd, 2026)
+
+### Fixed
+
+* sync: return `TryRecvError::Disconnected` from `Receiver::try_recv` after `Receiver::close` ([#7686])
+
 # 1.47.2 (October 14th, 2025)
 
 ### Fixed
