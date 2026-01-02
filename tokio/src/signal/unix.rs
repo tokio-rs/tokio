@@ -8,7 +8,7 @@
 
 use crate::runtime::scheduler;
 use crate::runtime::signal::Handle;
-use crate::signal::registry::{globals, EventId, EventInfo, Globals, Init, Storage};
+use crate::signal::registry::{globals, EventId, EventInfo, Globals, Storage};
 use crate::signal::RxFuture;
 use crate::sync::watch;
 
@@ -30,8 +30,8 @@ impl OsStorage {
     }
 }
 
-impl Init for OsStorage {
-    fn init() -> Self {
+impl Default for OsStorage {
+    fn default() -> Self {
         // There are reliable signals ranging from 1 to 33 available on every Unix platform.
         #[cfg(not(any(target_os = "linux", target_os = "illumos")))]
         let inner = std::array::from_fn(|_| SignalInfo::default());
@@ -67,8 +67,8 @@ pub(crate) struct OsExtraData {
     pub(crate) receiver: UnixStream,
 }
 
-impl Init for OsExtraData {
-    fn init() -> Self {
+impl Default for OsExtraData {
+    fn default() -> Self {
         let (receiver, sender) = UnixStream::pair().expect("failed to create UnixStream");
 
         Self { sender, receiver }
