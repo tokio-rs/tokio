@@ -7,6 +7,8 @@ on:
 jobs:
   benchmark:
     name: Benchmark
+    permissions:
+      checks: write
     runs-on: ubuntu-latest
     env:
       BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
@@ -31,4 +33,9 @@ jobs:
       - uses: bencherdev/bencher@main
       - name: Run Bencher
         run: |
-          bencher run --adapter rust_gungraun --err "cargo bench --bench ${{ matrix.bench }}"
+          bencher run \
+          --branch master \
+          --err \
+          --adapter rust_gungraun \
+          --github-actions '${{ secrets.GITHUB_TOKEN }}' \
+          "cargo bench --bench ${{ matrix.bench }}"
