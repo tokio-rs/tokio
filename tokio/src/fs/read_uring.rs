@@ -44,7 +44,11 @@ async fn read_to_end_batch(fd: OwnedFd, buf: Vec<u8>) -> io::Result<Vec<u8>> {
     if file_len > MAX_READ_SIZE {
         match Op::read_batch_size(fd, buf, file_len, batch_size).await {
             Ok(buf) => Ok(buf),
-            Err((r_fd, r_buf)) => read_to_end(r_fd, r_buf).await,
+            Err((r_fd, r_buf)) => {
+                // clear the buffer before we write to it from start again
+                r_buf.clear();
+                read_to_end(r_fd, r_buf).await
+            }
         }
     } else {
         read_to_end(fd, buf).await
