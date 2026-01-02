@@ -238,9 +238,11 @@ impl Builder {
     /// Configuration methods can be chained on the return value.
     ///
     /// To spawn non-`Send` tasks on the resulting runtime, combine it with a
-    /// [`LocalSet`].
+    /// [`LocalSet`], or call [`build_local`] to create a [`LocalRuntime`] (unstable).
     ///
     /// [`LocalSet`]: crate::task::LocalSet
+    /// [`LocalRuntime`]: crate::runtime::LocalRuntime
+    /// [`build_local`]: crate::runtime::Builder::build_local
     pub fn new_current_thread() -> Builder {
         #[cfg(loom)]
         const EVENT_INTERVAL: u32 = 4;
