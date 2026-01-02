@@ -209,11 +209,12 @@
 //!
 //! Depending on how the runtime is configured, Tokio may already be running.
 //! If it is not, tasks will not execute unless you explicitly drive the runtime,
-//! for example by calling [Runtime::block_on].
+//! for example by calling [`Runtime::block_on`].
 //!
 //! A multi-threaded runtime is always running. The current-thread runtime is only
-//! running when there is at least on call to [Runtime::block_on]. A LocalSet is
-//! running when it's being driven by one of more mechanisms.
+//! running when there is at least on call to [`Runtime::block_on`]. A
+//! [`LocalSet`](crate::task::LocalSet) is running when it's being driven by one 
+//! of more mechanisms.
 //!
 //! ## Lifetime of spawned threads
 //!
