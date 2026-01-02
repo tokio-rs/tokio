@@ -308,9 +308,7 @@ impl Handle {
 
         self.metrics.dec_fd_count();
 
-        os_result?; // Return error after cleanup
-
-        Ok(())
+        os_result // Return error after cleanup
     }
 
     fn release_pending_registrations(&self) {
