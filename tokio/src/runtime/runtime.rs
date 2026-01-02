@@ -206,12 +206,13 @@ impl Runtime {
     /// thread pool. The thread pool is then responsible for polling the future
     /// until it completes.
     ///
-    /// Executes the given future. Depending on the current [Runtime] configuration,
-    /// it may start immediately in the background or require blocking on the [JoinHandle].
+    /// Executes the given future. Depending if the current [Runtime]
+    /// is [running][running-runtime] it may start immediately in the background.
     ///
     /// See [module level][mod] documentation for more details.
     ///
     /// [mod]: index.html
+    /// [running-runtime]: index.html#running-runtime
     ///
     /// # Examples
     ///

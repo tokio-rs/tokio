@@ -205,6 +205,12 @@
 //! This is done with [`Builder::enable_io`] and [`Builder::enable_time`]. As a
 //! shorthand, [`Builder::enable_all`] enables both resource drivers.
 //!
+//! #### Running runtime
+//!
+//! Depending on how the runtime is configured, Tokio may already be running.
+//! If it is not, tasks will not execute unless you explicitly drive the runtime,
+//! for example by calling [`Runtime::block_on`].
+//!
 //! ## Lifetime of spawned threads
 //!
 //! The runtime may spawn threads depending on its configuration and usage. The

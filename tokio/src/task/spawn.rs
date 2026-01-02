@@ -15,8 +15,10 @@ cfg_rt! {
     /// Spawning a task enables the task to execute concurrently to other tasks. The
     /// spawned task may execute on the current thread, or it may be sent to a
     /// different thread to be executed. The specifics depend on the current
-    /// [`Runtime`](crate::runtime::Runtime) configuration - it may start immediately in
-    /// the background or require blocking on the [JoinHandle].
+    /// [`Runtime`](crate::runtime::Runtime) configuration. In a
+    /// [running runtime][running-runtime], it may start immediately in the background.
+    /// On a blocked runtime, the user must drive the runtime forward (for example,
+    /// by calling [block_on](crate::runtime::Runtime::block_on)).
     ///
     /// It is guaranteed that spawn will not synchronously poll the task being spawned.
     /// This means that calling spawn while holding a lock does not pose a risk of
@@ -29,6 +31,8 @@ cfg_rt! {
     /// This function must be called from the context of a Tokio runtime. Tasks running on
     /// the Tokio runtime are always inside its context, but you can also enter the context
     /// using the [`Runtime::enter`](crate::runtime::Runtime::enter()) method.
+    ///
+    /// [running-runtime]: ../runtime/index.html#running-runtime
     ///
     /// # Examples
     ///
