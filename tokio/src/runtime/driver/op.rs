@@ -3,6 +3,7 @@ use crate::io::uring::read::Read;
 use crate::io::uring::write::Write;
 use crate::runtime::Handle;
 
+use crate::io::uring::statx::{Statx, StatxFd};
 use io_uring::cqueue;
 use io_uring::squeue::Entry;
 use std::future::Future;
@@ -19,6 +20,8 @@ pub(crate) enum CancelData {
     Open(Open),
     Write(Write),
     Read(Read),
+    Statx(Statx),
+    StatxFd(StatxFd),
 }
 
 #[derive(Debug)]
