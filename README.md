@@ -56,7 +56,7 @@ Make sure you enable the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.48.0", features = ["full"] }
+tokio = { version = "1.49.0", features = ["full"] }
 ```
 Then, on your main.rs:
 
