@@ -531,16 +531,30 @@ mod tests {
 
     #[test]
     fn signal_enable_error_on_invalid_input() {
-        signal_enable(SignalKind::from_raw(-1), &Handle::default()).unwrap_err();
+        let inputs = [-1, 0];
+
+        for input in inputs {
+            assert_eq!(
+                signal_enable(SignalKind::from_raw(input), &Handle::default())
+                    .unwrap_err()
+                    .kind(),
+                ErrorKind::Other,
+            );
+        }
     }
 
     #[test]
     fn signal_enable_error_on_forbidden_input() {
-        signal_enable(
-            SignalKind::from_raw(signal_hook_registry::FORBIDDEN[0]),
-            &Handle::default(),
-        )
-        .unwrap_err();
+        let inputs = signal_hook_registry::FORBIDDEN;
+
+        for &input in inputs {
+            assert_eq!(
+                signal_enable(SignalKind::from_raw(input), &Handle::default())
+                    .unwrap_err()
+                    .kind(),
+                ErrorKind::Other,
+            );
+        }
     }
 
     #[test]
