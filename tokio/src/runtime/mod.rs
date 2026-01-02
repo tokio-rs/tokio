@@ -213,7 +213,7 @@
 //!
 //! A multi-threaded runtime is always running. The current-thread runtime is only
 //! running when there is at least on call to [`Runtime::block_on`]. A
-//! [`LocalSet`](crate::task::LocalSet) is running when it's being driven by one 
+//! [`LocalSet`](crate::task::LocalSet) is running when it's being driven by one
 //! of more mechanisms.
 //!
 //! ## Lifetime of spawned threads
