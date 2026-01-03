@@ -178,10 +178,6 @@
 //! poll call will notice it when the poll finishes, and the task is cancelled
 //! at that point.
 
-// Some task infrastructure is here to support `JoinSet`, which is currently
-// unstable. This should be removed once `JoinSet` is stabilized.
-#![cfg_attr(not(tokio_unstable), allow(dead_code))]
-
 mod core;
 use self::core::Cell;
 use self::core::Header;
