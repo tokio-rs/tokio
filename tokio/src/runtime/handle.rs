@@ -165,12 +165,13 @@ impl Handle {
     /// until it completes.
     ///
     /// Executes the given future. Depending if the current [`Runtime`](runtime::Runtime)
-    /// is [running][running-runtime] it may start immediately in the background.
+    /// is [running][running-runtime] it may start immediately in the background, even if
+    /// you don't await the returned [JoinHandle].
     ///
     /// See [module level][mod] documentation for more details.
     ///
     /// [mod]: index.html
-    /// [running-runtime]: index.html#running-runtime
+    /// [running-runtime]: index.html#driving-the-runtime
     ///
     /// # Examples
     ///

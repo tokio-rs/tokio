@@ -205,16 +205,24 @@
 //! This is done with [`Builder::enable_io`] and [`Builder::enable_time`]. As a
 //! shorthand, [`Builder::enable_all`] enables both resource drivers.
 //!
-//! #### Running runtime
+//! ## Driving the runtime
 //!
-//! Depending on how the runtime is configured, Tokio may already be running.
-//! If it is not, tasks will not execute unless you explicitly drive the runtime,
-//! for example by calling [`Runtime::block_on`].
+//! A Tokio runtime can only execute tasks if the runtime is running. Normally
+//! this is not an issue as the default configuration of a runtime is always running,
+//! but alternate configurations such as the current-thread runtime require that
+//! [`Runtime::block_on`] is called.
 //!
-//! A multi-threaded runtime is always running. The current-thread runtime is only
-//! running when there is at least on call to [`Runtime::block_on`]. A
-//! [`LocalSet`](crate::task::LocalSet) is running when it's being driven by one
-//! of more mechanisms.
+//! - A multi-threaded runtime is always running because it spawns its own worker
+//!   threads.
+//! - A current-thread runtime does not spawn any worker threads, so it can only
+//!   execute tasks when you provide a thread by calling [`Runtime::block_on`].
+//! - A [`LocalSet`](crate::task::LocalSet) only executes local tasks spawned on
+//!   it when the LocalSet is `.awaited` or otherwise driven using one of its
+//!   methods for this purpose.
+//!
+//! Please be aware that [`Handle::block_on`] does not drive the runtime.
+//! There must be at least one call to [`Runtime::block_on`] when using the current
+//! thread runtime. [`Handle::block_on`] is not enough.
 //!
 //! ## Lifetime of spawned threads
 //!
