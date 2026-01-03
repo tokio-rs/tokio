@@ -166,7 +166,7 @@ impl Handle {
     ///
     /// Executes the given future. Depending if the current [`Runtime`](runtime::Runtime)
     /// is [running][running-runtime] it may start immediately in the background, even if
-    /// you don't await the returned [JoinHandle].
+    /// you don't await the returned [`JoinHandle`].
     ///
     /// See [module level][mod] documentation for more details.
     ///
