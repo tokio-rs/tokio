@@ -8,11 +8,20 @@
 //! The queue adapts to the current concurrency level by using fewer shards
 //! when there are few threads, which improves cache locality and reduces
 //! lock contention on the active shards.
+//!
+//! For shard selection, we use the same approach as `sync::watch`: prefer
+//! randomness when available to reduce contention, falling back to circular
+//! access when the random number generator is not available.
 
 use crate::loom::sync::{Condvar, Mutex};
 
 use std::collections::VecDeque;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
+#[cfg(not(all(
+    not(loom),
+    any(feature = "macros", all(feature = "sync", feature = "rt"))
+)))]
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::time::Duration;
 
@@ -52,6 +61,11 @@ pub(super) struct ShardedQueue {
     /// The shards - each with its own mutex-protected queue.
     shards: [Shard; NUM_SHARDS],
     /// Atomic counter for round-robin task distribution.
+    /// Only used when randomness is not available (loom or missing features).
+    #[cfg(not(all(
+        not(loom),
+        any(feature = "macros", all(feature = "sync", feature = "rt"))
+    )))]
     push_index: AtomicUsize,
     /// Tracks the highest shard index that has ever been pushed to.
     /// This allows `pop()` to skip checking shards that have never had tasks,
@@ -83,6 +97,10 @@ impl ShardedQueue {
     pub(super) fn new() -> Self {
         ShardedQueue {
             shards: std::array::from_fn(|_| Shard::new()),
+            #[cfg(not(all(
+                not(loom),
+                any(feature = "macros", all(feature = "sync", feature = "rt"))
+            )))]
             push_index: AtomicUsize::new(0),
             max_shard_pushed: AtomicUsize::new(0),
             shutdown: AtomicBool::new(false),
@@ -91,14 +109,33 @@ impl ShardedQueue {
         }
     }
 
+    /// Select the next shard index for pushing a task -- when the RNG is
+    /// available.
+    #[cfg(all(
+        not(loom),
+        any(feature = "macros", all(feature = "sync", feature = "rt"))
+    ))]
+    fn next_push_index(&self, num_shards: usize) -> usize {
+        crate::runtime::context::thread_rng_n(num_shards as u32) as usize
+    }
+
+    /// Select the next shard index for pushing a task -- when the RNG is not
+    /// available.
+    #[cfg(not(all(
+        not(loom),
+        any(feature = "macros", all(feature = "sync", feature = "rt"))
+    )))]
+    fn next_push_index(&self, num_shards: usize) -> usize {
+        self.push_index.fetch_add(1, Relaxed) & (num_shards - 1)
+    }
+
     /// Push a task to the queue.
     ///
     /// `num_threads` is a hint about the current thread count, used to
     /// adaptively choose how many shards to distribute across.
     pub(super) fn push(&self, task: Task, num_threads: usize) {
         let num_shards = effective_shards(num_threads);
-        let mask = num_shards - 1;
-        let index = self.push_index.fetch_add(1, Relaxed) & mask;
+        let index = self.next_push_index(num_shards);
 
         // Update max_shard_pushed BEFORE pushing the task.
         // AcqRel ensures the subsequent push cannot be reordered before this.
