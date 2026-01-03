@@ -20,7 +20,7 @@ use std::{future::Future, io, mem};
 ///   the task
 ///
 /// There are three types of task that can be spawned from a Builder:
-/// - [`spawn_local`] for executing ![`Send`] futures using [`LocalSet`]
+/// - [`spawn_local`] for executing not [`Send`] futures using [`LocalSet`]
 ///   or [`LocalRuntime`] (unstable)
 /// - [`spawn`] for executing [`Send`] futures on the runtime
 /// - [`spawn_blocking`] for executing blocking code in the
