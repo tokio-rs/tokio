@@ -217,7 +217,7 @@
 //! - A current-thread runtime does not spawn any worker threads, so it can only
 //!   execute tasks when you provide a thread by calling [`Runtime::block_on`].
 //! - A [`LocalSet`](crate::task::LocalSet) only executes local tasks spawned on
-//!   it when the LocalSet is `.awaited` or otherwise driven using one of its
+//!   it when the `LocalSet` is `.awaited` or otherwise driven using one of its
 //!   methods for this purpose.
 //!
 //! Please be aware that [`Handle::block_on`] does not drive the runtime.
