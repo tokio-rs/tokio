@@ -1,4 +1,4 @@
-use crate::runtime::task::{Header, RawTask};
+use crate::runtime::task::{AbortHandle, Header, RawTask};
 
 use std::fmt;
 use std::future::Future;
@@ -21,6 +21,10 @@ cfg_rt! {
     ///
     /// This `struct` is created by the [`task::spawn`] and [`task::spawn_blocking`]
     /// functions.
+    ///
+    /// It is guaranteed that the destructor of the spawned task has finished
+    /// before task completion is observed via `JoinHandle` `await`,
+    /// [`JoinHandle::is_finished`] or [`AbortHandle::is_finished`].
     ///
     /// # Cancel safety
     ///
@@ -300,9 +304,9 @@ impl<T> JoinHandle<T> {
     /// ```
     /// [cancelled]: method@super::error::JoinError::is_cancelled
     #[must_use = "abort handles do nothing unless `.abort` is called"]
-    pub fn abort_handle(&self) -> super::AbortHandle {
+    pub fn abort_handle(&self) -> AbortHandle {
         self.raw.ref_inc();
-        super::AbortHandle::new(self.raw)
+        AbortHandle::new(self.raw)
     }
 
     /// Returns a [task ID] that uniquely identifies this task relative to other
