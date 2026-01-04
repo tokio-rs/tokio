@@ -14,8 +14,7 @@ use crate::sync::watch;
 
 use mio::net::UnixStream;
 use std::io::{self, Error, ErrorKind, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Once;
+use std::sync::OnceLock;
 use std::task::{Context, Poll};
 
 #[cfg(not(any(target_os = "linux", target_os = "illumos")))]
@@ -239,20 +238,10 @@ impl From<SignalKind> for std::os::raw::c_int {
     }
 }
 
+#[derive(Default)]
 pub(crate) struct SignalInfo {
     event_info: EventInfo,
-    init: Once,
-    initialized: AtomicBool,
-}
-
-impl Default for SignalInfo {
-    fn default() -> SignalInfo {
-        SignalInfo {
-            event_info: EventInfo::default(),
-            init: Once::new(),
-            initialized: AtomicBool::new(false),
-        }
-    }
+    init: OnceLock<Result<(), ()>>,
 }
 
 /// Our global signal handler for all signals registered by this module.
@@ -294,26 +283,24 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
         Some(slot) => slot,
         None => return Err(io::Error::new(io::ErrorKind::Other, "signal too large")),
     };
-    let mut registered = Ok(());
-    siginfo.init.call_once(|| {
-        registered = unsafe {
-            signal_hook_registry::register(signal, move || action(globals, signal)).map(|_| ())
-        };
-        if registered.is_ok() {
-            siginfo.initialized.store(true, Ordering::Relaxed);
-        }
-    });
-    registered?;
-    // If the call_once failed, it won't be retried on the next attempt to register the signal. In
-    // such case it is not run, registered is still `Ok(())`, initialized is still `false`.
-    if siginfo.initialized.load(Ordering::Relaxed) {
-        Ok(())
-    } else {
-        Err(Error::new(
-            ErrorKind::Other,
-            "Failed to register signal handler",
-        ))
-    }
+
+    let mut error = None;
+    siginfo
+        .init
+        .get_or_init(|| {
+            let result =
+                unsafe { signal_hook_registry::register(signal, move || action(globals, signal)) };
+            match result {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    error = Some(e);
+                    Err(())
+                }
+            }
+        })
+        .map_err(|_| {
+            error.unwrap_or_else(|| Error::new(ErrorKind::Other, "registering handler failed"))
+        })
 }
 
 /// An listener for receiving a particular type of OS signal.
