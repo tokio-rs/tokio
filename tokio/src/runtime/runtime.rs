@@ -546,6 +546,30 @@ fn display_eq(d: impl std::fmt::Display, s: &str) -> bool {
 }
 
 /// Checks whether the given error was emitted by Tokio when shutting down its runtime.
+///
+/// # Examples
+///
+/// ```
+/// use tokio::runtime::Runtime;
+/// use tokio::net::TcpListener;
+///
+/// fn main() {
+///     let rt1 = Runtime::new().unwrap();
+///     let rt2 = Runtime::new().unwrap();
+///
+///     let listener = rt1.block_on(async {
+///         TcpListener::bind("127.0.0.1:0").await.unwrap()
+///     });
+///
+///     drop(rt1);
+///
+///     rt2.block_on(async {
+///         let res = listener.accept().await;
+///         assert!(res.is_err());
+///         assert!(tokio::runtime::is_rt_shutdown_err(res.as_ref().unwrap_err()));
+///     });
+/// }
+/// ```
 pub fn is_rt_shutdown_err(err: &io::Error) -> bool {
     if let Some(inner) = err.get_ref() {
         err.kind() == io::ErrorKind::Other
