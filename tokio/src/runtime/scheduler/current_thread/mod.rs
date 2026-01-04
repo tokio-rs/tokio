@@ -499,7 +499,7 @@ impl Handle {
         F: crate::future::Future + 'static,
         F::Output: 'static,
     {
-        // Safety: the caller guarantees that the this is only called on a `LocalRuntime`.
+        // Safety: the caller guarantees that this is only called on a `LocalRuntime`.
         let (handle, notified) = unsafe {
             me.shared
                 .owned
