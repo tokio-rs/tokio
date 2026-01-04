@@ -16,10 +16,7 @@
 use crate::loom::sync::{Condvar, Mutex};
 
 use std::collections::VecDeque;
-#[cfg(not(all(
-    not(loom),
-    any(feature = "macros", all(feature = "sync", feature = "rt"))
-)))]
+#[cfg(loom)]
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
@@ -61,11 +58,8 @@ pub(super) struct ShardedQueue {
     /// The shards - each with its own mutex-protected queue.
     shards: [Shard; NUM_SHARDS],
     /// Atomic counter for round-robin task distribution.
-    /// Only used when randomness is not available (loom or missing features).
-    #[cfg(not(all(
-        not(loom),
-        any(feature = "macros", all(feature = "sync", feature = "rt"))
-    )))]
+    /// Only used when randomness is not available (loom).
+    #[cfg(loom)]
     push_index: AtomicUsize,
     /// Tracks the highest shard index that has ever been pushed to.
     /// This allows `pop()` to skip checking shards that have never had tasks,
@@ -97,10 +91,7 @@ impl ShardedQueue {
     pub(super) fn new() -> Self {
         ShardedQueue {
             shards: std::array::from_fn(|_| Shard::new()),
-            #[cfg(not(all(
-                not(loom),
-                any(feature = "macros", all(feature = "sync", feature = "rt"))
-            )))]
+            #[cfg(loom)]
             push_index: AtomicUsize::new(0),
             max_shard_pushed: AtomicUsize::new(0),
             shutdown: AtomicBool::new(false),
@@ -111,20 +102,14 @@ impl ShardedQueue {
 
     /// Select the next shard index for pushing a task -- when the RNG is
     /// available.
-    #[cfg(all(
-        not(loom),
-        any(feature = "macros", all(feature = "sync", feature = "rt"))
-    ))]
+    #[cfg(not(loom))]
     fn next_push_index(&self, num_shards: usize) -> usize {
         crate::runtime::context::thread_rng_n(num_shards as u32) as usize
     }
 
     /// Select the next shard index for pushing a task -- when the RNG is not
-    /// available.
-    #[cfg(not(all(
-        not(loom),
-        any(feature = "macros", all(feature = "sync", feature = "rt"))
-    )))]
+    /// available (loom).
+    #[cfg(loom)]
     fn next_push_index(&self, num_shards: usize) -> usize {
         self.push_index.fetch_add(1, Relaxed) & (num_shards - 1)
     }
