@@ -6,7 +6,7 @@
 
 ### Changed
 
-- task: remove unnecessary trait bounds on the `Debug` implementation ([#7720])
+- task: remove unnecessary trait bounds on the `Debug` implementation for `JoinQueue` and `AbortOnDropHandle` ([#7720])
 
 ### Fixed
 
