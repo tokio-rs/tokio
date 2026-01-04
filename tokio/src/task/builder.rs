@@ -20,8 +20,7 @@ use std::{future::Future, io, mem};
 ///   the task
 ///
 /// There are three types of task that can be spawned from a Builder:
-/// - [`spawn_local`] for executing not [`Send`] futures using [`LocalSet`]
-///   or [`LocalRuntime`] (unstable)
+/// - [`spawn_local`] for executing not [`Send`] futures
 /// - [`spawn`] for executing [`Send`] futures on the runtime
 /// - [`spawn_blocking`] for executing blocking code in the
 ///   blocking thread pool.
@@ -59,8 +58,6 @@ use std::{future::Future, io, mem};
 /// [`spawn_local`]: Builder::spawn_local
 /// [`spawn`]: Builder::spawn
 /// [`spawn_blocking`]: Builder::spawn_blocking
-/// [`LocalRuntime`]: crate::runtime::LocalRuntime
-/// [`LocalSet`]: LocalSet
 #[derive(Default, Debug)]
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 pub struct Builder<'a> {
