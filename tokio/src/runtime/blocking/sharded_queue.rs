@@ -43,6 +43,36 @@ impl Shard {
     /// Push a task to this shard's queue.
     fn push(&self, task: Task) {
         let mut queue = self.queue.lock();
+
+        // Check if pushing would require reallocation (when len == capacity).
+        // If so, allocate outside the lock to avoid blocking readers.
+        while queue.len() == queue.capacity() {
+            let current_len = queue.len();
+            // Use 2x growth factor, minimum 4
+            let new_cap = current_len.saturating_mul(2).max(4);
+
+            // Release lock before allocating
+            drop(queue);
+
+            let mut new_queue = VecDeque::with_capacity(new_cap);
+
+            queue = self.queue.lock();
+            // If the queue is:
+            // a) Not full anymore => push to the current queue
+            // b) Full and our new queue is big enough => copy items to the new
+            //    queue and push to it.
+            // c) Full and our new queue is too small => try again.
+            if queue.len() == queue.capacity() {
+                if new_queue.capacity() > queue.len() {
+                    new_queue.extend(queue.drain(..));
+                    *queue = new_queue;
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
         queue.push_back(task);
     }
 
