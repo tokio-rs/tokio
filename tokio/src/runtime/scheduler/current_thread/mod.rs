@@ -382,7 +382,7 @@ impl Context {
 
         // This check will fail if `before_park` spawns a task for us to run
         // instead of parking the thread
-        if core.tasks.is_empty() {
+        if !self.has_pending_work(&core) {
             // Park until the thread is signaled
             core.metrics.about_to_park();
             core.submit_metrics(handle);
@@ -412,6 +412,10 @@ impl Context {
 
         core.driver = Some(driver);
         core
+    }
+
+    fn has_pending_work(&self, core: &Core) -> bool {
+        !core.tasks.is_empty() || !self.defer.is_empty()
     }
 
     fn park_internal(
@@ -775,7 +779,7 @@ impl CoreGuard<'_> {
                         None => {
                             core.metrics.end_processing_scheduled_tasks();
 
-                            core = if !context.defer.is_empty() {
+                            core = if context.has_pending_work(&core) {
                                 context.park_yield(core, handle)
                             } else {
                                 context.park(core, handle)
