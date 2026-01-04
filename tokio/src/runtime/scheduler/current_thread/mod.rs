@@ -15,7 +15,7 @@ use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
-use std::sync::atomic::Ordering::{AcqRel, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
 use std::thread::ThreadId;
@@ -415,7 +415,7 @@ impl Context {
     }
 
     fn has_pending_work(&self, core: &Core) -> bool {
-        !core.tasks.is_empty() || !self.defer.is_empty()
+        !core.tasks.is_empty() || !self.defer.is_empty() || self.handle.shared.woken.load(Acquire)
     }
 
     fn park_internal(
@@ -724,8 +724,16 @@ impl Wake for Handle {
 
     /// Wake by reference
     fn wake_by_ref(arc_self: &Arc<Self>) {
-        arc_self.shared.woken.store(true, Release);
-        arc_self.driver.unpark();
+        if !arc_self.shared.woken.swap(true, Release) {
+            use scheduler::Context::CurrentThread;
+
+            context::with_scheduler(|maybe_cx| match maybe_cx {
+                Some(CurrentThread(cx)) if Arc::ptr_eq(arc_self, &cx.handle) => {}
+                _ => {
+                    arc_self.driver.unpark();
+                }
+            });
+        }
     }
 }
 
