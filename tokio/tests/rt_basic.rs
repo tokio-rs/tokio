@@ -483,8 +483,9 @@ fn before_park_yields() {
         .on_thread_park(move || {
             if !woken2.swap(true, Ordering::SeqCst) {
                 let mut cx = Context::from_waker(&waker);
-                let mut fut = std::pin::pin!(tokio::task::yield_now());
-                let _ = Pin::new(&mut fut).poll(&mut cx);
+                // `yield_now` pushes the waker to the defer slot.
+                let fut = std::pin::pin!(tokio::task::yield_now());
+                let _ = fut.poll(&mut cx);
             }
         })
         .build()
