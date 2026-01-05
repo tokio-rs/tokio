@@ -55,7 +55,7 @@ unsafe impl GlobalAlloc for TrackingAllocator {
 static GLOBAL: TrackingAllocator = TrackingAllocator::new();
 
 fn allocated_bytes() -> usize {
-    GLOBAL.load(Ordering::Relaxed)
+    GLOBAL.allocated.load(Ordering::Relaxed)
 }
 
 #[tokio::test]
