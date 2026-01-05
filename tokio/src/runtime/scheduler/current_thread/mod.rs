@@ -380,8 +380,8 @@ impl Context {
             core = c;
         }
 
-        // This check will fail if `before_park` spawns a task for us to run
-        // instead of parking the thread
+        // If `before_park` spawns a task (or otherwise schedules work for us), then we should not
+        // park the thread.
         if !self.has_pending_work(&core) {
             // Park until the thread is signaled
             core.metrics.about_to_park();
@@ -724,9 +724,13 @@ impl Wake for Handle {
 
     /// Wake by reference
     fn wake_by_ref(arc_self: &Arc<Self>) {
-        if !arc_self.shared.woken.swap(true, Release) {
+        let already_woken = arc_self.shared.woken.swap(true, Release);
+
+        if !already_woken {
             use scheduler::Context::CurrentThread;
 
+            // If we are already running on the runtime, then it's not required to wake up the
+            // runtime.
             context::with_scheduler(|maybe_cx| match maybe_cx {
                 Some(CurrentThread(cx)) if Arc::ptr_eq(arc_self, &cx.handle) => {}
                 _ => {
