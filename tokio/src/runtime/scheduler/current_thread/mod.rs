@@ -15,7 +15,7 @@ use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
-use std::sync::atomic::Ordering::{AcqRel, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
 use std::thread::ThreadId;
@@ -380,8 +380,8 @@ impl Context {
             core = c;
         }
 
-        // This check will fail if `before_park` spawns a task for us to run
-        // instead of parking the thread
+        // If `before_park` spawns a task (or otherwise schedules work for us), then we should not
+        // park the thread.
         if !self.has_pending_work(&core) {
             // Park until the thread is signaled
             core.metrics.about_to_park();
@@ -415,7 +415,7 @@ impl Context {
     }
 
     fn has_pending_work(&self, core: &Core) -> bool {
-        !core.tasks.is_empty() || !self.defer.is_empty()
+        !core.tasks.is_empty() || !self.defer.is_empty() || self.handle.shared.woken.load(Acquire)
     }
 
     fn park_internal(
@@ -724,8 +724,20 @@ impl Wake for Handle {
 
     /// Wake by reference
     fn wake_by_ref(arc_self: &Arc<Self>) {
-        arc_self.shared.woken.store(true, Release);
-        arc_self.driver.unpark();
+        let already_woken = arc_self.shared.woken.swap(true, Release);
+
+        if !already_woken {
+            use scheduler::Context::CurrentThread;
+
+            // If we are already running on the runtime, then it's not required to wake up the
+            // runtime.
+            context::with_scheduler(|maybe_cx| match maybe_cx {
+                Some(CurrentThread(cx)) if Arc::ptr_eq(arc_self, &cx.handle) => {}
+                _ => {
+                    arc_self.driver.unpark();
+                }
+            });
+        }
     }
 }
 
