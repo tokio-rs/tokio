@@ -181,14 +181,8 @@ async fn memory_leak_when_fd_closed_before_drop() {
     assert!(
         growth_phase2 < threshold || growth_phase3 < threshold,
         "Memory leak detected: allocations keep growing without stabilizing. \
-         Phase 1->2: +{} bytes, Phase 2->3: +{} bytes. \
-         (baseline: {} bytes, phase2: {} bytes, phase3: {} bytes). \
-         Expected at least one phase with <{} bytes growth.",
-        growth_phase2,
-        growth_phase3,
-        baseline,
-        after_phase2,
-        after_phase3,
-        threshold,
+         Phase 1->2: +{growth_phase2} bytes, Phase 2->3: +{growth_phase3} bytes. \
+         (baseline: {baseline} bytes, phase2: {after_phase2} bytes, phase3: {after_phase3} bytes). \
+         Expected at least one phase with <{threshold} bytes growth.",
     );
 }
