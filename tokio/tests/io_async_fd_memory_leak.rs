@@ -3,28 +3,36 @@
 //! This test uses a custom global allocator to track actual memory usage,
 //! avoiding false positives from RSS measurements which include freed-but-retained memory.
 
-#![cfg(all(unix, target_os = "linux"))]
+#![cfg(all(unix, target_os = "linux", feature = "full"))]
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// A tracking allocator that counts bytes currently allocated
-struct TrackingAllocator;
+struct TrackingAllocator {
+    allocated: AtomicUsize,
+}
 
-static ALLOCATED: AtomicUsize = AtomicUsize::new(0);
+impl TrackingAllocator {
+    const fn new() -> Self {
+        Self {
+            allocated: AtomicUsize::new(0),
+        }
+    }
+}
 
 unsafe impl GlobalAlloc for TrackingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let ptr = unsafe { System.alloc(layout) };
         if !ptr.is_null() {
-            ALLOCATED.fetch_add(layout.size(), Ordering::Relaxed);
+            self.allocated.fetch_add(layout.size(), Ordering::Relaxed);
         }
         ptr
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         unsafe { System.dealloc(ptr, layout) };
-        ALLOCATED.fetch_sub(layout.size(), Ordering::Relaxed);
+        self.allocated.fetch_sub(layout.size(), Ordering::Relaxed);
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
@@ -32,9 +40,11 @@ unsafe impl GlobalAlloc for TrackingAllocator {
         if !new_ptr.is_null() {
             // Subtract old size, add new size
             if new_size > layout.size() {
-                ALLOCATED.fetch_add(new_size - layout.size(), Ordering::Relaxed);
+                self.allocated
+                    .fetch_add(new_size - layout.size(), Ordering::Relaxed);
             } else {
-                ALLOCATED.fetch_sub(layout.size() - new_size, Ordering::Relaxed);
+                self.allocated
+                    .fetch_sub(layout.size() - new_size, Ordering::Relaxed);
             }
         }
         new_ptr
@@ -42,10 +52,10 @@ unsafe impl GlobalAlloc for TrackingAllocator {
 }
 
 #[global_allocator]
-static GLOBAL: TrackingAllocator = TrackingAllocator;
+static GLOBAL: TrackingAllocator = TrackingAllocator::new();
 
 fn allocated_bytes() -> usize {
-    ALLOCATED.load(Ordering::Relaxed)
+    GLOBAL.load(Ordering::Relaxed)
 }
 
 #[tokio::test]
@@ -74,10 +84,21 @@ async fn memory_leak_when_fd_closed_before_drop() {
     }
 
     fn set_nonblocking(fd: RawFd) {
-        unsafe {
-            let flags = libc::fcntl(fd, libc::F_GETFL);
-            libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+        use nix::fcntl::{OFlag, F_GETFL, F_SETFL};
+
+        let flags = nix::fcntl::fcntl(fd, F_GETFL).expect("fcntl(F_GETFL)");
+
+        if flags < 0 {
+            panic!(
+                "bad return value from fcntl(F_GETFL): {} ({:?})",
+                flags,
+                nix::Error::last()
+            );
         }
+
+        let flags = OFlag::from_bits_truncate(flags) | OFlag::O_NONBLOCK;
+
+        nix::fcntl::fcntl(fd, F_SETFL(flags)).expect("fcntl(F_SETFL)");
     }
 
     // Warm up - let runtime and allocator stabilize
