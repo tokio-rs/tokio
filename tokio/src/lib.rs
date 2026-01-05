@@ -480,13 +480,14 @@ compile_error! {
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
-#[cfg(all(not(tokio_unstable), feature = "io-uring"))]
+#[cfg(all(tokio_unstable, feature = "io-uring"))]
 compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");
 
-#[cfg(all(not(tokio_unstable), feature = "taskdump"))]
+#[cfg(all(tokio_unstable, feature = "taskdump"))]
 compile_error!("The `taskdump` feature requires `--cfg tokio_unstable`.");
 
 #[cfg(all(
+    tokio_unstable,
     feature = "taskdump",
     not(doc),
     not(all(
