@@ -1258,8 +1258,8 @@ impl TcpStream {
         ///
         /// For more information about this option, see [`set_zero_linger`] and [`set_linger`].
         ///
-        /// [`set_linger`]: TcpSocket::set_linger
-        /// [`set_zero_linger`]: TcpSocket::set_zero_linger
+        /// [`set_linger`]: TcpStream::set_linger
+        /// [`set_zero_linger`]: TcpStream::set_zero_linger
         ///
         /// # Examples
         ///
