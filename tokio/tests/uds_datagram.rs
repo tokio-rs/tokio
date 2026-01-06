@@ -8,6 +8,10 @@ use tokio::try_join;
 
 use std::future::poll_fn;
 use std::io;
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::os::linux::net::SocketAddrExt;
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::os::unix::net as std_net;
 use std::sync::Arc;
 
 async fn echo_server(socket: UnixDatagram) -> io::Result<()> {
@@ -66,6 +70,50 @@ async fn echo_from() -> io::Result<()> {
         let (len, addr) = socket.recv_from(&mut recv_buf[..]).await?;
         assert_eq!(&recv_buf[..len], b"ECHO");
         assert_eq!(addr.as_pathname(), Some(server_path.as_path()));
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::bool_assert_comparison)]
+#[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
+async fn recv_abstract() -> io::Result<()> {
+    // Generate 128-bit random string prefixed by `\0` as socket path
+    let abstract_path = format!(
+        "\0{:016x}{:016x}",
+        rand::random::<u64>(),
+        rand::random::<u64>()
+    );
+
+    // On non-Linux platforms, abstract socket paths are rejected
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    assert_eq!(
+        UnixDatagram::bind(&abstract_path).err().map(|e| e.kind()),
+        Some(io::ErrorKind::InvalidInput)
+    );
+
+    // Remaining test is Linux-only
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        // Create socket in abstract namespace
+        let recv_socket = UnixDatagram::bind(&abstract_path)?;
+
+        // Send message from stdlib
+        //
+        //FIXME: Use `tokio` native here once passing abstract socket paths to
+        //       `send_to`/`connect` is implemented
+        let send_socket = std_net::UnixDatagram::unbound()?;
+        send_socket.send_to_addr(
+            b"READY=1\n",
+            &std_net::SocketAddr::from_abstract_name(&abstract_path[1..])?,
+        )?;
+
+        // Receive and validate message
+        let mut buf = vec![0u8; 32];
+        let (len, addr) = recv_socket.recv_from(&mut buf).await?;
+        assert_eq!(&buf[0..len], b"READY=1\n");
+        assert_eq!(addr.is_unnamed(), true);
     }
 
     Ok(())
