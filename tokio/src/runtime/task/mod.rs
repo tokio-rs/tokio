@@ -189,7 +189,6 @@ mod harness;
 use self::harness::Harness;
 
 mod id;
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub, unused_imports))]
 pub use id::{id, try_id, Id};
 
 #[cfg(feature = "rt")]
