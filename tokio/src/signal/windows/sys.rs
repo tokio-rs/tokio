@@ -98,7 +98,9 @@ fn global_init() -> io::Result<()> {
         }
     })
     .map_err(|_| {
-        error.unwrap_or_else(|| io::Error::new(io::ErrorKind::Other, "registering handler failed"))
+        error.unwrap_or_else(|| {
+            io::Error::new(io::ErrorKind::Other, "registering signal handler failed")
+        })
     })
 }
 

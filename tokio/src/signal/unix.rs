@@ -298,7 +298,9 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
             }
         })
         .map_err(|_| {
-            error.unwrap_or_else(|| Error::new(ErrorKind::Other, "registering handler failed"))
+            error.unwrap_or_else(|| {
+                Error::new(ErrorKind::Other, "registering signal handler failed")
+            })
         })
 }
 
