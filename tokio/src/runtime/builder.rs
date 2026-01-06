@@ -1123,6 +1123,10 @@ impl Builder {
     /// will minimize that overhead while still keeping the scheduler responsive to
     /// events.
     ///
+    /// # Panics
+    ///
+    /// This function will panic if 0 is passed as an argument.
+    ///
     /// # Examples
     ///
     /// ```
@@ -1136,7 +1140,9 @@ impl Builder {
     /// # }
     /// # }
     /// ```
+    #[track_caller]
     pub fn event_interval(&mut self, val: u32) -> &mut Self {
+        assert!(val > 0, "event_interval must be greater than 0");
         self.event_interval = val;
         self
     }
