@@ -290,12 +290,11 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
         .get_or_init(|| {
             let result =
                 unsafe { signal_hook_registry::register(signal, move || action(globals, signal)) };
-            match result {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    error = Some(e);
-                    Err(())
-                }
+            if let Err(e) = result {
+                error = Some(e);
+                Err(())
+            } else {
+                Ok(())
             }
         })
         .map_err(|_| {
