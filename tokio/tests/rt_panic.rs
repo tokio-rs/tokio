@@ -94,7 +94,6 @@ fn builder_event_interval_interval_panic_caller() -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
-
 fn current_thread() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
