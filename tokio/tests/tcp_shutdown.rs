@@ -33,7 +33,6 @@ async fn shutdown() {
 }
 
 #[tokio::test]
-#[expect(deprecated)] // set_linger is deprecated
 async fn shutdown_after_tcp_reset() {
     let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
@@ -51,7 +50,7 @@ async fn shutdown_after_tcp_reset() {
 
     let (stream, _) = assert_ok!(srv.accept().await);
     // By setting linger to 0 we will trigger a TCP reset
-    stream.set_linger(Some(Duration::new(0, 0))).unwrap();
+    stream.set_zero_linger().unwrap();
     connected_rx.await.unwrap();
 
     drop(stream);

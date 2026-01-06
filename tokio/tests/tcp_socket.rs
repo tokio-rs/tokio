@@ -62,7 +62,6 @@ async fn bind_before_connect() {
 }
 
 #[tokio::test]
-#[expect(deprecated)] // set_linger is deprecated
 async fn basic_linger() {
     // Create server
     let addr = assert_ok!("127.0.0.1:0".parse());
@@ -71,7 +70,7 @@ async fn basic_linger() {
 
     assert!(srv.linger().unwrap().is_none());
 
-    srv.set_linger(Some(Duration::new(0, 0))).unwrap();
+    srv.set_zero_linger().unwrap();
     assert_eq!(srv.linger().unwrap(), Some(Duration::new(0, 0)));
 }
 
