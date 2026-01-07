@@ -320,7 +320,7 @@
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all features listed below except `test-util` and `tracing`.
+//! - `full`: Enables all features listed below except `test-util` and unstable features.
 //! - `rt`: Enables `tokio::spawn`, the current-thread scheduler,
 //!   and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
@@ -330,7 +330,7 @@
 //!   `UdpSocket`, as well as (on Unix-like systems) `AsyncFd` and (on
 //!   FreeBSD) `PollAio`.
 //! - `time`: Enables `tokio::time` types and allows the schedulers to enable
-//!   the built in timer.
+//!   the built-in timer.
 //! - `process`: Enables `tokio::process` types.
 //! - `macros`: Enables `#[tokio::main]` and `#[tokio::test]` macros.
 //! - `sync`: Enables all `tokio::sync` types.
@@ -351,16 +351,10 @@
 //! Some feature flags are only available when specifying the `tokio_unstable` flag:
 //!
 //! - `tracing`: Enables tracing events.
+//! - `io-uring`: Enables `io-uring` (Linux only).
+//! - `taskdump`: Enables `taskdump` (Linux only).
 //!
-//! Likewise, some parts of the API are only available with the same flag:
-//!
-//! - [`task::Builder`]
-//! - Some methods on [`task::JoinSet`]
-//! - [`runtime::RuntimeMetrics`]
-//! - [`runtime::Builder::on_task_spawn`]
-//! - [`runtime::Builder::on_task_terminate`]
-//! - [`runtime::Builder::unhandled_panic`]
-//! - [`runtime::TaskMeta`]
+//! Likewise, this flag enables access to unstable APIs.
 //!
 //! This flag enables **unstable** features. The public API of these features
 //! may break in 1.x releases. To enable these features, the `--cfg
