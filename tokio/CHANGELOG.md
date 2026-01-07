@@ -1,3 +1,71 @@
+# 1.49.0 (January 3rd, 2026)
+
+### Added
+
+* net: add support for `TCLASS` option on IPv6 ([#7781])
+* runtime: stabilize `runtime::id::Id` ([#7125])
+* task: implement `Extend` for `JoinSet` ([#7195])
+* task: stabilize the `LocalSet::id()` ([#7776])
+
+### Changed
+
+* net: deprecate `{TcpStream,TcpSocket}::set_linger` ([#7752])
+
+### Fixed
+
+* macros: fix the hygiene issue of `join!` and `try_join!` ([#7766])
+* runtime: revert "replace manual vtable definitions with Wake" ([#7699])
+* sync: return `TryRecvError::Disconnected` from `Receiver::try_recv` after `Receiver::close` ([#7686])
+* task: remove unnecessary trait bounds on the `Debug` implementation ([#7720])
+
+### Unstable
+
+* fs: handle `EINTR` in `fs::write` for io-uring ([#7786])
+* fs: support io-uring with `tokio::fs::read` ([#7696])
+* runtime: disable io-uring on `EPERM` ([#7724])
+* time: add alternative timer for better multicore scalability ([#7467])
+
+### Documented
+
+* docs: fix a typos in `bounded.rs` and `park.rs` ([#7817])
+* io: add `SyncIoBridge` cross-references to `copy` and `copy_buf` ([#7798])
+* io: doc that `AsyncWrite` does not inherit from `std::io::Write` ([#7705])
+* metrics: clarify that `num_alive_tasks` is not strongly consistent ([#7614])
+* net: clarify the cancellation safety of the `TcpStream::peek` ([#7305])
+* net: clarify the drop behavior of `unix::OwnedWriteHalf` ([#7742])
+* net: clarify the platform-dependent backlog in `TcpSocket` docs ([#7738])
+* runtime: mention `LocalRuntime` in `new_current_thread` docs ([#7820])
+* sync: add missing period to `mpsc::Sender::try_send` docs ([#7721])
+* sync: clarify the cancellation safety of `oneshot::Receiver` ([#7780])
+* sync: improve the docs for the `errors` of mpsc ([#7722])
+* task: add example for `spawn_local` usage on local runtime ([#7689])
+
+[#7125]: https://github.com/tokio-rs/tokio/pull/7125
+[#7195]: https://github.com/tokio-rs/tokio/pull/7195
+[#7305]: https://github.com/tokio-rs/tokio/pull/7305
+[#7467]: https://github.com/tokio-rs/tokio/pull/7467
+[#7614]: https://github.com/tokio-rs/tokio/pull/7614
+[#7686]: https://github.com/tokio-rs/tokio/pull/7686
+[#7689]: https://github.com/tokio-rs/tokio/pull/7689
+[#7696]: https://github.com/tokio-rs/tokio/pull/7696
+[#7699]: https://github.com/tokio-rs/tokio/pull/7699
+[#7705]: https://github.com/tokio-rs/tokio/pull/7705
+[#7720]: https://github.com/tokio-rs/tokio/pull/7720
+[#7721]: https://github.com/tokio-rs/tokio/pull/7721
+[#7722]: https://github.com/tokio-rs/tokio/pull/7722
+[#7724]: https://github.com/tokio-rs/tokio/pull/7724
+[#7738]: https://github.com/tokio-rs/tokio/pull/7738
+[#7742]: https://github.com/tokio-rs/tokio/pull/7742
+[#7752]: https://github.com/tokio-rs/tokio/pull/7752
+[#7766]: https://github.com/tokio-rs/tokio/pull/7766
+[#7776]: https://github.com/tokio-rs/tokio/pull/7776
+[#7780]: https://github.com/tokio-rs/tokio/pull/7780
+[#7781]: https://github.com/tokio-rs/tokio/pull/7781
+[#7786]: https://github.com/tokio-rs/tokio/pull/7786
+[#7798]: https://github.com/tokio-rs/tokio/pull/7798
+[#7817]: https://github.com/tokio-rs/tokio/pull/7817
+[#7820]: https://github.com/tokio-rs/tokio/pull/7820
+
 # 1.48.0 (October 14th, 2025)
 
 The MSRV is increased to 1.71.
@@ -110,6 +178,12 @@ The MSRV is increased to 1.71.
 [#7669]: https://github.com/tokio-rs/tokio/pull/7669
 [#7672]: https://github.com/tokio-rs/tokio/pull/7672
 [#7675]: https://github.com/tokio-rs/tokio/pull/7675
+
+# 1.47.3 (Januar 3rd, 2026)
+
+### Fixed
+
+* sync: return `TryRecvError::Disconnected` from `Receiver::try_recv` after `Receiver::close` ([#7686])
 
 # 1.47.2 (October 14th, 2025)
 
@@ -377,6 +451,14 @@ comment on [#7172].
 [#7185]: https://github.com/tokio-rs/tokio/pull/7185
 [#7186]: https://github.com/tokio-rs/tokio/pull/7186
 [#7192]: https://github.com/tokio-rs/tokio/pull/7192
+
+# 1.43.4 (January 3rd, 2026)
+
+### Fixed
+
+* sync: return `TryRecvError::Disconnected` from `Receiver::try_recv` after `Receiver::close` ([#7686])
+
+[#7686]: https://github.com/tokio-rs/tokio/pull/7686
 
 # 1.43.3 (October 14th, 2025)
 

@@ -1,4 +1,4 @@
-311
+312
 &
 +
 <
@@ -195,6 +195,7 @@ ntasks
 NUMA
 ok
 oneshot
+opcode
 ORed
 os
 parker

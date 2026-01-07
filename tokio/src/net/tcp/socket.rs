@@ -489,15 +489,113 @@ impl TcpSocket {
         self.inner.tcp_nodelay()
     }
 
+    /// Gets the value of the `IPV6_TCLASS` option for this socket.
+    ///
+    /// For more information about this option, see [`set_tclass_v6`].
+    ///
+    /// [`set_tclass_v6`]: Self::set_tclass_v6
+    // https://docs.rs/socket2/0.6.1/src/socket2/sys/unix.rs.html#2541
+    #[cfg(any(
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "fuchsia",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "cygwin",
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "android",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "fuchsia",
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "netbsd",
+            target_os = "openbsd",
+            target_os = "cygwin",
+        )))
+    )]
+    pub fn tclass_v6(&self) -> io::Result<u32> {
+        self.inner.tclass_v6()
+    }
+
+    /// Sets the value for the `IPV6_TCLASS` option on this socket.
+    ///
+    /// Specifies the traffic class field that is used in every packet
+    /// sent from this socket.
+    ///
+    /// # Note
+    ///
+    /// This may not have any effect on IPv4 sockets.
+    // https://docs.rs/socket2/0.6.1/src/socket2/sys/unix.rs.html#2566
+    #[cfg(any(
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "fuchsia",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "cygwin",
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "android",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "fuchsia",
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "netbsd",
+            target_os = "openbsd",
+            target_os = "cygwin",
+        )))
+    )]
+    pub fn set_tclass_v6(&self, tclass: u32) -> io::Result<()> {
+        self.inner.set_tclass_v6(tclass)
+    }
+
     /// Gets the value of the `IP_TOS` option for this socket.
     ///
-    /// For more information about this option, see [`set_tos`].
+    /// For more information about this option, see [`set_tos_v4`].
     ///
-    /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
-    /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
+    /// [`set_tos_v4`]: Self::set_tos_v4
+    // https://docs.rs/socket2/0.6.1/src/socket2/socket.rs.html#1585
+    #[cfg(not(any(
+        target_os = "fuchsia",
+        target_os = "redox",
+        target_os = "solaris",
+        target_os = "illumos",
+        target_os = "haiku"
+    )))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(not(any(
+            target_os = "fuchsia",
+            target_os = "redox",
+            target_os = "solaris",
+            target_os = "illumos",
+            target_os = "haiku"
+        ))))
+    )]
+    pub fn tos_v4(&self) -> io::Result<u32> {
+        self.inner.tos_v4()
+    }
+
+    /// Deprecated. Use [`tos_v4()`] instead.
     ///
-    /// [`set_tos`]: Self::set_tos
-    // https://docs.rs/socket2/0.5.3/src/socket2/socket.rs.html#1464
+    /// [`tos_v4()`]: Self::tos_v4
+    #[deprecated(
+        note = "`tos` related methods have been renamed `tos_v4` since they are IPv4-specific."
+    )]
+    #[doc(hidden)]
     #[cfg(not(any(
         target_os = "fuchsia",
         target_os = "redox",
@@ -516,7 +614,7 @@ impl TcpSocket {
         ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
-        self.inner.tos_v4()
+        self.tos_v4()
     }
 
     /// Sets the value for the `IP_TOS` option on this socket.
@@ -524,9 +622,40 @@ impl TcpSocket {
     /// This value sets the type-of-service field that is used in every packet
     /// sent from this socket.
     ///
-    /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
-    /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
-    // https://docs.rs/socket2/0.5.3/src/socket2/socket.rs.html#1446
+    /// # Note
+    ///
+    /// - This may not have any effect on IPv6 sockets.
+    /// - On Windows, `IP_TOS` is only supported on [Windows 8+ or
+    ///   Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
+    // https://docs.rs/socket2/0.6.1/src/socket2/socket.rs.html#1566
+    #[cfg(not(any(
+        target_os = "fuchsia",
+        target_os = "redox",
+        target_os = "solaris",
+        target_os = "illumos",
+        target_os = "haiku"
+    )))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(not(any(
+            target_os = "fuchsia",
+            target_os = "redox",
+            target_os = "solaris",
+            target_os = "illumos",
+            target_os = "haiku"
+        ))))
+    )]
+    pub fn set_tos_v4(&self, tos: u32) -> io::Result<()> {
+        self.inner.set_tos_v4(tos)
+    }
+
+    /// Deprecated. Use [`set_tos_v4()`] instead.
+    ///
+    /// [`set_tos_v4()`]: Self::set_tos_v4
+    #[deprecated(
+        note = "`tos` related methods have been renamed `tos_v4` since they are IPv4-specific."
+    )]
+    #[doc(hidden)]
     #[cfg(not(any(
         target_os = "fuchsia",
         target_os = "redox",
@@ -545,7 +674,7 @@ impl TcpSocket {
         ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
-        self.inner.set_tos_v4(tos)
+        self.set_tos_v4(tos)
     }
 
     /// Gets the value for the `SO_BINDTODEVICE` option on this socket

@@ -259,11 +259,11 @@ async fn from_file_detects_wrong_access_mode() -> io::Result<()> {
     let _reader = pipe::OpenOptions::new().open_receiver(&fifo)?;
 
     // Check if Receiver detects write-only access mode.
-    let wronly = std::fs::OpenOptions::new()
+    let write_only = std::fs::OpenOptions::new()
         .write(true)
         .custom_flags(libc::O_NONBLOCK)
         .open(&fifo)?;
-    let err = assert_err!(pipe::Receiver::from_file(wronly));
+    let err = assert_err!(pipe::Receiver::from_file(write_only));
     assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
 
     // Check if Sender detects read-only access mode.
@@ -298,9 +298,9 @@ async fn from_file_sets_nonblock() -> io::Result<()> {
     assert!(is_nonblocking(&reader)?);
 
     // Check if Sender sets the pipe in non-blocking mode.
-    let wronly = std::fs::OpenOptions::new().write(true).open(&fifo)?;
-    assert!(!is_nonblocking(&wronly)?);
-    let writer = pipe::Sender::from_file(wronly)?;
+    let write_only = std::fs::OpenOptions::new().write(true).open(&fifo)?;
+    assert!(!is_nonblocking(&write_only)?);
+    let writer = pipe::Sender::from_file(write_only)?;
     assert!(is_nonblocking(&writer)?);
 
     Ok(())

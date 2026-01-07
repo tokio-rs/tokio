@@ -139,11 +139,9 @@ pub(crate) fn shutdown_local_timers(
 
         let mut wake_queue = WakeQueue::new();
         // simply wake all unregistered timers
-        for hdl in inject {
-            if !hdl.is_cancelled() {
-                unsafe {
-                    wake_queue.push_front(hdl);
-                }
+        for hdl in inject.into_iter().filter(|hdl| !hdl.is_cancelled()) {
+            unsafe {
+                wake_queue.push_front(hdl);
             }
         }
 

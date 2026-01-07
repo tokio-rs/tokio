@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.48.0"
+version = "1.49.0"
 edition = "2021"
 rust-version = "1.71"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -110,7 +110,7 @@ tracing = { version = "0.1.29", default-features = false, features = ["std"], op
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
 [target.'cfg(all(tokio_unstable, target_os = "linux"))'.dependencies]
-io-uring = { version = "0.7.6", default-features = false, optional = true }
+io-uring = { version = "0.7.11", default-features = false, optional = true }
 libc = { version = "0.2.168", optional = true }
 mio = { version = "1.0.1", default-features = false, features = ["os-poll", "os-ext"], optional = true }
 slab = { version = "0.4.9", optional = true }

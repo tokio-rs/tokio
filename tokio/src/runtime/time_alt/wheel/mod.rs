@@ -107,39 +107,31 @@ impl Wheel {
 
     /// Advances the timer up to the instant represented by `now`.
     pub(crate) fn take_expired(&mut self, now: u64, wake_queue: &mut WakeQueue) {
-        loop {
-            match self.next_expiration() {
-                Some(ref expiration) if expiration.deadline <= now => {
-                    self.process_expiration(expiration, wake_queue);
+        while let Some(expiration) = self
+            .next_expiration()
+            .filter(|expiration| expiration.deadline <= now)
+        {
+            self.process_expiration(&expiration, wake_queue);
 
-                    self.set_elapsed(expiration.deadline);
-                }
-                _ => {
-                    // in this case the poll did not indicate an expiration
-                    // _and_ we were not able to find a next expiration in
-                    // the current list of timers.  advance to the poll's
-                    // current time and do nothing else.
-                    self.set_elapsed(now);
-                    break;
-                }
-            }
+            self.set_elapsed(expiration.deadline);
         }
+        self.set_elapsed(now);
     }
 
     /// Returns the instant at which the next timeout expires.
     fn next_expiration(&self) -> Option<Expiration> {
         // Check all levels
-        for (level_num, level) in self.levels.iter().enumerate() {
-            if let Some(expiration) = level.next_expiration(self.elapsed) {
+        self.levels
+            .iter()
+            .enumerate()
+            .find_map(|(level_num, level)| {
+                let expiration = level.next_expiration(self.elapsed)?;
                 // There cannot be any expirations at a higher level that happen
                 // before this one.
                 debug_assert!(self.no_expirations_before(level_num + 1, expiration.deadline));
 
-                return Some(expiration);
-            }
-        }
-
-        None
+                Some(expiration)
+            })
     }
 
     /// Returns the tick at which this timer wheel next needs to perform some
@@ -150,17 +142,10 @@ impl Wheel {
 
     /// Used for debug assertions
     fn no_expirations_before(&self, start_level: usize, before: u64) -> bool {
-        let mut res = true;
-
-        for level in &self.levels[start_level..] {
-            if let Some(e2) = level.next_expiration(self.elapsed) {
-                if e2.deadline < before {
-                    res = false;
-                }
-            }
-        }
-
-        res
+        self.levels[start_level..]
+            .iter()
+            .flat_map(|level| level.next_expiration(self.elapsed))
+            .all(|e2| before <= e2.deadline)
     }
 
     /// iteratively find entries that are between the wheel's current

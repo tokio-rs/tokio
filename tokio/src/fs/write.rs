@@ -37,7 +37,7 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
     {
         let handle = crate::runtime::Handle::current();
         let driver_handle = handle.inner.driver().io();
-        if driver_handle.check_and_init()? {
+        if driver_handle.check_and_init(io_uring::opcode::Write::CODE)? {
             return write_uring(path, contents).await;
         }
     }
@@ -72,12 +72,14 @@ async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
     let mut buf_offset: usize = 0;
     let mut file_offset: u64 = 0;
     while buf_offset < total {
-        let (n, _buf, _fd) = Op::write_at(fd, buf, buf_offset, file_offset)?.await;
-        // TODO: handle EINT here
-        let n = n?;
-        if n == 0 {
-            return Err(io::ErrorKind::WriteZero.into());
-        }
+        let (res, _buf, _fd) = Op::write_at(fd, buf, buf_offset, file_offset)?.await;
+
+        let n = match res {
+            Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
+            Ok(n) => n,
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => 0,
+            Err(e) => return Err(e),
+        };
 
         buf = _buf;
         fd = _fd;

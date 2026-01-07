@@ -12,11 +12,6 @@
 
 //! Macros for use with Tokio
 
-// This `extern` is required for older `rustc` versions but newer `rustc`
-// versions warn about the unused `extern crate`.
-#[allow(unused_extern_crates)]
-extern crate proc_macro;
-
 mod entry;
 mod select;
 
