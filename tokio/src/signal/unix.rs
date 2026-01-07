@@ -12,8 +12,7 @@ use crate::signal::registry::{globals, EventId, EventInfo, Globals, Storage};
 use crate::signal::RxFuture;
 use crate::sync::watch;
 
-use mio::net::UnixStream;
-use std::io::{self, Error, ErrorKind, Write};
+use std::io::{self, Error, ErrorKind};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 use std::task::{Context, Poll};
@@ -61,17 +60,208 @@ impl Storage for OsStorage {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct OsExtraData {
-    sender: UnixStream,
-    pub(crate) receiver: UnixStream,
+#[cfg(any(target_os = "linux", target_os = "illumos"))]
+pub(crate) mod pipe {
+    use std::{
+        io,
+        os::fd::{AsRawFd, FromRawFd, OwnedFd},
+    };
+
+    use mio::{event, unix::SourceFd};
+
+    #[derive(Debug)]
+    pub(crate) struct Sender {
+        fd: OwnedFd,
+    }
+
+    #[derive(Debug)]
+    pub(crate) struct Receiver {
+        fd: OwnedFd,
+    }
+
+    impl event::Source for Receiver {
+        fn register(
+            &mut self,
+            registry: &mio::Registry,
+            token: mio::Token,
+            interests: mio::Interest,
+        ) -> io::Result<()> {
+            SourceFd(&self.fd.as_raw_fd()).register(registry, token, interests)
+        }
+
+        fn reregister(
+            &mut self,
+            registry: &mio::Registry,
+            token: mio::Token,
+            interests: mio::Interest,
+        ) -> io::Result<()> {
+            SourceFd(&self.fd.as_raw_fd()).reregister(registry, token, interests)
+        }
+
+        fn deregister(&mut self, registry: &mio::Registry) -> io::Result<()> {
+            SourceFd(&self.fd.as_raw_fd()).deregister(registry)
+        }
+    }
+
+    impl Sender {
+        pub(crate) fn new() -> Self {
+            let fd = unsafe { libc::eventfd(0, libc::EFD_NONBLOCK | libc::EFD_CLOEXEC) };
+            if fd < 0 {
+                panic!("eventfd failed: {}", io::Error::last_os_error());
+            }
+            Sender {
+                fd: unsafe { OwnedFd::from_raw_fd(fd) },
+            }
+        }
+
+        pub(crate) fn receiver(&self) -> Receiver {
+            Receiver {
+                fd: self.fd.try_clone().unwrap(),
+            }
+        }
+    }
+
+    impl Sender {
+        pub(crate) fn write(&self) {
+            unsafe {
+                libc::eventfd_write(self.fd.as_raw_fd(), 1);
+            }
+        }
+    }
+
+    impl Receiver {
+        pub(crate) fn read(&self) -> libc::c_int {
+            let fd = &self.fd;
+            let mut value: libc::eventfd_t = 0;
+
+            unsafe { libc::eventfd_read(fd.as_raw_fd(), &mut value as *mut libc::eventfd_t) }
+        }
+    }
 }
 
+#[cfg(not(any(target_os = "linux", target_os = "illumos")))]
+pub(crate) mod pipe {
+    use mio::net::UnixStream;
+    use std::io::{self, Read, Write};
+    use std::mem::ManuallyDrop;
+    use std::os::unix::io::{AsRawFd, FromRawFd};
+
+    #[derive(Debug)]
+    pub(crate) struct Sender {
+        inner: UnixStream,
+    }
+
+    #[derive(Debug)]
+    pub(crate) struct Receiver {
+        inner: UnixStream,
+    }
+
+    impl Clone for Receiver {
+        fn clone(&self) -> Self {
+            let receiver_fd = self.inner.as_raw_fd();
+            let original = ManuallyDrop::new(unsafe {
+                std::os::unix::net::UnixStream::from_raw_fd(receiver_fd)
+            });
+            let inner =
+                UnixStream::from_std(original.try_clone().expect("failed to clone UnixStream"));
+            Self { inner }
+        }
+    }
+
+    impl mio::event::Source for Receiver {
+        fn register(
+            &mut self,
+            registry: &mio::Registry,
+            token: mio::Token,
+            interests: mio::Interest,
+        ) -> io::Result<()> {
+            self.inner.register(registry, token, interests)
+        }
+
+        fn reregister(
+            &mut self,
+            registry: &mio::Registry,
+            token: mio::Token,
+            interests: mio::Interest,
+        ) -> io::Result<()> {
+            self.inner.reregister(registry, token, interests)
+        }
+
+        fn deregister(&mut self, registry: &mio::Registry) -> io::Result<()> {
+            self.inner.deregister(registry)
+        }
+    }
+
+    impl Sender {
+        pub(crate) fn write(&self) {
+            let _ = (&self.inner).write(&[1]);
+        }
+    }
+
+    impl Receiver {
+        pub(crate) fn read(&self) -> libc::c_int {
+            // Drain the pipe completely so we can receive a new readiness event
+            // if another signal has come in.
+            let mut buf = [0; 128];
+            #[allow(clippy::unused_io_amount)]
+            loop {
+                match self.inner.read(&mut buf) {
+                    Ok(0) => panic!("EOF on self-pipe"),
+                    Ok(_) => continue, // Keep reading
+                    Err(e) if e.kind() == std_io::ErrorKind::WouldBlock => break,
+                    Err(e) => panic!("Bad read on self-pipe: {e}"),
+                }
+            }
+            0
+        }
+    }
+
+    pub(crate) fn channel() -> (Sender, Receiver) {
+        let (sender, receiver) = UnixStream::pair().expect("failed to create UnixStream");
+        (Sender { inner: sender }, Receiver { inner: receiver })
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "illumos"))]
+#[derive(Debug)]
+pub(crate) struct OsExtraData {
+    sender: pipe::Sender,
+}
+
+#[cfg(any(target_os = "linux", target_os = "illumos"))]
 impl Default for OsExtraData {
     fn default() -> Self {
-        let (receiver, sender) = UnixStream::pair().expect("failed to create UnixStream");
+        let sender = pipe::Sender::new();
+        Self { sender }
+    }
+}
 
+#[cfg(any(target_os = "linux", target_os = "illumos"))]
+impl OsExtraData {
+    pub(crate) fn receiver(&self) -> pipe::Receiver {
+        self.sender.receiver()
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "illumos")))]
+#[derive(Debug)]
+pub(crate) struct OsExtraData {
+    sender: pipe::Sender,
+    receiver: pipe::Receiver,
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "illumos")))]
+impl Default for OsExtraData {
+    fn default() -> Self {
+        let (sender, receiver) = pipe::channel();
         Self { sender, receiver }
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "illumos")))]
+impl OsExtraData {
+    pub(crate) fn receiver(&self) -> pipe::Receiver {
+        self.receiver.clone()
     }
 }
 
@@ -268,8 +458,7 @@ fn action(globals: &'static Globals, signal: libc::c_int) {
 
     // Send a wakeup, ignore any errors (anything reasonably possible is
     // full pipe and then it will wake up anyway).
-    let mut sender = &globals.sender;
-    drop(sender.write(&[1]));
+    globals.sender.write();
 }
 
 /// Enables this module to receive signal notifications for the `signal`
