@@ -36,7 +36,7 @@ fn test_is_not_rt_shutdown_err() {
 }
 
 #[test]
-#[cfg_attr(not(panic = "abort"), ignore)]
+#[cfg_attr(panic = "abort", ignore)]
 fn test_join_error_panic() {
     let rt = rt();
     let handle = rt.spawn(async {
