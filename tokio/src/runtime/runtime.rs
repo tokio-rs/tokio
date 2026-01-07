@@ -550,6 +550,8 @@ fn display_eq(d: impl std::fmt::Display, s: &str) -> bool {
 /// # Examples
 ///
 /// ```
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use tokio::runtime::Runtime;
 /// use tokio::net::TcpListener;
 ///
@@ -569,6 +571,7 @@ fn display_eq(d: impl std::fmt::Display, s: &str) -> bool {
 ///         assert!(tokio::runtime::is_rt_shutdown_err(res.as_ref().unwrap_err()));
 ///     });
 /// }
+/// # }
 /// ```
 pub fn is_rt_shutdown_err(err: &io::Error) -> bool {
     if let Some(inner) = err.get_ref() {
