@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
+#![cfg(not(miri))] // No socket in miri.
 
 use std::io;
 use tokio::net::TcpListener;
