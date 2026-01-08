@@ -17,7 +17,6 @@
 
 use tokio::io::{stdin, stdout};
 use tokio::net::UdpSocket;
-use tokio::select;
 use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite};
 
 use bytes::Bytes;
@@ -60,7 +59,7 @@ pub async fn connect(
     let socket = UdpSocket::bind(&bind_addr).await?;
     socket.connect(addr).await?;
 
-    select! {
+    tokio::select! {
         r = send(stdin, &socket) => r?,
         r = recv(stdout, &socket) => r?,
     }

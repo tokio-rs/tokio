@@ -17,7 +17,6 @@
 
 use tokio::io::{stdin, stdout};
 use tokio::net::TcpStream;
-use tokio::select;
 use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite};
 
 use bytes::Bytes;
@@ -65,7 +64,7 @@ pub async fn connect(
         })
         .map(Ok);
 
-    select! {
+    tokio::select! {
         r = sink.send_all(&mut stdin) => r?,
         r = stdout.send_all(&mut stream) => r?,
     }
