@@ -17,6 +17,7 @@
 
 use tokio::io::{stdin, stdout};
 use tokio::net::TcpStream;
+use tokio::select;
 use tokio_util::codec::{BytesCodec, FramedRead, FramedWrite};
 
 use bytes::Bytes;
@@ -64,8 +65,10 @@ pub async fn connect(
         })
         .map(Ok);
 
-    match future::join(sink.send_all(&mut stdin), stdout.send_all(&mut stream)).await {
-        (Err(e), _) | (_, Err(e)) => Err(e.into()),
-        _ => Ok(()),
+    select! {
+        r = sink.send_all(&mut stdin) => r?,
+        r = stdout.send_all(&mut stream) => r?,
     }
+
+    Ok(())
 }
