@@ -442,7 +442,7 @@ impl TcpSocket {
     /// Sets a linger duration of zero on this socket by setting the `SO_LINGER` option.
     ///
     /// This causes the connection to be forcefully aborted ("abortive close") when the socket is
-    /// dropped or closed. Instead of the normal TCP shutdown handshake (FIN/ACK), a TCP RST
+    /// dropped or closed. Instead of the normal TCP shutdown handshake (`FIN`/`ACK`), a TCP `RST`
     /// (reset) segment is sent to the peer, and the socket immediately discards any unsent data
     /// residing in the socket send buffer. This prevents the socket from entering the `TIME_WAIT`
     /// state after closing it.

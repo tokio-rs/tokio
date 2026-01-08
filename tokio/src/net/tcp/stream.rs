@@ -1322,10 +1322,10 @@ impl TcpStream {
         /// Sets a linger duration of zero on this socket by setting the `SO_LINGER` option.
         ///
         /// This causes the connection to be forcefully aborted ("abortive close") when the socket
-        /// is dropped or closed. Instead of the normal TCP shutdown handshake (FIN/ACK), a TCP RST
-        /// (reset) segment is sent to the peer, and the socket immediately discards any unsent
-        /// data residing in the socket send buffer. This prevents the socket from entering the
-        /// `TIME_WAIT` state after closing it.
+        /// is dropped or closed. Instead of the normal TCP shutdown handshake (`FIN`/`ACK`), a TCP
+        /// `RST` (reset) segment is sent to the peer, and the socket immediately discards any
+        /// unsent data residing in the socket send buffer. This prevents the socket from entering
+        /// the `TIME_WAIT` state after closing it.
         ///
         /// This is a destructive action. Any data currently buffered by the OS but not yet
         /// transmitted will be lost. The peer will likely receive a "Connection Reset" error
