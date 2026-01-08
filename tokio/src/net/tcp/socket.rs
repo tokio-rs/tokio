@@ -429,17 +429,41 @@ impl TcpSocket {
     /// > it. Rely on the `shutdown()`-followed-by-`read()`-eof technique instead.
     /// >
     /// > From [The ultimate `SO_LINGER` page, or: why is my tcp not reliable](https://blog.netherlabs.nl/articles/2009/01/18/the-ultimate-so_linger-page-or-why-is-my-tcp-not-reliable)
+    ///
+    /// Although this method is deprecated, it will not be removed from Tokio.
+    ///
+    /// Note that the special case of setting `SO_LINGER` to zero does not lead to blocking. Tokio
+    /// provides [`set_zero_linger`](Self::set_zero_linger) for this purpose.
     #[deprecated = "`SO_LINGER` causes the socket to block the thread on drop"]
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.inner.set_linger(dur)
     }
 
+    /// Sets a linger duration of zero on this socket by setting the `SO_LINGER` option.
+    ///
+    /// This causes the connection to be forcefully aborted ("abortive close") when the socket is
+    /// dropped or closed. Instead of the normal TCP shutdown handshake (`FIN`/`ACK`), a TCP `RST`
+    /// (reset) segment is sent to the peer, and the socket immediately discards any unsent data
+    /// residing in the socket send buffer. This prevents the socket from entering the `TIME_WAIT`
+    /// state after closing it.
+    ///
+    /// This is a destructive action. Any data currently buffered by the OS but not yet transmitted
+    /// will be lost. The peer will likely receive a "Connection Reset" error rather than a clean
+    /// end-of-stream.
+    ///
+    /// See the documentation for [`set_linger`](Self::set_linger) for additional details on how
+    /// `SO_LINGER` works.
+    pub fn set_zero_linger(&self) -> io::Result<()> {
+        self.inner.set_linger(Some(Duration::ZERO))
+    }
+
     /// Reads the linger duration for this socket by getting the `SO_LINGER`
     /// option.
     ///
-    /// For more information about this option, see [`set_linger`].
+    /// For more information about this option, see [`set_zero_linger`] and [`set_linger`].
     ///
     /// [`set_linger`]: TcpSocket::set_linger
+    /// [`set_zero_linger`]: TcpSocket::set_zero_linger
     pub fn linger(&self) -> io::Result<Option<Duration>> {
         self.inner.linger()
     }
