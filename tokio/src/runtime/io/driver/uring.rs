@@ -188,7 +188,9 @@ impl Handle {
             }
         })?;
 
-        Ok(probe.as_ref().is_some_and(|probe| probe.is_supported(opcode)))
+        Ok(probe
+            .as_ref()
+            .is_some_and(|probe| probe.is_supported(opcode)))
     }
 
     /// Initialize the io_uring context if it hasn't been initialized yet.
