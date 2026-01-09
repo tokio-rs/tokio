@@ -175,7 +175,7 @@ impl Handle {
     ///
     /// TODO: This would like to be a synchronous function,
     /// but we require `OnceLock::get_or_try_init`.
-    /// https://github.com/rust-lang/rust/issues/109737
+    /// <https://github.com/rust-lang/rust/issues/109737>
     pub(crate) async fn check_and_init(&self, opcode: u8) -> io::Result<bool> {
         let probe = self
             .uring_probe
