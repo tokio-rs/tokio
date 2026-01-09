@@ -826,7 +826,8 @@ jobs:
           toolchain: ${{ env.rust_nightly }}
       - uses: Swatinem/rust-cache@v2
       - name: "doc --lib --all-features"
-        run: cargo doc --lib --no-deps --document-private-items --features $TOKIO_STABLE_FEATURES,${{ matrix.run.extra_features }}
+        # __docs_rs specifies the feature that are only used in the docs
+        run: cargo doc --lib --no-deps --document-private-items --features $TOKIO_STABLE_FEATURES,${{ matrix.run.extra_features }},__docs_rs
         env:
           RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
           RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
