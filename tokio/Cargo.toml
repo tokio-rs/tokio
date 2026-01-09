@@ -85,7 +85,7 @@ sync = []
 test-util = ["rt", "sync", "time"]
 time = []
 # Unstable feature. Requires `--cfg tokio_unstable` to enable.
-io-uring = ["dep:io-uring", "libc", "mio/os-poll", "mio/os-ext", "dep:slab", "once_cell"]
+io-uring = ["dep:io-uring", "libc", "mio/os-poll", "mio/os-ext", "dep:slab"]
 # Unstable feature. Requires `--cfg tokio_unstable` to enable.
 taskdump = ["dep:backtrace"]
 
@@ -115,7 +115,6 @@ libc = { version = "0.2.168", optional = true }
 mio = { version = "1.0.1", default-features = false, features = ["os-poll", "os-ext"], optional = true }
 slab = { version = "0.4.9", optional = true }
 backtrace = { version = "0.3.58", optional = true }
-once_cell = { version = "1.21.3", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.168", optional = true }
