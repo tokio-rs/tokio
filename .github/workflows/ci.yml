@@ -258,6 +258,8 @@ jobs:
           # only Linux supports io_uring
           - { os: ubuntu-latest, extra_features: io-uring }
           - { os: macos-latest, extra_features: "" }
+        package: [tokio, tokio-macros, tokio-test, tokio-stream, tokio-util]
+          
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
@@ -275,6 +277,7 @@ jobs:
       - name: test tokio full --cfg unstable
         run: |
           set -euxo pipefail
+          # cargo nextest run --manifest-path ${{ matrix.package }}/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
           cargo nextest run --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
           cargo test --doc --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
         working-directory: tokio
@@ -555,8 +558,8 @@ jobs:
           # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
-          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
-          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo nextest run --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo test --doc -manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
@@ -1047,7 +1050,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       - name: WASI test tokio full
-        run: cargo test -p tokio --target ${{ matrix.target }} --features "sync,macros,io-util,rt,time"
+        run: cargo test --manifest-path tokio/Cargo.toml --target ${{ matrix.target }} --features "sync,macros,io-util,rt,time"
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
