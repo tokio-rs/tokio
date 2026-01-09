@@ -130,7 +130,7 @@ pub(crate) mod pipe {
     }
 
     impl Receiver {
-        pub(crate) fn read(&self) -> libc::c_int {
+        pub(crate) fn read(&mut self) -> libc::c_int {
             let fd = &self.fd;
             let mut value: libc::eventfd_t = 0;
 
@@ -199,7 +199,7 @@ pub(crate) mod pipe {
     }
 
     impl Receiver {
-        pub(crate) fn read(&self) -> libc::c_int {
+        pub(crate) fn read(&mut self) -> libc::c_int {
             // Drain the pipe completely so we can receive a new readiness event
             // if another signal has come in.
             let mut buf = [0; 128];
