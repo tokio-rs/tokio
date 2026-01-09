@@ -40,5 +40,20 @@ pub async fn hard_link(original: impl AsRef<Path>, link: impl AsRef<Path>) -> io
     let original = original.as_ref().to_owned();
     let link = link.as_ref().to_owned();
 
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux"
+    ))]
+    {
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+        if driver_handle.check_and_init(io_uring::opcode::LinkAt::CODE)? {
+            return crate::runtime::driver::op::Op::link(&original, &link)?.await;
+        }
+    }
+
     asyncify(move || std::fs::hard_link(original, link)).await
 }
