@@ -722,13 +722,16 @@ jobs:
           if [[ "${{ github.event.pull_request.base.ref }}" =~ ^tokio-1\..* ]]; then
             # Only check `tokio` crate as the PR is backporting to an earlier tokio release.
 
-            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
+            cargo check --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES
           else
             # Check all crates in the workspace
 
-            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
+            cargo check --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES
             # Other crates doesn't have unstable features, so we can use --all-features.
-            cargo check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features
+            cargo check --manifest-path tokio-macros/Cargo.toml --all-features
+            cargo check --manifest-path tokio-stream/Cargo.toml --all-features
+            cargo check --manifest-path tokio-util/Cargo.toml --all-features
+            cargo check --manifest-path tokio-test/Cargo.toml --all-features
           fi
 
   minimal-versions:
