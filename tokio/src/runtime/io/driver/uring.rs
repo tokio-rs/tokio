@@ -177,20 +177,23 @@ impl Handle {
     /// but we require `OnceLock::get_or_try_init`.
     /// https://github.com/rust-lang/rust/issues/109737
     pub(crate) async fn check_and_init(&self, opcode: u8) -> io::Result<bool> {
-        let probe = self.uring_probe.get_or_try_init(|| async {
-            let mut probe = Probe::new();
-            match self.try_init(&mut probe) {
-                Ok(()) => Ok(Some(probe)),
-                // If the system doesn't support io_uring, we set the probe to `None`.
-                Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => Ok(None),
-                // If we get EPERM, io-uring syscalls may be blocked (for example, by seccomp).
-                // In this case, we try to fall back to spawn_blocking for this and future operations.
-                // See also: https://github.com/tokio-rs/tokio/issues/7691
-                Err(e) if e.raw_os_error() == Some(libc::EPERM) => Ok(None),
-                // For other system errors, we just return it.
-                Err(e) => Err(e),
-            }
-        }).await?;
+        let probe = self
+            .uring_probe
+            .get_or_try_init(|| async {
+                let mut probe = Probe::new();
+                match self.try_init(&mut probe) {
+                    Ok(()) => Ok(Some(probe)),
+                    // If the system doesn't support io_uring, we set the probe to `None`.
+                    Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => Ok(None),
+                    // If we get EPERM, io-uring syscalls may be blocked (for example, by seccomp).
+                    // In this case, we try to fall back to spawn_blocking for this and future operations.
+                    // See also: https://github.com/tokio-rs/tokio/issues/7691
+                    Err(e) if e.raw_os_error() == Some(libc::EPERM) => Ok(None),
+                    // For other system errors, we just return it.
+                    Err(e) => Err(e),
+                }
+            })
+            .await?;
 
         Ok(probe
             .as_ref()
