@@ -5,8 +5,7 @@ cfg_signal_internal_and_unix! {
 cfg_io_uring! {
     mod uring;
     use uring::UringContext;
-    // TODO: Replace with std after https://github.com/rust-lang/rust/issues/109737
-    use once_cell::sync::OnceCell;
+    use crate::loom::sync::atomic::AtomicUsize;
 }
 
 use crate::io::interest::Interest;
@@ -68,7 +67,7 @@ pub(crate) struct Handle {
         feature = "fs",
         target_os = "linux",
     ))]
-    pub(crate) uring_probe: OnceCell<Option<io_uring::Probe>>,
+    pub(crate) uring_state: AtomicUsize,
 }
 
 #[derive(Debug)]
@@ -151,7 +150,7 @@ impl Driver {
                 feature = "fs",
                 target_os = "linux",
             ))]
-            uring_probe: OnceCell::new(),
+            uring_state: AtomicUsize::new(0),
         };
 
         Ok((driver, handle))
