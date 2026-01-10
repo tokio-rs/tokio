@@ -45,7 +45,7 @@ jobs:
           # Build both integration (tokio/tests/) and unit (e.g., tokio/src/fs/file/tests.rs) tests with io_uring enabled
           rustup target add x86_64-unknown-linux-musl
           RUSTFLAGS="--cfg tokio_unstable" \
-            cargo test -p tokio --features full,io-uring \
+            cargo test --manifest-path tokio/Cargo.toml --features full,io-uring \
             --target x86_64-unknown-linux-musl --test 'fs*' --lib --no-run
 
       - name: Prepare initramfs + tests binaries
