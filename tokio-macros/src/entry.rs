@@ -1,7 +1,8 @@
 use proc_macro2::{Span, TokenStream, TokenTree};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream, Parser};
-use syn::{braced, Attribute, Ident, Path, Signature, Visibility};
+use syn::punctuated::Punctuated;
+use syn::{braced, Attribute, Ident, Path, PathSegment, Signature, Token, Visibility};
 
 // syn::AttributeArgs does not implement syn::Parse
 type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
@@ -408,7 +409,16 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     let crate_path = config
         .crate_name
         .map(ToTokens::into_token_stream)
-        .unwrap_or_else(|| Ident::new("tokio", last_stmt_start_span).into_token_stream());
+        .unwrap_or_else(|| {
+            Path {
+                leading_colon: Some(Token![::](last_stmt_start_span)),
+                segments: Punctuated::from_iter([PathSegment::from(Ident::new(
+                    "tokio",
+                    last_stmt_start_span,
+                ))]),
+            }
+            .into_token_stream()
+        });
 
     let mut rt = match config.flavor {
         RuntimeFlavor::CurrentThread | RuntimeFlavor::Local => {
