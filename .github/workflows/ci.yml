@@ -146,7 +146,8 @@ jobs:
             --exclude tests-build \
             --features $TOKIO_STABLE_FEATURES \
             --ignore-unknown-features \
-            --tests
+            --tests \
+            --no-test=pass
 
   test-integration-tests-per-feature:
     needs: basics
@@ -764,7 +765,7 @@ jobs:
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
           # from determining minimal versions based on dev-dependencies.
-          cargo hack --remove-dev-deps --workspace
+          cargo hack --remove-dev-deps --workspace --ignore-unknown-features
           # Update Cargo.lock to minimal version dependencies.
           cargo update -Z minimal-versions
           cargo hack check -p tokio --features $TOKIO_STABLE_FEATURES --ignore-private
