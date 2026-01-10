@@ -1,11 +1,10 @@
 use io_uring::squeue::Entry;
-use io_uring::IoUring;
+use io_uring::{IoUring, Probe};
 use mio::unix::SourceFd;
 use slab::Slab;
 
 use super::{Handle, TOKEN_WAKEUP};
 use crate::io::Interest;
-use crate::loom::sync::atomic::Ordering;
 use crate::loom::sync::Mutex;
 use crate::runtime::driver::op::{Cancellable, Lifecycle};
 
@@ -228,9 +227,7 @@ impl Handle {
         entries: &mut [Entry],
         waker: Waker,
     ) -> io::Result<Vec<usize>> {
-        if !self.check_and_init()? {
-            return Err(io::Error::from_raw_os_error(libc::ENOSYS));
-        }
+        assert!(self.uring_probe.initialized());
 
         let mut guard = self.get_uring().lock();
         let ctx = &mut *guard;
