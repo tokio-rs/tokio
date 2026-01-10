@@ -108,10 +108,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: test ${{ matrix.package }} --features ${{ env.TOKIO_STABLE_FEATURES }}
+      - name: test --features ${{ env.TOKIO_STABLE_FEATURES }}
         run: |
           set -euxo pipefail
-          cargo hack nextest run --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features
+          cargo hack nextest run --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features --no-test=pass
           cargo hack test --doc --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features
 
   test-workspace-all-features-panic-abort:
@@ -216,7 +216,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Check tests --features ${{ env.TOKIO_STABLE_FEATURES }}
-        run: cargo hack check --workspace --tests --features $TOKIO_STABLE_FEATURES
+        run: cargo hack check --workspace --tests --features $TOKIO_STABLE_FEATURES --ignore-unknown-features
 
   valgrind:
     name: valgrind
@@ -550,10 +550,10 @@ jobs:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
 
-      - name: Install cargo-nextest
+      - name: Install cargo-nextest and cargo hack
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest
+          tool: cargo-nextest, cargo-hack
 
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
