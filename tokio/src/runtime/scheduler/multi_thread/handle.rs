@@ -93,7 +93,9 @@ impl Handle {
             _phantom: Default::default(),
         });
 
-        me.schedule_option_task_without_yield(notified);
+        if let Some(notified) = notified {
+            me.schedule_task(notified, /* is_yield */ false);
+        }
 
         handle
     }
