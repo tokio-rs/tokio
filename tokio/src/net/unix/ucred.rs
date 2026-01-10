@@ -34,6 +34,7 @@ impl UCred {
 #[cfg(any(
     target_os = "linux",
     target_os = "redox",
+    target_os = "hurd",
     target_os = "android",
     target_os = "openbsd",
     target_os = "haiku",
@@ -68,6 +69,7 @@ pub(crate) use self::impl_noproc::get_peer_cred;
 #[cfg(any(
     target_os = "linux",
     target_os = "redox",
+    target_os = "hurd",
     target_os = "android",
     target_os = "openbsd",
     target_os = "haiku",
@@ -84,6 +86,7 @@ pub(crate) mod impl_linux {
     #[cfg(any(
         target_os = "linux",
         target_os = "redox",
+        target_os = "hurd",
         target_os = "android",
         target_os = "haiku",
         target_os = "cygwin"
