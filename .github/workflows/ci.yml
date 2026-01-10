@@ -87,7 +87,7 @@ jobs:
 
   test-workspace-all-features:
     needs: basics
-    name: test all crates in the workspace with all features
+    name: test all crates in the workspace with all features --ignore-unknown-features
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -111,7 +111,7 @@ jobs:
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }}
         run: |
           set -euxo pipefail
-          cargo hack nextest run --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features --no-test=pass
+          cargo hack nextest run --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features --no-tests=pass
           cargo hack test --doc --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features
 
   test-workspace-all-features-panic-abort:
@@ -339,15 +339,15 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest
+          tool: cargo-nextest,cargo-hack
       - uses: Swatinem/rust-cache@v2
       # Since the internal-mt-counters feature is only for debugging purposes,
       # we can enable all features including unstable.
       - name: check tokio full --cfg unstable --cfg internal-mt-counters
         run: |
           set -euxo pipefail
-          cargo nextest run --all-features
-          cargo test --doc --all-features
+          cargo hack nextest run --all-features
+          cargo hack test --doc --all-features
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_internal_mt_counters -Dwarnings
@@ -493,7 +493,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       # We don't use --all-features since io-uring will be enabled and is not supported on those targets.
-      - run: cargo hack check --workspace --features $TOKIO_STABLE_FEATURES --target ${{ matrix.target }}
+      - run: cargo hack check --workspace --features $TOKIO_STABLE_FEATURES --target ${{ matrix.target }} --ignore-unknown-features
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -553,7 +553,7 @@ jobs:
       - name: Install cargo-nextest and cargo hack
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest, cargo-hack
+          tool: cargo-nextest,cargo-hack
 
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
@@ -603,7 +603,7 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest
+          tool: cargo-nextest,cargo-hack
 
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
@@ -768,7 +768,7 @@ jobs:
           # Update Cargo.lock to minimal version dependencies.
           cargo update -Z minimal-versions
           cargo hack check -p tokio --features $TOKIO_STABLE_FEATURES --ignore-private
-          cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features --ignore-private
+          cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features --ignore-private --ignore-unknown-features
       - name: "check --all-features --unstable -Z minimal-versions"
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
