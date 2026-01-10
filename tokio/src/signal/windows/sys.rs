@@ -1,5 +1,5 @@
 use std::io;
-use std::sync::Once;
+use std::sync::OnceLock;
 
 use crate::signal::registry::{globals, EventId, EventInfo, Storage};
 use crate::signal::RxFuture;
@@ -85,22 +85,23 @@ impl Storage for OsStorage {
 pub(crate) struct OsExtraData {}
 
 fn global_init() -> io::Result<()> {
-    static INIT: Once = Once::new();
+    static INIT: OnceLock<Result<(), ()>> = OnceLock::new();
 
-    let mut init = None;
-
-    INIT.call_once(|| unsafe {
-        let rc = console::SetConsoleCtrlHandler(Some(handler), 1);
-        let ret = if rc == 0 {
-            Err(io::Error::last_os_error())
+    let mut error = None;
+    INIT.get_or_init(|| {
+        let rc = unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) };
+        if rc == 0 {
+            error = Some(io::Error::last_os_error());
+            Err(())
         } else {
             Ok(())
-        };
-
-        init = Some(ret);
-    });
-
-    init.unwrap_or_else(|| Ok(()))
+        }
+    })
+    .map_err(|_| {
+        error.unwrap_or_else(|| {
+            io::Error::new(io::ErrorKind::Other, "registering signal handler failed")
+        })
+    })
 }
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
