@@ -87,7 +87,7 @@ jobs:
 
   test-workspace-all-features:
     needs: basics
-    name: test ${{ matrix.package }} on ${{ matrix.os }}
+    name: test all crates in the workspace with all features
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -95,39 +95,28 @@ jobs:
           - windows-latest
           - ubuntu-latest
           - macos-latest
-        package:
-          - tokio
-          - tokio-macros
-          - tokio-test
-          - tokio-stream
-          - tokio-util
-          - benches
-          - examples
-          - stress-test
-          - tests-build
-          - tests-integration
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
             toolchain: ${{ env.rust_stable }}
-      - name: Install cargo-nextest
+      - name: Install cargo-nextest and cargo-hack
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest
+          tool: cargo-nextest,cargo-hack
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: test --features ${{ env.TOKIO_STABLE_FEATURES }}
+      - name: test ${{ matrix.package }} --features ${{ env.TOKIO_STABLE_FEATURES }}
         run: |
           set -euxo pipefail
-          cargo nextest run --manifest-path ${{ matrix.package }}/Cargo.toml --features $TOKIO_STABLE_FEATURES
-          cargo test --doc --manifest-path ${{ matrix.package }}/Cargo.toml --features $TOKIO_STABLE_FEATURES
+          cargo hack nextest run --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features
+          cargo hack test --doc --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features
 
   test-workspace-all-features-panic-abort:
     needs: basics
-    name: test ${{ matrix.package }} on ${{ matrix.os }} with panic=abort
+    name: test all crates in the workspace with all features and panic=abort
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -135,34 +124,28 @@ jobs:
           - windows-latest
           - ubuntu-latest
           - macos-latest
-        package:
-          - tokio
-          - tokio-test
-          - tokio-stream
-          - tokio-util
-          - benches
-          - examples
-          - stress-test
-          - tests-integration
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_nightly }}
         uses: dtolnay/rust-toolchain@stable
         with:
             toolchain: ${{ env.rust_nightly }}
-      - name: Install cargo-nextest
+      - name: Install cargo-nextest and cargo-hack
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest
+          tool: cargo-nextest,cargo-hack
 
       - uses: Swatinem/rust-cache@v2
 
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }} panic=abort
         run: |
           set -euxo pipefail
-          RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run \
-            --manifest-path ${{ matrix.package }}/Cargo.toml \
+          RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo hack nextest run \
+            --workspace \
+            --exclude tokio-macros \
+            --exclude tests-build \
             --features $TOKIO_STABLE_FEATURES \
+            --ignore-unknown-features \
             --tests
 
   test-integration-tests-per-feature:
@@ -212,28 +195,19 @@ jobs:
     #
     # This relies on the potentially affected Tokio type being listed in
     # `tokio/tokio/tests/async_send_sync.rs`.
-    name: compile ${{ matrix.package }} with parking lot send guards
+    name: compile workspace tests with parking lot send guards
     needs: basics
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package:
-          - tokio
-          - tokio-macros
-          - tokio-test
-          - tokio-stream
-          - tokio-util
-          - benches
-          - examples
-          - stress-test
-          - tests-build
-          - tests-integration
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
             toolchain: ${{ env.rust_stable }}
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
 
       - name: Enable parking_lot send_guard feature
         # Inserts the line "plsend = ["parking_lot/send_guard"]" right after [features]
@@ -242,7 +216,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Check tests --features ${{ env.TOKIO_STABLE_FEATURES }}
-        run: cargo check --manifest-path ${{ matrix.package }}/Cargo.toml --tests --features $TOKIO_STABLE_FEATURES
+        run: cargo hack check --workspace --tests --features $TOKIO_STABLE_FEATURES
 
   valgrind:
     name: valgrind
@@ -289,8 +263,6 @@ jobs:
           # only Linux supports io_uring
           - { os: ubuntu-latest, extra_features: io-uring }
           - { os: macos-latest, extra_features: "" }
-        package: [tokio, tokio-macros, tokio-test, tokio-stream, tokio-util]
-          
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
@@ -298,20 +270,18 @@ jobs:
         with:
             toolchain: ${{ env.rust_stable }}
 
-      - name: Install cargo-nextest
+      - name: Install cargo-nextest and cargo-hack
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest
+          tool: cargo-nextest,cargo-hack
 
       - uses: Swatinem/rust-cache@v2
       # Run `tokio` with "unstable" cfg flag.
-      - name: test tokio full --cfg unstable
+      - name: test ${{ matrix.package }} --cfg unstable
         run: |
           set -euxo pipefail
-          # cargo nextest run --manifest-path ${{ matrix.package }}/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
-          cargo nextest run --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
-          cargo test --doc --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
-        working-directory: tokio
+          cargo hack nextest run --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
+          cargo hack test --doc --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
           # in order to run doctests for unstable features, we must also pass
@@ -451,22 +421,9 @@ jobs:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
 
   asan:
-    name: asan ${{ matrix.package }}
+    name: asan
     needs: basics
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package:
-          - tokio
-          - tokio-macros
-          - tokio-test
-          - tokio-stream
-          - tokio-util
-          - benches
-          - examples
-          - stress-test
-          - tests-build
-          - tests-integration
     steps:
       - uses: actions/checkout@v5
       - name: Install llvm
@@ -476,10 +433,14 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.rust_nightly }}
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
 
       - uses: Swatinem/rust-cache@v2
       - name: asan
-        run: cargo test --manifest-path ${{ matrix.package }}/Cargo.toml --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
+        run: cargo hack test --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
         env:
           RUSTFLAGS: -Z sanitizer=address --cfg tokio_no_tuning_tests
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
@@ -509,7 +470,7 @@ jobs:
           release-type: minor
 
   cross-check:
-    name: cross-check ${{ matrix.package }} on ${{ matrix.target }}
+    name: cross-check
     needs: basics
     runs-on: ubuntu-latest
     strategy:
@@ -518,17 +479,6 @@ jobs:
           - powerpc-unknown-linux-gnu
           - powerpc64-unknown-linux-gnu
           - arm-linux-androideabi
-        package:
-          - tokio
-          - tokio-macros
-          - tokio-test
-          - tokio-stream
-          - tokio-util
-          - benches
-          - examples
-          - stress-test
-          - tests-build
-          - tests-integration
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
@@ -536,15 +486,19 @@ jobs:
         with:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
 
       - uses: Swatinem/rust-cache@v2
       # We don't use --all-features since io-uring will be enabled and is not supported on those targets.
-      - run: cargo check --manifest-path ${{ matrix.package }}/Cargo.toml --features $TOKIO_STABLE_FEATURES --target ${{ matrix.target }}
+      - run: cargo hack check --workspace --features $TOKIO_STABLE_FEATURES --target ${{ matrix.target }}
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
   cross-check-tier3:
-    name: cross-check-tier3 ${{ matrix.package }} on ${{ matrix.target.name }}
+    name: cross-check-tier3
     needs: basics
     runs-on: ubuntu-latest
     strategy:
@@ -554,17 +508,6 @@ jobs:
             exclude_features: "taskdump" # taskdump is only available on Linux
 #         - name: armv7-sony-vita-newlibeabihf
 #           exclude_features: "process,signal,rt-process-signal,full,taskdump"
-        package:
-          - tokio
-          - tokio-macros
-          - tokio-test
-          - tokio-stream
-          - tokio-util
-          - benches
-          - examples
-          - stress-test
-          - tests-build
-          - tests-integration
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_nightly }}
@@ -577,7 +520,7 @@ jobs:
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@v2
-      - run: cargo hack check -Zbuild-std --manifest-path ${{ matrix.package }}/Cargo.toml --each-feature --target ${{ matrix.target.name }} --exclude-features "${{ matrix.target.exclude_features }}"
+      - run: cargo hack check -Zbuild-std --workspace --each-feature --target ${{ matrix.target.name }} --exclude-features "${{ matrix.target.exclude_features }}"
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -624,8 +567,8 @@ jobs:
           # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
-          cargo nextest run --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
-          cargo test --doc --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo hack nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo hack test --doc -- tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
@@ -678,8 +621,8 @@ jobs:
           # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
-          cargo nextest run --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
-          cargo test --doc --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo hack nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo hack test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_parking_lot --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
@@ -824,11 +767,8 @@ jobs:
           cargo hack --remove-dev-deps --workspace
           # Update Cargo.lock to minimal version dependencies.
           cargo update -Z minimal-versions
-          cargo hack check --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES --ignore-private
-          cargo hack check --manifest-path tokio-macros/Cargo.toml --all-features --ignore-private
-          cargo hack check --manifest-path tokio-stream/Cargo.toml --all-features --ignore-private
-          cargo hack check --manifest-path tokio-util/Cargo.toml --all-features --ignore-private
-          cargo hack check --manifest-path tokio-test/Cargo.toml --all-features --ignore-private
+          cargo hack check -p tokio --features $TOKIO_STABLE_FEATURES --ignore-private
+          cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features --ignore-private
       - name: "check --all-features --unstable -Z minimal-versions"
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
@@ -838,11 +778,7 @@ jobs:
           cargo hack --remove-dev-deps --workspace
           # Update Cargo.lock to minimal version dependencies.
           cargo update -Z minimal-versions
-          cargo hack check --manifest-path tokio/Cargo.toml --all-features --ignore-private
-          cargo hack check --manifest-path tokio-macros/Cargo.toml --all-features --ignore-private
-          cargo hack check --manifest-path tokio-stream/Cargo.toml --all-features --ignore-private
-          cargo hack check --manifest-path tokio-util/Cargo.toml --all-features --ignore-private
-          cargo hack check --manifest-path tokio-test/Cargo.toml --all-features --ignore-private
+          cargo hack check --all-features --ignore-private
 
   fmt:
     name: fmt
