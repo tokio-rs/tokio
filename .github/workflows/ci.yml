@@ -79,6 +79,8 @@ jobs:
         run: sed -Ei 's/,\s*path\s*=\s*"[^"]*"//g; s/path\s*=\s*"[^"]*",?\s*//g' ${{ matrix.crate }}/Cargo.toml
       - name: Check ${{ matrix.crate }}
         run: cargo check --manifest-path ${{ matrix.crate }}/Cargo.toml --all-features
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
   test-tokio-full:
     needs: basics
