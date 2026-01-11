@@ -53,6 +53,31 @@ jobs:
     steps:
       - run: exit 0
 
+  # Checks that crates do not depend on unpublished versions of their deps
+  # by stripping path deps and verifying they compile with the latest version
+  # published on crates.io.
+  # see: (https://github.com/tokio-rs/tokio/issues/7832)
+  check-release:
+    name: check release ${{ matrix.crate }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crate:
+          - tokio-util
+          - tokio-stream
+          - tokio-test
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Strip path dependencies
+        run: sed -i 's/path = "[^"]*", //g' ${{ matrix.crate }}/Cargo.toml
+      - name: Check ${{ matrix.crate }}
+        run: cargo check --manifest-path ${{ matrix.crate }}/Cargo.toml --all-features
+
   test-tokio-full:
     needs: basics
     name: test tokio full
