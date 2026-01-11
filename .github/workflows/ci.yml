@@ -63,9 +63,11 @@ jobs:
     strategy:
       matrix:
         crate:
-          - tokio-util
-          - tokio-stream
+          - tokio
+          - tokio-macros
           - tokio-test
+          - tokio-stream
+          - tokio-util
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}

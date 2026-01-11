@@ -1,7 +1,6 @@
 [package]
 name = "tokio-test"
 # When releasing to crates.io:
-# - Remove path dependencies
 # - Update CHANGELOG.md.
 # - Create "tokio-test-0.4.x" git tag.
 version = "0.4.5"

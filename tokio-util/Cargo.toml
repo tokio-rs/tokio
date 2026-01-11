@@ -1,7 +1,6 @@
 [package]
 name = "tokio-util"
 # When releasing to crates.io:
-# - Remove path dependencies
 # - Update CHANGELOG.md.
 # - Create "tokio-util-0.7.x" git tag.
 version = "0.7.18"
