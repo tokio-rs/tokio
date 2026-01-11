@@ -74,7 +74,7 @@ jobs:
           toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
       - name: Strip path dependencies
-        run: sed -i 's/path = "[^"]*",\{0,1\}\s*//g' ${{ matrix.crate }}/Cargo.toml
+        run: sed -Ei 's/,\s*path\s*=\s*"[^"]*"//g; s/path\s*=\s*"[^"]*",?\s*//g' ${{ matrix.crate }}/Cargo.toml
       - name: Check ${{ matrix.crate }}
         run: cargo check --manifest-path ${{ matrix.crate }}/Cargo.toml --all-features
 
