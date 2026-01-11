@@ -115,6 +115,7 @@ jobs:
             --workspace \
             --exclude examples \
             --exclude benches \
+            --exclude tokio-macros \
             --features $TOKIO_STABLE_FEATURES \
             --ignore-unknown-features
           cargo hack test --doc --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features
@@ -775,7 +776,7 @@ jobs:
           # Update Cargo.lock to minimal version dependencies.
           cargo update -Z minimal-versions
           cargo hack check -p tokio --features $TOKIO_STABLE_FEATURES --ignore-private
-          cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features --ignore-private --ignore-unknown-features
+          cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features --ignore-private
       - name: "check --all-features --unstable -Z minimal-versions"
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
