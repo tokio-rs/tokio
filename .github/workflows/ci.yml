@@ -87,7 +87,7 @@ jobs:
 
   test-workspace-all-features:
     needs: basics
-    name: test all crates in the workspace with all features --ignore-unknown-features
+    name: test all crates in the workspace with all features
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -111,7 +111,12 @@ jobs:
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }}
         run: |
           set -euxo pipefail
-          cargo hack nextest run --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features --no-tests=pass
+          cargo hack nextest run \
+            --workspace \
+            --exclude examples \
+            --exclude benches \
+            --features $TOKIO_STABLE_FEATURES \
+            --ignore-unknown-features
           cargo hack test --doc --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features
 
   test-workspace-all-features-panic-abort:
@@ -144,10 +149,11 @@ jobs:
             --workspace \
             --exclude tokio-macros \
             --exclude tests-build \
+            --exclude benches \
+            --exclude examples \
             --features $TOKIO_STABLE_FEATURES \
             --ignore-unknown-features \
-            --tests \
-            --no-test=pass
+            --tests
 
   test-integration-tests-per-feature:
     needs: basics
@@ -569,7 +575,7 @@ jobs:
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
           cargo hack nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
-          cargo hack test --doc -- tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo hack test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
@@ -684,7 +690,7 @@ jobs:
       # https://github.com/tokio-rs/tokio/issues/5373
       - name: Check
         # We use `--skip io-uring` since io-uring crate doesn't provide a binding for the i686 target.
-        run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json --manifest-path tokio/Cargo.toml --feature-powerset --skip io-uring --depth 2 --keep-going
+        run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --skip io-uring --depth 2 --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
