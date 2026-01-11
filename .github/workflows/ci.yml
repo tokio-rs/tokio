@@ -113,9 +113,10 @@ jobs:
           set -euxo pipefail
           cargo hack nextest run \
             --workspace \
-            --exclude examples \
-            --exclude benches \
             --exclude tokio-macros \
+            --exclude benches \
+            --exclude examples \
+            --exclude stress-test \
             --features $TOKIO_STABLE_FEATURES \
             --ignore-unknown-features
           cargo hack test --doc --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features
@@ -152,6 +153,7 @@ jobs:
             --exclude tests-build \
             --exclude benches \
             --exclude examples \
+            --exclude stress-test \
             --features $TOKIO_STABLE_FEATURES \
             --ignore-unknown-features \
             --tests
@@ -772,7 +774,7 @@ jobs:
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
           # from determining minimal versions based on dev-dependencies.
-          cargo hack --remove-dev-deps --workspace --ignore-unknown-features
+          cargo hack --remove-dev-deps --workspace
           # Update Cargo.lock to minimal version dependencies.
           cargo update -Z minimal-versions
           cargo hack check -p tokio --features $TOKIO_STABLE_FEATURES --ignore-private
