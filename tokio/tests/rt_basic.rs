@@ -365,13 +365,13 @@ mod unstable {
             .unwrap();
 
         let rt = Arc::new(rt);
-        let mut ths = vec![];
+        let mut threads = vec![];
         let (tx, rx) = mpsc::channel();
 
         for _ in 0..N {
             let rt = rt.clone();
             let tx = tx.clone();
-            ths.push(std::thread::spawn(move || {
+            threads.push(std::thread::spawn(move || {
                 rt.block_on(async {
                     tx.send(()).unwrap();
                     futures::future::pending::<()>().await;
@@ -387,8 +387,8 @@ mod unstable {
             panic!("boom");
         });
 
-        for th in ths {
-            assert!(th.join().is_err());
+        for thread in threads {
+            assert!(thread.join().is_err());
         }
     }
 
@@ -455,4 +455,45 @@ fn rt() -> Runtime {
         .enable_all()
         .build()
         .unwrap()
+}
+
+#[test]
+fn before_park_yields() {
+    use futures::task::ArcWake;
+    use std::sync::Arc;
+    use tokio::runtime::Builder;
+    use tokio::sync::Notify;
+
+    struct MyWaker(Notify);
+
+    impl ArcWake for MyWaker {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            arc_self.0.notify_one();
+        }
+    }
+
+    let notify = Arc::new(MyWaker(Notify::new()));
+    let notify2 = notify.clone();
+    let waker = futures::task::waker(notify2);
+    let woken = Arc::new(AtomicBool::new(false));
+    let woken2 = woken.clone();
+
+    let rt = Builder::new_current_thread()
+        .enable_all()
+        .on_thread_park(move || {
+            if !woken2.swap(true, Ordering::SeqCst) {
+                let mut cx = Context::from_waker(&waker);
+                // `yield_now` pushes the waker to the defer slot.
+                let fut = std::pin::pin!(tokio::task::yield_now());
+                let _ = fut.poll(&mut cx);
+            }
+        })
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        notify.0.notified().await;
+    });
+
+    assert!(woken.load(Ordering::SeqCst));
 }

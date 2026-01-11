@@ -50,12 +50,6 @@ impl Storage for Vec<EventInfo> {
     }
 }
 
-/// An interface for initializing a type. Useful for situations where we cannot
-/// inject a configured instance in the constructor of another type.
-pub(crate) trait Init {
-    fn init() -> Self;
-}
-
 /// Manages and distributes event notifications to any registered listeners.
 ///
 /// Generic over the underlying storage to allow for domain specific
@@ -150,19 +144,19 @@ impl Globals {
 
 fn globals_init() -> Globals
 where
-    OsExtraData: 'static + Send + Sync + Init,
-    OsStorage: 'static + Send + Sync + Init,
+    OsExtraData: 'static + Send + Sync + Default,
+    OsStorage: 'static + Send + Sync + Default,
 {
     Globals {
-        extra: OsExtraData::init(),
-        registry: Registry::new(OsStorage::init()),
+        extra: OsExtraData::default(),
+        registry: Registry::new(OsStorage::default()),
     }
 }
 
 pub(crate) fn globals() -> &'static Globals
 where
-    OsExtraData: 'static + Send + Sync + Init,
-    OsStorage: 'static + Send + Sync + Init,
+    OsExtraData: 'static + Send + Sync + Default,
+    OsStorage: 'static + Send + Sync + Default,
 {
     static GLOBALS: OnceLock<Globals> = OnceLock::new();
 

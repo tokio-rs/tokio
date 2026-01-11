@@ -1,3 +1,25 @@
+# 0.1.18 (January 4th, 2026)
+
+### Added
+
+- stream: add `ChunksTimeout::into_remainder` ([#7715])
+- stream: add examples to wrapper types ([#7024])
+- sync: implement `Stream::size_hint` for `ReceiverStream` and `UnboundedReceiverStream` ([#7492])
+
+### Fixed
+
+- stream: work around the rustc bug in `StreamExt::collect` ([#7754])
+
+### Documented
+
+- stream: improve the the docs of `TcpListenerStream` ([#7578])
+
+[#7024]: https://github.com/tokio-rs/tokio/pull/7024
+[#7492]: https://github.com/tokio-rs/tokio/pull/7492
+[#7578]: https://github.com/tokio-rs/tokio/pull/7578
+[#7715]: https://github.com/tokio-rs/tokio/pull/7715
+[#7754]: https://github.com/tokio-rs/tokio/pull/7754
+
 # 0.1.17 (December 6th, 2024)
 
 - deps: fix dev-dependency on tokio-test ([#6931], [#7019])

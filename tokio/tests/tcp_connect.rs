@@ -181,7 +181,6 @@ mod linux {
     use std::{net, thread};
 
     #[tokio::test]
-    #[expect(deprecated)] // set_linger is deprecated
     fn poll_hup() {
         let addr = assert_ok!("127.0.0.1:0".parse());
         let mut srv = assert_ok!(TcpListener::bind(&addr));
@@ -189,7 +188,7 @@ mod linux {
 
         tokio::spawn(async move {
             let (mut client, _) = assert_ok!(srv.accept().await);
-            assert_ok!(client.set_linger(Some(Duration::from_millis(0))));
+            assert_ok!(client.set_zero_linger());
             assert_ok!(client.write_all(b"hello world").await);
 
             // TODO: Drop?
@@ -198,7 +197,7 @@ mod linux {
         /*
         let t = thread::spawn(move || {
             let mut client = assert_ok!(srv.accept()).0;
-            client.set_linger(Some(Duration::from_millis(0))).unwrap();
+            client.set_zero_linger().unwrap();
             client.write(b"hello world").unwrap();
             thread::sleep(Duration::from_millis(200));
         });

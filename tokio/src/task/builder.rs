@@ -20,7 +20,7 @@ use std::{future::Future, io, mem};
 ///   the task
 ///
 /// There are three types of task that can be spawned from a Builder:
-/// - [`spawn_local`] for executing futures on the current thread
+/// - [`spawn_local`] for executing not [`Send`] futures
 /// - [`spawn`] for executing [`Send`] futures on the runtime
 /// - [`spawn_blocking`] for executing blocking code in the
 ///   blocking thread pool.
@@ -118,7 +118,7 @@ impl<'a> Builder<'a> {
         })
     }
 
-    /// Spawns `!Send` a task on the current [`LocalSet`] or [`LocalRuntime`] with
+    /// Spawns a `!Send` task on the current [`LocalSet`] or [`LocalRuntime`] with
     /// this builder's settings.
     ///
     /// The spawned future will be run on the same thread that called `spawn_local`.
