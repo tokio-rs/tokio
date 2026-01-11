@@ -23,7 +23,7 @@ tokio = { version = "1.15.0", path = "../tokio", features = ["sync"] }
 ```
 
 In this case, local development of `tokio-stream` uses the local version
-of `tokio` via the `path` dependency. During the release, path will be
-removed and the version used will be `1.15.0`. As mentioned before, this
-version should only be bumped when adding a new feature in the crate that
-relies on a newer version.
+of `tokio` via the `path` dependency. During CI checks, the path will be 
+removed to check if the crate can be released and does not depend on unreleased
+changes. As mentioned before, this version should only be bumped when adding a new 
+feature in the crate that relies on a newer version.
