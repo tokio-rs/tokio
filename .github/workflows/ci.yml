@@ -101,25 +101,18 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
             toolchain: ${{ env.rust_stable }}
-      - name: Install cargo-nextest and cargo-hack
+      - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-hack
+          tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
 
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }}
         run: |
           set -euxo pipefail
-          cargo hack nextest run \
-            --workspace \
-            --exclude tokio-macros \
-            --exclude benches \
-            --exclude examples \
-            --exclude stress-test \
-            --features $TOKIO_STABLE_FEATURES \
-            --ignore-unknown-features
-          cargo hack test --doc --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features
+          cargo nextest run --workspace --features $TOKIO_STABLE_FEATURES
+          cargo test --doc --workspace --features $TOKIO_STABLE_FEATURES
 
   test-workspace-all-features-panic-abort:
     needs: basics
@@ -137,25 +130,21 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
             toolchain: ${{ env.rust_nightly }}
-      - name: Install cargo-nextest and cargo-hack
+      - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-hack
+          tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
 
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }} panic=abort
         run: |
           set -euxo pipefail
-          RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo hack nextest run \
+          RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run \
             --workspace \
             --exclude tokio-macros \
             --exclude tests-build \
-            --exclude benches \
-            --exclude examples \
-            --exclude stress-test \
             --features $TOKIO_STABLE_FEATURES \
-            --ignore-unknown-features \
             --tests
 
   test-integration-tests-per-feature:
@@ -205,7 +194,7 @@ jobs:
     #
     # This relies on the potentially affected Tokio type being listed in
     # `tokio/tokio/tests/async_send_sync.rs`.
-    name: compile workspace tests with parking lot send guards
+    name: compile tests with parking lot send guards
     needs: basics
     runs-on: ubuntu-latest
     steps:
@@ -214,10 +203,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
             toolchain: ${{ env.rust_stable }}
-      - name: Install cargo-hack
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-hack
 
       - name: Enable parking_lot send_guard feature
         # Inserts the line "plsend = ["parking_lot/send_guard"]" right after [features]
@@ -226,7 +211,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Check tests --features ${{ env.TOKIO_STABLE_FEATURES }}
-        run: cargo hack check --workspace --tests --features $TOKIO_STABLE_FEATURES --ignore-unknown-features
+        run: cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
 
   valgrind:
     name: valgrind
@@ -280,18 +265,19 @@ jobs:
         with:
             toolchain: ${{ env.rust_stable }}
 
-      - name: Install cargo-nextest and cargo-hack
+      - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-hack
+          tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
       # Run `tokio` with "unstable" cfg flag.
-      - name: test ${{ matrix.package }} --cfg unstable
+      - name: test tokio full --cfg unstable
         run: |
           set -euxo pipefail
-          cargo hack nextest run --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
-          cargo hack test --doc --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
+          cargo nextest run --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
+          cargo test --doc --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
+        working-directory: tokio
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
           # in order to run doctests for unstable features, we must also pass
@@ -349,15 +335,15 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-hack
+          tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
       # Since the internal-mt-counters feature is only for debugging purposes,
       # we can enable all features including unstable.
       - name: check tokio full --cfg unstable --cfg internal-mt-counters
         run: |
           set -euxo pipefail
-          cargo hack nextest run --all-features
-          cargo hack test --doc --all-features
+          cargo nextest run --all-features
+          cargo test --doc --all-features
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg tokio_unstable --cfg tokio_internal_mt_counters -Dwarnings
@@ -443,14 +429,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.rust_nightly }}
-      - name: Install cargo-hack
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-hack
 
       - uses: Swatinem/rust-cache@v2
       - name: asan
-        run: cargo hack test --workspace --features $TOKIO_STABLE_FEATURES --ignore-unknown-features --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
+        run: cargo test --workspace --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
         env:
           RUSTFLAGS: -Z sanitizer=address --cfg tokio_no_tuning_tests
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
@@ -496,14 +478,10 @@ jobs:
         with:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
-      - name: Install cargo-hack
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-hack
 
       - uses: Swatinem/rust-cache@v2
       # We don't use --all-features since io-uring will be enabled and is not supported on those targets.
-      - run: cargo hack check --workspace --features $TOKIO_STABLE_FEATURES --target ${{ matrix.target }} --ignore-unknown-features
+      - run: cargo check --workspace --features $TOKIO_STABLE_FEATURES --target ${{ matrix.target }}
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -560,10 +538,10 @@ jobs:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
 
-      - name: Install cargo-nextest and cargo hack
+      - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-hack
+          tool: cargo-nextest
 
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
@@ -577,8 +555,8 @@ jobs:
           # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
-          cargo hack nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
-          cargo hack test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
@@ -613,7 +591,7 @@ jobs:
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-hack
+          tool: cargo-nextest
 
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
@@ -631,8 +609,8 @@ jobs:
           # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
-          cargo hack nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
-          cargo hack test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_parking_lot --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
@@ -664,8 +642,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: test tokio --all-features
         run: |
-          cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,taskdump
-          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,taskdump
+          cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
+          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
         env:
           RUST_TEST_THREADS: 1
           RUSTDOCFLAGS: --cfg tokio_unstable
@@ -744,16 +722,13 @@ jobs:
           if [[ "${{ github.event.pull_request.base.ref }}" =~ ^tokio-1\..* ]]; then
             # Only check `tokio` crate as the PR is backporting to an earlier tokio release.
 
-            cargo check --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES
+            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
           else
             # Check all crates in the workspace
 
-            cargo check --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES
+            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
             # Other crates doesn't have unstable features, so we can use --all-features.
-            cargo check --manifest-path tokio-macros/Cargo.toml --all-features
-            cargo check --manifest-path tokio-stream/Cargo.toml --all-features
-            cargo check --manifest-path tokio-util/Cargo.toml --all-features
-            cargo check --manifest-path tokio-test/Cargo.toml --all-features
+            cargo check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features
           fi
 
   minimal-versions:
@@ -848,8 +823,7 @@ jobs:
           toolchain: ${{ env.rust_nightly }}
       - uses: Swatinem/rust-cache@v2
       - name: "doc --lib --all-features"
-        # __docs_rs specifies the feature that are only used in the docs
-        run: cargo doc --lib --no-deps --document-private-items --features $TOKIO_STABLE_FEATURES,${{ matrix.run.extra_features }},__docs_rs
+        run: cargo doc --lib --no-deps --document-private-items --features $TOKIO_STABLE_FEATURES,${{ matrix.run.extra_features }}
         env:
           RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
           RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
@@ -1069,7 +1043,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       - name: WASI test tokio full
-        run: cargo test --manifest-path tokio/Cargo.toml --target ${{ matrix.target }} --features "sync,macros,io-util,rt,time"
+        run: cargo test -p tokio --target ${{ matrix.target }} --features "sync,macros,io-util,rt,time"
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
@@ -1079,7 +1053,7 @@ jobs:
           RUSTDOCFLAGS: --cfg tokio_unstable
 
       - name: WASI test tokio-util full
-        run: cargo test --manifest-path tokio-util/Cargo.toml --target ${{ matrix.target }} --features full
+        run: cargo test -p tokio-util --target ${{ matrix.target }} --features full
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
@@ -1087,7 +1061,7 @@ jobs:
           RUSTDOCFLAGS: -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-stream
-        run: cargo test --manifest-path tokio-stream/Cargo.toml --target ${{ matrix.target }} --features time,net,io-util,sync
+        run: cargo test -p tokio-stream --target ${{ matrix.target }} --features time,net,io-util,sync
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
