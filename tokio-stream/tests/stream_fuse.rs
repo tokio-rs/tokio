@@ -50,6 +50,7 @@ async fn basic_usage() {
 }
 
 #[tokio::test]
+#[cfg(feature = "time")]
 async fn interval_stream_is_never_terminated() {
     use futures_core::stream::FusedStream;
     use tokio_stream::wrappers::IntervalStream;
