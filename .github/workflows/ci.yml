@@ -53,6 +53,7 @@ jobs:
     steps:
       - run: exit 0
 
+
   test-tokio-full:
     needs: basics
     name: test tokio full
@@ -555,8 +556,8 @@ jobs:
           # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
-          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
-          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo nextest run --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo test --doc --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
@@ -609,8 +610,8 @@ jobs:
           # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
-          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
-          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo nextest run --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo test --doc --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_parking_lot --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
@@ -642,8 +643,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: test tokio --all-features
         run: |
-          cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
-          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
+          cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,taskdump
+          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES,taskdump
         env:
           RUST_TEST_THREADS: 1
           RUSTDOCFLAGS: --cfg tokio_unstable
@@ -722,11 +723,11 @@ jobs:
           if [[ "${{ github.event.pull_request.base.ref }}" =~ ^tokio-1\..* ]]; then
             # Only check `tokio` crate as the PR is backporting to an earlier tokio release.
 
-            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
+            cargo check --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES
           else
             # Check all crates in the workspace
 
-            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
+            cargo check --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES
             # Other crates doesn't have unstable features, so we can use --all-features.
             cargo check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features
           fi
@@ -797,10 +798,14 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
       # Run clippy
-      - name: "clippy --all --features ${{ env.TOKIO_STABLE_FEATURES }}"
-        run: cargo clippy --all --tests --no-deps --features $TOKIO_STABLE_FEATURES
-      - name: "clippy --all --all-features --unstable"
-        run: cargo clippy --all --tests --no-deps --all-features
+      - name: "clippy --features ${{ env.TOKIO_STABLE_FEATURES }}"
+        run: |
+          cargo clippy --manifest-path tokio/Cargo.toml --tests --no-deps --features $TOKIO_STABLE_FEATURES
+          cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
+      - name: "clippy --all-features --unstable"
+        run: |
+          cargo clippy --manifest-path tokio/Cargo.toml --tests --no-deps --all-features
+          cargo clippy --workspace --exclude tokio --tests --no-deps --all-features
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
