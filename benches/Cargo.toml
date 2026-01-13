@@ -9,14 +9,14 @@ license = "MIT"
 test-util = ["tokio/test-util"]
 
 [dependencies]
-tokio = { version = "1.5.0", path = "../tokio", features = ["full"] }
+tokio = { version = "1.5.0", features = ["full"] }
 criterion = "0.5.1"
 rand = "0.9"
 rand_chacha = "0.9"
 
 [dev-dependencies]
-tokio-util = { version = "0.7.0", path = "../tokio-util", features = ["full"] }
-tokio-stream = { version = "0.1", path = "../tokio-stream" }
+tokio-util = { version = "0.7.0", features = ["full"] }
+tokio-stream = { version = "0.1" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.42"
