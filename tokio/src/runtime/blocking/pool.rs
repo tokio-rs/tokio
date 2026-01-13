@@ -399,17 +399,14 @@ impl Spawner {
             return Err(SpawnError::ShuttingDown);
         }
 
-        // Get thread count for adaptive sharding
-        let num_threads = self.inner.metrics.num_threads();
-
-        // Push to the sharded queue - uses adaptive shard count based on thread count
-        self.inner.queue.push(task, num_threads);
+        // Push to the sharded queue
+        self.inner.queue.push(task);
         self.inner.metrics.inc_queue_depth();
 
         // Check if we need to spawn a new thread or notify an idle one
         if self.inner.metrics.num_idle_threads() == 0 {
             // No idle threads - might need to spawn one
-            if num_threads < self.inner.thread_cap {
+            if self.inner.metrics.num_threads() < self.inner.thread_cap {
                 // Try to spawn a new thread
                 let mut shared = self.inner.shared.lock();
 

@@ -5,10 +5,6 @@
 //! The push operations use per-shard locking, while notifications use a global
 //! condvar for simplicity.
 //!
-//! The queue adapts to the current concurrency level by using fewer shards
-//! when there are few threads, which improves cache locality and reduces
-//! lock contention on the active shards.
-//!
 //! For shard selection, we use the same approach as `sync::watch`: prefer
 //! randomness when available to reduce contention, falling back to circular
 //! access when the random number generator is not available.
@@ -16,10 +12,12 @@
 use crate::loom::sync::{Condvar, Mutex};
 
 use std::collections::VecDeque;
+use std::sync::atomic::AtomicBool;
+#[cfg(loom)]
+use std::sync::atomic::AtomicUsize;
 #[cfg(loom)]
 use std::sync::atomic::Ordering::Relaxed;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::atomic::Ordering::{Acquire, Release};
 use std::time::Duration;
 
 use super::pool::Task;
@@ -91,11 +89,6 @@ pub(super) struct ShardedQueue {
     /// Only used when randomness is not available (loom).
     #[cfg(loom)]
     push_index: AtomicUsize,
-    /// Tracks the highest shard index that has ever been pushed to.
-    /// This allows `pop()` to skip checking shards that have never had tasks,
-    /// which is important for maintaining low overhead at low concurrency.
-    /// Only increases, never decreases (even when shards become empty).
-    max_shard_pushed: AtomicUsize,
     /// Global shutdown flag.
     shutdown: AtomicBool,
     /// Global condition variable for worker notifications.
@@ -105,25 +98,12 @@ pub(super) struct ShardedQueue {
     condvar_mutex: Mutex<()>,
 }
 
-/// Calculate the effective number of shards to use based on thread count.
-/// Uses fewer shards at low concurrency for better cache locality.
-#[inline]
-fn effective_shards(num_threads: usize) -> usize {
-    match num_threads {
-        0..=2 => 2,
-        3..=4 => 4,
-        5..=8 => 8,
-        _ => NUM_SHARDS,
-    }
-}
-
 impl ShardedQueue {
     pub(super) fn new() -> Self {
         ShardedQueue {
             shards: std::array::from_fn(|_| Shard::new()),
             #[cfg(loom)]
             push_index: AtomicUsize::new(0),
-            max_shard_pushed: AtomicUsize::new(0),
             shutdown: AtomicBool::new(false),
             condvar: Condvar::new(),
             condvar_mutex: Mutex::new(()),
@@ -145,17 +125,8 @@ impl ShardedQueue {
     }
 
     /// Push a task to the queue.
-    ///
-    /// `num_threads` is a hint about the current thread count, used to
-    /// adaptively choose how many shards to distribute across.
-    pub(super) fn push(&self, task: Task, num_threads: usize) {
-        let num_shards = effective_shards(num_threads);
-        let index = self.next_push_index(num_shards);
-
-        // Update max_shard_pushed BEFORE pushing the task.
-        // AcqRel ensures the subsequent push cannot be reordered before this.
-        self.max_shard_pushed.fetch_max(index, AcqRel);
-
+    pub(super) fn push(&self, task: Task) {
+        let index = self.next_push_index(NUM_SHARDS);
         self.shards[index].push(task);
     }
 
@@ -170,18 +141,11 @@ impl ShardedQueue {
     }
 
     /// Try to pop a task, checking the preferred shard first, then others.
-    ///
-    /// Only checks shards up to `max_shard_pushed` since tasks can only exist
-    /// in shards that have been pushed to.
     pub(super) fn pop(&self, preferred_shard: usize) -> Option<Task> {
-        // Only check shards that have ever had tasks pushed to them
-        let max_shard = self.max_shard_pushed.load(Acquire);
-        let num_shards_to_check = max_shard + 1;
-
-        // Check shards starting from preferred, wrapping within active range
-        let start = preferred_shard % num_shards_to_check;
-        for i in 0..num_shards_to_check {
-            let index = (start + i) % num_shards_to_check;
+        // Check shards starting from preferred, wrapping around
+        let start = preferred_shard % NUM_SHARDS;
+        for i in 0..NUM_SHARDS {
+            let index = (start + i) % NUM_SHARDS;
             if let Some(task) = self.shards[index].pop() {
                 return Some(task);
             }
