@@ -86,7 +86,7 @@ pub(crate) struct OsExtraData {}
 
 impl OsExtraData {
     pub(crate) fn new() -> std::io::Result<Self> {
-        Ok(OsExtraData{})
+        Ok(OsExtraData {})
     }
 }
 
