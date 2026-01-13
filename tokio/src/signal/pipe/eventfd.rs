@@ -40,37 +40,49 @@ impl event::Source for Receiver {
 }
 
 impl Sender {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> std::io::Result<Self> {
+        // SAFETY: it's ok to call libc API
         let fd = unsafe { libc::eventfd(0, libc::EFD_NONBLOCK | libc::EFD_CLOEXEC) };
-        if fd < 0 {
-            panic!("eventfd failed: {}", io::Error::last_os_error());
+        if fd == -1 {
+            return Err(io::Error::last_os_error());
         }
-        Sender {
+        Ok(Sender {
+            // SAFETY: fd just opened by the above libc::eventfd
             fd: unsafe { OwnedFd::from_raw_fd(fd) },
-        }
+        })
     }
 
-    pub(crate) fn receiver(&self) -> Receiver {
-        Receiver {
-            fd: self.fd.try_clone().unwrap(),
-        }
+    pub(crate) fn receiver(&self) -> std::io::Result<Receiver> {
+        Ok(Receiver {
+            fd: self.fd.try_clone()?,
+        })
     }
 }
 
 impl Sender {
-    pub(crate) fn write(&self) {
-        unsafe {
-            libc::eventfd_write(self.fd.as_raw_fd(), 1);
+    pub(crate) fn write(&self) -> std::io::Result<usize> {
+        // SAFETY: it's ok to call libc API
+        let r = unsafe { libc::eventfd_write(self.fd.as_raw_fd(), 1) };
+        if r == 0 {
+            Ok(0)
+        } else {
+            Err(std::io::Error::last_os_error())
         }
     }
 }
 
 impl Receiver {
-    pub(crate) fn read(&mut self) -> libc::c_int {
-        let fd = &self.fd;
+    pub(crate) fn read(&mut self) -> std::io::Result<libc::c_int> {
+        let fd = self.fd.as_raw_fd();
         let mut value: libc::eventfd_t = 0;
 
-        unsafe { libc::eventfd_read(fd.as_raw_fd(), &mut value as *mut libc::eventfd_t) }
+        // SAFETY: it's ok to call libc API
+        let r = unsafe { libc::eventfd_read(fd, &mut value as *mut libc::eventfd_t) };
+        if r == 0 {
+            Ok(0)
+        } else {
+            Err(std::io::Error::last_os_error())
+        }
     }
 }
 
@@ -78,15 +90,14 @@ pub(crate) struct OsExtraData {
     sender: Sender,
 }
 
-impl Default for OsExtraData {
-    fn default() -> Self {
-        let sender = Sender::new();
-        Self { sender }
+impl OsExtraData {
+    pub(crate) fn new() -> std::io::Result<Self> {
+        Sender::new().map(|sender| Self { sender })
     }
 }
 
 impl OsExtraData {
-    pub(crate) fn receiver(&self) -> Receiver {
+    pub(crate) fn receiver(&self) -> std::io::Result<Receiver> {
         self.sender.receiver()
     }
 

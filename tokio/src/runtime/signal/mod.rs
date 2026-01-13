@@ -60,7 +60,7 @@ impl Driver {
         // safe as each dup is registered with separate reactors **and** we
         // only expect at least one dup to receive the notification.
 
-        let mut receiver = globals().receiver();
+        let mut receiver = globals().receiver()?;
         io_handle.register_signal_receiver(&mut receiver)?;
 
         Ok(Self {
@@ -100,7 +100,7 @@ impl Driver {
         }
 
         // consume value
-        self.receiver.read();
+        let _ = self.receiver.read();
 
         // Broadcast any signals which were received
         globals().broadcast();

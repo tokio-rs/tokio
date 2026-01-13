@@ -144,18 +144,18 @@ impl Globals {
 
 fn globals_init() -> Globals
 where
-    OsExtraData: 'static + Send + Sync + Default,
+    OsExtraData: 'static + Send + Sync,
     OsStorage: 'static + Send + Sync + Default,
 {
     Globals {
-        extra: OsExtraData::default(),
+        extra: OsExtraData::new().expect("failed to initialize OsExtraData"),
         registry: Registry::new(OsStorage::default()),
     }
 }
 
 pub(crate) fn globals() -> &'static Globals
 where
-    OsExtraData: 'static + Send + Sync + Default,
+    OsExtraData: 'static + Send + Sync,
     OsStorage: 'static + Send + Sync + Default,
 {
     static GLOBALS: OnceLock<Globals> = OnceLock::new();

@@ -278,7 +278,7 @@ fn action(globals: &'static Globals, signal: libc::c_int) {
 
     // Send a wakeup, ignore any errors (anything reasonably possible is
     // full pipe and then it will wake up anyway).
-    globals.sender().write();
+    let _ = globals.sender().write();
 }
 
 /// Enables this module to receive signal notifications for the `signal`
