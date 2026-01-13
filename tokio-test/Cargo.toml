@@ -16,12 +16,12 @@ Testing utilities for Tokio- and futures-based code
 categories = ["asynchronous", "development-tools::testing"]
 
 [dependencies]
-tokio = { version = "1.2.0", path = "../tokio", features = ["rt", "sync", "time", "test-util"] }
-tokio-stream = { version = "0.1.1", path = "../tokio-stream" }
+tokio = { version = "1.2.0", features = ["rt", "sync", "time", "test-util"] }
+tokio-stream = { version = "0.1.1" }
 futures-core = "0.3.0"
 
 [dev-dependencies]
-tokio = { version = "1.2.0", path = "../tokio", features = ["full"] }
+tokio = { version = "1.2.0", features = ["full"] }
 futures-util = "0.3.0"
 
 [package.metadata.docs.rs]
