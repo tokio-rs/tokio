@@ -514,8 +514,10 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
             let body = async #body;
             // identity function that constrains the future's output type to ensure better error messages
             let body = {
-                fn check_output<F: ::core::future::Future<Output = #output_type>>(f: F) -> F { f }
-                check_output(body)
+                if false {
+                    let _: &dyn ::core::future::Future<Output = #output_type> = &body;
+                }
+                body
             };
         }
     };
