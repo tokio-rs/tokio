@@ -717,6 +717,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.rust_min }}
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
       - uses: Swatinem/rust-cache@v2
       - name: "cargo check"
         run: |
@@ -729,7 +731,7 @@ jobs:
 
             cargo check --manifest-path tokio/Cargo.toml --features $TOKIO_STABLE_FEATURES
             # Other crates doesn't have unstable features, so we can use --all-features.
-            cargo check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features
+            cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features
           fi
 
   minimal-versions:
