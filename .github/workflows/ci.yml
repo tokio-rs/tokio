@@ -800,11 +800,11 @@ jobs:
       # Run clippy
       - name: "clippy --features ${{ env.TOKIO_STABLE_FEATURES }}"
         run: |
-          cargo clippy --manifest-path tokio/Cargo.toml --tests --no-deps --features $TOKIO_STABLE_FEATURES
+          cargo clippy -p tokio --config 'patch.crates-io.tokio.path="tokio"' --tests --no-deps --features $TOKIO_STABLE_FEATURES
           cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
       - name: "clippy --all-features --unstable"
         run: |
-          cargo clippy --manifest-path tokio/Cargo.toml --tests --no-deps --all-features
+          cargo clippy -p tokio --config 'patch.crates-io.tokio.path="tokio"' --tests --no-deps --all-features
           cargo clippy --workspace --exclude tokio --tests --no-deps --all-features
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
