@@ -12,7 +12,7 @@ use crate::signal::registry::{globals, EventId, EventInfo, Globals, Storage};
 use crate::signal::RxFuture;
 use crate::sync::watch;
 
-use std::io::{self, Error, ErrorKind, Write};
+use std::io::{self, Error, ErrorKind};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
 
