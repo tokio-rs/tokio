@@ -142,7 +142,13 @@ jobs:
         run: |
           set -euxo pipefail
           RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run \
+            -p tokio \
+            --features $TOKIO_STABLE_FEATURES \
+            --tests \
+            --config 'patch.crates-io.tokio.path="tokio"'
+          RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run \
             --workspace \
+            --exclude tokio \
             --exclude tokio-macros \
             --exclude tests-build \
             --features $TOKIO_STABLE_FEATURES \
@@ -183,7 +189,7 @@ jobs:
 
       # Check benchmarks.
       - name: Check benches
-        run: cargo check --benches --config 'patch.crates-io.tokio.path="tokio"'
+        run: cargo check --benches --config 'patch.crates-io.tokio.path="../tokio"'
         working-directory: benches
         if: startsWith(matrix.os, 'ubuntu')
 
@@ -212,7 +218,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Check tests --features ${{ env.TOKIO_STABLE_FEATURES }}
-        run: cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
+        run: |
+          set -euxo pipefail
+          cargo check -p tokio --tests --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
+          cargo check --workspace --exclude tokio --tests --features $TOKIO_STABLE_FEATURES
 
   valgrind:
     name: valgrind
@@ -433,7 +442,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       - name: asan
-        run: cargo test --workspace --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
+        run: |
+          set -euxo pipefail
+          cargo test -p tokio --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests --config 'patch.crates-io.tokio.path="tokio"' -- --test-threads 1 --nocapture
+          cargo test --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
         env:
           RUSTFLAGS: -Z sanitizer=address --cfg tokio_no_tuning_tests
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
@@ -556,7 +568,7 @@ jobs:
           # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
-          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }} --config 'patch.crates-io.tokio.path="tokio"'
           cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
@@ -610,7 +622,7 @@ jobs:
           # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
-          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }} --config 'patch.crates-io.tokio.path="tokio"'
           cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
@@ -643,7 +655,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: test tokio --all-features
         run: |
-          cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
+          cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump --config 'patch.crates-io.tokio.path="tokio"'
           cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
         env:
           RUST_TEST_THREADS: 1
@@ -1054,7 +1066,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       - name: WASI test tokio full
-        run: cargo test -p tokio --target ${{ matrix.target }} --features "sync,macros,io-util,rt,time"
+        run: cargo test -p tokio --target ${{ matrix.target }} --features "sync,macros,io-util,rt,time" --config 'patch.crates-io.tokio.path="tokio"'
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
