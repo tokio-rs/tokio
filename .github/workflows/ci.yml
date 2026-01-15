@@ -797,14 +797,20 @@ jobs:
         with:
           toolchain: ${{ env.rust_clippy }}
           components: clippy
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
       - uses: Swatinem/rust-cache@v2
       # Run clippy
       - name: "clippy --all --features ${{ env.TOKIO_STABLE_FEATURES }}"
         run: |
-          cargo hack clippy -p tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
+          cargo clippy -p tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
           cargo clippy --all --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
       - name: "clippy --all --all-features --unstable"
-        run: cargo clippy --all --tests --no-deps --all-features
+        run: |
+          cargo clippy -p tokio --tests --no-deps --all-features --config 'patch.crates-io.tokio.path="tokio"'
+          cargo clippy --workspace --exclude tokio --tests --no-deps --all-features
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 

@@ -88,7 +88,7 @@ impl Inner {
 /// # Cancellation safety
 ///
 /// The `Receiver` is cancel safe. If it is used as the event in a
-/// [`tokio::select!`](macro@tokio::select) statement and some other branch
+/// `tokio::select!` statement and some other branch
 /// completes first, it is guaranteed that no bytes were received on this
 /// channel.
 ///
@@ -163,7 +163,7 @@ impl AsyncRead for Receiver {
 /// # Cancellation safety
 ///
 /// The `Sender` is cancel safe. If it is used as the event in a
-/// [`tokio::select!`](macro@tokio::select) statement and some other branch
+/// `tokio::select!` statement and some other branch
 /// completes first, it is guaranteed that no bytes were sent on this
 /// channel.
 ///
