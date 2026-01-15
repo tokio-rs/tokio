@@ -6,7 +6,7 @@ use crate::runtime::{driver, io};
 use crate::signal::registry::globals;
 use crate::signal::unix::pipe;
 
-use std::io::{self as std_io};
+use std::io as std_io;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
