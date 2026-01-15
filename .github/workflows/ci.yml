@@ -81,7 +81,7 @@ jobs:
       - name: test tokio full
         run: |
           set -euxo pipefail
-          cargo nextest run --features full
+          cargo nextest run --features full --config 'patch.crates-io.tokio.path="../tokio"'
           cargo test --doc --features full
         working-directory: tokio
 
@@ -285,7 +285,7 @@ jobs:
       - name: test tokio full --cfg unstable
         run: |
           set -euxo pipefail
-          cargo nextest run --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --config 'patch.crates-io.tokio.path="tokio"'
+          cargo nextest run --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --config 'patch.crates-io.tokio.path="../tokio"'
           cargo test --doc --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }}
         working-directory: tokio
         env:
@@ -319,7 +319,7 @@ jobs:
       - name: test tokio full --cfg unstable --cfg taskdump
         run: |
           set -euxo pipefail
-          cargo nextest run --features $TOKIO_STABLE_FEATURES,taskdump
+          cargo nextest run --features $TOKIO_STABLE_FEATURES,taskdump --config 'patch.crates-io.tokio.path="../tokio"'
           cargo test --doc --features $TOKIO_STABLE_FEATURES
         working-directory: tokio
         env:
@@ -352,7 +352,7 @@ jobs:
       - name: check tokio full --cfg unstable --cfg internal-mt-counters
         run: |
           set -euxo pipefail
-          cargo nextest run --all-features --config 'patch.crates-io.tokio.path="tokio"'
+          cargo nextest run --all-features --config 'patch.crates-io.tokio.path="../tokio"'
           cargo test --doc --all-features
         working-directory: tokio
         env:
@@ -379,7 +379,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: miri
         run: |
-          cargo miri nextest run --features full --lib --no-fail-fast --config 'patch.crates-io.tokio.path="tokio"'
+          cargo miri nextest run --features full --lib --no-fail-fast --config 'patch.crates-io.tokio.path="../tokio"'
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
@@ -402,7 +402,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: miri
         run: |
-          cargo miri nextest run --features full --test '*' --no-fail-fast --config 'patch.crates-io.tokio.path="tokio"'
+          cargo miri nextest run --features full --test '*' --no-fail-fast --config 'patch.crates-io.tokio.path="../tokio"'
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
@@ -421,7 +421,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: miri-doc-test
         run: |
-          cargo miri test --doc --features $TOKIO_STABLE_FEATURES --no-fail-fast --config 'patch.crates-io.tokio.path="tokio"'
+          cargo miri test --doc --features $TOKIO_STABLE_FEATURES --no-fail-fast --config 'patch.crates-io.tokio.path="../tokio"'
         working-directory: tokio
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
@@ -863,7 +863,7 @@ jobs:
           toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
       - name: build --cfg loom
-        run: cargo test --no-run --lib --features full
+        run: cargo test --no-run --lib --features full --config 'patch.crates-io.tokio.path="../tokio"'
         working-directory: tokio
         env:
           RUSTFLAGS: --cfg loom --cfg tokio_unstable -Dwarnings
