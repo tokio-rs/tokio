@@ -1280,6 +1280,7 @@ impl Handle {
         });
     }
 
+    // Separated case to reduce LLVM codegen in `Handle::bind_new_task`.
     pub(super) fn schedule_option_task_without_yield(&self, task: Option<Notified>) {
         if let Some(task) = task {
             self.schedule_task(task, false);
