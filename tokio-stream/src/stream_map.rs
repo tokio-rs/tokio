@@ -580,7 +580,7 @@ where
     ///
     /// This method is cancel safe. If `next_many` is used as the event in a
     /// [`tokio::select!`] statement and some other branch completes first,
-    /// it is guaranteed that no items were received on any of the underlying 
+    /// it is guaranteed that no items were received on any of the underlying
     /// streams.
     ///
     /// [`tokio::select!`]: https://docs.rs/tokio/1.0/tokio/macro.select.html
