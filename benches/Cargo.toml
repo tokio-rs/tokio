@@ -15,8 +15,8 @@ rand = "0.9"
 rand_chacha = "0.9"
 
 [dev-dependencies]
-tokio-util = { version = "0.7.18", path = "../tokio-util", features = ["full"] }
-tokio-stream = { version = "0.1.18", path = "../tokio-stream" }
+tokio-util = { version = "0.7.0", path = "../tokio-util", features = ["full"] }
+tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.42"

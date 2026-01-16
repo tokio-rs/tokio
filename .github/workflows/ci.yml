@@ -82,7 +82,7 @@ jobs:
         run: |
           set -euxo pipefail
           cargo nextest run --features full --config 'patch.crates-io.tokio.path="../tokio"'
-          cargo test --doc --features full
+          cargo test --doc --features full --config 'patch.crates-io.tokio.path="../tokio"'
         working-directory: tokio
 
   test-workspace-all-features:
