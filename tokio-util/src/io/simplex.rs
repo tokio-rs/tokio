@@ -172,7 +172,7 @@ impl AsyncRead for Receiver {
 ///
 /// See [`Sender::poll_shutdown`].
 ///
-/// [`tokio::select!`]: https://docs.rs/tokio/1.0/tokio/macro.select.html
+/// [`tokio::select!`]: https://docs.rs/tokio/latest/tokio/macro.select.html
 #[derive(Debug)]
 pub struct Sender {
     inner: Arc<Mutex<Inner>>,
