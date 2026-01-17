@@ -583,7 +583,7 @@ where
     /// it is guaranteed that no items were received on any of the underlying
     /// streams.
     ///
-    /// [`tokio::select!`]: https://docs.rs/tokio/1.0/tokio/macro.select.html
+    /// [`tokio::select!`]: https://docs.rs/tokio/latest/tokio/macro.select.html
     pub async fn next_many(&mut self, buffer: &mut Vec<(K, V::Item)>, limit: usize) -> usize {
         poll_fn(|cx| self.poll_next_many(cx, buffer, limit)).await
     }
