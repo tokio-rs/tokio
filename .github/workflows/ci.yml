@@ -113,8 +113,8 @@ jobs:
           set -euxo pipefail
           cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
           cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
-          cargo nextest run --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES
-          cargo test --doc --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES
+          cargo hack nextest run --workspace --exclude tokio --features full,test-util --ignore-unknown-features --no-tests=warn
+          cargo test --doc --workspace --features $TOKIO_STABLE_FEATURES
 
   test-workspace-all-features-panic-abort:
     needs: basics
@@ -657,7 +657,7 @@ jobs:
       - name: test tokio --all-features
         run: |
           cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump --config 'patch.crates-io.tokio.path="tokio"'
-          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
+          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump --config 'patch.crates-io.tokio.path="tokio"'
         env:
           RUST_TEST_THREADS: 1
           RUSTDOCFLAGS: --cfg tokio_unstable
@@ -1085,7 +1085,7 @@ jobs:
           RUSTDOCFLAGS: -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-stream
-        run: cargo test -p tokio-stream --target ${{ matrix.target }} --features time,net,io-util,sync
+        run: cargo test -p tokio-stream --target ${{ matrix.target }} --features time,net,io-util,sync --config 'patch.crates-io.tokio.path="tokio-stream"'
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"

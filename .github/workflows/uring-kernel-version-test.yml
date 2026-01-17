@@ -46,7 +46,7 @@ jobs:
           rustup target add x86_64-unknown-linux-musl
           RUSTFLAGS="--cfg tokio_unstable" \
             cargo test --manifest-path=tokio/Cargo.toml --features full,io-uring \
-            --target x86_64-unknown-linux-musl --test 'fs*' --lib --no-run
+            --target x86_64-unknown-linux-musl --test 'fs*' --lib --no-run --config 'patch.crates-io.tokio.path="../tokio"'
 
       - name: Prepare initramfs + tests binaries
         run: |
