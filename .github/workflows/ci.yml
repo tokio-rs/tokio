@@ -112,8 +112,9 @@ jobs:
         run: |
           set -euxo pipefail
           cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
+          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
           cargo nextest run --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES
-          cargo test --doc --workspace --features $TOKIO_STABLE_FEATURES
+          cargo test --doc --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES
 
   test-workspace-all-features-panic-abort:
     needs: basics
@@ -569,7 +570,7 @@ jobs:
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
           cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }} --config 'patch.crates-io.tokio.path="tokio"'
-          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }} --config 'patch.crates-io.tokio.path="tokio"'
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
@@ -623,7 +624,7 @@ jobs:
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
           cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }} --config 'patch.crates-io.tokio.path="tokio"'
-          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }} --config 'patch.crates-io.tokio.path="tokio"'
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_parking_lot --cfg tokio_no_tuning_tests ${{ matrix.rustflags }}
@@ -1038,7 +1039,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       - name: test tokio (${{ matrix.name }})
-        run: wasm-pack test --node -- --features "${{ matrix.features }}"
+        run: wasm-pack test --node -- --features "${{ matrix.features }}" --config 'patch.crates-io.tokio.path="../tokio"'
         working-directory: tokio
 
   wasm32-wasip1:
