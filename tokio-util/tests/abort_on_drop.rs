@@ -70,7 +70,7 @@ async fn handle_does_not_abort_after_detach() {
         let _ = rx.await;
     });
     let handle = AbortOnDrop::new(handle.abort_handle());
-    handle.detach(); // returns and drops the original join handle
+    handle.detach(); // returns and drops the original abort handle
     yield_now().await;
     assert!(!tx.is_closed()); // task is still live
 }

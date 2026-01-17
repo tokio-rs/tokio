@@ -86,10 +86,9 @@ impl<T> AsRef<JoinHandle<T>> for AbortOnDropHandle<T> {
 /// which [aborts] the task when it is dropped.
 ///
 /// Unlike [`AbortOnDropHandle`], [`AbortOnDrop`] does not represent the permission to await a
-/// tasks completion, and in exchange can be a concrete type.
+/// task's completion, and in exchange can be a concrete type.
 ///
-///
-/// [aborts]: tokio::task::JoinHandle::abort
+/// [aborts]: tokio::task::AbortHandle::abort
 #[must_use = "Dropping the handle aborts the task immediately"]
 pub struct AbortOnDrop(AbortHandle);
 
