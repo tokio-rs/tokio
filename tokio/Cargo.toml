@@ -1,7 +1,6 @@
 [package]
 name = "tokio"
 # When releasing to crates.io:
-# - Remove path dependencies
 # - Update doc url
 #   - README.md
 # - Update CHANGELOG.md.
