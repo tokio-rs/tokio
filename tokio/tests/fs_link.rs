@@ -60,3 +60,62 @@ async fn test_symlink() {
     let symlink_meta = fs::symlink_metadata(dst.clone()).await.unwrap();
     assert!(symlink_meta.file_type().is_symlink());
 }
+
+#[tokio::test]
+#[cfg_attr(miri, ignore)] // No `linkat` in miri.
+async fn test_hard_link_error_source_not_found() {
+    let dir = tempdir().unwrap();
+    let src = dir.path().join("nonexistent.txt");
+    let dst = dir.path().join("dst.txt");
+
+    let result = fs::hard_link(&src, &dst).await;
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+}
+
+#[tokio::test]
+#[cfg_attr(miri, ignore)] // No `linkat` in miri.
+async fn test_hard_link_error_destination_already_exists() {
+    let dir = tempdir().unwrap();
+    let src = dir.path().join("src.txt");
+    let dst = dir.path().join("dst.txt");
+
+    // Create source file
+    std::fs::File::create(&src)
+        .unwrap()
+        .write_all(b"source content")
+        .unwrap();
+
+    // Create destination file
+    std::fs::File::create(&dst)
+        .unwrap()
+        .write_all(b"destination content")
+        .unwrap();
+
+    // Attempt to create hard link when destination already exists
+    let result = fs::hard_link(&src, &dst).await;
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
+}
+
+#[tokio::test]
+#[cfg_attr(miri, ignore)] // No `linkat` in miri.
+async fn test_hard_link_error_source_is_directory() {
+    let dir = tempdir().unwrap();
+    let src_dir = dir.path().join("src_directory");
+    let dst = dir.path().join("dst.txt");
+
+    // Create source directory
+    fs::create_dir(&src_dir).await.unwrap();
+
+    // Attempt to create hard link from a directory
+    let result = fs::hard_link(&src_dir, &dst).await;
+
+    // On most systems, hard linking directories is not allowed
+    assert!(result.is_err());
+    // The exact error kind may vary by platform, but it should fail
+}
