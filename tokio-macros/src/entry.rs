@@ -293,6 +293,35 @@ fn parse_bool(bool: syn::Lit, span: Span, field: &str) -> Result<bool, syn::Erro
     }
 }
 
+fn contains_impl_trait(ty: &syn::Type) -> bool {
+    match ty {
+        syn::Type::ImplTrait(_) => true,
+        syn::Type::Array(t) => contains_impl_trait(&t.elem),
+        syn::Type::Ptr(t) => contains_impl_trait(&t.elem),
+        syn::Type::Reference(t) => contains_impl_trait(&t.elem),
+        syn::Type::Slice(t) => contains_impl_trait(&t.elem),
+        syn::Type::Tuple(t) => t.elems.iter().any(contains_impl_trait),
+        syn::Type::Paren(t) => contains_impl_trait(&t.elem),
+        syn::Type::Group(t) => contains_impl_trait(&t.elem),
+        syn::Type::Path(t) => match t.path.segments.last() {
+            Some(segment) => match &segment.arguments {
+                syn::PathArguments::AngleBracketed(args) => args.args.iter().any(|arg| match arg {
+                    syn::GenericArgument::Type(t) => contains_impl_trait(t),
+                    syn::GenericArgument::AssocType(t) => contains_impl_trait(&t.ty),
+                    _ => false,
+                }),
+                syn::PathArguments::Parenthesized(args) => {
+                    args.inputs.iter().any(contains_impl_trait)
+                        || matches!(&args.output, syn::ReturnType::Type(_, t) if contains_impl_trait(t))
+                }
+                syn::PathArguments::None => false,
+            },
+            None => false,
+        },
+        _ => false,
+    }
+}
+
 fn build_config(
     input: &ItemFn,
     args: AttributeArgs,
@@ -512,7 +541,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         // force typecheck without runtime overhead
         let check_block = match &input.sig.output {
             syn::ReturnType::Type(_, t)
-                if matches!(**t, syn::Type::Never(_) | syn::Type::ImplTrait(_)) =>
+                if matches!(**t, syn::Type::Never(_)) || contains_impl_trait(t) =>
             {
                 quote! {}
             }
