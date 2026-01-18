@@ -511,7 +511,9 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     } else {
         // force typecheck without runtime overhead
         let check_block = match &input.sig.output {
-            syn::ReturnType::Type(_, t) if matches!(**t, syn::Type::Never(_)) => quote! {},
+            syn::ReturnType::Type(_, t) if matches!(**t, syn::Type::Never(_) | syn::Type::ImplTrait(_)) => {
+                quote! {}
+            }
             _ => quote! {
                 if false {
                     let _: &dyn ::core::future::Future<Output = #output_type> = &body;
