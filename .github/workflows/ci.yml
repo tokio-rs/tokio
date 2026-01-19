@@ -117,7 +117,7 @@ jobs:
           set -euxo pipefail
           cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
           cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
-          cargo hack nextest run --workspace --exclude tokio --features full,test-util --ignore-unknown-features --no-tests=warn
+          cargo hack nextest run --workspace --exclude tokio --exclude examples --features full,test-util --ignore-unknown-features --no-tests=warn
           cargo test --doc --workspace --features $TOKIO_STABLE_FEATURES
 
   test-workspace-all-features-panic-abort:
@@ -1089,7 +1089,7 @@ jobs:
           RUSTDOCFLAGS: -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-stream
-        run: cargo test -p tokio-stream --target ${{ matrix.target }} --features time,net,io-util,sync --config 'patch.crates-io.tokio-stream.path="../tokio-stream"'
+        run: cargo test -p tokio-stream --target ${{ matrix.target }} --features time,net,io-util,sync --config 'patch.crates-io.tokio-stream.path="tokio-stream"'
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
