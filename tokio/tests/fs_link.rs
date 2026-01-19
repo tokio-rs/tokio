@@ -68,10 +68,7 @@ async fn test_hard_link_error_source_not_found() {
     let src = dir.path().join("nonexistent.txt");
     let dst = dir.path().join("dst.txt");
 
-    let result = fs::hard_link(&src, &dst).await;
-
-    assert!(result.is_err());
-    let err = result.unwrap_err();
+    let err = fs::hard_link(&src, &dst).await.unwrap_err();
     assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
 }
 
@@ -83,22 +80,13 @@ async fn test_hard_link_error_destination_already_exists() {
     let dst = dir.path().join("dst.txt");
 
     // Create source file
-    std::fs::File::create(&src)
-        .unwrap()
-        .write_all(b"source content")
-        .unwrap();
+    std::fs::write(&src, b"source content").unwrap();
 
     // Create destination file
-    std::fs::File::create(&dst)
-        .unwrap()
-        .write_all(b"destination content")
-        .unwrap();
+    std::fs::write(&dst, b"destination content").unwrap();
 
     // Attempt to create hard link when destination already exists
-    let result = fs::hard_link(&src, &dst).await;
-
-    assert!(result.is_err());
-    let err = result.unwrap_err();
+    let err = fs::hard_link(&src, &dst).await.unwrap_err();
     assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
 }
 
@@ -113,11 +101,8 @@ async fn test_hard_link_error_source_is_directory() {
     fs::create_dir(&src_dir).await.unwrap();
 
     // Attempt to create hard link from a directory
-    let result = fs::hard_link(&src_dir, &dst).await;
-
     // On most systems, hard linking directories is not allowed
-    assert!(result.is_err());
-    let err = result.unwrap_err();
+    let err = fs::hard_link(&src_dir, &dst).await.unwrap_err();
 
     // Different platforms return different error kinds
     #[cfg(unix)]
