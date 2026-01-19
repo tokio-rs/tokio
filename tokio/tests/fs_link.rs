@@ -117,5 +117,15 @@ async fn test_hard_link_error_source_is_directory() {
 
     // On most systems, hard linking directories is not allowed
     assert!(result.is_err());
-    // The exact error kind may vary by platform, but it should fail
+    let err = result.unwrap_err();
+
+    // Different platforms return different error kinds
+    #[cfg(unix)]
+    assert!(
+        err.kind() == std::io::ErrorKind::PermissionDenied
+            || err.kind() == std::io::ErrorKind::Other
+    );
+
+    #[cfg(windows)]
+    assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
 }
