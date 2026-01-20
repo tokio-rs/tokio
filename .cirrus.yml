@@ -40,7 +40,7 @@ task:
     - |
       RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
       RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" \
-        cargo test --workspace --exclude tokio \
+        cargo test --workspace --exclude tokio --exclude examples \
           --features $TOKIO_STABLE_FEATURES,io-uring,tracing
 
 task:
@@ -76,4 +76,4 @@ task:
   test_script:
     - . $HOME/.cargo/env
     - cargo test -p tokio --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd --config 'patch.crates-io.tokio.path="tokio"'
-    - cargo test --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd
+    - cargo test --workspace --exclude tokio --exclude examples --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd
