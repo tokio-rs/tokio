@@ -435,7 +435,7 @@ where
     ///
     /// # Cancel Safety
     ///
-    /// This method is cancel safe. If `join_next` is used as the event in a `tokio::select!`
+    /// This method is cancel safe. If `join_next` is used as the event in a [`tokio::select!`]
     /// statement and some other branch completes first, it is guaranteed that no tasks were
     /// removed from this `JoinMap`.
     ///
@@ -451,6 +451,7 @@ where
     ///    that panicked or was aborted.
     ///  * `None` if the `JoinMap` is empty.
     ///
+    /// [`tokio::select!`]: tokio::select
     pub async fn join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
         loop {
             let (res, id) = match self.tasks.join_next_with_id().await {

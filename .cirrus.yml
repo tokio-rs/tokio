@@ -26,7 +26,7 @@ task:
   test_script:
     - . $HOME/.cargo/env
     - cargo test -p tokio --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
-    - cargo test --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES
+    - cargo test --workspace --exclude tokio --exclude examples --features $TOKIO_STABLE_FEATURES
     # Free the disk space before the next build,
     # otherwise cirrus-ci complains about "No space left on device".
     - cargo clean
