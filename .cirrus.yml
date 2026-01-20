@@ -25,7 +25,8 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --features $TOKIO_STABLE_FEATURES
+    - cargo test -p tokio --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
+    - cargo test --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES
     # Free the disk space before the next build,
     # otherwise cirrus-ci complains about "No space left on device".
     - cargo clean
@@ -33,7 +34,13 @@ task:
     - |
       RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
       RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" \
-        cargo test \
+        cargo test -p tokio \
+          --features $TOKIO_STABLE_FEATURES,io-uring,tracing \
+          --config 'patch.crates-io.tokio.path="tokio"'
+    - |
+      RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
+      RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" \
+        cargo test --workspace --exclude tokio \
           --features $TOKIO_STABLE_FEATURES,io-uring,tracing
 
 task:
@@ -68,4 +75,5 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd
+    - cargo test -p tokio --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd --config 'patch.crates-io.tokio.path="tokio"'
+    - cargo test --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd
