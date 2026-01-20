@@ -408,16 +408,23 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     let crate_path = config
         .crate_name
         .map(ToTokens::into_token_stream)
-        .unwrap_or_else(|| Ident::new("tokio", last_stmt_start_span).into_token_stream());
+        .unwrap_or_else(|| {
+            Ident::new("tokio", Span::call_site().located_at(last_stmt_start_span))
+                .into_token_stream()
+        });
+
+    let use_builder = quote_spanned! {Span::call_site().located_at(last_stmt_start_span)=>
+        use #crate_path::runtime::Builder;
+    };
 
     let mut rt = match config.flavor {
         RuntimeFlavor::CurrentThread | RuntimeFlavor::Local => {
             quote_spanned! {last_stmt_start_span=>
-                #crate_path::runtime::Builder::new_current_thread()
+                Builder::new_current_thread()
             }
         }
         RuntimeFlavor::Threaded => quote_spanned! {last_stmt_start_span=>
-            #crate_path::runtime::Builder::new_multi_thread()
+            Builder::new_multi_thread()
         },
     };
 
@@ -470,6 +477,8 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         #[cfg(all(#(#checks),*))]
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return, clippy::unwrap_in_result)]
         {
+            #use_builder
+
             return #rt
                 .enable_all()
                 .#build
