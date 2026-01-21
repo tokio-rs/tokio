@@ -4,7 +4,7 @@ Each crate (e.g., `tokio-util`, `tokio-stream`, etc.) should specify dependencie
 according to these rules:
 
 1. The listed version should be the oldest version that the crate works with
-(e.g., if `tokio-util` works with `tokio` version `1.44` but not `1.43`, then 
+(e.g., if `tokio-util` works with `tokio` version `1.44` but not `1.43`, then
 `tokio-util` should specify version `1.44` for its `tokio` dependency.)
 We don't require users to use the latest version unnecessarily).
 2. When a crate starts using a newer feature in a dependency, the version
@@ -25,7 +25,7 @@ tokio = { version = "1.15.0", path = "../tokio", features = ["sync"] }
 
 In this case, local development of `tokio-stream` uses the local version
 of `tokio` via the `path` dependency. This means that it's currently not
-possible to release `tokio-stream`. Once a new version of `tokio` is 
+possible to release `tokio-stream`. Once a new version of `tokio` is
 released, the path dependency will be removed from `tokio-stream`.
 As mentioned before, this version should only be bumped when adding a new
 feature in the crate that relies on a newer version.
