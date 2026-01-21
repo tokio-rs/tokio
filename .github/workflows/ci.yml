@@ -821,11 +821,11 @@ jobs:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@v2
       # Run clippy
-      - name: "clippy --all --features ${{ env.TOKIO_STABLE_FEATURES }}"
+      - name: "clippy --workspace --features ${{ env.TOKIO_STABLE_FEATURES }}"
         run: |
           cargo clippy -p tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
-          cargo clippy --all --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
-      - name: "clippy --all --all-features --unstable"
+          cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
+      - name: "clippy --workspace --all-features --unstable"
         run: |
           cargo clippy -p tokio --tests --no-deps --all-features --config 'patch.crates-io.tokio.path="tokio"'
           cargo clippy --workspace --exclude tokio --tests --no-deps --all-features

@@ -41,7 +41,7 @@ task:
       RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
       RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" \
         cargo test --workspace --exclude tokio --exclude examples \
-          --features $TOKIO_STABLE_FEATURES,io-uring,tracing
+          --features $TOKIO_STABLE_FEATURES,tracing
 
 task:
   name: FreeBSD docs
