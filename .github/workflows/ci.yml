@@ -149,6 +149,8 @@ jobs:
           set -euxo pipefail
           RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run \
             --workspace \
+            --exclude tokio-macros \
+            --exclude tests-build \
             --features $TOKIO_STABLE_FEATURES \
             --tests
           # Removing the tokio workspace patch to run tests without path dependencies
