@@ -115,10 +115,9 @@ jobs:
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }}
         run: |
           set -euxo pipefail
-          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES
-          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES
+          cargo nextest run --workspace --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to run tests without path dependencies
-          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo hack nextest run --workspace --exclude tokio --exclude examples --features full,test-util --ignore-unknown-features --no-tests=warn
           cargo test --doc --workspace --features $TOKIO_STABLE_FEATURES
 
@@ -153,7 +152,7 @@ jobs:
             --features $TOKIO_STABLE_FEATURES \
             --tests
           # Removing the tokio workspace patch to run tests without path dependencies
-          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run \
             --workspace \
             --exclude tokio \
@@ -228,9 +227,9 @@ jobs:
       - name: Check tests --features ${{ env.TOKIO_STABLE_FEATURES }}
         run: |
           set -euxo pipefail
-          cargo check -p tokio --tests --features $TOKIO_STABLE_FEATURES
+          cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to run tests without path dependencies
-          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo check --workspace --exclude tokio --tests --features $TOKIO_STABLE_FEATURES
 
   valgrind:
@@ -454,9 +453,9 @@ jobs:
       - name: asan
         run: |
           set -euxo pipefail
-          cargo test -p tokio --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
+          cargo test --workspace --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
           # Removing the tokio workspace patch to run tests without path dependencies
-          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo test --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
         env:
           RUSTFLAGS: -Z sanitizer=address --cfg tokio_no_tuning_tests
@@ -749,11 +748,11 @@ jobs:
           if [[ "${{ github.event.pull_request.base.ref }}" =~ ^tokio-1\..* ]]; then
             # Only check `tokio` crate as the PR is backporting to an earlier tokio release.
 
-            cargo hack check -p tokio --features $TOKIO_STABLE_FEATURES
+            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
           else
             # Check all crates in the workspace
 
-            cargo hack check -p tokio --features $TOKIO_STABLE_FEATURES
+            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
             # Other crates doesn't have unstable features, so we can use --all-features.
             cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features
           fi
@@ -832,7 +831,7 @@ jobs:
         run: |
           cargo clippy --workspace --tests --no-deps --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to check without path dependencies
-          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
       - name: "clippy --workspace --all-features --unstable"
         run: |
