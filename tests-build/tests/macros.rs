@@ -16,6 +16,9 @@ fn compile_fail_full() {
     t.pass("tests/pass/impl_trait.rs");
 
     #[cfg(feature = "full")]
+    t.pass("tests/pass/use_builder_outer.rs");
+
+    #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_invalid_input.rs");
 
     #[cfg(feature = "full")]
