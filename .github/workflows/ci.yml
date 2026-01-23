@@ -830,17 +830,14 @@ jobs:
       # Run clippy
       - name: "clippy --workspace --features ${{ env.TOKIO_STABLE_FEATURES }}"
         run: |
-          cargo clippy -p tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
-          # Removing the tokio workspace patch to run tests without path dependencies
+          cargo clippy --workspace --tests --no-deps --features $TOKIO_STABLE_FEATURES
+          # Removing the tokio workspace patch to check without path dependencies
           sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
       - name: "clippy --workspace --all-features --unstable"
         run: |
-          echo '[patch.crates-io]' >>Cargo.toml
-          echo 'tokio = { path = "tokio" }' >>Cargo.toml
-          cargo clippy -p tokio --tests --no-deps --all-features
-          # Removing the tokio workspace patch to run tests without path dependencies
-          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          cargo clippy --workspace --tests --no-deps --all-features --config 'patch.crates-io.tokio.path="tokio"'
+          # check without path dependencies
           cargo clippy --workspace --exclude tokio --tests --no-deps --all-features
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
