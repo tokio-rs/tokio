@@ -117,7 +117,7 @@ jobs:
           set -euxo pipefail
           cargo nextest run --workspace --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to run tests without path dependencies
-          sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i.bak '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml && rm -f Cargo.toml.bak
           cargo hack nextest run --workspace --exclude tokio --exclude examples --features full,test-util --ignore-unknown-features --no-tests=warn
           cargo test --doc --workspace --features $TOKIO_STABLE_FEATURES
 
@@ -152,7 +152,7 @@ jobs:
             --features $TOKIO_STABLE_FEATURES \
             --tests
           # Removing the tokio workspace patch to run tests without path dependencies
-          sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i.bak '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml && rm -f Cargo.toml.bak
           RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run \
             --workspace \
             --exclude tokio \
@@ -229,7 +229,7 @@ jobs:
           set -euxo pipefail
           cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to run tests without path dependencies
-          sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo check --workspace --exclude tokio --tests --features $TOKIO_STABLE_FEATURES
 
   valgrind:
@@ -455,7 +455,7 @@ jobs:
           set -euxo pipefail
           cargo test --workspace --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
           # Removing the tokio workspace patch to run tests without path dependencies
-          sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo test --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
         env:
           RUSTFLAGS: -Z sanitizer=address --cfg tokio_no_tuning_tests
@@ -831,7 +831,7 @@ jobs:
         run: |
           cargo clippy --workspace --tests --no-deps --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to check without path dependencies
-          sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
       - name: "clippy --workspace --all-features --unstable"
         run: |
