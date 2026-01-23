@@ -25,7 +25,9 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test -p tokio --features $TOKIO_STABLE_FEATURES --config 'patch.crates-io.tokio.path="tokio"'
+    - cargo test -p tokio --features $TOKIO_STABLE_FEATURES
+    # Removing the tokio workspace patch to run tests without path dependencies
+    - sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
     - cargo test --workspace --exclude tokio --exclude examples --features $TOKIO_STABLE_FEATURES
     # Free the disk space before the next build,
     # otherwise cirrus-ci complains about "No space left on device".
@@ -75,5 +77,7 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test -p tokio --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd --config 'patch.crates-io.tokio.path="tokio"'
+    - cargo test -p tokio --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd
+    # Removing the tokio workspace patch to run tests without path dependencies
+    - sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
     - cargo test --workspace --exclude tokio --exclude examples --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd

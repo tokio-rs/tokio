@@ -1,7 +1,7 @@
 [package]
 name = "tokio"
 # When releasing to crates.io:
-# - Remove path dependencies (if any)
+# - Remove path dependencies
 # - Update doc url
 #   - README.md
 # - Update CHANGELOG.md.
@@ -90,7 +90,7 @@ io-uring = ["dep:io-uring", "libc", "mio/os-poll", "mio/os-ext", "dep:slab"]
 taskdump = ["dep:backtrace"]
 
 [dependencies]
-tokio-macros = { version = "~2.6.0", optional = true }
+tokio-macros = { version = "~2.6.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.11"
 
@@ -136,9 +136,9 @@ features = [
 ]
 
 [dev-dependencies]
-tokio-test = "0.4.0"
-tokio-stream = "0.1"
-tokio-util = { version = "0.7", features = ["rt"] }
+tokio-test = { version = "0.4.0", path = "../tokio-test" }
+tokio-stream = { version = "0.1", path = "../tokio-stream" }
+tokio-util = { version = "0.7", path = "../tokio-util", features = ["rt"] }
 futures = { version = "0.3.0", features = ["async-await"] }
 futures-test = "0.3.31"
 mockall = "0.13.0"
