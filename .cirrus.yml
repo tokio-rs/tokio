@@ -25,7 +25,7 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test -p tokio --features $TOKIO_STABLE_FEATURES
+    - cargo test --workspace --features $TOKIO_STABLE_FEATURES
     # Removing the tokio workspace patch to run tests without path dependencies
     - sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
     - cargo test --workspace --exclude tokio --exclude examples --features $TOKIO_STABLE_FEATURES
@@ -36,9 +36,10 @@ task:
     - |
       RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
       RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" \
-        cargo test -p tokio \
+        cargo test \
           --features $TOKIO_STABLE_FEATURES,io-uring,tracing \
           --config 'patch.crates-io.tokio.path="tokio"'
+    # Test without tokio patch
     - |
       RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
       RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" \
@@ -77,7 +78,7 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test -p tokio --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd
+    - cargo test --workspace --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd
     # Removing the tokio workspace patch to run tests without path dependencies
     - sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
     - cargo test --workspace --exclude tokio --exclude examples --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd

@@ -116,9 +116,16 @@ jobs:
         run: |
           set -euxo pipefail
           cargo nextest run --workspace --features $TOKIO_STABLE_FEATURES
-          # Removing workspace patches to run tests without path dependencies (if not specified differently in the crate)
+          # Removing workspace patches to run tests without path dependencies
+          # (if not specified differently in the crate)
           sed -i.bak '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml && rm -f Cargo.toml.bak
-          cargo hack nextest run --workspace --exclude tokio --exclude examples --features full,test-util --ignore-unknown-features --no-tests=warn
+          cargo hack nextest run \
+            --workspace \
+            --exclude tokio \
+            --exclude examples \
+            --features full,test-util \
+            --ignore-unknown-features \
+            --no-tests=warn
           cargo test --doc --workspace --features $TOKIO_STABLE_FEATURES
 
   test-workspace-all-features-panic-abort:
@@ -154,6 +161,7 @@ jobs:
             --features $TOKIO_STABLE_FEATURES \
             --tests
           # Removing the tokio workspace patch to run tests without path dependencies
+          # (if not specified differently in the crate)
           sed -i.bak '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml && rm -f Cargo.toml.bak
           RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run \
             --workspace \
@@ -230,7 +238,8 @@ jobs:
         run: |
           set -euxo pipefail
           cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
-          # Removing the tokio workspace patch to run tests without path dependencies
+          # Removing the tokio workspace patch to run tests without path dependencies 
+          # (if not specified differently in the crate)
           sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo check --workspace --exclude tokio --tests --features $TOKIO_STABLE_FEATURES
 
@@ -456,7 +465,8 @@ jobs:
         run: |
           set -euxo pipefail
           cargo test --workspace --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
-          # Removing the tokio workspace patch to run tests without path dependencies
+          # Removing the tokio workspace patch to run tests without path dependencies 
+          # (if not specified differently in the crate)
           sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo test --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
         env:
@@ -833,6 +843,7 @@ jobs:
         run: |
           cargo clippy --workspace --tests --no-deps --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to check without path dependencies
+          # (if not specified differently in the crate)
           sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
       - name: "clippy --workspace --all-features --unstable"
@@ -1100,7 +1111,7 @@ jobs:
           RUSTDOCFLAGS: -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-stream
-        run: cargo test -p tokio-stream --target ${{ matrix.target }} --features time,net,io-util,sync --config 'patch.crates-io.tokio-stream.path="tokio-stream"'
+        run: cargo test --manifest-path=tokio-stream/Cargo.toml --target ${{ matrix.target }} --features time,net,io-util,sync
 
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
