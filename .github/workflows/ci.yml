@@ -123,7 +123,7 @@ jobs:
             --workspace \
             --exclude tokio \
             --exclude examples \
-            --features full,test-util \
+            --features $TOKIO_STABLE_FEATURES \
             --ignore-unknown-features \
             --no-tests=warn
           cargo test --doc --workspace --features $TOKIO_STABLE_FEATURES
@@ -238,7 +238,7 @@ jobs:
         run: |
           set -euxo pipefail
           cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
-          # Removing the tokio workspace patch to run tests without path dependencies 
+          # Removing the tokio workspace patch to run tests without path dependencies
           # (if not specified differently in the crate)
           sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo check --workspace --exclude tokio --tests --features $TOKIO_STABLE_FEATURES
@@ -465,7 +465,7 @@ jobs:
         run: |
           set -euxo pipefail
           cargo test --workspace --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
-          # Removing the tokio workspace patch to run tests without path dependencies 
+          # Removing the tokio workspace patch to run tests without path dependencies
           # (if not specified differently in the crate)
           sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
           cargo test --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture

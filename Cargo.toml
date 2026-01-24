@@ -15,8 +15,6 @@ members = [
   "tests-integration",
 ]
 
-[patch.crates-io]
-tokio = { path = "tokio"}
 
 [workspace.metadata.spellcheck]
 config = "spellcheck.toml"
