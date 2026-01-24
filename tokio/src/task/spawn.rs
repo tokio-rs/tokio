@@ -16,8 +16,8 @@ cfg_rt! {
     /// spawned task may execute on the current thread, or it may be sent to a
     /// different thread to be executed. The specifics depend on the current
     /// [`Runtime`](crate::runtime::Runtime) configuration. In a
-    /// [running runtime][running-runtime], it may start immediately in the background,
-    /// even if you don't await the returned [`JoinHandle`].
+    /// [running runtime][running-runtime], the task will start immediately in the
+    /// background, even if you don't await the returned [`JoinHandle`].
     /// On a blocked runtime, the user must drive the runtime forward (for example,
     /// by calling [`Runtime::block_on`](crate::runtime::Runtime::block_on)).
     ///
