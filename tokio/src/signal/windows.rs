@@ -93,7 +93,8 @@ impl CtrlC {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        Some(self.inner.recv().await)
+        self.inner.recv().await;
+        Some(())
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -169,7 +170,8 @@ impl CtrlBreak {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        Some(self.inner.recv().await)
+        self.inner.recv().await;
+        Some(())
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -295,7 +297,8 @@ impl CtrlClose {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        Some(self.inner.recv().await)
+        self.inner.recv().await;
+        Some(())
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -392,7 +395,8 @@ impl CtrlShutdown {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        Some(self.inner.recv().await)
+        self.inner.recv().await;
+        Some(())
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -489,7 +493,8 @@ impl CtrlLogoff {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        Some(self.inner.recv().await)
+        self.inner.recv().await;
+        Some(())
     }
 
     /// Polls to receive the next signal notification event, outside of an
