@@ -93,7 +93,7 @@ impl CtrlC {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.recv().await
+        Some(self.inner.recv().await)
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -125,7 +125,7 @@ impl CtrlC {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.poll_recv(cx)
+        self.inner.poll_recv(cx).map(Some)
     }
 }
 
@@ -169,7 +169,7 @@ impl CtrlBreak {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.recv().await
+        Some(self.inner.recv().await)
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -201,7 +201,7 @@ impl CtrlBreak {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.poll_recv(cx)
+        self.inner.poll_recv(cx).map(Some)
     }
 }
 
@@ -295,7 +295,7 @@ impl CtrlClose {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.recv().await
+        Some(self.inner.recv().await)
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -327,7 +327,7 @@ impl CtrlClose {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.poll_recv(cx)
+        self.inner.poll_recv(cx).map(Some)
     }
 }
 
@@ -392,7 +392,7 @@ impl CtrlShutdown {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.recv().await
+        Some(self.inner.recv().await)
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -424,7 +424,7 @@ impl CtrlShutdown {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.poll_recv(cx)
+        self.inner.poll_recv(cx).map(Some)
     }
 }
 
@@ -489,7 +489,7 @@ impl CtrlLogoff {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.recv().await
+        Some(self.inner.recv().await)
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -521,6 +521,6 @@ impl CtrlLogoff {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.poll_recv(cx)
+        self.inner.poll_recv(cx).map(Some)
     }
 }

@@ -449,7 +449,7 @@ impl Signal {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.recv().await
+        Some(self.inner.recv().await)
     }
 
     /// Polls to receive the next signal notification event, outside of an
@@ -487,7 +487,7 @@ impl Signal {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.poll_recv(cx)
+        self.inner.poll_recv(cx).map(Some)
     }
 }
 
