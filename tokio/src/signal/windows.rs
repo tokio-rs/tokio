@@ -72,7 +72,7 @@ pub struct CtrlC {
 impl CtrlC {
     /// Receives the next signal notification event.
     ///
-    /// `None` is returned if no more events can be received by the listener.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Examples
     ///
@@ -99,7 +99,7 @@ impl CtrlC {
     /// Polls to receive the next signal notification event, outside of an
     /// `async` context.
     ///
-    /// `None` is returned if no more events can be received.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Examples
     ///
@@ -149,7 +149,7 @@ pub struct CtrlBreak {
 impl CtrlBreak {
     /// Receives the next signal notification event.
     ///
-    /// `None` is returned if no more events can be received by this listener.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Examples
     ///
@@ -175,7 +175,7 @@ impl CtrlBreak {
     /// Polls to receive the next signal notification event, outside of an
     /// `async` context.
     ///
-    /// `None` is returned if no more events can be received by this listener.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Examples
     ///
@@ -275,7 +275,7 @@ pub struct CtrlClose {
 impl CtrlClose {
     /// Receives the next signal notification event.
     ///
-    /// `None` is returned if no more events can be received by this listener.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Examples
     ///
@@ -301,7 +301,7 @@ impl CtrlClose {
     /// Polls to receive the next signal notification event, outside of an
     /// `async` context.
     ///
-    /// `None` is returned if no more events can be received by this listener.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Examples
     ///
@@ -372,7 +372,7 @@ pub struct CtrlShutdown {
 impl CtrlShutdown {
     /// Receives the next signal notification event.
     ///
-    /// `None` is returned if no more events can be received by this listener.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Examples
     ///
@@ -398,7 +398,7 @@ impl CtrlShutdown {
     /// Polls to receive the next signal notification event, outside of an
     /// `async` context.
     ///
-    /// `None` is returned if no more events can be received by this listener.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Examples
     ///
@@ -469,7 +469,7 @@ pub struct CtrlLogoff {
 impl CtrlLogoff {
     /// Receives the next signal notification event.
     ///
-    /// `None` is returned if no more events can be received by this listener.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Examples
     ///
@@ -495,7 +495,7 @@ impl CtrlLogoff {
     /// Polls to receive the next signal notification event, outside of an
     /// `async` context.
     ///
-    /// `None` is returned if no more events can be received by this listener.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Examples
     ///

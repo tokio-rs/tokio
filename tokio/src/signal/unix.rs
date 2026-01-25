@@ -421,7 +421,7 @@ pub(crate) fn signal_with_handle(
 impl Signal {
     /// Receives the next signal notification event.
     ///
-    /// `None` is returned if no more events can be received by this stream.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Cancel safety
     ///
@@ -455,13 +455,7 @@ impl Signal {
     /// Polls to receive the next signal notification event, outside of an
     /// `async` context.
     ///
-    /// This method returns:
-    ///
-    ///  * `Poll::Pending` if no signals are available but the channel is not
-    ///    closed.
-    ///  * `Poll::Ready(Some(()))` if a signal is available.
-    ///  * `Poll::Ready(None)` if the channel has been closed and all signals
-    ///    sent before it was closed have been received.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
     ///
     /// # Examples
     ///
