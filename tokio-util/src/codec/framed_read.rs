@@ -161,6 +161,18 @@ impl<T, D> FramedRead<T, D> {
             _priv: (),
         }
     }
+
+    /// Creates the `FramedRead` from I/O stream, the buffer
+    /// with unprocessed data, and the codec.
+    pub fn from_parts(parts: FramedParts<T, D>) -> FramedRead<T, D> {
+        FramedRead {
+            inner: FramedImpl {
+                inner: parts.io,
+                codec: parts.codec,
+                state: parts.read_buf.into(),
+            },
+        }
+    }
 }
 
 // This impl just defers to the underlying FramedImpl
