@@ -1,12 +1,11 @@
+use crate::signal::unix::pipe;
+
 use super::{Driver, Handle, TOKEN_SIGNAL};
 
 use std::io;
 
 impl Handle {
-    pub(crate) fn register_signal_receiver(
-        &self,
-        receiver: &mut mio::net::UnixStream,
-    ) -> io::Result<()> {
+    pub(crate) fn register_signal_receiver(&self, receiver: &mut pipe::Receiver) -> io::Result<()> {
         self.registry
             .register(receiver, TOKEN_SIGNAL, mio::Interest::READABLE)?;
         Ok(())

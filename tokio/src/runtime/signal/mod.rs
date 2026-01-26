@@ -4,9 +4,9 @@
 
 use crate::runtime::{driver, io};
 use crate::signal::registry::globals;
+use crate::signal::unix::pipe;
 
-use mio::net::UnixStream;
-use std::io::{self as std_io, Read};
+use std::io as std_io;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
@@ -21,7 +21,7 @@ pub(crate) struct Driver {
     io: io::Driver,
 
     /// A pipe for receiving wake events from the signal handler
-    receiver: UnixStream,
+    receiver: pipe::Receiver,
 
     /// Shared state. The driver keeps a strong ref and the handle keeps a weak
     /// ref. The weak ref is used to check if the driver is still active before
@@ -41,9 +41,6 @@ pub(crate) struct Handle {
 impl Driver {
     /// Creates a new signal `Driver` instance that delegates wakeups to `park`.
     pub(crate) fn new(io: io::Driver, io_handle: &io::Handle) -> std_io::Result<Self> {
-        use std::mem::ManuallyDrop;
-        use std::os::unix::io::{AsRawFd, FromRawFd};
-
         // NB: We give each driver a "fresh" receiver file descriptor to avoid
         // the issues described in alexcrichton/tokio-process#42.
         //
@@ -63,14 +60,7 @@ impl Driver {
         // safe as each dup is registered with separate reactors **and** we
         // only expect at least one dup to receive the notification.
 
-        // Manually drop as we don't actually own this instance of UnixStream.
-        let receiver_fd = globals().receiver.as_raw_fd();
-
-        // safety: there is nothing unsafe about this, but the `from_raw_fd` fn is marked as unsafe.
-        let original =
-            ManuallyDrop::new(unsafe { std::os::unix::net::UnixStream::from_raw_fd(receiver_fd) });
-        let mut receiver = UnixStream::from_std(original.try_clone()?);
-
+        let mut receiver = globals()?.receiver()?;
         io_handle.register_signal_receiver(&mut receiver)?;
 
         Ok(Self {
@@ -109,21 +99,14 @@ impl Driver {
             return;
         }
 
-        // Drain the pipe completely so we can receive a new readiness event
-        // if another signal has come in.
-        let mut buf = [0; 128];
-        #[allow(clippy::unused_io_amount)]
-        loop {
-            match self.receiver.read(&mut buf) {
-                Ok(0) => panic!("EOF on self-pipe"),
-                Ok(_) => continue, // Keep reading
-                Err(e) if e.kind() == std_io::ErrorKind::WouldBlock => break,
-                Err(e) => panic!("Bad read on self-pipe: {e}"),
-            }
-        }
+        // consume value
+        let _ = self.receiver.read();
 
-        // Broadcast any signals which were received
-        globals().broadcast();
+        // We do a best-effort broadcast here
+        if let Ok(globals) = globals() {
+            // Broadcast any signals which were received.
+            globals.broadcast();
+        }
     }
 }
 
