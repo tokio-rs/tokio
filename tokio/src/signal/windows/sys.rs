@@ -29,7 +29,7 @@ pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
 
 fn new(signum: u32) -> io::Result<RxFuture> {
     global_init()?;
-    let rx = globals().register_listener(signum as EventId);
+    let rx = globals()?.register_listener(signum as EventId)?;
     Ok(RxFuture::new(rx))
 }
 
@@ -110,7 +110,10 @@ fn global_init() -> io::Result<()> {
 }
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
-    let globals = globals();
+    let globals = match globals() {
+        Ok(globals) => globals,
+        Err(_) => return 0,
+    };
     globals.record_event(ty as EventId);
 
     // According to https://docs.microsoft.com/en-us/windows/console/handlerroutine

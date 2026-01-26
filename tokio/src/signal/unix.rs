@@ -287,7 +287,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     // Check that we have a signal driver running
     handle.check_inner()?;
 
-    let globals = globals();
+    let globals = globals()?;
     let siginfo = match globals.storage().get(signal as EventId) {
         Some(slot) => slot,
         None => return Err(io::Error::new(io::ErrorKind::Other, "signal too large")),
@@ -424,7 +424,7 @@ pub(crate) fn signal_with_handle(
     // Turn the signal delivery on once we are ready for it
     signal_enable(kind, handle)?;
 
-    Ok(globals().register_listener(kind.0 as EventId))
+    Ok(globals()?.register_listener(kind.0 as EventId))
 }
 
 impl Signal {
