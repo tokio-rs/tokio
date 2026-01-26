@@ -105,10 +105,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
-      - name: Install cargo-hack
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-hack
 
       - uses: Swatinem/rust-cache@v2
 
@@ -119,13 +115,11 @@ jobs:
           # Removing workspace patches to run tests without path dependencies
           # (if not specified differently in the crate)
           sed -i.bak '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml && rm -f Cargo.toml.bak
-          cargo hack nextest run \
+          cargo nextest run \
             --workspace \
             --exclude tokio \
             --exclude examples \
-            --features $TOKIO_STABLE_FEATURES \
-            --ignore-unknown-features \
-            --no-tests=warn
+            --features $TOKIO_STABLE_FEATURES
           cargo test --doc --workspace --features $TOKIO_STABLE_FEATURES
 
   test-workspace-all-features-panic-abort:
