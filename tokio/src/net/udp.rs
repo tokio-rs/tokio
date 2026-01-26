@@ -529,9 +529,11 @@ impl UdpSocket {
     /// connected to.
     ///
     /// The [`connect`] method will connect this socket to a remote address.
-    /// This method will fail if the socket is not connected.
+    /// This method will fail with a [`ConnectionRefused`] error if the remote
+    /// address has replied with ICMP Unreachable to a previously sent packet.
     ///
     /// [`connect`]: method@Self::connect
+    /// [`ConnectionRefused`]: std::io::ErrorKind::ConnectionRefused
     ///
     /// # Return
     ///
