@@ -73,6 +73,7 @@ impl CtrlC {
     /// Receives the next signal notification event.
     ///
     /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Examples
     ///
@@ -101,6 +102,7 @@ impl CtrlC {
     /// `async` context.
     ///
     /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Examples
     ///
@@ -151,6 +153,7 @@ impl CtrlBreak {
     /// Receives the next signal notification event.
     ///
     /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Examples
     ///
@@ -178,6 +181,7 @@ impl CtrlBreak {
     /// `async` context.
     ///
     /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Examples
     ///
@@ -278,6 +282,7 @@ impl CtrlClose {
     /// Receives the next signal notification event.
     ///
     /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Examples
     ///
@@ -305,6 +310,7 @@ impl CtrlClose {
     /// `async` context.
     ///
     /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Examples
     ///
@@ -376,6 +382,7 @@ impl CtrlShutdown {
     /// Receives the next signal notification event.
     ///
     /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Examples
     ///
@@ -403,6 +410,7 @@ impl CtrlShutdown {
     /// `async` context.
     ///
     /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Examples
     ///
@@ -474,6 +482,7 @@ impl CtrlLogoff {
     /// Receives the next signal notification event.
     ///
     /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Examples
     ///
@@ -501,6 +510,7 @@ impl CtrlLogoff {
     /// `async` context.
     ///
     /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Examples
     ///
