@@ -29,7 +29,7 @@ pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
 
 fn new(signum: u32) -> io::Result<RxFuture> {
     global_init()?;
-    let rx = globals()?.register_listener(signum as EventId)?;
+    let rx = globals()?.register_listener(signum as EventId);
     Ok(RxFuture::new(rx))
 }
 
