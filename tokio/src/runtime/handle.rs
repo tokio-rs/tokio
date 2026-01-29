@@ -166,7 +166,7 @@ impl Handle {
     ///
     /// The provided future will start running in the background immediately
     /// when `spawn` is called, even if you don't await the returned
-    /// `JoinHandle`. (Assuming that the runtime [is running][running-runtime]).
+    /// `JoinHandle` (assuming that the runtime [is running][running-runtime]).
     ///
     /// See [module level][mod] documentation for more details.
     ///
