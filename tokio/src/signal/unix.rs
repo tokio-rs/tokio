@@ -421,7 +421,8 @@ pub(crate) fn signal_with_handle(
 impl Signal {
     /// Receives the next signal notification event.
     ///
-    /// `None` is returned if no more events can be received by this stream.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Cancel safety
     ///
@@ -449,19 +450,15 @@ impl Signal {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Option<()> {
-        self.inner.recv().await
+        self.inner.recv().await;
+        Some(())
     }
 
     /// Polls to receive the next signal notification event, outside of an
     /// `async` context.
     ///
-    /// This method returns:
-    ///
-    ///  * `Poll::Pending` if no signals are available but the channel is not
-    ///    closed.
-    ///  * `Poll::Ready(Some(()))` if a signal is available.
-    ///  * `Poll::Ready(None)` if the channel has been closed and all signals
-    ///    sent before it was closed have been received.
+    /// Although this returns `Option<()>`, it will never actually return `None`.
+    /// This was accidentally exposed and would be a breaking change to be removed.
     ///
     /// # Examples
     ///
@@ -487,7 +484,7 @@ impl Signal {
     /// }
     /// ```
     pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<()>> {
-        self.inner.poll_recv(cx)
+        self.inner.poll_recv(cx).map(Some)
     }
 }
 
