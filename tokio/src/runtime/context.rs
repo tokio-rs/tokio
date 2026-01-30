@@ -121,7 +121,7 @@ tokio_thread_local! {
     }
 }
 
-#[cfg(any(feature = "macros", all(feature = "sync", feature = "rt")))]
+#[cfg(any(feature = "macros", feature = "rt"))]
 pub(crate) fn thread_rng_n(n: u32) -> u32 {
     CONTEXT.with(|ctx| {
         let mut rng = ctx.rng.get().unwrap_or_else(FastRand::new);
