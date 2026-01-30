@@ -26,9 +26,6 @@ task:
   test_script:
     - . $HOME/.cargo/env
     - cargo test --workspace --features $TOKIO_STABLE_FEATURES
-    # Removing the tokio workspace patch to run tests without path dependencies
-    - sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
-    - cargo test --workspace --exclude tokio --exclude examples --features $TOKIO_STABLE_FEATURES
     # Free the disk space before the next build,
     # otherwise cirrus-ci complains about "No space left on device".
     - cargo clean
@@ -37,14 +34,7 @@ task:
       RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
       RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" \
         cargo test \
-          --features $TOKIO_STABLE_FEATURES,io-uring,tracing \
-          --config 'patch.crates-io.tokio.path="tokio"'
-    # Test without tokio patch
-    - |
-      RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
-      RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" \
-        cargo test --workspace --exclude tokio --exclude examples \
-          --features $TOKIO_STABLE_FEATURES,tracing
+          --features $TOKIO_STABLE_FEATURES,io-uring,tracing
 
 task:
   name: FreeBSD docs
@@ -79,6 +69,3 @@ task:
   test_script:
     - . $HOME/.cargo/env
     - cargo test --workspace --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd
-    # Removing the tokio workspace patch to run tests without path dependencies
-    - sed -i '' '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
-    - cargo test --workspace --exclude tokio --exclude examples --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd

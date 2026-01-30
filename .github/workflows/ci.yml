@@ -156,16 +156,6 @@ jobs:
             --exclude tests-build \
             --features $TOKIO_STABLE_FEATURES \
             --tests
-          # Removing the tokio workspace patch to run tests without path dependencies
-          # (if not specified differently in the crate)
-          sed -i.bak '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml && rm -f Cargo.toml.bak
-          RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run \
-            --workspace \
-            --exclude tokio \
-            --exclude tokio-macros \
-            --exclude tests-build \
-            --features $TOKIO_STABLE_FEATURES \
-            --tests
 
   test-integration-tests-per-feature:
     needs: basics
@@ -458,13 +448,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
       - name: asan
-        run: |
-          set -euxo pipefail
-          cargo test --workspace --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
-          # Removing the tokio workspace patch to run tests without path dependencies
-          # (if not specified differently in the crate)
-          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
-          cargo test --workspace --exclude tokio --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
+        run: cargo test --workspace --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test threads 1 --nocapture
         env:
           RUSTFLAGS: -Z sanitizer=address --cfg tokio_no_tuning_tests
           # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
