@@ -86,12 +86,8 @@ async fn write_buf_vectored() {
         ) -> Poll<Result<usize, io::Error>> {
             let mut n = 0;
             for buf in bufs {
-                let amt = cmp::min(4 - n, buf.len());
-                self.buf.extend_from_slice(&buf[..amt]);
-                n += amt;
-                if n == 4 {
-                    break;
-                }
+                self.buf.extend_from_slice(buf);
+                n += buf.len();
             }
             self.cnt += 1;
             Ok(n).into()
@@ -110,7 +106,7 @@ async fn write_buf_vectored() {
     let mut buf = Cursor::new(&b"hello world"[..]);
 
     assert_ok!(wr.write_buf(&mut buf).await);
-    assert_eq!(wr.buf, b"hell"[..]);
+    assert_eq!(wr.buf, b"hello world"[..]);
     assert_eq!(wr.cnt, 1);
-    assert_eq!(buf.position(), 4);
+    assert_eq!(buf.position(), 11);
 }
