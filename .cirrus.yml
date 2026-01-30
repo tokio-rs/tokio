@@ -25,7 +25,7 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --features $TOKIO_STABLE_FEATURES
+    - cargo test --workspace --features $TOKIO_STABLE_FEATURES
     # Free the disk space before the next build,
     # otherwise cirrus-ci complains about "No space left on device".
     - cargo clean
@@ -68,4 +68,4 @@ task:
       rustc --version
   test_script:
     - . $HOME/.cargo/env
-    - cargo test --all --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd
+    - cargo test --workspace --features $TOKIO_STABLE_FEATURES --target i686-unknown-freebsd
