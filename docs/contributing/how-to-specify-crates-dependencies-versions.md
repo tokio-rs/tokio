@@ -5,8 +5,8 @@ according to these rules:
 
 1. The listed version should be the oldest version that the crate works with
 (e.g., if `tokio-util` works with `tokio` version `1.44` but not `1.43`, then
-`tokio-util` should specify version `1.44` for its `tokio` dependency.)
-We don't require users to use the latest version unnecessarily).
+`tokio-util` should specify version `1.44` for its `tokio` dependency. We
+don't require users to use the latest version unnecessarily).
 2. When a crate starts using a newer feature in a dependency, the version
 should be bumped to the version that introduced it.
 3. If a crate depends on an unreleased feature in a dependency, it may use
