@@ -120,6 +120,8 @@ jobs:
             --exclude tokio \
             --exclude examples \
             --features $TOKIO_STABLE_FEATURES
+          # Cargo nextest does not support doctest, so we run them separately
+          # (see https://github.com/nextest-rs/nextest/issues/16)
           cargo test --doc --workspace --features $TOKIO_STABLE_FEATURES
 
   test-workspace-all-features-panic-abort:
