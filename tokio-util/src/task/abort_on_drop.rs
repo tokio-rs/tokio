@@ -25,7 +25,7 @@ impl<T> Drop for AbortOnDropHandle<T> {
 
 impl<T> AbortOnDropHandle<T> {
     /// Create an [`AbortOnDropHandle`] from a [`JoinHandle`].
-    pub fn new(handle: JoinHandle<T>) -> Self {
+    pub const fn new(handle: JoinHandle<T>) -> Self {
         Self(handle)
     }
 
