@@ -208,13 +208,14 @@ impl Runtime {
     /// thread pool. The thread pool is then responsible for polling the future
     /// until it completes.
     ///
-    /// The provided future will start running in the background immediately
-    /// when `spawn` is called, even if you don't await the returned
-    /// `JoinHandle`.
+    /// Executes the given future. If the current [Runtime] is
+    /// [running][running-runtime],it will start immediately in the background,
+    /// even if you don't await the returned [`JoinHandle`].
     ///
     /// See [module level][mod] documentation for more details.
     ///
     /// [mod]: index.html
+    /// [running-runtime]: index.html#driving-the-runtime
     ///
     /// # Examples
     ///
