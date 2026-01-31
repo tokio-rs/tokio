@@ -31,7 +31,7 @@ use std::task::{Context, Poll};
 /// [`AsyncWriteExt`]. Most users will interact with `AsyncWrite` types through
 /// these extension methods, which provide ergonomic async functions such as
 /// `write_all` and `flush`.
-/// 
+///
 /// [`std::io::Write`]: std::io::Write
 /// [`Write::write`]: std::io::Write::write()
 /// [`poll_write`]: AsyncWrite::poll_write()
