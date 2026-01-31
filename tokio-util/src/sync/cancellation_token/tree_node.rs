@@ -38,6 +38,7 @@
 //! Specifically, through invariant #2, we know that we always have to lock a parent
 //! before its child.
 //!
+use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
 
 /// A node of the cancellation tree structure
@@ -46,6 +47,10 @@ use crate::loom::sync::{Arc, Mutex, MutexGuard};
 pub(crate) struct TreeNode {
     inner: Mutex<Inner>,
     waker: tokio::sync::Notify,
+    /// Atomic flag for lock-free `is_cancelled()` checks.
+    /// This is set to `true` when the node is cancelled, using `Release` ordering
+    /// to ensure all prior writes are visible to readers using `Acquire` ordering.
+    is_cancelled: AtomicBool,
 }
 impl TreeNode {
     pub(crate) fn new() -> Self {
@@ -58,6 +63,7 @@ impl TreeNode {
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
+            is_cancelled: AtomicBool::new(false),
         }
     }
 
@@ -80,7 +86,7 @@ struct Inner {
 
 /// Returns whether or not the node is cancelled
 pub(crate) fn is_cancelled(node: &Arc<TreeNode>) -> bool {
-    node.inner.lock().unwrap().is_cancelled
+    node.is_cancelled.load(Ordering::Acquire)
 }
 
 /// Creates a child node
@@ -100,6 +106,7 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
+            is_cancelled: AtomicBool::new(true),
         });
     }
 
@@ -112,6 +119,7 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
             num_handles: 1,
         }),
         waker: tokio::sync::Notify::new(),
+        is_cancelled: AtomicBool::new(false),
     });
 
     locked_parent.children.push(child.clone());
@@ -339,6 +347,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
                 locked_grandchild.is_cancelled = true;
                 locked_grandchild.children = Vec::new();
                 drop(locked_grandchild);
+                grandchild.is_cancelled.store(true, Ordering::Release);
                 grandchild.waker.notify_waiters();
             } else {
                 // Otherwise, adopt grandchild
@@ -353,6 +362,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         locked_child.is_cancelled = true;
         locked_child.children = Vec::new();
         drop(locked_child);
+        child.is_cancelled.store(true, Ordering::Release);
         child.waker.notify_waiters();
 
         // Now the child is cancelled and detached and all its children are adopted.
@@ -363,5 +373,6 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
     locked_node.is_cancelled = true;
     locked_node.children = Vec::new();
     drop(locked_node);
+    node.is_cancelled.store(true, Ordering::Release);
     node.waker.notify_waiters();
 }
