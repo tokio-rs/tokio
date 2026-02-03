@@ -424,6 +424,10 @@ where
 
         let cx = maybe_cx.expect("no .is_some() == false cases above should lead here");
 
+        // Since deferred tasks don't stay on `core`, make sure to wake them
+        // before blocking.
+        cx.defer.wake();
+
         // Get the worker core. If none is set, then blocking is fine!
         let mut core = match cx.core.borrow_mut().take() {
             Some(core) => core,

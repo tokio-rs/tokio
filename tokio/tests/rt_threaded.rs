@@ -6,7 +6,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime;
 use tokio::sync::oneshot;
-use tokio_test::{assert_err, assert_ok};
+use tokio_test::{assert_err, assert_ok, assert_pending};
 
 use std::future::{poll_fn, Future};
 use std::pin::Pin;
@@ -690,6 +690,54 @@ fn mutex_in_block_in_place() {
         .await
         .unwrap();
     })
+}
+
+#[test]
+/// Deferred tasks should be woken before starting the [`tokio::task::block_in_place`]
+// https://github.com/tokio-rs/tokio/issues/7877
+fn wake_deferred_tasks_before_block_in_place() {
+    let (tx1, rx1) = oneshot::channel::<()>();
+    let (tx2, rx2) = oneshot::channel::<()>();
+
+    let deferred_task = tokio_test::task::spawn(tokio::task::yield_now());
+    let deffered_task = Arc::new(Mutex::new(deferred_task));
+
+    let rt = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    let jh = {
+        let deferred_task = Arc::clone(&deffered_task);
+        rt.spawn(async move {
+            {
+                let mut lock = deferred_task.lock().unwrap();
+                assert_pending!(lock.poll());
+            }
+            tokio::task::block_in_place(|| {
+                // signal that the `block_in_place` has started
+                tx2.send(()).unwrap();
+                // wait for the shutdown signal
+                rx1.blocking_recv().unwrap();
+            });
+        })
+    };
+
+    // wait for the `block_in_place` to start
+    rx2.blocking_recv().unwrap();
+
+    // check that the deferred task was woken before the `block_in_place` ends
+    let is_woken = {
+        let lock = deffered_task.lock().unwrap();
+        lock.is_woken()
+    };
+
+    // signal the `block_in_place` to shutdown
+    tx1.send(()).unwrap();
+
+    rt.block_on(jh).unwrap();
+
+    assert!(is_woken);
 }
 
 // Testing the tuning logic is tricky as it is inherently timing based, and more
