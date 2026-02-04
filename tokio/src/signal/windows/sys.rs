@@ -97,7 +97,7 @@ fn global_init() -> io::Result<()> {
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
     // Ignore unknown control signal types.
-    let Some(info) = registry().event_info(ty) else {
+    let Some(event_info) = registry().event_info(ty) else {
         return 0;
     };
 
@@ -105,7 +105,7 @@ unsafe extern "system" fn handler(ty: u32) -> BOOL {
     // the handler routine is always invoked in a new thread, thus we don't
     // have the same restrictions as in Unix signal handlers, meaning we can
     // go ahead and perform the broadcast here.
-    match info.send(()) {
+    match event_info.send(()) {
         Ok(_) if event_requires_infinite_sleep_in_handler(ty) => loop {
             std::thread::park();
         },
