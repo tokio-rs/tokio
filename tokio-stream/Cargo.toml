@@ -38,7 +38,7 @@ signal = ["tokio/signal"]
 [dependencies]
 futures-core = { version = "0.3.0" }
 pin-project-lite = "0.2.11"
-tokio = { version = "1.15.0", path = "../tokio", features = ["sync"] }
+tokio = { version = "1.38.0", path = "../tokio", features = ["sync"] }
 tokio-util = { version = "0.7.0", path = "../tokio-util", optional = true }
 
 [dev-dependencies]
