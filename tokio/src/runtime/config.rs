@@ -51,4 +51,8 @@ pub(crate) struct Config {
     #[cfg(tokio_unstable)]
     /// How to respond to unhandled task panics.
     pub(crate) unhandled_panic: crate::runtime::UnhandledPanic,
+
+    /// Shuffles task in the queue
+    #[cfg(tokio_unstable)]
+    pub(crate) shuffle_tasks: bool,
 }
