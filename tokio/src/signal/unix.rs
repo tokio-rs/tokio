@@ -12,10 +12,34 @@ use crate::signal::registry::{globals, EventId, EventInfo, Globals, Storage};
 use crate::signal::RxFuture;
 use crate::sync::watch;
 
-use mio::net::UnixStream;
-use std::io::{self, Error, ErrorKind, Write};
+use std::io::{self, Error, ErrorKind};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
+
+#[cfg_attr(
+    any(
+        target_os = "android",
+        target_os = "espidf",
+        target_os = "fuchsia",
+        target_os = "hermit",
+        target_os = "illumos",
+        target_os = "linux",
+    ),
+    path = "pipe/eventfd.rs"
+)]
+#[cfg_attr(
+    not(any(
+        target_os = "android",
+        target_os = "espidf",
+        target_os = "fuchsia",
+        target_os = "hermit",
+        target_os = "illumos",
+        target_os = "linux",
+    )),
+    path = "pipe/unixstream.rs"
+)]
+pub(crate) mod pipe;
+pub(crate) use pipe::OsExtraData;
 
 #[cfg(not(any(target_os = "linux", target_os = "illumos")))]
 pub(crate) struct OsStorage([SignalInfo; 33]);
@@ -57,20 +81,6 @@ impl Storage for OsStorage {
         F: FnMut(&'a EventInfo),
     {
         self.0.iter().map(|si| &si.event_info).for_each(f);
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct OsExtraData {
-    sender: UnixStream,
-    pub(crate) receiver: UnixStream,
-}
-
-impl Default for OsExtraData {
-    fn default() -> Self {
-        let (receiver, sender) = UnixStream::pair().expect("failed to create UnixStream");
-
-        Self { sender, receiver }
     }
 }
 
@@ -257,8 +267,7 @@ fn action(globals: &'static Globals, signal: libc::c_int) {
 
     // Send a wakeup, ignore any errors (anything reasonably possible is
     // full pipe and then it will wake up anyway).
-    let mut sender = &globals.sender;
-    drop(sender.write(&[1]));
+    let _ = globals.sender().write();
 }
 
 /// Enables this module to receive signal notifications for the `signal`
@@ -278,7 +287,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     // Check that we have a signal driver running
     handle.check_inner()?;
 
-    let globals = globals();
+    let globals = globals()?;
     let siginfo = match globals.storage().get(signal as EventId) {
         Some(slot) => slot,
         None => return Err(io::Error::new(io::ErrorKind::Other, "signal too large")),
@@ -415,7 +424,7 @@ pub(crate) fn signal_with_handle(
     // Turn the signal delivery on once we are ready for it
     signal_enable(kind, handle)?;
 
-    Ok(globals().register_listener(kind.0 as EventId))
+    Ok(globals()?.register_listener(kind.0 as EventId))
 }
 
 impl Signal {

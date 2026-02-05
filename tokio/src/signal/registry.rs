@@ -142,25 +142,28 @@ impl Globals {
     }
 }
 
-fn globals_init() -> Globals
+fn globals_init() -> std::io::Result<Globals>
 where
-    OsExtraData: 'static + Send + Sync + Default,
+    OsExtraData: 'static + Send + Sync,
     OsStorage: 'static + Send + Sync + Default,
 {
-    Globals {
-        extra: OsExtraData::default(),
+    Ok(Globals {
+        extra: OsExtraData::new()?,
         registry: Registry::new(OsStorage::default()),
-    }
+    })
 }
 
-pub(crate) fn globals() -> &'static Globals
+pub(crate) fn globals() -> std::io::Result<&'static Globals>
 where
-    OsExtraData: 'static + Send + Sync + Default,
+    OsExtraData: 'static + Send + Sync,
     OsStorage: 'static + Send + Sync + Default,
 {
-    static GLOBALS: OnceLock<Globals> = OnceLock::new();
+    static GLOBALS: OnceLock<std::io::Result<Globals>> = OnceLock::new();
 
-    GLOBALS.get_or_init(globals_init)
+    match GLOBALS.get_or_init(globals_init) {
+        Ok(globals) => Ok(globals),
+        Err(e) => Err(std::io::Error::new(e.kind(), e.to_string())),
+    }
 }
 
 #[cfg(all(test, not(loom)))]
