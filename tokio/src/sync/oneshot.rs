@@ -1247,6 +1247,15 @@ impl<T> Drop for Receiver<T> {
         if let Some(inner) = self.inner.as_ref() {
             let state = inner.close();
 
+            // We need to unset RX_TASK_SET and drop the waker now, rather than
+            // waiting for completion, to avoid an unnecessary ref to the rx task
+            if state.is_rx_task_set() && !state.is_complete() {
+                State::unset_rx_task(&inner.state);
+                unsafe {
+                    inner.rx_task.drop_task();
+                }
+            }
+
             if state.is_complete() {
                 // SAFETY: we have ensured that the `VALUE_SENT` bit has been set,
                 // so only the receiver can access the value.
