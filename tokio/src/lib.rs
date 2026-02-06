@@ -549,9 +549,13 @@ cfg_not_sync! {
     mod sync;
 }
 
-pub mod task;
 cfg_rt! {
+    pub mod task;
     pub use task::spawn;
+}
+
+cfg_not_rt! {
+    pub(crate) mod task;
 }
 
 cfg_time! {
