@@ -30,3 +30,10 @@ unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(tokio_unstable)',
   'cfg(target_os, values("cygwin"))',
 ] }
+
+[features]
+custom_logging = [
+  "log = { version = \"0.4.29\", optional = true }"
+]
+
+# Injected from ClementTsang/bottom - https://github.com/ClementTsang/bottom/blob/ca833eb80faa4829a53778c903c65abcde36f6da/Cargo.toml
