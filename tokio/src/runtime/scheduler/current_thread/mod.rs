@@ -59,6 +59,10 @@ struct Core {
     /// Scheduler run queue
     tasks: VecDeque<Notified>,
 
+    /// Shuffles task in the queue
+    #[cfg(tokio_unstable)]
+    shuffle_tasks: bool,
+
     /// Current tick
     tick: u32,
 
@@ -141,6 +145,9 @@ impl CurrentThread {
             .global_queue_interval
             .unwrap_or(DEFAULT_GLOBAL_QUEUE_INTERVAL);
 
+        #[cfg(tokio_unstable)]
+        let shuffle_tasks = config.shuffle_tasks;
+
         let handle = Arc::new(Handle {
             task_hooks: TaskHooks {
                 task_spawn_callback: config.before_spawn.clone(),
@@ -171,6 +178,8 @@ impl CurrentThread {
             metrics: MetricsBatch::new(&handle.shared.worker_metrics),
             global_queue_interval,
             unhandled_panic: false,
+            #[cfg(tokio_unstable)]
+            shuffle_tasks,
         })));
 
         let scheduler = CurrentThread {
@@ -328,7 +337,20 @@ impl Core {
     }
 
     fn next_local_task(&mut self, handle: &Handle) -> Option<Notified> {
+        #[cfg(not(tokio_unstable))]
         let ret = self.tasks.pop_front();
+
+        #[cfg(tokio_unstable)]
+        #[cfg(any(feature = "macros", all(feature = "sync", feature = "rt")))]
+        let ret = if !self.shuffle_tasks {
+            self.tasks.pop_front()
+        } else if self.tasks.is_empty() {
+            None
+        } else {
+            let pos = crate::runtime::context::thread_rng_n(self.tasks.len() as u32);
+            self.tasks.remove(pos as usize)
+        };
+
         handle
             .shared
             .worker_metrics

@@ -137,6 +137,10 @@ pub struct Builder {
     pub(super) unhandled_panic: UnhandledPanic,
 
     timer_flavor: TimerFlavor,
+
+    /// Shuffles task in the queue
+    #[cfg(tokio_unstable)]
+    pub(super) shuffle_tasks: bool,
 }
 
 cfg_unstable! {
@@ -326,6 +330,9 @@ impl Builder {
             disable_lifo_slot: false,
 
             timer_flavor: TimerFlavor::Traditional,
+
+            #[cfg(tokio_unstable)]
+            shuffle_tasks: false,
         }
     }
 
@@ -1295,6 +1302,12 @@ impl Builder {
             self.seed_generator = RngSeedGenerator::new(seed);
             self
         }
+
+        /// Shuffles task in the queue
+        pub fn shuffle_tasks(&mut self) -> &mut Self {
+            self.shuffle_tasks = true;
+            self
+        }
     }
 
     cfg_unstable_metrics! {
@@ -1631,6 +1644,8 @@ impl Builder {
                 disable_lifo_slot: self.disable_lifo_slot,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                #[cfg(tokio_unstable)]
+                shuffle_tasks: self.shuffle_tasks,
             },
             local_tid,
         );
@@ -1812,6 +1827,8 @@ cfg_rt_multi_thread! {
                     disable_lifo_slot: self.disable_lifo_slot,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                    #[cfg(tokio_unstable)]
+                    shuffle_tasks: false,
                 },
                 self.timer_flavor,
             );
