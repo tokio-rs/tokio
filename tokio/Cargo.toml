@@ -1,7 +1,7 @@
 [package]
 name = "tokio"
 # When releasing to crates.io:
-# - Remove path dependencies
+# - Remove path dependencies (if any)
 # - Update doc url
 #   - README.md
 # - Update CHANGELOG.md.
@@ -136,9 +136,9 @@ features = [
 ]
 
 [dev-dependencies]
-tokio-test = { version = "0.4.0", path = "../tokio-test" }
-tokio-stream = { version = "0.1", path = "../tokio-stream" }
-tokio-util = { version = "0.7", path = "../tokio-util", features = ["rt"] }
+tokio-test = "0.4.0"
+tokio-stream = "0.1"
+tokio-util = { version = "0.7", features = ["rt"] }
 futures = { version = "0.3.0", features = ["async-await"] }
 futures-test = "0.3.31"
 mockall = "0.13.0"
