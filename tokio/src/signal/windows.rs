@@ -16,9 +16,6 @@ use std::task::{Context, Poll};
 #[path = "windows/sys.rs"]
 mod imp;
 
-#[cfg(windows)]
-pub(crate) use self::imp::{OsExtraData, OsStorage};
-
 // For building documentation on Unix machines when the `docsrs` flag is set.
 #[cfg(not(windows))]
 #[path = "windows/stub.rs"]
