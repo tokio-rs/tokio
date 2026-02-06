@@ -194,19 +194,18 @@ fn drop_rx_after_poll() {
     loom::model(|| {
         let (tx, mut rx) = oneshot::channel::<i32>();
 
-        // Spawn a thread that will poll the receiver once (setting rx_task),
-        // then drop it.
+        // Poll once to set rx_task before entering the parallel part of the
+        // test.
+        let _ = block_on(poll_fn(|cx| {
+            let _ = Pin::new(&mut rx).poll(cx);
+            Ready(())
+        }));
+
+        // Drop the receiver concurrently with the sender trying to send.
         let rx_thread = thread::spawn(move || {
-            // Poll once to set rx_task, then drop
-            let _ = block_on(poll_fn(|cx| {
-                let _ = Pin::new(&mut rx).poll(cx);
-                // Always return Ready to exit the poll, then rx will be dropped
-                Ready(())
-            }));
-            // rx is dropped here
+            drop(rx);
         });
 
-        // Sender tries to send concurrently
         let _ = tx.send(1);
 
         rx_thread.join().unwrap();

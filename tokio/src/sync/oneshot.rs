@@ -1247,15 +1247,6 @@ impl<T> Drop for Receiver<T> {
         if let Some(inner) = self.inner.as_ref() {
             let state = inner.close();
 
-            // We need to unset RX_TASK_SET and drop the waker now, rather than
-            // waiting for completion, to avoid an unnecessary ref to the rx task
-            if state.is_rx_task_set() && !state.is_complete() {
-                State::unset_rx_task(&inner.state);
-                unsafe {
-                    inner.rx_task.drop_task();
-                }
-            }
-
             if state.is_complete() {
                 // SAFETY: we have ensured that the `VALUE_SENT` bit has been set,
                 // so only the receiver can access the value.
@@ -1398,6 +1389,19 @@ impl<T> Inner<T> {
             unsafe {
                 self.tx_task.with_task(Waker::wake_by_ref);
             }
+        }
+
+        if prev.is_rx_task_set() && !prev.is_complete() {
+            State::unset_rx_task(&self.state);
+            // SAFETY: The sender only accesses `rx_task` (via
+            // `wake_by_ref`) in `complete()` after successfully setting
+            // `VALUE_SENT`. But `set_complete` will not set `VALUE_SENT`
+            // if `CLOSED` is already set (its CAS loop breaks early).
+            // Since `prev` shows that `VALUE_SENT` was not set before we
+            // set `CLOSED`, the sender can no longer set `VALUE_SENT` and
+            // will never access `rx_task`. Therefore, we have exclusive
+            // access here.
+            unsafe { self.rx_task.drop_task() };
         }
 
         prev
