@@ -35,7 +35,7 @@ async fn does_not_abort_after_detach() {
     let handle = AbortOnDropHandle::new(handle);
     handle.detach(); // returns and drops the original join handle
     yield_now().await;
-    assert!(!tx.is_closed()); // task is still live
+    assert!(!tx.is_closed()); // the task is still alive
 }
 
 #[tokio::test]
@@ -72,5 +72,5 @@ async fn handle_does_not_abort_after_detach() {
     let handle = AbortOnDrop::new(handle.abort_handle());
     handle.detach(); // returns and drops the original join handle
     yield_now().await;
-    assert!(!tx.is_closed()); // task is still live
+    assert!(!tx.is_closed()); // the task is still alive
 }

@@ -22,7 +22,7 @@ pub struct AbortOnDropHandle<T>(JoinHandle<T>);
 
 impl<T> Drop for AbortOnDropHandle<T> {
     fn drop(&mut self) {
-        self.0.abort()
+        self.abort()
     }
 }
 
@@ -34,12 +34,14 @@ impl<T> AbortOnDropHandle<T> {
 
     /// Abort the task associated with this handle,
     /// equivalent to [`JoinHandle::abort`].
+    #[inline]
     pub fn abort(&self) {
         self.0.abort()
     }
 
     /// Checks if the task associated with this handle is finished,
     /// equivalent to [`JoinHandle::is_finished`].
+    #[inline]
     pub fn is_finished(&self) -> bool {
         self.0.is_finished()
     }
@@ -95,7 +97,7 @@ pub struct AbortOnDrop(AbortHandle);
 
 impl Drop for AbortOnDrop {
     fn drop(&mut self) {
-        self.0.abort()
+        self.abort()
     }
 }
 
@@ -107,12 +109,14 @@ impl AbortOnDrop {
 
     /// Abort the task associated with this handle,
     /// equivalent to [`AbortHandle::abort`].
+    #[inline]
     pub fn abort(&self) {
         self.0.abort()
     }
 
     /// Checks if the task associated with this handle is finished,
     /// equivalent to [`AbortHandle::is_finished`].
+    #[inline]
     pub fn is_finished(&self) -> bool {
         self.0.is_finished()
     }
