@@ -1,8 +1,7 @@
 use bytes::BufMut;
-use std::future::Future;
+use std::future::poll_fn;
 use std::io;
 use std::pin::Pin;
-use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
 /// Read data from an `AsyncRead` into an implementer of the [`BufMut`] trait.
@@ -46,20 +45,5 @@ where
     R: AsyncRead + Unpin,
     B: BufMut,
 {
-    return ReadBufFn(read, buf).await;
-
-    struct ReadBufFn<'a, R, B>(&'a mut R, &'a mut B);
-
-    impl<'a, R, B> Future for ReadBufFn<'a, R, B>
-    where
-        R: AsyncRead + Unpin,
-        B: BufMut,
-    {
-        type Output = io::Result<usize>;
-
-        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let this = &mut *self;
-            crate::util::poll_read_buf(Pin::new(this.0), cx, this.1)
-        }
-    }
+    poll_fn(|cx| crate::util::poll_read_buf(Pin::new(read), cx, buf)).await
 }
