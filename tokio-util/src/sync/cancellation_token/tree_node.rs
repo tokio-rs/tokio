@@ -59,7 +59,6 @@ impl TreeNode {
                 parent: None,
                 parent_idx: 0,
                 children: vec![],
-                is_cancelled: false,
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
@@ -80,7 +79,6 @@ struct Inner {
     parent: Option<Arc<TreeNode>>,
     parent_idx: usize,
     children: Vec<Arc<TreeNode>>,
-    is_cancelled: bool,
     num_handles: usize,
 }
 
@@ -96,13 +94,12 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
     // Do not register as child if we are already cancelled.
     // Cancelled trees can never be uncancelled and therefore
     // need no connection to parents or children any more.
-    if locked_parent.is_cancelled {
+    if parent.is_cancelled.load(Ordering::Acquire) {
         return Arc::new(TreeNode {
             inner: Mutex::new(Inner {
                 parent: None,
                 parent_idx: 0,
                 children: vec![],
-                is_cancelled: true,
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
@@ -115,7 +112,6 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
             parent: Some(parent.clone()),
             parent_idx: locked_parent.children.len(),
             children: vec![],
-            is_cancelled: false,
             num_handles: 1,
         }),
         waker: tokio::sync::Notify::new(),
@@ -305,7 +301,7 @@ pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
 pub(crate) fn cancel(node: &Arc<TreeNode>) {
     let mut locked_node = node.inner.lock().unwrap();
 
-    if locked_node.is_cancelled {
+    if node.is_cancelled.load(Ordering::Acquire) {
         return;
     }
 
@@ -321,7 +317,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         locked_child.parent_idx = 0;
 
         // If child is already cancelled, detaching is enough
-        if locked_child.is_cancelled {
+        if child.is_cancelled.load(Ordering::Acquire) {
             continue;
         }
 
@@ -336,7 +332,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
             locked_grandchild.parent_idx = 0;
 
             // If grandchild is already cancelled, detaching is enough
-            if locked_grandchild.is_cancelled {
+            if grandchild.is_cancelled.load(Ordering::Acquire) {
                 continue;
             }
 
@@ -344,10 +340,9 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
             // Otherwise, just cancel them right away, no need for another iteration.
             if locked_grandchild.children.is_empty() {
                 // Cancel the grandchild
-                locked_grandchild.is_cancelled = true;
+                grandchild.is_cancelled.store(true, Ordering::Release);
                 locked_grandchild.children = Vec::new();
                 drop(locked_grandchild);
-                grandchild.is_cancelled.store(true, Ordering::Release);
                 grandchild.waker.notify_waiters();
             } else {
                 // Otherwise, adopt grandchild
@@ -359,10 +354,9 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         }
 
         // Cancel the child
-        locked_child.is_cancelled = true;
+        child.is_cancelled.store(true, Ordering::Release);
         locked_child.children = Vec::new();
         drop(locked_child);
-        child.is_cancelled.store(true, Ordering::Release);
         child.waker.notify_waiters();
 
         // Now the child is cancelled and detached and all its children are adopted.
@@ -370,9 +364,8 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
     }
 
     // Cancel the node itself.
-    locked_node.is_cancelled = true;
+    node.is_cancelled.store(true, Ordering::Release);
     locked_node.children = Vec::new();
     drop(locked_node);
-    node.is_cancelled.store(true, Ordering::Release);
     node.waker.notify_waiters();
 }
