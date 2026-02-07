@@ -87,11 +87,12 @@ impl<T> AsRef<JoinHandle<T>> for AbortOnDropHandle<T> {
 /// A wrapper around a [`tokio::task::AbortHandle`],
 /// which [aborts] the task when it is dropped.
 ///
-/// Unlike [`AbortOnDropHandle`], [`AbortOnDrop`] does not represent the permission to await a
-/// tasks completion, and in exchange can be a concrete type.
+/// Unlike [`AbortOnDropHandle`], [`AbortOnDrop`] cannot be `.await`ed for a result.
 ///
+/// It has no generic parameter, making it suitable when you only need to keep
+/// a task handle in a struct and do not care about the output.
 ///
-/// [aborts]: tokio::task::JoinHandle::abort
+/// [aborts]: tokio::task::AbortHandle::abort
 #[must_use = "Dropping the handle aborts the task immediately"]
 pub struct AbortOnDrop(AbortHandle);
 
