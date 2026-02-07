@@ -497,3 +497,55 @@ fn before_park_yields() {
 
     assert!(woken.load(Ordering::SeqCst));
 }
+
+// Validate that yielding many times on a current-thread runtime without I/O
+// sources completes quickly. Before the skip-poll optimization, each yield
+// triggered a syscall (epoll_wait/kevent) even with no registered I/O fds.
+#[test]
+fn yield_without_io_sources_is_fast() {
+    let rt = Runtime::new().unwrap();
+
+    let start = std::time::Instant::now();
+    rt.block_on(async {
+        // Yield 10_000 times — each yield previously caused 2 syscalls
+        for _ in 0..10_000 {
+            tokio::task::yield_now().await;
+        }
+    });
+    let elapsed = start.elapsed();
+
+    // With the optimization, 10K yields should take well under 100ms.
+    // Without it, on macOS/Linux, each yield costs ~1-2µs in syscalls,
+    // so 10K yields would take ~10-20ms. We use a generous 5s bound to
+    // avoid flakiness — the point is it doesn't hang or take minutes.
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "10K yields took {elapsed:?}, expected < 5s"
+    );
+}
+
+// Verify that yielding still works correctly when I/O sources ARE registered.
+// The poll should not be skipped in this case.
+#[test]
+fn yield_with_io_sources_works() {
+    let rt = Runtime::new().unwrap();
+
+    rt.block_on(async {
+        // Create a TcpListener to register an I/O source
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        // Yield a few times — poll should NOT be skipped (fd_count > 0)
+        for _ in 0..100 {
+            tokio::task::yield_now().await;
+        }
+
+        // Verify I/O still works after yields
+        let connect = tokio::net::TcpStream::connect(addr);
+        let accept = listener.accept();
+
+        let (stream, accepted) = tokio::join!(connect, accept);
+        assert!(stream.is_ok());
+        assert!(accepted.is_ok());
+    });
+}

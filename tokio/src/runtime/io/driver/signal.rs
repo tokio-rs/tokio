@@ -1,6 +1,7 @@
 use super::{Driver, Handle, TOKEN_SIGNAL};
 
 use std::io;
+use std::sync::atomic::Ordering;
 
 impl Handle {
     pub(crate) fn register_signal_receiver(
@@ -9,6 +10,7 @@ impl Handle {
     ) -> io::Result<()> {
         self.registry
             .register(receiver, TOKEN_SIGNAL, mio::Interest::READABLE)?;
+        self.io_event_sources.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
 }

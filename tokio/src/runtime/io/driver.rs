@@ -10,6 +10,7 @@ cfg_io_uring! {
 
 use crate::io::interest::Interest;
 use crate::io::ready::Ready;
+use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Mutex;
 use crate::runtime::driver;
 use crate::runtime::io::registration_set;
@@ -18,6 +19,7 @@ use crate::runtime::io::{IoDriverMetrics, RegistrationSet, ScheduledIo};
 use mio::event::Source;
 use std::fmt;
 use std::io;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -48,6 +50,13 @@ pub(crate) struct Handle {
     /// Not supported on `Wasi` due to lack of threading support.
     #[cfg(not(target_os = "wasi"))]
     waker: mio::Waker,
+
+    /// Number of I/O event sources registered with the OS poller (via
+    /// `add_source`, `register_signal_receiver`, or `add_uring_source`).
+    /// Does not include the internal waker. When this is zero AND the poll
+    /// is non-blocking (timeout = 0), `turn()` can skip the `mio::Poll::poll()`
+    /// syscall entirely since no user-visible events can be produced.
+    io_event_sources: AtomicUsize,
 
     pub(crate) metrics: IoDriverMetrics,
 
@@ -134,6 +143,7 @@ impl Driver {
             synced: Mutex::new(synced),
             #[cfg(not(target_os = "wasi"))]
             waker,
+            io_event_sources: AtomicUsize::new(0),
             metrics: IoDriverMetrics::default(),
             #[cfg(all(
                 tokio_unstable,
@@ -181,44 +191,57 @@ impl Driver {
 
         handle.release_pending_registrations();
 
-        let events = &mut self.events;
+        // When no I/O event sources are registered (fd_count == 0) and this is
+        // a non-blocking poll (timeout = 0), skip the mio::Poll::poll() syscall
+        // entirely. The only source registered with mio in this case is the
+        // internal waker, which cannot produce user-visible I/O events. This
+        // avoids an unnecessary epoll_wait/kevent/io_uring_enter syscall per
+        // call, which is significant for runtimes that yield frequently (e.g.,
+        // cooperative schedulers embedded in a tokio current-thread runtime).
+        let should_poll = max_wait != Some(Duration::ZERO)
+            || handle.io_event_sources.load(Ordering::Relaxed) > 0;
 
-        // Block waiting for an event to happen, peeling out how many events
-        // happened.
-        match self.poll.poll(events, max_wait) {
-            Ok(()) => {}
-            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
-            #[cfg(target_os = "wasi")]
-            Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
-                // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
-                // just return from the park, as there would be nothing, which wakes us up.
-            }
-            Err(e) => panic!("unexpected error when polling the I/O driver: {e:?}"),
-        }
-
-        // Process all the events that came in, dispatching appropriately
         let mut ready_count = 0;
-        for event in events.iter() {
-            let token = event.token();
 
-            if token == TOKEN_WAKEUP {
-                // Nothing to do, the event is used to unblock the I/O driver
-            } else if token == TOKEN_SIGNAL {
-                self.signal_ready = true;
-            } else {
-                let ready = Ready::from_mio(event);
-                let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
+        if should_poll {
+            let events = &mut self.events;
 
-                // Safety: we ensure that the pointers used as tokens are not freed
-                // until they are both deregistered from mio **and** we know the I/O
-                // driver is not concurrently polling. The I/O driver holds ownership of
-                // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
-                let io: &ScheduledIo = unsafe { &*ptr };
+            // Block waiting for an event to happen, peeling out how many events
+            // happened.
+            match self.poll.poll(events, max_wait) {
+                Ok(()) => {}
+                Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+                #[cfg(target_os = "wasi")]
+                Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
+                    // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
+                    // just return from the park, as there would be nothing, which wakes us up.
+                }
+                Err(e) => panic!("unexpected error when polling the I/O driver: {e:?}"),
+            }
 
-                io.set_readiness(Tick::Set, |curr| curr | ready);
-                io.wake(ready);
+            // Process all the events that came in, dispatching appropriately
+            for event in events.iter() {
+                let token = event.token();
 
-                ready_count += 1;
+                if token == TOKEN_WAKEUP {
+                    // Nothing to do, the event is used to unblock the I/O driver
+                } else if token == TOKEN_SIGNAL {
+                    self.signal_ready = true;
+                } else {
+                    let ready = Ready::from_mio(event);
+                    let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
+
+                    // Safety: we ensure that the pointers used as tokens are not freed
+                    // until they are both deregistered from mio **and** we know the I/O
+                    // driver is not concurrently polling. The I/O driver holds ownership of
+                    // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
+                    let io: &ScheduledIo = unsafe { &*ptr };
+
+                    io.set_readiness(Tick::Set, |curr| curr | ready);
+                    io.wake(ready);
+
+                    ready_count += 1;
+                }
             }
         }
 
@@ -284,6 +307,7 @@ impl Handle {
         }
 
         // TODO: move this logic to `RegistrationSet` and use a `CountedLinkedList`
+        self.io_event_sources.fetch_add(1, Ordering::Relaxed);
         self.metrics.incr_fd_count();
 
         Ok(scheduled_io)
@@ -306,6 +330,7 @@ impl Handle {
             self.unpark();
         }
 
+        self.io_event_sources.fetch_sub(1, Ordering::Relaxed);
         self.metrics.dec_fd_count();
 
         os_result // Return error after cleanup
