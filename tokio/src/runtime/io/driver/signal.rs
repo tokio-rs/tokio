@@ -1,7 +1,6 @@
 use super::{Driver, Handle, TOKEN_SIGNAL};
 
 use std::io;
-use std::sync::atomic::Ordering;
 
 impl Handle {
     pub(crate) fn register_signal_receiver(
@@ -10,7 +9,11 @@ impl Handle {
     ) -> io::Result<()> {
         self.registry
             .register(receiver, TOKEN_SIGNAL, mio::Interest::READABLE)?;
-        self.io_event_sources.fetch_add(1, Ordering::Relaxed);
+        // Note: we intentionally do NOT increment io_event_sources here.
+        // The signal receiver is an internal mechanism (like the mio::Waker)
+        // and should not prevent the poll-skip optimization in turn().
+        // Signal readiness is dispatched via the signal_ready flag, which
+        // is set when TOKEN_SIGNAL events arrive during an actual poll.
         Ok(())
     }
 }
