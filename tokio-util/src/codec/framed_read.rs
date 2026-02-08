@@ -147,6 +147,7 @@ impl<T, D> FramedRead<T, D> {
 
     /// Returns a mutable reference to the read buffer.
     pub fn read_buffer_mut(&mut self) -> &mut BytesMut {
+        self.inner.state.is_readable = true;
         &mut self.inner.state.buffer
     }
 
