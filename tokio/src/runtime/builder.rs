@@ -516,7 +516,7 @@ impl Builder {
 
     /// Sets name of threads spawned by the `Runtime`'s thread pool.
     ///
-    /// The default name is "tokio-runtime-worker".
+    /// The default name is "tokio-rt-worker".
     ///
     /// # Examples
     ///
@@ -540,7 +540,7 @@ impl Builder {
 
     /// Sets a function used to generate the name of threads spawned by the `Runtime`'s thread pool.
     ///
-    /// The default name fn is `|| "tokio-runtime-worker".into()`.
+    /// The default name fn is `|| "tokio-rt-worker".into()`.
     ///
     /// # Examples
     ///
