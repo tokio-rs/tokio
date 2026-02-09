@@ -20,7 +20,7 @@ Consider the following example from `tokio-stream`:
 [dependencies]
 futures-core = { version = "0.3.0" }
 pin-project-lite = "0.2.11"
-tokio = { version = "1.15.0", path = "../tokio", features = ["sync"] }
+tokio = { path = "../tokio", features = ["sync"] }
 ```
 
 In this case, local development of `tokio-stream` uses the local version
