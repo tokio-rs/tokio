@@ -226,7 +226,7 @@ jobs:
           cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to run tests without path dependencies
           # (if not specified differently in the crate)
-          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"\s*}$/d' Cargo.toml
           cargo check --workspace --exclude tokio --tests --features $TOKIO_STABLE_FEATURES
 
   valgrind:
@@ -822,7 +822,7 @@ jobs:
           cargo clippy --workspace --tests --no-deps --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to check without path dependencies
           # (if not specified differently in the crate)
-          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml
+          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"\s*}$/d' Cargo.toml
           cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
       - name: "clippy --workspace --all-features --unstable"
         run: |
