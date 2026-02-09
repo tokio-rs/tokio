@@ -114,7 +114,7 @@ jobs:
           cargo nextest run --workspace --features $TOKIO_STABLE_FEATURES
           # Removing workspace patches to run tests without path dependencies
           # (if not specified differently in the crate)
-          sed -i.bak '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"}$/d' Cargo.toml && rm -f Cargo.toml.bak
+          sed -i.bak '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"\s*}$/d' Cargo.toml && rm -f Cargo.toml.bak
           cargo nextest run \
             --workspace \
             --exclude tokio \
