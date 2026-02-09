@@ -733,7 +733,9 @@ jobs:
         with:
           toolchain: ${{ env.rust_min }}
       - name: Install cargo-hack
-        uses: taiki-e/install-action@cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
       - uses: Swatinem/rust-cache@v2
       - name: "cargo check"
         run: |
@@ -813,10 +815,6 @@ jobs:
         with:
           toolchain: ${{ env.rust_clippy }}
           components: clippy
-      - name: Install cargo-hack
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-hack
       - uses: Swatinem/rust-cache@v2
       # Run clippy
       - name: "clippy --workspace --features ${{ env.TOKIO_STABLE_FEATURES }}"
