@@ -366,8 +366,8 @@ struct Tail {
     /// Number of active receivers.
     rx_cnt: usize,
 
-    /// True if the channel is closed.
-    closed: bool,
+    /// True if there are any strong senders.
+    has_senders: bool,
 
     /// Receivers waiting for a value.
     waiters: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
@@ -566,7 +566,7 @@ impl<T> Sender<T> {
             tail: Mutex::new(Tail {
                 pos: 0,
                 rx_cnt: receiver_count,
-                closed: receiver_count == 0,
+                has_senders: true,
                 waiters: LinkedList::new(),
             }),
             num_tx: AtomicUsize::new(1),
@@ -887,24 +887,12 @@ impl<T> Sender<T> {
     /// # }
     /// ```
     pub async fn closed(&self) {
-        loop {
-            let notified = self.shared.notify_last_rx_drop.notified();
-
-            {
-                // Ensure the lock drops if the channel isn't closed
-                let tail = self.shared.tail.lock();
-                if tail.closed {
-                    return;
-                }
-            }
-
-            notified.await;
-        }
+        self.shared.closed_for_senders().await;
     }
 
     fn close_channel(&self) {
         let mut tail = self.shared.tail.lock();
-        tail.closed = true;
+        tail.has_senders = false;
 
         self.shared.notify_rx(tail);
     }
@@ -925,13 +913,6 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     let mut tail = shared.tail.lock();
 
     assert!(tail.rx_cnt != MAX_RECEIVERS, "max receivers");
-
-    if tail.rx_cnt == 0 {
-        // Potentially need to re-open the channel, if a new receiver has been added between calls
-        // to poll(). Note that we use rx_cnt == 0 instead of is_closed since is_closed also
-        // applies if the sender has been dropped
-        tail.closed = false;
-    }
 
     tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
     let next = tail.pos;
@@ -1053,6 +1034,27 @@ impl<T> Shared<T> {
 
         wakers.wake_all();
     }
+
+    async fn closed_for_senders(&self) {
+        cooperative(async {
+            crate::trace::async_trace_leaf().await;
+
+            loop {
+                let notified = self.notify_last_rx_drop.notified();
+
+                {
+                    // Ensure the lock drops if the channel isn't closed
+                    let tail = self.tail.lock();
+                    if tail.rx_cnt == 0 {
+                        return;
+                    }
+                }
+
+                notified.await;
+            }
+        })
+        .await;
+    }
 }
 
 impl<T> Clone for Sender<T> {
@@ -1100,6 +1102,37 @@ impl<T> WeakSender<T> {
                 Err(prev_count) => tx_count = prev_count,
             }
         }
+    }
+
+    /// A future which completes when the number of [Receiver]s subscribed to this channel reaches
+    /// zero, regardless of whether strong senders still exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use futures::FutureExt;
+    /// use tokio::sync::broadcast;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx1) = broadcast::channel::<u32>(16);
+    /// let mut rx2 = tx.subscribe();
+    ///
+    /// let _ = tx.send(10);
+    /// let weak = tx.downgrade();
+    /// drop(tx);
+    ///
+    /// assert_eq!(rx1.recv().await.unwrap(), 10);
+    /// drop(rx1);
+    /// assert!(weak.closed().now_or_never().is_none());
+    ///
+    /// assert_eq!(rx2.recv().await.unwrap(), 10);
+    /// drop(rx2);
+    /// assert!(weak.closed().now_or_never().is_some());
+    /// # }
+    /// ```
+    pub async fn closed(&self) {
+        self.shared.closed_for_senders().await;
     }
 
     /// Returns the number of [`Sender`] handles.
@@ -1256,7 +1289,7 @@ impl<T> Receiver<T> {
                     // At this point the channel is empty for *this* receiver. If
                     // it's been closed, then that's what we return, otherwise we
                     // set a waker and return empty.
-                    if tail.closed {
+                    if !tail.has_senders {
                         return Err(TryRecvError::Closed);
                     }
 
@@ -1555,7 +1588,6 @@ impl<T> Drop for Receiver<T> {
 
         if remaining_rx == 0 {
             self.shared.notify_last_rx_drop.notify_waiters();
-            tail.closed = true;
         }
 
         drop(tail);
