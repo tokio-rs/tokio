@@ -112,6 +112,16 @@ jobs:
         run: |
           set -euxo pipefail
           cargo nextest run --workspace --features $TOKIO_STABLE_FEATURES
+          # Removing workspace patches to run tests without path dependencies
+          # (if not specified differently in the crate)
+          sed -i.bak '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"\s*}$/d' Cargo.toml && rm -f Cargo.toml.bak
+          cargo nextest run \
+            --workspace \
+            --exclude tokio \
+            --exclude examples \
+            --features $TOKIO_STABLE_FEATURES
+          # Cargo nextest does not support doctest, so we run them separately
+          # (see https://github.com/nextest-rs/nextest/issues/16)
           cargo test --doc --workspace --features $TOKIO_STABLE_FEATURES
 
   test-workspace-all-features-panic-abort:
@@ -211,7 +221,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Check tests --features ${{ env.TOKIO_STABLE_FEATURES }}
-        run: cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
+        run: |
+          set -euxo pipefail
+          cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
+          # Removing the tokio workspace patch to run tests without path dependencies
+          # (if not specified differently in the crate)
+          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"\s*}$/d' Cargo.toml
+          cargo check --workspace --exclude tokio --tests --features $TOKIO_STABLE_FEATURES
 
   valgrind:
     name: valgrind
@@ -716,6 +732,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.rust_min }}
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
       - uses: Swatinem/rust-cache@v2
       - name: "cargo check"
         run: |
@@ -728,7 +748,7 @@ jobs:
 
             cargo check -p tokio --features $TOKIO_STABLE_FEATURES
             # Other crates doesn't have unstable features, so we can use --all-features.
-            cargo check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features
+            cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features
           fi
 
   minimal-versions:
@@ -797,10 +817,18 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
       # Run clippy
-      - name: "clippy --all --features ${{ env.TOKIO_STABLE_FEATURES }}"
-        run: cargo clippy --all --tests --no-deps --features $TOKIO_STABLE_FEATURES
-      - name: "clippy --all --all-features --unstable"
-        run: cargo clippy --all --tests --no-deps --all-features
+      - name: "clippy --workspace --features ${{ env.TOKIO_STABLE_FEATURES }}"
+        run: |
+          cargo clippy --workspace --tests --no-deps --features $TOKIO_STABLE_FEATURES
+          # Removing the tokio workspace patch to check without path dependencies
+          # (if not specified differently in the crate)
+          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"\s*}$/d' Cargo.toml
+          cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
+      - name: "clippy --workspace --all-features --unstable"
+        run: |
+          cargo clippy --workspace --tests --no-deps --all-features --config 'patch.crates-io.tokio.path="tokio"'
+          # check without path dependencies
+          cargo clippy --workspace --exclude tokio --tests --no-deps --all-features
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -1061,7 +1089,7 @@ jobs:
           RUSTDOCFLAGS: -C link-args=--max-memory=67108864
 
       - name: WASI test tokio-stream
-        run: cargo test -p tokio-stream --target ${{ matrix.target }} --features time,net,io-util,sync
+        run: cargo test --manifest-path=tokio-stream/Cargo.toml --target ${{ matrix.target }} --features time,net,io-util,sync
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
