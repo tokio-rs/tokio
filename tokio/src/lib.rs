@@ -549,13 +549,15 @@ cfg_not_sync! {
     mod sync;
 }
 
-cfg_rt! {
-    pub mod task;
-    pub use task::spawn;
-}
+// Currently, task module does not expose any public API outside `rt`
+// feature, so we mark it in the docs. This happens only to docs to
+// avoid introducing breaking changes by restricting the visibility
+// of the task module.
+#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
+pub mod task;
 
-cfg_not_rt! {
-    pub(crate) mod task;
+cfg_rt! {
+    pub use task::spawn;
 }
 
 cfg_time! {
