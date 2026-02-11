@@ -555,7 +555,6 @@ cfg_not_sync! {
 // of the task module.
 #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub mod task;
-
 cfg_rt! {
     pub use task::spawn;
 }
