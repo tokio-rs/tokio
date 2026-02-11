@@ -87,6 +87,14 @@ pub(crate) fn is_cancelled(node: &Arc<TreeNode>) -> bool {
     node.is_cancelled.load(Ordering::Acquire)
 }
 
+/// Returns whether or not the node is cancelled, using a mutex lock for proper
+/// synchronization. This is used in WaitForCancellationFuture::poll() to ensure
+/// correct memory ordering with the cancellation process.
+pub(crate) fn is_cancelled_with_lock(node: &Arc<TreeNode>) -> bool {
+    let _guard = node.inner.lock().unwrap();
+    node.is_cancelled.load(Ordering::Acquire)
+}
+
 /// Creates a child node
 pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
     let mut locked_parent = parent.inner.lock().unwrap();
