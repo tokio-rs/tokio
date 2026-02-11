@@ -207,7 +207,7 @@ impl CancellationToken {
     }
 
     /// Internal method that checks cancellation with mutex lock for proper
-    /// synchronization in WaitForCancellationFuture::poll().
+    /// synchronization in `WaitForCancellationFuture::poll()`.
     fn is_cancelled_with_lock(&self) -> bool {
         tree_node::is_cancelled_with_lock(&self.inner)
     }

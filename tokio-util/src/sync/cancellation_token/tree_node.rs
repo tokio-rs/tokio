@@ -74,7 +74,7 @@ impl TreeNode {
 /// The data contained inside a `TreeNode`.
 ///
 /// This struct exists so that the data of the node can be wrapped
-/// in a Mutex.
+/// in a `Mutex`.
 struct Inner {
     parent: Option<Arc<TreeNode>>,
     parent_idx: usize,
@@ -88,7 +88,7 @@ pub(crate) fn is_cancelled(node: &Arc<TreeNode>) -> bool {
 }
 
 /// Returns whether or not the node is cancelled, using a mutex lock for proper
-/// synchronization. This is used in WaitForCancellationFuture::poll() to ensure
+/// synchronization. This is used in `WaitForCancellationFuture::poll()` to ensure
 /// correct memory ordering with the cancellation process.
 pub(crate) fn is_cancelled_with_lock(node: &Arc<TreeNode>) -> bool {
     let _guard = node.inner.lock().unwrap();
