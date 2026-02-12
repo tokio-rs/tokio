@@ -59,9 +59,9 @@ fn static_atomic_u64_concurrent_access() {
         thread1.join().unwrap();
         thread2.join().unwrap();
 
-        // Final value should be 10 + 10 = 20 (from thread1) + 5*2 = 10 (from thread2)
+        // Final value should be 10 (from thread1) + 5*2 = 10 (from thread2) = 20 total
         let final_value = atomic.load(Relaxed);
-        assert!(final_value == 20 || final_value == 30);
+        assert_eq!(final_value, 20);
     });
 }
 
