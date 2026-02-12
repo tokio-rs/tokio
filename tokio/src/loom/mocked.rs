@@ -122,7 +122,7 @@ pub(crate) mod sync {
 
             /// Atomically compares and exchanges the value.
             ///
-            /// Loom's compare_exchange just delegates to compare_exchange_weak,
+            /// Loom's `compare_exchange` just delegates to `compare_exchange_weak`,
             /// since Mutex provides total ordering.
             ///
             /// Note: Ordering parameters are ignored; Loom uses Mutex to simulate atomic behavior.
