@@ -76,17 +76,26 @@ pub(crate) mod sync {
                 }
             }
 
-            pub(crate) fn load(&self, order: Ordering) -> u64 {
+            /// Loads the atomic value.
+            ///
+            /// Note: Ordering parameter is ignored; Loom uses Mutex to simulate atomic behavior.
+            pub(crate) fn load(&self, _order: Ordering) -> u64 {
                 *self.inner().lock()
             }
 
-            pub(crate) fn fetch_add(&self, val: u64, order: Ordering) -> u64 {
+            /// Atomically adds to the current value, returning the previous value.
+            ///
+            /// Note: Ordering parameter is ignored; Loom uses Mutex to simulate atomic behavior.
+            pub(crate) fn fetch_add(&self, val: u64, _order: Ordering) -> u64 {
                 let mut lock = self.inner().lock();
                 let prev = *lock;
                 *lock = prev + val;
                 prev
             }
 
+            /// Atomically compares and exchanges the value, but may fail spuriously.
+            ///
+            /// Note: Ordering parameters are ignored; Loom uses Mutex to simulate atomic behavior.
             pub(crate) fn compare_exchange_weak(
                 &self,
                 current: u64,
@@ -104,10 +113,19 @@ pub(crate) mod sync {
                 }
             }
 
-            pub(crate) fn store(&self, val: u64, order: Ordering) {
+            /// Stores a value into the atomic.
+            ///
+            /// Note: Ordering parameter is ignored; Loom uses Mutex to simulate atomic behavior.
+            pub(crate) fn store(&self, val: u64, _order: Ordering) {
                 *self.inner().lock() = val;
             }
 
+            /// Atomically compares and exchanges the value.
+            ///
+            /// Loom's compare_exchange just delegates to compare_exchange_weak,
+            /// since Mutex provides total ordering.
+            ///
+            /// Note: Ordering parameters are ignored; Loom uses Mutex to simulate atomic behavior.
             pub(crate) fn compare_exchange(
                 &self,
                 current: u64,
@@ -121,6 +139,20 @@ pub(crate) mod sync {
             fn inner(&self) -> &crate::loom::sync::Mutex<u64> {
                 self.cell
                     .get_or_init(|| crate::loom::sync::Mutex::new(self.init))
+            }
+        }
+
+        impl std::fmt::Debug for StaticAtomicU64 {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_struct("StaticAtomicU64")
+                    .field("value", &self.load(Ordering::Relaxed))
+                    .finish()
+            }
+        }
+
+        impl Default for StaticAtomicU64 {
+            fn default() -> Self {
+                StaticAtomicU64::new(0)
             }
         }
     }
