@@ -277,6 +277,38 @@ impl Buf {
     }
 }
 
+cfg_io_uring! {
+    impl Buf {
+        /// Prepare the internal buffer for an io-uring read operation.
+        ///
+        /// Returns a pointer to the spare capacity and the length available
+        /// for the kernel to write into.
+        pub(crate) fn prepare_uring_read(&mut self, max_buf_size: usize) -> (*mut u8, u32) {
+            assert!(self.is_empty());
+            self.buf.reserve(max_buf_size);
+            let spare = self.buf.spare_capacity_mut();
+            let len = std::cmp::min(spare.len(), max_buf_size);
+            let ptr = spare.as_mut_ptr().cast::<u8>();
+            (ptr, len as u32)
+        }
+
+        /// Complete an io-uring read operation.
+        ///
+        /// # Safety
+        ///
+        /// The caller must ensure that the kernel wrote exactly `n` bytes
+        /// into the buffer that was returned by `prepare_uring_read`.
+        pub(crate) unsafe fn complete_uring_read(&mut self, n: usize) {
+            // SAFETY: `prepare_uring_read` handed out a pointer to
+            // `self.buf.spare_capacity_mut()` after asserting it's empty.
+            // The caller guarantees the kernel initialised exactly `n` bytes
+            // starting at that pointer, so bytes `0..n` are now initialised and
+            // it is sound to set the Vec length to `n`.
+            unsafe { self.buf.set_len(n) };
+        }
+    }
+}
+
 cfg_fs! {
     impl Buf {
         pub(crate) fn discard_read(&mut self) -> i64 {
