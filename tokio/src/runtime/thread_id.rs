@@ -7,9 +7,6 @@ impl ThreadId {
     pub(crate) fn next() -> Self {
         use crate::loom::sync::atomic::{Ordering::Relaxed, StaticAtomicU64};
 
-        // Under loom, StaticAtomicU64::new is not const (loom types need runtime
-        // tracking for permutation testing), so we must use lazy_static! for
-        // static initialization. In production, we can use const initialization.
         #[cfg(all(test, loom))]
         crate::loom::lazy_static! {
             static ref NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(0);
