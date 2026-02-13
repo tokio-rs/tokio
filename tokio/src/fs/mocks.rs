@@ -159,6 +159,30 @@ impl<T> Future for JoinHandle<T> {
     }
 }
 
+cfg_io_uring! {
+    pub(super) fn spawn<F, R>(f: F) -> JoinHandle<R>
+    where
+        F: std::future::Future<Output = R> + Send + 'static,
+        R: Send + 'static,
+    {
+        let (tx, rx) = oneshot::channel();
+        let task = Box::new(move || {
+            // In mock tests, we just block on the future using a trivial executor.
+            // The io-uring path won't actually run in mock tests, but this allows
+            // the code to compile.
+            let _ = tx.send(crate::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(f));
+        });
+
+        QUEUE.with(|cell| cell.borrow_mut().push_back(task));
+
+        JoinHandle { rx }
+    }
+}
+
 pub(super) mod pool {
     use super::*;
 
