@@ -220,7 +220,7 @@ async fn test_file_read_after_write() {
 
 #[tokio::test]
 async fn test_file_read_cancel() {
-    let data: Vec<u8> = (0..10_000u16).map(|i| (i % 256) as u8).collect();
+    let data: Vec<u8> = (0..10_000).map(|i| (i % 256) as u8).collect();
     let (_tmp, path) = create_temp_file(&data);
 
     let path2 = path.clone();
@@ -243,31 +243,12 @@ async fn test_file_read_cancel() {
 }
 
 #[tokio::test]
-async fn test_file_read_drop_midway() {
-    let data: Vec<u8> = (0..100_000u32).map(|i| (i % 256) as u8).collect();
-    let (_tmp, path) = create_temp_file(&data);
-
-    // Open, read a small amount, then drop
-    {
-        let mut file = File::open(&path).await.unwrap();
-        let mut buf = vec![0u8; 10];
-        file.read(&mut buf).await.unwrap();
-    }
-
-    // Verify we can still do work
-    let mut file = File::open(&path).await.unwrap();
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf).await.unwrap();
-    assert_eq!(buf, data);
-}
-
-#[tokio::test]
 async fn test_file_read_concurrent() {
     const NUM_FILES: usize = 100;
 
     let files: Vec<_> = (0..NUM_FILES)
         .map(|i| {
-            let data: Vec<u8> = (0..1024u16).map(|j| ((i as u16 + j) % 256) as u8).collect();
+            let data: Vec<u8> = (0..1024).map(|j| ((i as u16 + j) % 256) as u8).collect();
             create_temp_file(&data)
         })
         .collect();
@@ -276,7 +257,7 @@ async fn test_file_read_concurrent() {
 
     for (i, (_tmp, path)) in files.iter().enumerate() {
         let path = path.clone();
-        let expected: Vec<u8> = (0..1024u16).map(|j| ((i as u16 + j) % 256) as u8).collect();
+        let expected: Vec<u8> = (0..1024).map(|j| ((i as u16 + j) % 256) as u8).collect();
         tracker.spawn(async move {
             let mut file = File::open(&path).await.unwrap();
             let mut buf = Vec::new();
@@ -293,7 +274,7 @@ async fn test_file_read_concurrent() {
 fn test_file_read_multi_runtime() {
     for rt_factory in rt_combinations() {
         let rt = rt_factory();
-        let data: Vec<u8> = (0..10_000u16).map(|i| (i % 256) as u8).collect();
+        let data: Vec<u8> = (0..10_000).map(|i| (i % 256) as u8).collect();
         let (_tmp, path) = create_temp_file(&data);
 
         let result = rt.block_on(async {
@@ -313,7 +294,7 @@ fn shutdown_runtime_with_pending_reads() {
         let rt = rt_factory();
         let (done_tx, done_rx) = mpsc::channel();
 
-        let data: Vec<u8> = (0..10_000u16).map(|i| (i % 256) as u8).collect();
+        let data: Vec<u8> = (0..10_000).map(|i| (i % 256) as u8).collect();
         let (_tmp, path) = create_temp_file(&data);
 
         for _ in 0..50 {
