@@ -1,4 +1,0 @@
-[language-server.rust-analyzer.config]
-cargo.features = "all"
-carg.extraEnv = { RUSTFLAGS = "--cfg tokio_unstable" }
-check.command = "clippy"
