@@ -692,6 +692,122 @@ impl UnixDatagram {
             .try_io(Interest::WRITABLE, || self.io.send(buf))
     }
 
+    /// Tries to send vectored data with ancillary data on the socket.
+    ///
+    /// This is typically used to pass file descriptors between processes
+    /// using `SCM_RIGHTS`. The socket must be connected (see [`connect`](Self::connect)).
+    /// This method is non-blocking and should be paired with
+    /// [`writable()`](Self::writable).
+    ///
+    /// # Return
+    ///
+    /// Returns the number of bytes of regular data sent, or
+    /// `Err(io::ErrorKind::WouldBlock)` if the socket is not ready.
+    pub fn try_send_vectored_with_ancillary(
+        &self,
+        bufs: &[io::IoSlice<'_>],
+        ancillary: &mut crate::net::unix::SocketAncillary<'_>,
+    ) -> io::Result<usize> {
+        self.io.registration().try_io(Interest::WRITABLE, || {
+            crate::net::unix::cmsg::sendmsg_vectored(
+                self.as_raw_fd(),
+                bufs,
+                ancillary.as_buffer(),
+                ancillary.len(),
+            )
+        })
+    }
+
+    /// Sends vectored data with ancillary data on the socket, waiting
+    /// for the socket to become writable if necessary.
+    ///
+    /// This is typically used to pass file descriptors between processes
+    /// using `SCM_RIGHTS`. The socket must be connected.
+    pub async fn send_vectored_with_ancillary(
+        &self,
+        bufs: &[io::IoSlice<'_>],
+        ancillary: &mut crate::net::unix::SocketAncillary<'_>,
+    ) -> io::Result<usize> {
+        self.io
+            .registration()
+            .async_io(Interest::WRITABLE, || {
+                crate::net::unix::cmsg::sendmsg_vectored(
+                    self.as_raw_fd(),
+                    bufs,
+                    ancillary.as_buffer(),
+                    ancillary.len(),
+                )
+            })
+            .await
+    }
+
+    /// Tries to receive vectored data with ancillary data from the socket.
+    ///
+    /// On success, returns the number of bytes of regular data read.
+    /// The ancillary buffer will be populated with any received control
+    /// messages (e.g., file descriptors via `SCM_RIGHTS`).
+    ///
+    /// This method is non-blocking and should be paired with
+    /// [`readable()`](Self::readable).
+    pub fn try_recv_vectored_with_ancillary(
+        &self,
+        bufs: &mut [io::IoSliceMut<'_>],
+        ancillary: &mut crate::net::unix::SocketAncillary<'_>,
+    ) -> io::Result<usize> {
+        self.io.registration().try_io(Interest::READABLE, || {
+            let result = crate::net::unix::cmsg::recvmsg_vectored(
+                self.as_raw_fd(),
+                bufs,
+                ancillary.as_mut_buffer(),
+            )?;
+            ancillary.set_received(result.ancillary_len, result.truncated);
+            #[cfg(not(any(
+                target_os = "linux",
+                target_os = "android",
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "netbsd",
+                target_os = "openbsd",
+            )))]
+            ancillary.set_cloexec()?;
+            Ok(result.bytes_read)
+        })
+    }
+
+    /// Receives vectored data with ancillary data from the socket,
+    /// waiting for the socket to become readable if necessary.
+    ///
+    /// On success, returns the number of bytes of regular data read.
+    /// Use [`SocketAncillary::messages`](crate::net::unix::SocketAncillary::messages)
+    /// to iterate received control messages.
+    pub async fn recv_vectored_with_ancillary(
+        &self,
+        bufs: &mut [io::IoSliceMut<'_>],
+        ancillary: &mut crate::net::unix::SocketAncillary<'_>,
+    ) -> io::Result<usize> {
+        self.io
+            .registration()
+            .async_io(Interest::READABLE, || {
+                let result = crate::net::unix::cmsg::recvmsg_vectored(
+                    self.as_raw_fd(),
+                    bufs,
+                    ancillary.as_mut_buffer(),
+                )?;
+                ancillary.set_received(result.ancillary_len, result.truncated);
+                #[cfg(not(any(
+                    target_os = "linux",
+                    target_os = "android",
+                    target_os = "freebsd",
+                    target_os = "dragonfly",
+                    target_os = "netbsd",
+                    target_os = "openbsd",
+                )))]
+                ancillary.set_cloexec()?;
+                Ok(result.bytes_read)
+            })
+            .await
+    }
+
     /// Tries to send a datagram to the peer without waiting.
     ///
     /// # Examples

@@ -702,6 +702,256 @@ impl UnixStream {
             .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(buf))
     }
 
+    /// Tries to send vectored data with ancillary data on the socket.
+    ///
+    /// This is typically used to pass file descriptors between processes
+    /// using `SCM_RIGHTS`. This method is non-blocking and should be
+    /// paired with [`writable()`](Self::writable).
+    ///
+    /// # Return
+    ///
+    /// Returns the number of bytes of regular data sent, or
+    /// `Err(io::ErrorKind::WouldBlock)` if the socket is not ready.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    /// use tokio::net::unix::SocketAncillary;
+    /// use std::io;
+    /// use std::os::unix::io::AsRawFd;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let (stream, _) = UnixStream::pair()?;
+    ///     let file = std::fs::File::open("/dev/null")?;
+    ///
+    ///     let mut ancillary_buf = [0u8; 128];
+    ///     let mut ancillary = SocketAncillary::new(&mut ancillary_buf);
+    ///     ancillary.add_fds(&[file.as_raw_fd()]).unwrap();
+    ///
+    ///     loop {
+    ///         stream.writable().await?;
+    ///         match stream.try_send_vectored_with_ancillary(
+    ///             &[io::IoSlice::new(b"hello")],
+    ///             &mut ancillary,
+    ///         ) {
+    ///             Ok(n) => {
+    ///                 println!("sent {} bytes with fds", n);
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+    ///             Err(e) => return Err(e),
+    ///         }
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn try_send_vectored_with_ancillary(
+        &self,
+        bufs: &[io::IoSlice<'_>],
+        ancillary: &mut super::SocketAncillary<'_>,
+    ) -> io::Result<usize> {
+        self.io.registration().try_io(Interest::WRITABLE, || {
+            super::cmsg::sendmsg_vectored(
+                self.as_raw_fd(),
+                bufs,
+                ancillary.as_buffer(),
+                ancillary.len(),
+            )
+        })
+    }
+
+    /// Sends vectored data with ancillary data on the socket, waiting
+    /// for the socket to become writable if necessary.
+    ///
+    /// This is typically used to pass file descriptors between processes
+    /// using `SCM_RIGHTS`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    /// use tokio::net::unix::SocketAncillary;
+    /// use std::io;
+    /// use std::os::unix::io::AsRawFd;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let (stream, _) = UnixStream::pair()?;
+    ///     let file = std::fs::File::open("/dev/null")?;
+    ///
+    ///     let mut ancillary_buf = [0u8; 128];
+    ///     let mut ancillary = SocketAncillary::new(&mut ancillary_buf);
+    ///     ancillary.add_fds(&[file.as_raw_fd()]).unwrap();
+    ///
+    ///     let n = stream.send_vectored_with_ancillary(
+    ///         &[io::IoSlice::new(b"hello")],
+    ///         &mut ancillary,
+    ///     ).await?;
+    ///     println!("sent {} bytes with fds", n);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn send_vectored_with_ancillary(
+        &self,
+        bufs: &[io::IoSlice<'_>],
+        ancillary: &mut super::SocketAncillary<'_>,
+    ) -> io::Result<usize> {
+        self.io
+            .registration()
+            .async_io(Interest::WRITABLE, || {
+                super::cmsg::sendmsg_vectored(
+                    self.as_raw_fd(),
+                    bufs,
+                    ancillary.as_buffer(),
+                    ancillary.len(),
+                )
+            })
+            .await
+    }
+
+    /// Tries to receive vectored data with ancillary data from the socket.
+    ///
+    /// On success, returns the number of bytes of regular data read.
+    /// The ancillary buffer will be populated with any received control
+    /// messages (e.g., file descriptors via `SCM_RIGHTS`).
+    ///
+    /// This method is non-blocking and should be paired with
+    /// [`readable()`](Self::readable).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    /// use tokio::net::unix::{SocketAncillary, AncillaryData};
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let (_, stream) = UnixStream::pair()?;
+    ///
+    ///     loop {
+    ///         stream.readable().await?;
+    ///
+    ///         let mut buf = [0u8; 1024];
+    ///         let mut ancillary_buf = [0u8; 128];
+    ///         let mut ancillary = SocketAncillary::new(&mut ancillary_buf);
+    ///
+    ///         match stream.try_recv_vectored_with_ancillary(
+    ///             &mut [io::IoSliceMut::new(&mut buf)],
+    ///             &mut ancillary,
+    ///         ) {
+    ///             Ok(n) => {
+    ///                 println!("read {} bytes", n);
+    ///                 for msg in ancillary.messages() {
+    ///                     match msg {
+    ///                         AncillaryData::ScmRights(fds) => {
+    ///                             for fd in fds {
+    ///                                 println!("received fd: {}", fd);
+    ///                             }
+    ///                         }
+    ///                     }
+    ///                 }
+    ///                 break;
+    ///             }
+    ///             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+    ///             Err(e) => return Err(e),
+    ///         }
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn try_recv_vectored_with_ancillary(
+        &self,
+        bufs: &mut [io::IoSliceMut<'_>],
+        ancillary: &mut super::SocketAncillary<'_>,
+    ) -> io::Result<usize> {
+        self.io.registration().try_io(Interest::READABLE, || {
+            let result =
+                super::cmsg::recvmsg_vectored(self.as_raw_fd(), bufs, ancillary.as_mut_buffer())?;
+            ancillary.set_received(result.ancillary_len, result.truncated);
+            #[cfg(not(any(
+                target_os = "linux",
+                target_os = "android",
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "netbsd",
+                target_os = "openbsd",
+            )))]
+            ancillary.set_cloexec()?;
+            Ok(result.bytes_read)
+        })
+    }
+
+    /// Receives vectored data with ancillary data from the socket,
+    /// waiting for the socket to become readable if necessary.
+    ///
+    /// On success, returns the number of bytes of regular data read.
+    /// Use [`SocketAncillary::messages`](super::SocketAncillary::messages)
+    /// to iterate received control messages (e.g., file descriptors).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::net::UnixStream;
+    /// use tokio::net::unix::{SocketAncillary, AncillaryData};
+    /// use std::io;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let (_, stream) = UnixStream::pair()?;
+    ///
+    ///     let mut buf = [0u8; 1024];
+    ///     let mut ancillary_buf = [0u8; 128];
+    ///     let mut ancillary = SocketAncillary::new(&mut ancillary_buf);
+    ///
+    ///     let n = stream.recv_vectored_with_ancillary(
+    ///         &mut [io::IoSliceMut::new(&mut buf)],
+    ///         &mut ancillary,
+    ///     ).await?;
+    ///
+    ///     println!("read {} bytes", n);
+    ///     for msg in ancillary.messages() {
+    ///         match msg {
+    ///             AncillaryData::ScmRights(fds) => {
+    ///                 for fd in fds {
+    ///                     println!("received fd: {}", fd);
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn recv_vectored_with_ancillary(
+        &self,
+        bufs: &mut [io::IoSliceMut<'_>],
+        ancillary: &mut super::SocketAncillary<'_>,
+    ) -> io::Result<usize> {
+        self.io
+            .registration()
+            .async_io(Interest::READABLE, || {
+                let result = super::cmsg::recvmsg_vectored(
+                    self.as_raw_fd(),
+                    bufs,
+                    ancillary.as_mut_buffer(),
+                )?;
+                ancillary.set_received(result.ancillary_len, result.truncated);
+                #[cfg(not(any(
+                    target_os = "linux",
+                    target_os = "android",
+                    target_os = "freebsd",
+                    target_os = "dragonfly",
+                    target_os = "netbsd",
+                    target_os = "openbsd",
+                )))]
+                ancillary.set_cloexec()?;
+                Ok(result.bytes_read)
+            })
+            .await
+    }
+
     /// Tries to read or write from the socket using a user-provided IO operation.
     ///
     /// If the socket is ready, the provided closure is called. The closure

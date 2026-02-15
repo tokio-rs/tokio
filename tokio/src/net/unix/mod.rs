@@ -24,6 +24,11 @@ pub(crate) use stream::UnixStream;
 mod ucred;
 pub use ucred::UCred;
 
+mod ancillary;
+pub use ancillary::{AncillaryData, AncillaryError, Messages, ScmRights, SocketAncillary};
+
+pub(crate) mod cmsg;
+
 pub mod pipe;
 
 /// A type representing user ID.

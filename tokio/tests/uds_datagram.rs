@@ -423,3 +423,65 @@ async fn poll_ready() -> io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+#[cfg_attr(miri, ignore)]
+async fn send_recv_fd_over_datagram() {
+    use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+    use tokio::net::unix::{AncillaryData, SocketAncillary};
+
+    let (a, b) = UnixDatagram::pair().unwrap();
+
+    let file = tempfile::tempfile().unwrap();
+    {
+        use std::io::Write;
+        let mut f = &file;
+        f.write_all(b"datagram-fd-test").unwrap();
+    }
+    let fd_to_send = file.as_raw_fd();
+
+    // Send fd over datagram
+    let mut ancillary_buf = [0u8; 128];
+    let mut ancillary = SocketAncillary::new(&mut ancillary_buf);
+    ancillary.add_fds(&[fd_to_send]).unwrap();
+
+    let n = a
+        .send_vectored_with_ancillary(&[io::IoSlice::new(b"dgram")], &mut ancillary)
+        .await
+        .unwrap();
+    assert_eq!(n, 5);
+
+    // Receive fd
+    let mut recv_buf = [0u8; 64];
+    let mut recv_ancillary_buf = [0u8; 128];
+    let mut recv_ancillary = SocketAncillary::new(&mut recv_ancillary_buf);
+
+    let n = b
+        .recv_vectored_with_ancillary(
+            &mut [io::IoSliceMut::new(&mut recv_buf)],
+            &mut recv_ancillary,
+        )
+        .await
+        .unwrap();
+    assert_eq!(n, 5);
+    assert_eq!(&recv_buf[..5], b"dgram");
+
+    let mut received_fds: Vec<RawFd> = Vec::new();
+    for msg in recv_ancillary.messages() {
+        match msg {
+            AncillaryData::ScmRights(fds) => received_fds.extend(fds),
+        }
+    }
+    assert_eq!(received_fds.len(), 1);
+
+    // Verify the fd works
+    let received_file = unsafe { std::fs::File::from_raw_fd(received_fds[0]) };
+    {
+        use std::io::{Read, Seek, SeekFrom};
+        let mut f = &received_file;
+        f.seek(SeekFrom::Start(0)).unwrap();
+        let mut contents = String::new();
+        f.read_to_string(&mut contents).unwrap();
+        assert_eq!(contents, "datagram-fd-test");
+    }
+}

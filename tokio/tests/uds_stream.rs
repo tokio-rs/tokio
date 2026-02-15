@@ -444,3 +444,174 @@ async fn abstract_socket_name() {
     // `as_abstract_name` removes leading zero bytes
     assert_eq!(abstract_path_name, b"aaa");
 }
+
+#[tokio::test]
+async fn send_recv_fd_over_stream() {
+    use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+    use tokio::net::unix::{AncillaryData, SocketAncillary};
+
+    let (a, b) = UnixStream::pair().unwrap();
+
+    // Create a file to pass
+    let file = tempfile::tempfile().unwrap();
+    // Write some data to identify the file later
+    {
+        use std::io::Write;
+        let mut f = &file;
+        f.write_all(b"tokio-fd-test").unwrap();
+    }
+
+    let fd_to_send = file.as_raw_fd();
+
+    // Send fd
+    let mut ancillary_buf = [0u8; 128];
+    let mut ancillary = SocketAncillary::new(&mut ancillary_buf);
+    ancillary.add_fds(&[fd_to_send]).unwrap();
+
+    let n = a
+        .send_vectored_with_ancillary(&[io::IoSlice::new(b"hello")], &mut ancillary)
+        .await
+        .unwrap();
+    assert_eq!(n, 5);
+
+    // Receive fd
+    let mut recv_buf = [0u8; 64];
+    let mut recv_ancillary_buf = [0u8; 128];
+    let mut recv_ancillary = SocketAncillary::new(&mut recv_ancillary_buf);
+
+    let n = b
+        .recv_vectored_with_ancillary(
+            &mut [io::IoSliceMut::new(&mut recv_buf)],
+            &mut recv_ancillary,
+        )
+        .await
+        .unwrap();
+    assert_eq!(n, 5);
+    assert_eq!(&recv_buf[..5], b"hello");
+    assert!(!recv_ancillary.is_truncated());
+
+    // Extract received fds
+    let mut received_fds: Vec<RawFd> = Vec::new();
+    for msg in recv_ancillary.messages() {
+        match msg {
+            AncillaryData::ScmRights(fds) => received_fds.extend(fds),
+        }
+    }
+    assert_eq!(received_fds.len(), 1);
+    // Kernel assigns a new fd number
+    assert_ne!(received_fds[0], fd_to_send);
+
+    // Verify the received fd is valid by reading the file content
+    let received_file = unsafe { std::fs::File::from_raw_fd(received_fds[0]) };
+    {
+        use std::io::{Read, Seek, SeekFrom};
+        let mut f = &received_file;
+        f.seek(SeekFrom::Start(0)).unwrap();
+        let mut contents = String::new();
+        f.read_to_string(&mut contents).unwrap();
+        assert_eq!(contents, "tokio-fd-test");
+    }
+    // received_file is dropped here, closing the fd
+}
+
+#[tokio::test]
+async fn send_recv_multiple_fds_over_stream() {
+    use std::os::unix::io::{AsRawFd, RawFd};
+    use tokio::net::unix::{AncillaryData, SocketAncillary};
+
+    let (a, b) = UnixStream::pair().unwrap();
+
+    let file1 = tempfile::tempfile().unwrap();
+    let file2 = tempfile::tempfile().unwrap();
+    let file3 = tempfile::tempfile().unwrap();
+
+    let fds_to_send = [file1.as_raw_fd(), file2.as_raw_fd(), file3.as_raw_fd()];
+
+    let buf_size = SocketAncillary::buffer_size_for_rights(3);
+    let mut ancillary_buf = vec![0u8; buf_size];
+    let mut ancillary = SocketAncillary::new(&mut ancillary_buf);
+    ancillary.add_fds(&fds_to_send).unwrap();
+
+    let n = a
+        .send_vectored_with_ancillary(&[io::IoSlice::new(b"fds")], &mut ancillary)
+        .await
+        .unwrap();
+    assert_eq!(n, 3);
+
+    let mut recv_buf = [0u8; 64];
+    let mut recv_ancillary_buf = vec![0u8; buf_size];
+    let mut recv_ancillary = SocketAncillary::new(&mut recv_ancillary_buf);
+
+    let n = b
+        .recv_vectored_with_ancillary(
+            &mut [io::IoSliceMut::new(&mut recv_buf)],
+            &mut recv_ancillary,
+        )
+        .await
+        .unwrap();
+    assert_eq!(n, 3);
+
+    let mut received_fds: Vec<RawFd> = Vec::new();
+    for msg in recv_ancillary.messages() {
+        match msg {
+            AncillaryData::ScmRights(fds) => received_fds.extend(fds),
+        }
+    }
+    assert_eq!(received_fds.len(), 3);
+
+    // Clean up received fds
+    for fd in &received_fds {
+        unsafe { libc::close(*fd) };
+    }
+}
+
+#[tokio::test]
+async fn try_send_recv_fd_over_stream() {
+    use std::os::unix::io::{AsRawFd, RawFd};
+    use tokio::net::unix::{AncillaryData, SocketAncillary};
+
+    let (a, b) = UnixStream::pair().unwrap();
+
+    let file = tempfile::tempfile().unwrap();
+    let fd_to_send = file.as_raw_fd();
+
+    // Wait for writable, then try_send
+    a.writable().await.unwrap();
+
+    let mut ancillary_buf = [0u8; 128];
+    let mut ancillary = SocketAncillary::new(&mut ancillary_buf);
+    ancillary.add_fds(&[fd_to_send]).unwrap();
+
+    let n = a
+        .try_send_vectored_with_ancillary(&[io::IoSlice::new(b"try")], &mut ancillary)
+        .unwrap();
+    assert_eq!(n, 3);
+
+    // Wait for readable, then try_recv
+    b.readable().await.unwrap();
+
+    let mut recv_buf = [0u8; 64];
+    let mut recv_ancillary_buf = [0u8; 128];
+    let mut recv_ancillary = SocketAncillary::new(&mut recv_ancillary_buf);
+
+    let n = b
+        .try_recv_vectored_with_ancillary(
+            &mut [io::IoSliceMut::new(&mut recv_buf)],
+            &mut recv_ancillary,
+        )
+        .unwrap();
+    assert_eq!(n, 3);
+    assert_eq!(&recv_buf[..3], b"try");
+
+    let mut received_fds: Vec<RawFd> = Vec::new();
+    for msg in recv_ancillary.messages() {
+        match msg {
+            AncillaryData::ScmRights(fds) => received_fds.extend(fds),
+        }
+    }
+    assert_eq!(received_fds.len(), 1);
+
+    for fd in &received_fds {
+        unsafe { libc::close(*fd) };
+    }
+}
