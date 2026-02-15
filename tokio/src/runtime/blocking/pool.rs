@@ -561,12 +561,6 @@ impl Inner {
                     shared = self.shared.lock();
                 }
 
-                // Work was produced, and we "took" it (by decrementing num_notify).
-                // This means that num_idle was decremented once for our wakeup.
-                // But, since we are exiting, we need to "undo" that, as we'll stay idle.
-                self.metrics.inc_num_idle_threads();
-                // NOTE: Technically we should also do num_notify++ and notify again,
-                // but since we're shutting down anyway, that won't be necessary.
                 break;
             }
         }
