@@ -65,6 +65,7 @@ impl Default for WriteFrame {
 
 impl From<BytesMut> for ReadFrame {
     fn from(mut buffer: BytesMut) -> Self {
+        let is_readable = !buffer.is_empty();
         let size = buffer.capacity();
         if size < INITIAL_CAPACITY {
             buffer.reserve(INITIAL_CAPACITY - size);
@@ -72,7 +73,7 @@ impl From<BytesMut> for ReadFrame {
 
         Self {
             buffer,
-            is_readable: size > 0,
+            is_readable,
             eof: false,
             has_errored: false,
         }
