@@ -33,3 +33,17 @@ unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(tokio_unstable)',
   'cfg(target_os, values("cygwin"))',
 ] }
+
+[workspace.dependencies]
+rand = "^0.9.2" #unified
+slab = "^0.4.12" #unified
+tokio = { path = "tokio", version = "^1.49.0", features = ["full", "rt", "sync", "test-util", "time", "tracing"] } #unified
+libc = "^0.2.182" #unified
+tempfile = "^3.25.0" #unified
+bytes = "^1.11.1" #unified
+parking_lot = "^0.12.5" #unified
+futures = { version = "^0.3.31", features = ["async-await", "thread-pool"] } #unified
+tracing = { version = "^0.1.44", features = ["std"] } #unified
+
+[workspace.package]
+rust-version = "1.85.0"

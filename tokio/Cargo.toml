@@ -93,11 +93,9 @@ taskdump = ["dep:backtrace"]
 tokio-macros = { version = "~2.6.0", path = "../tokio-macros", optional = true }
 
 pin-project-lite = "0.2.11"
-
-# Everything else is optional...
-bytes = { version = "1.2.1", optional = true }
+bytes = { workspace = true, optional = true } #unified
 mio = { version = "1.0.1", optional = true, default-features = false }
-parking_lot = { version = "0.12.0", optional = true }
+parking_lot = { workspace = true, optional = true } #unified
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 socket2 = { version = "0.6.0", optional = true, features = ["all"] }
@@ -105,23 +103,23 @@ socket2 = { version = "0.6.0", optional = true, features = ["all"] }
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
 [target.'cfg(tokio_unstable)'.dependencies]
-tracing = { version = "0.1.29", default-features = false, features = ["std"], optional = true } # Not in full
+tracing = { workspace = true, optional = true } #unified
 
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
 [target.'cfg(all(tokio_unstable, target_os = "linux"))'.dependencies]
 io-uring = { version = "0.7.11", default-features = false, optional = true }
-libc = { version = "0.2.168", optional = true }
+libc = { workspace = true, optional = true } #unified
 mio = { version = "1.0.1", default-features = false, features = ["os-poll", "os-ext"], optional = true }
-slab = { version = "0.4.9", optional = true }
+slab = { workspace = true, optional = true } #unified
 backtrace = { version = "0.3.58", optional = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.168", optional = true }
+libc = { workspace = true, optional = true } #unified
 signal-hook-registry = { version = "1.1.1", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
-libc = { version = "0.2.168" }
+libc = { workspace = true } #unified
 nix = { version = "0.29.0", default-features = false, features = ["aio", "fs", "socket"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
@@ -139,7 +137,7 @@ features = [
 tokio-test = "0.4.0"
 tokio-stream = "0.1"
 tokio-util = { version = "0.7", features = ["rt"] }
-futures = { version = "0.3.0", features = ["async-await"] }
+futures = { workspace = true, features = ["thread-pool"] } #unified
 futures-test = "0.3.31"
 mockall = "0.13.0"
 async-stream = "0.3"
@@ -147,11 +145,11 @@ futures-concurrency = "7.6.3"
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 socket2 = "0.6.0"
-tempfile = "3.1.0"
+tempfile = { workspace = true } #unified
 proptest = "1"
 
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dev-dependencies]
-rand = "0.9"
+rand = { workspace = true } #unified
 
 [target.'cfg(all(target_family = "wasm", not(target_os = "wasi")))'.dev-dependencies]
 wasm-bindgen-test = "0.3.0"

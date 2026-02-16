@@ -8,14 +8,13 @@ license = "MIT"
 # If you copy one of the examples into a new project, you should be using
 # [dependencies] instead, and delete the **path**.
 [dev-dependencies]
-tokio = { version = "1.0.0", path = "../tokio", features = ["full", "tracing"] }
+tokio = { workspace = true } #unified
 tokio-util = { version = "0.7.0", path = "../tokio-util", features = ["full"] }
 tokio-stream = { version = "0.1", path = "../tokio-stream" }
-
-tracing = "0.1"
+tracing = { workspace = true } #unified
 tracing-subscriber = { version = "0.3.1", default-features = false, features = ["fmt", "ansi", "env-filter", "tracing-log"] }
-bytes = "1.0.0"
-futures = { version = "0.3.0", features = ["thread-pool"]}
+bytes = { workspace = true } #unified
+futures = { workspace = true, features = ["async-await"] } #unified
 http = "1"
 serde = "1.0"
 serde_derive = "1.0"
@@ -25,7 +24,7 @@ httpdate = "1.0"
 once_cell = "1.5.2"
 
 [target.'cfg(all(tokio_unstable, target_os = "linux"))'.dev-dependencies]
-tokio = { version = "1.0.0", path = "../tokio", features = ["full", "tracing", "taskdump"] }
+tokio = { workspace = true, features = ["taskdump"] } #unified
 
 [target.'cfg(windows)'.dev-dependencies.windows-sys]
 version = "0.61"

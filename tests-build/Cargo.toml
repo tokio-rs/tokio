@@ -11,7 +11,7 @@ full = ["tokio/full"]
 rt = ["tokio/rt", "tokio/macros"]
 
 [dependencies]
-tokio = { version = "1.0.0", path = "../tokio", optional = true }
+tokio = { workspace = true, optional = true } #unified
 
 [dev-dependencies]
 trybuild = "1.0"

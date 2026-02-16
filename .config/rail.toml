@@ -1,0 +1,9 @@
+# cargo-rail configuration (unify only)
+# Full documentation: https://github.com/loadingalias/cargo-rail
+
+[unify]
+detect_undeclared_features = true
+fix_undeclared_features = true
+prune_dead_features = true
+msrv = true
+sort_dependencies = false  # preserve upstream order
