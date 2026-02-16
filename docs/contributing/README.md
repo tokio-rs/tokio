@@ -37,6 +37,7 @@ If you are unsure where to begin, use the following guides:
     - [Review a bit at a time](reviewing-pull-requests.md#review-a-bit-at-a-time)
     - [Be aware of the person behind the code](reviewing-pull-requests.md#be-aware-of-the-person-behind-the-code)
     - [Abandoned or Stalled Pull Requests](reviewing-pull-requests.md#abandoned-or-stalled-pull-requests)
+- [How to specify crates dependencies versions](how-to-specify-crates-dependencies-versions.md)
 - [Keeping track of issues and PRs](keeping-track-of-issues-and-prs.md)
     - [Area](keeping-track-of-issues-and-prs.md#area)
     - [Category](keeping-track-of-issues-and-prs.md#category)

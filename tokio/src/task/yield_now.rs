@@ -1,8 +1,7 @@
 use crate::runtime::context;
 
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::future::poll_fn;
+use std::task::{ready, Poll};
 
 /// Yields execution back to the Tokio runtime.
 ///
@@ -37,28 +36,19 @@ use std::task::{ready, Context, Poll};
 /// [`tokio::select!`]: macro@crate::select
 #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub async fn yield_now() {
-    /// Yield implementation
-    struct YieldNow {
-        yielded: bool,
-    }
+    let mut yielded = false;
+    poll_fn(|cx| {
+        ready!(crate::trace::trace_leaf(cx));
 
-    impl Future for YieldNow {
-        type Output = ();
-
-        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-            ready!(crate::trace::trace_leaf(cx));
-
-            if self.yielded {
-                return Poll::Ready(());
-            }
-
-            self.yielded = true;
-
-            context::defer(cx.waker());
-
-            Poll::Pending
+        if yielded {
+            return Poll::Ready(());
         }
-    }
 
-    YieldNow { yielded: false }.await;
+        yielded = true;
+
+        context::defer(cx.waker());
+
+        Poll::Pending
+    })
+    .await
 }

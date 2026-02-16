@@ -50,15 +50,8 @@ mod ctrl_c;
 #[cfg(feature = "signal")]
 pub use ctrl_c::ctrl_c;
 
+#[cfg(unix)]
 pub(crate) mod registry;
-
-mod os {
-    #[cfg(unix)]
-    pub(crate) use super::unix::{OsExtraData, OsStorage};
-
-    #[cfg(windows)]
-    pub(crate) use super::windows::{OsExtraData, OsStorage};
-}
 
 pub mod unix;
 pub mod windows;

@@ -549,6 +549,11 @@ cfg_not_sync! {
     mod sync;
 }
 
+// Currently, task module does not expose any public API outside `rt`
+// feature, so we mark it in the docs. This happens only to docs to
+// avoid introducing breaking changes by restricting the visibility
+// of the task module.
+#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub mod task;
 cfg_rt! {
     pub use task::spawn;
@@ -559,10 +564,6 @@ cfg_time! {
 }
 
 mod trace {
-    use std::future::Future;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-
     cfg_taskdump! {
         pub(crate) use crate::runtime::task::trace::trace_leaf;
     }
@@ -576,19 +577,8 @@ mod trace {
     }
 
     #[cfg_attr(not(feature = "sync"), allow(dead_code))]
-    pub(crate) fn async_trace_leaf() -> impl Future<Output = ()> {
-        struct Trace;
-
-        impl Future for Trace {
-            type Output = ();
-
-            #[inline(always)]
-            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-                trace_leaf(cx)
-            }
-        }
-
-        Trace
+    pub(crate) async fn async_trace_leaf() {
+        std::future::poll_fn(trace_leaf).await
     }
 }
 
