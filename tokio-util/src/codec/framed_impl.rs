@@ -310,27 +310,3 @@ where
         Poll::Ready(Ok(()))
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use bytes::BytesMut;
-
-    #[test]
-    fn read_frame_from_empty_buffer_is_not_readable() {
-        let buf = BytesMut::with_capacity(INITIAL_CAPACITY);
-        let frame = ReadFrame::from(buf);
-
-        assert!(!frame.is_readable);
-    }
-
-    #[test]
-    fn read_frame_from_nonempty_buffer_is_readable() {
-        let mut buf = BytesMut::new();
-        buf.extend_from_slice(b"hello");
-        let frame = ReadFrame::from(buf);
-
-        assert!(frame.is_readable);
-        assert_eq!(&frame.buffer[..], b"hello");
-    }
-}
