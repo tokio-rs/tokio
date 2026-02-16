@@ -5,7 +5,8 @@ pub(crate) struct ThreadId(NonZeroU64);
 
 impl ThreadId {
     pub(crate) fn next() -> Self {
-        use crate::loom::sync::atomic::{Ordering::Relaxed, StaticAtomicU64};
+        use crate::loom::sync::atomic::Ordering::Relaxed;
+
         #[cfg(all(test, loom))]
         use loom::sync::atomic::AtomicU64;
 
@@ -13,6 +14,9 @@ impl ThreadId {
         crate::loom::lazy_static! {
             static ref NEXT_ID: AtomicU64 = AtomicU64::new(0);
         }
+
+        #[cfg(not(all(test, loom)))]
+        use crate::loom::sync::atomic::StaticAtomicU64;
 
         #[cfg(not(all(test, loom)))]
         static NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(0);
