@@ -1,18 +1,17 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::io::{AsyncWrite, AsyncWriteExt};
-use tokio_test::{assert_err, assert_ok};
+use tokio::io::AsyncWrite;
+use tokio_util::io::write_all_vectored;
 
-use bytes::{Buf, Bytes, BytesMut};
-use std::cmp;
+use bytes::BytesMut;
 use std::io;
 use std::io::IoSlice;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 #[tokio::test]
-async fn write_all_vectored() {
+async fn test_write_all_vectored() {
     struct Wr {
         buf: BytesMut,
     }
@@ -59,7 +58,7 @@ async fn write_all_vectored() {
         IoSlice::new(&b"world"[..]),
     ];
 
-    wr.write_all_vectored(buf).await.unwrap();
+    write_all_vectored(&mut wr, buf).await.unwrap();
     assert_eq!(&wr.buf[..], b"hello world");
 }
 
@@ -110,7 +109,7 @@ async fn write_all_vectored_with_empty_slice() {
         IoSlice::new(&b"world"[..]),
     ];
 
-    wr.write_all_vectored(buf).await.unwrap();
+    write_all_vectored(&mut wr, buf).await.unwrap();
     assert_eq!(&wr.buf[..], b"helloworld");
 
     // case 2 no slices
@@ -120,7 +119,7 @@ async fn write_all_vectored_with_empty_slice() {
 
     let buf = &mut [];
 
-    wr.write_all_vectored(buf).await.unwrap();
+    write_all_vectored(&mut wr, buf).await.unwrap();
     assert_eq!(&wr.buf[..], b"");
 
     // case 3 just an empty slice
@@ -129,7 +128,7 @@ async fn write_all_vectored_with_empty_slice() {
     };
     let buf = &mut [IoSlice::new(&[])];
 
-    wr.write_all_vectored(buf).await.unwrap();
+    write_all_vectored(&mut wr, buf).await.unwrap();
     assert_eq!(&wr.buf[..], b"");
 
     // case 4 ending with empty slice
@@ -138,6 +137,6 @@ async fn write_all_vectored_with_empty_slice() {
     };
     let buf = &mut [IoSlice::new(b"hello"), IoSlice::new(&[])];
 
-    wr.write_all_vectored(buf).await.unwrap();
+    write_all_vectored(&mut wr, buf).await.unwrap();
     assert_eq!(&wr.buf[..], b"hello");
 }

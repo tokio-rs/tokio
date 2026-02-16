@@ -3,7 +3,6 @@ use crate::io::util::shutdown::{shutdown, Shutdown};
 use crate::io::util::write::{write, Write};
 use crate::io::util::write_all::{write_all, WriteAll};
 use crate::io::util::write_all_buf::{write_all_buf, WriteAllBuf};
-use crate::io::util::write_all_vectored::{write_all_vectored, WriteAllVectored};
 use crate::io::util::write_buf::{write_buf, WriteBuf};
 use crate::io::util::write_int::{WriteF32, WriteF32Le, WriteF64, WriteF64Le};
 use crate::io::util::write_int::{
@@ -185,75 +184,6 @@ cfg_io_util! {
             Self: Unpin,
         {
             write_vectored(self, bufs)
-        }
-
-        /// Like [`write_all`], except that it writes multiple (possibly non-contiguous)
-        /// buffers into this writer.
-        ///
-        /// Equivalent to:
-        ///
-        /// ```ignore
-        /// async fn write_all_vectored(
-        ///     &mut self,
-        ///     mut bufs: &mut [IoSlice<'_>]
-        /// ) -> io::Result<()> {
-        ///     while !bufs.is_empty() {
-        ///         let n = self.write_vectored(bufs).await?;
-        ///         if n == 0 {
-        ///             return Err(io::ErrorKind::WriteZero.into());
-        ///         }
-        ///         IoSlice::advance_slices(&mut bufs, n);
-        ///     }
-        ///     Ok(())
-        /// }
-        /// ```
-        ///
-        /// # Cancel safety
-        ///
-        /// This method is not cancellation safe. If it is used as the event
-        /// in a [`tokio::select!`](crate::select) statement and some other
-        /// branch completes first, then the provided buffer may have been
-        /// partially written, but future calls to `write_all_vectored` will
-        /// have lost its place in the buffer.
-        ///
-        /// # Examples
-        ///
-        /// ```rust
-        /// # #[cfg(not(target_family = "wasm"))]
-        /// # {
-        /// use tokio::io::{self, AsyncWriteExt};
-        /// use std::io::IoSlice;
-        ///
-        /// #[tokio::main]
-        /// async fn main() -> io::Result<()> {
-        ///
-        ///     let mut writer = Vec::new();
-        ///     let bufs = &mut [
-        ///         IoSlice::new(&[1]),
-        ///         IoSlice::new(&[2, 3]),
-        ///         IoSlice::new(&[4, 5, 6]),
-        ///     ];
-        ///
-        ///     writer.write_all_vectored(bufs).await?;
-        ///
-        ///     // Note: the contents of `bufs` is now undefined, see the Notes section.
-        ///     assert_eq!(writer, &[1, 2, 3, 4, 5, 6]);
-        ///     Ok(())
-        /// }
-        /// # }
-        /// ```
-        ///
-        /// # Notes
-        ///
-        /// See the documentation for [`write_all_vectored`] from std
-        ///
-        /// [`write_all_vectored`]: https://doc.rust-lang.org/std/io/trait.Write.html#method.write_all_vectored
-        /// [`write_all`]: AsyncWriteExt::write_all
-        fn write_all_vectored<'a, 'b>(&'a mut self, bufs: &'a mut [IoSlice<'b>]) -> WriteAllVectored<'a, 'b, Self>
-        where
-            Self: Unpin,
-        {
-            write_all_vectored(self, bufs)
         }
 
         /// Writes a buffer into this writer, advancing the buffer's internal
