@@ -93,7 +93,9 @@ pub(crate) mod sync {
                 prev
             }
 
-            /// Atomically compares and exchanges the value, but may fail spuriously.
+            /// Atomically compares and exchanges the value.
+            ///
+            /// Uses a Mutex for synchronization, so never fails spuriously.
             ///
             /// Note: Ordering parameters are ignored; Loom uses Mutex to simulate atomic behavior.
             pub(crate) fn compare_exchange_weak(
