@@ -572,7 +572,10 @@ impl Inner {
         // with a descriptive message if it is not the
         // case.
         let prev_idle = self.metrics.dec_num_idle_threads();
-        assert_ne!(prev_idle, 0, "`num_idle_threads` underflowed on thread exit");
+        assert_ne!(
+            prev_idle, 0,
+            "`num_idle_threads` underflowed on thread exit"
+        );
 
         if shared.shutdown && self.metrics.num_threads() == 0 {
             self.condvar.notify_one();
