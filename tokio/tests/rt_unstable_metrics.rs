@@ -63,6 +63,38 @@ fn num_idle_blocking_threads() {
 }
 
 #[test]
+fn num_idle_blocking_threads_is_zero_after_shutdown() {
+    let rt = current_thread();
+    let handle = rt.handle().clone();
+
+    // Spawn a blocking task to create a worker thread.
+    let _ = rt.block_on(rt.spawn_blocking(move || {}));
+
+    // Wait for the thread to become idle.
+    rt.block_on(async {
+        time::sleep(Duration::from_millis(5)).await;
+    });
+    if handle.metrics().num_idle_blocking_threads() == 0 {
+        rt.block_on(async {
+            time::sleep(Duration::from_secs(1)).await;
+        });
+    }
+    assert_eq!(1, handle.metrics().num_idle_blocking_threads());
+
+    // Drop the runtime, which triggers shutdown and joins all blocking
+    // threads. Before the fix for #6439, the shutdown path incremented
+    // num_idle_threads a second time for each idle worker, so this
+    // counter stayed at 1 instead of going back to 0.
+    drop(rt);
+
+    assert_eq!(
+        0,
+        handle.metrics().num_idle_blocking_threads(),
+        "num_idle_blocking_threads should be 0 after shutdown (see #6439)"
+    );
+}
+
+#[test]
 fn blocking_queue_depth() {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
