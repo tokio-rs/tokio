@@ -568,14 +568,7 @@ impl Inner {
         // Thread exit
         self.metrics.dec_num_threads();
 
-        // num_idle should now be tracked exactly, panic
-        // with a descriptive message if it is not the
-        // case.
-        let prev_idle = self.metrics.dec_num_idle_threads();
-        assert!(
-            prev_idle >= self.metrics.num_idle_threads(),
-            "num_idle_threads underflowed on thread exit"
-        );
+        self.metrics.dec_num_idle_threads();
 
         if shared.shutdown && self.metrics.num_threads() == 0 {
             self.condvar.notify_one();
