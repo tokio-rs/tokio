@@ -561,7 +561,7 @@ impl Builder {
     /// # }
     /// # }
     /// ```
-    pub fn name(&mut self, val: impl Into<String>) -> &mut Self {
+    pub fn name(&mut self, val: impl Into<String>) -> &mut Self { //TODO(5545): should this be an unstable API?
         let val = val.into();
         self.name = val;
         self
