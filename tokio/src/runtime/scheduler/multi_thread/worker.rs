@@ -262,6 +262,7 @@ pub(super) fn create(
     seed_generator: RngSeedGenerator,
     config: Config,
     timer_flavor: TimerFlavor,
+    runtime_name: String,
 ) -> (Arc<Handle>, Launch) {
     let mut cores = Vec::with_capacity(size);
     let mut remotes = Vec::with_capacity(size);
@@ -301,6 +302,7 @@ pub(super) fn create(
 
     let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
+        runtime_name: runtime_name,
         task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
