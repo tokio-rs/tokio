@@ -62,6 +62,7 @@ impl MultiThread {
         seed_generator: RngSeedGenerator,
         config: Config,
         timer_flavor: TimerFlavor,
+        runtime_name: String,
     ) -> (MultiThread, Arc<Handle>, Launch) {
         let parker = Parker::new(driver);
         let (handle, launch) = worker::create(
@@ -72,6 +73,7 @@ impl MultiThread {
             seed_generator,
             config,
             timer_flavor,
+            runtime_name,
         );
 
         (MultiThread, handle, launch)

@@ -75,6 +75,9 @@ pub struct Builder {
     /// Name fn used for threads spawned by the runtime.
     pub(super) thread_name: ThreadNameFn,
 
+    /// Name used for the runtime.
+    name: String, //TODO(5545): should this be a slice instead?
+
     /// Stack size used for threads spawned by the runtime.
     pub(super) thread_stack_size: Option<usize>,
 
@@ -289,6 +292,9 @@ impl Builder {
 
             // Default thread name
             thread_name: std::sync::Arc::new(|| "tokio-rt-worker".into()),
+
+            // Default runtime name
+            name: String::from("tokio-rt"),
 
             // Do not set a stack size by default
             thread_stack_size: None,
@@ -535,6 +541,29 @@ impl Builder {
     pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
         let val = val.into();
         self.thread_name = std::sync::Arc::new(move || val.clone());
+        self
+    }
+
+
+    /// Sets name of the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .runtime("my-runtime")
+    ///     .build();
+    /// # }
+    /// # }
+    /// ```
+    pub fn name(&mut self, val: impl Into<String>) -> &mut Self {
+        let val = val.into();
+        self.name = val;
         self
     }
 
@@ -1633,6 +1662,7 @@ impl Builder {
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
             },
             local_tid,
+            self.name.clone(),
         );
 
         let handle = Handle {
@@ -1814,6 +1844,7 @@ cfg_rt_multi_thread! {
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 },
                 self.timer_flavor,
+                self.name.clone(),
             );
 
             let handle = Handle { inner: scheduler::Handle::MultiThread(handle) };
