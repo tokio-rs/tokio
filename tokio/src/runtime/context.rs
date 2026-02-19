@@ -159,6 +159,11 @@ cfg_rt! {
         CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or(None)
     }
 
+    #[cfg(tokio_unstable)]
+    pub(crate) fn worker_id() -> Option<usize> {
+        with_scheduler(|ctx| ctx.and_then(|c| c.worker_id()))
+    }
+
     #[track_caller]
     pub(crate) fn defer(waker: &Waker) {
         with_scheduler(|maybe_scheduler| {

@@ -293,6 +293,15 @@ cfg_rt! {
             match_flavor!(self, Context(context) => context.defer(waker));
         }
 
+        #[cfg(tokio_unstable)]
+        pub(crate) fn worker_id(&self) -> Option<usize> {
+            match self {
+                Context::CurrentThread(_) => Some(0),
+                #[cfg(feature = "rt-multi-thread")]
+                Context::MultiThread(context) => Some(context.worker_index()),
+            }
+        }
+
         #[cfg(all(tokio_unstable, feature = "time", feature = "rt-multi-thread"))]
         pub(crate) fn with_time_temp_local_context<F, R>(&self, f: F) -> R
         where
