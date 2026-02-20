@@ -145,6 +145,32 @@ impl UnixListener {
         Ok(UnixListener { io })
     }
 
+    /// Create a new UnixListener with the provided raw epoll flags.
+    ///
+    /// These flags replace any epoll flags would normally set when registering the fd.
+    ///
+    /// # Note
+    /// This API does not support the use of `EPOLLONESHOT`.
+    /// Users are strongly advised to use `EPOLLET` to prevent the tokio IO driver from receiving
+    /// spurious wakes.
+    ///
+    /// # Stability
+    /// This is an [unstable API][unstable]. The public API of this may break in 1.x releases.
+    /// See [the documentation on unstable features][unstable] for details.
+    ///
+    ///  [unstable]: crate#unstable-features
+    #[track_caller]
+    #[cfg(all(target_os = "linux", tokio_unstable))]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, target_os = "linux"))))]
+    pub fn from_std_with_epoll_flags(
+        listener: net::UnixListener,
+        flags: u32,
+    ) -> io::Result<UnixListener> {
+        let io = mio::net::UnixListener::from_std(listener);
+        let io = PollEvented::new_raw(io, flags)?;
+        Ok(UnixListener { io })
+    }
+
     /// Turns a [`tokio::net::UnixListener`] into a [`std::os::unix::net::UnixListener`].
     ///
     /// The returned [`std::os::unix::net::UnixListener`] will have nonblocking mode
