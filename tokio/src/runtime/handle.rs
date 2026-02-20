@@ -483,11 +483,10 @@ impl Handle {
     ///
     /// #[tokio::main(flavor = "current_thread")]
     /// async fn main() {
-    ///   println!("Current runtime id: {}", Handle::current().name().unwrap();
+    ///   println!("Current runtime name: {}", Handle::current().name().unwrap();
     /// }
     /// ```
     ///
-    /// [`Id`]: struct@crate::runtime::Id
     pub fn name(&self) -> Option<&str> {
         match &self.inner {
             scheduler::Handle::CurrentThread(handle) => handle.name(),
