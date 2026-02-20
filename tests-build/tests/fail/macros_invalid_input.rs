@@ -41,9 +41,6 @@ async fn test_crate_not_path_int() {}
 #[tokio::test(crate = "456")]
 async fn test_crate_not_path_invalid() {}
 
-#[tokio::test(name = 123)]
-async fn test_name_not_string() {}
-
 #[tokio::test(flavor = "multi_thread", unhandled_panic = "shutdown_runtime")]
 async fn test_multi_thread_with_unhandled_panic() {}
 
@@ -70,5 +67,8 @@ async fn test_has_second_test_attr_rust_2021() {}
 #[tokio::test]
 #[tokio::test]
 async fn test_has_generated_second_test_attr() {}
+
+#[tokio::test(name = 123)]
+async fn test_name_not_string() {}
 
 fn main() {}

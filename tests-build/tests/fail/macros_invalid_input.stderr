@@ -119,3 +119,9 @@ error: second test attribute is supplied, consider removing or changing the orde
    | ^^^^^^^^^^^^^^
    |
    = note: this error originates in the attribute macro `tokio::test` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: Failed to parse value of `name` as string.
+  --> tests/fail/macros_invalid_input.rs:71:22
+   |
+71 | #[tokio::test(name = 123)]
+   |                      ^^^
