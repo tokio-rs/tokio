@@ -34,7 +34,6 @@ pub(crate) struct CurrentThread {
 
 /// Handle to the current thread scheduler
 pub(crate) struct Handle {
-
     /// The name of the runtime
     pub(crate) name: Option<String>,
 
