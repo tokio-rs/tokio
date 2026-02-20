@@ -1,6 +1,8 @@
+use crate::io::blocking::Buf;
 use crate::io::uring::open::Open;
 use crate::io::uring::read::Read;
 use crate::io::uring::write::Write;
+
 use crate::runtime::Handle;
 
 use io_uring::cqueue;
@@ -18,7 +20,8 @@ use std::task::{Context, Poll, Waker};
 pub(crate) enum CancelData {
     Open(Open),
     Write(Write),
-    Read(Read),
+    ReadVec(Read<Vec<u8>>),
+    ReadBuf(Read<Buf>),
 }
 
 #[derive(Debug)]
