@@ -448,6 +448,12 @@
 //! As an exception, methods ending in `_timeout` are not runtime agnostic
 //! because they require access to the Tokio timer. See the documentation of
 //! each `*_timeout` method for more information on its use.
+//!
+//! This module is also compatible with WASM, with one caveat: Tokio may use
+//! blocking operations when more than one thread is involved. This means that,
+//! for example, using a Tokio mpsc channel to send messages from a web worker
+//! to the main browser context will not work, as the main browser context does
+//! not support blocking operations.
 
 cfg_sync! {
     /// Named future types.
