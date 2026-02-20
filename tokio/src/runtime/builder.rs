@@ -54,7 +54,7 @@ pub struct Builder {
     /// Runtime type
     kind: Kind,
 
-    /// Name used for the runtime.
+    /// Name of the runtime.
     name: Option<String>,
 
     /// Whether or not to enable the I/O driver
