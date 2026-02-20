@@ -83,7 +83,7 @@ pin_project! {
 /// After calling this function, the buffer slices may have
 /// been advanced and should not be reused.
 ///
-/// [`write_all_vectored`]: https://doc.rust-lang.org/std/io/trait.Write.html#method.write_all_vectored
+/// [`write_all_vectored`]: std::io::Write::write_all_vectored
 /// [`write_all`]: tokio::io::AsyncWriteExt::write_all
 /// [`writev`]: https://man7.org/linux/man-pages/man3/writev.3p.html
 pub fn write_all_vectored<'a, 'b, W>(
