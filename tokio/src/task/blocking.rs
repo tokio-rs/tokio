@@ -96,7 +96,7 @@ cfg_rt! {
     /// asynchronously.  When you run CPU-bound code using `spawn_blocking`, you
     /// should keep this large upper limit in mind. When running many CPU-bound
     /// computations, a semaphore or some other synchronization primitive should be
-    /// used to limit the number of computation executed in parallel. Specialized
+    /// used to limit the number of computations executed in parallel. Specialized
     /// CPU-bound executors, such as [rayon], may also be a good fit.
     ///
     /// This function is intended for non-async operations that eventually finish on

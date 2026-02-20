@@ -64,8 +64,10 @@ pub async fn connect(
         })
         .map(Ok);
 
-    match future::join(sink.send_all(&mut stdin), stdout.send_all(&mut stream)).await {
-        (Err(e), _) | (_, Err(e)) => Err(e.into()),
-        _ => Ok(()),
+    tokio::select! {
+        r = sink.send_all(&mut stdin) => r?,
+        r = stdout.send_all(&mut stream) => r?,
     }
+
+    Ok(())
 }

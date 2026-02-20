@@ -238,9 +238,11 @@ impl Builder {
     /// Configuration methods can be chained on the return value.
     ///
     /// To spawn non-`Send` tasks on the resulting runtime, combine it with a
-    /// [`LocalSet`].
+    /// [`LocalSet`], or call [`build_local`] to create a [`LocalRuntime`] (unstable).
     ///
     /// [`LocalSet`]: crate::task::LocalSet
+    /// [`LocalRuntime`]: crate::runtime::LocalRuntime
+    /// [`build_local`]: crate::runtime::Builder::build_local
     pub fn new_current_thread() -> Builder {
         #[cfg(loom)]
         const EVENT_INTERVAL: u32 = 4;
@@ -286,7 +288,7 @@ impl Builder {
             max_blocking_threads: 512,
 
             // Default thread name
-            thread_name: std::sync::Arc::new(|| "tokio-runtime-worker".into()),
+            thread_name: std::sync::Arc::new(|| "tokio-rt-worker".into()),
 
             // Do not set a stack size by default
             thread_stack_size: None,
@@ -514,7 +516,7 @@ impl Builder {
 
     /// Sets name of threads spawned by the `Runtime`'s thread pool.
     ///
-    /// The default name is "tokio-runtime-worker".
+    /// The default name is "tokio-rt-worker".
     ///
     /// # Examples
     ///
@@ -538,7 +540,7 @@ impl Builder {
 
     /// Sets a function used to generate the name of threads spawned by the `Runtime`'s thread pool.
     ///
-    /// The default name fn is `|| "tokio-runtime-worker".into()`.
+    /// The default name fn is `|| "tokio-rt-worker".into()`.
     ///
     /// # Examples
     ///
@@ -1121,6 +1123,10 @@ impl Builder {
     /// will minimize that overhead while still keeping the scheduler responsive to
     /// events.
     ///
+    /// # Panics
+    ///
+    /// This function will panic if 0 is passed as an argument.
+    ///
     /// # Examples
     ///
     /// ```
@@ -1134,7 +1140,9 @@ impl Builder {
     /// # }
     /// # }
     /// ```
+    #[track_caller]
     pub fn event_interval(&mut self, val: u32) -> &mut Self {
+        assert!(val > 0, "event_interval must be greater than 0");
         self.event_interval = val;
         self
     }

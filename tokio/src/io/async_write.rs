@@ -27,11 +27,10 @@ use std::task::{Context, Poll};
 /// * `Poll::Ready(Err(e))` for other errors are standard I/O errors coming from the
 ///   underlying object.
 ///
-/// This trait importantly means that the `write` method only works in the
-/// context of a future's task. The object may panic if used outside of a task.
-///
 /// Utilities for working with `AsyncWrite` values are provided by
-/// [`AsyncWriteExt`].
+/// [`AsyncWriteExt`]. Most users will interact with `AsyncWrite` types through
+/// these extension methods, which provide ergonomic async functions such as
+/// `write_all` and `flush`.
 ///
 /// [`std::io::Write`]: std::io::Write
 /// [`Write::write`]: std::io::Write::write()
