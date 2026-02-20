@@ -53,12 +53,10 @@ pin_project! {
 /// # Examples
 ///
 /// ```rust
-/// # #[cfg(not(target_family = "wasm"))]
-/// # {
 /// use tokio_util::io::write_all_vectored;
 /// use std::io::IoSlice;
 ///
-/// #[tokio::main]
+/// #[tokio::main(flavor = "current_thread")]
 /// async fn main() -> std::io::Result<()> {
 ///
 ///     let mut writer = Vec::new();
@@ -74,16 +72,15 @@ pin_project! {
 ///     assert_eq!(writer, &[1, 2, 3, 4, 5, 6]);
 ///     Ok(())
 /// }
-/// # }
 /// ```
 ///
 /// # Notes
 ///
-/// See the documentation for [`write_all_vectored`] from std.
+/// See the documentation for [`Write::write_all_vectored`] from std.
 /// After calling this function, the buffer slices may have
 /// been advanced and should not be reused.
 ///
-/// [`write_all_vectored`]: std::io::Write::write_all_vectored
+/// [`Write::write_all_vectored`]: std::io::Write::write_all_vectored
 /// [`write_all`]: tokio::io::AsyncWriteExt::write_all
 /// [`writev`]: https://man7.org/linux/man-pages/man3/writev.3p.html
 pub fn write_all_vectored<'a, 'b, W>(
@@ -151,9 +148,14 @@ fn advance_slices<'a>(bufs: &mut &mut [IoSlice<'a>], n: usize) {
     *bufs = &mut std::mem::take(bufs)[remove..];
     if let Some(first) = bufs.first_mut() {
         let buf = &first[..left];
-        // SAFETY: necessary due to limitating in the borrow checker,
+        // necessary due to limitating in the borrow checker,
         // when tokio MSRV reaches 1.81.0 this entire function
         // can be replaced with `IoSlice::advance_slices`
+        //
+        // SAFETY: transmute a sub-slice of an IoSlice<'a> back to
+        // the lifetime `'a`. This is safe because the underlying memory
+        // is guaranteed to live for 'a, we have shared access, and no
+        // underlying data is reinterpreted to a different type.
         unsafe {
             *first = IoSlice::new(std::mem::transmute::<&[u8], &'a [u8]>(buf));
         }
