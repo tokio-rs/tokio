@@ -415,7 +415,8 @@ fn build_config(
                             "Set the runtime flavor with #[{macro_name}(flavor = \"current_thread\")]."
                         )
                     }
-                    "flavor" | "worker_threads" | "start_paused" | "crate" | "unhandled_panic" | "name" => {
+                    "flavor" | "worker_threads" | "start_paused" | "crate" | "unhandled_panic"
+                    | "name" => {
                         format!("The `{name}` attribute requires an argument.")
                     }
                     name => {
