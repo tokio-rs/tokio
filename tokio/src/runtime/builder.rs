@@ -556,7 +556,7 @@ impl Builder {
     ///
     /// # pub fn main() {
     /// let rt = runtime::Builder::new_multi_thread()
-    ///     .runtime("my-runtime")
+    ///     .name("my-runtime")
     ///     .build();
     /// # }
     /// # }
