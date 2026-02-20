@@ -27,7 +27,7 @@ quote = "1"
 syn = { version = "2.0", features = ["full"] }
 
 [dev-dependencies]
-tokio = { path = "../tokio", features = ["full", "test-util"] }
+tokio = { version = "1.0.0", path = "../tokio", features = ["full", "test-util"] }
 
 [package.metadata.docs.rs]
 all-features = true
