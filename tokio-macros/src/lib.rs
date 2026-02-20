@@ -91,6 +91,30 @@ use proc_macro::TokenStream;
 ///
 /// # Usage
 ///
+/// ## Set the name of the runtime
+///
+/// ```rust
+/// #[tokio::main(name = "my-runtime")]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new_multi_thread()
+///         .enable_all()
+///         .name("my-runtime")
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
 /// ## Using the multi-threaded runtime
 ///
 /// ```rust
