@@ -54,6 +54,7 @@ pub(crate) struct MultiThread;
 // ===== impl MultiThread =====
 
 impl MultiThread {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         size: usize,
         driver: Driver,

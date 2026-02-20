@@ -254,6 +254,7 @@ type Notified = task::Notified<Arc<Handle>>;
 /// improvements.
 const MAX_LIFO_POLLS_PER_TICK: usize = 3;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn create(
     size: usize,
     park: Parker,
