@@ -544,7 +544,7 @@ impl Builder {
         self
     }
 
-    /// Sets name of the runtime.
+    /// Sets the name of the runtime.
     ///
     /// # Examples
     ///
