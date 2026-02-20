@@ -561,12 +561,6 @@ impl Inner {
                     shared = self.shared.lock();
                 }
 
-                // Work was produced, and we "took" it (by decrementing num_notify).
-                // This means that num_idle was decremented once for our wakeup.
-                // But, since we are exiting, we need to "undo" that, as we'll stay idle.
-                self.metrics.inc_num_idle_threads();
-                // NOTE: Technically we should also do num_notify++ and notify again,
-                // but since we're shutting down anyway, that won't be necessary.
                 break;
             }
         }
@@ -574,13 +568,13 @@ impl Inner {
         // Thread exit
         self.metrics.dec_num_threads();
 
-        // num_idle should now be tracked exactly, panic
+        // `num_idle_threads` should now be tracked exactly, panic
         // with a descriptive message if it is not the
         // case.
         let prev_idle = self.metrics.dec_num_idle_threads();
-        assert!(
-            prev_idle >= self.metrics.num_idle_threads(),
-            "num_idle_threads underflowed on thread exit"
+        assert_ne!(
+            prev_idle, 0,
+            "`num_idle_threads` underflowed on thread exit"
         );
 
         if shared.shutdown && self.metrics.num_threads() == 0 {
