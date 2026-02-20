@@ -54,6 +54,9 @@ pub struct Builder {
     /// Runtime type
     kind: Kind,
 
+    /// Name used for the runtime.
+    name: Option<String>,
+
     /// Whether or not to enable the I/O driver
     enable_io: bool,
     nevents: usize,
@@ -74,9 +77,6 @@ pub struct Builder {
 
     /// Name fn used for threads spawned by the runtime.
     pub(super) thread_name: ThreadNameFn,
-
-    /// Name used for the runtime.
-    name: String, //TODO(5545): should this be a slice instead?
 
     /// Stack size used for threads spawned by the runtime.
     pub(super) thread_stack_size: Option<usize>,
@@ -274,6 +274,9 @@ impl Builder {
         Builder {
             kind,
 
+            // Default runtime name
+            name: None,
+
             // I/O defaults to "off"
             enable_io: false,
             nevents: 1024,
@@ -292,9 +295,6 @@ impl Builder {
 
             // Default thread name
             thread_name: std::sync::Arc::new(|| "tokio-rt-worker".into()),
-
-            // Default runtime name
-            name: String::from("tokio-rt"),
 
             // Do not set a stack size by default
             thread_stack_size: None,
@@ -544,7 +544,6 @@ impl Builder {
         self
     }
 
-
     /// Sets name of the runtime.
     ///
     /// # Examples
@@ -561,9 +560,9 @@ impl Builder {
     /// # }
     /// # }
     /// ```
-    pub fn name(&mut self, val: impl Into<String>) -> &mut Self { //TODO(5545): should this be an unstable API?
+    pub fn name(&mut self, val: impl Into<String>) -> &mut Self {
         let val = val.into();
-        self.name = val;
+        self.name = Some(val);
         self
     }
 

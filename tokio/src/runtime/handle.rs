@@ -483,16 +483,16 @@ impl Handle {
     ///
     /// #[tokio::main(flavor = "current_thread")]
     /// async fn main() {
-    ///   println!("Current runtime id: {}", Handle::current().name();
+    ///   println!("Current runtime id: {}", Handle::current().name().unwrap();
     /// }
     /// ```
     ///
     /// [`Id`]: struct@crate::runtime::Id
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> Option<&str> {
         match &self.inner {
-            scheduler::Handle::CurrentThread(handle) => handle.runtime_name(),
+            scheduler::Handle::CurrentThread(handle) => handle.name(),
             #[cfg(feature = "rt-multi-thread")]
-            scheduler::Handle::MultiThread(handle) => handle.runtime_name(),
+            scheduler::Handle::MultiThread(handle) => handle.name(),
         }
     }
 
