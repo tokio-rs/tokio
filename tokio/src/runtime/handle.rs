@@ -481,7 +481,7 @@ impl Handle {
     /// ```
     /// use tokio::runtime::Handle;
     ///
-    /// #[tokio::main(flavor = "current_thread")]
+    /// #[tokio::main(flavor = "current_thread", name = "my-runtime")]
     /// async fn main() {
     ///   println!("Current runtime name: {}", Handle::current().name().unwrap_or("unnamed");
     /// }

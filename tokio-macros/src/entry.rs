@@ -53,6 +53,7 @@ impl UnhandledPanic {
 }
 
 struct FinalConfig {
+    name: Option<String>,
     flavor: RuntimeFlavor,
     worker_threads: Option<usize>,
     start_paused: Option<bool>,
@@ -62,6 +63,7 @@ struct FinalConfig {
 
 /// Config used in case of the attribute not being able to build a valid config
 const DEFAULT_ERROR_CONFIG: FinalConfig = FinalConfig {
+    name: None,
     flavor: RuntimeFlavor::CurrentThread,
     worker_threads: None,
     start_paused: None,
@@ -70,6 +72,7 @@ const DEFAULT_ERROR_CONFIG: FinalConfig = FinalConfig {
 };
 
 struct Configuration {
+    name: Option<String>,
     rt_multi_thread_available: bool,
     default_flavor: RuntimeFlavor,
     flavor: Option<RuntimeFlavor>,
@@ -83,6 +86,7 @@ struct Configuration {
 impl Configuration {
     fn new(is_test: bool, rt_multi_thread: bool) -> Self {
         Configuration {
+            name: None,
             rt_multi_thread_available: rt_multi_thread,
             default_flavor: match is_test {
                 true => RuntimeFlavor::CurrentThread,
@@ -95,6 +99,16 @@ impl Configuration {
             crate_name: None,
             unhandled_panic: None,
         }
+    }
+
+    fn set_name(&mut self, name: syn::Lit, span: Span) -> Result<(), syn::Error> {
+        if self.name.is_some() {
+            return Err(syn::Error::new(span, "`name` set multiple times."));
+        }
+
+        let runtime_name = parse_string(name, span, "name")?;
+        self.name = Some(runtime_name);
+        Ok(())
     }
 
     fn set_flavor(&mut self, runtime: syn::Lit, span: Span) -> Result<(), syn::Error> {
@@ -227,6 +241,7 @@ impl Configuration {
         };
 
         Ok(FinalConfig {
+            name: self.name.clone(),
             crate_name: self.crate_name.clone(),
             flavor,
             worker_threads,
@@ -372,6 +387,9 @@ fn build_config(
                         config
                             .set_unhandled_panic(lit.clone(), syn::spanned::Spanned::span(lit))?;
                     }
+                    "name" => {
+                        config.set_name(lit.clone(), syn::spanned::Spanned::span(lit))?;
+                    }
                     name => {
                         let msg = format!(
                             "Unknown attribute {name} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`",
@@ -477,6 +495,9 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     if let Some(v) = config.unhandled_panic {
         let unhandled_panic = v.into_tokens(&crate_path);
         rt = quote_spanned! {last_stmt_start_span=> #rt.unhandled_panic(#unhandled_panic) };
+    }
+    if let Some(v) = config.name {
+        rt = quote_spanned! {last_stmt_start_span=> #rt.name(#v) };
     }
 
     let generated_attrs = if is_test {
