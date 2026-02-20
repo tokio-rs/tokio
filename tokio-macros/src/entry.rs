@@ -392,7 +392,7 @@ fn build_config(
                     }
                     name => {
                         let msg = format!(
-                            "Unknown attribute {name} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`",
+                            "Unknown attribute {name} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`, `name`.",
                         );
                         return Err(syn::Error::new_spanned(namevalue, msg));
                     }
@@ -415,11 +415,11 @@ fn build_config(
                             "Set the runtime flavor with #[{macro_name}(flavor = \"current_thread\")]."
                         )
                     }
-                    "flavor" | "worker_threads" | "start_paused" | "crate" | "unhandled_panic" => {
+                    "flavor" | "worker_threads" | "start_paused" | "crate" | "unhandled_panic" | "name" => {
                         format!("The `{name}` attribute requires an argument.")
                     }
                     name => {
-                        format!("Unknown attribute {name} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`.")
+                        format!("Unknown attribute {name} is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`, `name`.")
                     }
                 };
                 return Err(syn::Error::new_spanned(path, msg));
