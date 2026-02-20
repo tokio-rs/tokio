@@ -23,8 +23,8 @@ use crate::loom::sync::atomic::{AtomicBool, Ordering::SeqCst};
 
 /// Handle to the multi thread scheduler
 pub(crate) struct Handle {
-    ///
-    pub(crate) runtime_name: String,
+    /// The name of the runtime
+    pub(crate) name: Option<String>,
 
     /// Task spawner
     pub(super) shared: worker::Shared,
@@ -127,8 +127,8 @@ impl Handle {
         self.shared.owned.id
     }
 
-    pub(crate) fn runtime_name(&self) -> String {
-        self.runtime_name.clone()
+    pub(crate) fn name(&self) -> Option<&str> {
+        self.name.as_deref()
     }
 }
 

@@ -36,7 +36,7 @@ pub(crate) struct CurrentThread {
 pub(crate) struct Handle {
 
     /// The name of runtime
-    pub(crate) runtime_name: String,
+    pub(crate) name: Option<String>,
 
     /// Scheduler state shared across threads
     shared: Shared,
@@ -136,7 +136,7 @@ impl CurrentThread {
         seed_generator: RngSeedGenerator,
         config: Config,
         local_tid: Option<ThreadId>,
-        runtime_name: String,
+        name: Option<String>,
     ) -> (CurrentThread, Arc<Handle>) {
         let worker_metrics = WorkerMetrics::from_config(&config);
         worker_metrics.set_thread_id(thread::current().id());
@@ -147,7 +147,7 @@ impl CurrentThread {
             .unwrap_or(DEFAULT_GLOBAL_QUEUE_INTERVAL);
 
         let handle = Arc::new(Handle {
-            runtime_name,
+            name,
             task_hooks: TaskHooks {
                 task_spawn_callback: config.before_spawn.clone(),
                 task_terminate_callback: config.after_termination.clone(),
@@ -646,8 +646,8 @@ impl Handle {
         self.shared.owned.id
     }
 
-    pub(crate) fn runtime_name(&self) -> String {
-        self.runtime_name.clone()
+    pub(crate) fn name(&self) -> Option<&str> {
+        self.name.as_deref()
     }
 }
 
