@@ -432,6 +432,31 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ## Usage
 ///
+/// ### Set the name of the runtime
+///
+/// ```no_run
+/// #[tokio::test(name = "my-test-runtime")]
+/// async fn my_test() {
+///     assert!(true);
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::test]`
+///
+/// ```no_run
+/// #[test]
+/// fn my_test() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .name("my-test-runtime")
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             assert!(true);
+///         })
+/// }
+/// ```
+///
 /// ### Using the multi-thread runtime
 ///
 /// ```no_run
