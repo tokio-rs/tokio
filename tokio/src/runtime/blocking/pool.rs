@@ -507,6 +507,8 @@ impl Inner {
 
         let mut shared = self.shared.lock();
         let mut join_on_thread = None;
+        // is this thread currently counted in `num_idle_threads`?
+        let mut is_counted_idle;
 
         'main: loop {
             // BUSY
@@ -520,6 +522,8 @@ impl Inner {
 
             // IDLE
             self.metrics.inc_num_idle_threads();
+            // mark this thread as currently counted in `num_idle_threads`.
+            is_counted_idle = true;
 
             while !shared.shutdown {
                 let lock_result = self.condvar.wait_timeout(shared, self.keep_alive).unwrap();
@@ -532,6 +536,9 @@ impl Inner {
                     // acknowledge it by decrementing the counter
                     // and transition to the BUSY state.
                     shared.num_notify -= 1;
+                    // since this is a legitimate wakeup,
+                    // the `Spawner::spawn_task` has already decremented `num_idle_threads`.
+                    is_counted_idle = false;
                     break;
                 }
 
@@ -568,14 +575,17 @@ impl Inner {
         // Thread exit
         self.metrics.dec_num_threads();
 
-        // `num_idle_threads` should now be tracked exactly, panic
-        // with a descriptive message if it is not the
-        // case.
-        let prev_idle = self.metrics.dec_num_idle_threads();
-        assert_ne!(
-            prev_idle, 0,
-            "`num_idle_threads` underflowed on thread exit"
-        );
+        // Is this thread currently counted in `num_idle_threads`?
+        if is_counted_idle {
+            // `num_idle_threads` should now be tracked exactly, panic
+            // with a descriptive message if it is not the
+            // case.
+            let prev_idle = self.metrics.dec_num_idle_threads();
+            assert_ne!(
+                prev_idle, 0,
+                "`num_idle_threads` underflowed on thread exit"
+            );
+        }
 
         if shared.shutdown && self.metrics.num_threads() == 0 {
             self.condvar.notify_one();
