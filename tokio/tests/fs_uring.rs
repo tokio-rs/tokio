@@ -15,7 +15,7 @@ use std::time::Duration;
 use std::{future::poll_fn, path::PathBuf};
 use tempfile::NamedTempFile;
 use tokio::{
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     runtime::{Builder, Runtime},
 };
 use tokio_util::task::TaskTracker;
@@ -143,6 +143,14 @@ async fn cancel_op_future() {
 
     let res = handle.await.unwrap_err();
     assert!(res.is_cancelled());
+}
+
+#[tokio::test]
+async fn uring_cmd_is_available_via_file() {
+    let (tmp_file, _path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
+    let file = File::open(tmp_file[0].path()).await.unwrap();
+
+    let _ = file.uring_cmd(0, [0; 16], None).await;
 }
 
 fn create_tmp_files(num_files: usize) -> (Vec<NamedTempFile>, Vec<PathBuf>) {

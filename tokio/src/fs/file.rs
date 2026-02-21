@@ -446,6 +446,58 @@ impl File {
         asyncify(move || std.metadata()).await
     }
 
+    /// Executes an `IORING_OP_URING_CMD` operation on this file descriptor.
+    ///
+    /// This submits a 16-byte device/file-specific command payload that is
+    /// handled by the kernel subsystem backing this file descriptor.
+    ///
+    /// # io_uring support
+    ///
+    /// To use this API, enable `--cfg tokio_unstable`, the `io-uring` feature,
+    /// and `Builder::enable_io_uring` on Linux.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::io::ErrorKind::Unsupported`] if `io_uring` or
+    /// `IORING_OP_URING_CMD` is not available at runtime.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux"
+    ))]
+    pub async fn uring_cmd(
+        &self,
+        cmd_op: u32,
+        cmd: [u8; 16],
+        buf_index: Option<u16>,
+    ) -> io::Result<u32> {
+        use crate::runtime::driver::op::Op;
+        use std::os::fd::OwnedFd;
+
+        let mut inner = self.inner.lock().await;
+        inner.complete_inflight().await;
+        drop(inner);
+
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+
+        if !driver_handle
+            .check_and_init(io_uring::opcode::UringCmd16::CODE)
+            .await?
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "io_uring uring_cmd is not supported",
+            ));
+        }
+
+        let fd: OwnedFd = self.std.try_clone()?.into();
+        let (res, _fd) = Op::uring_cmd16(fd, cmd_op, cmd, buf_index).await;
+        res
+    }
+
     /// Creates a new `File` instance that shares the same underlying file handle
     /// as the existing `File` instance. Reads, writes, and seeks will affect both
     /// File instances simultaneously.
