@@ -54,6 +54,9 @@ pub struct Builder {
     /// Runtime type
     kind: Kind,
 
+    /// Name of the runtime.
+    name: Option<String>,
+
     /// Whether or not to enable the I/O driver
     enable_io: bool,
     nevents: usize,
@@ -270,6 +273,9 @@ impl Builder {
     pub(crate) fn new(kind: Kind, event_interval: u32) -> Builder {
         Builder {
             kind,
+
+            // Default runtime name
+            name: None,
 
             // I/O defaults to "off"
             enable_io: false,
@@ -535,6 +541,28 @@ impl Builder {
     pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
         let val = val.into();
         self.thread_name = std::sync::Arc::new(move || val.clone());
+        self
+    }
+
+    /// Sets the name of the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .name("my-runtime")
+    ///     .build();
+    /// # }
+    /// # }
+    /// ```
+    pub fn name(&mut self, val: impl Into<String>) -> &mut Self {
+        let val = val.into();
+        self.name = Some(val);
         self
     }
 
@@ -1633,6 +1661,7 @@ impl Builder {
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
             },
             local_tid,
+            self.name.clone(),
         );
 
         let handle = Handle {
@@ -1814,6 +1843,7 @@ cfg_rt_multi_thread! {
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 },
                 self.timer_flavor,
+                self.name.clone(),
             );
 
             let handle = Handle { inner: scheduler::Handle::MultiThread(handle) };
