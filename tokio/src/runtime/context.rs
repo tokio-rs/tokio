@@ -160,8 +160,8 @@ cfg_rt! {
     }
 
     #[cfg(tokio_unstable)]
-    pub(crate) fn worker_id() -> Option<usize> {
-        with_scheduler(|ctx| ctx.and_then(|c| c.worker_id()))
+    pub(crate) fn worker_index() -> Option<usize> {
+        with_scheduler(|ctx| ctx.and_then(|c| c.worker_index()))
     }
 
     #[track_caller]

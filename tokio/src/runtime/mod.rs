@@ -593,15 +593,15 @@ cfg_rt! {
         /// # {
         /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
         /// async fn main() {
-        ///     let id = tokio::spawn(async {
-        ///         tokio::runtime::worker_id()
+        ///     let index = tokio::spawn(async {
+        ///         tokio::runtime::worker_index()
         ///     }).await.unwrap();
-        ///     println!("Task ran on worker {:?}", id);
+        ///     println!("Task ran on worker {:?}", index);
         /// }
         /// # }
         /// ```
-        pub fn worker_id() -> Option<usize> {
-            context::worker_id()
+        pub fn worker_index() -> Option<usize> {
+            context::worker_index()
         }
     }
 

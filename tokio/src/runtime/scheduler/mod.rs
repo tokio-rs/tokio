@@ -294,7 +294,7 @@ cfg_rt! {
         }
 
         #[cfg(tokio_unstable)]
-        pub(crate) fn worker_id(&self) -> Option<usize> {
+        pub(crate) fn worker_index(&self) -> Option<usize> {
             match self {
                 Context::CurrentThread(_) => Some(0),
                 #[cfg(feature = "rt-multi-thread")]
