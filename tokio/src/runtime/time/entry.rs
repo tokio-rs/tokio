@@ -543,18 +543,6 @@ impl TimerEntry {
             return;
         };
 
-        // Fast path: if we never registered with the driver (i.e., the timer
-        // was created but never polled), there is no need to acquire the driver
-        // lock. The timer was never visible to the driver thread, so no
-        // acq/rel fence is needed for memory ordering.
-        //
-        // This is a common case for timeouts: a timeout wraps an operation,
-        // the operation completes before the timeout fires, and the Sleep is
-        // dropped without ever being polled.
-        if !self.registered {
-            return;
-        }
-
         // We need to perform an acq/rel fence with the driver thread, and the
         // simplest way to do so is to grab the driver lock.
         //
