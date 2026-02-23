@@ -379,20 +379,6 @@ impl Handle {
     /// `add_entry` must not be called concurrently.
     pub(self) unsafe fn clear_entry(&self, entry: NonNull<TimerShared>) {
         unsafe {
-            // Fast path: if the timer is definitely not registered with the
-            // driver, we can skip acquiring the lock entirely. This is the
-            // common case for timers that are dropped before being polled
-            // (e.g., timeouts that complete before firing).
-            //
-            // `might_be_registered()` uses relaxed ordering but is conservative:
-            // if it returns false, the timer is *definitely* not in the wheel.
-            // In the deregistered state, `fire()` is a no-op (returns None),
-            // so calling it without the lock is safe.
-            if !entry.as_ref().might_be_registered() {
-                entry.as_ref().handle().fire(Ok(()));
-                return;
-            }
-
             let mut lock = self.inner.lock();
 
             if entry.as_ref().might_be_registered() {
