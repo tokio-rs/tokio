@@ -615,9 +615,7 @@ doc! {macro_rules! select {
 
         // `tokio::macros::support` is a public, but doc(hidden) module
         // including a re-export of all types needed by this macro.
-        use $crate::macros::support::Future as __Future;
-        use $crate::macros::support::Pin as __Pin;
-        use $crate::macros::support::Poll::{Ready as __Ready, Pending as __Pending};
+        use $crate::macros::support::Pin;
 
         const BRANCHES: u32 = $crate::count!( $($count)* );
 
@@ -701,12 +699,12 @@ doc! {macro_rules! select {
 
                                 // Safety: future is stored on the stack above
                                 // and never moved.
-                                let mut fut = unsafe { __Pin::new_unchecked(fut) };
+                                let mut fut = unsafe { Pin::new_unchecked(fut) };
 
                                 // Try polling it
-                                let out = match __Future::poll(fut, cx) {
-                                    __Ready(out) => out,
-                                    __Pending => {
+                                let out = match $crate::macros::support::Future::poll(fut, cx) {
+                                    $crate::macros::support::Poll::Ready(out) => out,
+                                    $crate::macros::support::Poll::Pending => {
                                         // Track that at least one future is
                                         // still pending and continue polling.
                                         is_pending = true;
@@ -727,7 +725,7 @@ doc! {macro_rules! select {
                                 }
 
                                 // The select is complete, return the value
-                                return __Ready($crate::select_variant!(__tokio_select_util::Out, ($($skip)*))(out));
+                                return $crate::macros::support::Poll::Ready($crate::select_variant!(__tokio_select_util::Out, ($($skip)*))(out));
                             }
                         )*
                         _ => unreachable!("reaching this means there probably is an off by one bug"),
@@ -735,10 +733,10 @@ doc! {macro_rules! select {
                 }
 
                 if is_pending {
-                    __Pending
+                    $crate::macros::support::Poll::Pending
                 } else {
                     // All branches have been disabled.
-                    __Ready(__tokio_select_util::Out::Disabled)
+                    $crate::macros::support::Poll::Ready(__tokio_select_util::Out::Disabled)
                 }
             }).await
         };
