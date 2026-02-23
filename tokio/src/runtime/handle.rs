@@ -561,7 +561,7 @@ cfg_taskdump! {
         /// You can do this by setting the `RUSTFLAGS` environment variable
         /// before invoking `cargo`; e.g.:
         /// ```bash
-        /// RUSTFLAGS="--cfg tokio_unstable cargo run --example dump
+        /// RUSTFLAGS="--cfg tokio_unstable" cargo run --example dump
         /// ```
         ///
         /// Or by [configuring][cargo-config] `rustflags` in
