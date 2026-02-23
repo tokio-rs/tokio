@@ -557,7 +557,7 @@ cfg_rt! {
         pub(crate) use blocking::Mandatory;
     }
 
-    cfg_fs! {
+    cfg_io_blocking! {
         pub(crate) use blocking::spawn_mandatory_blocking;
     }
 
