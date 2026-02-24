@@ -1,6 +1,7 @@
 use crate::runtime::{self, Runtime};
 
 use std::sync::Arc;
+use std::time::Duration;
 
 #[test]
 fn blocking_shutdown() {
@@ -75,7 +76,6 @@ fn spawn_mandatory_blocking_should_run_even_when_shutting_down_from_other_thread
 
 #[test]
 fn spawn_blocking_when_paused() {
-    use std::time::Duration;
     loom::model(|| {
         let rt = crate::runtime::Builder::new_current_thread()
             .enable_time()
@@ -91,6 +91,44 @@ fn spawn_blocking_when_paused() {
             b.await.expect("blocking task should finish");
         }))
         .expect("timeout should not trigger");
+    });
+}
+
+#[test]
+/// See <https://github.com/tokio-rs/tokio/pull/7922>
+fn spawn_blocking_then_shutdown() {
+    loom::model(|| {
+        let rt = crate::runtime::Builder::new_current_thread()
+            .max_blocking_threads(1)
+            .thread_keep_alive(Duration::from_secs(7200)) // don't let the thread exit on its own
+            .build()
+            .unwrap();
+        let rt_hdl = rt.handle().clone();
+
+        // Currently, there is no live blocking thread,
+        // so `spawn_blocking` will spawn a new blocking thread.
+        let jh0 = rt_hdl.spawn_blocking(|| {});
+        loom::future::block_on(jh0).unwrap();
+
+        // Now, there is a idle blocking threads park on the condvar,
+        // so the following `spawn_blocking` will decrease the `num_idle_threads`
+        // and then notify one of the idle threads to run the task.
+
+        // this will decrease the `num_idle_threads`
+        // and then notify one of the idle threads to run the task.
+        let jh3 = rt_hdl.spawn_blocking(|| {});
+
+        // shutdown the runtime, which also shutdown the blocking pool
+        drop(rt);
+
+        // loom will emulate two parrel operations:
+        //
+        // 1. the blocking thread is woken up on the condvar
+        // 2. the main thread is waiting for the blocking thread to finish the task
+        //
+        // So, if the `num_idle_threads` is not counted correctly,
+        // it will trigger the assertions inside the `Inner::run` function.
+        let _ = loom::future::block_on(jh3);
     });
 }
 
