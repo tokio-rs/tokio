@@ -438,7 +438,30 @@ impl AsyncWrite for Mock {
                         let until = Instant::now() + rem;
                         self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
                     } else {
-                        panic!("unexpected WouldBlock {}", self.pmsg());
+                        // A race condition (TOCTOU) can occur if the
+                        // timer expires between the `write()` call
+                        // and `remaining_wait()` due to preemption or other
+                        // delays. In this case, the `Wait` action is already popped by
+                        // `action()`, so we continue to the next one.
+                        //
+                        // Consider the following sequence:
+                        //
+                        // poll_write      Inner          action()
+                        //    |--write()--->|               |
+                        //    |             |--action()---->| (returns Wait)
+                        //    |<-WouldBlk---|               |
+                        //    |             |               |
+                        //    |      <--- TIMEOUT! --->     |
+                        //    |  (due to preemption, etc.)  |
+                        //    |             |               |
+                        //    |-rem_wait()->|               |
+                        //    |             |--action()---->| (time's up, pop Wait)
+                        //    |<--None------|               |
+                        //    |             |               |
+                        //    |---continue->| (process next action)
+                        //
+                        // See <https://github.com/tokio-rs/tokio/issues/7881>.
+                        continue;
                     }
                 }
                 Ok(0) => {
