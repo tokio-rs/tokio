@@ -1,6 +1,14 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support bind
-                                                                   // No `socket` on miri.
+// WASIp1 doesn't support bind
+// No `socket` on miri.
+#![cfg(all(
+    feature = "net",
+    feature = "macros",
+    feature = "rt",
+    feature = "io-util",
+    not(all(target_os = "wasi", target_env = "p1")),
+    not(miri)
+))]
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
@@ -96,6 +104,13 @@ async fn connect_addr_ip_str_slice() {
     join!(server, client);
 }
 
+// Note that WASIp2 _does_ support asynchronous name lookups without
+// requiring a worker thread, so this test could be ungated if/when that's
+// implemented.
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "net::lookup_host requires multithreading, which WASI does not yet support"
+)]
 #[tokio::test]
 async fn connect_addr_host_string() {
     let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
@@ -147,6 +162,13 @@ async fn connect_addr_ip_str_port_tuple() {
     join!(server, client);
 }
 
+// Note that WASIp2 _does_ support asynchronous name lookups without
+// requiring a worker thread, so this test could be ungated if/when that's
+// implemented.
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "net::lookup_host requires multithreading, which WASI does not yet support"
+)]
 #[tokio::test]
 async fn connect_addr_host_str_port_tuple() {
     let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);

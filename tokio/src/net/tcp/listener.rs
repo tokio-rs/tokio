@@ -2,7 +2,7 @@ use crate::io::{Interest, PollEvented};
 use crate::net::tcp::TcpStream;
 use crate::util::check_socket_for_blocking;
 
-cfg_not_wasi! {
+cfg_not_wasip1! {
     use crate::net::{to_socket_addrs, ToSocketAddrs};
 }
 
@@ -60,7 +60,7 @@ cfg_net! {
 }
 
 impl TcpListener {
-    cfg_not_wasi! {
+    cfg_not_wasip1! {
         /// Creates a new `TcpListener`, which will be bound to the specified address.
         ///
         /// The returned listener is ready for accepting connections.
@@ -292,7 +292,7 @@ impl TcpListener {
 
         #[cfg(target_os = "wasi")]
         {
-            use std::os::wasi::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
             self.io
                 .into_inner()
                 .map(|io| io.into_raw_fd())
@@ -300,7 +300,7 @@ impl TcpListener {
         }
     }
 
-    cfg_not_wasi! {
+    cfg_not_wasip1! {
         pub(crate) fn new(listener: mio::net::TcpListener) -> io::Result<TcpListener> {
             let io = PollEvented::new(listener)?;
             Ok(TcpListener { io })
@@ -427,7 +427,7 @@ cfg_unstable! {
     #[cfg(target_os = "wasi")]
     mod sys {
         use super::TcpListener;
-        use std::os::wasi::prelude::*;
+        use std::os::fd::{RawFd, BorrowedFd, AsRawFd, AsFd};
 
         impl AsRawFd for TcpListener {
             fn as_raw_fd(&self) -> RawFd {

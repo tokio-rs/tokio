@@ -1112,6 +1112,32 @@ jobs:
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
 
+  wasm32-wasip2:
+    name: test tokio for wasm32-wasip2
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_stable }}
+          targets: wasm32-wasip2
+
+      - name: Install cargo-nextest, wasmtime
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,wasmtime-cli
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: test tokio --target wasm32-wasip2
+        run: cargo nextest run --target wasm32-wasip2 --features net,macros,rt,io-util
+        working-directory: tokio
+        env:
+          RUSTFLAGS: --cfg tokio_unstable
+          CARGO_TARGET_WASM32_WASIP2_RUNNER: wasmtime run -Sinherit-network
+
   check-external-types:
     name: check-external-types (${{ matrix.os }})
     needs: basics
