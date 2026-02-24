@@ -1116,7 +1116,7 @@ impl Builder {
     /// Setting the event interval determines the effective "priority" of delivering
     /// these external events (which may wake up additional tasks), compared to
     /// executing tasks that are currently ready to run. A smaller value is useful
-    /// when tasks frequently spend a long time in polling, or frequently yield,
+    /// when tasks frequently spend a long time in polling, or infrequently yield,
     /// which can result in overly long delays picking up I/O events. Conversely,
     /// picking up new events requires extra synchronization and syscall overhead,
     /// so if tasks generally complete their polling quickly, a higher event interval
