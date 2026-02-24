@@ -206,6 +206,12 @@ impl CancellationToken {
         tree_node::is_cancelled(&self.inner)
     }
 
+    /// Internal method that checks cancellation with mutex lock for proper
+    /// synchronization in `WaitForCancellationFuture::poll()`.
+    fn is_cancelled_with_lock(&self) -> bool {
+        tree_node::is_cancelled_with_lock(&self.inner)
+    }
+
     /// Returns a [`Future`] that gets fulfilled when cancellation is requested.
     ///
     /// Equivalent to:
@@ -329,14 +335,14 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         let mut this = self.project();
         loop {
-            if this.cancellation_token.is_cancelled() {
+            if this.cancellation_token.is_cancelled_with_lock() {
                 return Poll::Ready(());
             }
 
             // No wakeups can be lost here because there is always a call to
-            // `is_cancelled` between the creation of the future and the call to
+            // `is_cancelled_with_lock` between the creation of the future and the call to
             // `poll`, and the code that sets the cancelled flag does so before
-            // waking the `Notified`.
+            // waking the `Notified`. The mutex lock ensures proper synchronization.
             if this.future.as_mut().poll(cx).is_pending() {
                 return Poll::Pending;
             }
@@ -390,14 +396,14 @@ impl Future for WaitForCancellationFutureOwned {
         let mut this = self.project();
 
         loop {
-            if this.cancellation_token.is_cancelled() {
+            if this.cancellation_token.is_cancelled_with_lock() {
                 return Poll::Ready(());
             }
 
             // No wakeups can be lost here because there is always a call to
-            // `is_cancelled` between the creation of the future and the call to
+            // `is_cancelled_with_lock` between the creation of the future and the call to
             // `poll`, and the code that sets the cancelled flag does so before
-            // waking the `Notified`.
+            // waking the `Notified`. The mutex lock ensures proper synchronization.
             if this.future.as_mut().poll(cx).is_pending() {
                 return Poll::Pending;
             }

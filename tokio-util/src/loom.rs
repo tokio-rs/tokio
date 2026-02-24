@@ -6,4 +6,11 @@ pub(crate) mod sync {
     pub(crate) use loom::sync::{Arc, Mutex, MutexGuard};
     #[cfg(not(all(test, loom)))]
     pub(crate) use std::sync::{Arc, Mutex, MutexGuard};
+
+    pub(crate) mod atomic {
+        #[cfg(all(test, loom))]
+        pub(crate) use loom::sync::atomic::{AtomicBool, Ordering};
+        #[cfg(not(all(test, loom)))]
+        pub(crate) use std::sync::atomic::{AtomicBool, Ordering};
+    }
 }
