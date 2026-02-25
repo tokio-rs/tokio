@@ -826,6 +826,7 @@ jobs:
           cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
       - name: "clippy --workspace --all-features --unstable"
         run: |
+          rm Cargo.lock
           cargo clippy --workspace --tests --no-deps --all-features --config 'patch.crates-io.tokio.path="tokio"'
           # check without path dependencies
           cargo clippy --workspace --exclude tokio --tests --no-deps --all-features
