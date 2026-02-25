@@ -46,5 +46,21 @@ use std::path::Path;
 /// ```
 pub async fn create_dir(path: impl AsRef<Path>) -> io::Result<()> {
     let path = path.as_ref().to_owned();
+
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux"
+    ))]
+    {
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+        if driver_handle.check_and_init(io_uring::opcode::MkDirAt::CODE)? {
+            return crate::runtime::driver::op::Op::mkdir(&path)?.await;
+        }
+    }
+
     asyncify(move || std::fs::create_dir(path)).await
 }
