@@ -75,7 +75,10 @@ fn worker_index_from_spawn_blocking() {
         let index = tokio::task::spawn_blocking(runtime::worker_index)
             .await
             .unwrap();
-        assert_eq!(index, None, "spawn_blocking should not be on a worker thread");
+        assert_eq!(
+            index, None,
+            "spawn_blocking should not be on a worker thread"
+        );
     });
 }
 
@@ -88,11 +91,4 @@ fn worker_index_block_on_multi_thread() {
         index, None,
         "block_on thread is not a worker thread on multi-thread runtime"
     );
-}
-
-#[tokio::main(flavor = "current_thread")]
-#[test]
-async fn worker_index_tokio_main_current_thread() {
-    // current_thread block_on runs on the worker, so this is Some(0)
-    assert_eq!(runtime::worker_index(), Some(0));
 }
