@@ -69,12 +69,12 @@ pin_project! {
 
 impl<S> SinkWriter<S> {
     /// Creates a new [`SinkWriter`].
-    pub fn new(sink: S) -> Self {
+    pub const fn new(sink: S) -> Self {
         Self { inner: sink }
     }
 
     /// Gets a reference to the underlying sink.
-    pub fn get_ref(&self) -> &S {
+    pub const fn get_ref(&self) -> &S {
         &self.inner
     }
 

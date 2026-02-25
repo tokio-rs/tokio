@@ -72,7 +72,7 @@ impl AnyDelimiterCodec {
     /// for information on why this could be a potential security risk.
     ///
     /// [`new_with_max_length`]: crate::codec::AnyDelimiterCodec::new_with_max_length()
-    pub fn new(seek_delimiters: Vec<u8>, sequence_writer: Vec<u8>) -> AnyDelimiterCodec {
+    pub const fn new(seek_delimiters: Vec<u8>, sequence_writer: Vec<u8>) -> AnyDelimiterCodec {
         AnyDelimiterCodec {
             next_index: 0,
             max_length: usize::MAX,
@@ -100,15 +100,14 @@ impl AnyDelimiterCodec {
     /// without any delimiter characters, causing unbounded memory consumption.
     ///
     /// [`AnyDelimiterCodecError`]: crate::codec::AnyDelimiterCodecError
-    pub fn new_with_max_length(
+    pub const fn new_with_max_length(
         seek_delimiters: Vec<u8>,
         sequence_writer: Vec<u8>,
         max_length: usize,
     ) -> Self {
-        AnyDelimiterCodec {
-            max_length,
-            ..AnyDelimiterCodec::new(seek_delimiters, sequence_writer)
-        }
+        let mut codec = AnyDelimiterCodec::new(seek_delimiters, sequence_writer);
+        codec.max_length = max_length;
+        codec
     }
 
     /// Returns the maximum chunk length when decoding.
@@ -126,7 +125,7 @@ impl AnyDelimiterCodec {
     /// let codec = AnyDelimiterCodec::new_with_max_length(b",;\n".to_vec(), b";".to_vec(), 256);
     /// assert_eq!(codec.max_length(), 256);
     /// ```
-    pub fn max_length(&self) -> usize {
+    pub const fn max_length(&self) -> usize {
         self.max_length
     }
 }
