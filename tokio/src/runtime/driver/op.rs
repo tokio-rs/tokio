@@ -1,3 +1,4 @@
+use crate::io::uring::link::Link;
 use crate::io::uring::open::Open;
 use crate::io::uring::read::Read;
 use crate::io::uring::write::Write;
@@ -16,6 +17,7 @@ use std::task::{Context, Poll, Waker};
 #[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) enum CancelData {
+    Link(Link),
     Open(Open),
     Write(Write),
     Read(Read),

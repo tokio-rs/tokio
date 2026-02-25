@@ -1,3 +1,4 @@
+pub(crate) mod link;
 pub(crate) mod open;
 pub(crate) mod read;
 pub(crate) mod utils;
