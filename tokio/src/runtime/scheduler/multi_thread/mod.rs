@@ -54,6 +54,7 @@ pub(crate) struct MultiThread;
 // ===== impl MultiThread =====
 
 impl MultiThread {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         size: usize,
         driver: Driver,
@@ -62,6 +63,7 @@ impl MultiThread {
         seed_generator: RngSeedGenerator,
         config: Config,
         timer_flavor: TimerFlavor,
+        name: Option<String>,
     ) -> (MultiThread, Arc<Handle>, Launch) {
         let parker = Parker::new(driver);
         let (handle, launch) = worker::create(
@@ -72,6 +74,7 @@ impl MultiThread {
             seed_generator,
             config,
             timer_flavor,
+            name,
         );
 
         (MultiThread, handle, launch)

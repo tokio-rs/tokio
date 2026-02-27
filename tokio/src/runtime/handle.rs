@@ -474,6 +474,27 @@ impl Handle {
         runtime::Id::new(owned_id)
     }
 
+    /// Returns the name of the current `Runtime`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main(flavor = "current_thread", name = "my-runtime")]
+    /// async fn main() {
+    ///   println!("Current runtime name: {}", Handle::current().name().unwrap());
+    /// }
+    /// ```
+    ///
+    pub fn name(&self) -> Option<&str> {
+        match &self.inner {
+            scheduler::Handle::CurrentThread(handle) => handle.name(),
+            #[cfg(feature = "rt-multi-thread")]
+            scheduler::Handle::MultiThread(handle) => handle.name(),
+        }
+    }
+
     /// Returns a view that lets you get information about how the runtime
     /// is performing.
     pub fn metrics(&self) -> RuntimeMetrics {

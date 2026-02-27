@@ -4,7 +4,7 @@ error: the `async` keyword is missing from the function declaration
 6 | fn main_is_not_async() {}
   | ^^
 
-error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`.
+error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`, `name`.
  --> tests/fail/macros_invalid_input.rs:8:15
   |
 8 | #[tokio::main(foo)]
@@ -22,13 +22,13 @@ error: the `async` keyword is missing from the function declaration
 15 | fn test_is_not_async() {}
    | ^^
 
-error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`.
+error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`, `name`.
   --> tests/fail/macros_invalid_input.rs:17:15
    |
 17 | #[tokio::test(foo)]
    |               ^^^
 
-error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`
+error: Unknown attribute foo is specified; expected one of: `flavor`, `worker_threads`, `start_paused`, `crate`, `unhandled_panic`, `name`.
   --> tests/fail/macros_invalid_input.rs:20:15
    |
 20 | #[tokio::test(foo = 123)]
@@ -119,3 +119,9 @@ error: second test attribute is supplied, consider removing or changing the orde
    | ^^^^^^^^^^^^^^
    |
    = note: this error originates in the attribute macro `tokio::test` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: Failed to parse value of `name` as string.
+  --> tests/fail/macros_invalid_input.rs:71:22
+   |
+71 | #[tokio::test(name = 123)]
+   |                      ^^^
