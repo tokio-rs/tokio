@@ -569,6 +569,40 @@ cfg_rt! {
 
         mod local_runtime;
         pub use local_runtime::{LocalRuntime, LocalOptions};
+
+        /// Returns the index of the current worker thread, if called from a
+        /// runtime worker thread.
+        ///
+        /// The returned value is a 0-based index matching the worker indices
+        /// used by [`RuntimeMetrics`] methods such as
+        /// [`worker_total_busy_duration`](RuntimeMetrics::worker_total_busy_duration).
+        ///
+        /// Returns `None` when called from outside a runtime worker thread
+        /// (for example, from a blocking thread or a non-Tokio thread). On the
+        /// multi-thread runtime, the thread that calls [`Runtime::block_on`] is
+        /// not a worker thread, so this also returns `None` there.
+        ///
+        /// For the current-thread runtime, this always returns `Some(0)`
+        /// (including inside `block_on`, since the calling thread *is* the
+        /// worker thread).
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
+        /// async fn main() {
+        ///     let index = tokio::spawn(async {
+        ///         tokio::runtime::worker_index()
+        ///     }).await.unwrap();
+        ///     println!("Task ran on worker {:?}", index);
+        /// }
+        /// # }
+        /// ```
+        pub fn worker_index() -> Option<usize> {
+            context::worker_index()
+        }
     }
 
     cfg_taskdump! {
