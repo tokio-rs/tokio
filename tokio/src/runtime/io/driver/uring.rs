@@ -164,6 +164,17 @@ impl Handle {
         &self.uring_context
     }
 
+    /// Returns `true` if io_uring has already been initialized and the Read
+    /// opcode is supported. Returns `false` if io_uring hasn't been
+    /// initialized yet or is unsupported. Unlike `check_and_init`, this
+    /// doesn't attempt initialization.
+    pub(crate) fn is_uring_ready(&self) -> bool {
+        self.uring_probe
+            .get()
+            .and_then(|opt| opt.as_ref())
+            .is_some_and(|probe| probe.is_supported(io_uring::opcode::Read::CODE))
+    }
+
     /// Check if the io_uring context is initialized. If not, it will try to initialize it.
     /// Then, check if the provided opcode is supported.
     ///

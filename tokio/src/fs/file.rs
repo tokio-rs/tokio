@@ -30,6 +30,13 @@ use crate::blocking::{spawn_blocking, spawn_mandatory_blocking};
 #[cfg(not(test))]
 use std::fs::File as StdFile;
 
+cfg_io_uring! {
+    #[cfg(test)]
+    use super::mocks::spawn;
+    #[cfg(not(test))]
+    use crate::spawn;
+}
+
 /// A reference to an open file on the filesystem.
 ///
 /// This is a specialized version of [`std::fs::File`] for usage from the
@@ -613,13 +620,7 @@ impl AsyncRead for File {
                     let std = me.std.clone();
 
                     let max_buf_size = cmp::min(dst.remaining(), me.max_buf_size);
-                    inner.state = State::Busy(spawn_blocking(move || {
-                        // SAFETY: the `Read` implementation of `std` does not
-                        // read from the buffer it is borrowing and correctly
-                        // reports the length of the data written into the buffer.
-                        let res = unsafe { buf.read_from(&mut &*std, max_buf_size) };
-                        (Operation::Read(res), buf)
-                    }));
+                    inner.state = State::Busy(Inner::poll_read_inner(std, buf, max_buf_size)?);
                 }
                 State::Busy(ref mut rx) => {
                     let (op, mut buf) = ready!(Pin::new(rx).poll(cx))?;
@@ -952,6 +953,60 @@ cfg_windows! {
 }
 
 impl Inner {
+    fn poll_read_inner(
+        std: Arc<StdFile>,
+        buf: Buf,
+        max_buf_size: usize,
+    ) -> io::Result<JoinHandle<(Operation, Buf)>> {
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        {
+            use crate::runtime::driver::op::Op;
+
+            if let Ok(handle) = crate::runtime::Handle::try_current() {
+                let driver_handle = handle.inner.driver().io();
+                if driver_handle.is_uring_ready() {
+                    let fd: crate::io::uring::utils::ArcFd = std;
+                    let join = spawn(async move {
+                        let mut buf = buf;
+                        let mut fd = fd;
+                        loop {
+                            let (res, r_fd, r_buf) =
+                                // u64::MAX to use and advance the file position
+                                Op::read_at(fd, buf, max_buf_size, u64::MAX).await;
+                            match res {
+                                Err(e) if e.kind() == io::ErrorKind::Interrupted => {
+                                    buf = r_buf;
+                                    fd = r_fd;
+                                    continue;
+                                }
+                                Err(e) => break (Operation::Read(Err(e)), r_buf),
+                                Ok(n) => break (Operation::Read(Ok(n as usize)), r_buf),
+                            }
+                        }
+                    });
+                    return Ok(join);
+                }
+            }
+        }
+
+        // Fallback: spawn_blocking
+        let join = spawn_blocking(move || {
+            let mut buf = buf;
+            // SAFETY: the `Read` implementation of `std` does not
+            // read from the buffer it is borrowing and correctly
+            // reports the length of the data written into the buffer.
+            let res = unsafe { buf.read_from(&mut &*std, max_buf_size) };
+            (Operation::Read(res), buf)
+        });
+        Ok(join)
+    }
+
     async fn complete_inflight(&mut self) {
         use std::future::poll_fn;
 
