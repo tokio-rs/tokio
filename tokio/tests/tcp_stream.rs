@@ -1,5 +1,14 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support bind
+// WASIp1 doesn't support bind
+// No `socket` on miri.
+#![cfg(all(
+    feature = "net",
+    feature = "macros",
+    feature = "rt",
+    feature = "io-util",
+    not(all(target_os = "wasi", target_env = "p1")),
+    not(miri)
+))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
 use tokio::net::{TcpListener, TcpStream};
@@ -10,9 +19,11 @@ use tokio_test::{assert_ok, assert_pending, assert_ready_ok};
 use std::future::poll_fn;
 use std::io;
 use std::task::Poll;
+#[cfg(not(target_os = "wasi"))]
 use std::time::Duration;
 
 #[tokio::test]
+#[cfg(not(target_os = "wasi"))] // WASI does not yet support `SO_LINGER`
 #[cfg_attr(miri, ignore)] // No `socket` on miri.
 #[expect(deprecated)] // set_linger is deprecated
 async fn set_linger() {
@@ -33,6 +44,10 @@ async fn set_linger() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
+)]
 #[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn try_read_write() {
     const DATA: &[u8] = b"this is some data to write to the socket";
@@ -98,6 +113,7 @@ async fn try_read_write() {
     }
 
     written.clear();
+    written.reserve(10 * 1024 * 1024);
     client.writable().await.unwrap();
 
     // Fill the write buffer using vectored I/O
@@ -108,7 +124,9 @@ async fn try_read_write() {
         assert_ready_ok!(writable.poll());
 
         match client.try_write_vectored(&data_bufs) {
-            Ok(n) => written.extend(&DATA[..n]),
+            Ok(n) => {
+                written.extend(&DATA[..n]);
+            }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 break;
             }
@@ -145,13 +163,16 @@ async fn try_read_write() {
     // Now, we listen for shutdown
     drop(client);
 
-    loop {
-        let ready = server.ready(Interest::READABLE).await.unwrap();
+    #[cfg(not(target_os = "wasi"))] // WASI does not yet support `POLLHUP` or `POLLRDHUP`
+    {
+        loop {
+            let ready = server.ready(Interest::READABLE).await.unwrap();
 
-        if ready.is_read_closed() {
-            return;
-        } else {
-            tokio::task::yield_now().await;
+            if ready.is_read_closed() {
+                return;
+            } else {
+                tokio::task::yield_now().await;
+            }
         }
     }
 }
@@ -359,19 +380,31 @@ async fn try_read_buf() {
     // Now, we listen for shutdown
     drop(client);
 
-    loop {
-        let ready = server.ready(Interest::READABLE).await.unwrap();
+    #[cfg(not(target_os = "wasi"))] // WASI does not yet support `POLLHUP` or `POLLRDHUP`
+    {
+        let mut count = 0;
+        loop {
+            count += 1;
+            if count > 100 {
+                panic!("loop 4")
+            }
+            let ready = server.ready(Interest::READABLE).await.unwrap();
 
-        if ready.is_read_closed() {
-            return;
-        } else {
-            tokio::task::yield_now().await;
+            if ready.is_read_closed() {
+                return;
+            } else {
+                tokio::task::yield_now().await;
+            }
         }
     }
 }
 
 // read_closed is a best effort event, so test only for no false positives.
 #[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
+)]
 #[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn read_closed() {
     let (client, mut server) = create_pair().await;

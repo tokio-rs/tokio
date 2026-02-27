@@ -58,6 +58,18 @@ macro_rules! cfg_unix {
     }
 }
 
+/// Enables Unix-specific code, including WASI.
+/// Use this macro instead of `cfg(any(unix, target_os = "wasi"))` to generate docs properly.
+macro_rules! cfg_unix_or_wasi {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(all(doc, docsrs), unix, target_os = "wasi"))]
+            #[cfg_attr(docsrs, doc(cfg(any(unix, target_os = "wasi"))))]
+            $item
+        )*
+    }
+}
+
 /// Enables unstable Windows-specific code.
 /// Use this macro instead of `cfg(windows)` to generate docs properly.
 macro_rules! cfg_unstable_windows {
@@ -669,6 +681,15 @@ macro_rules! cfg_not_wasi {
     ($($item:item)*) => {
         $(
             #[cfg(not(target_os = "wasi"))]
+            $item
+        )*
+    }
+}
+
+macro_rules! cfg_not_wasip1 {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(target_os = "wasi", target_env = "p1")))]
             $item
         )*
     }

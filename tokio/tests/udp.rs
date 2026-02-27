@@ -1,6 +1,14 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi does not support bind or UDP
-                                                                   // No `socket` on miri.
+// WASIp1 doesn't support bind
+// No `socket` on miri.
+#![cfg(all(
+    feature = "net",
+    feature = "macros",
+    feature = "rt",
+    feature = "io-util",
+    not(all(target_os = "wasi", target_env = "p1")),
+    not(miri)
+))]
 
 use std::future::poll_fn;
 use std::io;
@@ -47,6 +55,10 @@ async fn send_recv_poll() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
+)]
 async fn send_to_recv_from() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
@@ -63,6 +75,10 @@ async fn send_to_recv_from() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
+)]
 async fn send_to_recv_from_poll() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
@@ -79,6 +95,7 @@ async fn send_to_recv_from_poll() -> std::io::Result<()> {
     Ok(())
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[tokio::test]
 async fn send_to_peek_from() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
@@ -107,6 +124,7 @@ async fn send_to_peek_from() -> std::io::Result<()> {
     Ok(())
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[tokio::test]
 async fn send_to_try_peek_from() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
@@ -146,6 +164,7 @@ async fn send_to_try_peek_from() -> std::io::Result<()> {
     Ok(())
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[tokio::test]
 async fn send_to_peek_from_poll() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
@@ -174,6 +193,7 @@ async fn send_to_peek_from_poll() -> std::io::Result<()> {
     Ok(())
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[tokio::test]
 async fn peek_sender() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
@@ -199,6 +219,7 @@ async fn peek_sender() -> std::io::Result<()> {
     Ok(())
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[tokio::test]
 async fn poll_peek_sender() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
@@ -225,6 +246,7 @@ async fn poll_peek_sender() -> std::io::Result<()> {
     Ok(())
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
 #[tokio::test]
 async fn try_peek_sender() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
@@ -353,6 +375,10 @@ async fn split_chan_poll() -> std::io::Result<()> {
 // **not** be okay because it's resources are completion based (via IOCP).
 // If data is sent and not yet received, attempting to send more data will
 // result in `ErrorKind::WouldBlock` until the first operation completes.
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not yet support multithreading"
+)]
 #[tokio::test]
 async fn try_send_spawn() {
     const MSG2: &[u8] = b"world!";
@@ -439,6 +465,10 @@ async fn try_send_recv() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
+)]
 async fn try_send_to_recv_from() {
     // Create listener
     let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -543,6 +573,10 @@ async fn recv_buf() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
+)]
 async fn try_recv_buf_from() {
     // Create listener
     let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -586,6 +620,10 @@ async fn try_recv_buf_from() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
+)]
 async fn recv_buf_from() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
@@ -603,6 +641,10 @@ async fn recv_buf_from() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
+)]
 async fn poll_ready() {
     // Create listener
     let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -690,13 +732,16 @@ macro_rules! test {
     };
 }
 
+#[cfg(not(target_os = "wasi"))] // WASI does not yet support broadcast
 test!(broadcast, set_broadcast(true));
 
+#[cfg(not(target_os = "wasi"))] // WASI does not yet support multicast
 test!(IPv4 multicast_loop_v4, set_multicast_loop_v4(false));
 
 #[cfg(target_os = "linux")] // broken on non-Linux platforms https://github.com/rust-lang/socket2/pull/630
 test!(multicast_ttl_v4, set_multicast_ttl_v4(40));
 
+#[cfg(not(target_os = "wasi"))] // WASI does not yet support multicast
 test!(IPv6 multicast_loop_v6, set_multicast_loop_v6(false));
 
 #[cfg(any(
@@ -719,6 +764,7 @@ test!(IPv4 ttl, set_ttl(40));
     target_os = "redox",
     target_os = "solaris",
     target_os = "illumos",
-    target_os = "haiku"
+    target_os = "haiku",
+    target_os = "wasi"
 )))]
 test!(IPv4 tos_v4, set_tos_v4(96));
