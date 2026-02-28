@@ -1,5 +1,5 @@
 use crate::fs::OpenOptions;
-use crate::runtime::driver::op::Op;
+use crate::runtime::driver::op::{CqeResult, Op};
 
 use std::io;
 use std::io::ErrorKind;
@@ -14,13 +14,13 @@ const PROBE_SIZE_U32: u32 = PROBE_SIZE as u32;
 // Max bytes we can read using io uring submission at a time
 // SAFETY: cannot be higher than u32::MAX for safe cast
 // Set to read max 64 MiB at time
-const MAX_READ_SIZE: usize = 64 * 1024 * 1024;
+pub(crate) const MAX_READ_SIZE: usize = 64 * 1024 * 1024;
 
 pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
     let file = OpenOptions::new().read(true).open(path).await?;
 
     // TODO: use io uring in the future to obtain metadata
-    let size_hint: Option<usize> = file.metadata().await.map(|m| m.len() as usize).ok();
+    let size_hint = file.metadata().await.map(|m| m.len() as usize).ok();
 
     let fd: OwnedFd = file
         .try_into_std()
@@ -33,10 +33,29 @@ pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
         buf.try_reserve(size_hint)?;
     }
 
-    read_to_end_uring(fd, buf).await
+    read_to_end_batch(fd, buf).await
 }
 
-async fn read_to_end_uring(mut fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Vec<u8>> {
+async fn read_to_end_batch(fd: OwnedFd, buf: Vec<u8>) -> io::Result<Vec<u8>> {
+    let file_len = buf.capacity();
+    let batch_size = 128;
+
+    // try reading in batch if we have substantial capacity
+    if file_len > MAX_READ_SIZE {
+        match Op::read_batch_size(fd, buf, file_len, batch_size).await {
+            Ok(buf) => Ok(buf),
+            Err((r_fd, mut r_buf)) => {
+                // clear the buffer before we write to it from start again
+                r_buf.clear();
+                read_to_end(r_fd, r_buf).await
+            }
+        }
+    } else {
+        read_to_end(fd, buf).await
+    }
+}
+
+async fn read_to_end(mut fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Vec<u8>> {
     let mut offset = 0;
     let start_cap = buf.capacity();
 
@@ -119,16 +138,20 @@ async fn op_read(
         let (res, r_fd, r_buf) = Op::read(fd, buf, read_len, *offset).await;
 
         match res {
-            Err(e) if e.kind() == ErrorKind::Interrupted => {
-                buf = r_buf;
-                fd = r_fd;
-            }
-            Err(e) => return Err(e),
-            Ok(size_read) => {
+            CqeResult::Single(Ok(size_read)) => {
                 *offset += size_read as u64;
 
                 return Ok((r_fd, r_buf, size_read == 0));
             }
+            CqeResult::InitErr(e) | CqeResult::Single(Err(e)) => {
+                if e.kind() == ErrorKind::Interrupted {
+                    buf = r_buf;
+                    fd = r_fd;
+                } else {
+                    return Err(e);
+                }
+            }
+            CqeResult::Batch(_) => return Err(ErrorKind::Unsupported.into()),
         }
     }
 }

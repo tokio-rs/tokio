@@ -1,14 +1,17 @@
-use io_uring::{squeue::Entry, IoUring, Probe};
+use io_uring::squeue::Entry;
+use io_uring::{IoUring, Probe};
 use mio::unix::SourceFd;
 use slab::Slab;
 
-use crate::runtime::driver::op::{Cancellable, Lifecycle};
-use crate::{io::Interest, loom::sync::Mutex};
-
 use super::{Handle, TOKEN_WAKEUP};
+use crate::io::Interest;
+use crate::loom::sync::Mutex;
+use crate::runtime::driver::op::{Cancellable, Lifecycle};
 
 use std::os::fd::{AsRawFd, RawFd};
-use std::{io, mem, task::Waker};
+use std::sync::Arc;
+use std::task::Waker;
+use std::{io, mem};
 
 const DEFAULT_RING_SIZE: u32 = 256;
 
@@ -59,7 +62,6 @@ impl UringContext {
 
         Ok(true)
     }
-
     pub(crate) fn dispatch_completions(&mut self) {
         let ops = &mut self.ops;
         let Some(mut uring) = self.uring.take() else {
@@ -114,6 +116,11 @@ impl UringContext {
                 }
             }
         }
+    }
+
+    // check if the specified range of slab indexes exist or not
+    pub(crate) fn check_slab_entry(&self, indexes: &[usize]) -> bool {
+        indexes.iter().all(|i| self.ops.get(*i).is_none())
     }
 
     pub(crate) fn remove_op(&mut self, index: usize) -> Lifecycle {
@@ -210,6 +217,58 @@ impl Handle {
         Ok(())
     }
 
+    // Register batch operations with io-uring, the returned value is the
+    // list of indexes.
+    //
+    // If the IO_LINK flag is not set the completions may not arrive in order
+    // for ordering set the IO_LINK flag before passing the entires to this function
+    pub(crate) unsafe fn register_batch(
+        &self,
+        entries: &mut [Entry],
+        waker: Waker,
+    ) -> io::Result<Vec<usize>> {
+        assert!(self.uring_probe.initialized());
+
+        let mut guard = self.get_uring().lock();
+        let ctx = &mut *guard;
+
+        let length = entries.len();
+        let mut indexes: Vec<usize> = Vec::with_capacity(length);
+
+        for entry in entries.iter_mut() {
+            let index = ctx.ops.insert(Lifecycle::Waiting(waker.clone()));
+            entry.set_user_data(index as u64);
+            indexes.push(index);
+        }
+
+        let submit_or_remove = |ctx: &mut UringContext| -> io::Result<()> {
+            if let Err(e) = ctx.submit() {
+                // Submission failed, remove the entry from the slab and return the error
+                for i in indexes.iter() {
+                    ctx.ops.remove(*i);
+                }
+
+                return Err(e);
+            }
+            Ok(())
+        };
+
+        // SAFETY: entry is valid for the entire duration of the operation
+        while unsafe { ctx.ring_mut().submission().push_multiple(entries).is_err() } {
+            // If the submission queue is full, flush it to the kernel
+            submit_or_remove(ctx)?;
+        }
+
+        // Ensure that the completion queue is not full before submitting the entry.
+        while ctx.ring_mut().completion().is_full() {
+            ctx.dispatch_completions();
+        }
+
+        submit_or_remove(ctx)?;
+
+        Ok(indexes)
+    }
+
     /// Register an operation with the io_uring.
     ///
     /// If this is the first io_uring operation, it will also initialize the io_uring context.
@@ -269,7 +328,7 @@ impl Handle {
         // uring data alive until the operation completes.
 
         let cancel_data = data.expect("Data should be present").cancel();
-        match mem::replace(lifecycle, Lifecycle::Cancelled(cancel_data)) {
+        match mem::replace(lifecycle, Lifecycle::Cancelled(Arc::new(cancel_data))) {
             Lifecycle::Submitted | Lifecycle::Waiting(_) => (),
             // The driver saw the completion, but it was never polled.
             Lifecycle::Completed(_) => {
@@ -278,5 +337,28 @@ impl Handle {
             }
             prev => panic!("Unexpected state: {prev:?}"),
         };
+    }
+
+    pub(crate) fn cancel_batched_op<T: Cancellable>(&self, indexes: &[usize], data: Option<T>) {
+        let mut guard = self.get_uring().lock();
+        let ctx = &mut *guard;
+        let ops = &mut ctx.ops;
+
+        let cancel_data = data.expect("Data should be present").cancel();
+        let cancel_rc = Arc::new(cancel_data);
+
+        for &i in indexes.iter() {
+            if let Some(lifecycle) = ops.get_mut(i) {
+                match mem::replace(lifecycle, Lifecycle::Cancelled(Arc::clone(&cancel_rc))) {
+                    Lifecycle::Submitted | Lifecycle::Waiting(_) => (),
+                    // The driver saw the completion, but it was never polled.
+                    Lifecycle::Completed(_) => {
+                        // We can safely remove the entry from the slab, as it has already been completed.
+                        ops.remove(i);
+                    }
+                    prev => panic!("Unexpected state: {prev:?}"),
+                };
+            }
+        }
     }
 }
