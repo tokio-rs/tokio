@@ -1,3 +1,11 @@
+# 2.6.1 (Feb 27th, 2026)
+
+- macros: improve error message for return type mismatch in #[tokio::main] ([#7856])
+- macros: use call_site hygiene to avoid unused qualification ([#7866])
+
+[#7856]: https://github.com/tokio-rs/tokio/pull/7856
+[#7866]: https://github.com/tokio-rs/tokio/pull/7866
+
 # 2.6.0 (Oct 14th, 2025)
 
 The MSRV is raised to 1.71.
