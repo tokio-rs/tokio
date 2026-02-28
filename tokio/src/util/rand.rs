@@ -68,11 +68,7 @@ impl FastRand {
         }
     }
 
-    #[cfg(any(
-        feature = "macros",
-        feature = "rt-multi-thread",
-        all(feature = "sync", feature = "rt")
-    ))]
+    #[cfg(any(feature = "macros", feature = "sync", feature = "rt"))]
     pub(crate) fn fastrand_n(&mut self, n: u32) -> u32 {
         // This is similar to fastrand() % n, but faster.
         // See https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
