@@ -11,9 +11,7 @@
 - io: implement vectored writes for `write_buf` ([#7871])
 - runtime: panic when `event_interval` is set to 0 ([#7838])
 - runtime: shorten default thread name to fit in Linux limit ([#7880])
-- signal: guarantee that listeners never return `None` ([#7869])
 - signal: remember the result of `SetConsoleCtrlHandler` ([#7833])
-- io: hardcode platform list for short write optimization ([#7872])
 - signal: specialize windows `Registry` ([#7885])
 
 ### Fixed
@@ -23,9 +21,8 @@
 - net: fix `GET_BUF_SIZE` constant for `target_os = "android"` ([#7889])
 - runtime: avoid redundant unpark in current_thread scheduler ([#7834])
 - runtime: don't park in `current_thread` if `before_park` defers waker ([#7835])
-- runtime: fix double increment of `num_idle_threads` on shutdown ([#7910])
-- runtime: fix race condition during the blocking pool shutdown ([#7922])
-- runtime: fix TOCTOU issue when decreasing `num_idle_threads` ([#7918])
+- runtime: fix double increment of `num_idle_threads` on shutdown ([#7910], [#7918], [#7922])
+- io: fix write readiness on ESP32 on short writes ([#7872])
 - runtime: wake deferred tasks before entering `block_in_place` ([#7879])
 - sync: drop rx waker when oneshot receiver is dropped ([#7886])
 
@@ -48,6 +45,7 @@
 - sync: clarify that `recv` returns `None` once closed and no more messages ([#7920])
 - task: clarify when to use `spawn_blocking` vs dedicated threads ([#7923])
 - task: doc that task drops before `JoinHandle` completion ([#7825])
+- signal: guarantee that listeners never return `None` ([#7869])
 - task: fix task module feature flags in docs ([#7891])
 - task: fix two typos ([#7913])
 - task: improve the docs of `Builder::spawn_local` ([#7828])
