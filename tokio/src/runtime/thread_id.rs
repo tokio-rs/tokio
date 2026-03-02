@@ -16,10 +16,10 @@ impl ThreadId {
         }
 
         #[cfg(not(all(test, loom)))]
-        use crate::loom::sync::atomic::StaticAtomicU64;
+        use std::sync::atomic::AtomicU64;
 
         #[cfg(not(all(test, loom)))]
-        static NEXT_ID: StaticAtomicU64 = StaticAtomicU64::new(0);
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
         let mut last = NEXT_ID.load(Relaxed);
         loop {
