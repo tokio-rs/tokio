@@ -21,10 +21,10 @@
 - net: fix `GET_BUF_SIZE` constant for `target_os = "android"` ([#7889])
 - runtime: avoid redundant unpark in current_thread scheduler ([#7834])
 - runtime: don't park in `current_thread` if `before_park` defers waker ([#7835])
-- runtime: fix double increment of `num_idle_threads` on shutdown ([#7910], [#7918], [#7922])
 - io: fix write readiness on ESP32 on short writes ([#7872])
 - runtime: wake deferred tasks before entering `block_in_place` ([#7879])
 - sync: drop rx waker when oneshot receiver is dropped ([#7886])
+- runtime: fix double increment of `num_idle_threads` on shutdown ([#7910], [#7918], [#7922])
 
 ### Unstable
 
