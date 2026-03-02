@@ -1,4 +1,4 @@
-# 2.6.1 (Mar 1st, 2026)
+# 2.6.1 (Mar 2nd, 2026)
 
 - macros: improve error message for return type mismatch in #[tokio::main] ([#7856])
 - macros: use call_site hygiene to avoid unused qualification ([#7866])
