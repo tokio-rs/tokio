@@ -78,7 +78,7 @@ impl Id {
         }
 
         #[cfg(not(all(test, loom)))]
-        use std::sync::atomic::AtomicU64;
+        use crate::loom::sync::atomic::AtomicU64;
 
         #[cfg(not(all(test, loom)))]
         static NEXT_ID: AtomicU64 = AtomicU64::new(1);
