@@ -67,7 +67,7 @@ impl fmt::Display for Id {
 
 impl Id {
     pub(crate) fn next() -> Self {
-        use std::sync::atomic::Ordering::Relaxed;
+        use crate::loom::sync::atomic::Ordering::Relaxed;
 
         #[cfg(all(test, loom))]
         use loom::sync::atomic::AtomicU64;
