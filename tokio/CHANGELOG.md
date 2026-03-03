@@ -1,9 +1,9 @@
-# 1.50.0 (Mar 2nd, 2026)
+# 1.50.0 (Mar 3rd, 2026)
 
 ### Added
 
 - net: add `TcpStream::set_zero_linger` ([#7837])
-- rt: make `is_rt_shutdown_err` method public ([#7771])
+- rt: add `is_rt_shutdown_err` ([#7771])
 
 ### Changed
 
