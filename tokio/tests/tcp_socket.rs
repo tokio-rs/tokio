@@ -123,10 +123,10 @@ const SET_BUF_SIZE: u32 = 4096;
 // Linux doubles the buffer size for kernel usage, and exposes that when
 // retrieving the buffer size.
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 const GET_BUF_SIZE: u32 = SET_BUF_SIZE;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 const GET_BUF_SIZE: u32 = 2 * SET_BUF_SIZE;
 
 test!(keepalive, set_keepalive(true));

@@ -424,6 +424,10 @@ where
 
         let cx = maybe_cx.expect("no .is_some() == false cases above should lead here");
 
+        // Since deferred tasks don't stay on `core`, make sure to wake them
+        // before blocking.
+        cx.defer.wake();
+
         // Get the worker core. If none is set, then blocking is fine!
         let mut core = match cx.core.borrow_mut().take() {
             Some(core) => core,
@@ -1280,6 +1284,7 @@ impl Handle {
         });
     }
 
+    // Separated case to reduce LLVM codegen in `Handle::bind_new_task`.
     pub(super) fn schedule_option_task_without_yield(&self, task: Option<Notified>) {
         if let Some(task) = task {
             self.schedule_task(task, false);

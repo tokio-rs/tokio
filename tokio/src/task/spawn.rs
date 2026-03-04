@@ -6,16 +6,19 @@ use std::future::Future;
 
 cfg_rt! {
     /// Spawns a new asynchronous task, returning a
-    /// [`JoinHandle`](JoinHandle) for it.
+    /// [`JoinHandle`] for it.
     ///
     /// The provided future will start running in the background immediately
     /// when `spawn` is called, even if you don't await the returned
-    /// `JoinHandle`.
+    /// [`JoinHandle`].
     ///
     /// Spawning a task enables the task to execute concurrently to other tasks. The
     /// spawned task may execute on the current thread, or it may be sent to a
     /// different thread to be executed. The specifics depend on the current
-    /// [`Runtime`](crate::runtime::Runtime) configuration.
+    /// [`Runtime`](crate::runtime::Runtime) configuration. In a
+    /// [running runtime][running-runtime], the task will start immediately in the
+    /// background. On a blocked runtime, the user must drive the runtime forward (for
+    /// example, by calling [`Runtime::block_on`](crate::runtime::Runtime::block_on)).
     ///
     /// It is guaranteed that spawn will not synchronously poll the task being spawned.
     /// This means that calling spawn while holding a lock does not pose a risk of
@@ -28,6 +31,8 @@ cfg_rt! {
     /// This function must be called from the context of a Tokio runtime. Tasks running on
     /// the Tokio runtime are always inside its context, but you can also enter the context
     /// using the [`Runtime::enter`](crate::runtime::Runtime::enter()) method.
+    ///
+    /// [running-runtime]: ../runtime/index.html#driving-the-runtime
     ///
     /// # Examples
     ///

@@ -74,6 +74,20 @@ cfg_io_std! {
     /// to occur as a single write, so multiple threads writing data with
     /// [`write_all`] may result in interleaved output.
     ///
+    /// Note that unlike [`std::io::stdout`], each call to this `stdout()`
+    /// produces a new writer, so for example, this program does **not** flush stdout:
+    ///
+    /// ```no_run
+    /// # use tokio::io::AsyncWriteExt;
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// tokio::io::stdout().write_all(b"aa").await?;
+    /// tokio::io::stdout().flush().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`std::io::stdout`]: std::io::stdout
     /// [`AsyncWrite`]: AsyncWrite
     /// [`write_all`]: crate::io::AsyncWriteExt::write_all()
     ///

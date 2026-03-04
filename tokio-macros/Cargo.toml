@@ -1,10 +1,10 @@
 [package]
 name = "tokio-macros"
 # When releasing to crates.io:
-# - Remove path dependencies
+# - Remove path dependencies (if any)
 # - Update CHANGELOG.md.
 # - Create "tokio-macros-x.y.z" git tag.
-version = "2.6.0"
+version = "2.6.1"
 edition = "2021"
 rust-version = "1.71"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -27,7 +27,7 @@ quote = "1"
 syn = { version = "2.0", features = ["full"] }
 
 [dev-dependencies]
-tokio = { version = "1.0.0", path = "../tokio", features = ["full"] }
+tokio = { version = "1.0.0", features = ["full", "test-util"] }
 
 [package.metadata.docs.rs]
 all-features = true

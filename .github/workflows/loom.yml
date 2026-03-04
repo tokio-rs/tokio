@@ -23,6 +23,22 @@ permissions:
   contents: read
 
 jobs:
+  loom-blocking:
+    name: loom tokio::runtime::spawn_blocking
+    # base_ref is null when it's not a pull request
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-blocking') || (github.base_ref == null))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      - name: run tests
+        run: cargo test --lib --release --features full -- --nocapture loom_blocking
+        working-directory: tokio
+
   loom-sync:
     name: loom tokio::sync
     # base_ref is null when it's not a pull request
