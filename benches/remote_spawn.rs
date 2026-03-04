@@ -19,6 +19,7 @@ use tokio::runtime::{self, Runtime};
 /// Total number of tasks spawned across all threads per iteration.
 /// Must be divisible by the largest parallelism level (64).
 const TOTAL_TASKS: usize = 12_800;
+const _: () = assert!(TOTAL_TASKS % 64 == 0, "TOTAL_TASKS must be divisible by 64");
 
 fn remote_spawn_contention(c: &mut Criterion) {
     let parallelism_levels = parallelism_levels();
@@ -32,38 +33,45 @@ fn remote_spawn_contention(c: &mut Criterion) {
             |b, &num_threads| {
                 let rt = rt();
                 let tasks_per_thread = TOTAL_TASKS / num_threads;
+                let barrier = Barrier::new(num_threads);
 
-                b.iter(|| {
-                    let barrier = Barrier::new(num_threads);
+                b.iter_custom(|iters| {
+                    let mut total_duration = std::time::Duration::ZERO;
+                    for _ in 0..iters {
+                        let start = std::time::Instant::now();
 
-                    std::thread::scope(|s| {
-                        let handles: Vec<_> = (0..num_threads)
-                            .map(|_| {
-                                let barrier = &barrier;
-                                let rt = &rt;
-                                s.spawn(move || {
-                                    let mut join_handles = Vec::with_capacity(tasks_per_thread);
-                                    barrier.wait();
+                        let all_handles = std::thread::scope(|s| {
+                            let handles: Vec<_> = (0..num_threads)
+                                .map(|_| {
+                                    let barrier = &barrier;
+                                    let rt = &rt;
+                                    s.spawn(move || {
+                                        let mut join_handles = Vec::with_capacity(tasks_per_thread);
+                                        barrier.wait();
 
-                                    for _ in 0..tasks_per_thread {
-                                        join_handles.push(rt.spawn(async {}));
-                                    }
-                                    join_handles
+                                        for _ in 0..tasks_per_thread {
+                                            join_handles.push(rt.spawn(async {}));
+                                        }
+                                        join_handles
+                                    })
                                 })
-                            })
-                            .collect();
+                                .collect();
 
-                        let all_handles: Vec<_> = handles
-                            .into_iter()
-                            .flat_map(|h| h.join().unwrap())
-                            .collect();
+                            handles
+                                .into_iter()
+                                .flat_map(|h| h.join().unwrap())
+                                .collect::<Vec<_>>()
+                        });
+
+                        total_duration += start.elapsed();
 
                         rt.block_on(async {
                             for h in all_handles {
                                 h.await.unwrap();
                             }
                         });
-                    });
+                    }
+                    total_duration
                 });
             },
         );
@@ -84,10 +92,7 @@ fn parallelism_levels() -> Vec<usize> {
 }
 
 fn rt() -> Runtime {
-    runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap()
+    runtime::Builder::new_multi_thread().build().unwrap()
 }
 
 criterion_group!(remote_spawn_benches, remote_spawn_contention);
