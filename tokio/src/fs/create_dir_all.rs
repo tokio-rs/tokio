@@ -60,7 +60,7 @@ pub async fn create_dir_all(path: impl AsRef<Path>) -> io::Result<()> {
 
         let handle = crate::runtime::Handle::current();
         let driver_handle = handle.inner.driver().io();
-        if driver_handle.check_and_init(io_uring::opcode::MkDirAt::CODE)? {
+        if driver_handle.check_and_init(io_uring::opcode::MkDirAt::CODE).await? {
             return create_dir_all_uring(&path).await;
         }
     }
