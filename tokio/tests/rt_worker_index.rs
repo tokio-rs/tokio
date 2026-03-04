@@ -1,28 +1,7 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(
-    feature = "full",
-    tokio_unstable,
-    not(target_os = "wasi"),
-    target_has_atomic = "64"
-))]
+#![cfg(all(feature = "full", tokio_unstable, not(target_os = "wasi"),))]
 
 use tokio::runtime::{self, Runtime};
-
-#[test]
-fn worker_index_multi_thread() {
-    let rt = Runtime::new().unwrap();
-    rt.block_on(async {
-        let index = tokio::task::spawn(async { runtime::worker_index() })
-            .await
-            .unwrap();
-        let num_workers = rt.metrics().num_workers();
-        let index = index.expect("should be Some on worker thread");
-        assert!(
-            index < num_workers,
-            "worker_index {index} >= num_workers {num_workers}"
-        );
-    });
-}
 
 #[test]
 fn worker_index_current_thread() {
@@ -37,10 +16,20 @@ fn worker_index_current_thread() {
 }
 
 #[test]
+fn worker_index_local_runtime() {
+    let rt = runtime::LocalRuntime::new().unwrap();
+    rt.block_on(async {
+        let index = runtime::worker_index();
+        assert_eq!(index, Some(0));
+    });
+}
+
+#[test]
 fn worker_index_outside_runtime() {
     assert_eq!(runtime::worker_index(), None);
 }
 
+#[cfg(target_has_atomic = "64")]
 #[test]
 fn worker_index_matches_metrics_worker_thread_id() {
     let rt = runtime::Builder::new_multi_thread()

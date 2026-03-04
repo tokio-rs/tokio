@@ -582,9 +582,12 @@ cfg_rt! {
         /// multi-thread runtime, the thread that calls [`Runtime::block_on`] is
         /// not a worker thread, so this also returns `None` there.
         ///
-        /// For the current-thread runtime, this always returns `Some(0)`
-        /// (including inside `block_on`, since the calling thread *is* the
-        /// worker thread).
+        /// For the current-thread runtime and [`LocalRuntime`], this always
+        /// returns `Some(0)` (including inside `block_on`, since the calling
+        /// thread *is* the worker thread).
+        ///
+        /// Note that the result may change across `.await` points, as the
+        /// task may be moved to a different worker thread by the scheduler.
         ///
         /// # Examples
         ///
