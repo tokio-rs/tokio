@@ -8,9 +8,11 @@ license = "MIT"
 [features]
 test-util = ["tokio/test-util"]
 
+
 [dependencies]
 tokio = { version = "1.5.0", path = "../tokio", features = ["full"] }
 criterion = "0.5.1"
+gungraun = "0.17.0"
 rand = "0.9"
 rand_chacha = "0.9"
 
@@ -99,6 +101,11 @@ harness = false
 [[bench]]
 name = "spawn_blocking"
 path = "spawn_blocking.rs"
+harness = false
+
+[[bench]]
+name = "ct_spawn"
+path = "ct_spawn.rs"
 harness = false
 
 [lints]
