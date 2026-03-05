@@ -3,7 +3,8 @@ use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
 use crate::runtime::task::{
-    self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task, TaskHarnessScheduleHooks,
+    self, JoinHandle, LocalNotified, OwnedTasks, Schedule, SpawnLocation, Task,
+    TaskHarnessScheduleHooks,
 };
 use crate::runtime::{
     blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
@@ -363,11 +364,28 @@ fn wake_deferred_tasks_and_free(context: &Context) {
 impl Context {
     /// Execute the closure with the given scheduler core stored in the
     /// thread-local context.
-    fn run_task<R>(&self, mut core: Box<Core>, f: impl FnOnce() -> R) -> (Box<Core>, R) {
-        core.metrics.start_poll();
-        let mut ret = self.enter(core, || crate::task::coop::budget(f));
-        ret.0.metrics.end_poll();
-        ret
+    fn run_task(&self, task: LocalNotified<Arc<Handle>>, mut core: Box<Core>) -> Box<Core> {
+        #[cfg(tokio_unstable)]
+        let task_meta = task.task_meta();
+
+        #[cfg(tokio_unstable)]
+        core.metrics.start_poll(task.get_scheduled_at());
+        #[cfg(not(tokio_unstable))]
+        core.metrics.start_poll(None);
+
+        let (mut c, ()) = self.enter(core, || {
+            crate::task::coop::budget(|| {
+                #[cfg(tokio_unstable)]
+                self.handle.task_hooks.poll_start_callback(&task_meta);
+
+                task.run();
+
+                #[cfg(tokio_unstable)]
+                self.handle.task_hooks.poll_stop_callback(&task_meta);
+            })
+        });
+        c.metrics.end_poll();
+        c
     }
 
     /// Blocks the current thread until an event is received by the driver,
@@ -657,6 +675,14 @@ impl Schedule for Arc<Handle> {
     fn schedule(&self, task: task::Notified<Self>) {
         use scheduler::Context::CurrentThread;
 
+        // SAFETY: There are no concurrent writes because tasks cannot be scheduled in
+        // multiple places concurrently. There are no concurrent reads because this field
+        // is only read when polling the task, which can only happen after it's scheduled.
+        #[cfg(tokio_unstable)]
+        unsafe {
+            task.set_scheduled_at(std::time::Instant::now());
+        }
+
         context::with_scheduler(|maybe_cx| match maybe_cx {
             Some(CurrentThread(cx)) if Arc::ptr_eq(self, &cx.handle) => {
                 let mut core = cx.core.borrow_mut();
@@ -806,18 +832,7 @@ impl CoreGuard<'_> {
 
                     let task = context.handle.shared.owned.assert_owner(task);
 
-                    #[cfg(tokio_unstable)]
-                    let task_meta = task.task_meta();
-
-                    let (c, ()) = context.run_task(core, || {
-                        #[cfg(tokio_unstable)]
-                        context.handle.task_hooks.poll_start_callback(&task_meta);
-
-                        task.run();
-
-                        #[cfg(tokio_unstable)]
-                        context.handle.task_hooks.poll_stop_callback(&task_meta);
-                    });
+                    let c = context.run_task(task, core);
 
                     core = c;
                 }

@@ -225,6 +225,8 @@ use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
 use std::panic::Location;
 use std::ptr::NonNull;
+#[cfg(tokio_unstable)]
+use std::time::Instant;
 use std::{fmt, mem};
 
 /// An owned handle to the task, tracked by ref count.
@@ -247,6 +249,13 @@ impl<S> Notified<S> {
     pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
         self.0.task_meta()
     }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) unsafe fn set_scheduled_at(&self, now: Instant) {
+        unsafe {
+            self.0.header().set_scheduled_at(now);
+        }
+    }
 }
 
 // safety: This type cannot be used to touch the task without first verifying
@@ -267,6 +276,11 @@ impl<S> LocalNotified<S> {
     #[inline]
     pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
         self.task.task_meta()
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn get_scheduled_at(&self) -> Option<Instant> {
+        self.task.header().get_scheduled_at()
     }
 }
 

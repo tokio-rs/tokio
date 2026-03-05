@@ -629,7 +629,10 @@ impl Context {
         // tasks under this measurement. In this case, the tasks came from the
         // LIFO slot and are considered part of the current task for scheduling
         // purposes. These tasks inherent the "parent"'s limits.
-        core.stats.start_poll();
+        #[cfg(tokio_unstable)]
+        core.stats.start_poll(task.get_scheduled_at());
+        #[cfg(not(tokio_unstable))]
+        core.stats.start_poll(None);
 
         // Make the core available to the runtime context
         *self.core.borrow_mut() = Some(core);
@@ -1271,6 +1274,14 @@ impl Worker {
 
 impl Handle {
     pub(super) fn schedule_task(&self, task: Notified, is_yield: bool) {
+        // SAFETY: There are no concurrent writes because tasks cannot be scheduled in
+        // multiple places concurrently. There are no concurrent reads because this field
+        // is only read when polling the task, which can only happen after it's scheduled.
+        #[cfg(tokio_unstable)]
+        unsafe {
+            task.set_scheduled_at(std::time::Instant::now());
+        }
+
         with_current(|maybe_cx| {
             if let Some(cx) = maybe_cx {
                 // Make sure the task is part of the **current** scheduler.

@@ -32,6 +32,8 @@ use std::panic::Location;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
+#[cfg(tokio_unstable)]
+use std::time::Instant;
 
 /// The task cell. Contains the components of the task.
 ///
@@ -191,6 +193,10 @@ pub(crate) struct Header {
     /// The tracing ID for this instrumented task.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) tracing_id: Option<tracing::Id>,
+
+    /// The last time this task was scheduled. Used to measure schedule latency.
+    #[cfg(tokio_unstable)]
+    pub(super) scheduled_at: UnsafeCell<Option<Instant>>,
 }
 
 unsafe impl Send for Header {}
@@ -247,6 +253,8 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 owner_id: UnsafeCell::new(None),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
+                #[cfg(tokio_unstable)]
+                scheduled_at: UnsafeCell::new(None),
             }
         }
 
@@ -533,6 +541,25 @@ impl Header {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) unsafe fn get_tracing_id(me: &NonNull<Header>) -> Option<&tracing::Id> {
         me.as_ref().tracing_id.as_ref()
+    }
+
+    /// Updates the last time this task was scheduled. Used to calculate
+    /// the time elapsed between task scheduling and polling.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee exclusive access to this field.
+    #[cfg(tokio_unstable)]
+    pub(super) unsafe fn set_scheduled_at(&self, now: Instant) {
+        self.scheduled_at.with_mut(|ptr| *ptr = Some(now));
+    }
+
+    /// Gets the last time this task was scheduled.
+    #[cfg(tokio_unstable)]
+    pub(super) fn get_scheduled_at(&self) -> Option<Instant> {
+        // Safety: If there are concurrent writes, then that write has violated
+        // the safety requirements on `set_scheduled_at`.
+        unsafe { self.scheduled_at.with(|ptr| *ptr) }
     }
 }
 

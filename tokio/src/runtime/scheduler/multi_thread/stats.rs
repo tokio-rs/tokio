@@ -113,8 +113,8 @@ impl Stats {
         }
     }
 
-    pub(crate) fn start_poll(&mut self) {
-        self.batch.start_poll();
+    pub(crate) fn start_poll(&mut self, task_scheduled_at: Option<Instant>) {
+        self.batch.start_poll(task_scheduled_at);
 
         self.tasks_polled_in_batch += 1;
     }
