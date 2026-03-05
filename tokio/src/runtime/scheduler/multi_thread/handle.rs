@@ -24,7 +24,7 @@ use crate::loom::sync::atomic::{AtomicBool, Ordering::SeqCst};
 /// Handle to the multi thread scheduler
 pub(crate) struct Handle {
     /// The name of the runtime
-    pub(crate) name: Option<String>,
+    pub(super) name: Option<String>,
 
     /// Task spawner
     pub(super) shared: worker::Shared,
