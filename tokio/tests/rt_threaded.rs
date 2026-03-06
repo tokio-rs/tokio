@@ -861,6 +861,13 @@ fn test_tuning() {
 }
 
 #[test]
+fn default_runtime_name_should_be_none() {
+    let rt1 = runtime::Builder::new_multi_thread().build().unwrap();
+
+    assert!(rt1.handle().name().is_none());
+}
+
+#[test]
 fn different_runtime_names() {
     let rt1 = runtime::Builder::new_multi_thread()
         .name("test-runtime-1")
