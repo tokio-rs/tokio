@@ -834,6 +834,56 @@ cfg_windows! {
             self.as_inner_mut().security_qos_flags(flags);
             self
         }
+
+        /// Sets whether the file handle will prevent modification of the last
+        /// access time of the file.
+        ///
+        /// When this option is enabled and a file is opened, the system will not
+        /// update the last access time of the file when it is read from.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::fs::OpenOptions;
+        ///
+        /// # #[tokio::main]
+        /// # async fn main() -> std::io::Result<()> {
+        /// let file = OpenOptions::new()
+        ///     .read(true)
+        ///     .freeze_last_access_time(true)
+        ///     .open("foo.txt").await?;
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub fn freeze_last_access_time(&mut self, freeze: bool) -> &mut OpenOptions {
+            self.as_inner_mut().freeze_last_access_time(freeze);
+            self
+        }
+
+        /// Sets whether the file handle will prevent modification of the last
+        /// write time of the file.
+        ///
+        /// When this option is enabled and a file is opened, the system will not
+        /// update the last write time of the file when it is written to.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use tokio::fs::OpenOptions;
+        ///
+        /// # #[tokio::main]
+        /// # async fn main() -> std::io::Result<()> {
+        /// let file = OpenOptions::new()
+        ///     .write(true)
+        ///     .freeze_last_write_time(true)
+        ///     .open("foo.txt").await?;
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub fn freeze_last_write_time(&mut self, freeze: bool) -> &mut OpenOptions {
+            self.as_inner_mut().freeze_last_write_time(freeze);
+            self
+        }
     }
 }
 
