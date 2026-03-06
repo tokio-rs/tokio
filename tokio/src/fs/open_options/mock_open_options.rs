@@ -36,9 +36,4 @@ mock! {
         fn attributes(&mut self, val: u32) -> &mut Self;
         fn security_qos_flags(&mut self, flags: u32) -> &mut Self;
     }
-    #[cfg(windows)]
-    impl OpenOptions {
-        fn freeze_last_access_time(&mut self, _freeze: bool) -> &mut Self { todo!() }
-        fn freeze_last_write_time(&mut self, _freeze: bool) -> &mut Self { todo!() }
-    }
 }

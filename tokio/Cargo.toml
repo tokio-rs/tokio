@@ -141,7 +141,7 @@ tokio-stream = "0.1"
 tokio-util = { version = "0.7", features = ["rt"] }
 futures = { version = "0.3.0", features = ["async-await"] }
 futures-test = "0.3.31"
-mockall = "0.13.0"
+mockall = "0.14.0"
 async-stream = "0.3"
 futures-concurrency = "7.6.3"
 
