@@ -73,8 +73,7 @@ impl Op<Read> {
         mut buf: Vec<u8>,
         len: usize,
     ) -> Result<Vec<u8>, (OwnedFd, Vec<u8>)> {
-        // hold multiple >= batch_size length vectors of operations
-        let mut batches_of_ops = Vec::new();
+        let mut batches_of_ops = Vec::with_capacity(len / (N * MAX_READ_SIZE));
         // hold batch_size operations and reuse it
         let mut n_ops = [const { MaybeUninit::uninit() }; N];
         let mut last_len = 0;
@@ -83,7 +82,6 @@ impl Op<Read> {
         for (index, start) in (0..len).step_by(MAX_READ_SIZE).enumerate() {
             // push a chunk into the batches
             if (index + 1) % N == 0 {
-                last_len = 0;
                 // SAFETY: the index + 1 divides N so we have written N ops.
                 // We can transmute those into a array of sqe entries
                 let entries: [Entry; N] = unsafe { std::mem::transmute_copy(&n_ops) };
@@ -91,9 +89,7 @@ impl Op<Read> {
                 batches_of_ops.push(entries);
             } else {
                 let end = (start + MAX_READ_SIZE).min(len); // clamp to len for the final chunk
-                let len = last_len as u32;
-
-                last_len = end - start; // save last len for last batch
+                let len = (end - start) as u32;
 
                 n_ops[index % N].write(
                     opcode::Read::new(
@@ -107,16 +103,15 @@ impl Op<Read> {
                     .flags(Flags::IO_LINK),
                 );
             }
-        }
 
-        // total bytes we read
-        let mut read_size = 0;
+            last_len = index % N; // save last len for last batch
+        }
 
         // Handle all full batches
         for batches in batches_of_ops {
             // SAFETY: Batches are valid array entries
             let op = unsafe { Op::batch(batches, Read { fd, buf }) };
-            let (_, r_fd, r_buf) = uring_task(&mut read_size, op).await?;
+            let (_, r_fd, r_buf) = uring_task(op).await?;
 
             fd = r_fd;
             buf = r_buf;
@@ -128,24 +123,18 @@ impl Op<Read> {
             // in the array at any time. We will slice it by `last_len` to avoid
             // double counting / wrong cqe.
             let mut entries: [Entry; N] = unsafe { std::mem::transmute_copy(&n_ops) };
+
             for (i, entry) in entries.iter_mut().enumerate() {
-                if i < last_len {
+                if i > last_len {
                     *entry = opcode::Nop::new().build();
                 }
             }
 
             // SAFETY: Because of the loop above, the entries that are repeated
             // or invalided have been Nop'ed
-            let op = unsafe { Op::batch(entries, Read { fd, buf }) };
-
-            let (_, _, r_buf) = uring_task(&mut read_size, op).await?;
+            let (_, _, r_buf) = uring_task(unsafe { Op::batch(entries, Read { fd, buf }) }).await?;
 
             buf = r_buf;
-        }
-
-        // SAFETY: We have read `read_size` amount
-        unsafe {
-            buf.set_len(buf.len() + read_size);
         }
 
         Ok(buf)
@@ -153,12 +142,9 @@ impl Op<Read> {
 }
 
 // Poll the batch operation and get the Output out of it
-async fn uring_task<const N: usize>(
-    read_size: &mut usize,
-    op: Op<Read, N>,
-) -> Result<Output<N>, (OwnedFd, Vec<u8>)> {
+async fn uring_task<const N: usize>(op: Op<Read, N>) -> Result<Output<N>, (OwnedFd, Vec<u8>)> {
     // TODO: Maybe we can put this in a tokio task
-    let (res, r_fd, r_buf) = op.await;
+    let (res, r_fd, mut r_buf) = op.await;
 
     match res {
         CqeResult::Batch(cqes) => {
@@ -167,7 +153,10 @@ async fn uring_task<const N: usize>(
 
                 match cqe {
                     Ok(r_size) => {
-                        *read_size += r_size as usize;
+                        // SAFETY: We have read `r_size` amount
+                        unsafe {
+                            r_buf.set_len(r_buf.len() + r_size as usize);
+                        }
                     }
                     Err(e) => {
                         if e.kind() != ErrorKind::Interrupted {
