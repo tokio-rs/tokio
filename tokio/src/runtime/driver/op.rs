@@ -43,7 +43,7 @@ pub(crate) enum Lifecycle {
     Completed(io_uring::cqueue::Entry),
 }
 
-/// Const parameter is only used for Batch
+/// `const` parameter is only used for Batch
 pub(crate) enum State<const N: usize> {
     // Single operation state
     Initialize(Option<squeue::Entry>),
