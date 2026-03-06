@@ -860,6 +860,27 @@ fn test_tuning() {
     flag.store(false, Relaxed);
 }
 
+#[test]
+fn default_runtime_name_should_be_none() {
+    let rt1 = runtime::Builder::new_multi_thread().build().unwrap();
+
+    assert!(rt1.handle().name().is_none());
+}
+
+#[test]
+fn different_runtime_names() {
+    let rt1 = runtime::Builder::new_multi_thread()
+        .name("test-runtime-1")
+        .build()
+        .unwrap();
+    let rt2 = runtime::Builder::new_multi_thread()
+        .name("test-runtime-2")
+        .build()
+        .unwrap();
+
+    assert_ne!(rt1.handle().name().unwrap(), rt2.handle().name().unwrap());
+}
+
 fn rt() -> runtime::Runtime {
     runtime::Runtime::new().unwrap()
 }
