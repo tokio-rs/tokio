@@ -88,6 +88,7 @@ time = []
 io-uring = ["dep:io-uring", "libc", "mio/os-poll", "mio/os-ext", "dep:slab"]
 # Unstable feature. Requires `--cfg tokio_unstable` to enable.
 taskdump = ["dep:backtrace"]
+windows_freeze_file_times = []
 
 [dependencies]
 tokio-macros = { version = "~2.6.0", optional = true }
@@ -141,7 +142,7 @@ tokio-stream = "0.1"
 tokio-util = { version = "0.7", features = ["rt"] }
 futures = { version = "0.3.0", features = ["async-await"] }
 futures-test = "0.3.31"
-mockall = "0.13.0"
+mockall = "0.14.0"
 async-stream = "0.3"
 futures-concurrency = "7.6.3"
 

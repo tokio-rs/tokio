@@ -35,5 +35,10 @@ mock! {
         fn custom_flags(&mut self, flags: u32) -> &mut Self;
         fn attributes(&mut self, val: u32) -> &mut Self;
         fn security_qos_flags(&mut self, flags: u32) -> &mut Self;
+
+        #[cfg(feature = "windows_freeze_file_times")]
+        fn freeze_last_access_time(&mut self, freeze: bool) -> &mut Self;
+        #[cfg(feature = "windows_freeze_file_times")]
+        fn freeze_last_write_time(&mut self, freeze: bool) -> &mut Self;
     }
 }
