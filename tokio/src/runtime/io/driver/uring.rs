@@ -222,23 +222,25 @@ impl Handle {
     //
     // If the IO_LINK flag is not set the completions may not arrive in order
     // for ordering set the IO_LINK flag before passing the entires to this function
-    pub(crate) unsafe fn register_batch(
+    //
+    // This function returns indexes in the slab for each Entry, to ensure all entries
+    // passed are completed, check against the slab for the indexes returned.
+    pub(crate) unsafe fn register_batch<const N: usize>(
         &self,
-        entries: &mut [Entry],
+        entries: &mut [Entry; N],
         waker: Waker,
-    ) -> io::Result<Vec<usize>> {
+    ) -> io::Result<[usize; N]> {
         assert!(self.uring_probe.initialized());
 
         let mut guard = self.get_uring().lock();
         let ctx = &mut *guard;
 
-        let length = entries.len();
-        let mut indexes: Vec<usize> = Vec::with_capacity(length);
+        let mut indexes = [0; N];
 
-        for entry in entries.iter_mut() {
+        for (i, entry) in entries.iter_mut().enumerate() {
             let index = ctx.ops.insert(Lifecycle::Waiting(waker.clone()));
             entry.set_user_data(index as u64);
-            indexes.push(index);
+            indexes[i] = index;
         }
 
         let submit_or_remove = |ctx: &mut UringContext| -> io::Result<()> {

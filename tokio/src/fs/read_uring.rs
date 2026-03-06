@@ -11,6 +11,9 @@ use std::path::Path;
 const PROBE_SIZE: usize = 32;
 const PROBE_SIZE_U32: u32 = PROBE_SIZE as u32;
 
+// batch size for batched reads
+const BATCH_SIZE: usize = 128;
+
 // Max bytes we can read using io uring submission at a time
 // SAFETY: cannot be higher than u32::MAX for safe cast
 // Set to read max 64 MiB at time
@@ -38,11 +41,10 @@ pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
 
 async fn read_to_end_batch(fd: OwnedFd, buf: Vec<u8>) -> io::Result<Vec<u8>> {
     let file_len = buf.capacity();
-    let batch_size = 128;
 
     // try reading in batch if we have substantial capacity
     if file_len > MAX_READ_SIZE {
-        match Op::read_batch_size(fd, buf, file_len, batch_size).await {
+        match Op::read_batch_size::<BATCH_SIZE>(fd, buf, file_len).await {
             Ok(buf) => Ok(buf),
             Err((r_fd, mut r_buf)) => {
                 // clear the buffer before we write to it from start again
