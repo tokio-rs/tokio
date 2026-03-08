@@ -1,7 +1,7 @@
 only_if: $CIRRUS_TAG == '' && ($CIRRUS_PR != '' || $CIRRUS_BRANCH == 'master' || $CIRRUS_BRANCH =~ 'tokio-.*')
 auto_cancellation: $CIRRUS_BRANCH != 'master' && $CIRRUS_BRANCH !=~ 'tokio-.*'
 freebsd_instance:
-  image_family: freebsd-14-3
+  image_family: freebsd-15-0-amd64-ufs
 env:
   RUST_STABLE: stable
   RUST_NIGHTLY: nightly-2025-01-25
@@ -16,7 +16,6 @@ env:
 task:
   name: FreeBSD 64-bit
   setup_script:
-    - pkg upgrade -y
     - pkg install -y bash
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
@@ -43,7 +42,6 @@ task:
     RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
     RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
   setup_script:
-    - pkg upgrade -y
     - pkg install -y bash
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --profile minimal --default-toolchain $RUST_NIGHTLY
@@ -60,7 +58,6 @@ task:
 task:
   name: FreeBSD 32-bit
   setup_script:
-    - pkg upgrade -y
     - pkg install -y bash
     - curl https://sh.rustup.rs -sSf --output rustup.sh
     - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
