@@ -99,6 +99,10 @@ name = "named-pipe-multi-client"
 path = "named-pipe-multi-client.rs"
 
 [[example]]
+name = "graceful-shutdown"
+path = "graceful-shutdown.rs"
+
+[[example]]
 name = "dump"
 path = "dump.rs"
 
