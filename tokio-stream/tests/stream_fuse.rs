@@ -48,3 +48,15 @@ async fn basic_usage() {
     assert_eq!(stream.next().await, None);
     assert_eq!(stream.size_hint(), (0, Some(0)));
 }
+
+#[tokio::test]
+#[cfg(feature = "time")]
+async fn interval_stream_is_never_terminated() {
+    use futures_core::stream::FusedStream;
+    use tokio_stream::wrappers::IntervalStream;
+
+    let interval = tokio::time::interval(std::time::Duration::from_millis(1));
+    let stream = IntervalStream::new(interval);
+
+    assert!(!stream.is_terminated());
+}

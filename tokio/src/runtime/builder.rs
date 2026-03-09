@@ -288,7 +288,7 @@ impl Builder {
             max_blocking_threads: 512,
 
             // Default thread name
-            thread_name: std::sync::Arc::new(|| "tokio-runtime-worker".into()),
+            thread_name: std::sync::Arc::new(|| "tokio-rt-worker".into()),
 
             // Do not set a stack size by default
             thread_stack_size: None,
@@ -516,7 +516,7 @@ impl Builder {
 
     /// Sets name of threads spawned by the `Runtime`'s thread pool.
     ///
-    /// The default name is "tokio-runtime-worker".
+    /// The default name is "tokio-rt-worker".
     ///
     /// # Examples
     ///
@@ -540,7 +540,7 @@ impl Builder {
 
     /// Sets a function used to generate the name of threads spawned by the `Runtime`'s thread pool.
     ///
-    /// The default name fn is `|| "tokio-runtime-worker".into()`.
+    /// The default name fn is `|| "tokio-rt-worker".into()`.
     ///
     /// # Examples
     ///
@@ -1116,7 +1116,7 @@ impl Builder {
     /// Setting the event interval determines the effective "priority" of delivering
     /// these external events (which may wake up additional tasks), compared to
     /// executing tasks that are currently ready to run. A smaller value is useful
-    /// when tasks frequently spend a long time in polling, or frequently yield,
+    /// when tasks frequently spend a long time in polling, or infrequently yield,
     /// which can result in overly long delays picking up I/O events. Conversely,
     /// picking up new events requires extra synchronization and syscall overhead,
     /// so if tasks generally complete their polling quickly, a higher event interval

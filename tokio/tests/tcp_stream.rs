@@ -25,6 +25,9 @@ async fn set_linger() {
     assert_ok!(stream.set_linger(Some(Duration::from_secs(1))));
     assert_eq!(stream.linger().unwrap().unwrap().as_secs(), 1);
 
+    assert_ok!(stream.set_zero_linger());
+    assert_eq!(stream.linger().unwrap().unwrap().as_secs(), 0);
+
     assert_ok!(stream.set_linger(None));
     assert!(stream.linger().unwrap().is_none());
 }

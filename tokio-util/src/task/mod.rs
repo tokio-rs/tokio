@@ -12,7 +12,7 @@ cfg_rt! {
     pub use task_tracker::TaskTracker;
 
     mod abort_on_drop;
-    pub use abort_on_drop::AbortOnDropHandle;
+    pub use abort_on_drop::{AbortOnDrop, AbortOnDropHandle};
 
     mod join_queue;
     pub use join_queue::JoinQueue;

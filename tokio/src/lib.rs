@@ -320,7 +320,7 @@
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all features listed below except `test-util` and `tracing`.
+//! - `full`: Enables all features listed below except `test-util` and unstable features.
 //! - `rt`: Enables `tokio::spawn`, the current-thread scheduler,
 //!   and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
@@ -330,7 +330,7 @@
 //!   `UdpSocket`, as well as (on Unix-like systems) `AsyncFd` and (on
 //!   FreeBSD) `PollAio`.
 //! - `time`: Enables `tokio::time` types and allows the schedulers to enable
-//!   the built in timer.
+//!   the built-in timer.
 //! - `process`: Enables `tokio::process` types.
 //! - `macros`: Enables `#[tokio::main]` and `#[tokio::test]` macros.
 //! - `sync`: Enables all `tokio::sync` types.
@@ -351,16 +351,10 @@
 //! Some feature flags are only available when specifying the `tokio_unstable` flag:
 //!
 //! - `tracing`: Enables tracing events.
+//! - `io-uring`: Enables `io-uring` (Linux only).
+//! - `taskdump`: Enables `taskdump` (Linux only).
 //!
-//! Likewise, some parts of the API are only available with the same flag:
-//!
-//! - [`task::Builder`]
-//! - Some methods on [`task::JoinSet`]
-//! - [`runtime::RuntimeMetrics`]
-//! - [`runtime::Builder::on_task_spawn`]
-//! - [`runtime::Builder::on_task_terminate`]
-//! - [`runtime::Builder::unhandled_panic`]
-//! - [`runtime::TaskMeta`]
+//! Likewise, this flag enables access to unstable APIs.
 //!
 //! This flag enables **unstable** features. The public API of these features
 //! may break in 1.x releases. To enable these features, the `--cfg
@@ -555,6 +549,11 @@ cfg_not_sync! {
     mod sync;
 }
 
+// Currently, task module does not expose any public API outside `rt`
+// feature, so we mark it in the docs. This happens only to docs to
+// avoid introducing breaking changes by restricting the visibility
+// of the task module.
+#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub mod task;
 cfg_rt! {
     pub use task::spawn;
@@ -565,10 +564,6 @@ cfg_time! {
 }
 
 mod trace {
-    use std::future::Future;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-
     cfg_taskdump! {
         pub(crate) use crate::runtime::task::trace::trace_leaf;
     }
@@ -582,19 +577,8 @@ mod trace {
     }
 
     #[cfg_attr(not(feature = "sync"), allow(dead_code))]
-    pub(crate) fn async_trace_leaf() -> impl Future<Output = ()> {
-        struct Trace;
-
-        impl Future for Trace {
-            type Output = ();
-
-            #[inline(always)]
-            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-                trace_leaf(cx)
-            }
-        }
-
-        Trace
+    pub(crate) async fn async_trace_leaf() {
+        std::future::poll_fn(trace_leaf).await
     }
 }
 

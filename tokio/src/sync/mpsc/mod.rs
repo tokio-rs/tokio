@@ -29,7 +29,9 @@
 //!
 //! When all [`Sender`] handles have been dropped, it is no longer
 //! possible to send values into the channel. This is considered the termination
-//! event of the stream. As such, `Receiver::poll` returns `Ok(Ready(None))`.
+//! event of the stream. Once all senders have been dropped and any remaining
+//! buffered values have been received, `Receiver::recv` returns `None`
+//! (and `Receiver::poll_recv` returns `Poll::Ready(None)`).
 //!
 //! If the [`Receiver`] handle is dropped, then messages can no longer
 //! be read out of the channel. In this case, all further attempts to send will

@@ -62,7 +62,6 @@ async fn bind_before_connect() {
 }
 
 #[tokio::test]
-#[expect(deprecated)] // set_linger is deprecated
 async fn basic_linger() {
     // Create server
     let addr = assert_ok!("127.0.0.1:0".parse());
@@ -71,7 +70,7 @@ async fn basic_linger() {
 
     assert!(srv.linger().unwrap().is_none());
 
-    srv.set_linger(Some(Duration::new(0, 0))).unwrap();
+    srv.set_zero_linger().unwrap();
     assert_eq!(srv.linger().unwrap(), Some(Duration::new(0, 0)));
 }
 
@@ -124,10 +123,10 @@ const SET_BUF_SIZE: u32 = 4096;
 // Linux doubles the buffer size for kernel usage, and exposes that when
 // retrieving the buffer size.
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 const GET_BUF_SIZE: u32 = SET_BUF_SIZE;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 const GET_BUF_SIZE: u32 = 2 * SET_BUF_SIZE;
 
 test!(keepalive, set_keepalive(true));

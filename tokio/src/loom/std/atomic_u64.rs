@@ -16,4 +16,4 @@ cfg_not_has_atomic_u64! {
     mod imp;
 }
 
-pub(crate) use imp::{AtomicU64, StaticAtomicU64};
+pub(crate) use imp::AtomicU64;
