@@ -19,10 +19,15 @@ mock! {
         pub fn read(&mut self, read: bool) -> &mut Self;
         pub fn truncate(&mut self, truncate: bool) -> &mut Self;
         pub fn write(&mut self, write: bool) -> &mut Self;
+        #[cfg(windows)]
         pub fn access_mode(&mut self, access: u32) -> &mut Self;
+        #[cfg(windows)]
         pub fn share_mode(&mut self, val: u32) -> &mut Self;
+        #[cfg(windows)]
         pub fn custom_flags(&mut self, flags: u32) -> &mut Self;
+        #[cfg(windows)]
         pub fn attributes(&mut self, val: u32) -> &mut Self;
+        #[cfg(windows)]
         pub fn security_qos_flags(&mut self, flags: u32) -> &mut Self;
     }
     impl Clone for OpenOptions {
