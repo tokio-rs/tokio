@@ -12,12 +12,12 @@ const PROBE_SIZE: usize = 32;
 const PROBE_SIZE_U32: u32 = PROBE_SIZE as u32;
 
 // batch size for batched reads
-const BATCH_SIZE: usize = 128;
+const BATCH_SIZE: usize = 200;
 
 // Max bytes we can read using io uring submission at a time
 // SAFETY: cannot be higher than u32::MAX for safe cast
 // Set to read max 64 MiB at time
-pub(crate) const MAX_READ_SIZE: usize = 64 * 1024 * 1024;
+pub(crate) const MAX_READ_SIZE: usize = 64 * 1024;
 
 pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
     let file = OpenOptions::new().read(true).open(path).await?;
@@ -40,11 +40,9 @@ pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
 }
 
 async fn read_to_end_batch(fd: OwnedFd, buf: Vec<u8>) -> io::Result<Vec<u8>> {
-    let file_len = buf.capacity();
-
     // try reading in batch if we have substantial capacity
-    if file_len > MAX_READ_SIZE {
-        match Op::read_batch_size::<BATCH_SIZE>(fd, buf, file_len).await {
+    if buf.capacity() > MAX_READ_SIZE {
+        match Op::read_batch_size::<BATCH_SIZE>(fd, buf).await {
             Ok(buf) => Ok(buf),
             Err((r_fd, mut r_buf)) => {
                 // clear the buffer before we write to it from start again
