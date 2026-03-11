@@ -6,7 +6,7 @@ use core::mem;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
 use pin_project_lite::pin_project;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 // Do not export this struct until `FromStream` can be unsealed.
 pin_project! {
@@ -151,6 +151,25 @@ impl<T: Ord> sealed::FromStreamPriv<T> for BTreeSet<T> {
     }
 
     fn finalize(_: sealed::Internal, collection: &mut BTreeSet<T>) -> BTreeSet<T> {
+        mem::take(collection)
+    }
+}
+
+impl<K: Ord, V> FromStream<(K, V)> for BTreeMap<K, V> {}
+
+impl<K: Ord, V> sealed::FromStreamPriv<(K, V)> for BTreeMap<K, V> {
+    type InternalCollection = BTreeMap<K, V>;
+
+    fn initialize(_: sealed::Internal, _lower: usize, _upper: Option<usize>) -> BTreeMap<K, V> {
+        BTreeMap::new()
+    }
+
+    fn extend(_: sealed::Internal, collection: &mut BTreeMap<K, V>, (key, value): (K, V)) -> bool {
+        collection.insert(key, value);
+        true
+    }
+
+    fn finalize(_: sealed::Internal, collection: &mut BTreeMap<K, V>) -> BTreeMap<K, V> {
         mem::take(collection)
     }
 }

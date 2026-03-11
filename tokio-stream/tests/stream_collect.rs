@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use tokio_stream::{self as stream, StreamExt};
 use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task};
@@ -82,6 +82,27 @@ async fn collect_btreeset_items() {
     assert!(fut.is_woken());
     let coll = assert_ready!(fut.poll());
     assert_eq!(BTreeSet::from([1, 2]), coll);
+}
+
+#[tokio::test]
+async fn collect_btreemap_items() {
+    let (tx, rx) = mpsc::unbounded_channel_stream();
+    let mut fut = task::spawn(rx.collect::<BTreeMap<i32, i32>>());
+
+    assert_pending!(fut.poll());
+
+    tx.send((3, 4)).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    tx.send((1, 2)).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    drop(tx);
+    assert!(fut.is_woken());
+    let coll = assert_ready!(fut.poll());
+    assert_eq!(BTreeMap::from([(1, 2), (3, 4)]), coll);
 }
 
 #[tokio::test]
