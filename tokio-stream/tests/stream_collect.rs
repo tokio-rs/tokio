@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use tokio_stream::{self as stream, StreamExt};
 use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task};
@@ -124,6 +124,27 @@ async fn collect_hashset_items() {
     assert!(fut.is_woken());
     let coll = assert_ready!(fut.poll());
     assert_eq!(HashSet::from([1, 2]), coll);
+}
+
+#[tokio::test]
+async fn collect_hashmap_items() {
+    let (tx, rx) = mpsc::unbounded_channel_stream();
+    let mut fut = task::spawn(rx.collect::<HashMap<i32, i32>>());
+
+    assert_pending!(fut.poll());
+
+    tx.send((1, 2)).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    tx.send((3, 4)).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    drop(tx);
+    assert!(fut.is_woken());
+    let coll = assert_ready!(fut.poll());
+    assert_eq!(HashMap::from([(1, 2), (3, 4)]), coll);
 }
 
 #[tokio::test]

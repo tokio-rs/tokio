@@ -6,7 +6,7 @@ use core::mem;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
 use pin_project_lite::pin_project;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::Hash;
 
 // Do not export this struct until `FromStream` can be unsealed.
@@ -190,6 +190,25 @@ impl<T: Eq + Hash> sealed::FromStreamPriv<T> for HashSet<T> {
     }
 
     fn finalize(_: sealed::Internal, collection: &mut HashSet<T>) -> HashSet<T> {
+        mem::take(collection)
+    }
+}
+
+impl<K: Eq + Hash, V> FromStream<(K, V)> for HashMap<K, V> {}
+
+impl<K: Eq + Hash, V> sealed::FromStreamPriv<(K, V)> for HashMap<K, V> {
+    type InternalCollection = HashMap<K, V>;
+
+    fn initialize(_: sealed::Internal, lower: usize, _upper: Option<usize>) -> HashMap<K, V> {
+        HashMap::with_capacity(lower)
+    }
+
+    fn extend(_: sealed::Internal, collection: &mut HashMap<K, V>, (key, value): (K, V)) -> bool {
+        collection.insert(key, value);
+        true
+    }
+
+    fn finalize(_: sealed::Internal, collection: &mut HashMap<K, V>) -> HashMap<K, V> {
         mem::take(collection)
     }
 }
