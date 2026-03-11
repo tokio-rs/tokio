@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
 
 use tokio_stream::{self as stream, StreamExt};
 use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task};
@@ -82,6 +82,27 @@ async fn collect_vecdeque_items() {
     assert!(fut.is_woken());
     let coll = assert_ready!(fut.poll());
     assert_eq!(VecDeque::from([1, 2]), coll);
+}
+
+#[tokio::test]
+async fn collect_linkedlist_items() {
+    let (tx, rx) = mpsc::unbounded_channel_stream();
+    let mut fut = task::spawn(rx.collect::<LinkedList<i32>>());
+
+    assert_pending!(fut.poll());
+
+    tx.send(1).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    tx.send(2).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    drop(tx);
+    assert!(fut.is_woken());
+    let coll = assert_ready!(fut.poll());
+    assert_eq!(LinkedList::from([1, 2]), coll);
 }
 
 #[tokio::test]
