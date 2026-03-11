@@ -243,6 +243,13 @@ pub struct Sender<T> {
 ///
 /// [`Future`]: trait@std::future::Future
 ///
+/// # Cancellation safety
+///
+/// The `Receiver` is cancel safe. If it is used as the event in a
+/// [`tokio::select!`](crate::select) statement and some other branch
+/// completes first, it is guaranteed that no message was received on this
+/// channel.
+///
 /// # Examples
 ///
 /// ```
@@ -404,31 +411,51 @@ struct Inner<T> {
 struct Task(UnsafeCell<MaybeUninit<Waker>>);
 
 impl Task {
+    /// # Safety
+    ///
+    /// The caller must do the necessary synchronization to ensure that
+    /// the [`Self::0`] contains the valid [`Waker`] during the call.
     unsafe fn will_wake(&self, cx: &mut Context<'_>) -> bool {
-        self.with_task(|w| w.will_wake(cx.waker()))
+        unsafe { self.with_task(|w| w.will_wake(cx.waker())) }
     }
 
+    /// # Safety
+    ///
+    /// The caller must do the necessary synchronization to ensure that
+    /// the [`Self::0`] contains the valid [`Waker`] during the call.
     unsafe fn with_task<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&Waker) -> R,
     {
         self.0.with(|ptr| {
-            let waker: *const Waker = (*ptr).as_ptr();
-            f(&*waker)
+            let waker: *const Waker = unsafe { (*ptr).as_ptr() };
+            f(unsafe { &*waker })
         })
     }
 
+    /// # Safety
+    ///
+    /// The caller must do the necessary synchronization to ensure that
+    /// the [`Self::0`] contains the valid [`Waker`] during the call.
     unsafe fn drop_task(&self) {
         self.0.with_mut(|ptr| {
-            let ptr: *mut Waker = (*ptr).as_mut_ptr();
-            ptr.drop_in_place();
+            let ptr: *mut Waker = unsafe { (*ptr).as_mut_ptr() };
+            unsafe {
+                ptr.drop_in_place();
+            }
         });
     }
 
+    /// # Safety
+    ///
+    /// The caller must do the necessary synchronization to ensure that
+    /// the [`Self::0`] contains the valid [`Waker`] during the call.
     unsafe fn set_task(&self, cx: &mut Context<'_>) {
         self.0.with_mut(|ptr| {
-            let ptr: *mut Waker = (*ptr).as_mut_ptr();
-            ptr.write(cx.waker().clone());
+            let ptr: *mut Waker = unsafe { (*ptr).as_mut_ptr() };
+            unsafe {
+                ptr.write(cx.waker().clone());
+            }
         });
     }
 }
@@ -1364,6 +1391,19 @@ impl<T> Inner<T> {
             }
         }
 
+        if prev.is_rx_task_set() && !prev.is_complete() {
+            State::unset_rx_task(&self.state);
+            // SAFETY: The sender only accesses `rx_task` (via
+            // `wake_by_ref`) in `complete()` after successfully setting
+            // `VALUE_SENT`. But `set_complete` will not set `VALUE_SENT`
+            // if `CLOSED` is already set (its CAS loop breaks early).
+            // Since `prev` shows that `VALUE_SENT` was not set before we
+            // set `CLOSED`, the sender can no longer set `VALUE_SENT` and
+            // will never access `rx_task`. Therefore, we have exclusive
+            // access here.
+            unsafe { self.rx_task.drop_task() };
+        }
+
         prev
     }
 
@@ -1377,7 +1417,7 @@ impl<T> Inner<T> {
     /// If `VALUE_SENT` is not set, then only the sender may call this method;
     /// if it is set, then only the receiver may call this method.
     unsafe fn consume_value(&self) -> Option<T> {
-        self.value.with_mut(|ptr| (*ptr).take())
+        self.value.with_mut(|ptr| unsafe { (*ptr).take() })
     }
 
     /// Returns true if there is a value. This function does not check `state`.
@@ -1390,7 +1430,7 @@ impl<T> Inner<T> {
     /// If `VALUE_SENT` is not set, then only the sender may call this method;
     /// if it is set, then only the receiver may call this method.
     unsafe fn has_value(&self) -> bool {
-        self.value.with(|ptr| (*ptr).is_some())
+        self.value.with(|ptr| unsafe { (*ptr).is_some() })
     }
 }
 

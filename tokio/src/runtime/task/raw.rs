@@ -1,3 +1,12 @@
+// It doesn't make sense to enforce `unsafe_op_in_unsafe_fn` for this module because
+//
+// * This module is doing the low-level task management that requires tons of unsafe
+//   operations.
+// * Excessive `unsafe {}` blocks hurt readability significantly.
+// TODO: replace with `#[expect(unsafe_op_in_unsafe_fn)]` after bumpping
+// the MSRV to 1.81.0.
+#![allow(unsafe_op_in_unsafe_fn)]
+
 use crate::future::Future;
 use crate::runtime::task::core::{Core, Trailer};
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
@@ -222,6 +231,9 @@ impl RawTask {
         RawTask { ptr }
     }
 
+    /// # Safety
+    ///
+    /// `ptr` must be a valid pointer to a [`Header`].
     pub(super) unsafe fn from_raw(ptr: NonNull<Header>) -> RawTask {
         RawTask { ptr }
     }
@@ -269,9 +281,9 @@ impl RawTask {
 
     /// Safety: `dst` must be a `*mut Poll<super::Result<T::Output>>` where `T`
     /// is the future stored by the task.
-    pub(super) unsafe fn try_read_output(self, dst: *mut (), waker: &Waker) {
+    pub(super) unsafe fn try_read_output<O>(self, dst: *mut Poll<super::Result<O>>, waker: &Waker) {
         let vtable = self.header().vtable;
-        (vtable.try_read_output)(self.ptr, dst, waker);
+        (vtable.try_read_output)(self.ptr, dst as *mut _, waker);
     }
 
     pub(super) fn drop_join_handle_slow(self) {

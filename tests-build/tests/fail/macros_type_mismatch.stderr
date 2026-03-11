@@ -1,3 +1,14 @@
+error[E0271]: expected `{async block@$DIR/tests/fail/macros_type_mismatch.rs:3:1: 3:15}` to be a future that resolves to `()`, but it resolves to `Result<(), _>`
+ --> tests/fail/macros_type_mismatch.rs:3:1
+  |
+3 | #[tokio::main]
+  | ^^^^^^^^^^^^^^ expected `()`, found `Result<(), _>`
+  |
+  = note: expected unit type `()`
+                  found enum `Result<(), _>`
+  = note: required for the cast from `&{async block@$DIR/tests/fail/macros_type_mismatch.rs:3:1: 3:15}` to `&dyn Future<Output = ()>`
+  = note: this error originates in the attribute macro `tokio::main` (in Nightly builds, run with -Z macro-backtrace for more info)
+
 error[E0308]: mismatched types
  --> tests/fail/macros_type_mismatch.rs:5:5
   |
@@ -15,6 +26,17 @@ help: consider using `Result::expect` to unwrap the `Result<(), _>` value, panic
 5 |     Ok(()).expect("REASON")
   |           +++++++++++++++++
 
+error[E0271]: expected `{async block@$DIR/tests/fail/macros_type_mismatch.rs:8:1: 8:15}` to be a future that resolves to `()`, but it resolves to `Result<(), _>`
+ --> tests/fail/macros_type_mismatch.rs:8:1
+  |
+8 | #[tokio::main]
+  | ^^^^^^^^^^^^^^ expected `()`, found `Result<(), _>`
+  |
+  = note: expected unit type `()`
+                  found enum `Result<(), _>`
+  = note: required for the cast from `&{async block@$DIR/tests/fail/macros_type_mismatch.rs:8:1: 8:15}` to `&dyn Future<Output = ()>`
+  = note: this error originates in the attribute macro `tokio::main` (in Nightly builds, run with -Z macro-backtrace for more info)
+
 error[E0308]: mismatched types
   --> tests/fail/macros_type_mismatch.rs:10:5
    |
@@ -31,6 +53,17 @@ help: consider using `Result::expect` to unwrap the `Result<(), _>` value, panic
    |
 10 |     return Ok(());.expect("REASON")
    |                   +++++++++++++++++
+
+error[E0271]: expected `{async block@$DIR/tests/fail/macros_type_mismatch.rs:13:1: 13:15}` to be a future that resolves to `Result<(), ()>`, but it resolves to `()`
+  --> tests/fail/macros_type_mismatch.rs:13:1
+   |
+13 | #[tokio::main]
+   | ^^^^^^^^^^^^^^ expected `Result<(), ()>`, found `()`
+   |
+   = note:   expected enum `Result<(), ()>`
+           found unit type `()`
+   = note: required for the cast from `&{async block@$DIR/tests/fail/macros_type_mismatch.rs:13:1: 13:15}` to `&dyn Future<Output = Result<(), ()>>`
+   = note: this error originates in the attribute macro `tokio::main` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0308]: mismatched types
   --> tests/fail/macros_type_mismatch.rs:23:5
@@ -57,6 +90,17 @@ error[E0277]: the `?` operator can only be used in an async block that returns `
 39 | async fn question_mark_operator_with_invalid_option() -> Option<()> {
 40 |     None?;
    |         ^ cannot use the `?` operator in an async block that returns `()`
+
+error[E0271]: expected `{async block@$DIR/tests/fail/macros_type_mismatch.rs:38:1: 38:15}` to be a future that resolves to `Option<()>`, but it resolves to `()`
+  --> tests/fail/macros_type_mismatch.rs:38:1
+   |
+38 | #[tokio::main]
+   | ^^^^^^^^^^^^^^ expected `Option<()>`, found `()`
+   |
+   = note:   expected enum `Option<()>`
+           found unit type `()`
+   = note: required for the cast from `&{async block@$DIR/tests/fail/macros_type_mismatch.rs:38:1: 38:15}` to `&dyn Future<Output = Option<()>>`
+   = note: this error originates in the attribute macro `tokio::main` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0308]: mismatched types
   --> tests/fail/macros_type_mismatch.rs:40:5
@@ -86,6 +130,17 @@ error[E0277]: the `?` operator can only be used in an async block that returns `
 57 |     Ok(())?;
    |           ^ cannot use the `?` operator in an async block that returns `()`
 
+error[E0271]: expected `{async block@$DIR/tests/fail/macros_type_mismatch.rs:55:1: 55:15}` to be a future that resolves to `Result<(), ()>`, but it resolves to `()`
+  --> tests/fail/macros_type_mismatch.rs:55:1
+   |
+55 | #[tokio::main]
+   | ^^^^^^^^^^^^^^ expected `Result<(), ()>`, found `()`
+   |
+   = note:   expected enum `Result<(), ()>`
+           found unit type `()`
+   = note: required for the cast from `&{async block@$DIR/tests/fail/macros_type_mismatch.rs:55:1: 55:15}` to `&dyn Future<Output = Result<(), ()>>`
+   = note: this error originates in the attribute macro `tokio::main` (in Nightly builds, run with -Z macro-backtrace for more info)
+
 error[E0308]: mismatched types
   --> tests/fail/macros_type_mismatch.rs:57:5
    |
@@ -101,6 +156,15 @@ help: try adding an expression at the end of the block
 57 ~     Ok(())?;;
 58 +     Ok(())
    |
+
+error[E0271]: expected `{async block@$DIR/tests/fail/macros_type_mismatch.rs:63:1: 63:15}` to be a future that resolves to `()`, but it resolves to `{integer}`
+  --> tests/fail/macros_type_mismatch.rs:63:1
+   |
+63 | #[tokio::main]
+   | ^^^^^^^^^^^^^^ expected `()`, found integer
+   |
+   = note: required for the cast from `&{async block@$DIR/tests/fail/macros_type_mismatch.rs:63:1: 63:15}` to `&dyn Future<Output = ()>`
+   = note: this error originates in the attribute macro `tokio::main` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0308]: mismatched types
   --> tests/fail/macros_type_mismatch.rs:66:5

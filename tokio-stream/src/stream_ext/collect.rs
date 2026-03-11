@@ -1,25 +1,24 @@
 use crate::Stream;
 
 use core::future::Future;
-use core::marker::PhantomPinned;
+use core::marker::{PhantomData, PhantomPinned};
 use core::mem;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
 use pin_project_lite::pin_project;
+use std::collections::BTreeSet;
 
 // Do not export this struct until `FromStream` can be unsealed.
 pin_project! {
     /// Future returned by the [`collect`](super::StreamExt::collect) method.
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     #[derive(Debug)]
-    pub struct Collect<T, U>
-    where
-        T: Stream,
-        U: FromStream<T::Item>,
+    pub struct Collect<T, U, C>
     {
         #[pin]
         stream: T,
-        collection: U::InternalCollection,
+        collection: C,
+        _output: PhantomData<U>,
         // Make this future `!Unpin` for compatibility with async trait methods.
         #[pin]
         _pin: PhantomPinned,
@@ -38,24 +37,25 @@ pin_project! {
 /// enhancements to the Rust language.
 pub trait FromStream<T>: sealed::FromStreamPriv<T> {}
 
-impl<T, U> Collect<T, U>
+impl<T, U> Collect<T, U, U::InternalCollection>
 where
     T: Stream,
     U: FromStream<T::Item>,
 {
-    pub(super) fn new(stream: T) -> Collect<T, U> {
+    pub(super) fn new(stream: T) -> Collect<T, U, U::InternalCollection> {
         let (lower, upper) = stream.size_hint();
         let collection = U::initialize(sealed::Internal, lower, upper);
 
         Collect {
             stream,
             collection,
+            _output: PhantomData,
             _pin: PhantomPinned,
         }
     }
 }
 
-impl<T, U> Future for Collect<T, U>
+impl<T, U> Future for Collect<T, U, U::InternalCollection>
 where
     T: Stream,
     U: FromStream<T::Item>,
@@ -132,6 +132,25 @@ impl<T> sealed::FromStreamPriv<T> for Vec<T> {
     }
 
     fn finalize(_: sealed::Internal, collection: &mut Vec<T>) -> Vec<T> {
+        mem::take(collection)
+    }
+}
+
+impl<T: Ord> FromStream<T> for BTreeSet<T> {}
+
+impl<T: Ord> sealed::FromStreamPriv<T> for BTreeSet<T> {
+    type InternalCollection = BTreeSet<T>;
+
+    fn initialize(_: sealed::Internal, _lower: usize, _upper: Option<usize>) -> BTreeSet<T> {
+        BTreeSet::new()
+    }
+
+    fn extend(_: sealed::Internal, collection: &mut BTreeSet<T>, item: T) -> bool {
+        collection.insert(item);
+        true
+    }
+
+    fn finalize(_: sealed::Internal, collection: &mut BTreeSet<T>) -> BTreeSet<T> {
         mem::take(collection)
     }
 }

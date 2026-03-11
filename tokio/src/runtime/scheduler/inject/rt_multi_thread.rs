@@ -55,13 +55,21 @@ impl<T: 'static> Shared<T> {
 
         // Now that the tasks are linked together, insert them into the
         // linked list.
-        self.push_batch_inner(shared, first, prev, counter);
+        //
+        // Safety: exactly the same safety requirements as `push_batch` method.
+        unsafe {
+            self.push_batch_inner(shared, first, prev, counter);
+        }
     }
 
     /// Inserts several tasks that have been linked together into the queue.
     ///
     /// The provided head and tail may be the same task. In this case, a
     /// single task is inserted.
+    ///
+    /// # Safety
+    ///
+    /// Must be called with the same `Synced` instance returned by `Inject::new`
     #[inline]
     unsafe fn push_batch_inner<L>(
         &self,
@@ -82,7 +90,8 @@ impl<T: 'static> Shared<T> {
             let mut curr = Some(batch_head);
 
             while let Some(task) = curr {
-                curr = task.get_queue_next();
+                // Safety: exactly the same safety requirements as `push_batch_inner`.
+                curr = unsafe { task.get_queue_next() };
 
                 let _ = unsafe { task::Notified::<T>::from_raw(task) };
             }
@@ -106,7 +115,7 @@ impl<T: 'static> Shared<T> {
         //
         // safety: All updates to the len atomic are guarded by the mutex. As
         // such, a non-atomic load followed by a store is safe.
-        let len = self.len.unsync_load();
+        let len = unsafe { self.len.unsync_load() };
 
         self.len.store(len + num, Release);
     }

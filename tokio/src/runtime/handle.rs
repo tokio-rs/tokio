@@ -1,4 +1,3 @@
-#[cfg(tokio_unstable)]
 use crate::runtime;
 use crate::runtime::{context, scheduler, RuntimeFlavor, RuntimeMetrics};
 
@@ -167,11 +166,12 @@ impl Handle {
     ///
     /// The provided future will start running in the background immediately
     /// when `spawn` is called, even if you don't await the returned
-    /// `JoinHandle`.
+    /// `JoinHandle` (assuming that the runtime [is running][running-runtime]).
     ///
     /// See [module level][mod] documentation for more details.
     ///
     /// [mod]: index.html
+    /// [running-runtime]: index.html#driving-the-runtime
     ///
     /// # Examples
     ///
@@ -392,6 +392,10 @@ impl Handle {
 
     #[track_caller]
     #[allow(dead_code)]
+    /// # Safety
+    ///
+    /// This must only be called in `LocalRuntime` if the runtime has been verified to be owned
+    /// by the current thread.
     pub(crate) unsafe fn spawn_local_named<F>(
         &self,
         future: F,
@@ -412,7 +416,7 @@ impl Handle {
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", meta, id.as_u64());
-        self.inner.spawn_local(future, id, meta.spawned_at)
+        unsafe { self.inner.spawn_local(future, id, meta.spawned_at) }
     }
 
     /// Returns the flavor of the current `Runtime`.
@@ -447,34 +451,27 @@ impl Handle {
         }
     }
 
-    cfg_unstable! {
-        /// Returns the [`Id`] of the current `Runtime`.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::Handle;
-        ///
-        /// #[tokio::main(flavor = "current_thread")]
-        /// async fn main() {
-        ///   println!("Current runtime id: {}", Handle::current().id());
-        /// }
-        /// ```
-        ///
-        /// **Note**: This is an [unstable API][unstable]. The public API of this type
-        /// may break in 1.x releases. See [the documentation on unstable
-        /// features][unstable] for details.
-        ///
-        /// [unstable]: crate#unstable-features
-        /// [`Id`]: struct@crate::runtime::Id
-        pub fn id(&self) -> runtime::Id {
-            let owned_id = match &self.inner {
-                scheduler::Handle::CurrentThread(handle) => handle.owned_id(),
-                #[cfg(feature = "rt-multi-thread")]
-                scheduler::Handle::MultiThread(handle) => handle.owned_id(),
-            };
-            owned_id.into()
-        }
+    /// Returns the [`Id`] of the current `Runtime`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main(flavor = "current_thread")]
+    /// async fn main() {
+    ///   println!("Current runtime id: {}", Handle::current().id());
+    /// }
+    /// ```
+    ///
+    /// [`Id`]: struct@crate::runtime::Id
+    pub fn id(&self) -> runtime::Id {
+        let owned_id = match &self.inner {
+            scheduler::Handle::CurrentThread(handle) => handle.owned_id(),
+            #[cfg(feature = "rt-multi-thread")]
+            scheduler::Handle::MultiThread(handle) => handle.owned_id(),
+        };
+        runtime::Id::new(owned_id)
     }
 
     /// Returns a view that lets you get information about how the runtime
@@ -564,7 +561,7 @@ cfg_taskdump! {
         /// You can do this by setting the `RUSTFLAGS` environment variable
         /// before invoking `cargo`; e.g.:
         /// ```bash
-        /// RUSTFLAGS="--cfg tokio_unstable cargo run --example dump
+        /// RUSTFLAGS="--cfg tokio_unstable" cargo run --example dump
         /// ```
         ///
         /// Or by [configuring][cargo-config] `rustflags` in

@@ -205,6 +205,25 @@
 //! This is done with [`Builder::enable_io`] and [`Builder::enable_time`]. As a
 //! shorthand, [`Builder::enable_all`] enables both resource drivers.
 //!
+//! ## Driving the runtime
+//!
+//! A Tokio runtime can only execute tasks if the runtime is running. Normally
+//! this is not an issue as the default configuration of a runtime is always running,
+//! but alternate configurations such as the current-thread runtime require that
+//! [`Runtime::block_on`] is called.
+//!
+//! - A multi-threaded runtime is always running because it spawns its own worker
+//!   threads.
+//! - A current-thread runtime does not spawn any worker threads, so it can only
+//!   execute tasks when you provide a thread by calling [`Runtime::block_on`].
+//! - A [`LocalSet`](crate::task::LocalSet) only executes local tasks spawned on
+//!   it when the `LocalSet` is `.awaited` or otherwise driven using one of its
+//!   methods for this purpose.
+//!
+//! Please be aware that [`Handle::block_on`] does not drive the runtime.
+//! There must be at least one call to [`Runtime::block_on`] when using the current
+//! thread runtime. [`Handle::block_on`] is not enough.
+//!
 //! ## Lifetime of spawned threads
 //!
 //! The runtime may spawn threads depending on its configuration and usage. The
@@ -389,8 +408,135 @@ cfg_process_driver! {
     mod process;
 }
 
+#[cfg_attr(not(feature = "time"), allow(dead_code))]
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) enum TimerFlavor {
+    Traditional,
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    Alternative,
+}
+
 cfg_time! {
     pub(crate) mod time;
+
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    pub(crate) mod time_alt;
+
+    use std::task::{Context, Poll};
+    use std::pin::Pin;
+
+    #[derive(Debug)]
+    pub(crate) enum Timer {
+        Traditional(time::TimerEntry),
+
+        #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+        Alternative(time_alt::Timer),
+    }
+
+    impl Timer {
+        #[track_caller]
+        pub(crate) fn new(
+            handle: crate::runtime::scheduler::Handle,
+            deadline: crate::time::Instant,
+        ) -> Self {
+            match handle.timer_flavor() {
+                crate::runtime::TimerFlavor::Traditional => {
+                    Timer::Traditional(time::TimerEntry::new(handle, deadline))
+                }
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                crate::runtime::TimerFlavor::Alternative => {
+                    Timer::Alternative(time_alt::Timer::new(handle, deadline))
+                }
+            }
+        }
+
+        pub(crate) fn deadline(&self) -> crate::time::Instant {
+            match self {
+                Timer::Traditional(entry) => entry.deadline(),
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Timer::Alternative(entry) => entry.deadline(),
+            }
+        }
+
+        pub(crate) fn is_elapsed(&self) -> bool {
+            match self {
+                Timer::Traditional(entry) => entry.is_elapsed(),
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Timer::Alternative(entry) => entry.is_elapsed(),
+            }
+        }
+
+        pub(crate) fn flavor(self: Pin<&Self>) -> TimerFlavor {
+            match self.get_ref() {
+                Timer::Traditional(_) => TimerFlavor::Traditional,
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Timer::Alternative(_) => TimerFlavor::Alternative,
+            }
+        }
+
+        pub(crate) fn reset(
+            self: Pin<&mut Self>,
+            new_time: crate::time::Instant,
+            reregister: bool
+        ) {
+            // Safety: we never move the inner entries.
+            let this = unsafe { self.get_unchecked_mut() };
+            match this {
+                Timer::Traditional(entry) => {
+                    // Safety: we never move the inner entries.
+                    unsafe { Pin::new_unchecked(entry).reset(new_time, reregister); }
+                }
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Timer::Alternative(_) => panic!("not implemented yet"),
+            }
+        }
+
+        pub(crate) fn poll_elapsed(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+        ) -> Poll<Result<(), crate::time::error::Error>> {
+            // Safety: we never move the inner entries.
+            let this = unsafe { self.get_unchecked_mut() };
+            match this {
+                Timer::Traditional(entry) => {
+                    // Safety: we never move the inner entries.
+                    unsafe { Pin::new_unchecked(entry).poll_elapsed(cx) }
+                }
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Timer::Alternative(entry) => {
+                    // Safety: we never move the inner entries.
+                    unsafe { Pin::new_unchecked(entry).poll_elapsed(cx).map(Ok) }
+                }
+            }
+        }
+
+        #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+        pub(crate) fn scheduler_handle(&self) -> &crate::runtime::scheduler::Handle {
+            match self {
+                Timer::Traditional(_) => unreachable!("we should not call this on Traditional Timer"),
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Timer::Alternative(entry) => entry.scheduler_handle(),
+            }
+        }
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        pub(crate) fn driver(self: Pin<&Self>) -> &crate::runtime::time::Handle {
+            match self.get_ref() {
+                Timer::Traditional(entry) => entry.driver(),
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Timer::Alternative(entry) => entry.driver(),
+            }
+        }
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        pub(crate) fn clock(self: Pin<&Self>) -> &crate::time::Clock {
+            match self.get_ref() {
+                Timer::Traditional(entry) => entry.clock(),
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Timer::Alternative(entry) => entry.clock(),
+            }
+        }
+    }
 }
 
 cfg_signal_internal_and_unix! {
@@ -418,10 +564,6 @@ cfg_rt! {
     mod builder;
     pub use self::builder::Builder;
     cfg_unstable! {
-        mod id;
-        #[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
-        pub use id::Id;
-
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
 
@@ -446,7 +588,11 @@ cfg_rt! {
     pub use handle::{EnterGuard, Handle, TryCurrentError};
 
     mod runtime;
-    pub use runtime::{Runtime, RuntimeFlavor};
+    pub use runtime::{Runtime, RuntimeFlavor, is_rt_shutdown_err};
+
+    mod id;
+    pub use id::Id;
+
 
     /// Boundary value to prevent stack overflow caused by a large-sized
     /// Future being placed in the stack.

@@ -1,3 +1,165 @@
+# 1.50.0 (Mar 3rd, 2026)
+
+### Added
+
+- net: add `TcpStream::set_zero_linger` ([#7837])
+- rt: add `is_rt_shutdown_err` ([#7771])
+
+### Changed
+
+- io: add optimizer hint that `memchr` returns in-bounds pointer ([#7792])
+- io: implement vectored writes for `write_buf` ([#7871])
+- runtime: panic when `event_interval` is set to 0 ([#7838])
+- runtime: shorten default thread name to fit in Linux limit ([#7880])
+- signal: remember the result of `SetConsoleCtrlHandler` ([#7833])
+- signal: specialize windows `Registry` ([#7885])
+
+### Fixed
+
+- io: always cleanup `AsyncFd` registration list on deregister ([#7773])
+- macros: remove (most) local `use` declarations in `tokio::select!` ([#7929])
+- net: fix `GET_BUF_SIZE` constant for `target_os = "android"` ([#7889])
+- runtime: avoid redundant unpark in current_thread scheduler ([#7834])
+- runtime: don't park in `current_thread` if `before_park` defers waker ([#7835])
+- io: fix write readiness on ESP32 on short writes ([#7872])
+- runtime: wake deferred tasks before entering `block_in_place` ([#7879])
+- sync: drop rx waker when oneshot receiver is dropped ([#7886])
+- runtime: fix double increment of `num_idle_threads` on shutdown ([#7910], [#7918], [#7922])
+
+### Unstable
+
+- fs: check for io-uring opcode support ([#7815])
+- runtime: avoid lock acquisition after uring init ([#7850])
+
+### Documented
+
+- docs: update outdated unstable features section ([#7839])
+- io: clarify the behavior of `AsyncWriteExt::shutdown()` ([#7908])
+- io: explain how to flush stdout/stderr ([#7904])
+- io: fix incorrect and confusing `AsyncWrite` documentation ([#7875])
+- rt: clarify the documentation of `Runtime::spawn` ([#7803])
+- rt: fix missing quotation in docs ([#7925])
+- runtime: correct the default thread name in docs ([#7896])
+- runtime: fix `event_interval` doc ([#7932])
+- sync: clarify RwLock fairness documentation ([#7919])
+- sync: clarify that `recv` returns `None` once closed and no more messages ([#7920])
+- task: clarify when to use `spawn_blocking` vs dedicated threads ([#7923])
+- task: doc that task drops before `JoinHandle` completion ([#7825])
+- signal: guarantee that listeners never return `None` ([#7869])
+- task: fix task module feature flags in docs ([#7891])
+- task: fix two typos ([#7913])
+- task: improve the docs of `Builder::spawn_local` ([#7828])
+- time: add docs about auto-advance and when to use sleep ([#7858])
+- util: fix typo in docs ([#7926])
+
+[#7771]: https://github.com/tokio-rs/tokio/pull/7771
+[#7773]: https://github.com/tokio-rs/tokio/pull/7773
+[#7792]: https://github.com/tokio-rs/tokio/pull/7792
+[#7803]: https://github.com/tokio-rs/tokio/pull/7803
+[#7815]: https://github.com/tokio-rs/tokio/pull/7815
+[#7825]: https://github.com/tokio-rs/tokio/pull/7825
+[#7828]: https://github.com/tokio-rs/tokio/pull/7828
+[#7833]: https://github.com/tokio-rs/tokio/pull/7833
+[#7834]: https://github.com/tokio-rs/tokio/pull/7834
+[#7835]: https://github.com/tokio-rs/tokio/pull/7835
+[#7837]: https://github.com/tokio-rs/tokio/pull/7837
+[#7838]: https://github.com/tokio-rs/tokio/pull/7838
+[#7839]: https://github.com/tokio-rs/tokio/pull/7839
+[#7850]: https://github.com/tokio-rs/tokio/pull/7850
+[#7858]: https://github.com/tokio-rs/tokio/pull/7858
+[#7869]: https://github.com/tokio-rs/tokio/pull/7869
+[#7871]: https://github.com/tokio-rs/tokio/pull/7871
+[#7872]: https://github.com/tokio-rs/tokio/pull/7872
+[#7875]: https://github.com/tokio-rs/tokio/pull/7875
+[#7879]: https://github.com/tokio-rs/tokio/pull/7879
+[#7880]: https://github.com/tokio-rs/tokio/pull/7880
+[#7885]: https://github.com/tokio-rs/tokio/pull/7885
+[#7886]: https://github.com/tokio-rs/tokio/pull/7886
+[#7889]: https://github.com/tokio-rs/tokio/pull/7889
+[#7891]: https://github.com/tokio-rs/tokio/pull/7891
+[#7896]: https://github.com/tokio-rs/tokio/pull/7896
+[#7904]: https://github.com/tokio-rs/tokio/pull/7904
+[#7908]: https://github.com/tokio-rs/tokio/pull/7908
+[#7910]: https://github.com/tokio-rs/tokio/pull/7910
+[#7913]: https://github.com/tokio-rs/tokio/pull/7913
+[#7918]: https://github.com/tokio-rs/tokio/pull/7918
+[#7919]: https://github.com/tokio-rs/tokio/pull/7919
+[#7920]: https://github.com/tokio-rs/tokio/pull/7920
+[#7922]: https://github.com/tokio-rs/tokio/pull/7922
+[#7923]: https://github.com/tokio-rs/tokio/pull/7923
+[#7925]: https://github.com/tokio-rs/tokio/pull/7925
+[#7926]: https://github.com/tokio-rs/tokio/pull/7926
+[#7929]: https://github.com/tokio-rs/tokio/pull/7929
+[#7932]: https://github.com/tokio-rs/tokio/pull/7932
+
+# 1.49.0 (January 3rd, 2026)
+
+### Added
+
+* net: add support for `TCLASS` option on IPv6 ([#7781])
+* runtime: stabilize `runtime::id::Id` ([#7125])
+* task: implement `Extend` for `JoinSet` ([#7195])
+* task: stabilize the `LocalSet::id()` ([#7776])
+
+### Changed
+
+* net: deprecate `{TcpStream,TcpSocket}::set_linger` ([#7752])
+
+### Fixed
+
+* macros: fix the hygiene issue of `join!` and `try_join!` ([#7766])
+* runtime: revert "replace manual vtable definitions with Wake" ([#7699])
+* sync: return `TryRecvError::Disconnected` from `Receiver::try_recv` after `Receiver::close` ([#7686])
+* task: remove unnecessary trait bounds on the `Debug` implementation ([#7720])
+
+### Unstable
+
+* fs: handle `EINTR` in `fs::write` for io-uring ([#7786])
+* fs: support io-uring with `tokio::fs::read` ([#7696])
+* runtime: disable io-uring on `EPERM` ([#7724])
+* time: add alternative timer for better multicore scalability ([#7467])
+
+### Documented
+
+* docs: fix a typos in `bounded.rs` and `park.rs` ([#7817])
+* io: add `SyncIoBridge` cross-references to `copy` and `copy_buf` ([#7798])
+* io: doc that `AsyncWrite` does not inherit from `std::io::Write` ([#7705])
+* metrics: clarify that `num_alive_tasks` is not strongly consistent ([#7614])
+* net: clarify the cancellation safety of the `TcpStream::peek` ([#7305])
+* net: clarify the drop behavior of `unix::OwnedWriteHalf` ([#7742])
+* net: clarify the platform-dependent backlog in `TcpSocket` docs ([#7738])
+* runtime: mention `LocalRuntime` in `new_current_thread` docs ([#7820])
+* sync: add missing period to `mpsc::Sender::try_send` docs ([#7721])
+* sync: clarify the cancellation safety of `oneshot::Receiver` ([#7780])
+* sync: improve the docs for the `errors` of mpsc ([#7722])
+* task: add example for `spawn_local` usage on local runtime ([#7689])
+
+[#7125]: https://github.com/tokio-rs/tokio/pull/7125
+[#7195]: https://github.com/tokio-rs/tokio/pull/7195
+[#7305]: https://github.com/tokio-rs/tokio/pull/7305
+[#7467]: https://github.com/tokio-rs/tokio/pull/7467
+[#7614]: https://github.com/tokio-rs/tokio/pull/7614
+[#7686]: https://github.com/tokio-rs/tokio/pull/7686
+[#7689]: https://github.com/tokio-rs/tokio/pull/7689
+[#7696]: https://github.com/tokio-rs/tokio/pull/7696
+[#7699]: https://github.com/tokio-rs/tokio/pull/7699
+[#7705]: https://github.com/tokio-rs/tokio/pull/7705
+[#7720]: https://github.com/tokio-rs/tokio/pull/7720
+[#7721]: https://github.com/tokio-rs/tokio/pull/7721
+[#7722]: https://github.com/tokio-rs/tokio/pull/7722
+[#7724]: https://github.com/tokio-rs/tokio/pull/7724
+[#7738]: https://github.com/tokio-rs/tokio/pull/7738
+[#7742]: https://github.com/tokio-rs/tokio/pull/7742
+[#7752]: https://github.com/tokio-rs/tokio/pull/7752
+[#7766]: https://github.com/tokio-rs/tokio/pull/7766
+[#7776]: https://github.com/tokio-rs/tokio/pull/7776
+[#7780]: https://github.com/tokio-rs/tokio/pull/7780
+[#7781]: https://github.com/tokio-rs/tokio/pull/7781
+[#7786]: https://github.com/tokio-rs/tokio/pull/7786
+[#7798]: https://github.com/tokio-rs/tokio/pull/7798
+[#7817]: https://github.com/tokio-rs/tokio/pull/7817
+[#7820]: https://github.com/tokio-rs/tokio/pull/7820
+
 # 1.48.0 (October 14th, 2025)
 
 The MSRV is increased to 1.71.
@@ -110,6 +272,12 @@ The MSRV is increased to 1.71.
 [#7669]: https://github.com/tokio-rs/tokio/pull/7669
 [#7672]: https://github.com/tokio-rs/tokio/pull/7672
 [#7675]: https://github.com/tokio-rs/tokio/pull/7675
+
+# 1.47.3 (Januar 3rd, 2026)
+
+### Fixed
+
+* sync: return `TryRecvError::Disconnected` from `Receiver::try_recv` after `Receiver::close` ([#7686])
 
 # 1.47.2 (October 14th, 2025)
 
@@ -377,6 +545,14 @@ comment on [#7172].
 [#7185]: https://github.com/tokio-rs/tokio/pull/7185
 [#7186]: https://github.com/tokio-rs/tokio/pull/7186
 [#7192]: https://github.com/tokio-rs/tokio/pull/7192
+
+# 1.43.4 (January 3rd, 2026)
+
+### Fixed
+
+* sync: return `TryRecvError::Disconnected` from `Receiver::try_recv` after `Receiver::close` ([#7686])
+
+[#7686]: https://github.com/tokio-rs/tokio/pull/7686
 
 # 1.43.3 (October 14th, 2025)
 

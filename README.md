@@ -1,3 +1,7 @@
+*[TokioConf 2026 program and tickets are now available!](https://tokioconf.com)*
+
+---
+
 # Tokio
 
 A runtime for writing reliable, asynchronous, and slim applications with
@@ -52,11 +56,11 @@ an asynchronous application.
 
 A basic TCP echo server with Tokio.
 
-Make sure you activated the full features of the tokio crate on Cargo.toml:
+Make sure you enable the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.48.0", features = ["full"] }
+tokio = { version = "1.50.0", features = ["full"] }
 ```
 Then, on your main.rs:
 
@@ -103,7 +107,7 @@ More examples can be found [here][examples]. For a larger "real world" example, 
 [examples]: https://github.com/tokio-rs/tokio/tree/master/examples
 [mini-redis]: https://github.com/tokio-rs/mini-redis/
 
-To see a list of the available features flags that can be enabled, check our
+To see a list of the available feature flags that can be enabled, check our
 [docs][feature-flag-docs].
 
 ## Getting Help
@@ -125,7 +129,7 @@ question. You can also ask your question on [the discussions page][discussions].
 you! We have a [contributing guide][guide] to help you get involved in the Tokio
 project.
 
-[guide]: https://github.com/tokio-rs/tokio/blob/master/CONTRIBUTING.md
+[guide]: https://github.com/tokio-rs/tokio/blob/master/docs/contributing/README.md
 
 ## Related Projects
 
@@ -251,5 +255,5 @@ This project is licensed under the [MIT license].
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in Tokio by you, shall be licensed as MIT, without any additional
+for inclusion in Tokio by you shall be licensed as MIT, without any additional
 terms or conditions.

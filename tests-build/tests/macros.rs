@@ -13,10 +13,22 @@ fn compile_fail_full() {
     t.pass("tests/pass/macros_main_loop.rs");
 
     #[cfg(feature = "full")]
+    t.pass("tests/pass/impl_trait.rs");
+
+    #[cfg(feature = "full")]
+    t.pass("tests/pass/use_builder_outer.rs");
+
+    #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_invalid_input.rs");
 
     #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_dead_code.rs");
+
+    #[cfg(feature = "full")]
+    t.compile_fail("tests/fail/macros_join.rs");
+
+    #[cfg(feature = "full")]
+    t.compile_fail("tests/fail/macros_try_join.rs");
 
     #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_type_mismatch.rs");

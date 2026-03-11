@@ -106,6 +106,7 @@ impl<S: 'static> OwnedTasks<S> {
     /// Bind a task that isn't safe to transfer across thread boundaries.
     ///
     /// # Safety
+    ///
     /// Only use this in `LocalRuntime` where the task cannot move
     pub(crate) unsafe fn bind_local<T>(
         &self,
@@ -192,9 +193,11 @@ impl<S: 'static> OwnedTasks<S> {
         self.list.len()
     }
 
-    cfg_64bit_metrics! {
-        pub(crate) fn spawned_tasks_count(&self) -> u64 {
-            self.list.added()
+    cfg_unstable_metrics! {
+        cfg_64bit_metrics! {
+            pub(crate) fn spawned_tasks_count(&self) -> u64 {
+                self.list.added()
+            }
         }
     }
 

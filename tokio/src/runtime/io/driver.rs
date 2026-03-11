@@ -5,7 +5,7 @@ cfg_signal_internal_and_unix! {
 cfg_io_uring! {
     mod uring;
     use uring::UringContext;
-    use crate::loom::sync::atomic::AtomicUsize;
+    use crate::sync::OnceCell;
 }
 
 use crate::io::interest::Interest;
@@ -67,7 +67,7 @@ pub(crate) struct Handle {
         feature = "fs",
         target_os = "linux",
     ))]
-    pub(crate) uring_state: AtomicUsize,
+    pub(crate) uring_probe: OnceCell<Option<io_uring::Probe>>,
 }
 
 #[derive(Debug)]
@@ -150,7 +150,7 @@ impl Driver {
                 feature = "fs",
                 target_os = "linux",
             ))]
-            uring_state: AtomicUsize::new(0),
+            uring_probe: OnceCell::new(),
         };
 
         Ok((driver, handle))
@@ -296,7 +296,8 @@ impl Handle {
         source: &mut impl Source,
     ) -> io::Result<()> {
         // Deregister the source with the OS poller **first**
-        self.registry.deregister(source)?;
+        // Cleanup ALWAYS happens
+        let os_result = self.registry.deregister(source);
 
         if self
             .registrations
@@ -307,7 +308,7 @@ impl Handle {
 
         self.metrics.dec_fd_count();
 
-        Ok(())
+        os_result // Return error after cleanup
     }
 
     fn release_pending_registrations(&self) {

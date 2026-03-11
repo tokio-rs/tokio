@@ -10,15 +10,17 @@ use std::fmt::Debug;
 
 /// Timing wheel implementation.
 ///
-/// This type provides the hashed timing wheel implementation that backs `Timer`
-/// and `DelayQueue`.
+/// This type provides the hashed timing wheel implementation that backs
+/// [`DelayQueue`].
 ///
 /// The structure is generic over `T: Stack`. This allows handling timeout data
 /// being stored on the heap or in a slab. In order to support the latter case,
 /// the slab must be passed into each function allowing the implementation to
 /// lookup timer entries.
 ///
-/// See `Timer` documentation for some implementation notes.
+/// See `Driver` documentation for some implementation notes.
+///
+/// [`DelayQueue`]: crate::time::DelayQueue
 #[derive(Debug)]
 pub(crate) struct Wheel<T> {
     /// The number of milliseconds elapsed since the wheel started.

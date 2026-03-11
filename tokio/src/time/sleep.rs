@@ -1,4 +1,4 @@
-use crate::runtime::time::TimerEntry;
+use crate::runtime::Timer;
 use crate::time::{error::Error, Duration, Instant};
 use crate::util::trace;
 
@@ -227,7 +227,7 @@ pin_project! {
 
         // The link between the `Sleep` instance and the timer that drives it.
         #[pin]
-        entry: TimerEntry,
+        entry: Timer,
     }
 }
 
@@ -253,7 +253,7 @@ impl Sleep {
     ) -> Sleep {
         use crate::runtime::scheduler;
         let handle = scheduler::Handle::current();
-        let entry = TimerEntry::new(handle, deadline);
+        let entry = Timer::new(handle, deadline);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
             let handle = scheduler::Handle::current();
@@ -362,12 +362,30 @@ impl Sleep {
     /// without having it wake up the last task that polled it.
     pub(crate) fn reset_without_reregister(self: Pin<&mut Self>, deadline: Instant) {
         let mut me = self.project();
-        me.entry.as_mut().reset(deadline, false);
+        match me.entry.as_ref().flavor() {
+            crate::runtime::TimerFlavor::Traditional => {
+                me.entry.as_mut().reset(deadline, false);
+            }
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            crate::runtime::TimerFlavor::Alternative => {
+                let handle = me.entry.as_ref().scheduler_handle().clone();
+                me.entry.set(Timer::new(handle, deadline));
+            }
+        }
     }
 
     fn reset_inner(self: Pin<&mut Self>, deadline: Instant) {
         let mut me = self.project();
-        me.entry.as_mut().reset(deadline, true);
+        match me.entry.as_ref().flavor() {
+            crate::runtime::TimerFlavor::Traditional => {
+                me.entry.as_mut().reset(deadline, true);
+            }
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            crate::runtime::TimerFlavor::Alternative => {
+                let handle = me.entry.as_ref().scheduler_handle().clone();
+                me.entry.set(Timer::new(handle, deadline));
+            }
+        }
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
@@ -380,8 +398,8 @@ impl Sleep {
                 tracing::trace_span!("runtime.resource.async_op.poll");
 
             let duration = {
-                let clock = me.entry.clock();
-                let time_source = me.entry.driver().time_source();
+                let clock = me.entry.as_ref().clock();
+                let time_source = me.entry.as_ref().driver().time_source();
                 let now = time_source.now(clock);
                 let deadline_tick = time_source.deadline_to_tick(deadline);
                 deadline_tick.saturating_sub(now)
@@ -431,7 +449,7 @@ impl Future for Sleep {
     //
     // - AtCapacity: this is a pathological case where far too many
     //   sleep instances have been scheduled.
-    // - Shutdown: No timer has been setup, which is a mis-use error.
+    // - Shutdown: No timer has been setup, which is a misuse error.
     //
     // Both cases are extremely rare, and pretty accurately fit into
     // "logic errors", so we just panic in this case. A user couldn't

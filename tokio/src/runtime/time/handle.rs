@@ -21,9 +21,15 @@ impl Handle {
     /// Track that the driver is being unparked
     pub(crate) fn unpark(&self) {
         #[cfg(feature = "test-util")]
-        self.inner
-            .did_wake
-            .store(true, std::sync::atomic::Ordering::SeqCst);
+        match self.inner {
+            super::Inner::Traditional { ref did_wake, .. } => {
+                did_wake.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            super::Inner::Alternative { ref did_wake, .. } => {
+                did_wake.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
     }
 }
 

@@ -83,7 +83,7 @@ where
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         if let Some(inner) = &self.inner {
-            // We always return +1 because when there's stream there's atleast one more item.
+            // We always return +1 because when there's a stream there's at least one more item.
             let (l, u) = inner.size_hint();
             (l.saturating_add(1), u.and_then(|u| u.checked_add(1)))
         } else {

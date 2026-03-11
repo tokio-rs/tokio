@@ -14,6 +14,7 @@ use std::time::Duration;
 
 #[tokio::test]
 #[cfg_attr(miri, ignore)] // No `socket` on miri.
+#[expect(deprecated)] // set_linger is deprecated
 async fn set_linger() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
 
@@ -23,6 +24,9 @@ async fn set_linger() {
 
     assert_ok!(stream.set_linger(Some(Duration::from_secs(1))));
     assert_eq!(stream.linger().unwrap().unwrap().as_secs(), 1);
+
+    assert_ok!(stream.set_zero_linger());
+    assert_eq!(stream.linger().unwrap().unwrap().as_secs(), 0);
 
     assert_ok!(stream.set_linger(None));
     assert!(stream.linger().unwrap().is_none());

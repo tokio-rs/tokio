@@ -81,18 +81,21 @@ impl<T> ReusableBoxFuture<T> {
         F: Future<Output = T> + Send + 'static,
     {
         // Drop the existing future, catching any panics.
-        let result = panic::catch_unwind(AssertUnwindSafe(|| {
+        let result = panic::catch_unwind(AssertUnwindSafe(|| unsafe {
             ptr::drop_in_place(self.boxed.as_ptr());
         }));
 
         // Overwrite the future behind the pointer. This is safe because the
         // allocation was allocated with the same size and alignment as the type F.
         let self_ptr: *mut F = self.boxed.as_ptr() as *mut F;
-        ptr::write(self_ptr, future);
+        // SAFETY: The pointer is valid and the layout is exactly same.
+        unsafe {
+            ptr::write(self_ptr, future);
+        }
 
         // Update the vtable of self.boxed. The pointer is not null because we
         // just got it from self.boxed, which is not null.
-        self.boxed = NonNull::new_unchecked(self_ptr);
+        self.boxed = unsafe { NonNull::new_unchecked(self_ptr) };
 
         // If the old future's destructor panicked, resume unwinding.
         match result {

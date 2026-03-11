@@ -15,7 +15,7 @@ use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
-use std::sync::atomic::Ordering::{AcqRel, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
 use std::thread::ThreadId;
@@ -380,19 +380,14 @@ impl Context {
             core = c;
         }
 
-        // This check will fail if `before_park` spawns a task for us to run
-        // instead of parking the thread
-        if core.tasks.is_empty() {
+        // If `before_park` spawns a task (or otherwise schedules work for us), then we should not
+        // park the thread.
+        if !self.has_pending_work(&core) {
             // Park until the thread is signaled
             core.metrics.about_to_park();
             core.submit_metrics(handle);
 
-            let (c, ()) = self.enter(core, || {
-                driver.park(&handle.driver);
-                self.defer.wake();
-            });
-
-            core = c;
+            core = self.park_internal(core, handle, &mut driver, None);
 
             core.metrics.unparked();
             core.submit_metrics(handle);
@@ -413,12 +408,31 @@ impl Context {
 
         core.submit_metrics(handle);
 
-        let (mut core, ()) = self.enter(core, || {
-            driver.park_timeout(&handle.driver, Duration::from_millis(0));
+        core = self.park_internal(core, handle, &mut driver, Some(Duration::from_millis(0)));
+
+        core.driver = Some(driver);
+        core
+    }
+
+    fn has_pending_work(&self, core: &Core) -> bool {
+        !core.tasks.is_empty() || !self.defer.is_empty() || self.handle.shared.woken.load(Acquire)
+    }
+
+    fn park_internal(
+        &self,
+        core: Box<Core>,
+        handle: &Handle,
+        driver: &mut Driver,
+        duration: Option<Duration>,
+    ) -> Box<Core> {
+        let (core, ()) = self.enter(core, || {
+            match duration {
+                Some(dur) => driver.park_timeout(&handle.driver, dur),
+                None => driver.park(&handle.driver),
+            }
             self.defer.wake();
         });
 
-        core.driver = Some(driver);
         core
     }
 
@@ -474,6 +488,7 @@ impl Handle {
     /// Spawn a task which isn't safe to send across thread boundaries onto the runtime.
     ///
     /// # Safety
+    ///
     /// This should only be used when this is a `LocalRuntime` or in another case where the runtime
     /// provably cannot be driven from or moved to different threads from the one on which the task
     /// is spawned.
@@ -488,10 +503,12 @@ impl Handle {
         F: crate::future::Future + 'static,
         F::Output: 'static,
     {
-        let (handle, notified) = me
-            .shared
-            .owned
-            .bind_local(future, me.clone(), id, spawned_at);
+        // Safety: the caller guarantees that this is only called on a `LocalRuntime`.
+        let (handle, notified) = unsafe {
+            me.shared
+                .owned
+                .bind_local(future, me.clone(), id, spawned_at)
+        };
 
         me.task_hooks.spawn(&TaskMeta {
             id,
@@ -616,13 +633,11 @@ cfg_unstable_metrics! {
     }
 }
 
-cfg_unstable! {
-    use std::num::NonZeroU64;
+use std::num::NonZeroU64;
 
-    impl Handle {
-        pub(crate) fn owned_id(&self) -> NonZeroU64 {
-            self.shared.owned.id
-        }
+impl Handle {
+    pub(crate) fn owned_id(&self) -> NonZeroU64 {
+        self.shared.owned.id
     }
 }
 
@@ -709,8 +724,20 @@ impl Wake for Handle {
 
     /// Wake by reference
     fn wake_by_ref(arc_self: &Arc<Self>) {
-        arc_self.shared.woken.store(true, Release);
-        arc_self.driver.unpark();
+        let already_woken = arc_self.shared.woken.swap(true, Release);
+
+        if !already_woken {
+            use scheduler::Context::CurrentThread;
+
+            // If we are already running on the runtime, then it's not required to wake up the
+            // runtime.
+            context::with_scheduler(|maybe_cx| match maybe_cx {
+                Some(CurrentThread(cx)) if Arc::ptr_eq(arc_self, &cx.handle) => {}
+                _ => {
+                    arc_self.driver.unpark();
+                }
+            });
+        }
     }
 }
 
@@ -764,7 +791,7 @@ impl CoreGuard<'_> {
                         None => {
                             core.metrics.end_processing_scheduled_tasks();
 
-                            core = if !context.defer.is_empty() {
+                            core = if context.has_pending_work(&core) {
                                 context.park_yield(core, handle)
                             } else {
                                 context.park(core, handle)

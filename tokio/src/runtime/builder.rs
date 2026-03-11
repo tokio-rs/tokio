@@ -1,7 +1,9 @@
 #![cfg_attr(loom, allow(unused_imports))]
 
 use crate::runtime::handle::Handle;
-use crate::runtime::{blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback};
+use crate::runtime::{
+    blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback, TimerFlavor,
+};
 #[cfg(tokio_unstable)]
 use crate::runtime::{metrics::HistogramConfiguration, LocalOptions, LocalRuntime, TaskMeta};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
@@ -133,6 +135,8 @@ pub struct Builder {
 
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
+
+    timer_flavor: TimerFlavor,
 }
 
 cfg_unstable! {
@@ -234,9 +238,11 @@ impl Builder {
     /// Configuration methods can be chained on the return value.
     ///
     /// To spawn non-`Send` tasks on the resulting runtime, combine it with a
-    /// [`LocalSet`].
+    /// [`LocalSet`], or call [`build_local`] to create a [`LocalRuntime`] (unstable).
     ///
     /// [`LocalSet`]: crate::task::LocalSet
+    /// [`LocalRuntime`]: crate::runtime::LocalRuntime
+    /// [`build_local`]: crate::runtime::Builder::build_local
     pub fn new_current_thread() -> Builder {
         #[cfg(loom)]
         const EVENT_INTERVAL: u32 = 4;
@@ -282,7 +288,7 @@ impl Builder {
             max_blocking_threads: 512,
 
             // Default thread name
-            thread_name: std::sync::Arc::new(|| "tokio-runtime-worker".into()),
+            thread_name: std::sync::Arc::new(|| "tokio-rt-worker".into()),
 
             // Do not set a stack size by default
             thread_stack_size: None,
@@ -318,6 +324,8 @@ impl Builder {
             metrics_poll_count_histogram: HistogramBuilder::default(),
 
             disable_lifo_slot: false,
+
+            timer_flavor: TimerFlavor::Traditional,
         }
     }
 
@@ -360,6 +368,41 @@ impl Builder {
         #[cfg(feature = "time")]
         self.enable_time();
 
+        self
+    }
+
+    /// Enables the alternative timer implementation, which is disabled by default.
+    ///
+    /// The alternative timer implementation is an unstable feature that may
+    /// provide better performance on multi-threaded runtimes with a large number
+    /// of worker threads.
+    ///
+    /// This option only applies to multi-threaded runtimes. Attempting to use
+    /// this option with any other runtime type will have no effect.
+    ///
+    /// [Click here to share your experience with the alternative timer](https://github.com/tokio-rs/tokio/issues/7745)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///   .enable_alt_timer()
+    ///   .build()
+    ///   .unwrap();
+    /// # }
+    /// ```
+    #[cfg(all(tokio_unstable, feature = "time", feature = "rt-multi-thread"))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(tokio_unstable, feature = "time", feature = "rt-multi-thread")))
+    )]
+    pub fn enable_alt_timer(&mut self) -> &mut Self {
+        self.enable_time();
+        self.timer_flavor = TimerFlavor::Alternative;
         self
     }
 
@@ -473,7 +516,7 @@ impl Builder {
 
     /// Sets name of threads spawned by the `Runtime`'s thread pool.
     ///
-    /// The default name is "tokio-runtime-worker".
+    /// The default name is "tokio-rt-worker".
     ///
     /// # Examples
     ///
@@ -497,7 +540,7 @@ impl Builder {
 
     /// Sets a function used to generate the name of threads spawned by the `Runtime`'s thread pool.
     ///
-    /// The default name fn is `|| "tokio-runtime-worker".into()`.
+    /// The default name fn is `|| "tokio-rt-worker".into()`.
     ///
     /// # Examples
     ///
@@ -992,6 +1035,7 @@ impl Builder {
             enable_time: self.enable_time,
             start_paused: self.start_paused,
             nevents: self.nevents,
+            timer_flavor: self.timer_flavor,
         }
     }
 
@@ -1072,12 +1116,16 @@ impl Builder {
     /// Setting the event interval determines the effective "priority" of delivering
     /// these external events (which may wake up additional tasks), compared to
     /// executing tasks that are currently ready to run. A smaller value is useful
-    /// when tasks frequently spend a long time in polling, or frequently yield,
+    /// when tasks frequently spend a long time in polling, or infrequently yield,
     /// which can result in overly long delays picking up I/O events. Conversely,
     /// picking up new events requires extra synchronization and syscall overhead,
     /// so if tasks generally complete their polling quickly, a higher event interval
     /// will minimize that overhead while still keeping the scheduler responsive to
     /// events.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if 0 is passed as an argument.
     ///
     /// # Examples
     ///
@@ -1092,7 +1140,9 @@ impl Builder {
     /// # }
     /// # }
     /// ```
+    #[track_caller]
     pub fn event_interval(&mut self, val: u32) -> &mut Self {
+        assert!(val > 0, "event_interval must be greater than 0");
         self.event_interval = val;
         self
     }
@@ -1544,7 +1594,9 @@ impl Builder {
         use crate::runtime::scheduler;
         use crate::runtime::Config;
 
-        let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+        let mut cfg = self.get_cfg();
+        cfg.timer_flavor = TimerFlavor::Traditional;
+        let (driver, driver_handle) = driver::Driver::new(cfg)?;
 
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
@@ -1761,6 +1813,7 @@ cfg_rt_multi_thread! {
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 },
+                self.timer_flavor,
             );
 
             let handle = Handle { inner: scheduler::Handle::MultiThread(handle) };

@@ -24,6 +24,8 @@ cfg_rt_multi_thread! {
     pub(crate) use multi_thread::MultiThread;
 }
 
+pub(super) mod util;
+
 use crate::runtime::driver;
 
 #[derive(Debug, Clone)]
@@ -107,6 +109,48 @@ cfg_rt! {
             }
         }
 
+        #[cfg(feature = "time")]
+        pub(crate) fn timer_flavor(&self) -> crate::runtime::TimerFlavor {
+            match self {
+                Handle::CurrentThread(_) => crate::runtime::TimerFlavor::Traditional,
+
+                #[cfg(feature = "rt-multi-thread")]
+                Handle::MultiThread(h) => h.timer_flavor,
+            }
+        }
+
+        #[cfg(all(tokio_unstable, feature = "rt-multi-thread", feature = "time"))]
+        /// Returns true if both handles belong to the same runtime instance.
+        pub(crate) fn is_same_runtime(&self, other: &Handle) -> bool {
+            match (self, other) {
+                (Handle::CurrentThread(a), Handle::CurrentThread(b)) => Arc::ptr_eq(a, b),
+                #[cfg(feature = "rt-multi-thread")]
+                (Handle::MultiThread(a), Handle::MultiThread(b)) => Arc::ptr_eq(a, b),
+                #[cfg(feature = "rt-multi-thread")]
+                _ => false, // different runtime types
+            }
+        }
+
+        #[cfg(all(tokio_unstable, feature = "rt-multi-thread", feature = "time"))]
+        /// Returns true if the runtime is shutting down.
+        pub(crate) fn is_shutdown(&self) -> bool {
+            match self {
+                Handle::CurrentThread(_) => panic!("the alternative timer implementation is not supported on CurrentThread runtime"),
+                Handle::MultiThread(h) => h.is_shutdown(),
+            }
+        }
+
+        #[cfg(all(tokio_unstable, feature = "rt-multi-thread", feature = "time"))]
+        /// Push a timer entry that was created outside of this runtime
+        /// into the runtime-global queue. The pushed timer will be
+        /// processed by a random worker thread.
+        pub(crate) fn push_remote_timer(&self, entry_hdl: crate::runtime::time_alt::EntryHandle) {
+            match self {
+                Handle::CurrentThread(_) => panic!("the alternative timer implementation is not supported on CurrentThread runtime"),
+                Handle::MultiThread(h) => h.push_remote_timer(entry_hdl),
+            }
+        }
+
         /// Returns true if this is a local runtime and the runtime is owned by the current thread.
         pub(crate) fn can_spawn_local_on_local_runtime(&self) -> bool {
             match self {
@@ -133,6 +177,7 @@ cfg_rt! {
         /// Spawn a local task
         ///
         /// # Safety
+        ///
         /// This should only be called in `LocalRuntime` if the runtime has been verified to be owned
         /// by the current thread.
         #[allow(irrefutable_let_patterns)]
@@ -143,7 +188,8 @@ cfg_rt! {
             F::Output: 'static,
         {
             if let Handle::CurrentThread(h) = self {
-                current_thread::Handle::spawn_local(h, future, id, spawned_at)
+                // Safety: caller guarantees that this is a `LocalRuntime`.
+                unsafe { current_thread::Handle::spawn_local(h, future, id, spawned_at) }
             } else {
                 panic!("Only current_thread and LocalSet have spawn_local internals implemented")
             }
@@ -247,6 +293,17 @@ cfg_rt! {
             match_flavor!(self, Context(context) => context.defer(waker));
         }
 
+        #[cfg(all(tokio_unstable, feature = "time", feature = "rt-multi-thread"))]
+        pub(crate) fn with_time_temp_local_context<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(Option<crate::runtime::time_alt::TempLocalContext<'_>>) -> R,
+        {
+            match self {
+                Context::CurrentThread(_) => panic!("the alternative timer implementation is not supported on CurrentThread runtime"),
+                Context::MultiThread(context) => context.with_time_temp_local_context(f),
+            }
+        }
+
         cfg_rt_multi_thread! {
             #[track_caller]
             pub(crate) fn expect_multi_thread(&self) -> &multi_thread::Context {
@@ -269,6 +326,12 @@ cfg_not_rt! {
     impl Handle {
         #[track_caller]
         pub(crate) fn current() -> Handle {
+            panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
+        }
+
+        #[cfg_attr(not(feature = "time"), allow(dead_code))]
+        #[track_caller]
+        pub(crate) fn timer_flavor(&self) -> crate::runtime::TimerFlavor {
             panic!("{}", crate::util::error::CONTEXT_MISSING_ERROR)
         }
     }

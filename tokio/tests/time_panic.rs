@@ -13,19 +13,64 @@ mod support {
 }
 use support::panic::test_panic;
 
+fn rt_combinations() -> Vec<Runtime> {
+    let mut rts = vec![];
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    rts.push(rt);
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .unwrap();
+    rts.push(rt);
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .build()
+        .unwrap();
+    rts.push(rt);
+
+    #[cfg(tokio_unstable)]
+    {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_alt_timer()
+            .enable_all()
+            .build()
+            .unwrap();
+        rts.push(rt);
+
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(4)
+            .enable_alt_timer()
+            .enable_all()
+            .build()
+            .unwrap();
+        rts.push(rt);
+    }
+
+    rts
+}
+
 #[test]
 fn pause_panic_caller() -> Result<(), Box<dyn Error>> {
-    let panic_location_file = test_panic(|| {
-        let rt = current_thread();
-
-        rt.block_on(async {
-            time::pause();
-            time::pause();
+    for rt in rt_combinations() {
+        let panic_location_file = test_panic(|| {
+            rt.block_on(async {
+                time::pause();
+                time::pause();
+            });
         });
-    });
 
-    // The panic location should be in this file
-    assert_eq!(&panic_location_file.unwrap(), file!());
+        // The panic location should be in this file
+        assert_eq!(&panic_location_file.unwrap(), file!());
+    }
 
     Ok(())
 }

@@ -27,11 +27,10 @@ use std::task::{Context, Poll};
 /// * `Poll::Ready(Err(e))` for other errors are standard I/O errors coming from the
 ///   underlying object.
 ///
-/// This trait importantly means that the `write` method only works in the
-/// context of a future's task. The object may panic if used outside of a task.
-///
 /// Utilities for working with `AsyncWrite` values are provided by
-/// [`AsyncWriteExt`].
+/// [`AsyncWriteExt`]. Most users will interact with `AsyncWrite` types through
+/// these extension methods, which provide ergonomic async functions such as
+/// `write_all` and `flush`.
 ///
 /// [`std::io::Write`]: std::io::Write
 /// [`Write::write`]: std::io::Write::write()
@@ -54,7 +53,7 @@ pub trait AsyncWrite {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>>;
+    ) -> Poll<io::Result<usize>>;
 
     /// Attempts to flush the object, ensuring that any buffered data reach
     /// their destination.
@@ -65,7 +64,7 @@ pub trait AsyncWrite {
     /// `Poll::Pending` and arranges for the current task (via
     /// `cx.waker()`) to receive a notification when the object can make
     /// progress towards flushing.
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>>;
 
     /// Initiates or attempts to shut down this writer, returning success when
     /// the I/O connection has completely shut down.
@@ -125,7 +124,7 @@ pub trait AsyncWrite {
     ///
     /// This function will panic if not called within the context of a future's
     /// task.
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>>;
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>>;
 
     /// Like [`poll_write`], except that it writes from a slice of buffers.
     ///
@@ -154,7 +153,7 @@ pub trait AsyncWrite {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         bufs: &[IoSlice<'_>],
-    ) -> Poll<Result<usize, io::Error>> {
+    ) -> Poll<io::Result<usize>> {
         let buf = bufs
             .iter()
             .find(|b| !b.is_empty())

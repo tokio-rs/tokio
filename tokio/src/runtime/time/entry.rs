@@ -471,7 +471,7 @@ unsafe impl linked_list::Link for TimerShared {
     unsafe fn pointers(
         target: NonNull<Self::Target>,
     ) -> NonNull<linked_list::Pointers<Self::Target>> {
-        TimerShared::addr_of_pointers(target)
+        unsafe { TimerShared::addr_of_pointers(target) }
     }
 }
 
@@ -644,7 +644,9 @@ impl TimerHandle {
     /// SAFETY: The caller must ensure that the handle remains valid, the driver
     /// lock is held, and that the timer is not in any wheel linked lists.
     pub(super) unsafe fn set_expiration(&self, tick: u64) {
-        self.inner.as_ref().set_expiration(tick);
+        unsafe {
+            self.inner.as_ref().set_expiration(tick);
+        }
     }
 
     /// Attempts to mark this entry as pending. If the expiration time is after
@@ -657,14 +659,18 @@ impl TimerHandle {
     /// lock is held, and that the timer is not in any wheel linked lists.
     /// After returning Ok, the entry must be added to the pending list.
     pub(super) unsafe fn mark_pending(&self, not_after: u64) -> Result<(), u64> {
-        match self.inner.as_ref().state.mark_pending(not_after) {
+        match unsafe { self.inner.as_ref().state.mark_pending(not_after) } {
             Ok(()) => {
                 // mark this as being on the pending queue in registered_when
-                self.inner.as_ref().set_registered_when(STATE_DEREGISTERED);
+                unsafe {
+                    self.inner.as_ref().set_registered_when(STATE_DEREGISTERED);
+                }
                 Ok(())
             }
             Err(tick) => {
-                self.inner.as_ref().set_registered_when(tick);
+                unsafe {
+                    self.inner.as_ref().set_registered_when(tick);
+                }
                 Err(tick)
             }
         }
@@ -682,6 +688,6 @@ impl TimerHandle {
     /// SAFETY: The driver lock must be held while invoking this function, and
     /// the entry must not be in any wheel linked lists.
     pub(super) unsafe fn fire(self, completed_state: TimerResult) -> Option<Waker> {
-        self.inner.as_ref().state.fire(completed_state)
+        unsafe { self.inner.as_ref().state.fire(completed_state) }
     }
 }

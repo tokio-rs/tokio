@@ -1070,6 +1070,13 @@ impl TcpStream {
     /// Successive calls return the same data. This is accomplished by passing
     /// `MSG_PEEK` as a flag to the underlying `recv` system call.
     ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe. If the method is used as the event in a
+    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// completes first, then it is guaranteed that no peek was performed, and
+    /// that `buf` has not been modified.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -1249,9 +1256,10 @@ impl TcpStream {
         /// Reads the linger duration for this socket by getting the `SO_LINGER`
         /// option.
         ///
-        /// For more information about this option, see [`set_linger`].
+        /// For more information about this option, see [`set_zero_linger`] and [`set_linger`].
         ///
         /// [`set_linger`]: TcpStream::set_linger
+        /// [`set_zero_linger`]: TcpStream::set_zero_linger
         ///
         /// # Examples
         ///
@@ -1278,9 +1286,25 @@ impl TcpStream {
         /// If `SO_LINGER` is not specified, and the stream is closed, the system handles the call in a
         /// way that allows the process to continue as quickly as possible.
         ///
+        /// This option is deprecated because setting `SO_LINGER` on a socket used with Tokio is
+        /// always incorrect as it leads to blocking the thread when the socket is closed. For more
+        /// details, please see:
+        ///
+        /// > Volumes of communications have been devoted to the intricacies of `SO_LINGER` versus
+        /// > non-blocking (`O_NONBLOCK`) sockets. From what I can tell, the final word is: don't
+        /// > do it. Rely on the `shutdown()`-followed-by-`read()`-eof technique instead.
+        /// >
+        /// > From [The ultimate `SO_LINGER` page, or: why is my tcp not reliable](https://blog.netherlabs.nl/articles/2009/01/18/the-ultimate-so_linger-page-or-why-is-my-tcp-not-reliable)
+        ///
+        /// Although this method is deprecated, it will not be removed from Tokio.
+        ///
+        /// Note that the special case of setting `SO_LINGER` to zero does not lead to blocking.
+        /// Tokio provides [`set_zero_linger`](Self::set_zero_linger) for this purpose.
+        ///
         /// # Examples
         ///
         /// ```no_run
+        /// # #![allow(deprecated)]
         /// use tokio::net::TcpStream;
         ///
         /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
@@ -1290,8 +1314,42 @@ impl TcpStream {
         /// # Ok(())
         /// # }
         /// ```
+        #[deprecated = "`SO_LINGER` causes the socket to block the thread on drop"]
         pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
             socket2::SockRef::from(self).set_linger(dur)
+        }
+
+        /// Sets a linger duration of zero on this socket by setting the `SO_LINGER` option.
+        ///
+        /// This causes the connection to be forcefully aborted ("abortive close") when the socket
+        /// is dropped or closed. Instead of the normal TCP shutdown handshake (`FIN`/`ACK`), a TCP
+        /// `RST` (reset) segment is sent to the peer, and the socket immediately discards any
+        /// unsent data residing in the socket send buffer. This prevents the socket from entering
+        /// the `TIME_WAIT` state after closing it.
+        ///
+        /// This is a destructive action. Any data currently buffered by the OS but not yet
+        /// transmitted will be lost. The peer will likely receive a "Connection Reset" error
+        /// rather than a clean end-of-stream.
+        ///
+        /// See the documentation for [`set_linger`](Self::set_linger) for additional details on
+        /// how `SO_LINGER` works.
+        ///
+        /// # Examples
+        ///
+        /// ```no_run
+        /// use std::time::Duration;
+        /// use tokio::net::TcpStream;
+        ///
+        /// # async fn dox() -> Result<(), Box<dyn std::error::Error>> {
+        /// let stream = TcpStream::connect("127.0.0.1:8080").await?;
+        ///
+        /// stream.set_zero_linger()?;
+        /// assert_eq!(stream.linger()?, Some(Duration::ZERO));
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub fn set_zero_linger(&self) -> io::Result<()> {
+            socket2::SockRef::from(self).set_linger(Some(Duration::ZERO))
         }
     }
 

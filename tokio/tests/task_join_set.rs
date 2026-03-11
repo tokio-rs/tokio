@@ -404,6 +404,23 @@ async fn try_join_next_with_id() {
     assert_eq!(joined, spawned);
 }
 
+#[tokio::test]
+async fn extend() {
+    let mut set: JoinSet<_> = (0..5).map(|i| async move { i }).collect();
+
+    set.extend((5..10).map(|i| async move { i }));
+
+    let mut seen = [false; 10];
+    while let Some(res) = set.join_next().await {
+        let idx = res.unwrap();
+        seen[idx] = true;
+    }
+
+    for s in &seen {
+        assert!(s);
+    }
+}
+
 mod spawn_local {
     use super::*;
 

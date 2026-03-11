@@ -9,6 +9,15 @@
 //! Make sure to consult the relevant safety section of each function before
 //! use.
 
+// It doesn't make sense to enforce `unsafe_op_in_unsafe_fn` for this module because
+//
+// * This module is doing the low-level task management that requires tons of unsafe
+//   operations.
+// * Excessive `unsafe {}` blocks hurt readability significantly.
+// TODO: replace with `#[expect(unsafe_op_in_unsafe_fn)]` after bumpping
+// the MSRV to 1.81.0.
+#![allow(unsafe_op_in_unsafe_fn)]
+
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::context;
@@ -195,6 +204,7 @@ pub(super) struct Trailer {
     /// Consumer task waiting on completion of this task.
     pub(super) waker: UnsafeCell<Option<Waker>>,
     /// Optional hooks needed in the harness.
+    #[cfg_attr(not(tokio_unstable), allow(dead_code))] //TODO: remove when hooks are stabilized
     pub(super) hooks: TaskHarnessScheduleHooks,
 }
 

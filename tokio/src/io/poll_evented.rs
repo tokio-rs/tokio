@@ -171,7 +171,7 @@ feature! {
             loop {
                 let evt = ready!(self.registration.poll_read_ready(cx))?;
 
-                let b = &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]);
+                let b = unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
 
                 // used only when the cfgs below apply
                 #[allow(unused_variables)]
@@ -188,6 +188,7 @@ feature! {
                         // Read more:
                         // https://github.com/tokio-rs/tokio/issues/5866
                         #[cfg(all(
+                            // keep in sync with poll_write
                             not(mio_unsupported_force_poll_poll),
                             any(
                                 // epoll
@@ -213,7 +214,7 @@ feature! {
 
                         // Safety: We trust `TcpStream::read` to have filled up `n` bytes in the
                         // buffer.
-                        buf.assume_init(n);
+                        unsafe { buf.assume_init(n) };
                         buf.advance(n);
                         return Poll::Ready(Ok(()));
                     },
@@ -240,7 +241,28 @@ feature! {
                         // that the socket buffer is full.  Unfortunately this assumption
                         // fails for level-triggered selectors (like on Windows or poll even for
                         // UNIX): https://github.com/tokio-rs/tokio/issues/5866
-                        if n > 0 && (!cfg!(windows) && !cfg!(mio_unsupported_force_poll_poll) && n < buf.len()) {
+                        #[cfg(all(
+                            // keep in sync with poll_read
+                            not(mio_unsupported_force_poll_poll),
+                            any(
+                                // epoll
+                                target_os = "android",
+                                target_os = "illumos",
+                                target_os = "linux",
+                                target_os = "redox",
+                                // kqueue
+                                target_os = "dragonfly",
+                                target_os = "freebsd",
+                                target_os = "ios",
+                                target_os = "macos",
+                                target_os = "netbsd",
+                                target_os = "openbsd",
+                                target_os = "tvos",
+                                target_os = "visionos",
+                                target_os = "watchos",
+                            )
+                        ))]
+                        if 0 < n && n < buf.len() {
                             self.registration.clear_readiness(evt);
                         }
 

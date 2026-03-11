@@ -1,3 +1,28 @@
+# 0.7.18 (January 4th, 2026)
+
+### Added
+
+- io: add `tokio_util::io::simplex` ([#7565])
+
+### Changed
+
+- task: remove unnecessary trait bounds on the `Debug` implementation for `JoinQueue` and `AbortOnDropHandle` ([#7720])
+
+### Fixed
+
+- deps: bump `tokio` to `1.44.0` ([#7733])
+
+### Documented
+
+- io: document the default capacity of the `ReaderStream` ([#7147])
+- sync: fix a typo in the docs of `PollSender::is_closed` ([#7737])
+
+[#7147]: https://github.com/tokio-rs/tokio/pull/7147
+[#7565]: https://github.com/tokio-rs/tokio/pull/7565
+[#7720]: https://github.com/tokio-rs/tokio/pull/7720
+[#7733]: https://github.com/tokio-rs/tokio/pull/7733
+[#7737]: https://github.com/tokio-rs/tokio/pull/7737
+
 # 0.7.17 (November 2nd, 2025)
 
 The MSRV is increased to 1.71.

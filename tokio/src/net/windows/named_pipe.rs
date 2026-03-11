@@ -126,7 +126,7 @@ impl NamedPipeServer {
     /// [Tokio Runtime]: crate::runtime::Runtime
     /// [enabled I/O]: crate::runtime::Builder::enable_io
     pub unsafe fn from_raw_handle(handle: RawHandle) -> io::Result<Self> {
-        let named_pipe = mio_windows::NamedPipe::from_raw_handle(handle);
+        let named_pipe = unsafe { mio_windows::NamedPipe::from_raw_handle(handle) };
 
         Ok(Self {
             io: PollEvented::new(named_pipe)?,
@@ -999,7 +999,7 @@ impl NamedPipeClient {
     /// [Tokio Runtime]: crate::runtime::Runtime
     /// [enabled I/O]: crate::runtime::Builder::enable_io
     pub unsafe fn from_raw_handle(handle: RawHandle) -> io::Result<Self> {
-        let named_pipe = mio_windows::NamedPipe::from_raw_handle(handle);
+        let named_pipe = unsafe { mio_windows::NamedPipe::from_raw_handle(handle) };
 
         Ok(Self {
             io: PollEvented::new(named_pipe)?,
@@ -2344,22 +2344,24 @@ impl ServerOptions {
             mode
         };
 
-        let h = windows_sys::CreateNamedPipeW(
-            addr.as_ptr(),
-            open_mode,
-            pipe_mode,
-            self.max_instances,
-            self.out_buffer_size,
-            self.in_buffer_size,
-            self.default_timeout,
-            attrs as *mut _,
-        );
+        let h = unsafe {
+            windows_sys::CreateNamedPipeW(
+                addr.as_ptr(),
+                open_mode,
+                pipe_mode,
+                self.max_instances,
+                self.out_buffer_size,
+                self.in_buffer_size,
+                self.default_timeout,
+                attrs as *mut _,
+            )
+        };
 
         if h == windows_sys::INVALID_HANDLE_VALUE {
             return Err(io::Error::last_os_error());
         }
 
-        NamedPipeServer::from_raw_handle(h as _)
+        unsafe { NamedPipeServer::from_raw_handle(h as _) }
     }
 }
 
@@ -2550,15 +2552,17 @@ impl ClientOptions {
         // we have access to windows_sys it ultimately doesn't hurt to use
         // `CreateFile` explicitly since it allows the use of our already
         // well-structured wide `addr` to pass into CreateFileW.
-        let h = windows_sys::CreateFileW(
-            addr.as_ptr(),
-            desired_access,
-            0,
-            attrs as *mut _,
-            windows_sys::OPEN_EXISTING,
-            self.get_flags(),
-            null_mut(),
-        );
+        let h = unsafe {
+            windows_sys::CreateFileW(
+                addr.as_ptr(),
+                desired_access,
+                0,
+                attrs as *mut _,
+                windows_sys::OPEN_EXISTING,
+                self.get_flags(),
+                null_mut(),
+            )
+        };
 
         if h == windows_sys::INVALID_HANDLE_VALUE {
             return Err(io::Error::last_os_error());
@@ -2566,15 +2570,16 @@ impl ClientOptions {
 
         if matches!(self.pipe_mode, PipeMode::Message) {
             let mode = windows_sys::PIPE_READMODE_MESSAGE;
-            let result =
-                windows_sys::SetNamedPipeHandleState(h, &mode, ptr::null_mut(), ptr::null_mut());
+            let result = unsafe {
+                windows_sys::SetNamedPipeHandleState(h, &mode, ptr::null_mut(), ptr::null_mut())
+            };
 
             if result == 0 {
                 return Err(io::Error::last_os_error());
             }
         }
 
-        NamedPipeClient::from_raw_handle(h as _)
+        unsafe { NamedPipeClient::from_raw_handle(h as _) }
     }
 
     fn get_flags(&self) -> u32 {
@@ -2659,13 +2664,15 @@ unsafe fn named_pipe_info(handle: RawHandle) -> io::Result<PipeInfo> {
     let mut in_buffer_size = 0;
     let mut max_instances = 0;
 
-    let result = windows_sys::GetNamedPipeInfo(
-        handle as _,
-        &mut flags,
-        &mut out_buffer_size,
-        &mut in_buffer_size,
-        &mut max_instances,
-    );
+    let result = unsafe {
+        windows_sys::GetNamedPipeInfo(
+            handle as _,
+            &mut flags,
+            &mut out_buffer_size,
+            &mut in_buffer_size,
+            &mut max_instances,
+        )
+    };
 
     if result == 0 {
         return Err(io::Error::last_os_error());
