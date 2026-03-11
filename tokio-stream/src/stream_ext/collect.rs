@@ -6,7 +6,7 @@ use core::mem;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
 use pin_project_lite::pin_project;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 
 // Do not export this struct until `FromStream` can be unsealed.
@@ -133,6 +133,25 @@ impl<T> sealed::FromStreamPriv<T> for Vec<T> {
     }
 
     fn finalize(_: sealed::Internal, collection: &mut Vec<T>) -> Vec<T> {
+        mem::take(collection)
+    }
+}
+
+impl<T> FromStream<T> for VecDeque<T> {}
+
+impl<T> sealed::FromStreamPriv<T> for VecDeque<T> {
+    type InternalCollection = VecDeque<T>;
+
+    fn initialize(_: sealed::Internal, lower: usize, _upper: Option<usize>) -> VecDeque<T> {
+        VecDeque::with_capacity(lower)
+    }
+
+    fn extend(_: sealed::Internal, collection: &mut VecDeque<T>, item: T) -> bool {
+        collection.push_back(item);
+        true
+    }
+
+    fn finalize(_: sealed::Internal, collection: &mut VecDeque<T>) -> VecDeque<T> {
         mem::take(collection)
     }
 }
