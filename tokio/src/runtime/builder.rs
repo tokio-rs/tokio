@@ -560,8 +560,14 @@ impl Builder {
     /// # }
     /// # }
     /// ```
+    /// # Panics
+    ///
+    /// This function will panic if an empty value is passed as an argument.
+    ///
+    #[track_caller]
     pub fn name(&mut self, val: impl Into<String>) -> &mut Self {
         let val = val.into();
+        assert!(!val.trim().is_empty(), "runtime name shouldn't be empty");
         self.name = Some(val);
         self
     }
