@@ -15,7 +15,7 @@ env:
   RUST_BACKTRACE: 1
   RUSTUP_WINDOWS_PATH_ADD_BIN: 1
   # Change to specific Rust release to pin
-  rust_stable: '1.93.1'
+  rust_stable: stable
   rust_nightly: nightly-2025-10-12
   # Pin a specific miri version
   rust_miri_nightly: nightly-2025-11-13
@@ -1057,6 +1057,8 @@ jobs:
         target:
           - wasm32-wasip1
           - wasm32-wasip1-threads
+    env:
+      rust_stable: '1.93.1'
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_stable }}
