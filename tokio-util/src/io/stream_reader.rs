@@ -175,7 +175,7 @@ where
     /// [`Result`]: std::result::Result
     /// [`Buf`]: bytes::Buf
     /// [io error]: std::io::Error
-    pub fn new(stream: S) -> Self {
+    pub const fn new(stream: S) -> Self {
         Self {
             inner: stream,
             chunk: None,
@@ -207,7 +207,7 @@ impl<S, B> StreamReader<S, B> {
     /// Gets a reference to the underlying stream.
     ///
     /// It is inadvisable to directly read from the underlying stream.
-    pub fn get_ref(&self) -> &S {
+    pub const fn get_ref(&self) -> &S {
         &self.inner
     }
 
