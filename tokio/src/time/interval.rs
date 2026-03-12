@@ -175,6 +175,9 @@ fn internal_interval_at(
 /// `MissedTickBehavior` can be used to specify a different behavior for
 /// [`Interval`] to exhibit. Each variant represents a different strategy.
 ///
+/// With all tick behaviors, the next tick after a missed tick will always
+/// complete immediately.
+///
 /// Note that because the executor cannot guarantee exact precision with timers,
 /// these strategies will only apply when the delay is greater than 5
 /// milliseconds.
@@ -294,12 +297,11 @@ pub enum MissedTickBehavior {
     /// When this strategy is used, [`Interval`] schedules the next tick to fire
     /// at the next-closest tick that is a multiple of `period` away from
     /// `start` (the point where [`Interval`] first ticked). Like [`Burst`], all
-    /// ticks remain multiples of `period` away from `start`, but unlike
-    /// [`Burst`], the ticks may not be *one* multiple of `period` away from the
-    /// last tick. Like [`Delay`], the ticks are no longer the same as they
-    /// would have been if ticks had not been missed, but unlike [`Delay`], and
-    /// like [`Burst`], the ticks may be shortened to be less than one `period`
-    /// away from each other.
+    /// ticks remain multiples of `period` away from `start`. Like [`Delay`],
+    /// the number of fired ticks are no longer the same as they would have been
+    /// if ticks had not been missed, but unlike [`Delay`], and like [`Burst`],
+    /// the ticks may be shortened to be less than one `period` away from each
+    /// other.
     ///
     /// This looks something like this:
     /// ```text
