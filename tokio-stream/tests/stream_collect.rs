@@ -92,18 +92,19 @@ async fn collect_linkedlist_items() {
 
     assert_pending!(fut.poll());
 
-    tx.send(1).unwrap();
-    assert!(fut.is_woken());
-    assert_pending!(fut.poll());
-
-    tx.send(2).unwrap();
-    assert!(fut.is_woken());
-    assert_pending!(fut.poll());
+    let xs = [1, 2, 42, 3];
+    for x in xs {
+        tx.send(x).unwrap();
+        assert!(fut.is_woken());
+        assert_pending!(fut.poll());
+    }
 
     drop(tx);
     assert!(fut.is_woken());
     let coll = assert_ready!(fut.poll());
-    assert_eq!(LinkedList::from([1, 2]), coll);
+
+    assert_eq!(coll, LinkedList::from(xs));
+    assert_eq!(coll.into_iter().collect::<Vec<_>>(), xs);
 }
 
 #[tokio::test]
