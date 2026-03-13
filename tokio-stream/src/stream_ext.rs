@@ -504,10 +504,13 @@ pub trait StreamExt: Stream {
     /// ```
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
+    /// use std::time::Duration;
+    /// use tokio::time;
     /// use tokio_stream::{self as stream, StreamExt};
     ///
     /// let stream = stream::iter(0..=7);
     /// let odds = stream.filter_map_async(async |x| {
+    ///     time::sleep(Duration::from_millis(100)).await;
     ///     if x % 2 == 0 { Some(x + 1) } else { None }
     /// });
     ///
