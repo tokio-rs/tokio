@@ -16,6 +16,9 @@ use collect::{Collect, FromStream};
 mod filter;
 pub use filter::Filter;
 
+mod filter_map_async;
+pub use filter_map_async::FilterMapAsync;
+
 mod filter_map;
 pub use filter_map::FilterMap;
 
@@ -477,6 +480,53 @@ pub trait StreamExt: Stream {
         Self: Sized,
     {
         FilterMap::new(self, f)
+    }
+
+    /// Filters the values produced by this stream asynchronously while
+    /// simultaneously mapping them to a different type according to the
+    /// provided async closure.
+    ///
+    /// The provided closure is executed over all elements of this stream as
+    /// they are made available, and the returned future is executed. Only one
+    /// future is executed at the time. If the returned future resolves to
+    /// [`Some(item)`](Some) then the stream will yield the value `item`, but if
+    /// it resolves to [`None`], then the value will be skipped.
+    ///
+    /// Note that this function consumes the stream passed into it and returns a
+    /// wrapped version of it, similar to [`Iterator::filter_map`] method in the
+    /// standard library.
+    ///
+    /// Be aware that if the future is not `Unpin`, then neither is the `Stream`
+    /// returned by this method. To handle this, you can use `tokio::pin!` as in
+    /// the example below or put the stream in a `Box` with `Box::pin(stream)`.
+    ///
+    /// # Examples
+    /// ```
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// let stream = stream::iter(0..=7);
+    /// let odds = stream.filter_map_async(async |x| {
+    ///     if x % 2 == 0 { Some(x + 1) } else { None }
+    /// });
+    ///
+    /// tokio::pin!(odds);
+    ///
+    /// assert_eq!(Some(1), odds.next().await);
+    /// assert_eq!(Some(3), odds.next().await);
+    /// assert_eq!(Some(5), odds.next().await);
+    /// assert_eq!(Some(7), odds.next().await);
+    /// assert_eq!(None, odds.next().await);
+    /// # }
+    /// ```
+    fn filter_map_async<T, F, Fut>(self, f: F) -> FilterMapAsync<Self, Fut, F>
+    where
+        F: FnMut(Self::Item) -> Fut,
+        Fut: Future<Output = Option<T>>,
+        Self: Sized,
+    {
+        FilterMapAsync::new(self, f)
     }
 
     /// Creates a stream which ends after the first `None`.
