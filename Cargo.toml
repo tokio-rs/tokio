@@ -17,6 +17,9 @@ members = [
 
 [patch.crates-io]
 tokio = { path = "tokio" }
+# TODO: Remove these once new releases are available:
+mio = { git = "https://github.com/tokio-rs/mio", rev = "9a387a507a32f3bc29bd3b9c0b59edaa95ed7bd0" }
+socket2 = { git = "https://github.com/rust-lang/socket2", rev = "e47157c29446856d87370b49194ce2f998337bfa" }
 
 [workspace.metadata.spellcheck]
 config = "spellcheck.toml"

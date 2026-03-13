@@ -1,6 +1,14 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support bind
-                                                                   // No socket on miri.
+// WASIp1 doesn't support bind
+// No `socket` on miri.
+#![cfg(all(
+    feature = "net",
+    feature = "macros",
+    feature = "rt",
+    feature = "io-util",
+    not(all(target_os = "wasi", target_env = "p1")),
+    not(miri)
+))]
 
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
