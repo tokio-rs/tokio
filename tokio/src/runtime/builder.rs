@@ -58,6 +58,16 @@ pub struct Builder {
     enable_io: bool,
     nevents: usize,
 
+    /// Idle timeout (in milliseconds) for the io_uring SQPOLL kernel thread.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux"
+    ))]
+    uring_setup_sqpoll: Option<u32>,
+
     /// Whether or not to enable the time driver
     enable_time: bool,
 
@@ -274,6 +284,15 @@ impl Builder {
             // I/O defaults to "off"
             enable_io: false,
             nevents: 1024,
+
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux"
+            ))]
+            uring_setup_sqpoll: None,
 
             // Time defaults to "off"
             enable_time: false,
@@ -1598,6 +1617,19 @@ impl Builder {
         cfg.timer_flavor = TimerFlavor::Traditional;
         let (driver, driver_handle) = driver::Driver::new(cfg)?;
 
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux"
+        ))]
+        if let Some(idle_timeout) = self.uring_setup_sqpoll {
+            if let Some(io) = driver_handle.io.as_ref() {
+                io.setup_uring_sqpoll(idle_timeout);
+            }
+        }
+
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
@@ -1736,10 +1768,41 @@ cfg_io_uring! {
         ///     .build()
         ///     .unwrap();
         /// ```
-        #[cfg_attr(docsrs, doc(cfg(feature = "io-uring")))]
+        #[cfg_attr(docsrs, doc(cfg(all(feature = "io-uring", feature = "rt", feature = "fs"))))]
         pub fn enable_io_uring(&mut self) -> &mut Self {
             // Currently, the uring flag is equivalent to `enable_io`.
             self.enable_io = true;
+            self
+        }
+
+        /// Enables SQPOLL for the io_uring driver and sets the idle timeout (in milliseconds).
+        ///
+        /// When SQPOLL is enabled, a kernel thread is created to poll the
+        /// submission queue. This can reduce syscall overhead.
+        ///
+        /// # Prerequisites
+        ///
+        /// SQPOLL requires Linux kernel 5.1 or later.
+        /// Until Linux 5.10, using this flag required the `CAP_SYS_ADMIN` capability.
+        /// From Linux 5.11, the `CAP_SYS_ADMIN` capability is no longer required.
+        ///
+        /// If SQPOLL is enabled but not supported by the kernel, the first I/O
+        /// operation using `io_uring` will fail.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_io_uring()
+        ///     .uring_setup_sqpoll(2000)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        #[cfg_attr(docsrs, doc(cfg(all(feature = "io-uring", feature = "rt", feature = "fs"))))]
+        pub fn uring_setup_sqpoll(&mut self, idle_timeout: u32) -> &mut Self {
+            self.uring_setup_sqpoll = Some(idle_timeout);
             self
         }
     }
@@ -1780,6 +1843,13 @@ cfg_rt_multi_thread! {
             let worker_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
             let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+
+            #[cfg(all(tokio_unstable, feature = "io-uring", feature = "rt", feature = "fs", target_os = "linux"))]
+            if let Some(idle_timeout) = self.uring_setup_sqpoll {
+                if let Some(io) = driver_handle.io.as_ref() {
+                    io.setup_uring_sqpoll(idle_timeout);
+                }
+            }
 
             // Create the blocking pool
             let blocking_pool =

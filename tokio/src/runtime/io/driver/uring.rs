@@ -15,6 +15,7 @@ const DEFAULT_RING_SIZE: u32 = 256;
 pub(crate) struct UringContext {
     pub(crate) uring: Option<io_uring::IoUring>,
     pub(crate) ops: slab::Slab<Lifecycle>,
+    pub(crate) sqpoll_idle: Option<u32>,
 }
 
 impl UringContext {
@@ -22,6 +23,7 @@ impl UringContext {
         Self {
             ops: Slab::new(),
             uring: None,
+            sqpoll_idle: None,
         }
     }
 
@@ -44,7 +46,13 @@ impl UringContext {
             return Ok(false);
         }
 
-        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
+        let uring = if let Some(idle_timeout) = self.sqpoll_idle {
+            IoUring::builder()
+                .setup_sqpoll(idle_timeout)
+                .build(DEFAULT_RING_SIZE)?
+        } else {
+            IoUring::new(DEFAULT_RING_SIZE)?
+        };
 
         match uring.submitter().register_probe(probe) {
             Ok(_) => {}
@@ -97,6 +105,14 @@ impl UringContext {
     }
 
     pub(crate) fn submit(&mut self) -> io::Result<()> {
+        if self.sqpoll_idle.is_some() {
+            let mut sq = self.ring_mut().submission();
+            sq.sync();
+            if !sq.need_wakeup() {
+                return Ok(());
+            }
+        }
+
         loop {
             // Errors from io_uring_enter: https://man7.org/linux/man-pages/man2/io_uring_enter.2.html#ERRORS
             match self.ring().submit() {
@@ -162,6 +178,11 @@ impl Handle {
 
     pub(crate) fn get_uring(&self) -> &Mutex<UringContext> {
         &self.uring_context
+    }
+
+    pub(crate) fn setup_uring_sqpoll(&self, idle_timeout: u32) {
+        let mut guard = self.get_uring().lock();
+        guard.sqpoll_idle = Some(idle_timeout);
     }
 
     /// Check if the io_uring context is initialized. If not, it will try to initialize it.
