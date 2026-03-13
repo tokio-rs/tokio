@@ -70,6 +70,12 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, self.stream.size_hint().1)
+        let future_len = usize::from(self.future.is_some());
+        let upper = self
+            .stream
+            .size_hint()
+            .1
+            .and_then(|upper| upper.checked_add(future_len));
+        (future_len, upper)
     }
 }
