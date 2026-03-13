@@ -446,6 +446,104 @@ impl File {
         asyncify(move || std.metadata()).await
     }
 
+    /// Executes an `IORING_OP_URING_CMD` operation on this file descriptor.
+    ///
+    /// This submits a 16-byte device/file-specific command payload that is
+    /// handled by the kernel subsystem backing this file descriptor.
+    /// Since the commands and their payloads are device specific, there is no
+    /// central list of possible commands. See the relevant kernel subsystem
+    /// documentation for the device you are interacting with.
+    ///
+    /// # io_uring support
+    ///
+    /// To use this API, enable `--cfg tokio_unstable`, the `io-uring` feature,
+    /// `Builder::enable_io`, and `Builder::enable_io_uring` on Linux.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because one could send privileged commands
+    /// or commands with payloads "telling" the kernel to read/write random
+    /// memory addresses specific to the command, which could fail due to
+    /// use-after-free or cause data corruption.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// use tokio::fs::File;
+    ///
+    /// // Suppose you have a character device that supports a specific `uring_cmd`.
+    /// let file = File::open("/dev/my_custom_device").await?;
+    ///
+    /// // The `cmd_op` is defined by the device driver (similar to an ioctl number).
+    /// const MY_DRIVER_CMD_OP: u32 = 0x1234;
+    ///
+    /// // The 16-byte payload is also defined by the device driver.
+    /// // Often, this is used to pass small serialized C structs or pointers.
+    /// #[repr(C)]
+    /// struct MyCmdData {
+    ///     device_id: u32,
+    ///     size_param: u32,
+    ///     _pad: [u8; 8], // Pad to exactly 16 bytes
+    /// }
+    ///
+    /// let data = MyCmdData {
+    ///     device_id: 42,
+    ///     size_param: 100,
+    ///     _pad: [0; 8],
+    /// };
+    ///
+    /// // Safely transmute the 16-byte struct into a byte array
+    /// let cmd_payload: [u8; 16] = unsafe { std::mem::transmute(data) };
+    ///
+    /// // SAFETY: The command and payload must be exactly what the specific
+    /// // device driver expects to prevent undefined behavior in the kernel.
+    /// let _ = unsafe { file.uring_cmd(MY_DRIVER_CMD_OP, cmd_payload, None).await };
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::io::ErrorKind::Unsupported`] if `io_uring` or
+    /// `IORING_OP_URING_CMD` is not available at runtime.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux"
+    ))]
+    pub async unsafe fn uring_cmd(
+        &self,
+        cmd_op: u32,
+        cmd: [u8; 16],
+        buf_index: Option<u16>,
+    ) -> io::Result<u32> {
+        use crate::runtime::driver::op::Op;
+        use std::os::fd::OwnedFd;
+
+        self.inner.lock().await.complete_inflight().await;
+
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+
+        if !driver_handle
+            .check_and_init(io_uring::opcode::UringCmd16::CODE)
+            .await?
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "io_uring uring_cmd is not supported",
+            ));
+        }
+
+        let fd: OwnedFd = self.std.try_clone()?.into();
+        let (res, _fd) = Op::uring_cmd16(fd, cmd_op, cmd, buf_index).await;
+        res
+    }
+
     /// Creates a new `File` instance that shares the same underlying file handle
     /// as the existing `File` instance. Reads, writes, and seeks will affect both
     /// File instances simultaneously.
