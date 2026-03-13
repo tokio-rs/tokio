@@ -15,6 +15,9 @@ mock! {
         pub fn read(&mut self, read: bool) -> &mut Self;
         pub fn truncate(&mut self, truncate: bool) -> &mut Self;
         pub fn write(&mut self, write: bool) -> &mut Self;
+
+        // Not mocking OpenOptionsExt trait due to:
+        // https://github.com/rust-lang/rust/issues/153486
         #[cfg(unix)]
         pub fn custom_flags(&mut self, flags: i32) -> &mut Self;
         #[cfg(unix)]
