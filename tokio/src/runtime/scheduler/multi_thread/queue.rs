@@ -452,37 +452,29 @@ impl<T> Steal<T> {
         // tasks in `dst`.
         let mut n = self.steal_into2(dst, dst_tail);
 
-        // Ooh, there's another task just sitting there? Grab that one, too!
-        let lifo = self.0.lifo.take();
-
-        if n == 0 && lifo.is_none() {
-            // No tasks were stolen
-            return None;
+        if n == 0 {
+            // If no tasks were stolen, let's see if there's one in the LIFO
+            // slot.
+            let lifo = self.0.lifo.take();
+            if lifo.is_some() {
+                dst_stats.incr_steal_count(1);
+                dst_stats.incr_steal_operations();
+            }
+            return lifo;
         }
 
-        // If we also grabbed the task from the LIFO slot, include that in the
-        // steal count as well.
-        dst_stats.incr_steal_count(n as u16 + lifo.is_some() as u16);
+        dst_stats.incr_steal_count(n as u16);
         dst_stats.incr_steal_operations();
 
-        let ret = if let Some(lifo) = lifo {
-            // If we took the task from the LIFO slot, just return it as the
-            // next task to run, rather than messing around with tasks from the
-            // queue.
-            lifo
-        } else {
-            // We are returning a task from the queue here.
-            n -= 1;
+        // We are returning a task here
+        n -= 1;
 
-            // The LIFO slot was was empty, so take the last task we squirted
-            // into `dst` instead.
-            let ret_pos = dst_tail.wrapping_add(n);
-            let ret_idx = ret_pos as usize & MASK;
+        let ret_pos = dst_tail.wrapping_add(n);
+        let ret_idx = ret_pos as usize & MASK;
 
-            // safety: the value was written as part of `steal_into2` and not
-            // exposed to stealers, so no other thread can access it.
-            dst.inner.buffer[ret_idx].with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) })
-        };
+        // safety: the value was written as part of `steal_into2` and not
+        // exposed to stealers, so no other thread can access it.
+        let ret = dst.inner.buffer[ret_idx].with(|ptr| unsafe { ptr::read((*ptr).as_ptr()) });
 
         if n == 0 {
             // The `dst` queue is empty, but a single task was stolen
