@@ -76,6 +76,6 @@ where
             .size_hint()
             .1
             .and_then(|upper| upper.checked_add(future_len));
-        (future_len, upper)
+        (0, upper)
     }
 }
