@@ -52,11 +52,10 @@ where
 
         loop {
             if let Some(future) = me.future.as_mut().as_pin_mut() {
-                if let Some(item) = ready!(future.poll(cx)) {
-                    me.future.set(None);
+                let item = ready!(future.poll(cx));
+                me.future.set(None);
+                if let Some(item) = item {
                     return Poll::Ready(Some(item));
-                } else {
-                    me.future.set(None);
                 }
             }
 
