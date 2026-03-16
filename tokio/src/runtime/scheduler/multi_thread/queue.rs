@@ -598,6 +598,7 @@ impl<T> Drop for Local<T> {
     fn drop(&mut self) {
         if !std::thread::panicking() {
             assert!(self.pop().is_none(), "queue not empty");
+            assert!(self.pop_lifo().is_none(), "LIFO slot not empty");
         }
     }
 }
