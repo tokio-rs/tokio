@@ -738,7 +738,7 @@ fn lifo_stealable() {
         // shouldn't ever kick the victim task out of its worker's LIFO slot.
         let churn = tokio::spawn(async move {
             loop {
-                tokio::time::sleep(Duration::from_millis(64)).await;
+                tokio::time::sleep(Duration::from_millis(4)).await;
             }
         });
 
