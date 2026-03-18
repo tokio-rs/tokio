@@ -114,7 +114,7 @@ jobs:
           cargo nextest run --workspace --features $TOKIO_STABLE_FEATURES
           # Removing workspace patches to run tests without path dependencies
           # (if not specified differently in the crate)
-          sed -i.bak '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"\s*}$/d' Cargo.toml && rm -f Cargo.toml.bak
+          perl -0 -i -pe 's/\[patch\.crates-io\].+\n\[/[/s' Cargo.toml
           cargo nextest run \
             --workspace \
             --exclude tokio \
@@ -226,7 +226,7 @@ jobs:
           cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to run tests without path dependencies
           # (if not specified differently in the crate)
-          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"\s*}$/d' Cargo.toml
+          perl -0 -i -pe 's/\[patch\.crates-io\].+\n\[/[/s' Cargo.toml
           cargo check --workspace --exclude tokio --tests --features $TOKIO_STABLE_FEATURES
 
   valgrind:
@@ -822,14 +822,17 @@ jobs:
           cargo clippy --workspace --tests --no-deps --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to check without path dependencies
           # (if not specified differently in the crate)
-          sed -i '/^\[patch\.crates-io\]$/d; /^tokio = { path = "tokio"\s*}$/d' Cargo.toml
+          perl -0 -i.bak -pe 's/\[patch\.crates-io\].+\n\[/[/s' Cargo.toml
           cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
       - name: "clippy --workspace --all-features --unstable"
         run: |
           # Forcing the cargo lock regeneration to apply the tokio patch
           rm Cargo.lock
-          cargo clippy --workspace --tests --no-deps --all-features --config 'patch.crates-io.tokio.path="tokio"'
+          mv Cargo.toml Cargo.toml.nopatch
+          mv Cargo.toml.bak Cargo.toml
+          cargo clippy --workspace --tests --no-deps --all-features
           # check without path dependencies
+          mv Cargo.toml.nopatch Cargo.toml
           cargo clippy --workspace --exclude tokio --tests --no-deps --all-features
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
