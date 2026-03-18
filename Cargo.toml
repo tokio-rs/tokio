@@ -17,6 +17,10 @@ members = [
 
 [patch.crates-io]
 tokio = { path = "tokio" }
+tokio-macros = { path = "tokio-macros" }
+tokio-stream = { path = "tokio-stream" }
+tokio-test = { path = "tokio-test" }
+tokio-util = { path = "tokio-util" }
 
 [workspace.metadata.spellcheck]
 config = "spellcheck.toml"
