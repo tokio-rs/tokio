@@ -14,7 +14,7 @@
 //!
 //! This is most relevant for services that open many connections concurrently
 //! (e.g. HTTP servers, connection pools). The pre-warm target should be at least
-//! your expected peak FD count.
+//! your expected peak FD count, and must not exceed `RLIMIT_NOFILE`.
 //!
 //! See: <https://github.com/tokio-rs/tokio/issues/7970>
 //!
@@ -25,7 +25,7 @@
 #![warn(rust_2018_idioms)]
 
 #[cfg(target_os = "linux")]
-fn prewarm_fd_table(target: u32) -> std::io::Result<()> {
+fn prewarm_fd_table(target: i32) -> std::io::Result<()> {
     use std::os::unix::io::{FromRawFd, OwnedFd};
 
     // Open /dev/null to get a base FD.
@@ -53,7 +53,7 @@ fn prewarm_fd_table(target: u32) -> std::io::Result<()> {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn prewarm_fd_table(_target: u32) -> std::io::Result<()> {
+fn prewarm_fd_table(_target: i32) -> std::io::Result<()> {
     // FD table pre-warming is Linux-specific.
     Ok(())
 }
@@ -61,7 +61,7 @@ fn prewarm_fd_table(_target: u32) -> std::io::Result<()> {
 fn main() {
     #[cfg(target_os = "linux")]
     {
-        const FD_TARGET: u32 = 10_000;
+        const FD_TARGET: i32 = 10_000;
 
         println!("Pre-warming FD table to {FD_TARGET} entries...");
         if let Err(e) = prewarm_fd_table(FD_TARGET) {
@@ -77,7 +77,5 @@ fn main() {
         .build()
         .unwrap();
 
-    rt.block_on(async {
-        println!("Runtime started. Worker threads will not stall on FD table growth up to {FD_TARGET} FDs.");
-    });
+    rt.block_on(async {});
 }
