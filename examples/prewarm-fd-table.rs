@@ -52,12 +52,6 @@ fn prewarm_fd_table(target: i32) -> std::io::Result<()> {
     Ok(())
 }
 
-#[cfg(not(target_os = "linux"))]
-fn prewarm_fd_table(_target: i32) -> std::io::Result<()> {
-    // FD table pre-warming is Linux-specific.
-    Ok(())
-}
-
 fn main() {
     #[cfg(target_os = "linux")]
     {
