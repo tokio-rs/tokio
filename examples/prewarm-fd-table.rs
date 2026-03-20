@@ -24,16 +24,15 @@
 
 #![warn(rust_2018_idioms)]
 
+/// Pre-warms the FD table using `fcntl(F_DUPFD_CLOEXEC)` to duplicate an FD
+/// into a high slot, expanding the table in a single syscall. `F_DUPFD_CLOEXEC`
+/// allocates the lowest available FD >= `target`, so it never clobbers an
+/// existing FD.
 #[cfg(target_os = "linux")]
 fn prewarm_fd_table(target: i32) -> std::io::Result<()> {
     use std::os::unix::io::{FromRawFd, OwnedFd};
 
-    // Open /dev/null to get a base FD.
     let dev_null = std::fs::File::open("/dev/null")?;
-
-    // Use F_DUPFD_CLOEXEC to duplicate to a slot >= target. This forces the
-    // kernel to expand the FD table in a single syscall, without clobbering
-    // existing FDs. CLOEXEC prevents leaking to child processes.
     let raw = unsafe {
         libc::fcntl(
             std::os::unix::io::AsRawFd::as_raw_fd(&dev_null),
@@ -49,6 +48,18 @@ fn prewarm_fd_table(target: i32) -> std::io::Result<()> {
     let _owned = unsafe { OwnedFd::from_raw_fd(raw) };
     drop(dev_null);
 
+    Ok(())
+}
+
+/// Fully safe alternative using only stdlib. Requires O(n) syscalls instead of
+/// one, but avoids `unsafe` entirely.
+#[cfg(target_os = "linux")]
+#[allow(dead_code)]
+fn prewarm_fd_table_safe(target: i32) -> std::io::Result<()> {
+    let f = std::fs::File::open("/dev/null")?;
+    let _fds: Vec<_> = (0..target)
+        .map(|_| f.try_clone())
+        .collect::<Result<_, _>>()?;
     Ok(())
 }
 
