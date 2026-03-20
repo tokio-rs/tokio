@@ -59,13 +59,16 @@ fn prewarm_fd_table(_target: u32) -> std::io::Result<()> {
 }
 
 fn main() {
-    const FD_TARGET: u32 = 10_000;
+    #[cfg(target_os = "linux")]
+    {
+        const FD_TARGET: u32 = 10_000;
 
-    println!("Pre-warming FD table to {FD_TARGET} entries...");
-    if let Err(e) = prewarm_fd_table(FD_TARGET) {
-        eprintln!("Warning: failed to pre-warm FD table: {e}");
-    } else {
-        println!("FD table pre-warmed successfully.");
+        println!("Pre-warming FD table to {FD_TARGET} entries...");
+        if let Err(e) = prewarm_fd_table(FD_TARGET) {
+            eprintln!("Warning: failed to pre-warm FD table: {e}");
+        } else {
+            println!("FD table pre-warmed successfully.");
+        }
     }
 
     // Build the runtime *after* pre-warming.
