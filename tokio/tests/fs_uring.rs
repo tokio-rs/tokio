@@ -187,7 +187,7 @@ async fn file_descriptors_are_removed_when_cancelling_open_op() {
         assert!(res.is_cancelled());
     }
 
-    // wait for some processed to be cancelled
+    // wait for some ops to be cancelled
     tokio::time::sleep(Duration::from_millis(250)).await;
 
     let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
