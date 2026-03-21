@@ -2,9 +2,9 @@ use io_uring::{squeue::Entry, IoUring, Probe};
 use mio::unix::SourceFd;
 use slab::Slab;
 
-use crate::runtime::driver::op::{Cancellable, Lifecycle};
-use crate::runtime::driver::op::CqeResult;
 use crate::runtime::driver::op::CancelData;
+use crate::runtime::driver::op::CqeResult;
+use crate::runtime::driver::op::{Cancellable, Lifecycle};
 
 use crate::{io::Interest, loom::sync::Mutex};
 
