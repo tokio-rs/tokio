@@ -148,7 +148,7 @@ async fn cancel_op_future() {
 
 // see: https://github.com/tokio-rs/tokio/issues/7979
 #[tokio::test]
-async fn file_descriptors_are_removed_when_cancelling_open_op() {
+async fn file_descriptors_are_closed_when_cancelling_open_op() {
     let (_tmp_file, path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
 
     let fd_count_before_access = fs::read_dir("/proc/self/fd").unwrap().count();
