@@ -83,6 +83,7 @@ impl UringContext {
                     if let CancelData::Open(_) = cancel_data {
                         if let Ok(fd) = CqeResult::from(cqe).result {
                             // SAFETY: the fd comes from the CQE result
+                            // of a cancelled event still to be closed
                             unsafe { libc::close(fd as i32) };
                         }
                     }

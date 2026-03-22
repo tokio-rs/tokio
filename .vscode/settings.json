@@ -1,0 +1,10 @@
+{
+    "type": "lldb",
+    "request": "launch",
+    "cargo": {
+        "args": ["test", "--no-run", "--lib"],      // Cargo command line to build the debug target
+                                                    // "args": ["build", "--bin=foo"] is another possibility
+        // The rest are optional
+        "env": { "RUSTFLAGS": "--cfg tokio_unstable" }, // Extra environment variables.
+    }
+}

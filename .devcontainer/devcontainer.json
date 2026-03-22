@@ -1,0 +1,5 @@
+{
+  "containerEnv": {
+    "RUSTFLAGS": "--cfg tokio_unstable"
+  }
+}
