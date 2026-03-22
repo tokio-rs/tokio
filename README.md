@@ -4,6 +4,8 @@
 
 # Tokio
 
+[![gitcgr](https://gitcgr.com/badge/tokio-rs/tokio.svg)](https://gitcgr.com/tokio-rs/tokio)
+
 A runtime for writing reliable, asynchronous, and slim applications with
 the Rust programming language. It is:
 
