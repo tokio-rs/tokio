@@ -5,7 +5,6 @@ use slab::Slab;
 use crate::runtime::driver::op::CancelData;
 use crate::runtime::driver::op::CqeResult;
 use crate::runtime::driver::op::{Cancellable, Lifecycle};
-
 use crate::{io::Interest, loom::sync::Mutex};
 
 use super::{Handle, TOKEN_WAKEUP};
@@ -83,12 +82,11 @@ impl UringContext {
                 Some(Lifecycle::Cancelled(cancel_data)) => {
                     if let CancelData::Open(_) = cancel_data {
                         if let Ok(fd) = CqeResult::from(cqe).result {
-                            //TODO
+                            // SAFETY: the fd comes from the CQE result
                             unsafe { libc::close(fd as i32) };
                         }
                     }
                     // Op future was cancelled, so we discard the result.
-                    // We just remove the entry from the slab.
                     ops.remove(idx);
                 }
                 Some(other) => {
