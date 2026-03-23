@@ -43,6 +43,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let (socket, addr) = match result {
                     Ok(conn) => conn,
                     Err(e) => {
+                        // Transient errors (e.g. fd exhaustion) are recoverable,
+                        // so we log and continue. A production server might add a
+                        // backoff or break on fatal errors to avoid a busy loop.
                         eprintln!("failed to accept: {e}");
                         continue;
                     }
