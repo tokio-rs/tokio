@@ -38,8 +38,10 @@ async fn file_descriptors_are_closed_when_cancelling_open_op() {
                 let fut = opt.open(&path);
 
                 // If io_uring is enabled (and not falling back to the thread pool),
-                // the first poll should return Pending.
-                assert_pending!(Box::pin(fut).poll_unpin(cx));
+                // the first poll should return Pending. We don't check if the result
+                // is actually a poll because some CI checks based on old kernels might
+                // return ready.
+                let _pending = Box::pin(fut).poll_unpin(cx);
 
                 tx.send(()).unwrap();
 
