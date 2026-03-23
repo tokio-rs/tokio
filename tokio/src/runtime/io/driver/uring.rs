@@ -9,7 +9,7 @@ use crate::{io::Interest, loom::sync::Mutex};
 
 use super::{Handle, TOKEN_WAKEUP};
 
-use std::os::fd::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::{io, mem, task::Waker};
 
 const DEFAULT_RING_SIZE: u32 = 256;
@@ -79,13 +79,12 @@ impl UringContext {
                     waker.wake_by_ref();
                     *ops.get_mut(idx).unwrap() = Lifecycle::Completed(cqe);
                 }
-                Some(Lifecycle::Cancelled(cancel_data)) => {
-                    if let CancelData::Open(_) = cancel_data {
-                        if let Ok(fd) = CqeResult::from(cqe).result {
-                            // SAFETY: the fd comes from the CQE result
-                            // of a cancelled event still to be closed
-                            unsafe { libc::close(fd as i32) };
-                        }
+                Some(Lifecycle::Cancelled(CancelData::Open(_))) => {
+                    if let Ok(fd) = CqeResult::from(cqe).result {
+                        // SAFETY: the successful CQE result provides
+                        // a non-negative integer, and the event is
+                        // related to an open operation.
+                        unsafe { OwnedFd::from_raw_fd(fd as i32) };
                     }
                     // Op future was cancelled, so we discard the result.
                     ops.remove(idx);
