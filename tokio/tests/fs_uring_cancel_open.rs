@@ -10,17 +10,18 @@
 
 use futures::future::FutureExt;
 use std::fs;
+use std::future::poll_fn;
 use std::task::Poll;
-use std::{future::poll_fn, path::PathBuf};
 use tempfile::NamedTempFile;
 use tokio_test::assert_pending;
 
 // see: https://github.com/tokio-rs/tokio/issues/7979
 #[tokio::test]
 async fn file_descriptors_are_closed_when_cancelling_open_op() {
-    let (_tmp_file, path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
+    let tmp = NamedTempFile::new().unwrap();
+    let path = tmp.path().to_path_buf();
 
-    let fd_count_before_access = fs::read_dir("/proc/self/fd").unwrap().count();
+    let fd_count_before_opens = fs::read_dir("/proc/self/fd").unwrap().count();
 
     for _ in 0..128 {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -34,7 +35,7 @@ async fn file_descriptors_are_closed_when_cancelling_open_op() {
                     opt
                 };
 
-                let fut = opt.open(&path[0]);
+                let fut = opt.open(&path);
 
                 // If io_uring is enabled (and not falling back to the thread pool),
                 // the first poll should return Pending.
@@ -57,19 +58,13 @@ async fn file_descriptors_are_closed_when_cancelling_open_op() {
     }
 
     let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
-    let leaked = fd_count_after_cancel.saturating_sub(fd_count_before_access);
+    let leaked = fd_count_after_cancel.saturating_sub(fd_count_before_opens);
 
-    //TODO(7979): check and explain
+    // Since we are opening 128 files, we expect that the related fds
+    // related to this operation will be closed. Since some other fds
+    // can be opened in the meantime, we expect this number to be higher
+    // than the counter before opening the files. This number could be
+    // lower, but to avoid test flakiness we check that this is at most
+    // half the number of the file we opened to check if there's a leak.
     assert!(leaked <= 64);
-}
-
-fn create_tmp_files(num_files: usize) -> (Vec<NamedTempFile>, Vec<PathBuf>) {
-    let mut files = Vec::with_capacity(num_files);
-    for _ in 0..num_files {
-        let tmp = NamedTempFile::new().unwrap();
-        let path = tmp.path().to_path_buf();
-        files.push((tmp, path));
-    }
-
-    files.into_iter().unzip()
 }
