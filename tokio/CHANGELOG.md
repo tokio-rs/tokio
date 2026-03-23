@@ -1,3 +1,12 @@
+# 1.50.1 (Mar 23rd, 2026)
+
+### Unstable
+
+- runtime: (io-uring) ensure fds are closed when invoking cancel op ([#7983])
+
+[#7983]: https://github.com/tokio-rs/tokio/pull/7983
+TODO(7979): add others
+
 # 1.50.0 (Mar 3rd, 2026)
 
 ### Added
