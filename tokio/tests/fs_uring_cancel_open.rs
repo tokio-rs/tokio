@@ -13,7 +13,6 @@ use std::fs;
 use std::future::poll_fn;
 use std::task::Poll;
 use tempfile::NamedTempFile;
-use tokio_test::assert_pending;
 
 // see: https://github.com/tokio-rs/tokio/issues/7979
 #[tokio::test]
