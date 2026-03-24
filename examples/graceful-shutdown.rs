@@ -23,11 +23,12 @@
 #![warn(rust_2018_idioms)]
 
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpStream};
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 
 use std::error::Error;
+use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -53,34 +54,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("accepted connection from {addr}");
 
                 let token = token.clone();
-
-                tracker.spawn(async move {
-                    let (reader, mut writer) = socket.into_split();
-                    let mut reader = BufReader::new(reader);
-                    let mut line = String::new();
-
-                    loop {
-                        tokio::select! {
-                            result = reader.read_line(&mut line) => {
-                                match result {
-                                    Ok(0) | Err(_) => break,
-                                    Ok(_) => {
-                                        if writer.write_all(line.as_bytes()).await.is_err() {
-                                            break;
-                                        }
-                                        line.clear();
-                                    }
-                                }
-                            }
-                            _ = token.cancelled() => {
-                                let _ = writer.write_all(b"server shutting down\n").await;
-                                break;
-                            }
-                        }
-                    }
-
-                    println!("connection from {addr} closed");
-                });
+                tracker.spawn(handle_connection(socket, addr, token));
             }
 
             _ = tokio::signal::ctrl_c() => {
@@ -97,4 +71,42 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("shutdown complete");
     Ok(())
+}
+
+async fn handle_connection(socket: TcpStream, addr: SocketAddr, token: CancellationToken) {
+    let (reader, mut writer) = socket.into_split();
+    let mut reader = BufReader::new(reader);
+    let mut line = String::new();
+
+    loop {
+        tokio::select! {
+            result = reader.read_line(&mut line) => {
+                match result {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {
+                        // Use select! so that a cancellation during a slow
+                        // write_all is noticed immediately.
+                        tokio::select! {
+                            res = writer.write_all(line.as_bytes()) => {
+                                if res.is_err() {
+                                    break;
+                                }
+                            }
+                            _ = token.cancelled() => {
+                                let _ = writer.write_all(b"server shutting down\n").await;
+                                break;
+                            }
+                        }
+                        line.clear();
+                    }
+                }
+            }
+            _ = token.cancelled() => {
+                let _ = writer.write_all(b"server shutting down\n").await;
+                break;
+            }
+        }
+    }
+
+    println!("connection from {addr} closed");
 }
