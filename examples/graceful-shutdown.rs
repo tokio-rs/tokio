@@ -24,6 +24,7 @@
 
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::time::{self, Duration};
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 
@@ -81,7 +82,13 @@ async fn handle_connection(
     tokio::select! {
         _ = echo(&mut socket) => {}
         _ = token.cancelled() => {
-            let _ = socket.write_all(b"server shutting down\n").await;
+            // Optionally notify the client before closing. Use a timeout
+            // so a slow or unresponsive client doesn't hold up shutdown.
+            let _ = time::timeout(
+                Duration::from_secs(1),
+                socket.write_all(b"server shutting down\n"),
+            )
+            .await;
         }
     }
 
