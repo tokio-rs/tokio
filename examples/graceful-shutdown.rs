@@ -73,40 +73,35 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn handle_connection(socket: TcpStream, addr: SocketAddr, token: CancellationToken) {
-    let (reader, mut writer) = socket.into_split();
-    let mut reader = BufReader::new(reader);
-    let mut line = String::new();
-
-    loop {
-        tokio::select! {
-            result = reader.read_line(&mut line) => {
-                match result {
-                    Ok(0) | Err(_) => break,
-                    Ok(_) => {
-                        // Use select! so that a cancellation during a slow
-                        // write_all is noticed immediately.
-                        tokio::select! {
-                            res = writer.write_all(line.as_bytes()) => {
-                                if res.is_err() {
-                                    break;
-                                }
-                            }
-                            _ = token.cancelled() => {
-                                let _ = writer.write_all(b"server shutting down\n").await;
-                                break;
-                            }
-                        }
-                        line.clear();
-                    }
-                }
-            }
-            _ = token.cancelled() => {
-                let _ = writer.write_all(b"server shutting down\n").await;
-                break;
-            }
+async fn handle_connection(
+    mut socket: TcpStream,
+    addr: SocketAddr,
+    token: CancellationToken,
+) {
+    tokio::select! {
+        _ = echo(&mut socket) => {}
+        _ = token.cancelled() => {
+            let _ = socket.write_all(b"server shutting down\n").await;
         }
     }
 
     println!("connection from {addr} closed");
+}
+
+async fn echo(socket: &mut TcpStream) {
+    let (reader, mut writer) = socket.split();
+    let mut reader = BufReader::new(reader);
+    let mut line = String::new();
+
+    loop {
+        match reader.read_line(&mut line).await {
+            Ok(0) | Err(_) => return,
+            Ok(_) => {
+                if writer.write_all(line.as_bytes()).await.is_err() {
+                    return;
+                }
+                line.clear();
+            }
+        }
+    }
 }
