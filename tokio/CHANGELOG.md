@@ -1,11 +1,20 @@
-# 1.50.1 (Mar 23rd, 2026)
+# 1.50.1 (Mar 24rd, 2026)
+
+This release fixes an issue where cancelling a file opening operation
+could lead to a leak of file descriptors on Linux when using io-uring.
 
 ### Unstable
 
+- runtime: add worker_index() getter (#7921)
 - runtime: (io-uring) ensure fds are closed when invoking cancel op ([#7983])
 
+### Documented
+
+- chore: Do not show "Available on non-loom only." doc label (#7977)
+
+[#7921]: https://github.com/tokio-rs/tokio/pull/7921
+[#7977]: https://github.com/tokio-rs/tokio/pull/7977
 [#7983]: https://github.com/tokio-rs/tokio/pull/7983
-TODO(7979): add others
 
 # 1.50.0 (Mar 3rd, 2026)
 
