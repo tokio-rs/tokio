@@ -814,6 +814,7 @@ fn schedule_latency_counts() {
             .build()
             .unwrap(),
         tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
             .enable_all()
             .enable_metrics_schedule_latency_histogram()
             .metrics_schedule_latency_histogram_configuration(HistogramConfiguration::linear(

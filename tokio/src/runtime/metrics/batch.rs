@@ -98,10 +98,13 @@ impl MetricsBatch {
                             poll_started_at: now,
                         })
                 });
-                let schedule_latencies = worker_metrics
+                // Schedule latencies cannot be tracked if `Instant::now()` is unavailable
+                let schedule_latencies = maybe_now.and_then(|_| {
+                    worker_metrics
                         .schedule_latency_histogram
                         .as_ref()
-                        .map(HistogramBatch::from_histogram);
+                        .map(HistogramBatch::from_histogram)
+                });
                 MetricsBatch {
                     park_count: 0,
                     park_unpark_count: 0,
@@ -230,9 +233,10 @@ impl MetricsBatch {
                 }
                 if let Some(task_scheduled_at) = task_scheduled_at {
                     if let Some(schedule_latencies) = &mut self.schedule_latencies {
-                        let now = self.poll_timer.as_ref().map(|p| p.poll_started_at).unwrap_or_else(Instant::now);
-                        let elapsed = duration_as_u64(now - task_scheduled_at);
-                        schedule_latencies.measure(elapsed, 1);
+                        if let Some(now) = self.poll_timer.as_ref().map(|p| p.poll_started_at).or_else(now) {
+                            let elapsed = duration_as_u64(now.saturating_duration_since(task_scheduled_at));
+                            schedule_latencies.measure(elapsed, 1);
+                        }
                     }
                 }
             }

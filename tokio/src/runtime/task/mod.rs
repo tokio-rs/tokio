@@ -250,7 +250,7 @@ impl<S> Notified<S> {
         self.0.task_meta()
     }
 
-    #[cfg(tokio_unstable)]
+    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
     pub(crate) unsafe fn set_scheduled_at(&self, now: Instant) {
         unsafe {
             self.0.header().set_scheduled_at(now);
@@ -278,7 +278,7 @@ impl<S> LocalNotified<S> {
         self.task.task_meta()
     }
 
-    #[cfg(tokio_unstable)]
+    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
     pub(crate) fn get_scheduled_at(&self) -> Option<Instant> {
         self.task.header().get_scheduled_at()
     }

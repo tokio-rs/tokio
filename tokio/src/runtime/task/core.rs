@@ -195,7 +195,10 @@ pub(crate) struct Header {
     pub(super) tracing_id: Option<tracing::Id>,
 
     /// The last time this task was scheduled. Used to measure schedule latency.
-    #[cfg(tokio_unstable)]
+    ///
+    /// Only enabled when the target supports 64-bit atomics because the metric
+    /// that uses this field also requires 64-bit atomics.
+    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
     pub(super) scheduled_at: UnsafeCell<Option<Instant>>,
 }
 
@@ -253,7 +256,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 owner_id: UnsafeCell::new(None),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
-                #[cfg(tokio_unstable)]
+                #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
                 scheduled_at: UnsafeCell::new(None),
             }
         }
@@ -549,13 +552,13 @@ impl Header {
     /// # Safety
     ///
     /// The caller must guarantee exclusive access to this field.
-    #[cfg(tokio_unstable)]
+    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
     pub(super) unsafe fn set_scheduled_at(&self, now: Instant) {
         self.scheduled_at.with_mut(|ptr| *ptr = Some(now));
     }
 
     /// Gets the last time this task was scheduled.
-    #[cfg(tokio_unstable)]
+    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
     pub(super) fn get_scheduled_at(&self) -> Option<Instant> {
         // Safety: If there are concurrent writes, then that write has violated
         // the safety requirements on `set_scheduled_at`.
