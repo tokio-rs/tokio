@@ -225,7 +225,7 @@ use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
 use std::panic::Location;
 use std::ptr::NonNull;
-#[cfg(tokio_unstable)]
+#[cfg(all(tokio_unstable, target_has_atomic = "64"))]
 use std::time::Instant;
 use std::{fmt, mem};
 

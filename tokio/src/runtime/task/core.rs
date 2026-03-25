@@ -32,7 +32,7 @@ use std::panic::Location;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
-#[cfg(tokio_unstable)]
+#[cfg(all(tokio_unstable, target_has_atomic = "64"))]
 use std::time::Instant;
 
 /// The task cell. Contains the components of the task.
