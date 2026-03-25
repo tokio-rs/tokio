@@ -682,12 +682,7 @@ impl Schedule for Arc<Handle> {
             .metrics_schedule_latency_histogram
             .is_some()
         {
-            // SAFETY: There are no concurrent writes because tasks cannot be scheduled in
-            // multiple places concurrently. There are no concurrent reads because this field
-            // is only read when polling the task, which can only happen after it's scheduled.
-            unsafe {
-                task.set_scheduled_at(std::time::Instant::now());
-            }
+            task.set_scheduled_at(std::time::Instant::now());
         }
 
         context::with_scheduler(|maybe_cx| match maybe_cx {

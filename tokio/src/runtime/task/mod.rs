@@ -251,7 +251,10 @@ impl<S> Notified<S> {
     }
 
     #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-    pub(crate) unsafe fn set_scheduled_at(&self, now: Instant) {
+    pub(crate) fn set_scheduled_at(&self, now: Instant) {
+        // SAFETY: There are no concurrent writes because there is only ever one `Notified`
+        // reference per task. There are no concurrent reads because this field is only read
+        // when polling the task, which can only happen after it's scheduled.
         unsafe {
             self.0.header().set_scheduled_at(now);
         }
