@@ -67,6 +67,7 @@ pub(crate) struct WorkerMetrics {
     pub(super) poll_count_histogram: Option<Histogram>,
 
     #[cfg(tokio_unstable)]
+    /// If `Some`, tracks the number of times tasks were scheduled by duration range.
     pub(super) schedule_latency_histogram: Option<Histogram>,
 }
 

@@ -1570,9 +1570,9 @@ impl Builder {
         /// execution and when it is polled.
         ///
         /// Task schedule latencies are not instrumented by default as doing
-        /// so requires calling [`Instant::now()`] twice per task poll, which
-        /// could add measurable overhead. Use the [`Handle::metrics()`] to
-        /// access the metrics data.
+        /// so requires calling [`Instant::now()`] when a task is scheduled
+        /// and when it is polled, which could add measurable overhead. Use
+        /// the [`Handle::metrics()`] to access the metrics data.
         ///
         /// By default, a linear histogram with 10 buckets each 100 microseconds wide will be used.
         /// This has an extremely low memory footprint, but may not provide enough granularity. For
@@ -1609,6 +1609,10 @@ impl Builder {
         }
 
         /// Configure the histogram for tracking task schedule latencies.
+        ///
+        /// Tracking of task schedule latencies must be enabled with
+        /// [`enable_metrics_schedule_latency_histogram()`] for this function
+        /// to have any effect.
         ///
         /// By default, a linear histogram with 10 buckets each 100 microseconds wide will be used.
         /// This has an extremely low memory footprint, but may not provide enough granularity. For
@@ -1678,6 +1682,7 @@ impl Builder {
         /// ```
         ///
         /// [`LogHistogram`]: crate::runtime::LogHistogram
+        /// [`enable_metrics_schedule_latency_histogram()`]: Builder::enable_metrics_schedule_latency_histogram
         pub fn metrics_schedule_latency_histogram_configuration(&mut self, configuration: HistogramConfiguration) -> &mut Self {
             self.metrics_schedule_latency_histogram.histogram_type = configuration.inner;
             self

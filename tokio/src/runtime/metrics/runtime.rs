@@ -575,10 +575,10 @@ impl RuntimeMetrics {
         /// Returns `true` if the runtime is tracking the distribution of task
         /// schedule latencies.
         ///
-        /// Task schedule latencies times are not instrumented by default as doing
-        /// so requires calling [`Instant::now()`] twice per task poll. The feature
-        /// is enabled by calling [`enable_metrics_schedule_latency_histogram()`]
-        /// when building the runtime.
+        /// Task schedule latencies are not instrumented by default as doing so
+        /// requires calling [`Instant::now()`] when a task is scheduled and when
+        /// it is polled. The feature is enabled by calling
+        /// [`enable_metrics_schedule_latency_histogram()`] when building the runtime.
         ///
         /// # Examples
         ///
