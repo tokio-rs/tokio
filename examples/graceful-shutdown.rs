@@ -74,11 +74,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn handle_connection(
-    mut socket: TcpStream,
-    addr: SocketAddr,
-    token: CancellationToken,
-) {
+async fn handle_connection(mut socket: TcpStream, addr: SocketAddr, token: CancellationToken) {
     tokio::select! {
         _ = echo(&mut socket) => {}
         _ = token.cancelled() => {
