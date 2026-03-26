@@ -373,6 +373,13 @@
 //! When a task is woken from a thread that is not a worker thread, then the
 //! task is placed in the global queue.
 //!
+//! # Performance tuning
+//!
+//! ## File descriptor table pre-warming
+//!
+//! On Linux, file descriptor table growth can stall worker threads. See the
+//! [`prewarm-fd-table`] example.
+//!
 //! [`poll`]: std::future::Future::poll
 //! [`wake`]: std::task::Waker::wake
 //! [`yield_now`]: crate::task::yield_now
@@ -385,6 +392,7 @@
 //! [the lifo slot optimization]: crate::runtime::Builder::disable_lifo_slot
 //! [coop budget]: crate::task::coop#cooperative-scheduling
 //! [`worker_mean_poll_time`]: crate::runtime::RuntimeMetrics::worker_mean_poll_time
+//! [`prewarm-fd-table`]: https://github.com/tokio-rs/tokio/blob/master/examples/prewarm-fd-table.rs
 
 // At the top due to macros
 #[cfg(test)]

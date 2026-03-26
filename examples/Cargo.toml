@@ -24,6 +24,9 @@ httparse = "1.0"
 httpdate = "1.0"
 once_cell = "1.5.2"
 
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+libc = "0.2"
+
 [target.'cfg(all(tokio_unstable, target_os = "linux"))'.dev-dependencies]
 tokio = { version = "1.0.0", path = "../tokio", features = ["full", "tracing", "taskdump"] }
 
@@ -101,6 +104,10 @@ path = "named-pipe-multi-client.rs"
 [[example]]
 name = "dump"
 path = "dump.rs"
+
+[[example]]
+name = "prewarm-fd-table"
+path = "prewarm-fd-table.rs"
 
 [lints]
 workspace = true
