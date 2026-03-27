@@ -156,6 +156,16 @@ impl Drop for UringContext {
 
             for cqe in self.ring_mut().completion() {
                 let idx = cqe.user_data() as usize;
+
+                if let Some(Lifecycle::Cancelled(CancelData::Open(_))) = ops.get_mut(idx) {
+                    if let Ok(fd) = CqeResult::from(cqe).result {
+                        // SAFETY: the successful CQE result provides
+                        // a non-negative integer, and the event is
+                        // related to an open operation.
+                        unsafe { OwnedFd::from_raw_fd(fd as i32) };
+                    }
+                };
+
                 ops.remove(idx);
             }
         }
