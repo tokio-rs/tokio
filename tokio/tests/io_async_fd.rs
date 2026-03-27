@@ -10,6 +10,7 @@ use std::time::Duration;
 use std::{
     future::Future,
     io::{self, ErrorKind, Read, Write},
+    os::fd::OwnedFd,
     task::{Context, Waker},
 };
 
@@ -69,7 +70,7 @@ impl AsRawFd for FileDescriptor {
 
 impl Read for &FileDescriptor {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        read(self.fd.as_raw_fd(), buf).map_err(io::Error::from)
+        read(&self.fd, buf).map_err(io::Error::from)
     }
 }
 
@@ -99,7 +100,7 @@ impl Write for FileDescriptor {
     }
 }
 
-fn set_nonblocking(fd: RawFd) {
+fn set_nonblocking(fd: &OwnedFd) {
     use nix::fcntl::{OFlag, F_GETFL, F_SETFL};
 
     let flags = nix::fcntl::fcntl(fd, F_GETFL).expect("fcntl(F_GETFD)");
@@ -129,8 +130,8 @@ fn socketpair() -> (FileDescriptor, FileDescriptor) {
     .expect("socketpair");
     let fds = (FileDescriptor { fd: fd_a }, FileDescriptor { fd: fd_b });
 
-    set_nonblocking(fds.0.fd.as_raw_fd());
-    set_nonblocking(fds.1.fd.as_raw_fd());
+    set_nonblocking(&fds.0.fd);
+    set_nonblocking(&fds.1.fd);
 
     fds
 }

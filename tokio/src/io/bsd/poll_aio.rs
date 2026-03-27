@@ -9,8 +9,7 @@ use mio::Token;
 use std::fmt;
 use std::io;
 use std::ops::{Deref, DerefMut};
-use std::os::unix::io::AsRawFd;
-use std::os::unix::prelude::RawFd;
+use std::os::fd::{AsFd, BorrowedFd};
 use std::task::{ready, Context, Poll};
 
 /// Like [`mio::event::Source`], but for POSIX AIO only.
@@ -19,7 +18,7 @@ use std::task::{ready, Context, Poll};
 /// [`Aio`] object.
 pub trait AioSource {
     /// Registers this AIO event source with Tokio's reactor.
-    fn register(&mut self, kq: RawFd, token: usize);
+    fn register(&mut self, kq: BorrowedFd<'_>, token: usize);
 
     /// Deregisters this AIO event source with Tokio's reactor.
     fn deregister(&mut self);
@@ -37,7 +36,7 @@ impl<T: AioSource> Source for MioSource<T> {
         interests: mio::Interest,
     ) -> io::Result<()> {
         assert!(interests.is_aio() || interests.is_lio());
-        self.0.register(registry.as_raw_fd(), usize::from(token));
+        self.0.register(registry.as_fd(), usize::from(token));
         Ok(())
     }
 
@@ -53,7 +52,7 @@ impl<T: AioSource> Source for MioSource<T> {
         interests: mio::Interest,
     ) -> io::Result<()> {
         assert!(interests.is_aio() || interests.is_lio());
-        self.0.register(registry.as_raw_fd(), usize::from(token));
+        self.0.register(registry.as_fd(), usize::from(token));
         Ok(())
     }
 }
