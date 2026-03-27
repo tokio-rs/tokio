@@ -16,9 +16,9 @@ use mock_open_options::MockOpenOptions as StdOpenOptions;
 #[cfg(not(test))]
 use std::fs::OpenOptions as StdOpenOptions;
 
-#[cfg(all(unix, not(test)))]
+#[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
-#[cfg(all(windows, not(test)))]
+#[cfg(windows)]
 use std::os::windows::fs::OpenOptionsExt;
 
 /// Options and flags which can be used to configure how a file is opened.
