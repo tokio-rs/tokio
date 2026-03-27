@@ -222,19 +222,27 @@ impl MetricsBatch {
     cfg_metrics_variant! {
         stable: {
             /// Start polling an individual task
-            pub(crate) fn start_poll(&mut self, _task_scheduled_at: Option<Instant>) {}
+            pub(crate) fn start_poll(&mut self, _task_scheduled_at: Option<(Instant, u64)>) {}
         },
         unstable: {
             /// Start polling an individual task
-            pub(crate) fn start_poll(&mut self, task_scheduled_at: Option<Instant>) {
+            ///
+            /// # Arguments
+            ///
+            /// `task_scheduled_at` is an optional tuple containing the Instant the scheduler
+            /// was started and the number of nanoseconds elapsed between that instant and
+            /// the time the task being polled was scheduled.
+            pub(crate) fn start_poll(&mut self, task_scheduled_at: Option<(Instant, u64)>) {
                 self.poll_count += 1;
                 if let Some(poll_timer) = &mut self.poll_timer {
                     poll_timer.poll_started_at = Instant::now();
                 }
-                if let Some(task_scheduled_at) = task_scheduled_at {
+                if let Some((runtime_started_at, task_scheduled_at)) = task_scheduled_at {
                     if let Some(schedule_latencies) = &mut self.schedule_latencies {
                         if let Some(now) = self.poll_timer.as_ref().map(|p| p.poll_started_at).or_else(now) {
-                            let elapsed = duration_as_u64(now.saturating_duration_since(task_scheduled_at));
+                            // `u64::MAX` as nanoseconds is equal to 584 years
+                            let nanos_since_start = now.saturating_duration_since(runtime_started_at).as_nanos() as u64;
+                            let elapsed = nanos_since_start.saturating_sub(task_scheduled_at);
                             schedule_latencies.measure(elapsed, 1);
                         }
                     }

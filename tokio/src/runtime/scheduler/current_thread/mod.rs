@@ -21,6 +21,8 @@ use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
 use std::thread::ThreadId;
 use std::time::Duration;
+#[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+use std::time::Instant;
 use std::{fmt, thread};
 
 /// Executes tasks on the current thread
@@ -98,6 +100,12 @@ struct Shared {
 
     /// This scheduler only has one worker.
     worker_metrics: WorkerMetrics,
+
+    /// Startup time of this scheduler.
+    ///
+    /// This instant is used as the basis of task `scheduled_at` measurements.
+    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+    started_at: Instant,
 }
 
 /// Thread-local context.
@@ -158,6 +166,8 @@ impl CurrentThread {
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),
                 worker_metrics,
+                #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+                started_at: Instant::now(),
             },
             driver: driver_handle,
             blocking_spawner,
@@ -368,9 +378,12 @@ impl Context {
         #[cfg(tokio_unstable)]
         let task_meta = task.task_meta();
 
-        #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-        core.metrics.start_poll(task.get_scheduled_at());
-        #[cfg(not(all(tokio_unstable, target_has_atomic = "64")))]
+        #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+        core.metrics.start_poll(
+            task.get_scheduled_at()
+                .map(|t| (self.handle.shared.started_at, t.get())),
+        );
+        #[cfg(not(all(tokio_unstable, target_pointer_width = "64")))]
         core.metrics.start_poll(None);
 
         let (mut c, ()) = self.enter(core, || {
@@ -675,14 +688,18 @@ impl Schedule for Arc<Handle> {
     fn schedule(&self, task: task::Notified<Self>) {
         use scheduler::Context::CurrentThread;
 
-        #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+        #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
         if self
             .shared
             .config
             .metrics_schedule_latency_histogram
             .is_some()
         {
-            task.set_scheduled_at(std::time::Instant::now());
+            // SAFETY: `.max(1)` ensures the value can never be 0.
+            let scheduled_at = unsafe {
+                NonZeroU64::new_unchecked(self.shared.started_at.elapsed().as_nanos().max(1) as u64)
+            };
+            task.set_scheduled_at(scheduled_at);
         }
 
         context::with_scheduler(|maybe_cx| match maybe_cx {

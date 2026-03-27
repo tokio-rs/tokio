@@ -1569,6 +1569,8 @@ impl Builder {
         /// schedule latency is the time between when a task is scheduled for
         /// execution and when it is polled.
         ///
+        /// **This feature is only supported on 64-bit targets.**
+        ///
         /// Task schedule latencies are not instrumented by default as doing
         /// so requires calling [`Instant::now()`] when a task is scheduled
         /// and when it is polled, which could add measurable overhead. Use

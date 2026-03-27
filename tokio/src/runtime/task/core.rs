@@ -32,8 +32,6 @@ use std::panic::Location;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
-#[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-use std::time::Instant;
 
 /// The task cell. Contains the components of the task.
 ///
@@ -195,11 +193,12 @@ pub(crate) struct Header {
     pub(super) tracing_id: Option<tracing::Id>,
 
     /// The last time this task was scheduled. Used to measure schedule latency.
+    /// Stored as the number of nanoseconds since scheduler startup.
     ///
-    /// Only enabled when the target supports 64-bit atomics because the metric
-    /// that uses this field also requires 64-bit atomics.
-    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-    pub(super) scheduled_at: UnsafeCell<Option<Instant>>,
+    /// Only enabled on 64-bit targets because this field extends the size of this
+    /// struct beyond the size of one cache line on 32-bit targets.
+    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+    pub(super) scheduled_at: UnsafeCell<Option<NonZeroU64>>,
 }
 
 unsafe impl Send for Header {}
@@ -256,7 +255,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 owner_id: UnsafeCell::new(None),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
-                #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+                #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
                 scheduled_at: UnsafeCell::new(None),
             }
         }
@@ -549,17 +548,23 @@ impl Header {
     /// Updates the last time this task was scheduled. Used to calculate
     /// the time elapsed between task scheduling and polling.
     ///
+    ///
+    /// # Arguments
+    ///
+    /// `nanos` is the number of nanoseconds elapsed since the scheduler
+    /// was started.
+    ///
     /// # Safety
     ///
     /// The caller must guarantee exclusive access to this field.
-    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-    pub(super) unsafe fn set_scheduled_at(&self, now: Instant) {
-        self.scheduled_at.with_mut(|ptr| *ptr = Some(now));
+    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+    pub(super) unsafe fn set_scheduled_at(&self, nanos: NonZeroU64) {
+        self.scheduled_at.with_mut(|ptr| *ptr = Some(nanos));
     }
 
     /// Gets the last time this task was scheduled.
-    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-    pub(super) fn get_scheduled_at(&self) -> Option<Instant> {
+    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+    pub(super) fn get_scheduled_at(&self) -> Option<NonZeroU64> {
         // Safety: If there are concurrent writes, then that write has violated
         // the safety requirements on `set_scheduled_at`.
         unsafe { self.scheduled_at.with(|ptr| *ptr) }

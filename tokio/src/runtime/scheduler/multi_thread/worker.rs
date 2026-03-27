@@ -75,6 +75,8 @@ use std::cell::RefCell;
 use std::task::Waker;
 use std::thread;
 use std::time::Duration;
+#[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+use std::time::Instant;
 
 mod metrics;
 
@@ -192,6 +194,12 @@ pub(crate) struct Shared {
     pub(super) scheduler_metrics: SchedulerMetrics,
 
     pub(super) worker_metrics: Box<[WorkerMetrics]>,
+
+    /// Startup time of this scheduler.
+    ///
+    /// This instant is used as the basis of task `scheduled_at` measurements.
+    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+    started_at: Instant,
 
     /// Only held to trigger some code on drop. This is used to get internal
     /// runtime metrics that can be useful when doing performance
@@ -318,6 +326,8 @@ pub(super) fn create(
             config,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
+            #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+            started_at: Instant::now(),
             _counters: Counters,
         },
         driver: driver_handle,
@@ -629,9 +639,12 @@ impl Context {
         // tasks under this measurement. In this case, the tasks came from the
         // LIFO slot and are considered part of the current task for scheduling
         // purposes. These tasks inherent the "parent"'s limits.
-        #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-        core.stats.start_poll(task.get_scheduled_at());
-        #[cfg(not(all(tokio_unstable, target_has_atomic = "64")))]
+        #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+        core.stats.start_poll(
+            task.get_scheduled_at()
+                .map(|t| (self.worker.handle.shared.started_at, t.get())),
+        );
+        #[cfg(not(all(tokio_unstable, target_pointer_width = "64")))]
         core.stats.start_poll(None);
 
         // Make the core available to the runtime context
@@ -1274,14 +1287,20 @@ impl Worker {
 
 impl Handle {
     pub(super) fn schedule_task(&self, task: Notified, is_yield: bool) {
-        #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+        #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
         if self
             .shared
             .config
             .metrics_schedule_latency_histogram
             .is_some()
         {
-            task.set_scheduled_at(std::time::Instant::now());
+            // SAFETY: `.max(1)` ensures the value can never be 0.
+            let scheduled_at = unsafe {
+                std::num::NonZeroU64::new_unchecked(
+                    self.shared.started_at.elapsed().as_nanos().max(1) as u64,
+                )
+            };
+            task.set_scheduled_at(scheduled_at);
         }
 
         with_current(|maybe_cx| {

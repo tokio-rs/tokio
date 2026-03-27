@@ -223,10 +223,10 @@ use crate::util::sharded_list;
 
 use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
+#[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+use std::num::NonZeroU64;
 use std::panic::Location;
 use std::ptr::NonNull;
-#[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-use std::time::Instant;
 use std::{fmt, mem};
 
 /// An owned handle to the task, tracked by ref count.
@@ -250,13 +250,13 @@ impl<S> Notified<S> {
         self.0.task_meta()
     }
 
-    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-    pub(crate) fn set_scheduled_at(&self, now: Instant) {
+    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+    pub(crate) fn set_scheduled_at(&self, nanos: NonZeroU64) {
         // SAFETY: There are no concurrent writes because there is only ever one `Notified`
         // reference per task. There are no concurrent reads because this field is only read
         // when polling the task, which can only happen after it's scheduled.
         unsafe {
-            self.0.header().set_scheduled_at(now);
+            self.0.header().set_scheduled_at(nanos);
         }
     }
 }
@@ -281,8 +281,8 @@ impl<S> LocalNotified<S> {
         self.task.task_meta()
     }
 
-    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-    pub(crate) fn get_scheduled_at(&self) -> Option<Instant> {
+    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+    pub(crate) fn get_scheduled_at(&self) -> Option<NonZeroU64> {
         self.task.header().get_scheduled_at()
     }
 }

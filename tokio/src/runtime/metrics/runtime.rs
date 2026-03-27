@@ -1145,7 +1145,14 @@ impl RuntimeMetrics {
                 .load(Relaxed);
             Duration::from_nanos(nanos)
         }
+    }
 
+    feature! {
+        #![all(
+            tokio_unstable,
+            target_has_atomic = "64",
+            target_pointer_width = "64"
+        )]
         /// Returns the number of times the given worker polled tasks with a schedule
         /// latency within the given bucket's range.
         ///
