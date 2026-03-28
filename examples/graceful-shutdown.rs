@@ -78,19 +78,17 @@ async fn handle_connection(mut socket: TcpStream, addr: SocketAddr, token: Cance
     tokio::select! {
         _ = echo(&mut socket) => {}
         _ = token.cancelled() => {
-            // Optionally notify the client before closing. Use a timeout
-            // so a slow or unresponsive client doesn't hold up shutdown.
-            let _ = time::timeout(
-                Duration::from_secs(1),
-                socket.write_all(b"server shutting down\n"),
-            )
-            .await;
+            notify_shutdown(&mut socket).await;
         }
     }
 
     println!("connection from {addr} closed");
 }
 
+/// Reads lines from the client and writes them back.
+///
+/// Called for every accepted connection. Runs until the client disconnects
+/// or a read/write error occurs.
 async fn echo(socket: &mut TcpStream) {
     let (reader, mut writer) = socket.split();
     let mut reader = BufReader::new(reader);
@@ -107,4 +105,16 @@ async fn echo(socket: &mut TcpStream) {
             }
         }
     }
+}
+
+/// Sends a shutdown notice to the client before closing the connection.
+///
+/// Called when the cancellation token fires. Uses a timeout so that a
+/// slow or unresponsive client cannot hold up the server shutdown.
+async fn notify_shutdown(socket: &mut TcpStream) {
+    let _ = time::timeout(
+        Duration::from_secs(1),
+        socket.write_all(b"server shutting down\n"),
+    )
+    .await;
 }
