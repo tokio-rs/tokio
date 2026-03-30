@@ -374,10 +374,9 @@ cfg_rt! {
     /// }).await;
     /// # }
     /// ```
-    /// With local runtime flavor ([Unstable API][unstable] only).
+    /// With local runtime flavor.
     ///
     /// ```rust
-    /// # #[cfg(tokio_unstable)]
     /// #[tokio::main(flavor = "local")]
     /// async fn main() {
     ///     let join = tokio::task::spawn_local(async {
@@ -386,8 +385,6 @@ cfg_rt! {
     ///
     ///    join.await.unwrap()
     ///  }
-    /// # #[cfg(not(tokio_unstable))]
-    /// # fn main() {}
     ///
     /// ```
     ///
