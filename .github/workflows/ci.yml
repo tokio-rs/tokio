@@ -1060,8 +1060,6 @@ jobs:
         target:
           - wasm32-wasip1
           - wasm32-wasip1-threads
-    env:
-      rust_stable: '1.93.1'
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_stable }}
