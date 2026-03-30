@@ -50,6 +50,10 @@ name = "echo-tcp"
 path = "echo-tcp.rs"
 
 [[example]]
+name = "graceful-shutdown"
+path = "graceful-shutdown.rs"
+
+[[example]]
 name = "echo-udp"
 path = "echo-udp.rs"
 
