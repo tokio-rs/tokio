@@ -301,3 +301,15 @@ fn test_waker_update() {
 
     assert!(future.is_woken());
 }
+
+#[test]
+fn unpolled_future_completed_by_notify_waiters_preserves_notify_one_permit() {
+    use futures::FutureExt;
+    let notify = Notify::new();
+    let notified1 = notify.notified();
+    notify.notify_waiters();
+    notify.notify_one();
+    assert!(notified1.now_or_never().is_some());
+    let notified2 = notify.notified();
+    assert!(notified2.now_or_never().is_some());
+}
