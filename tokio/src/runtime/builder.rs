@@ -133,8 +133,10 @@ pub struct Builder {
     /// Configures the task poll count histogram
     pub(super) metrics_poll_count_histogram: HistogramBuilder,
 
-    pub(super) metrics_schedule_latency_histogram_enable: bool,
+    /// When true, enables task schedule latency instrumentation.
+    pub(super) metrics_schedule_latency_histogram_enabled: bool,
 
+    /// Configures the task schedule latency histogram.
     pub(super) metrics_schedule_latency_histogram: HistogramBuilder,
 
     #[cfg(tokio_unstable)]
@@ -327,7 +329,7 @@ impl Builder {
 
             metrics_poll_count_histogram: HistogramBuilder::default(),
 
-            metrics_schedule_latency_histogram_enable: false,
+            metrics_schedule_latency_histogram_enabled: false,
 
             metrics_schedule_latency_histogram: HistogramBuilder::default(),
 
@@ -1606,7 +1608,7 @@ impl Builder {
         /// [`LogHistogram`]: crate::runtime::LogHistogram
         /// [`metrics_schedule_latency_histogram_configuration()`]: Builder::metrics_schedule_latency_histogram_configuration
         pub fn enable_metrics_schedule_latency_histogram(&mut self) -> &mut Self {
-            self.metrics_schedule_latency_histogram_enable = true;
+            self.metrics_schedule_latency_histogram_enabled = true;
             self
         }
 
@@ -1786,7 +1788,7 @@ impl Builder {
     }
 
     fn metrics_schedule_latency_histogram_builder(&self) -> Option<HistogramBuilder> {
-        if self.metrics_schedule_latency_histogram_enable {
+        if self.metrics_schedule_latency_histogram_enabled {
             Some(self.metrics_schedule_latency_histogram.clone())
         } else {
             None

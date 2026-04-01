@@ -674,6 +674,7 @@ impl RuntimeMetrics {
         /// ```
         ///
         /// [`metrics_schedule_latency_histogram_configuration()`]: crate::runtime::Builder::metrics_schedule_latency_histogram_configuration
+        #[track_caller]
         pub fn schedule_latency_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
             self.handle
                 .inner
