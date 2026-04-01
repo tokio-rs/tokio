@@ -785,7 +785,7 @@ impl UdpSocket {
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.io.recv(buf))
+            .async_io(Interest::READABLE | Interest::ERROR, || self.io.recv(buf))
             .await
     }
 
