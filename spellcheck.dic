@@ -241,6 +241,7 @@ spawner
 Splitter
 spmc
 spsc
+SQPOLL
 src
 stabilised
 startup
