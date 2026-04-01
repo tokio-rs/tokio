@@ -91,6 +91,30 @@ use proc_macro::TokenStream;
 ///
 /// # Usage
 ///
+/// ## Set the name of the runtime
+///
+/// ```rust
+/// #[tokio::main(name = "my-runtime")]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new_multi_thread()
+///         .enable_all()
+///         .name("my-runtime")
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
+///
 /// ## Using the multi-threaded runtime
 ///
 /// ```rust
@@ -407,6 +431,31 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// ## Usage
+///
+/// ### Set the name of the runtime
+///
+/// ```no_run
+/// #[tokio::test(name = "my-test-runtime")]
+/// async fn my_test() {
+///     assert!(true);
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::test]`
+///
+/// ```no_run
+/// #[test]
+/// fn my_test() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .name("my-test-runtime")
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             assert!(true);
+///         })
+/// }
+/// ```
 ///
 /// ### Using the multi-thread runtime
 ///
