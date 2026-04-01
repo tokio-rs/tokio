@@ -39,21 +39,7 @@ struct Shard<T: 'static> {
 }
 
 cfg_not_loom! {
-    use std::cell::Cell;
     use std::sync::atomic::{AtomicUsize as StdAtomicUsize, Ordering::Relaxed};
-
-    /// Sentinel indicating the per-thread push shard has not been assigned.
-    const UNASSIGNED: usize = usize::MAX;
-
-    tokio_thread_local! {
-        /// Per-thread home shard for push operations.
-        ///
-        /// Each thread sticks to one shard for cache locality: consecutive
-        /// pushes from the same thread hit the same mutex and linked-list
-        /// tail. Distinct threads get distinct shards (modulo collisions)
-        /// via a global counter assigned on first use.
-        static PUSH_SHARD: Cell<usize> = const { Cell::new(UNASSIGNED) };
-    }
 
     /// Hands out shard indices to threads on first push. Shared across all
     /// `Sharded` instances, which is fine: it only needs to spread threads
@@ -142,7 +128,9 @@ impl<T: 'static> Sharded<T> {
         }
 
         // Publish the closed state for lock-free observers.
-        self.is_closed.store(true, Release);
+        if was_open {
+            self.is_closed.store(true, Release);
+        }
 
         was_open
     }
@@ -192,6 +180,11 @@ impl<T: 'static> Sharded<T> {
             }
 
             let mut synced = shard.synced.lock();
+            // Re-check under the lock: another worker may have drained
+            // this shard between the atomic check and the lock.
+            if shard.shared.is_empty() {
+                continue;
+            }
             // safety: `synced` belongs to `shard.shared`
             if let Some(task) = unsafe { shard.shared.pop(&mut synced) } {
                 return Some(task);
@@ -248,6 +241,10 @@ impl<T: 'static> Sharded<T> {
     /// Each thread is assigned a shard on first push and sticks with it.
     /// This keeps a single thread's pushes cache-local while spreading
     /// distinct threads across distinct mutexes.
+    ///
+    /// The shard index is stored in the per-thread `CONTEXT` thread local
+    /// (shared with the rest of the runtime) to avoid consuming an extra
+    /// thread-local slot.
     #[cfg(not(loom))]
     fn next_push_shard(&self) -> usize {
         // If there's only one shard, skip the thread-local lookup.
@@ -255,16 +252,8 @@ impl<T: 'static> Sharded<T> {
             return 0;
         }
 
-        PUSH_SHARD
-            .try_with(|cell| {
-                let mut idx = cell.get();
-                if idx == UNASSIGNED {
-                    idx = NEXT_SHARD.fetch_add(1, Relaxed);
-                    cell.set(idx);
-                }
-                idx & self.shard_mask
-            })
-            .unwrap_or(0)
+        crate::runtime::context::inject_push_shard(|| NEXT_SHARD.fetch_add(1, Relaxed))
+            & self.shard_mask
     }
 
     #[cfg(loom)]
