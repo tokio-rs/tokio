@@ -19,7 +19,10 @@ use tokio::runtime::{self, Runtime};
 /// Total number of tasks spawned across all threads per iteration.
 /// Must be divisible by the largest parallelism level (64).
 const TOTAL_TASKS: usize = 12_800;
-const _: () = assert!(TOTAL_TASKS % 64 == 0, "TOTAL_TASKS must be divisible by 64");
+const _: () = assert!(
+    TOTAL_TASKS.is_multiple_of(64),
+    "TOTAL_TASKS must be divisible by 64"
+);
 
 fn remote_spawn_contention(c: &mut Criterion) {
     let parallelism_levels = parallelism_levels();

@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque};
 
 use tokio_stream::{self as stream, StreamExt};
 use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task};
@@ -64,6 +64,50 @@ async fn collect_vec_items() {
 }
 
 #[tokio::test]
+async fn collect_vecdeque_items() {
+    let (tx, rx) = mpsc::unbounded_channel_stream();
+    let mut fut = task::spawn(rx.collect::<VecDeque<i32>>());
+
+    assert_pending!(fut.poll());
+
+    let xs = [1, 2, 42, 3];
+    for x in xs {
+        tx.send(x).unwrap();
+        assert!(fut.is_woken());
+        assert_pending!(fut.poll());
+    }
+
+    drop(tx);
+    assert!(fut.is_woken());
+    let coll = assert_ready!(fut.poll());
+
+    assert_eq!(coll, VecDeque::from(xs));
+    assert_eq!(coll.into_iter().collect::<Vec<_>>(), xs);
+}
+
+#[tokio::test]
+async fn collect_linkedlist_items() {
+    let (tx, rx) = mpsc::unbounded_channel_stream();
+    let mut fut = task::spawn(rx.collect::<LinkedList<i32>>());
+
+    assert_pending!(fut.poll());
+
+    let xs = [1, 2, 42, 3];
+    for x in xs {
+        tx.send(x).unwrap();
+        assert!(fut.is_woken());
+        assert_pending!(fut.poll());
+    }
+
+    drop(tx);
+    assert!(fut.is_woken());
+    let coll = assert_ready!(fut.poll());
+
+    assert_eq!(coll, LinkedList::from(xs));
+    assert_eq!(coll.into_iter().collect::<Vec<_>>(), xs);
+}
+
+#[tokio::test]
 async fn collect_btreeset_items() {
     let (tx, rx) = mpsc::unbounded_channel_stream();
     let mut fut = task::spawn(rx.collect::<BTreeSet<i32>>());
@@ -82,6 +126,90 @@ async fn collect_btreeset_items() {
     assert!(fut.is_woken());
     let coll = assert_ready!(fut.poll());
     assert_eq!(BTreeSet::from([1, 2]), coll);
+}
+
+#[tokio::test]
+async fn collect_btreemap_items() {
+    let (tx, rx) = mpsc::unbounded_channel_stream();
+    let mut fut = task::spawn(rx.collect::<BTreeMap<i32, i32>>());
+
+    assert_pending!(fut.poll());
+
+    tx.send((3, 4)).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    tx.send((1, 2)).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    drop(tx);
+    assert!(fut.is_woken());
+    let coll = assert_ready!(fut.poll());
+    assert_eq!(BTreeMap::from([(1, 2), (3, 4)]), coll);
+}
+
+#[tokio::test]
+async fn collect_hashset_items() {
+    let (tx, rx) = mpsc::unbounded_channel_stream();
+    let mut fut = task::spawn(rx.collect::<HashSet<i32>>());
+
+    assert_pending!(fut.poll());
+
+    tx.send(1).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    tx.send(2).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    drop(tx);
+    assert!(fut.is_woken());
+    let coll = assert_ready!(fut.poll());
+    assert_eq!(HashSet::from([1, 2]), coll);
+}
+
+#[tokio::test]
+async fn collect_hashmap_items() {
+    let (tx, rx) = mpsc::unbounded_channel_stream();
+    let mut fut = task::spawn(rx.collect::<HashMap<i32, i32>>());
+
+    assert_pending!(fut.poll());
+
+    tx.send((1, 2)).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    tx.send((3, 4)).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    drop(tx);
+    assert!(fut.is_woken());
+    let coll = assert_ready!(fut.poll());
+    assert_eq!(HashMap::from([(1, 2), (3, 4)]), coll);
+}
+
+#[tokio::test]
+async fn collect_binaryheap_items() {
+    let (tx, rx) = mpsc::unbounded_channel_stream();
+    let mut fut = task::spawn(rx.collect::<BinaryHeap<i32>>());
+
+    assert_pending!(fut.poll());
+
+    tx.send(2).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    tx.send(1).unwrap();
+    assert!(fut.is_woken());
+    assert_pending!(fut.poll());
+
+    drop(tx);
+    assert!(fut.is_woken());
+    let coll = assert_ready!(fut.poll());
+    assert_eq!(vec![1, 2], coll.into_sorted_vec());
 }
 
 #[tokio::test]
