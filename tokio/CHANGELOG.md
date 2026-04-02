@@ -273,7 +273,15 @@ The MSRV is increased to 1.71.
 [#7672]: https://github.com/tokio-rs/tokio/pull/7672
 [#7675]: https://github.com/tokio-rs/tokio/pull/7675
 
-# 1.47.3 (Januar 3rd, 2026)
+# 1.47.4 (April 2nd, 2026)
+
+### Fixed
+
+* sync: fix panic in `Chan::recv_many` when called with non-empty vector on closed channel ([#7991])
+
+[#7991]: https://github.com/tokio-rs/tokio/pull/7991
+
+# 1.47.3 (January 3rd, 2026)
 
 ### Fixed
 

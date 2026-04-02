@@ -659,7 +659,7 @@ doc! {macro_rules! select {
             $crate::macros::support::poll_fn(|cx| {
                 // Return `Pending` when the task budget is depleted since budget-aware futures
                 // are going to yield anyway and other futures will not cooperate.
-                ::std::task::ready!($crate::macros::support::poll_budget_available(cx));
+                $crate::macros::support::ready!($crate::macros::support::poll_budget_available(cx));
 
                 // Track if any branch returns pending. If no branch completes
                 // **or** returns pending, this implies that all branches are
@@ -699,7 +699,7 @@ doc! {macro_rules! select {
 
                                 // Safety: future is stored on the stack above
                                 // and never moved.
-                                let mut fut = unsafe { Pin::new_unchecked(fut) };
+                                let mut fut = unsafe { $crate::macros::support::Pin::new_unchecked(fut) };
 
                                 // Try polling it
                                 let out = match $crate::macros::support::Future::poll(fut, cx) {

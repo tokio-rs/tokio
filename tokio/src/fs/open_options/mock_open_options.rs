@@ -3,6 +3,10 @@
 use mockall::mock;
 
 use crate::fs::mocks::MockFile;
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+#[cfg(windows)]
+use std::os::windows::fs::OpenOptionsExt;
 use std::{io, path::Path};
 
 mock! {
@@ -15,25 +19,21 @@ mock! {
         pub fn read(&mut self, read: bool) -> &mut Self;
         pub fn truncate(&mut self, truncate: bool) -> &mut Self;
         pub fn write(&mut self, write: bool) -> &mut Self;
-
-        // Not mocking OpenOptionsExt trait due to:
-        // https://github.com/rust-lang/rust/issues/153486
-        #[cfg(unix)]
-        pub fn custom_flags(&mut self, flags: i32) -> &mut Self;
-        #[cfg(unix)]
-        pub fn mode(&mut self, mode: u32) -> &mut Self;
-        #[cfg(windows)]
-        pub fn access_mode(&mut self, access: u32) -> &mut Self;
-        #[cfg(windows)]
-        pub fn share_mode(&mut self, val: u32) -> &mut Self;
-        #[cfg(windows)]
-        pub fn custom_flags(&mut self, flags: u32) -> &mut Self;
-        #[cfg(windows)]
-        pub fn attributes(&mut self, val: u32) -> &mut Self;
-        #[cfg(windows)]
-        pub fn security_qos_flags(&mut self, flags: u32) -> &mut Self;
     }
     impl Clone for OpenOptions {
         fn clone(&self) -> Self;
+    }
+    #[cfg(unix)]
+    impl OpenOptionsExt for OpenOptions {
+        fn custom_flags(&mut self, flags: i32) -> &mut Self;
+        fn mode(&mut self, mode: u32) -> &mut Self;
+    }
+    #[cfg(windows)]
+    impl OpenOptionsExt for OpenOptions {
+        fn access_mode(&mut self, access: u32) -> &mut Self;
+        fn share_mode(&mut self, val: u32) -> &mut Self;
+        fn custom_flags(&mut self, flags: u32) -> &mut Self;
+        fn attributes(&mut self, val: u32) -> &mut Self;
+        fn security_qos_flags(&mut self, flags: u32) -> &mut Self;
     }
 }

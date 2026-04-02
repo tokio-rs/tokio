@@ -328,9 +328,8 @@ impl<'a> Drop for LocalDataEnterGuard<'a> {
 cfg_rt! {
     /// Spawns a `!Send` future on the current [`LocalSet`] or [`LocalRuntime`].
     ///
-    /// This is possible when either using one of these types
-    /// explicitly, or (with `tokio_unstable`) by opting to use the
-    /// `"local"` runtime flavor in `tokio::main`:
+    /// This is possible when either using one of these types explicitly, or by
+    /// opting to use the `"local"` runtime flavor in `tokio::main`:
     ///
     /// ```ignore
     /// #[tokio::main(flavor = "local")]
@@ -374,10 +373,9 @@ cfg_rt! {
     /// }).await;
     /// # }
     /// ```
-    /// With local runtime flavor ([Unstable API][unstable] only).
+    /// With local runtime flavor.
     ///
     /// ```rust
-    /// # #[cfg(tokio_unstable)]
     /// #[tokio::main(flavor = "local")]
     /// async fn main() {
     ///     let join = tokio::task::spawn_local(async {
@@ -386,8 +384,6 @@ cfg_rt! {
     ///
     ///    join.await.unwrap()
     ///  }
-    /// # #[cfg(not(tokio_unstable))]
-    /// # fn main() {}
     ///
     /// ```
     ///
