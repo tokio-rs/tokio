@@ -34,11 +34,13 @@ pub(crate) struct Config {
 
     /// The multi-threaded scheduler includes a per-worker LIFO slot used to
     /// store the last scheduled task. This can improve certain usage patterns,
-    /// especially message passing between tasks. However, this LIFO slot is not
-    /// currently stealable.
+    /// especially message passing between tasks.
     ///
-    /// Eventually, the LIFO slot **will** become stealable, however as a
-    /// stop-gap, this unstable option lets users disable the LIFO task.
+    /// In Tokio versions before 1.51, tasks in the LIFO slot could not be
+    /// stolen, which could cause issues in applications with long poll times.
+    /// As a stop-gap, this unstable option lets users disable the LIFO task.
+    /// Now that the LIFO slot is stealable, we may remove this option in a
+    /// future version.
     pub(crate) disable_lifo_slot: bool,
 
     /// Random number generator seed to configure runtimes to act in a
