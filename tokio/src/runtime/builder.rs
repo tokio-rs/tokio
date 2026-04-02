@@ -54,6 +54,9 @@ pub struct Builder {
     /// Runtime type
     kind: Kind,
 
+    /// Name of the runtime.
+    name: Option<String>,
+
     /// Whether or not to enable the I/O driver
     enable_io: bool,
     nevents: usize,
@@ -270,6 +273,9 @@ impl Builder {
     pub(crate) fn new(kind: Kind, event_interval: u32) -> Builder {
         Builder {
             kind,
+
+            // Default runtime name
+            name: None,
 
             // I/O defaults to "off"
             enable_io: false,
@@ -535,6 +541,34 @@ impl Builder {
     pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
         let val = val.into();
         self.thread_name = std::sync::Arc::new(move || val.clone());
+        self
+    }
+
+    /// Sets the name of the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .name("my-runtime")
+    ///     .build();
+    /// # }
+    /// # }
+    /// ```
+    /// # Panics
+    ///
+    /// This function will panic if an empty value is passed as an argument.
+    ///
+    #[track_caller]
+    pub fn name(&mut self, val: impl Into<String>) -> &mut Self {
+        let val = val.into();
+        assert!(!val.trim().is_empty(), "runtime name shouldn't be empty");
+        self.name = Some(val);
         self
     }
 
@@ -1633,6 +1667,7 @@ impl Builder {
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
             },
             local_tid,
+            self.name.clone(),
         );
 
         let handle = Handle {
@@ -1814,6 +1849,7 @@ cfg_rt_multi_thread! {
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 },
                 self.timer_flavor,
+                self.name.clone(),
             );
 
             let handle = Handle { inner: scheduler::Handle::MultiThread(handle) };
@@ -1829,7 +1865,13 @@ cfg_rt_multi_thread! {
 
 impl fmt::Debug for Builder {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Builder")
+        let mut debug = fmt.debug_struct("Builder");
+
+        if let Some(name) = &self.name {
+            debug.field("name", name);
+        }
+
+        debug
             .field("worker_threads", &self.worker_threads)
             .field("max_blocking_threads", &self.max_blocking_threads)
             .field(
@@ -1840,7 +1882,12 @@ impl fmt::Debug for Builder {
             .field("after_start", &self.after_start.as_ref().map(|_| "..."))
             .field("before_stop", &self.before_stop.as_ref().map(|_| "..."))
             .field("before_park", &self.before_park.as_ref().map(|_| "..."))
-            .field("after_unpark", &self.after_unpark.as_ref().map(|_| "..."))
-            .finish()
+            .field("after_unpark", &self.after_unpark.as_ref().map(|_| "..."));
+
+        if self.name.is_none() {
+            debug.finish_non_exhaustive()
+        } else {
+            debug.finish()
+        }
     }
 }

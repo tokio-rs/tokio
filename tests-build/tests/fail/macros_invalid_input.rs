@@ -68,4 +68,7 @@ async fn test_has_second_test_attr_rust_2021() {}
 #[tokio::test]
 async fn test_has_generated_second_test_attr() {}
 
+#[tokio::test(name = 123)]
+async fn test_name_not_string() {}
+
 fn main() {}
