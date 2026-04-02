@@ -229,7 +229,7 @@ doc! {macro_rules! try_join {
                     if $crate::macros::support::Future::poll(fut.as_mut(), cx).is_pending() {
                         is_pending = true;
                     } else if fut.as_mut().output_mut().expect("expected completed future").is_err() {
-                        return $crate::macros::support::Poll::Ready(Err(fut.take_output().expect("expected completed future").err().unwrap()))
+                        return $crate::macros::support::Poll::Ready($crate::macros::support::Result::Err(fut.take_output().expect("expected completed future").err().unwrap()))
                     }
                 } else {
                     // Future skipped, one less future to skip in the next iteration
@@ -241,7 +241,7 @@ doc! {macro_rules! try_join {
             if is_pending {
                 $crate::macros::support::Poll::Pending
             } else {
-                $crate::macros::support::Poll::Ready(Ok(($({
+                $crate::macros::support::Poll::Ready($crate::macros::support::Result::Ok(($({
                     // Extract the future for this branch from the tuple.
                     let ( $($skip,)* fut, .. ) = &mut futures;
 
