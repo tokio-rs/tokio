@@ -36,9 +36,9 @@
 //!                            | Yes                 | No
 //!                            |                     |
 //!                            V                     |
-//!              +--------------------------+        |
-//!              | Local Runtime (unstable) |        |
-//!              +--------------------------+        |
+//!                    +---------------+             |
+//!                    | Local Runtime |             |
+//!                    +---------------+             |
 //!                                                  |
 //!                                                  v
 //!                                      +------------------------+
@@ -575,9 +575,6 @@ cfg_rt! {
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
 
-        mod local_runtime;
-        pub use local_runtime::{LocalRuntime, LocalOptions};
-
         /// Returns the index of the current worker thread, if called from a
         /// runtime worker thread.
         ///
@@ -634,6 +631,9 @@ cfg_rt! {
 
     mod runtime;
     pub use runtime::{Runtime, RuntimeFlavor, is_rt_shutdown_err};
+
+    mod local_runtime;
+    pub use local_runtime::{LocalRuntime, LocalOptions};
 
     mod id;
     pub use id::Id;

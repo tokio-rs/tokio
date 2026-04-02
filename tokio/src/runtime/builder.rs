@@ -5,7 +5,9 @@ use crate::runtime::{
     blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback, TimerFlavor,
 };
 #[cfg(tokio_unstable)]
-use crate::runtime::{metrics::HistogramConfiguration, LocalOptions, LocalRuntime, TaskMeta};
+use crate::runtime::{metrics::HistogramConfiguration, TaskMeta};
+
+use crate::runtime::{LocalOptions, LocalRuntime};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use crate::runtime::blocking::BlockingPool;
@@ -241,7 +243,7 @@ impl Builder {
     /// Configuration methods can be chained on the return value.
     ///
     /// To spawn non-`Send` tasks on the resulting runtime, combine it with a
-    /// [`LocalSet`], or call [`build_local`] to create a [`LocalRuntime`] (unstable).
+    /// [`LocalSet`], or call [`build_local`] to create a [`LocalRuntime`].
     ///
     /// [`LocalSet`]: crate::task::LocalSet
     /// [`LocalRuntime`]: crate::runtime::LocalRuntime
@@ -1048,8 +1050,6 @@ impl Builder {
     /// });
     /// ```
     #[allow(unused_variables, unreachable_patterns)]
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn build_local(&mut self, options: LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
@@ -1605,7 +1605,6 @@ impl Builder {
         ))
     }
 
-    #[cfg(tokio_unstable)]
     fn build_current_thread_local_runtime(&mut self) -> io::Result<LocalRuntime> {
         use crate::runtime::local_runtime::LocalRuntimeScheduler;
 
