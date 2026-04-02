@@ -56,6 +56,10 @@ async fn send_recv_poll() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
+)]
 async fn send_to_recv_closed_returns_err() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
