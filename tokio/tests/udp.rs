@@ -48,7 +48,7 @@ async fn send_recv_poll() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-async fn send_to_recv_closed_err_kind_refused() -> std::io::Result<()> {
+async fn send_to_recv_closed_returns_err() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
@@ -62,8 +62,15 @@ async fn send_to_recv_closed_err_kind_refused() -> std::io::Result<()> {
         .await
         .expect("timed out instead of returning error")
         .unwrap_err();
+    let errno = err.kind();
 
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionRefused);
+    assert!(
+        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
+        matches!(
+            errno,
+            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
+        )
+    );
     Ok(())
 }
 
