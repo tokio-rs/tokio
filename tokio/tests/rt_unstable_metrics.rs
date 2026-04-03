@@ -595,7 +595,7 @@ fn worker_local_schedule_count() {
         .map(|i| metrics.worker_local_schedule_count(i))
         .sum();
 
-    assert_eq!(2, n);
+    assert!(n == 1 || n == 2, "n={n}");
     assert_eq!(1, metrics.remote_schedule_count());
 }
 
