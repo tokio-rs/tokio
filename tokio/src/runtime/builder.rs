@@ -1257,22 +1257,21 @@ impl Builder {
         /// scheduled task being polled first.
         ///
         /// To implement this heuristic, each worker thread has a slot which
-        /// holds the task that should be polled next. However, this slot cannot
-        /// be stolen by other worker threads, which can result in lower total
-        /// throughput when tasks tend to have longer poll times.
+        /// holds the task that should be polled next. In earlier versions of
+        /// Tokio, this slot could not be stolen by other worker threads, which
+        /// can result in lower total throughput when tasks tend to have longer
+        /// poll times.
         ///
         /// This configuration option will disable this heuristic resulting in
-        /// all scheduled tasks being pushed into the worker-local queue, which
-        /// is stealable.
-        ///
-        /// Consider trying this option when the task "scheduled" time is high
-        /// but the runtime is underutilized. Use [tokio-rs/tokio-metrics] to
-        /// collect this data.
+        /// all scheduled tasks being pushed into the worker-local queue. This
+        /// was intended as a workaround for the LIFO slot not being stealable.
+        /// As of Tokio 1.51, tasks can be stolen from the LIFO slot. In a
+        /// future version, this option may be deprecated.
         ///
         /// # Unstable
         ///
-        /// This configuration option is considered a workaround for the LIFO
-        /// slot not being stealable. When the slot becomes stealable, we will
+        /// This configuration option was considered a workaround for the LIFO
+        /// slot not being stealable. Since this is no longer the case, we will
         /// revisit whether or not this option is necessary. See
         /// issue [tokio-rs/tokio#4941].
         ///
