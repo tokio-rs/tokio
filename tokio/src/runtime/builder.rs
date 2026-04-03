@@ -427,12 +427,27 @@ impl Builder {
     /// When this option is enabled, a worker thread which has parked on the I/O
     /// or time driver will notify another worker thread once it is preparing to
     /// begin polling a task from the run queue, so that the notified worker can
-    /// begin polling the I/O or time driver. This can reduce the latency with which I/O and timer notifications are processed when
+    /// begin polling the I/O or time driver. This can reduce the latency with
+    /// which I/O and timer notifications are processed, especially when some
+    /// tasks have polls that take a long time to complete. In addition, it can
+    /// reduce the risk of a deadlock which may occur when a task blocks the
+    /// worker thread which is holding the I/O or time driver until some other
+    /// task, which is waiting for a notification from *that* driver, unblocks
+    /// it.
     ///
-    /// This is a surprise tool that will help us later.
+    /// This option is disabled by default, as enabling it may potentially
+    /// increase contention due to extra synchronization in cross-driver
+    /// wakeups.
     ///
-    /// **Note**: this only does something if this builder is constructing a
-    /// multi-threaded runtime.
+    /// This option only applies to multi-threaded runtimes. Attempting to use
+    /// this option with any other runtime type will have no effect.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. Eager driver handoff is
+    /// an experimental feature whose behavior may be removed or changed in 1.x
+    /// releases. See [the documentation on unstable features][unstable] for
+    /// details.
+    ///
+    /// [unstable]: crate#unstable-features
     #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
     #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
     pub fn enable_eager_driver_handoff(&mut self) -> &mut Self {
