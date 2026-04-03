@@ -1328,6 +1328,24 @@ impl Builder {
             self.seed_generator = RngSeedGenerator::new(seed);
             self
         }
+
+        /// Enable I/O driver heresy mode.
+        ///
+        /// This is a surprise tool that will help us later.
+        ///
+        /// **Note**: this only does something if this builder is constructing a
+        /// multi-threaded runtime.
+        pub fn enable_io_driver_heresy_mode(&mut self) -> &mut Self {
+            if !matches!(self.kind, Kind::MultiThread) {
+                panic!(
+                    "I/O driver heresy mode only does something for \
+                     multi-threaded runtimes"
+                );
+            }
+
+            self.io_driver_heresy_mode = true;
+            self
+        }
     }
 
     cfg_unstable_metrics! {
@@ -1661,6 +1679,10 @@ impl Builder {
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
+                // This setting never makes sense for a current thread runtime,
+                // as it only configures how the I/O driver is stolen across
+                // workers.
+                io_driver_heresy_mode: false,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
             },
@@ -1843,6 +1865,7 @@ cfg_rt_multi_thread! {
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
+                    io_driver_heresy_mode: self.io_driver_heresy_mode,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 },

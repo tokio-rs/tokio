@@ -59,7 +59,7 @@
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
-    idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
+    idle, park, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
 use crate::runtime::scheduler::{inject, Defer, Lock};
 use crate::runtime::task::OwnedTasks;
@@ -131,6 +131,11 @@ struct Core {
 
     /// True if the scheduler is being traced
     is_traced: bool,
+
+    /// True if the worker has stolen the I/O driver.
+    had_driver: park::HadDriver,
+
+    driver_heresy_mode: bool,
 
     /// Parker
     ///
@@ -280,6 +285,8 @@ pub(super) fn create(
             is_searching: false,
             is_shutdown: false,
             is_traced: false,
+            driver_heresy_mode: cfg!(tokio_unstable) && config.io_driver_heresy_mode,
+            had_driver: park::HadDriver::No,
             park: Some(park),
             global_queue_interval: stats.tuned_global_queue_interval(&config),
             stats,
@@ -618,6 +625,20 @@ impl Context {
         // another idle worker to try to steal work.
         core.transition_from_searching(&self.worker);
 
+        // If the setting to wake eagerly when releasing the I/O driver is
+        // enabled, and this worker had the driver, wake a parked worker to come
+        // grab it from us.
+        //
+        // Note that this is only done when we are *actually* about to poll a
+        // task, rather than whenever the worker has unparked. When the worker
+        // has been unparked ,it may not actually have any tasks to poll, and if
+        // it's still holding the I/O driver, it should just go back to polling
+        // the driver again, rather than trying to wake someone else spuriously.
+        if core.driver_heresy_mode && core.had_driver == park::HadDriver::Yes {
+            core.had_driver = park::HadDriver::No;
+            self.worker.handle.notify_parked_local();
+        }
+
         self.assert_lifo_enabled_is_correct(&core);
 
         // Measure the poll start time. Note that we may end up polling other
@@ -825,11 +846,11 @@ impl Context {
         };
 
         // Park thread
-        if let Some(timeout) = duration {
-            park.park_timeout(&self.worker.handle.driver, timeout);
+        let had_driver = if let Some(timeout) = duration {
+            park.park_timeout(&self.worker.handle.driver, timeout)
         } else {
-            park.park(&self.worker.handle.driver);
-        }
+            park.park(&self.worker.handle.driver)
+        };
 
         self.defer.wake();
 
@@ -854,6 +875,8 @@ impl Context {
 
         // Place `park` back in `core`
         core.park = Some(park);
+        core.had_driver = had_driver;
+
         if core.should_notify_others() {
             self.worker.handle.notify_parked_local();
         }
