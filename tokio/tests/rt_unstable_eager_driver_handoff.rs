@@ -1,6 +1,9 @@
 // These tests only work on Unix platforms because they rely on Unix pipes
 // as a way of generating I/O events from within the same process.
-#![cfg(all(unix, feature = "full"))]
+//
+// Also, Miri doesn't like it when you leak a thread, which will happen in
+// the "deadlock" case below, so we skip these tests on Miri.
+#![cfg(all(not(miri), unix, feature = "full"))]
 
 use std::sync::mpsc::RecvTimeoutError;
 use std::time::Duration;
