@@ -23,7 +23,13 @@ use std::time::Duration;
 use super::pool::Task;
 
 /// Number of shards. Must be a power of 2.
+/// Under loom, use a single shard to keep the state space tractable —
+/// the concurrency properties we need to verify (condvar signaling,
+/// shutdown ordering) are independent of shard count.
+#[cfg(not(loom))]
 const NUM_SHARDS: usize = 16;
+#[cfg(loom)]
+const NUM_SHARDS: usize = 1;
 
 /// A single shard containing a queue protected by its own mutex.
 struct Shard {
@@ -94,8 +100,10 @@ pub(super) struct ShardedQueue {
     /// Global condition variable for worker notifications.
     /// We use a single condvar to avoid the complexity of per-shard waiting.
     condvar: Condvar,
-    /// Mutex to pair with the condvar. Only held during wait, not during push/pop.
-    condvar_mutex: Mutex<()>,
+    /// Mutex paired with the condvar. Protects the notification counter
+    /// (`num_notify`), which tracks how many tasks have been pushed and
+    /// need to be picked up by idle workers.
+    condvar_mutex: Mutex<u32>,
 }
 
 impl ShardedQueue {
@@ -106,7 +114,7 @@ impl ShardedQueue {
             push_index: AtomicUsize::new(0),
             shutdown: AtomicBool::new(false),
             condvar: Condvar::new(),
-            condvar_mutex: Mutex::new(()),
+            condvar_mutex: Mutex::new(0),
         }
     }
 
@@ -131,13 +139,17 @@ impl ShardedQueue {
     }
 
     /// Notify one waiting worker that a task is available.
+    ///
+    /// Increments the notification counter under `condvar_mutex` and signals
+    /// the condvar. The counter acts as a persistent notification that cannot
+    /// be lost — even if no worker is currently waiting on the condvar, the
+    /// next worker to enter `wait_for_task` will see the counter and know
+    /// there is work to do.
     pub(super) fn notify_one(&self) {
+        let mut guard = self.condvar_mutex.lock();
+        *guard += 1;
+        drop(guard);
         self.condvar.notify_one();
-    }
-
-    /// Notify all waiting workers (used during shutdown).
-    pub(super) fn notify_all(&self) {
-        self.condvar.notify_all();
     }
 
     /// Try to pop a task, checking the preferred shard first, then others.
@@ -156,8 +168,14 @@ impl ShardedQueue {
 
     /// Set the shutdown flag and wake all workers.
     pub(super) fn shutdown(&self) {
-        self.shutdown.store(true, Release);
-        self.notify_all();
+        // Set the flag while holding condvar_mutex so that any worker
+        // currently inside `wait_for_task` (which also holds condvar_mutex
+        // while checking) is guaranteed to see the flag on its next check.
+        {
+            let _guard = self.condvar_mutex.lock();
+            self.shutdown.store(true, Release);
+        }
+        self.condvar.notify_all();
     }
 
     /// Check if shutdown has been initiated.
@@ -165,49 +183,46 @@ impl ShardedQueue {
         self.shutdown.load(Acquire)
     }
 
-    /// Wait for a task with timeout.
+    /// Wait for a task notification with timeout. Returns when a task has
+    /// been pushed (the caller should then `pop`), shutdown occurs, or the
+    /// wait times out.
+    ///
+    /// Uses a notification counter under `condvar_mutex` to prevent lost
+    /// wakeups — the same pattern as the original single-mutex blocking pool.
     pub(super) fn wait_for_task(&self, preferred_shard: usize, timeout: Duration) -> WaitResult {
-        if self.is_shutdown() {
-            return WaitResult::Shutdown;
-        }
+        let mut guard = self.condvar_mutex.lock();
 
-        // Try to pop without waiting first
-        if let Some(task) = self.pop(preferred_shard) {
-            return WaitResult::Task(task);
-        }
+        loop {
+            if self.is_shutdown() {
+                return WaitResult::Shutdown;
+            }
 
-        // Acquire the condvar mutex before waiting
-        let guard = self.condvar_mutex.lock();
+            if *guard > 0 {
+                // A notification is pending — a task was pushed.
+                *guard -= 1;
+                drop(guard);
+                // Pop outside the condvar_mutex to avoid holding two locks.
+                if let Some(task) = self.pop(preferred_shard) {
+                    return WaitResult::Task(task);
+                }
+                // The task was already consumed in the caller's BUSY loop
+                // (race between push+notify and the worker's pop loop).
+                // Re-enter the wait.
+                guard = self.condvar_mutex.lock();
+                continue;
+            }
 
-        // Double-check shutdown and tasks after acquiring lock, as state may
-        // have changed while we were waiting for the lock
-        if self.is_shutdown() {
-            return WaitResult::Shutdown;
-        }
-        if let Some(task) = self.pop(preferred_shard) {
-            return WaitResult::Task(task);
-        }
+            let (g, timeout_result) = self.condvar.wait_timeout(guard, timeout).unwrap();
+            guard = g;
 
-        // Wait for notification or timeout
-        let (guard, wait_timeout_result) = self.condvar.wait_timeout(guard, timeout).unwrap();
-        let timed_out = wait_timeout_result.timed_out();
-
-        // Drop the lock before doing further work
-        drop(guard);
-
-        if self.is_shutdown() {
-            return WaitResult::Shutdown;
-        }
-
-        // Try to get a task
-        if let Some(task) = self.pop(preferred_shard) {
-            return WaitResult::Task(task);
-        }
-
-        if timed_out {
-            WaitResult::Timeout
-        } else {
-            WaitResult::Spurious
+            if timeout_result.timed_out() && *guard == 0 {
+                // Double-check: shutdown may have raced with the timeout.
+                if self.is_shutdown() {
+                    return WaitResult::Shutdown;
+                }
+                return WaitResult::Timeout;
+            }
+            // Woken by notify or spurious wakeup — loop back to check.
         }
     }
 }
@@ -220,6 +235,4 @@ pub(super) enum WaitResult {
     Timeout,
     /// Shutdown was initiated.
     Shutdown,
-    /// Spurious wakeup, no task found.
-    Spurious,
 }

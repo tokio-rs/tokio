@@ -412,8 +412,14 @@ impl Spawner {
 
                 // Double-check conditions after acquiring the lock
                 if shared.shutdown {
-                    // Queue was shutdown while we were acquiring the lock
-                    // The task is already in the queue, so it will be drained during shutdown
+                    // Shutdown raced with our push. The task is in the
+                    // sharded queue but workers may have already exited.
+                    // Drain it here so mandatory tasks still run.
+                    drop(shared);
+                    while let Some(task) = self.inner.queue.pop(0) {
+                        self.inner.metrics.dec_queue_depth();
+                        task.shutdown_or_run_if_mandatory();
+                    }
                     return Ok(());
                 }
 
@@ -523,49 +529,31 @@ impl Inner {
                 break;
             }
 
-            // IDLE: Wait for new tasks
+            // IDLE: Wait for new tasks (spurious wakeups handled internally)
             self.metrics.inc_num_idle_threads();
 
-            loop {
-                match self.queue.wait_for_task(preferred_shard, self.keep_alive) {
-                    WaitResult::Task(task) => {
-                        // Got a task, process it
-                        self.metrics.dec_num_idle_threads();
-                        self.metrics.dec_queue_depth();
-                        task.run();
-                        // Go back to busy loop
-                        break;
-                    }
-                    WaitResult::Shutdown => {
-                        // Shutdown initiated
-                        self.metrics.dec_num_idle_threads();
-                        break 'main;
-                    }
-                    WaitResult::Timeout => {
-                        // Timed out, exit this thread
-                        self.metrics.dec_num_idle_threads();
+            match self.queue.wait_for_task(preferred_shard, self.keep_alive) {
+                WaitResult::Task(task) => {
+                    self.metrics.dec_num_idle_threads();
+                    self.metrics.dec_queue_depth();
+                    task.run();
+                }
+                WaitResult::Shutdown => {
+                    self.metrics.dec_num_idle_threads();
+                    break 'main;
+                }
+                WaitResult::Timeout => {
+                    self.metrics.dec_num_idle_threads();
 
-                        // Clean up thread handle
-                        let mut shared = self.shared.lock();
-                        if !shared.shutdown {
-                            let my_handle = shared.worker_threads.remove(&worker_thread_id);
-                            join_on_thread =
-                                std::mem::replace(&mut shared.last_exiting_thread, my_handle);
-                        }
+                    // Clean up thread handle
+                    let mut shared = self.shared.lock();
+                    if !shared.shutdown {
+                        let my_handle = shared.worker_threads.remove(&worker_thread_id);
+                        join_on_thread =
+                            std::mem::replace(&mut shared.last_exiting_thread, my_handle);
+                    }
 
-                        // Exit the main loop and terminate the thread
-                        break 'main;
-                    }
-                    WaitResult::Spurious => {
-                        // Spurious wakeup, check for tasks and continue waiting
-                        if let Some(task) = self.queue.pop(preferred_shard) {
-                            self.metrics.dec_num_idle_threads();
-                            self.metrics.dec_queue_depth();
-                            task.run();
-                            break;
-                        }
-                        // Continue waiting
-                    }
+                    break 'main;
                 }
             }
         }
