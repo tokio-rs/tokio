@@ -1,7 +1,4 @@
-use std::io;
-
-#[cfg(not(test))]
-use std::os::unix::fs::OpenOptionsExt;
+use std::{io, os::unix::fs::OpenOptionsExt};
 
 #[cfg(test)]
 use super::mock_open_options::MockOpenOptions as StdOpenOptions;

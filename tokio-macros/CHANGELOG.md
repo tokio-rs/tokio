@@ -1,3 +1,11 @@
+# 2.7.0 (April 3rd, 2026)
+
+- macros: stabilize `LocalRuntime` ([#7557])
+- macros: add runtime name ([#7924])
+
+[#7557]: https://github.com/tokio-rs/tokio/pull/7557
+[#7924]: https://github.com/tokio-rs/tokio/pull/7924
+
 # 2.6.1 (Mar 2nd, 2026)
 
 - macros: improve error message for return type mismatch in #[tokio::main] ([#7856])

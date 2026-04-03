@@ -1,20 +1,45 @@
-# 1.50.1 (Mar 24rd, 2026)
+# 1.51.1 (April x, 2026)
 
 This release fixes an issue where cancelling a file opening operation
 could lead to a leak of file descriptors on Linux when using io-uring.
 
 ### Unstable
 
-- runtime: add worker_index() getter ([#7921])
 - runtime: (io-uring) ensure fds are closed when invoking cancel op ([#7983])
 
-### Documented
-
-- chore: Do not show "Available on non-loom only." doc label ([#7977])
-
-[#7921]: https://github.com/tokio-rs/tokio/pull/7921
-[#7977]: https://github.com/tokio-rs/tokio/pull/7977
 [#7983]: https://github.com/tokio-rs/tokio/pull/7983
+
+# 1.51.0 (April 3rd, 2026)
+
+### Added
+
+- net: implement `get_peer_cred` on Hurd ([#7989])
+- runtime: add `tokio::runtime::worker_index()` ([#7921])
+- runtime: add runtime name ([#7924])
+- runtime: stabilize `LocalRuntime` ([#7557])
+- wasm: add wasm32-wasip2 networking support ([#7933])
+
+### Changed
+
+- runtime: steal tasks from the LIFO slot ([#7431])
+
+### Fixed
+
+- docs: do not show "Available on non-loom only." doc label ([#7977])
+- macros: improve overall macro hygiene ([#7997])
+- sync: fix `notify_waiters` priority in `Notify` ([#7996])
+- sync: fix panic in `Chan::recv_many` when called with non-empty vector on closed channel ([#7991])
+
+[#7431]: https://github.com/tokio-rs/tokio/pull/7431
+[#7557]: https://github.com/tokio-rs/tokio/pull/7557
+[#7921]: https://github.com/tokio-rs/tokio/pull/7921
+[#7924]: https://github.com/tokio-rs/tokio/pull/7924
+[#7933]: https://github.com/tokio-rs/tokio/pull/7933
+[#7977]: https://github.com/tokio-rs/tokio/pull/7977
+[#7989]: https://github.com/tokio-rs/tokio/pull/7989
+[#7991]: https://github.com/tokio-rs/tokio/pull/7991
+[#7996]: https://github.com/tokio-rs/tokio/pull/7996
+[#7997]: https://github.com/tokio-rs/tokio/pull/7997
 
 # 1.50.0 (Mar 3rd, 2026)
 
@@ -291,7 +316,15 @@ The MSRV is increased to 1.71.
 [#7672]: https://github.com/tokio-rs/tokio/pull/7672
 [#7675]: https://github.com/tokio-rs/tokio/pull/7675
 
-# 1.47.3 (Januar 3rd, 2026)
+# 1.47.4 (April 2nd, 2026)
+
+### Fixed
+
+* sync: fix panic in `Chan::recv_many` when called with non-empty vector on closed channel ([#7991])
+
+[#7991]: https://github.com/tokio-rs/tokio/pull/7991
+
+# 1.47.3 (January 3rd, 2026)
 
 ### Fixed
 

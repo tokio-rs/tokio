@@ -1118,6 +1118,14 @@ impl NotifiedProject<'_> {
                 State::Init => {
                     let curr = notify.state.load(SeqCst);
 
+                    // Check if `notify_waiters` was called before attempting to acquire
+                    // the `NOTIFIED` state. If a broadcast occurred, we will be woken by it,
+                    // leaving the `notify_one` permit for other waiters.
+                    if get_num_notify_waiters_calls(curr) != *notify_waiters_calls {
+                        *state = State::Done;
+                        continue 'outer_loop;
+                    }
+
                     // Optimistically try acquiring a pending notification
                     let res = notify.state.compare_exchange(
                         set_state(curr, NOTIFIED),
