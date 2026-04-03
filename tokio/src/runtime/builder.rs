@@ -143,7 +143,7 @@ pub struct Builder {
 
     timer_flavor: TimerFlavor,
 
-    /// Whether or not to enable eager handoff for the I/O and time drivers (in
+    /// Whether or not to enable eager hand-off for the I/O and time drivers (in
     /// `tokio_unstable`).
     enable_eager_driver_handoff: bool,
 }
@@ -421,7 +421,7 @@ impl Builder {
         self
     }
 
-    /// Enable eager handoff of the I/O and time drivers for multi-threaded
+    /// Enable eager hand-off of the I/O and time drivers for multi-threaded
     /// runtimes, which is disabled by default.
     ///
     /// When this option is enabled, a worker thread which has parked on the I/O
@@ -442,7 +442,7 @@ impl Builder {
     /// This option only applies to multi-threaded runtimes. Attempting to use
     /// this option with any other runtime type will have no effect.
     ///
-    /// **Note**: This is an [unstable API][unstable]. Eager driver handoff is
+    /// **Note**: This is an [unstable API][unstable]. Eager driver hand-off is
     /// an experimental feature whose behavior may be removed or changed in 1.x
     /// releases. See [the documentation on unstable features][unstable] for
     /// details.
