@@ -103,7 +103,7 @@ impl Write for FileDescriptor {
 fn set_nonblocking(fd: &OwnedFd) {
     use nix::fcntl::{OFlag, F_GETFL, F_SETFL};
 
-    let flags = nix::fcntl::fcntl(fd, F_GETFL).expect("fcntl(F_GETFD)");
+    let flags = nix::fcntl::fcntl(fd, F_GETFL).expect("fcntl(F_GETFL)");
 
     if flags < 0 {
         panic!(
@@ -115,7 +115,7 @@ fn set_nonblocking(fd: &OwnedFd) {
 
     let flags = OFlag::from_bits_truncate(flags) | OFlag::O_NONBLOCK;
 
-    nix::fcntl::fcntl(fd, F_SETFL(flags)).expect("fcntl(F_SETFD)");
+    nix::fcntl::fcntl(fd, F_SETFL(flags)).expect("fcntl(F_SETFL)");
 }
 
 fn socketpair() -> (FileDescriptor, FileDescriptor) {
