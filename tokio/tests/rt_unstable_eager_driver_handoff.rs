@@ -98,11 +98,6 @@ fn do_test(rt: tokio::runtime::Runtime) -> Result<(), RecvTimeoutError> {
             // block a worker thread when calling `recv`.
             let (deadlock_tx, deadlock_rx) = std::sync::mpsc::channel();
 
-            // Task 1 ("bad"): sleep briefly so both workers settle into parked
-            // state, then block the worker thread. Because the timer is
-            // processed by the driver-holding worker, this task will always
-            // wake up on the worker holding the time driver before it decides
-            // to block.
             let bad_task = tokio::spawn(async move {
                 // Wait on a pipe for a bit to ensure that we end up on the worker
                 // holding the time driver.
@@ -116,14 +111,10 @@ fn do_test(rt: tokio::runtime::Runtime) -> Result<(), RecvTimeoutError> {
                 //
                 // However, if *this* task blocking the thread prevents the
                 // I/O driver from ever running, the runtime will be wedged forever.
-                pipe2_tx.write(&[2]).await.unwrap();
+                pipe2_tx.write_all(&[2]).await.unwrap();
                 deadlock_rx.recv().unwrap();
             });
 
-            // Task 2 ("good"): attempts to read from its pipe fires well after
-            // the bad task has blocked the I/O driver-holding worker. If the
-            // driver is wedged, the read never notifies the task, and it is
-            // never woken.
             let good_task = tokio::spawn(async move {
                 let mut buf = [0u8; 1];
                 pipe2_rx.read_exact(&mut buf).await.unwrap();
@@ -132,7 +123,7 @@ fn do_test(rt: tokio::runtime::Runtime) -> Result<(), RecvTimeoutError> {
 
             tokio::time::sleep(Duration::from_millis(100)).await;
 
-            pipe1_tx.write(&[1]).await.unwrap();
+            pipe1_tx.write_all(&[1]).await.unwrap();
 
             good_task.await.unwrap();
             bad_task.await.unwrap();
