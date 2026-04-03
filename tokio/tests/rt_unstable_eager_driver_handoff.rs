@@ -99,7 +99,7 @@ fn do_test(rt: tokio::runtime::Runtime) -> Result<(), RecvTimeoutError> {
             let bad_task = tokio::spawn(async move {
                 // Sleep for a bit to ensure that we end up on the worker
                 // holding the time driver.
-                tokio::time::sleep(Duration::from_millis(10)).await;
+                tokio::time::sleep(Duration::from_millis(1)).await;
                 // Okay, we have now definitely woken up on the worker
                 // thread that polled the time driver. Now, block this
                 // worker thread until woken by the *other* task. If the
@@ -117,7 +117,7 @@ fn do_test(rt: tokio::runtime::Runtime) -> Result<(), RecvTimeoutError> {
             tokio::spawn(async move {
                 // Now, try to wait for a short timer. If the driver is not
                 // permanently stuck, this should be okay.
-                tokio::time::sleep(Duration::from_millis(1000)).await;
+                tokio::time::sleep(Duration::from_millis(1200)).await;
                 deadlock_tx.send(()).unwrap();
             })
             .await
