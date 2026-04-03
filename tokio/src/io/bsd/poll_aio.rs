@@ -56,7 +56,8 @@ impl<T: AioSource> Source for MioSource<T> {
         interests: mio::Interest,
     ) -> io::Result<()> {
         assert!(interests.is_aio() || interests.is_lio());
-        self.0.register_borrowed(registry.as_fd(), usize::from(token));
+        self.0
+            .register_borrowed(registry.as_fd(), usize::from(token));
         Ok(())
     }
 
@@ -72,7 +73,8 @@ impl<T: AioSource> Source for MioSource<T> {
         interests: mio::Interest,
     ) -> io::Result<()> {
         assert!(interests.is_aio() || interests.is_lio());
-        self.0.register_borrowed(registry.as_fd(), usize::from(token));
+        self.0
+            .register_borrowed(registry.as_fd(), usize::from(token));
         Ok(())
     }
 }
