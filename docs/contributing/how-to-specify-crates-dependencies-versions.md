@@ -25,7 +25,7 @@ tokio = { version = "1.38.0", path = "../tokio", features = ["sync"] }
 
 In this case, local development of `tokio-stream` uses the local version
 of `tokio` via the `path` dependency. This means that it's currently not
-possible to release `tokio-stream` and `tokio` should be released first.
+possible to release `tokio-stream`, and `tokio` should be released first.
 Once a new version of `tokio` is released (in this example the `1.38.0`),
 the path dependency should be removed.
 As mentioned before, this version should only be bumped when adding a new
