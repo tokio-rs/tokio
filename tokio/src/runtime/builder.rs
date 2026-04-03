@@ -431,7 +431,7 @@ impl Builder {
     #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
     #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
     pub fn enable_eager_driver_handoff(&mut self) -> &mut Self {
-        self.eager_driver_handoff = true;
+        self.enable_eager_driver_handoff = true;
         self
     }
 
