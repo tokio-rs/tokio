@@ -1,4 +1,6 @@
-#![cfg(all(feature = "rt-multi-thread", feature = "time"))]
+// These tests only work on Unix platforms because they rely on Unix pipes
+// as a way of generating I/O events from within the same process.
+#![cfg(all(unix, feature = "full"))]
 
 use std::sync::mpsc::RecvTimeoutError;
 use std::time::Duration;
@@ -43,31 +45,30 @@ fn eager_driver_handoff_fixes_deadlock() {
 ///
 /// The deadlock occurs as follows:
 ///
-/// 1. Both worker threads are idle. Worker A parks on the time driver (holding
+/// 1. Both worker threads are idle. Worker A parks on the I/O driver (holding
 ///    the driver lock), Worker B parks on a condvar.
-/// 2. A timer fires. Worker A (the driver holder) wakes up and processes the
-///    timer event, placing the woken task in its run queue.
+/// 2. An I/O event fires. Worker A (the driver holder) wakes up and processes the
+///    I/O  event, placing the woken task in its run queue.
 /// 3. Worker A begins polling the task. The task blocks the worker thread
 ///    until it is woken by the other task, so Worker A never returns to
-///    poll the driver.
+///    poll the I/O driver.
 /// 4. Worker B remains parked on the condvar indefinitely — nobody calls
-///    `unpark` on it, so it never wakes to take over the driver.
-/// 5. Subsequent timers are never woken because no worker is polling the
-///    time driver. The runtime is wedged.
+///    `unpark` on it, so it never wakes to take over the I/O driver.
+/// 5. Subsequent I/O events are never processed because no worker is polling
+///    the time driver. The runtime is wedged.
 ///
-/// To trigger this reliably, the test uses two tasks with **staggered** timers:
+/// To trigger this reliably, the test uses two tasks which send and receive
+/// on a pair of Unix pipes. We use pipes to reliably trigger I/O events from
+/// within the same process.
 ///
-/// - The "bad" task's timer fires first and **alone**, so only one task is in
-///   the run queue when the driver-holding worker wakes. Because
-///   `should_notify_others()` checks `run_queue.len() > 1`, it returns `false`
-///   and Worker B is **not** woken.
-/// - The "good" task's timer fires much later, well after the bad task has
-///   blocked Worker A.
+/// The "bad" task's pipe is written to immediately, while the "good" task is
+/// still waiting for a read on its pipe. Then, when it's woken, it writes to
+/// the other pipe, waking the "good" task, and then blocks on a notification
+/// from a blocking channel which is only written to by the "good" task.
 ///
-/// If both timers fired at the same time (e.g., both 10ms), the timer would
-/// (probably) process both events in one rotation of the timer wheel, placing 2
-/// tasks in the queue. `should_notify_others()` would return `true`, waking
-/// Worker B and defeating the deadlock.
+/// Because this task first waits on a pipe read, this ensures that it is
+/// first polled from the worker thread that has last parked on the I/O
+/// driver, so when it blocks, it prevents the driver from making progress.
 ///
 /// The specific scenario we've constructed here is, admittedly, somewhat
 /// contrived: most Tokio applications aren't going to spawn tasks that attempt
@@ -79,6 +80,9 @@ fn eager_driver_handoff_fixes_deadlock() {
 /// be waiting on a blocking syscall that completes only when the other task
 /// does something.
 fn do_test(rt: tokio::runtime::Runtime) -> Result<(), RecvTimeoutError> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::unix::pipe::pipe;
+
     // A blocking MPSC from the standard library is used to wait for the test to
     // complete within a reasonable amount of time, so that we can determine
     // whether or not the runtime has deadlocked.
@@ -86,6 +90,9 @@ fn do_test(rt: tokio::runtime::Runtime) -> Result<(), RecvTimeoutError> {
 
     std::thread::spawn(move || {
         rt.block_on(async {
+            let (mut pipe1_tx, mut pipe1_rx) = pipe().expect("ceci n'est pas une pipe");
+            let (mut pipe2_tx, mut pipe2_rx) = pipe().expect("ceci n'est pas une pipe");
+
             // Note that we use a *blocking* MPSC from the standard library
             // here, since the entire purpose of the channel is to temporarily
             // block a worker thread when calling `recv`.
@@ -97,39 +104,44 @@ fn do_test(rt: tokio::runtime::Runtime) -> Result<(), RecvTimeoutError> {
             // wake up on the worker holding the time driver before it decides
             // to block.
             let bad_task = tokio::spawn(async move {
-                // Sleep for a bit to ensure that we end up on the worker
+                // Wait on a pipe for a bit to ensure that we end up on the worker
                 // holding the time driver.
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                let mut buf = [0u8; 1];
+                pipe1_rx.read_exact(&mut buf).await.unwrap();
                 // Okay, we have now definitely woken up on the worker
-                // thread that polled the time driver. Now, block this
+                // thread that polled the I/0 driver. Now, block this
                 // worker thread until woken by the *other* task. If the
-                // other task's timer is allowed to complete, this task will
-                // be unblocked and the runtime will keep running.
+                // other task's I/O driver notification wakes it up,
+                // this task will be unblocked and the runtime will keep running.
                 //
                 // However, if *this* task blocking the thread prevents the
-                // timer from ever firing, the runtime will be wedged forever.
+                // I/O driver from ever running, the runtime will be wedged forever.
+                pipe2_tx.write(&[2]).await.unwrap();
                 deadlock_rx.recv().unwrap();
             });
 
-            // Task 2 ("good"): its timer fires well after the bad task has
-            // blocked the driver-holding worker. If the driver is wedged, this
-            // sleep never completes and `block_on` hangs.
-            tokio::spawn(async move {
-                // Now, try to wait for a short timer. If the driver is not
-                // permanently stuck, this should be okay.
-                tokio::time::sleep(Duration::from_millis(1200)).await;
+            // Task 2 ("good"): attempts to read from its pipe fires well after
+            // the bad task has blocked the I/O driver-holding worker. If the
+            // driver is wedged, the read never notifies the task, and it is
+            // never woken.
+            let good_task = tokio::spawn(async move {
+                let mut buf = [0u8; 1];
+                pipe2_rx.read_exact(&mut buf).await.unwrap();
                 deadlock_tx.send(()).unwrap();
-            })
-            .await
-            .unwrap();
+            });
 
+            tokio::time::sleep(Duration::from_millis(100)).await;
+
+            pipe1_tx.write(&[1]).await.unwrap();
+
+            good_task.await.unwrap();
             bad_task.await.unwrap();
         });
 
         done_tx.send(()).unwrap();
     });
 
-    done_rx.recv_timeout(Duration::from_secs(20))
+    done_rx.recv_timeout(Duration::from_secs(10))
 }
 
 /// Base runtime builder for both tests in this module: two worker threads, time
@@ -138,6 +150,6 @@ fn do_test(rt: tokio::runtime::Runtime) -> Result<(), RecvTimeoutError> {
 /// enable eager driver handoff before building it.
 fn rt_builder() -> tokio::runtime::Builder {
     let mut builder = tokio::runtime::Builder::new_multi_thread();
-    builder.enable_time().worker_threads(2);
+    builder.enable_all().worker_threads(2);
     builder
 }
