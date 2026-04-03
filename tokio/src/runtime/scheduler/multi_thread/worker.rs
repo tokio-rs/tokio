@@ -132,10 +132,14 @@ struct Core {
     /// True if the scheduler is being traced
     is_traced: bool,
 
-    /// True if the worker has stolen the I/O driver.
+    /// Whether or not the worker has just returned from a park in which we
+    /// parked on the I/O driver.
     had_driver: park::HadDriver,
 
-    driver_heresy_mode: bool,
+    /// If `true`, the worker should eagerly notify another worker when polling
+    /// the first task after returning from a park in which it parked on the I/O
+    /// or time driver.
+    enable_eager_driver_handoff: bool,
 
     /// Parker
     ///
@@ -285,7 +289,7 @@ pub(super) fn create(
             is_searching: false,
             is_shutdown: false,
             is_traced: false,
-            driver_heresy_mode: cfg!(tokio_unstable) && config.io_driver_heresy_mode,
+            enable_eager_driver_handoff: config.enable_eager_driver_handoff,
             had_driver: park::HadDriver::No,
             park: Some(park),
             global_queue_interval: stats.tuned_global_queue_interval(&config),
@@ -631,10 +635,17 @@ impl Context {
         //
         // Note that this is only done when we are *actually* about to poll a
         // task, rather than whenever the worker has unparked. When the worker
-        // has been unparked ,it may not actually have any tasks to poll, and if
+        // has been unparked, it may not actually have any tasks to poll, and if
         // it's still holding the I/O driver, it should just go back to polling
         // the driver again, rather than trying to wake someone else spuriously.
-        if core.driver_heresy_mode && core.had_driver == park::HadDriver::Yes {
+        //
+        // Note that this explicitly checks `cfg!(tokio_unstable)` in addition,
+        // as that should result in this whole expression being eliminated at
+        // compile-time when unstable features are disabled.
+        if cfg!(tokio_unstable)
+            && core.enable_eager_driver_handoff
+            && core.had_driver == park::HadDriver::Yes
+        {
             core.had_driver = park::HadDriver::No;
             self.worker.handle.notify_parked_local();
         }

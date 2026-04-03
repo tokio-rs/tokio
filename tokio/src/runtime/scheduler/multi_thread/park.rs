@@ -23,7 +23,7 @@ pub(crate) struct Unparker {
 
 /// Represents how a worker thread was parked
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub(super) enum HadDriver {
+pub(crate) enum HadDriver {
     Yes,
     No,
 }

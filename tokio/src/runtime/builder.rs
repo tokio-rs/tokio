@@ -142,6 +142,10 @@ pub struct Builder {
     pub(super) unhandled_panic: UnhandledPanic,
 
     timer_flavor: TimerFlavor,
+
+    /// Whether or not to enable eager handoff for the I/O and time drivers (in
+    /// `tokio_unstable`).
+    enable_eager_driver_handoff: bool,
 }
 
 cfg_unstable! {
@@ -334,6 +338,9 @@ impl Builder {
             disable_lifo_slot: false,
 
             timer_flavor: TimerFlavor::Traditional,
+
+            // Eager driver handoff is disabled by default.
+            enable_eager_driver_handoff: false,
         }
     }
 
@@ -411,6 +418,20 @@ impl Builder {
     pub fn enable_alt_timer(&mut self) -> &mut Self {
         self.enable_time();
         self.timer_flavor = TimerFlavor::Alternative;
+        self
+    }
+
+    /// Enable eager handoff of the I/O and time drivers for multi-threaded
+    /// runtimes.
+    ///
+    /// This is a surprise tool that will help us later.
+    ///
+    /// **Note**: this only does something if this builder is constructing a
+    /// multi-threaded runtime.
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
+    pub fn enable_eager_driver_handoff(&mut self) -> &mut Self {
+        self.eager_driver_handoff = true;
         self
     }
 
@@ -1328,24 +1349,6 @@ impl Builder {
             self.seed_generator = RngSeedGenerator::new(seed);
             self
         }
-
-        /// Enable I/O driver heresy mode.
-        ///
-        /// This is a surprise tool that will help us later.
-        ///
-        /// **Note**: this only does something if this builder is constructing a
-        /// multi-threaded runtime.
-        pub fn enable_io_driver_heresy_mode(&mut self) -> &mut Self {
-            if !matches!(self.kind, Kind::MultiThread) {
-                panic!(
-                    "I/O driver heresy mode only does something for \
-                     multi-threaded runtimes"
-                );
-            }
-
-            self.io_driver_heresy_mode = true;
-            self
-        }
     }
 
     cfg_unstable_metrics! {
@@ -1682,7 +1685,7 @@ impl Builder {
                 // This setting never makes sense for a current thread runtime,
                 // as it only configures how the I/O driver is stolen across
                 // workers.
-                io_driver_heresy_mode: false,
+                enable_eager_driver_handoff: false,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
             },
@@ -1865,7 +1868,7 @@ cfg_rt_multi_thread! {
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
-                    io_driver_heresy_mode: self.io_driver_heresy_mode,
+                    enable_eager_driver_handoff: self.enable_eager_driver_handoff,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 },
@@ -1903,7 +1906,11 @@ impl fmt::Debug for Builder {
             .field("after_start", &self.after_start.as_ref().map(|_| "..."))
             .field("before_stop", &self.before_stop.as_ref().map(|_| "..."))
             .field("before_park", &self.before_park.as_ref().map(|_| "..."))
-            .field("after_unpark", &self.after_unpark.as_ref().map(|_| "..."));
+            .field("after_unpark", &self.after_unpark.as_ref().map(|_| "..."))
+            .field(
+                "enable_eager_driver_handoff",
+                &self.enable_eager_driver_handoff,
+            );
 
         if self.name.is_none() {
             debug.finish_non_exhaustive()

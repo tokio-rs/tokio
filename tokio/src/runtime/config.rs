@@ -57,5 +57,5 @@ pub(crate) struct Config {
     /// If `true`, an idle worker is woken whenever a worker thread transitions
     /// from polling the I/O driver to polling its own tasks (requires
     /// `tokio_unstable`).
-    pub(crate) io_driver_heresy_mode: bool,
+    pub(crate) enable_eager_driver_handoff: bool,
 }
