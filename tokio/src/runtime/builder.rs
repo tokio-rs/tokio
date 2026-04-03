@@ -422,7 +422,12 @@ impl Builder {
     }
 
     /// Enable eager handoff of the I/O and time drivers for multi-threaded
-    /// runtimes.
+    /// runtimes, which is disabled by default.
+    ///
+    /// When this option is enabled, a worker thread which has parked on the I/O
+    /// or time driver will notify another worker thread once it is preparing to
+    /// begin polling a task from the run queue, so that the notified worker can
+    /// begin polling the I/O or time driver. This can reduce the latency with which I/O and timer notifications are processed when
     ///
     /// This is a surprise tool that will help us later.
     ///
