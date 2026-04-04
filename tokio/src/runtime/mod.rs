@@ -36,9 +36,9 @@
 //!                            | Yes                 | No
 //!                            |                     |
 //!                            V                     |
-//!              +--------------------------+        |
-//!              | Local Runtime (unstable) |        |
-//!              +--------------------------+        |
+//!                    +---------------+             |
+//!                    | Local Runtime |             |
+//!                    +---------------+             |
 //!                                                  |
 //!                                                  v
 //!                                      +------------------------+
@@ -367,8 +367,8 @@
 //! three times in a row, it is temporarily disabled until the worker thread has
 //! scheduled a task that didn't come from the lifo slot. The lifo slot can be
 //! disabled using the [`disable_lifo_slot`] setting. The lifo slot is separate
-//! from the local queue, so other worker threads cannot steal the task in the
-//! lifo slot.
+//! from the local queue, and is stolen from by other worker threads only when
+//! a worker's local queue has been drained.
 //!
 //! When a task is woken from a thread that is not a worker thread, then the
 //! task is placed in the global queue.
@@ -575,9 +575,6 @@ cfg_rt! {
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
 
-        mod local_runtime;
-        pub use local_runtime::{LocalRuntime, LocalOptions};
-
         /// Returns the index of the current worker thread, if called from a
         /// runtime worker thread.
         ///
@@ -634,6 +631,9 @@ cfg_rt! {
 
     mod runtime;
     pub use runtime::{Runtime, RuntimeFlavor, is_rt_shutdown_err};
+
+    mod local_runtime;
+    pub use local_runtime::{LocalRuntime, LocalOptions};
 
     mod id;
     pub use id::Id;

@@ -5,7 +5,9 @@ use crate::runtime::{
     blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback, TimerFlavor,
 };
 #[cfg(tokio_unstable)]
-use crate::runtime::{metrics::HistogramConfiguration, LocalOptions, LocalRuntime, TaskMeta};
+use crate::runtime::{metrics::HistogramConfiguration, TaskMeta};
+
+use crate::runtime::{LocalOptions, LocalRuntime};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use crate::runtime::blocking::BlockingPool;
@@ -241,7 +243,7 @@ impl Builder {
     /// Configuration methods can be chained on the return value.
     ///
     /// To spawn non-`Send` tasks on the resulting runtime, combine it with a
-    /// [`LocalSet`], or call [`build_local`] to create a [`LocalRuntime`] (unstable).
+    /// [`LocalSet`], or call [`build_local`] to create a [`LocalRuntime`].
     ///
     /// [`LocalSet`]: crate::task::LocalSet
     /// [`LocalRuntime`]: crate::runtime::LocalRuntime
@@ -1048,8 +1050,6 @@ impl Builder {
     /// });
     /// ```
     #[allow(unused_variables, unreachable_patterns)]
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn build_local(&mut self, options: LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
@@ -1257,22 +1257,21 @@ impl Builder {
         /// scheduled task being polled first.
         ///
         /// To implement this heuristic, each worker thread has a slot which
-        /// holds the task that should be polled next. However, this slot cannot
-        /// be stolen by other worker threads, which can result in lower total
-        /// throughput when tasks tend to have longer poll times.
+        /// holds the task that should be polled next. In earlier versions of
+        /// Tokio, this slot could not be stolen by other worker threads, which
+        /// can result in lower total throughput when tasks tend to have longer
+        /// poll times.
         ///
         /// This configuration option will disable this heuristic resulting in
-        /// all scheduled tasks being pushed into the worker-local queue, which
-        /// is stealable.
-        ///
-        /// Consider trying this option when the task "scheduled" time is high
-        /// but the runtime is underutilized. Use [tokio-rs/tokio-metrics] to
-        /// collect this data.
+        /// all scheduled tasks being pushed into the worker-local queue. This
+        /// was intended as a workaround for the LIFO slot not being stealable.
+        /// As of Tokio 1.51, tasks can be stolen from the LIFO slot. In a
+        /// future version, this option may be deprecated.
         ///
         /// # Unstable
         ///
-        /// This configuration option is considered a workaround for the LIFO
-        /// slot not being stealable. When the slot becomes stealable, we will
+        /// This configuration option was considered a workaround for the LIFO
+        /// slot not being stealable. Since this is no longer the case, we will
         /// revisit whether or not this option is necessary. See
         /// issue [tokio-rs/tokio#4941].
         ///
@@ -1605,7 +1604,6 @@ impl Builder {
         ))
     }
 
-    #[cfg(tokio_unstable)]
     fn build_current_thread_local_runtime(&mut self) -> io::Result<LocalRuntime> {
         use crate::runtime::local_runtime::LocalRuntimeScheduler;
 
