@@ -13,6 +13,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+use tempfile::NamedTempFile;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::timeout;
 
@@ -21,8 +22,6 @@ fn fd_count() -> usize {
     fs::read_dir("/proc/self/fd").unwrap().count()
 }
 
-/// Wrapper future used to hit the missing cleanup path.
-///
 /// First poll:
 /// - polls the inner `tokio::fs::OpenOptions::open()` future once,
 /// - expects `Pending` so we know we took the io_uring path,
@@ -35,9 +34,7 @@ fn fd_count() -> usize {
 /// - stays pending forever so the task can be aborted.
 ///
 /// Aborting the task here drops the inner `open()` future while Tokio still has
-/// a completed CQE sitting in the slab. Today that goes through
-/// `cancel_op(... Lifecycle::Completed(_))`, which removes the slab entry
-/// without adopting or closing the returned fd.
+/// a completed CQE sitting in the slab.
 struct PollOpenOnceThenNeverRepoll<F> {
     inner: Pin<Box<F>>,
     first_poll_tx: Option<UnboundedSender<()>>,
@@ -50,11 +47,9 @@ impl<F: Future> Future for PollOpenOnceThenNeverRepoll<F> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if !self.polled_once {
-            let poll = self.inner.as_mut().poll(cx);
-            assert!(
-                matches!(poll, Poll::Pending),
-                "open did not use io_uring path in this environment"
-            );
+            // We don't check if the result is actually pending because some
+            // CI checks based on old kernels might return ready.
+            let _pending = self.inner.as_mut().poll(cx);
 
             self.polled_once = true;
             self.first_poll_tx.take().unwrap().send(()).unwrap();
@@ -114,7 +109,8 @@ fn uring_completed_then_dropped() {
 
     rt.block_on(async {
         let before = fd_count();
-        let path = PathBuf::from("/etc/hosts");
+        let tmp = NamedTempFile::new().unwrap();
+        let path = tmp.path().to_path_buf();
 
         for _ in 0..128 {
             completed_then_dropped_before_repoll(path.clone()).await;
@@ -126,11 +122,12 @@ fn uring_completed_then_dropped() {
         let after = fd_count();
         let leaked = after.saturating_sub(before);
 
-        println!("before={before}");
-        println!("after={after}");
-        println!("leaked={leaked}");
-
-        // Vulnerable builds leak roughly one fd per iteration here.
+        // Since we are opening 128 files, we expect that the related fds
+        // related to this operation will be closed. Since some other fds
+        // can be opened in the meantime, we expect this number to be higher
+        // than the counter before opening the files. This number could be
+        // lower, but to avoid test flakiness we check that this is at most
+        // half the number of the file we opened to check if there's a leak.
         assert!(leaked <= 64);
     });
 }
