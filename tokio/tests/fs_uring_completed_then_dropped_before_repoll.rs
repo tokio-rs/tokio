@@ -47,8 +47,8 @@ impl<F: Future> Future for PollOpenOnceThenNeverRepoll<F> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if !self.polled_once {
-            // We don't check if the result is actually pending because some
-            // CI checks based on old kernels might return ready.
+            // We don't check if the result is actually pending because
+            // we run some checks on old kernel that do not support uring.
             let _pending = self.inner.as_mut().poll(cx);
 
             self.polled_once = true;

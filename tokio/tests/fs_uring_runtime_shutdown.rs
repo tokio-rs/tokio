@@ -42,8 +42,8 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
 
                     // If io_uring is enabled (and not falling back to the thread pool),
                     // the first poll should return Pending. We don't check if the result
-                    // is actually a poll because some CI checks based on old kernels might
-                    // return ready.
+                    // is actually a pending because we run some CI checks based on old
+                    // kernels that don't support uring.
                     let _pending = Box::pin(fut).poll_unpin(cx);
 
                     tx.send(()).unwrap();
