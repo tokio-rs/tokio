@@ -23,9 +23,9 @@ pub trait AioSource {
     ///
     /// # Safety
     ///
-    /// It's memory-safe safe, but not I/O safe.  If the file referenced by `kq` gets dropped, then
-    /// this source may end up notifying the wrong file.
-    #[deprecated(since = "1.51.0", note = "use register_borrowed instead")]
+    /// It's memory-safe, but not I/O safe.  If the file referenced by `kq` gets dropped, then this
+    /// source may end up notifying the wrong file.
+    #[deprecated(since = "1.52.0", note = "use register_borrowed instead")]
     fn register(&mut self, _kq: RawFd, _token: usize) {
         // This default implementation exists so new AioSource implementors that implement the
         // register_borrowed method can compile without the need to implement register.
@@ -35,7 +35,7 @@ pub trait AioSource {
     /// Registers this AIO event source with Tokio's reactor.
     fn register_borrowed(&mut self, kq: BorrowedFd<'_>, token: usize) {
         // This default implementation serves to provide backwards compatibility with AioSource
-        // implementors written before 1.51.0 that only implemented the unsafe `register` method.
+        // implementors written before 1.52.0 that only implemented the unsafe `register` method.
         #[allow(deprecated)]
         self.register(kq.as_raw_fd(), token)
     }
