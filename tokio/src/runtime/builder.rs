@@ -138,6 +138,12 @@ pub struct Builder {
     /// Configures the task poll count histogram
     pub(super) metrics_poll_count_histogram: HistogramBuilder,
 
+    /// When true, enables task schedule latency instrumentation.
+    pub(super) metrics_schedule_latency_histogram_enabled: bool,
+
+    /// Configures the task schedule latency histogram.
+    pub(super) metrics_schedule_latency_histogram: HistogramBuilder,
+
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
 
@@ -330,6 +336,10 @@ impl Builder {
             metrics_poll_count_histogram_enable: false,
 
             metrics_poll_count_histogram: HistogramBuilder::default(),
+
+            metrics_schedule_latency_histogram_enabled: false,
+
+            metrics_schedule_latency_histogram: HistogramBuilder::default(),
 
             disable_lifo_slot: false,
 
@@ -1589,6 +1599,131 @@ impl Builder {
             self.metrics_poll_count_histogram.legacy_mut(|b|b.num_buckets = buckets);
             self
         }
+
+        /// Enables tracking the distribution of task schedule latencies. Task
+        /// schedule latency is the time between when a task is scheduled for
+        /// execution and when it is polled.
+        ///
+        /// **This feature is only supported on 64-bit targets.**
+        ///
+        /// Task schedule latencies are not instrumented by default as doing
+        /// so requires calling [`Instant::now()`] when a task is scheduled
+        /// and when it is polled, which could add measurable overhead. Use
+        /// the [`Handle::metrics()`] to access the metrics data.
+        ///
+        /// By default, a linear histogram with 10 buckets each 100 microseconds wide will be used.
+        /// This has an extremely low memory footprint, but may not provide enough granularity. For
+        /// better granularity with low memory usage, use [`metrics_schedule_latency_histogram_configuration()`]
+        /// to select [`LogHistogram`] instead.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_schedule_latency_histogram()
+        ///     .build()
+        ///     .unwrap();
+        /// # // Test default values here
+        /// # fn us(n: u64) -> std::time::Duration { std::time::Duration::from_micros(n) }
+        /// # let m = rt.handle().metrics();
+        /// # assert_eq!(m.schedule_latency_histogram_num_buckets(), 10);
+        /// # assert_eq!(m.schedule_latency_histogram_bucket_range(0), us(0)..us(100));
+        /// # assert_eq!(m.schedule_latency_histogram_bucket_range(1), us(100)..us(200));
+        /// # }
+        /// ```
+        ///
+        /// [`Handle::metrics()`]: crate::runtime::Handle::metrics
+        /// [`Instant::now()`]: std::time::Instant::now
+        /// [`LogHistogram`]: crate::runtime::LogHistogram
+        /// [`metrics_schedule_latency_histogram_configuration()`]: Builder::metrics_schedule_latency_histogram_configuration
+        pub fn enable_metrics_schedule_latency_histogram(&mut self) -> &mut Self {
+            self.metrics_schedule_latency_histogram_enabled = true;
+            self
+        }
+
+        /// Configure the histogram for tracking task schedule latencies.
+        ///
+        /// Tracking of task schedule latencies must be enabled with
+        /// [`enable_metrics_schedule_latency_histogram()`] for this function
+        /// to have any effect.
+        ///
+        /// By default, a linear histogram with 10 buckets each 100 microseconds wide will be used.
+        /// This has an extremely low memory footprint, but may not provide enough granularity. For
+        /// better granularity with low memory usage, use [`LogHistogram`] instead.
+        ///
+        /// # Examples
+        /// Configure a [`LogHistogram`] with [default configuration]:
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// use tokio::runtime;
+        /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_schedule_latency_histogram()
+        ///     .metrics_schedule_latency_histogram_configuration(
+        ///         HistogramConfiguration::log(LogHistogram::default())
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// # }
+        /// ```
+        ///
+        /// Configure a linear histogram with 100 buckets, each 10μs wide
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// use tokio::runtime;
+        /// use std::time::Duration;
+        /// use tokio::runtime::HistogramConfiguration;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_schedule_latency_histogram()
+        ///     .metrics_schedule_latency_histogram_configuration(
+        ///         HistogramConfiguration::linear(Duration::from_micros(10), 100)
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// # }
+        /// ```
+        ///
+        /// Configure a [`LogHistogram`] with the following settings:
+        /// - Measure times from 100ns to 120s
+        /// - Max error of 0.1
+        /// - No more than 1024 buckets
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// use std::time::Duration;
+        /// use tokio::runtime;
+        /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_schedule_latency_histogram()
+        ///     .metrics_schedule_latency_histogram_configuration(
+        ///         HistogramConfiguration::log(LogHistogram::builder()
+        ///             .max_value(Duration::from_secs(120))
+        ///             .min_value(Duration::from_nanos(100))
+        ///             .max_error(0.1)
+        ///             .max_buckets(1024)
+        ///             .expect("configuration uses 488 buckets")
+        ///         )
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// # }
+        /// ```
+        ///
+        /// [`LogHistogram`]: crate::runtime::LogHistogram
+        /// [`enable_metrics_schedule_latency_histogram()`]: Builder::enable_metrics_schedule_latency_histogram
+        pub fn metrics_schedule_latency_histogram_configuration(&mut self, configuration: HistogramConfiguration) -> &mut Self {
+            self.metrics_schedule_latency_histogram.histogram_type = configuration.inner;
+            self
+        }
     }
 
     fn build_current_thread_runtime(&mut self) -> io::Result<Runtime> {
@@ -1663,6 +1798,8 @@ impl Builder {
                 disable_lifo_slot: self.disable_lifo_slot,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                metrics_schedule_latency_histogram: self
+                    .metrics_schedule_latency_histogram_builder(),
             },
             local_tid,
             self.name.clone(),
@@ -1678,6 +1815,14 @@ impl Builder {
     fn metrics_poll_count_histogram_builder(&self) -> Option<HistogramBuilder> {
         if self.metrics_poll_count_histogram_enable {
             Some(self.metrics_poll_count_histogram.clone())
+        } else {
+            None
+        }
+    }
+
+    fn metrics_schedule_latency_histogram_builder(&self) -> Option<HistogramBuilder> {
+        if self.metrics_schedule_latency_histogram_enabled {
+            Some(self.metrics_schedule_latency_histogram.clone())
         } else {
             None
         }
@@ -1845,6 +1990,7 @@ cfg_rt_multi_thread! {
                     disable_lifo_slot: self.disable_lifo_slot,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                    metrics_schedule_latency_histogram: self.metrics_schedule_latency_histogram_builder(),
                 },
                 self.timer_flavor,
                 self.name.clone(),
