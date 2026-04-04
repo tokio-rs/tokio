@@ -60,6 +60,12 @@ struct Context {
     #[cfg(any(feature = "rt", feature = "macros"))]
     rng: Cell<Option<FastRand>>,
 
+    /// Home shard index for the sharded inject queue. External threads
+    /// pushing tasks are assigned a shard on first push and stick with it
+    /// for cache locality. `INJECT_SHARD_UNASSIGNED` means not yet assigned.
+    #[cfg(feature = "rt-multi-thread")]
+    inject_push_shard: Cell<usize>,
+
     /// Tracks the amount of "work" a task may still do before yielding back to
     /// the scheduler
     budget: Cell<coop::Budget>,
@@ -91,6 +97,9 @@ tokio_thread_local! {
 
             #[cfg(feature = "rt")]
             current_task_id: Cell::new(None),
+
+            #[cfg(feature = "rt-multi-thread")]
+            inject_push_shard: Cell::new(INJECT_SHARD_UNASSIGNED),
 
             // Tracks if the current thread is currently driving a runtime.
             // Note, that if this is set to "entered", the current scheduler
@@ -201,5 +210,29 @@ cfg_rt! {
         pub(crate) unsafe fn with_trace<R>(f: impl FnOnce(&trace::Context) -> R) -> Option<R> {
             CONTEXT.try_with(|c| f(&c.trace)).ok()
         }
+    }
+}
+
+cfg_rt_multi_thread! {
+    /// Sentinel indicating the per-thread inject push shard has not been assigned.
+    const INJECT_SHARD_UNASSIGNED: usize = usize::MAX;
+
+    /// Returns the calling thread's inject-queue push shard, assigning one
+    /// via `init` on first use. Falls back to `init()` if the thread local
+    /// is inaccessible (e.g. during thread shutdown).
+    pub(crate) fn inject_push_shard(init: impl FnOnce() -> usize) -> usize {
+        let mut init = Some(init);
+        CONTEXT
+            .try_with(|ctx| {
+                let idx = ctx.inject_push_shard.get();
+                if idx == INJECT_SHARD_UNASSIGNED {
+                    let new = (init.take().unwrap())();
+                    ctx.inject_push_shard.set(new);
+                    new
+                } else {
+                    idx
+                }
+            })
+            .unwrap_or_else(|_| (init.take().unwrap())())
     }
 }
