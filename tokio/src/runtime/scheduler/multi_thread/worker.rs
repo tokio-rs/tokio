@@ -59,7 +59,7 @@
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
-    idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
+    idle, park, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
 use crate::runtime::scheduler::{inject, Defer, Lock};
 use crate::runtime::task::OwnedTasks;
@@ -131,6 +131,15 @@ struct Core {
 
     /// True if the scheduler is being traced
     is_traced: bool,
+
+    /// Whether or not the worker has just returned from a park in which we
+    /// parked on the I/O driver.
+    had_driver: park::HadDriver,
+
+    /// If `true`, the worker should eagerly notify another worker when polling
+    /// the first task after returning from a park in which it parked on the I/O
+    /// or time driver.
+    enable_eager_driver_handoff: bool,
 
     /// Parker
     ///
@@ -280,6 +289,8 @@ pub(super) fn create(
             is_searching: false,
             is_shutdown: false,
             is_traced: false,
+            enable_eager_driver_handoff: config.enable_eager_driver_handoff,
+            had_driver: park::HadDriver::No,
             park: Some(park),
             global_queue_interval: stats.tuned_global_queue_interval(&config),
             stats,
@@ -616,7 +627,30 @@ impl Context {
 
         // Make sure the worker is not in the **searching** state. This enables
         // another idle worker to try to steal work.
-        core.transition_from_searching(&self.worker);
+        let notified_parked_worker = core.transition_from_searching(&self.worker);
+
+        // If the setting to wake eagerly when releasing the I/O driver is
+        // enabled, and this worker had the driver, wake a parked worker to come
+        // grab it from us.
+        //
+        // Note that this is only done when we are *actually* about to poll a
+        // task, rather than whenever the worker has unparked. When the worker
+        // has been unparked, it may not actually have any tasks to poll, and if
+        // it's still holding the I/O driver, it should just go back to polling
+        // the driver again, rather than trying to wake someone else spuriously.
+        //
+        // Note that this explicitly checks `cfg!(tokio_unstable)` in addition,
+        // as that should result in this whole expression being eliminated at
+        // compile-time when unstable features are disabled.
+        if cfg!(tokio_unstable)
+            && core.enable_eager_driver_handoff
+            && core.had_driver == park::HadDriver::Yes
+            && !notified_parked_worker
+        // don't do it a second time
+        {
+            core.had_driver = park::HadDriver::No;
+            self.worker.handle.notify_parked_local();
+        }
 
         self.assert_lifo_enabled_is_correct(&core);
 
@@ -825,11 +859,11 @@ impl Context {
         };
 
         // Park thread
-        if let Some(timeout) = duration {
-            park.park_timeout(&self.worker.handle.driver, timeout);
+        let had_driver = if let Some(timeout) = duration {
+            park.park_timeout(&self.worker.handle.driver, timeout)
         } else {
-            park.park(&self.worker.handle.driver);
-        }
+            park.park(&self.worker.handle.driver)
+        };
 
         self.defer.wake();
 
@@ -854,6 +888,8 @@ impl Context {
 
         // Place `park` back in `core`
         core.park = Some(park);
+        core.had_driver = had_driver;
+
         if core.should_notify_others() {
             self.worker.handle.notify_parked_local();
         }
@@ -1117,13 +1153,13 @@ impl Core {
         self.is_searching
     }
 
-    fn transition_from_searching(&mut self, worker: &Worker) {
+    fn transition_from_searching(&mut self, worker: &Worker) -> bool {
         if !self.is_searching {
-            return;
+            return false;
         }
 
         self.is_searching = false;
-        worker.handle.transition_worker_from_searching();
+        worker.handle.transition_worker_from_searching()
     }
 
     fn has_tasks(&self) -> bool {
@@ -1370,12 +1406,18 @@ impl Handle {
         }
     }
 
-    fn notify_parked_local(&self) {
+    /// Notify a parked worker.
+    ///
+    /// Returns `true` if a worker was notified, `false` otherwise.
+    fn notify_parked_local(&self) -> bool {
         super::counters::inc_num_inc_notify_local();
 
         if let Some(index) = self.shared.idle.worker_to_notify(&self.shared) {
             super::counters::inc_num_unparks_local();
             self.shared.remotes[index].unpark.unpark(&self.driver);
+            true
+        } else {
+            false
         }
     }
 
@@ -1404,11 +1446,14 @@ impl Handle {
         }
     }
 
-    fn transition_worker_from_searching(&self) {
+    /// Returns `true` if another parked worker was notified, `false` otherwise.
+    fn transition_worker_from_searching(&self) -> bool {
         if self.shared.idle.transition_worker_from_searching() {
             // We are the final searching worker. Because work was found, we
             // need to notify another worker.
-            self.notify_parked_local();
+            self.notify_parked_local()
+        } else {
+            false
         }
     }
 

@@ -53,4 +53,9 @@ pub(crate) struct Config {
     #[cfg(tokio_unstable)]
     /// How to respond to unhandled task panics.
     pub(crate) unhandled_panic: crate::runtime::UnhandledPanic,
+
+    /// If `true`, an idle worker is woken whenever a worker thread transitions
+    /// from polling the I/O driver to polling its own tasks (requires
+    /// `tokio_unstable`).
+    pub(crate) enable_eager_driver_handoff: bool,
 }
