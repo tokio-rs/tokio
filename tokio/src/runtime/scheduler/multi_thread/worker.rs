@@ -1369,10 +1369,6 @@ impl Handle {
     }
 
     fn next_remote_task(&self, hint: usize) -> Option<Notified> {
-        if self.shared.inject.is_empty() {
-            return None;
-        }
-
         self.shared.inject.pop(hint)
     }
 
