@@ -1564,7 +1564,7 @@ impl UdpSocket {
     pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.io.peek(buf))
+            .async_io(Interest::READABLE | Interest::ERROR, || self.io.peek(buf))
             .await
     }
 
@@ -1706,7 +1706,9 @@ impl UdpSocket {
     pub async fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.io.peek_from(buf))
+            .async_io(Interest::READABLE | Interest::ERROR, || {
+                self.io.peek_from(buf)
+            })
             .await
     }
 
@@ -1823,7 +1825,9 @@ impl UdpSocket {
     pub async fn peek_sender(&self) -> io::Result<SocketAddr> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.peek_sender_inner())
+            .async_io(Interest::READABLE | Interest::ERROR, || {
+                self.peek_sender_inner()
+            })
             .await
     }
 
