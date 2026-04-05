@@ -1,14 +1,3 @@
-# 1.51.1 (April x, 2026)
-
-This release fixes an issue where cancelling a file opening operation
-could lead to a leak of file descriptors on Linux when using io-uring.
-
-### Unstable
-
-- runtime: (io-uring) ensure fds are closed when invoking cancel op ([#7983])
-
-[#7983]: https://github.com/tokio-rs/tokio/pull/7983
-
 # 1.51.0 (April 3rd, 2026)
 
 ### Added
