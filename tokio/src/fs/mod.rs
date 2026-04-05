@@ -296,7 +296,9 @@ cfg_windows! {
 }
 
 cfg_io_uring! {
+    pub(crate) mod create_dir_all_uring;
     pub(crate) mod read_uring;
+    pub(crate) use self::create_dir_all_uring::create_dir_all_uring;
     pub(crate) use self::read_uring::read_uring;
 
     pub(crate) use self::open_options::UringOpenOptions;
