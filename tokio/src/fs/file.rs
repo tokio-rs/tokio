@@ -976,8 +976,8 @@ impl Inner {
                 }
 
                 if !driver_handle.is_uring_probed() {
-                    // Not yet probed: lazy-init inside an async task so
-                    // File::from_std() can still benefit from io-uring.
+                    // Not yet probed: lazy init inside an async task so
+                    // `File::from_std()` can still benefit from io-uring.
                     return Ok(spawn(Self::lazy_init_read(std, buf, max_buf_size)));
                 }
                 // Probed but unsupported: fall through to spawn_blocking.
@@ -996,7 +996,7 @@ impl Inner {
         Ok(join)
     }
 
-    /// Perform an io-uring read with EINTR retry.
+    /// Perform an io-uring read with interrupt retry.
     #[cfg(all(
         tokio_unstable,
         feature = "io-uring",
@@ -1028,8 +1028,8 @@ impl Inner {
     }
 
     /// Attempt lazy io-uring initialization, then read via uring or fall back
-    /// to a blocking read. Covers the File::from_std() path where
-    /// check_and_init() hasn't been called yet.
+    /// to a blocking read. Covers the `File::from_std()` path where
+    /// `check_and_init()` hasn't been called yet.
     #[cfg(all(
         tokio_unstable,
         feature = "io-uring",
