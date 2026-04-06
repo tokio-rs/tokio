@@ -299,6 +299,7 @@ cfg_io_uring! {
         /// The caller must ensure that the kernel wrote exactly `n` bytes
         /// into the buffer that was returned by `prepare_uring_read`.
         pub(crate) unsafe fn complete_uring_read(&mut self, n: usize) {
+            assert_eq!(self.pos, 0);
             // SAFETY: `prepare_uring_read` handed out a pointer to
             // `self.buf.spare_capacity_mut()` after asserting it's empty.
             // The caller guarantees the kernel initialised exactly `n` bytes
