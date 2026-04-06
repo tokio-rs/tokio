@@ -314,3 +314,26 @@ fn shutdown_runtime_with_pending_reads() {
         done_rx.recv().unwrap();
     }
 }
+
+#[test]
+fn test_file_read_from_std() {
+    let mut tmp = NamedTempFile::new().unwrap();
+    let data = b"hello from_std io-uring";
+    tmp.write_all(data).unwrap();
+    tmp.flush().unwrap();
+    let path = tmp.path().to_owned();
+
+    let rt = Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let std_file = std::fs::File::open(&path).unwrap();
+        let mut file = File::from_std(std_file);
+        let mut buf = Vec::new();
+        file.read_to_end(&mut buf).await.unwrap();
+        assert_eq!(buf, data);
+    });
+}

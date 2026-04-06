@@ -966,32 +966,21 @@ impl Inner {
             target_os = "linux",
         ))]
         {
-            use crate::runtime::driver::op::Op;
-
             if let Ok(handle) = crate::runtime::Handle::try_current() {
                 let driver_handle = handle.inner.driver().io();
-                if driver_handle.is_uring_ready() {
+
+                if driver_handle.is_uring_ready(io_uring::opcode::Read::CODE) {
+                    // Fast path: uring already initialized and Read supported.
                     let fd: crate::io::uring::utils::ArcFd = std;
-                    let join = spawn(async move {
-                        let mut buf = buf;
-                        let mut fd = fd;
-                        loop {
-                            let (res, r_fd, r_buf) =
-                                // u64::MAX to use and advance the file position
-                                Op::read_at(fd, buf, max_buf_size, u64::MAX).await;
-                            match res {
-                                Err(e) if e.kind() == io::ErrorKind::Interrupted => {
-                                    buf = r_buf;
-                                    fd = r_fd;
-                                    continue;
-                                }
-                                Err(e) => break (Operation::Read(Err(e)), r_buf),
-                                Ok(n) => break (Operation::Read(Ok(n as usize)), r_buf),
-                            }
-                        }
-                    });
-                    return Ok(join);
+                    return Ok(spawn(Self::uring_read(fd, buf, max_buf_size)));
                 }
+
+                if !driver_handle.is_uring_probed() {
+                    // Not yet probed: lazy-init inside an async task so
+                    // File::from_std() can still benefit from io-uring.
+                    return Ok(spawn(Self::lazy_init_read(std, buf, max_buf_size)));
+                }
+                // Probed but unsupported: fall through to spawn_blocking.
             }
         }
 
@@ -1005,6 +994,67 @@ impl Inner {
             (Operation::Read(res), buf)
         });
         Ok(join)
+    }
+
+    /// Perform an io-uring read with EINTR retry.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    async fn uring_read(
+        mut fd: crate::io::uring::utils::ArcFd,
+        mut buf: Buf,
+        max_buf_size: usize,
+    ) -> (Operation, Buf) {
+        use crate::runtime::driver::op::Op;
+
+        loop {
+            let (res, r_fd, r_buf) =
+                // u64::MAX to use and advance the file position
+                Op::read_at(fd, buf, max_buf_size, u64::MAX).await;
+            match res {
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => {
+                    buf = r_buf;
+                    fd = r_fd;
+                    continue;
+                }
+                Err(e) => break (Operation::Read(Err(e)), r_buf),
+                Ok(n) => break (Operation::Read(Ok(n as usize)), r_buf),
+            }
+        }
+    }
+
+    /// Attempt lazy io-uring initialization, then read via uring or fall back
+    /// to a blocking read. Covers the File::from_std() path where
+    /// check_and_init() hasn't been called yet.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    async fn lazy_init_read(std: Arc<StdFile>, buf: Buf, max_buf_size: usize) -> (Operation, Buf) {
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+        if driver_handle
+            .check_and_init(io_uring::opcode::Read::CODE)
+            .await
+            .unwrap_or(false)
+        {
+            let fd: crate::io::uring::utils::ArcFd = std;
+            Self::uring_read(fd, buf, max_buf_size).await
+        } else {
+            let mut buf = buf;
+            // SAFETY: the `Read` implementation of `std` does not
+            // read from the buffer it is borrowing and correctly
+            // reports the length of the data written into the buffer.
+            let res = unsafe { buf.read_from(&mut &*std, max_buf_size) };
+            (Operation::Read(res), buf)
+        }
     }
 
     async fn complete_inflight(&mut self) {
