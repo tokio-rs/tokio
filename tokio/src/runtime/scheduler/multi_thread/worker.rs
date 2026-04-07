@@ -74,9 +74,7 @@ use crate::util::rand::{FastRand, RngSeedGenerator};
 use std::cell::RefCell;
 use std::task::Waker;
 use std::thread;
-use std::time::Duration;
-#[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 mod metrics;
 
@@ -96,6 +94,7 @@ use crate::runtime::time_alt;
 
 #[cfg(all(tokio_unstable, feature = "time"))]
 use crate::runtime::scheduler::util;
+use crate::runtime::task::schedule_latency::ScheduleLatencyInstant;
 
 /// A scheduler worker
 pub(super) struct Worker {
@@ -198,8 +197,7 @@ pub(crate) struct Shared {
     /// Startup time of this scheduler.
     ///
     /// This instant is used as the basis of task `scheduled_at` measurements.
-    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-    started_at: Instant,
+    started_at: Option<Instant>,
 
     /// Only held to trigger some code on drop. This is used to get internal
     /// runtime metrics that can be useful when doing performance
@@ -306,6 +304,10 @@ pub(super) fn create(
 
     let (idle, idle_synced) = Idle::new(size);
     let (inject, inject_synced) = inject::Shared::new();
+    let started_at = config
+        .metrics_schedule_latency_histogram
+        .as_ref()
+        .map(|_| Instant::now());
 
     let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
@@ -326,8 +328,7 @@ pub(super) fn create(
             config,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
-            #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-            started_at: Instant::now(),
+            started_at,
             _counters: Counters,
         },
         driver: driver_handle,
@@ -639,13 +640,10 @@ impl Context {
         // tasks under this measurement. In this case, the tasks came from the
         // LIFO slot and are considered part of the current task for scheduling
         // purposes. These tasks inherent the "parent"'s limits.
-        #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
         core.stats.start_poll(
             task.get_scheduled_at()
-                .map(|t| (self.worker.handle.shared.started_at, t.get())),
+                .prepare(self.worker.handle.shared.started_at),
         );
-        #[cfg(not(all(tokio_unstable, target_pointer_width = "64")))]
-        core.stats.start_poll(None);
 
         // Make the core available to the runtime context
         *self.core.borrow_mut() = Some(core);
@@ -1287,20 +1285,13 @@ impl Worker {
 
 impl Handle {
     pub(super) fn schedule_task(&self, task: Notified, is_yield: bool) {
-        #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
         if self
             .shared
             .config
             .metrics_schedule_latency_histogram
             .is_some()
         {
-            // SAFETY: `.max(1)` ensures the value can never be 0.
-            let scheduled_at = unsafe {
-                std::num::NonZeroU64::new_unchecked(
-                    self.shared.started_at.elapsed().as_nanos().max(1) as u64,
-                )
-            };
-            task.set_scheduled_at(scheduled_at);
+            task.set_scheduled_at(ScheduleLatencyInstant::new(self.shared.started_at));
         }
 
         with_current(|maybe_cx| {

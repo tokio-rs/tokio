@@ -221,10 +221,9 @@ use crate::future::Future;
 use crate::util::linked_list;
 use crate::util::sharded_list;
 
+use crate::runtime::task::schedule_latency::ScheduleLatencyInstant;
 use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
-#[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-use std::num::NonZeroU64;
 use std::panic::Location;
 use std::ptr::NonNull;
 use std::{fmt, mem};
@@ -250,13 +249,12 @@ impl<S> Notified<S> {
         self.0.task_meta()
     }
 
-    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-    pub(crate) fn set_scheduled_at(&self, nanos: NonZeroU64) {
+    pub(crate) fn set_scheduled_at(&self, scheduled_at: ScheduleLatencyInstant) {
         // SAFETY: There are no concurrent writes because there is only ever one `Notified`
         // reference per task. There are no concurrent reads because this field is only read
         // when polling the task, which can only happen after it's scheduled.
         unsafe {
-            self.0.header().set_scheduled_at(nanos);
+            self.0.header().set_scheduled_at(scheduled_at);
         }
     }
 }
@@ -281,8 +279,7 @@ impl<S> LocalNotified<S> {
         self.task.task_meta()
     }
 
-    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-    pub(crate) fn get_scheduled_at(&self) -> Option<NonZeroU64> {
+    pub(crate) fn get_scheduled_at(&self) -> ScheduleLatencyInstant {
         self.task.header().get_scheduled_at()
     }
 }
@@ -678,5 +675,101 @@ impl SpawnLocation {
     #[inline]
     pub(crate) fn capture() -> Self {
         Self::from(Location::caller())
+    }
+}
+
+// Task schedule latency is only tracked on 64-bit targets to avoid increasing the size
+// of the task Header beyond the bounds of one CPU cache line on 32-bit targets.
+#[cfg(all(tokio_unstable, target_pointer_width = "64"))]
+pub(crate) mod schedule_latency {
+    use std::num::NonZeroU64;
+    use std::time::Instant;
+
+    /// ScheduleLatencyInstant tracks the time a task was scheduled.
+    ///
+    /// The time a task was scheduled is stored as the number of nanoseconds
+    /// since startup of the task's scheduler.
+    #[derive(Copy, Clone)]
+    pub(crate) struct ScheduleLatencyInstant(Option<NonZeroU64>);
+
+    impl ScheduleLatencyInstant {
+        /// Create a new ScheduleLatencyInstant using the provided scheduler startup Instant.
+        pub(crate) fn new(scheduler_start: Option<Instant>) -> Self {
+            Self(scheduler_start.map(|scheduler_start| {
+                NonZeroU64::new(scheduler_start.elapsed().as_nanos() as u64)
+                    .unwrap_or(NonZeroU64::MIN)
+            }))
+        }
+
+        /// Prepare a context that can calculate the number of nanoseconds elapsed
+        /// since this task was scheduled.
+        pub(crate) fn prepare(
+            self,
+            scheduler_start: Option<Instant>,
+        ) -> Option<ScheduleLatencyContext> {
+            match (scheduler_start, self.0) {
+                (Some(scheduler_start), Some(scheduled_at_delta)) => Some(ScheduleLatencyContext {
+                    scheduler_start,
+                    scheduled_at_delta,
+                }),
+                _ => None,
+            }
+        }
+    }
+
+    /// ScheduleLatencyContext contains all the data required to calculate the time elapsed
+    /// since a task was scheduled.
+    ///
+    /// `ScheduleLatencyInstant` on its own in insufficient because it only contains a delta.
+    /// The scheduler startup time is required to convert the delta back into an actual time
+    /// but is omitted from `ScheduleLatencyInstant` to keep its memory size minimal.
+    pub(crate) struct ScheduleLatencyContext {
+        scheduler_start: Instant,
+        scheduled_at_delta: NonZeroU64,
+    }
+
+    impl ScheduleLatencyContext {
+        /// Calculate how many nanoseconds have elapsed between `now` and when this task
+        /// was last scheduled.
+        pub(crate) fn elapsed_nanos(&self, now: Instant) -> u64 {
+            let nanos_since_start = now
+                .saturating_duration_since(self.scheduler_start)
+                .as_nanos() as u64;
+            nanos_since_start.saturating_sub(self.scheduled_at_delta.get())
+        }
+    }
+}
+
+#[cfg(not(all(tokio_unstable, target_pointer_width = "64")))]
+pub(crate) mod schedule_latency {
+    use std::time::Instant;
+
+    #[derive(Copy, Clone)]
+    pub(crate) struct ScheduleLatencyInstant();
+
+    impl ScheduleLatencyInstant {
+        pub(crate) fn new(_runtime_start: Option<Instant>) -> Self {
+            Self()
+        }
+
+        pub(crate) fn prepare(
+            self,
+            _runtime_start: Option<Instant>,
+        ) -> Option<ScheduleLatencyContext> {
+            None
+        }
+    }
+
+    pub(crate) struct ScheduleLatencyContext {
+        _private: (),
+    }
+
+    impl ScheduleLatencyContext {
+        // This method is referenced (but never called) on 32-bit targets when
+        // `tokio_unstable` is enabled.
+        #[allow(dead_code)]
+        pub(crate) fn elapsed_nanos(&self, _now: Instant) -> u64 {
+            unimplemented!("This should never be called because prepare() always returns None")
+        }
     }
 }

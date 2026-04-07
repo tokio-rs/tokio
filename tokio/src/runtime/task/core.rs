@@ -22,6 +22,7 @@ use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::context;
 use crate::runtime::task::raw::{self, Vtable};
+use crate::runtime::task::schedule_latency::ScheduleLatencyInstant;
 use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule, TaskHarnessScheduleHooks};
 use crate::util::linked_list;
@@ -193,12 +194,7 @@ pub(crate) struct Header {
     pub(super) tracing_id: Option<tracing::Id>,
 
     /// The last time this task was scheduled. Used to measure schedule latency.
-    /// Stored as the number of nanoseconds since scheduler startup.
-    ///
-    /// Only enabled on 64-bit targets because this field extends the size of this
-    /// struct beyond the size of one cache line on 32-bit targets.
-    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-    pub(super) scheduled_at: UnsafeCell<Option<NonZeroU64>>,
+    pub(super) scheduled_at: UnsafeCell<ScheduleLatencyInstant>,
 }
 
 unsafe impl Send for Header {}
@@ -255,8 +251,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 owner_id: UnsafeCell::new(None),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
-                #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-                scheduled_at: UnsafeCell::new(None),
+                scheduled_at: UnsafeCell::new(ScheduleLatencyInstant::new(None)),
             }
         }
 
@@ -548,23 +543,15 @@ impl Header {
     /// Updates the last time this task was scheduled. Used to calculate
     /// the time elapsed between task scheduling and polling.
     ///
-    ///
-    /// # Arguments
-    ///
-    /// `nanos` is the number of nanoseconds elapsed since the scheduler
-    /// was started.
-    ///
     /// # Safety
     ///
     /// The caller must guarantee exclusive access to this field.
-    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-    pub(super) unsafe fn set_scheduled_at(&self, nanos: NonZeroU64) {
-        self.scheduled_at.with_mut(|ptr| *ptr = Some(nanos));
+    pub(super) unsafe fn set_scheduled_at(&self, scheduled_at: ScheduleLatencyInstant) {
+        self.scheduled_at.with_mut(|ptr| *ptr = scheduled_at);
     }
 
     /// Gets the last time this task was scheduled.
-    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-    pub(super) fn get_scheduled_at(&self) -> Option<NonZeroU64> {
+    pub(super) fn get_scheduled_at(&self) -> ScheduleLatencyInstant {
         // Safety: If there are concurrent writes, then that write has violated
         // the safety requirements on `set_scheduled_at`.
         unsafe { self.scheduled_at.with(|ptr| *ptr) }

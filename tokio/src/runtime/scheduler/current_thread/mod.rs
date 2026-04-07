@@ -21,7 +21,6 @@ use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
 use std::thread::ThreadId;
 use std::time::Duration;
-#[cfg(all(tokio_unstable, target_pointer_width = "64"))]
 use std::time::Instant;
 use std::{fmt, thread};
 
@@ -104,8 +103,7 @@ struct Shared {
     /// Startup time of this scheduler.
     ///
     /// This instant is used as the basis of task `scheduled_at` measurements.
-    #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-    started_at: Instant,
+    started_at: Option<Instant>,
 }
 
 /// Thread-local context.
@@ -150,6 +148,11 @@ impl CurrentThread {
             .global_queue_interval
             .unwrap_or(DEFAULT_GLOBAL_QUEUE_INTERVAL);
 
+        let started_at = config
+            .metrics_schedule_latency_histogram
+            .as_ref()
+            .map(|_| Instant::now());
+
         let handle = Arc::new(Handle {
             task_hooks: TaskHooks {
                 task_spawn_callback: config.before_spawn.clone(),
@@ -166,8 +169,7 @@ impl CurrentThread {
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),
                 worker_metrics,
-                #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
-                started_at: Instant::now(),
+                started_at,
             },
             driver: driver_handle,
             blocking_spawner,
@@ -378,13 +380,10 @@ impl Context {
         #[cfg(tokio_unstable)]
         let task_meta = task.task_meta();
 
-        #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
         core.metrics.start_poll(
             task.get_scheduled_at()
-                .map(|t| (self.handle.shared.started_at, t.get())),
+                .prepare(self.handle.shared.started_at),
         );
-        #[cfg(not(all(tokio_unstable, target_pointer_width = "64")))]
-        core.metrics.start_poll(None);
 
         let (mut c, ()) = self.enter(core, || {
             crate::task::coop::budget(|| {
@@ -664,6 +663,7 @@ cfg_unstable_metrics! {
     }
 }
 
+use crate::runtime::task::schedule_latency::ScheduleLatencyInstant;
 use std::num::NonZeroU64;
 
 impl Handle {
@@ -688,18 +688,13 @@ impl Schedule for Arc<Handle> {
     fn schedule(&self, task: task::Notified<Self>) {
         use scheduler::Context::CurrentThread;
 
-        #[cfg(all(tokio_unstable, target_pointer_width = "64"))]
         if self
             .shared
             .config
             .metrics_schedule_latency_histogram
             .is_some()
         {
-            // SAFETY: `.max(1)` ensures the value can never be 0.
-            let scheduled_at = unsafe {
-                NonZeroU64::new_unchecked(self.shared.started_at.elapsed().as_nanos().max(1) as u64)
-            };
-            task.set_scheduled_at(scheduled_at);
+            task.set_scheduled_at(ScheduleLatencyInstant::new(self.shared.started_at));
         }
 
         context::with_scheduler(|maybe_cx| match maybe_cx {

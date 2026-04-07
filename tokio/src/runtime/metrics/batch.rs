@@ -4,6 +4,7 @@ cfg_unstable_metrics! {
     use crate::runtime::metrics::HistogramBatch;
 }
 
+use crate::runtime::task::schedule_latency::ScheduleLatencyContext;
 use std::sync::atomic::Ordering::Relaxed;
 use std::time::{Duration, Instant};
 
@@ -222,27 +223,25 @@ impl MetricsBatch {
     cfg_metrics_variant! {
         stable: {
             /// Start polling an individual task
-            pub(crate) fn start_poll(&mut self, _task_scheduled_at: Option<(Instant, u64)>) {}
+            pub(crate) fn start_poll(&mut self, _task_scheduled_at: Option<ScheduleLatencyContext>) {}
         },
         unstable: {
             /// Start polling an individual task
             ///
             /// # Arguments
             ///
-            /// `task_scheduled_at` is an optional tuple containing the Instant the scheduler
-            /// was started and the number of nanoseconds elapsed between that instant and
-            /// the time the task being polled was scheduled.
-            pub(crate) fn start_poll(&mut self, task_scheduled_at: Option<(Instant, u64)>) {
+            /// `task_scheduled_at` is used to calculate task schedule latency.
+            /// A `ScheduleLatencyContext` can be obtained by calling `prepare` on a task's
+            /// `ScheduleLatencyInstant`.
+            pub(crate) fn start_poll(&mut self, task_scheduled_at: Option<ScheduleLatencyContext>) {
                 self.poll_count += 1;
                 if let Some(poll_timer) = &mut self.poll_timer {
                     poll_timer.poll_started_at = Instant::now();
                 }
-                if let Some((runtime_started_at, task_scheduled_at)) = task_scheduled_at {
+                if let Some(task_scheduled_at) = task_scheduled_at {
                     if let Some(schedule_latencies) = &mut self.schedule_latencies {
                         if let Some(now) = self.poll_timer.as_ref().map(|p| p.poll_started_at).or_else(now) {
-                            // `u64::MAX` as nanoseconds is equal to 584 years
-                            let nanos_since_start = now.saturating_duration_since(runtime_started_at).as_nanos() as u64;
-                            let elapsed = nanos_since_start.saturating_sub(task_scheduled_at);
+                            let elapsed = task_scheduled_at.elapsed_nanos(now);
                             schedule_latencies.measure(elapsed, 1);
                         }
                     }
