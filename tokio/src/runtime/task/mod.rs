@@ -685,7 +685,7 @@ pub(crate) mod schedule_latency {
     use std::num::NonZeroU64;
     use std::time::Instant;
 
-    /// ScheduleLatencyInstant tracks the time a task was scheduled.
+    /// `ScheduleLatencyInstant` tracks the time a task was scheduled.
     ///
     /// The time a task was scheduled is stored as the number of nanoseconds
     /// since startup of the task's scheduler.
@@ -693,7 +693,7 @@ pub(crate) mod schedule_latency {
     pub(crate) struct ScheduleLatencyInstant(Option<NonZeroU64>);
 
     impl ScheduleLatencyInstant {
-        /// Create a new ScheduleLatencyInstant using the provided scheduler startup Instant.
+        /// Create a new `ScheduleLatencyInstant` using the provided scheduler startup Instant.
         pub(crate) fn new(scheduler_start: Option<Instant>) -> Self {
             Self(scheduler_start.map(|scheduler_start| {
                 NonZeroU64::new(scheduler_start.elapsed().as_nanos() as u64)
@@ -717,7 +717,7 @@ pub(crate) mod schedule_latency {
         }
     }
 
-    /// ScheduleLatencyContext contains all the data required to calculate the time elapsed
+    /// `ScheduleLatencyContext` contains all the data required to calculate the time elapsed
     /// since a task was scheduled.
     ///
     /// `ScheduleLatencyInstant` on its own in insufficient because it only contains a delta.
