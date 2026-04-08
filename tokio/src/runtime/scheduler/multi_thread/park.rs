@@ -21,6 +21,13 @@ pub(crate) struct Unparker {
     inner: Arc<Inner>,
 }
 
+/// Represents how a worker thread was parked
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub(crate) enum HadDriver {
+    Yes,
+    No,
+}
+
 struct Inner {
     /// Avoids entering the park if possible
     state: AtomicUsize,
@@ -66,8 +73,8 @@ impl Parker {
         }
     }
 
-    pub(crate) fn park(&mut self, handle: &driver::Handle) {
-        self.inner.park(handle);
+    pub(crate) fn park(&mut self, handle: &driver::Handle) -> HadDriver {
+        self.inner.park(handle)
     }
 
     /// Parks the current thread for up to `duration`.
@@ -75,11 +82,16 @@ impl Parker {
     /// This function tries to acquire the driver lock. If it succeeds, it
     /// parks using the driver. Otherwise, it fails back to using a condvar,
     /// unless the duration is zero, in which case it returns immediately.
-    pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
+    pub(crate) fn park_timeout(
+        &mut self,
+        handle: &driver::Handle,
+        duration: Duration,
+    ) -> HadDriver {
         if let Some(mut driver) = self.inner.shared.driver.try_lock() {
-            self.inner.park_driver(&mut driver, handle, Some(duration));
+            self.inner.park_driver(&mut driver, handle, Some(duration))
         } else if !duration.is_zero() {
             self.inner.park_condvar(Some(duration));
+            HadDriver::No
         } else {
             // https://github.com/tokio-rs/tokio/issues/6536
             // Hacky, but it's just for loom tests. The counter gets incremented during
@@ -87,6 +99,7 @@ impl Parker {
             // lock.
             #[cfg(loom)]
             CURRENT_THREAD_PARK_COUNT.with(|count| count.fetch_add(1, SeqCst));
+            HadDriver::No
         }
     }
 
@@ -116,7 +129,7 @@ impl Unparker {
 
 impl Inner {
     /// Parks the current thread for at most `dur`.
-    fn park(&self, handle: &driver::Handle) {
+    fn park(&self, handle: &driver::Handle) -> HadDriver {
         // If we were previously notified then we consume this notification and
         // return quickly.
         if self
@@ -124,13 +137,14 @@ impl Inner {
             .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
             .is_ok()
         {
-            return;
+            return HadDriver::No;
         }
 
         if let Some(mut driver) = self.shared.driver.try_lock() {
-            self.park_driver(&mut driver, handle, None);
+            self.park_driver(&mut driver, handle, None)
         } else {
             self.park_condvar(None);
+            HadDriver::No
         }
     }
 
@@ -216,12 +230,12 @@ impl Inner {
         driver: &mut Driver,
         handle: &driver::Handle,
         duration: Option<Duration>,
-    ) {
+    ) -> HadDriver {
         if duration.as_ref().is_some_and(Duration::is_zero) {
             // zero duration doesn't actually park the thread, it just
             // polls the I/O events, timers, etc.
             driver.park_timeout(handle, Duration::ZERO);
-            return;
+            return HadDriver::Yes;
         }
 
         match self
@@ -239,7 +253,7 @@ impl Inner {
                 let old = self.state.swap(EMPTY, SeqCst);
                 debug_assert_eq!(old, NOTIFIED, "park state changed unexpectedly");
 
-                return;
+                return HadDriver::No;
             }
             Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
@@ -256,6 +270,8 @@ impl Inner {
             PARKED_DRIVER => {} // no notification, alas
             n => panic!("inconsistent park_timeout state: {n}"),
         }
+
+        HadDriver::Yes
     }
 
     fn unpark(&self, driver: &driver::Handle) {
