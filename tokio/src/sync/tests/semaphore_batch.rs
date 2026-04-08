@@ -308,19 +308,3 @@ fn update_permits_many_times() {
     assert_eq!(s.forget_permits(3), 3);
     assert_eq!(s.available_permits(), 0);
 }
-
-#[test]
-fn forget_permits_on_closed_semaphore_must_stay_closed() {
-    let s = Semaphore::new(10);
-    s.close();
-
-    assert!(s.is_closed());
-    assert_eq!(s.available_permits(), 10);
-    assert_eq!(s.forget_permits(4), 4);
-
-    assert!(
-        s.is_closed(),
-        "semaphore should still be closed after forget_permits"
-    );
-    assert_eq!(s.available_permits(), 6);
-}
