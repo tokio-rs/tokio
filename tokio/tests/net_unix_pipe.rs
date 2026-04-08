@@ -544,3 +544,105 @@ async fn anon_pipe_into_blocking_fd() -> std::io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn try_io_writable() -> std::io::Result<()> {
+    let (tx, _rx) = pipe::pipe()?;
+
+    // Give the runtime some time to update bookkeeping.
+    tokio::task::yield_now().await;
+
+    {
+        let mut called = false;
+        let _ = tx.try_io(|| {
+            called = true;
+            Ok(())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should still be marked as writable"
+        );
+    }
+    {
+        let mut called = false;
+        let _ = tx.try_io(|| {
+            called = true;
+            io::Result::<()>::Err(io::ErrorKind::WouldBlock.into())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should still be marked as writable"
+        );
+    }
+
+    {
+        let mut called = false;
+        let _ = tx.try_io(|| {
+            called = true;
+            Ok(())
+        });
+        assert!(!called, "closure should not have been called, since socket writable state should have been cleared");
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn try_io_readable() -> io::Result<()> {
+    let (mut tx, rx) = pipe::pipe()?;
+
+    // Give the runtime some time to update bookkeeping.
+    tokio::task::yield_now().await;
+
+    {
+        let mut called = false;
+        let _ = rx.try_io(|| {
+            called = true;
+            Ok(())
+        });
+        assert!(
+            !called,
+            "closure should not have been called, since socket should not be readable"
+        );
+    }
+
+    // Make `a` readable by writing to `b`.
+    // Give the runtime some time to update bookkeeping.
+    tx.write_all(&[0]).await?;
+    tokio::task::yield_now().await;
+
+    {
+        let mut called = false;
+        let _ = rx.try_io(|| {
+            called = true;
+            Ok(())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should have data available to read"
+        );
+    }
+
+    {
+        let mut called = false;
+        let _ = rx.try_io(|| {
+            called = true;
+            io::Result::<()>::Err(io::ErrorKind::WouldBlock.into())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should have data available to read"
+        );
+    }
+
+    {
+        let mut called = false;
+        let _ = rx.try_io(|| {
+            called = true;
+            Ok(())
+        });
+        assert!(!called, "closure should not have been called, since socket readable state should have been cleared");
+    }
+
+    Ok(())
+}
