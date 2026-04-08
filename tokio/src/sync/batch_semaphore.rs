@@ -381,13 +381,13 @@ impl Semaphore {
         let mut curr_bits = self.permits.load(Acquire);
         loop {
             let curr = curr_bits >> Self::PERMIT_SHIFT;
+            let closed_bits = curr_bits & Self::CLOSED;
             let new = curr.saturating_sub(n);
-            match self.permits.compare_exchange_weak(
-                curr_bits,
-                new << Self::PERMIT_SHIFT,
-                AcqRel,
-                Acquire,
-            ) {
+            let new_bits = (new << Self::PERMIT_SHIFT) | closed_bits;
+            match self
+                .permits
+                .compare_exchange_weak(curr_bits, new_bits, AcqRel, Acquire)
+            {
                 Ok(_) => return std::cmp::min(curr, n),
                 Err(actual) => curr_bits = actual,
             };
