@@ -57,6 +57,7 @@ fn add_permits_open() {
             let sem = Arc::new(Semaphore::new(size));
             sem.add_permits(add);
             assert_eq!(sem.available_permits(), size + add);
+            assert!(!sem.is_closed());
         }
     }
 }
@@ -69,6 +70,7 @@ fn add_permits_closed() {
             sem.close();
             sem.add_permits(add);
             assert_eq!(sem.available_permits(), size + add);
+            assert!(sem.is_closed());
         }
     }
 }
@@ -95,6 +97,7 @@ fn forget_open() {
             let expected = size.saturating_sub(sub);
             assert_eq!(sem.available_permits(), expected, "case: {size}-{sub}");
             assert_eq!(actual_sub, size - expected);
+            assert!(!sem.is_closed());
         }
     }
 }
@@ -109,6 +112,7 @@ fn forget_closed() {
             let expected = size.saturating_sub(sub);
             assert_eq!(sem.available_permits(), expected, "case: {size}-{sub}");
             assert_eq!(actual_sub, size - expected);
+            assert!(sem.is_closed());
         }
     }
 }
