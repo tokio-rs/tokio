@@ -8,8 +8,8 @@ use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
 
 use std::fs::File;
 use std::io;
+use std::os::fd::AsFd;
 use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 
 /// Helper struct which will clean up temporary files once dropped.
@@ -277,8 +277,8 @@ async fn from_file_detects_wrong_access_mode() -> io::Result<()> {
     Ok(())
 }
 
-fn is_nonblocking<T: AsRawFd>(fd: &T) -> io::Result<bool> {
-    let flags = nix::fcntl::fcntl(fd.as_raw_fd(), nix::fcntl::F_GETFL)?;
+fn is_nonblocking<T: AsFd>(fd: &T) -> io::Result<bool> {
+    let flags = nix::fcntl::fcntl(fd.as_fd(), nix::fcntl::F_GETFL)?;
     Ok((flags & libc::O_NONBLOCK) != 0)
 }
 
