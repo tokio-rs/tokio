@@ -183,6 +183,26 @@ impl Handle {
         &self.uring_context
     }
 
+    /// Returns `true` if io_uring has already been initialized and the given
+    /// opcode is supported. Returns `false` if io_uring hasn't been
+    /// initialized yet or is unsupported. Unlike `check_and_init`, this
+    /// doesn't attempt initialization.
+    #[cfg_attr(test, allow(dead_code))]
+    pub(crate) fn is_uring_ready(&self, opcode: u8) -> bool {
+        self.uring_probe
+            .get()
+            .and_then(|opt| opt.as_ref())
+            .is_some_and(|probe| probe.is_supported(opcode))
+    }
+
+    /// Returns `true` if the io_uring probe has already been attempted
+    /// (regardless of whether io_uring is supported). Returns `false` if
+    /// no probe has been attempted yet.
+    #[cfg_attr(test, allow(dead_code))]
+    pub(crate) fn is_uring_probed(&self) -> bool {
+        self.uring_probe.get().is_some()
+    }
+
     /// Check if the io_uring context is initialized. If not, it will try to initialize it.
     /// Then, check if the provided opcode is supported.
     ///

@@ -1,10 +1,12 @@
 use crate::fs::OpenOptions;
+use crate::io::uring::utils::ArcFd;
 use crate::runtime::driver::op::Op;
 
 use std::io;
 use std::io::ErrorKind;
 use std::os::fd::OwnedFd;
 use std::path::Path;
+use std::sync::Arc;
 
 // this algorithm is inspired from rust std lib version 1.90.0
 // https://doc.rust-lang.org/1.90.0/src/std/io/mod.rs.html#409
@@ -33,10 +35,12 @@ pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
         buf.try_reserve(size_hint)?;
     }
 
+    let fd: ArcFd = Arc::new(fd);
+
     read_to_end_uring(fd, buf).await
 }
 
-async fn read_to_end_uring(mut fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Vec<u8>> {
+async fn read_to_end_uring(mut fd: ArcFd, mut buf: Vec<u8>) -> io::Result<Vec<u8>> {
     let mut offset = 0;
     let start_cap = buf.capacity();
 
@@ -81,10 +85,10 @@ async fn read_to_end_uring(mut fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Vec<
 }
 
 async fn small_probe_read(
-    fd: OwnedFd,
+    fd: ArcFd,
     mut buf: Vec<u8>,
     offset: &mut u64,
-) -> io::Result<(OwnedFd, Vec<u8>, bool)> {
+) -> io::Result<(ArcFd, Vec<u8>, bool)> {
     let read_len = PROBE_SIZE_U32;
 
     let mut temp_arr = [0; PROBE_SIZE];
@@ -110,13 +114,13 @@ async fn small_probe_read(
 //
 // Returns the file descriptor, buffer and EOF reached or not
 async fn op_read(
-    mut fd: OwnedFd,
+    mut fd: ArcFd,
     mut buf: Vec<u8>,
     offset: &mut u64,
     read_len: u32,
-) -> io::Result<(OwnedFd, Vec<u8>, bool)> {
+) -> io::Result<(ArcFd, Vec<u8>, bool)> {
     loop {
-        let (res, r_fd, r_buf) = Op::read(fd, buf, read_len, *offset).await;
+        let (res, r_fd, r_buf) = Op::read_at(fd, buf, read_len as usize, *offset).await;
 
         match res {
             Err(e) if e.kind() == ErrorKind::Interrupted => {
