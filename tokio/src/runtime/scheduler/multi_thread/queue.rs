@@ -298,7 +298,7 @@ impl<T> Local<T> {
         if self
             .inner
             .head
-            .compare_exchange(
+            .compare_exchange_weak(
                 prev,
                 pack(
                     head.wrapping_add(NUM_TASKS_TAKEN),
@@ -387,7 +387,7 @@ impl<T> Local<T> {
             let res = self
                 .inner
                 .head
-                .compare_exchange(head, next, AcqRel, Acquire);
+                .compare_exchange_weak(head, next, AcqRel, Acquire);
 
             match res {
                 Ok(_) => break real as usize & MASK,
@@ -523,7 +523,7 @@ impl<T> Steal<T> {
             let res = self
                 .0
                 .head
-                .compare_exchange(prev_packed, next_packed, AcqRel, Acquire);
+                .compare_exchange_weak(prev_packed, next_packed, AcqRel, Acquire);
 
             match res {
                 Ok(_) => break n,
@@ -572,17 +572,11 @@ impl<T> Steal<T> {
             let res = self
                 .0
                 .head
-                .compare_exchange(prev_packed, next_packed, AcqRel, Acquire);
+                .compare_exchange_weak(prev_packed, next_packed, AcqRel, Acquire);
 
             match res {
                 Ok(_) => return n,
-                Err(actual) => {
-                    let (actual_steal, actual_real) = unpack(actual);
-
-                    assert_ne!(actual_steal, actual_real);
-
-                    prev_packed = actual;
-                }
+                Err(actual) => prev_packed = actual,
             }
         }
     }
