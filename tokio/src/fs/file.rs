@@ -31,8 +31,6 @@ use crate::blocking::{spawn_blocking, spawn_mandatory_blocking};
 use std::fs::File as StdFile;
 
 cfg_io_uring! {
-    #[cfg(test)]
-    use super::mocks::spawn;
     #[cfg(not(test))]
     use crate::spawn;
 }
@@ -958,7 +956,11 @@ impl Inner {
         buf: Buf,
         max_buf_size: usize,
     ) -> io::Result<JoinHandle<(Operation, Buf)>> {
+        // Unit tests use `MockFile` and the mock `spawn_blocking` infrastructure,
+        // which can't drive real io_uring operations. The io_uring read path
+        // is tested through integration tests in `tests/fs_uring_file_read.rs`.
         #[cfg(all(
+            not(test),
             tokio_unstable,
             feature = "io-uring",
             feature = "rt",
@@ -998,6 +1000,7 @@ impl Inner {
 
     /// Perform an io-uring read with interrupt retry.
     #[cfg(all(
+        not(test),
         tokio_unstable,
         feature = "io-uring",
         feature = "rt",
@@ -1031,6 +1034,7 @@ impl Inner {
     /// to a blocking read. Covers the `File::from_std()` path where
     /// `check_and_init()` hasn't been called yet.
     #[cfg(all(
+        not(test),
         tokio_unstable,
         feature = "io-uring",
         feature = "rt",

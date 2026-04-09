@@ -187,6 +187,7 @@ impl Handle {
     /// opcode is supported. Returns `false` if io_uring hasn't been
     /// initialized yet or is unsupported. Unlike `check_and_init`, this
     /// doesn't attempt initialization.
+    #[cfg_attr(test, allow(dead_code))]
     pub(crate) fn is_uring_ready(&self, opcode: u8) -> bool {
         self.uring_probe
             .get()
@@ -197,6 +198,7 @@ impl Handle {
     /// Returns `true` if the io_uring probe has already been attempted
     /// (regardless of whether io_uring is supported). Returns `false` if
     /// no probe has been attempted yet.
+    #[cfg_attr(test, allow(dead_code))]
     pub(crate) fn is_uring_probed(&self) -> bool {
         self.uring_probe.get().is_some()
     }
