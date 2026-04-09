@@ -337,3 +337,135 @@ fn test_file_read_from_std() {
         assert_eq!(buf, data);
     });
 }
+
+/// Read with a buffer smaller than the file content. Verifies internal
+/// buffering serves subsequent small reads without issuing new underlying read
+/// operations.
+#[tokio::test]
+async fn test_file_read_with_smaller_buf() {
+    let data: Vec<u8> = (0..1024u16).map(|i| (i % 256) as u8).collect();
+    let (_tmp, path) = create_temp_file(&data);
+
+    let mut file = File::open(&path).await.unwrap();
+
+    // triggers an underlying read that fills the internal buffer with more data
+    // than we consume here
+    let mut buf = vec![0u8; 4];
+    let n = file.read(&mut buf).await.unwrap();
+    assert_eq!(n, 4);
+    assert_eq!(&buf, &data[..4]);
+
+    // Second read: still smaller than what's buffered internally
+    let mut buf = vec![0u8; 32];
+    let n = file.read(&mut buf).await.unwrap();
+    assert!(n > 0);
+    assert_eq!(&buf[..n], &data[4..4 + n]);
+
+    // Read the rest
+    let mut rest = Vec::new();
+    file.read_to_end(&mut rest).await.unwrap();
+    let total = 4 + n + rest.len();
+    assert_eq!(total, data.len());
+}
+
+#[tokio::test]
+async fn test_file_read_with_bigger_buf() {
+    let data = b"hello io-uring";
+    let (_tmp, path) = create_temp_file(data);
+
+    let mut file = File::open(&path).await.unwrap();
+
+    // Read with buffer larger than file's contents
+    let mut buf = vec![0u8; 1024];
+    let n = file.read(&mut buf).await.unwrap();
+    assert!(n > 0 && n <= data.len());
+    assert_eq!(&buf[..n], &data[..n]);
+
+    if n < data.len() {
+        let mut rest = vec![0u8; 1024];
+        let n2 = file.read(&mut rest).await.unwrap();
+        assert_eq!(&rest[..n2], &data[n..n + n2]);
+    }
+}
+
+/// Read a file larger than DEFAULT_MAX_BUF_SIZE (2 MiB). Verifies that
+/// chunked reads across multiple underlying operations produce correct data.
+#[tokio::test]
+async fn test_file_read_buffer_larger_than_max() {
+    // 4 MiB + 1000 bytes to cross multiple chunk boundaries.
+    let size = (4 << 20) + 1000;
+    let data: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
+    let (_tmp, path) = create_temp_file(&data);
+
+    let mut file = File::open(&path).await.unwrap();
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf).await.unwrap();
+    assert_eq!(buf.len(), data.len());
+    assert_eq!(buf, data);
+}
+
+/// Read some bytes from a file, then write, verifying the implicit seek-back
+/// works correctly.
+#[tokio::test]
+async fn test_file_read_then_write() {
+    let original = b"hello world, io-uring!";
+    let (_tmp, path) = create_temp_file(original);
+
+    let mut file = tokio::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&path)
+        .await
+        .unwrap();
+
+    let mut buf = vec![0u8; 5];
+    file.read_exact(&mut buf).await.unwrap();
+    assert_eq!(&buf, b"hello");
+
+    // Write at the current position
+    file.write_all(b" REPLACED").await.unwrap();
+    file.flush().await.unwrap();
+
+    // Re-read the full file and verify the write landed correctly
+    file.seek(std::io::SeekFrom::Start(0)).await.unwrap();
+    let mut result = Vec::new();
+    file.read_to_end(&mut result).await.unwrap();
+    assert_eq!(&result[..5], b"hello");
+    assert_eq!(&result[5..14], b" REPLACED");
+}
+
+/// Partial read followed by write at a different position. Verifies the
+/// seek-back accounts for partially consumed internal buffer.
+#[tokio::test]
+async fn test_file_partial_read_then_write() {
+    let data = b"abcdefghijklmnopqrstuvwxyz";
+    let (_tmp, path) = create_temp_file(data);
+
+    let mut file = tokio::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&path)
+        .await
+        .unwrap();
+
+    // First read fills internal buffer.
+    let mut buf = vec![0u8; 10];
+    file.read_exact(&mut buf).await.unwrap();
+    assert_eq!(&buf, b"abcdefghij");
+
+    // Second read served from internal buffer
+    let mut buf2 = vec![0u8; 3];
+    file.read_exact(&mut buf2).await.unwrap();
+    assert_eq!(&buf2, b"klm");
+
+    // Write should seek back past unconsumed buffered bytes, then write
+    file.write_all(b"NOP").await.unwrap();
+    file.flush().await.unwrap();
+
+    file.seek(std::io::SeekFrom::Start(0)).await.unwrap();
+    let mut result = Vec::new();
+    file.read_to_end(&mut result).await.unwrap();
+    assert_eq!(&result[..13], b"abcdefghijklm");
+    assert_eq!(&result[13..16], b"NOP");
+    assert_eq!(&result[16..], &data[16..]);
+}
