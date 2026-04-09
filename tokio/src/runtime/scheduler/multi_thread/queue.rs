@@ -283,9 +283,7 @@ impl<T> Local<T> {
             "queue is not full; tail = {tail}; head = {head}"
         );
 
-        let prev = pack(head, head);
-
-        // Claim a bunch of tasks
+        // Claim all tasks.
         //
         // We are claiming the tasks **before** reading them out of the buffer.
         // This is safe because only the **current** thread is able to push new
@@ -298,15 +296,7 @@ impl<T> Local<T> {
         if self
             .inner
             .head
-            .compare_exchange(
-                prev,
-                pack(
-                    head.wrapping_add(NUM_TASKS_TAKEN),
-                    head.wrapping_add(NUM_TASKS_TAKEN),
-                ),
-                Release,
-                Relaxed,
-            )
+            .compare_exchange(pack(head, head), pack(tail, tail), Release, Relaxed)
             .is_err()
         {
             // We failed to claim the tasks, losing the race. Return out of
@@ -314,6 +304,29 @@ impl<T> Local<T> {
             // may not be full anymore.
             return Err(task);
         }
+
+        // Add back the first half of tasks.
+        //
+        // We are doing it this way instead of just taking half of the tasks because we want the
+        // *second* half of the tasks, and if you just incremented `head` by `NUM_TASKS_TAKEN`,
+        // then you would be taking the first half instead of the second half.
+        //
+        // Pushing the second half of the local queue to the injection queue is better because when
+        // we take tasks *out* of the injection queue, we always place them in the first half. This
+        // means that if a task is in the second half, then we know for sure that this task is not
+        // a task we just got from the injection queue. This ensures that when we take a task out
+        // of the injection queue, then it will not be moved back into the injection queue (at
+        // least not until after we have polled it at least once).
+        //
+        // Note that if a concurrent worker tries to steal from us between these two operations and
+        // sees that the worker queue is empty, then that worker may go to sleep, and we do not
+        // notify it about these tasks becoming available for stealing again. Ordinarily this would
+        // be a problem, but it isn't in this case because the worker will be notified about the
+        // tasks we are adding to the injection queue instead, which ensures that the stealer wakes
+        // up again to take the tasks from the injection queue.
+        self.inner
+            .tail
+            .store(tail.wrapping_add(NUM_TASKS_TAKEN), Release);
 
         /// An iterator that takes elements out of the run queue.
         struct BatchTaskIter<'a, T: 'static> {
@@ -346,7 +359,7 @@ impl<T> Local<T> {
         // values again, and we are the only producer.
         let batch_iter = BatchTaskIter {
             buffer: &self.inner.buffer,
-            head: head as UnsignedLong,
+            head: head.wrapping_add(NUM_TASKS_TAKEN) as UnsignedLong,
             i: 0,
         };
         overflow.push_batch(batch_iter.chain(std::iter::once(task)));
