@@ -1,4 +1,4 @@
-314
+316
 &
 +
 <
@@ -32,6 +32,7 @@
 8MB
 ABI
 accessors
+adaptively
 adaptor
 adaptors
 Adaptors
@@ -223,6 +224,7 @@ reregistering
 resize
 resized
 RMW
+RNG
 runtime
 runtime's
 runtimes
