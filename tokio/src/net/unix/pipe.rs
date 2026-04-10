@@ -617,6 +617,13 @@ impl Sender {
     /// number of bytes written. If the pipe is not ready to write data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
+    /// # Notes
+    ///
+    /// The runtime's I/O driver only delivers readiness events to a `Sender`
+    /// after control is yielded back to it. Calling this method before any
+    /// `.await` (such as [`writable`]) will return `WouldBlock` even when
+    /// the pipe has space available.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -680,6 +687,13 @@ impl Sender {
     /// If data is successfully written, `Ok(n)` is returned, where `n` is the
     /// number of bytes written. If the pipe is not ready to write data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Notes
+    ///
+    /// The runtime's I/O driver only delivers readiness events to a `Sender`
+    /// after control is yielded back to it. Calling this method before any
+    /// `.await` (such as [`writable`]) will return `WouldBlock` even when
+    /// the pipe has space available.
     ///
     /// # Examples
     ///
@@ -1120,6 +1134,13 @@ impl Receiver {
     /// If the pipe is not ready to read data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
+    /// # Notes
+    ///
+    /// The runtime's I/O driver only delivers readiness events to a `Receiver`
+    /// after control is yielded back to it. Calling this method before any
+    /// `.await` (such as [`readable()`]) will return `WouldBlock` even when
+    /// data is already available in the pipe.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -1187,6 +1208,13 @@ impl Receiver {
     /// number of bytes read. `Ok(0)` indicates the pipe's writing end is
     /// closed and will no longer write data. If the pipe is not ready to read
     /// data `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Notes
+    ///
+    /// The runtime's I/O driver only delivers readiness events to a `Receiver`
+    /// after control is yielded back to it. Calling this method before any
+    /// `.await` (such as [`readable()`]) will return `WouldBlock` even when
+    /// data is already available in the pipe.
     ///
     /// # Examples
     ///
@@ -1257,6 +1285,13 @@ impl Receiver {
         /// number of bytes read. `Ok(0)` indicates the pipe's writing end is
         /// closed and will no longer write data. If the pipe is not ready to read
         /// data `Err(io::ErrorKind::WouldBlock)` is returned.
+        ///
+        /// # Notes
+        ///
+        /// The runtime's I/O driver only delivers readiness events to a `Receiver`
+        /// after control is yielded back to it. Calling this method before any
+        /// `.await` (such as [`readable()`]) will return `WouldBlock` even when
+        /// data is already available in the pipe.
         ///
         /// # Examples
         ///
