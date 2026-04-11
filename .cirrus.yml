@@ -14,7 +14,7 @@ env:
 # 64-bit kernel and in a 64-bit environment.  Our tests don't execute any of
 # the system's binaries, so the environment shouldn't matter.
 task:
-  name: FreeBSD 64-bit
+  name: FreeBSD x86_64
   setup_script:
     - pkg install -y bash
     - curl https://sh.rustup.rs -sSf --output rustup.sh
@@ -56,7 +56,7 @@ task:
     - cargo doc --lib --no-deps --features $TOKIO_STABLE_FEATURES,io-uring,tracing --document-private-items
 
 task:
-  name: FreeBSD 32-bit
+  name: FreeBSD i686
   setup_script:
     - pkg install -y bash
     - curl https://sh.rustup.rs -sSf --output rustup.sh
