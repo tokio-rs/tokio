@@ -312,6 +312,10 @@ fn write_until_pending(stream: &mut TcpStream) -> usize {
     total
 }
 
+// This test is temporarily disabled on WASI due to
+// https://github.com/bytecodealliance/wasmtime/issues/13040.  We can re-enable
+// it once that issue is fixed and the fix is included in a Wasmtime release.
+#[cfg_attr(target_os = "wasi", ignore)]
 #[tokio::test]
 #[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn try_read_buf() {
