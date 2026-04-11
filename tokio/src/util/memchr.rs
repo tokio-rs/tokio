@@ -20,11 +20,11 @@ fn memchr_inner(needle: u8, haystack: &[u8]) -> Option<usize> {
     if ptr.is_null() {
         None
     } else {
-        // SAFETY: `ptr` will always be in bounds, since libc guarentees that the ptr will either
+        // SAFETY: `ptr` will always be in bounds, since libc guarantees that the ptr will either
         //          be to an element inside the array or the ptr will be null
         //          since the ptr is in bounds the offset must also always be non null
         //          and there can't be more than isize::MAX elements inside an array
-        //          as rust guarentees that the maximum number of bytes a allocation
+        //          as rust guarantees that the maximum number of bytes a allocation
         //          may occupy is isize::MAX
         unsafe {
             // TODO(MSRV 1.87): When bumping MSRV, switch to `ptr.byte_offset_from_unsigned(start)`.
@@ -38,7 +38,7 @@ pub(crate) fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
 
     // SAFETY: `memchr_inner` returns Some(index) and in that case index must point to an element in haystack
     //         or `memchr_inner` None which is guarded by the `?` operator above
-    //         therfore the index must **always** point to an element in the array
+    //         therefore the index must **always** point to an element in the array
     //         and so this indexing operation is safe
     // TODO(MSRV 1.81): When bumping MSRV, switch to `std::hint::assert_unchecked(haystack.get(..=index).is_some());`
     unsafe {

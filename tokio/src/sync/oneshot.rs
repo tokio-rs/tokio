@@ -1391,6 +1391,19 @@ impl<T> Inner<T> {
             }
         }
 
+        if prev.is_rx_task_set() && !prev.is_complete() {
+            State::unset_rx_task(&self.state);
+            // SAFETY: The sender only accesses `rx_task` (via
+            // `wake_by_ref`) in `complete()` after successfully setting
+            // `VALUE_SENT`. But `set_complete` will not set `VALUE_SENT`
+            // if `CLOSED` is already set (its CAS loop breaks early).
+            // Since `prev` shows that `VALUE_SENT` was not set before we
+            // set `CLOSED`, the sender can no longer set `VALUE_SENT` and
+            // will never access `rx_task`. Therefore, we have exclusive
+            // access here.
+            unsafe { self.rx_task.drop_task() };
+        }
+
         prev
     }
 

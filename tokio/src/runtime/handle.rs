@@ -166,11 +166,12 @@ impl Handle {
     ///
     /// The provided future will start running in the background immediately
     /// when `spawn` is called, even if you don't await the returned
-    /// `JoinHandle`.
+    /// `JoinHandle` (assuming that the runtime [is running][running-runtime]).
     ///
     /// See [module level][mod] documentation for more details.
     ///
     /// [mod]: index.html
+    /// [running-runtime]: index.html#driving-the-runtime
     ///
     /// # Examples
     ///
@@ -473,6 +474,27 @@ impl Handle {
         runtime::Id::new(owned_id)
     }
 
+    /// Returns the name of the current `Runtime`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main(flavor = "current_thread", name = "my-runtime")]
+    /// async fn main() {
+    ///   println!("Current runtime name: {}", Handle::current().name().unwrap());
+    /// }
+    /// ```
+    ///
+    pub fn name(&self) -> Option<&str> {
+        match &self.inner {
+            scheduler::Handle::CurrentThread(handle) => handle.name(),
+            #[cfg(feature = "rt-multi-thread")]
+            scheduler::Handle::MultiThread(handle) => handle.name(),
+        }
+    }
+
     /// Returns a view that lets you get information about how the runtime
     /// is performing.
     pub fn metrics(&self) -> RuntimeMetrics {
@@ -560,7 +582,7 @@ cfg_taskdump! {
         /// You can do this by setting the `RUSTFLAGS` environment variable
         /// before invoking `cargo`; e.g.:
         /// ```bash
-        /// RUSTFLAGS="--cfg tokio_unstable cargo run --example dump
+        /// RUSTFLAGS="--cfg tokio_unstable" cargo run --example dump
         /// ```
         ///
         /// Or by [configuring][cargo-config] `rustflags` in

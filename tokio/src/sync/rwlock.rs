@@ -41,11 +41,10 @@ const MAX_READS: u32 = 10;
 /// The priority policy of Tokio's read-write lock is _fair_ (or
 /// [_write-preferring_]), in order to ensure that readers cannot starve
 /// writers. Fairness is ensured using a first-in, first-out queue for the tasks
-/// awaiting the lock; if a task that wishes to acquire the write lock is at the
-/// head of the queue, read locks will not be given out until the write lock has
-/// been released. This is in contrast to the Rust standard library's
-/// `std::sync::RwLock`, where the priority policy is dependent on the
-/// operating system's implementation.
+/// awaiting the lock; a read lock will not be given out until all write lock
+/// requests that were queued before it have been acquired and released. This is
+/// in contrast to the Rust standard library's `std::sync::RwLock`, where the
+/// priority policy is dependent on the operating system's implementation.
 ///
 /// The type parameter `T` represents the data that this lock protects. It is
 /// required that `T` satisfies [`Send`] to be shared across threads. The RAII guards

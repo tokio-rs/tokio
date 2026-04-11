@@ -36,9 +36,9 @@
 //!                            | Yes                 | No
 //!                            |                     |
 //!                            V                     |
-//!              +--------------------------+        |
-//!              | Local Runtime (unstable) |        |
-//!              +--------------------------+        |
+//!                    +---------------+             |
+//!                    | Local Runtime |             |
+//!                    +---------------+             |
 //!                                                  |
 //!                                                  v
 //!                                      +------------------------+
@@ -205,6 +205,25 @@
 //! This is done with [`Builder::enable_io`] and [`Builder::enable_time`]. As a
 //! shorthand, [`Builder::enable_all`] enables both resource drivers.
 //!
+//! ## Driving the runtime
+//!
+//! A Tokio runtime can only execute tasks if the runtime is running. Normally
+//! this is not an issue as the default configuration of a runtime is always running,
+//! but alternate configurations such as the current-thread runtime require that
+//! [`Runtime::block_on`] is called.
+//!
+//! - A multi-threaded runtime is always running because it spawns its own worker
+//!   threads.
+//! - A current-thread runtime does not spawn any worker threads, so it can only
+//!   execute tasks when you provide a thread by calling [`Runtime::block_on`].
+//! - A [`LocalSet`](crate::task::LocalSet) only executes local tasks spawned on
+//!   it when the `LocalSet` is `.awaited` or otherwise driven using one of its
+//!   methods for this purpose.
+//!
+//! Please be aware that [`Handle::block_on`] does not drive the runtime.
+//! There must be at least one call to [`Runtime::block_on`] when using the current
+//! thread runtime. [`Handle::block_on`] is not enough.
+//!
 //! ## Lifetime of spawned threads
 //!
 //! The runtime may spawn threads depending on its configuration and usage. The
@@ -348,11 +367,18 @@
 //! three times in a row, it is temporarily disabled until the worker thread has
 //! scheduled a task that didn't come from the lifo slot. The lifo slot can be
 //! disabled using the [`disable_lifo_slot`] setting. The lifo slot is separate
-//! from the local queue, so other worker threads cannot steal the task in the
-//! lifo slot.
+//! from the local queue, and is stolen from by other worker threads only when
+//! a worker's local queue has been drained.
 //!
 //! When a task is woken from a thread that is not a worker thread, then the
 //! task is placed in the global queue.
+//!
+//! # Performance tuning
+//!
+//! ## File descriptor table pre-warming
+//!
+//! On Linux, file descriptor table growth can stall worker threads. See the
+//! [`prewarm-fd-table`] example.
 //!
 //! [`poll`]: std::future::Future::poll
 //! [`wake`]: std::task::Waker::wake
@@ -366,6 +392,7 @@
 //! [the lifo slot optimization]: crate::runtime::Builder::disable_lifo_slot
 //! [coop budget]: crate::task::coop#cooperative-scheduling
 //! [`worker_mean_poll_time`]: crate::runtime::RuntimeMetrics::worker_mean_poll_time
+//! [`prewarm-fd-table`]: https://github.com/tokio-rs/tokio/blob/master/examples/prewarm-fd-table.rs
 
 // At the top due to macros
 #[cfg(test)]
@@ -548,8 +575,42 @@ cfg_rt! {
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
 
-        mod local_runtime;
-        pub use local_runtime::{LocalRuntime, LocalOptions};
+        /// Returns the index of the current worker thread, if called from a
+        /// runtime worker thread.
+        ///
+        /// The returned value is a 0-based index matching the worker indices
+        /// used by [`RuntimeMetrics`] methods such as
+        /// [`worker_total_busy_duration`](RuntimeMetrics::worker_total_busy_duration).
+        ///
+        /// Returns `None` when called from outside a runtime worker thread
+        /// (for example, from a blocking thread or a non-Tokio thread). On the
+        /// multi-thread runtime, the thread that calls [`Runtime::block_on`] is
+        /// not a worker thread, so this also returns `None` there.
+        ///
+        /// For the current-thread runtime and [`LocalRuntime`], this always
+        /// returns `Some(0)` (including inside `block_on`, since the calling
+        /// thread *is* the worker thread).
+        ///
+        /// Note that the result may change across `.await` points, as the
+        /// task may be moved to a different worker thread by the scheduler.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
+        /// async fn main() {
+        ///     let index = tokio::spawn(async {
+        ///         tokio::runtime::worker_index()
+        ///     }).await.unwrap();
+        ///     println!("Task ran on worker {:?}", index);
+        /// }
+        /// # }
+        /// ```
+        pub fn worker_index() -> Option<usize> {
+            context::worker_index()
+        }
     }
 
     cfg_taskdump! {
@@ -570,6 +631,9 @@ cfg_rt! {
 
     mod runtime;
     pub use runtime::{Runtime, RuntimeFlavor, is_rt_shutdown_err};
+
+    mod local_runtime;
+    pub use local_runtime::{LocalRuntime, LocalOptions};
 
     mod id;
     pub use id::Id;

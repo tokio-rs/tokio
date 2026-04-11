@@ -17,7 +17,15 @@ async fn issue_7144() {
     }
 }
 
+async fn has_strace() -> bool {
+    Command::new("strace").arg("-V").output().await.is_ok()
+}
+
 async fn test_one() {
+    if !has_strace().await {
+        return;
+    }
+
     let mut t = Command::new("strace")
         .args("-o /dev/null -D sleep 5".split(' '))
         .spawn()

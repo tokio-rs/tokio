@@ -1294,8 +1294,8 @@ cfg_io_util! {
         /// async fn shutdown(&mut self) -> io::Result<()>;
         /// ```
         ///
-        /// Similar to [`flush`], all intermediately buffered is written to the
-        /// underlying stream. Once the operation completes, the caller should
+        /// Similar to [`flush`], all intermediately buffered content is written to
+        /// the underlying stream. Once the operation completes, the caller should
         /// no longer attempt to write to the stream. For example, the
         /// `TcpStream` implementation will issue a `shutdown(Write)` sys call.
         ///

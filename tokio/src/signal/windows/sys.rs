@@ -1,35 +1,37 @@
 use std::io;
 use std::sync::OnceLock;
 
-use crate::signal::registry::{globals, EventId, EventInfo, Storage};
 use crate::signal::RxFuture;
+use crate::sync::watch;
 
 use windows_sys::core::BOOL;
 use windows_sys::Win32::System::Console as console;
 
+type EventInfo = watch::Sender<()>;
+
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
-    new(console::CTRL_BREAK_EVENT)
+    new(&registry().ctrl_break)
 }
 
 pub(super) fn ctrl_close() -> io::Result<RxFuture> {
-    new(console::CTRL_CLOSE_EVENT)
+    new(&registry().ctrl_close)
 }
 
 pub(super) fn ctrl_c() -> io::Result<RxFuture> {
-    new(console::CTRL_C_EVENT)
+    new(&registry().ctrl_c)
 }
 
 pub(super) fn ctrl_logoff() -> io::Result<RxFuture> {
-    new(console::CTRL_LOGOFF_EVENT)
+    new(&registry().ctrl_logoff)
 }
 
 pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
-    new(console::CTRL_SHUTDOWN_EVENT)
+    new(&registry().ctrl_shutdown)
 }
 
-fn new(signum: u32) -> io::Result<RxFuture> {
+fn new(event_info: &EventInfo) -> io::Result<RxFuture> {
     global_init()?;
-    let rx = globals().register_listener(signum as EventId);
+    let rx = event_info.subscribe();
     Ok(RxFuture::new(rx))
 }
 
@@ -40,16 +42,14 @@ fn event_requires_infinite_sleep_in_handler(signum: u32) -> bool {
     //
     // For more information, see:
     // https://learn.microsoft.com/en-us/windows/console/handlerroutine#remarks
-    match signum {
-        console::CTRL_CLOSE_EVENT => true,
-        console::CTRL_LOGOFF_EVENT => true,
-        console::CTRL_SHUTDOWN_EVENT => true,
-        _ => false,
-    }
+    matches!(
+        signum,
+        console::CTRL_CLOSE_EVENT | console::CTRL_LOGOFF_EVENT | console::CTRL_SHUTDOWN_EVENT
+    )
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct OsStorage {
+struct Registry {
     ctrl_break: EventInfo,
     ctrl_close: EventInfo,
     ctrl_c: EventInfo,
@@ -57,32 +57,24 @@ pub(crate) struct OsStorage {
     ctrl_shutdown: EventInfo,
 }
 
-impl Storage for OsStorage {
-    fn event_info(&self, id: EventId) -> Option<&EventInfo> {
-        match u32::try_from(id) {
-            Ok(console::CTRL_BREAK_EVENT) => Some(&self.ctrl_break),
-            Ok(console::CTRL_CLOSE_EVENT) => Some(&self.ctrl_close),
-            Ok(console::CTRL_C_EVENT) => Some(&self.ctrl_c),
-            Ok(console::CTRL_LOGOFF_EVENT) => Some(&self.ctrl_logoff),
-            Ok(console::CTRL_SHUTDOWN_EVENT) => Some(&self.ctrl_shutdown),
+impl Registry {
+    fn event_info(&self, signum: u32) -> Option<&EventInfo> {
+        match signum {
+            console::CTRL_BREAK_EVENT => Some(&self.ctrl_break),
+            console::CTRL_CLOSE_EVENT => Some(&self.ctrl_close),
+            console::CTRL_C_EVENT => Some(&self.ctrl_c),
+            console::CTRL_LOGOFF_EVENT => Some(&self.ctrl_logoff),
+            console::CTRL_SHUTDOWN_EVENT => Some(&self.ctrl_shutdown),
             _ => None,
         }
     }
-
-    fn for_each<'a, F>(&'a self, mut f: F)
-    where
-        F: FnMut(&'a EventInfo),
-    {
-        f(&self.ctrl_break);
-        f(&self.ctrl_close);
-        f(&self.ctrl_c);
-        f(&self.ctrl_logoff);
-        f(&self.ctrl_shutdown);
-    }
 }
 
-#[derive(Debug, Default)]
-pub(crate) struct OsExtraData {}
+fn registry() -> &'static Registry {
+    static REGISTRY: OnceLock<Registry> = OnceLock::new();
+
+    REGISTRY.get_or_init(Default::default)
+}
 
 fn global_init() -> io::Result<()> {
     static INIT: OnceLock<Result<(), Option<i32>>> = OnceLock::new();
@@ -104,27 +96,23 @@ fn global_init() -> io::Result<()> {
 }
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
-    let globals = globals();
-    globals.record_event(ty as EventId);
+    // Ignore unknown control signal types.
+    let Some(event_info) = registry().event_info(ty) else {
+        return 0;
+    };
 
-    // According to https://docs.microsoft.com/en-us/windows/console/handlerroutine
+    // According to https://learn.microsoft.com/en-us/windows/console/handlerroutine
     // the handler routine is always invoked in a new thread, thus we don't
     // have the same restrictions as in Unix signal handlers, meaning we can
     // go ahead and perform the broadcast here.
-    let event_was_handled = globals.broadcast();
-
-    if event_was_handled && event_requires_infinite_sleep_in_handler(ty) {
-        loop {
+    match event_info.send(()) {
+        Ok(_) if event_requires_infinite_sleep_in_handler(ty) => loop {
             std::thread::park();
-        }
-    }
-
-    if event_was_handled {
-        1
-    } else {
+        },
+        Ok(_) => 1,
         // No one is listening for this notification any more
         // let the OS fire the next (possibly the default) handler.
-        0
+        Err(_) => 0,
     }
 }
 

@@ -96,7 +96,7 @@ cfg_rt! {
     /// asynchronously.  When you run CPU-bound code using `spawn_blocking`, you
     /// should keep this large upper limit in mind. When running many CPU-bound
     /// computations, a semaphore or some other synchronization primitive should be
-    /// used to limit the number of computation executed in parallel. Specialized
+    /// used to limit the number of computations executed in parallel. Specialized
     /// CPU-bound executors, such as [rayon], may also be a good fit.
     ///
     /// This function is intended for non-async operations that eventually finish on
@@ -118,6 +118,21 @@ cfg_rt! {
     /// the tasks — they are simply allowed to keep running after the method
     /// returns. It is possible for a blocking task to be cancelled if it has
     /// not yet started running, but this is not guaranteed.
+    ///
+    /// # When to use `spawn_blocking` vs dedicated threads
+    ///
+    /// `spawn_blocking` is intended for *bounded* blocking work that eventually finishes.
+    /// Each call occupies a thread from the runtime's blocking thread pool for the duration
+    /// of the task. Long-lived tasks therefore reduce the pool's effective capacity, which
+    /// can delay other blocking operations once the pool is saturated and work is queued.
+    ///
+    /// For workloads that run indefinitely or for extended periods (for example,
+    /// background workers or persistent processing loops), prefer a dedicated thread created with
+    /// [`thread::spawn`].
+    ///
+    /// As a rule of thumb:
+    /// - Use `spawn_blocking` for short-lived blocking operations
+    /// - Use dedicated threads for long-lived or persistent blocking workloads
     ///
     /// Note that if you are using the single threaded runtime, this function will
     /// still spawn additional threads for blocking operations. The current-thread

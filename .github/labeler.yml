@@ -1,3 +1,6 @@
+R-loom-blocking:
+- tokio/src/runtime/blocking/*
+- tokio/src/runtime/blocking/**/*
 
 R-loom-sync:
 - tokio/src/sync/*

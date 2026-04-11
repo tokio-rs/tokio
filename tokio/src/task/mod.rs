@@ -180,7 +180,7 @@
 //! #### `spawn_blocking`
 //!
 //! The `task::spawn_blocking` function is similar to the `task::spawn` function
-//! discussed in the previous section, but rather than spawning an
+//! discussed in the previous section, but rather than spawning a
 //! _non-blocking_ future on the Tokio runtime, it instead spawns a
 //! _blocking_ function on a dedicated thread pool for blocking tasks. For
 //! example:
