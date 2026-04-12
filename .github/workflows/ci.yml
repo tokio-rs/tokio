@@ -1302,6 +1302,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           usesh: true
+          envs: "TOKIO_STABLE_FEATURES RUSTFLAGS RUSTDOCFLAGS"
           prepare: |
             pkg install -y curl
           run: |
