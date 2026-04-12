@@ -619,10 +619,11 @@ impl Sender {
     ///
     /// # Notes
     ///
-    /// The runtime's I/O driver only delivers readiness events to a `Sender`
-    /// after control is yielded back to it. Calling this method before any
-    /// `.await` (such as [`writable`]) will return `WouldBlock` even when
-    /// the pipe has space available.
+    /// To avoid unnecessary syscalls, this will only attempt the write
+    /// operation if the OS has informed Tokio that this pipe has become
+    /// writable. Because of this, `try_write()` may fail with a
+    /// [`WouldBlock`] error if Tokio has not yet heard from the OS that
+    /// this pipe has become writable.
     ///
     /// # Examples
     ///
@@ -690,10 +691,11 @@ impl Sender {
     ///
     /// # Notes
     ///
-    /// The runtime's I/O driver only delivers readiness events to a `Sender`
-    /// after control is yielded back to it. Calling this method before any
-    /// `.await` (such as [`writable`]) will return `WouldBlock` even when
-    /// the pipe has space available.
+    /// To avoid unnecessary syscalls, this will only attempt the write
+    /// operation if the OS has informed Tokio that this pipe has become
+    /// writable. Because of this, `try_write_vectored()` may fail with a
+    /// [`WouldBlock`] error if Tokio has not yet heard from the OS that
+    /// this pipe has become writable.
     ///
     /// # Examples
     ///
@@ -1136,10 +1138,11 @@ impl Receiver {
     ///
     /// # Notes
     ///
-    /// The runtime's I/O driver only delivers readiness events to a `Receiver`
-    /// after control is yielded back to it. Calling this method before any
-    /// `.await` (such as [`readable()`]) will return `WouldBlock` even when
-    /// data is already available in the pipe.
+    /// To avoid unnecessary syscalls, this will only attempt the read
+    /// operation if the OS has informed Tokio that this pipe has become
+    /// readable. Because of this, `try_read()` may fail with a
+    /// [`WouldBlock`] error if Tokio has not yet heard from the OS that
+    /// this pipe has become readable.
     ///
     /// # Examples
     ///
@@ -1211,10 +1214,11 @@ impl Receiver {
     ///
     /// # Notes
     ///
-    /// The runtime's I/O driver only delivers readiness events to a `Receiver`
-    /// after control is yielded back to it. Calling this method before any
-    /// `.await` (such as [`readable()`]) will return `WouldBlock` even when
-    /// data is already available in the pipe.
+    /// To avoid unnecessary syscalls, this will only attempt the read
+    /// operation if the OS has informed Tokio that this pipe has become
+    /// readable. Because of this, `try_read_vectored()` may fail with a
+    /// [`WouldBlock`] error if Tokio has not yet heard from the OS that
+    /// this pipe has become readable.
     ///
     /// # Examples
     ///
@@ -1288,10 +1292,11 @@ impl Receiver {
         ///
         /// # Notes
         ///
-        /// The runtime's I/O driver only delivers readiness events to a `Receiver`
-        /// after control is yielded back to it. Calling this method before any
-        /// `.await` (such as [`readable()`]) will return `WouldBlock` even when
-        /// data is already available in the pipe.
+        /// To avoid unnecessary syscalls, this will only attempt the read
+        /// operation if the OS has informed Tokio that this pipe has become
+        /// readable. Because of this, `try_read_buf()` may fail with a
+        /// [`WouldBlock`] error if Tokio has not yet heard from the OS that
+        /// this pipe has become readable.
         ///
         /// # Examples
         ///
