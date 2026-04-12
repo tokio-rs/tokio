@@ -1,5 +1,6 @@
 use crate::io::uring::open::Open;
 use crate::io::uring::read::Read;
+use crate::io::uring::symlink::Symlink;
 use crate::io::uring::write::Write;
 use crate::runtime::Handle;
 
@@ -19,6 +20,7 @@ pub(crate) enum CancelData {
     Open(Open),
     Write(Write),
     Read(Read),
+    Symlink(Symlink),
 }
 
 #[derive(Debug)]
