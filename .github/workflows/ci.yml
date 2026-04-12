@@ -1303,7 +1303,7 @@ jobs:
         with:
           release: "14.4"
           usesh: true
-          envs: "TOKIO_STABLE_FEATURES RUSTFLAGS RUSTDOCFLAGS"
+          envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
           prepare: |
             pkg install -y curl
           run: |
@@ -1314,6 +1314,6 @@ jobs:
             cargo test --workspace --features $TOKIO_STABLE_FEATURES
             # Enable all unstable features except `taskdump`, which is Linux-only.
             RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
-            RUSTDOCFLAGS="$RUSTDOCFLAGS --cfg tokio_unstable" \
+            RUSTDOCFLAGS="--cfg tokio_unstable" \
               cargo test \
                 --features $TOKIO_STABLE_FEATURES,io-uring,tracing
