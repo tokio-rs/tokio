@@ -34,6 +34,7 @@ pub(crate) struct Context {
     /// The function that is invoked at each leaf future inside of Tokio
     ///
     /// For example, within tokio::time:sleep, sockets. etc.
+    #[allow(clippy::type_complexity)]
     trace_leaf_fn: Cell<Option<NonNull<dyn FnMut(&TraceMeta)>>>,
 }
 
