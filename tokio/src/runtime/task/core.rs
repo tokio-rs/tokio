@@ -22,6 +22,7 @@ use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::context;
 use crate::runtime::task::raw::{self, Vtable};
+use crate::runtime::task::schedule_latency::ScheduleLatencyInstant;
 use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule, TaskHarnessScheduleHooks};
 use crate::util::linked_list;
@@ -191,6 +192,9 @@ pub(crate) struct Header {
     /// The tracing ID for this instrumented task.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) tracing_id: Option<tracing::Id>,
+
+    /// The last time this task was scheduled. Used to measure schedule latency.
+    pub(super) scheduled_at: UnsafeCell<ScheduleLatencyInstant>,
 }
 
 unsafe impl Send for Header {}
@@ -247,6 +251,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 owner_id: UnsafeCell::new(None),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
+                scheduled_at: UnsafeCell::new(ScheduleLatencyInstant::new(None)),
             }
         }
 
@@ -533,6 +538,23 @@ impl Header {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) unsafe fn get_tracing_id(me: &NonNull<Header>) -> Option<&tracing::Id> {
         me.as_ref().tracing_id.as_ref()
+    }
+
+    /// Updates the last time this task was scheduled. Used to calculate
+    /// the time elapsed between task scheduling and polling.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee exclusive access to this field.
+    pub(super) unsafe fn set_scheduled_at(&self, scheduled_at: ScheduleLatencyInstant) {
+        self.scheduled_at.with_mut(|ptr| *ptr = scheduled_at);
+    }
+
+    /// Gets the last time this task was scheduled.
+    pub(super) fn get_scheduled_at(&self) -> ScheduleLatencyInstant {
+        // Safety: If there are concurrent writes, then that write has violated
+        // the safety requirements on `set_scheduled_at`.
+        unsafe { self.scheduled_at.with(|ptr| *ptr) }
     }
 }
 
