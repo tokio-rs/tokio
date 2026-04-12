@@ -722,6 +722,38 @@ impl Sender {
             .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(buf))
     }
 
+    /// Tries to write from the socket using a user-provided IO operation.
+    ///
+    /// If the socket is ready, the provided closure is called. The closure
+    /// should attempt to perform IO operation on the socket by manually
+    /// calling the appropriate syscall. If the operation fails because the
+    /// socket is not actually ready, then the closure should return a
+    /// `WouldBlock` error and the readiness flag is cleared. The return value
+    /// of the closure is then returned by `try_io`.
+    ///
+    /// If the socket is not ready, then the closure is not called
+    /// and a `WouldBlock` error is returned.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `pipe::Sender` type, as this will mess with the
+    /// readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// Usually, [`writable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`writable()`]: Self::writable()
+    /// [`ready()`]: Self::ready()
+    pub fn try_io<R>(&self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
+        self.io
+            .registration()
+            .try_io(Interest::WRITABLE, || self.io.try_io(f))
+    }
+
     /// Converts the pipe into an [`OwnedFd`] in blocking mode.
     ///
     /// This function will deregister this pipe end from the event loop, set
@@ -1235,6 +1267,38 @@ impl Receiver {
         self.io
             .registration()
             .try_io(Interest::READABLE, || (&*self.io).read_vectored(bufs))
+    }
+
+    /// Tries to read to the socket using a user-provided IO operation.
+    ///
+    /// If the socket is ready, the provided closure is called. The closure
+    /// should attempt to perform IO operation on the socket by manually
+    /// calling the appropriate syscall. If the operation fails because the
+    /// socket is not actually ready, then the closure should return a
+    /// `WouldBlock` error and the readiness flag is cleared. The return value
+    /// of the closure is then returned by `try_io`.
+    ///
+    /// If the socket is not ready, then the closure is not called
+    /// and a `WouldBlock` error is returned.
+    ///
+    /// The closure should only return a `WouldBlock` error if it has performed
+    /// an IO operation on the socket that failed due to the socket not being
+    /// ready. Returning a `WouldBlock` error in any other situation will
+    /// incorrectly clear the readiness flag, which can cause the socket to
+    /// behave incorrectly.
+    ///
+    /// The closure should not perform the IO operation using any of the methods
+    /// defined on the Tokio `pipe::Receiver` type, as this will mess with the
+    /// readiness flag and can cause the socket to behave incorrectly.
+    ///
+    /// Usually, [`readable()`] or [`ready()`] is used with this function.
+    ///
+    /// [`readable()`]: Self::readable()
+    /// [`ready()`]: Self::ready()
+    pub fn try_io<R>(&self, f: impl FnOnce() -> io::Result<R>) -> io::Result<R> {
+        self.io
+            .registration()
+            .try_io(Interest::READABLE, || self.io.try_io(f))
     }
 
     cfg_io_util! {
