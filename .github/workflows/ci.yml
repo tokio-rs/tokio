@@ -1292,3 +1292,28 @@ jobs:
     uses: ./.github/workflows/uring-kernel-version-test.yml
     with:
       kernel_version: ${{ matrix.kernel_version }}
+
+  freebsd:
+    name: FreeBSD
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test in FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "14.4"
+          usesh: true
+          envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
+          prepare: |
+            pkg install -y curl
+          run: |
+            curl https://sh.rustup.rs -sSf --output rustup.sh
+            sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
+            . $HOME/.cargo/env
+            rustc --version
+            cargo test --workspace --features $TOKIO_STABLE_FEATURES
+            # Enable all unstable features except `taskdump`, which is Linux-only.
+            RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
+            RUSTDOCFLAGS="--cfg tokio_unstable" \
+              cargo test \
+                --features $TOKIO_STABLE_FEATURES,io-uring,tracing
