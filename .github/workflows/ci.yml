@@ -1301,6 +1301,7 @@ jobs:
       - name: Test in FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
+          release: "14.4"
           usesh: true
           envs: "TOKIO_STABLE_FEATURES RUSTFLAGS RUSTDOCFLAGS"
           prepare: |
