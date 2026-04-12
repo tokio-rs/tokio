@@ -109,48 +109,41 @@ async fn task_trace_self() {
 
 /// Collect frames between `trace_leaf_for_test` and `root_addr` using
 /// `backtrace::trace`, resolve them, and store pretty-printed symbol names
-/// (with compiler hashes stripped) into `TRACE_WITH_LOG`.
+/// (with compiler hashes stripped) into `logs`.
 #[inline(never)]
-fn trace_leaf_for_test(meta: &TraceMeta) {
-    TRACE_WITH_LOG.with(|log| {
-        let mut frames: Vec<backtrace::BacktraceFrame> = vec![];
-        let mut above_leaf = false;
+fn trace_leaf_for_test(meta: &TraceMeta, log: &mut Vec<Vec<String>>) {
+    let mut frames: Vec<backtrace::BacktraceFrame> = vec![];
+    let mut above_leaf = false;
 
-        if let Some(root_addr) = meta.root_addr {
-            backtrace::trace(|frame| {
-                let below_root = !ptr::eq(frame.symbol_address(), root_addr);
+    if let Some(root_addr) = meta.root_addr {
+        backtrace::trace(|frame| {
+            let below_root = !ptr::eq(frame.symbol_address(), root_addr);
 
-                if above_leaf && below_root {
-                    frames.push(frame.to_owned().into());
-                }
+            if above_leaf && below_root {
+                frames.push(frame.to_owned().into());
+            }
 
-                if ptr::eq(frame.symbol_address(), meta.trace_leaf_addr) {
-                    above_leaf = true;
-                }
+            if ptr::eq(frame.symbol_address(), meta.trace_leaf_addr) {
+                above_leaf = true;
+            }
 
-                below_root
-            });
-        }
+            below_root
+        });
+    }
 
-        // Resolve frames into human-readable symbol names with hashes stripped.
-        let mut bt = backtrace::Backtrace::from(frames);
-        bt.resolve();
-        let mut names = vec![];
-        for frame in bt.frames() {
-            for symbol in frame.symbols() {
-                if let Some(name) = symbol.name() {
-                    names.push(strip_symbol_hash(&format!("{name}")).to_owned());
-                }
+    // Resolve frames into human-readable symbol names with hashes stripped.
+    let mut bt = backtrace::Backtrace::from(frames);
+    bt.resolve();
+    let mut names = vec![];
+    for frame in bt.frames() {
+        for symbol in frame.symbols() {
+            if let Some(name) = symbol.name() {
+                names.push(strip_symbol_hash(&format!("{name}")).to_owned());
             }
         }
+    }
 
-        log.borrow_mut().push(names);
-    });
-}
-
-thread_local! {
-    static TRACE_WITH_LOG: std::cell::RefCell<Vec<Vec<String>>> =
-        const { std::cell::RefCell::new(vec![]) };
+    log.push(names);
 }
 
 /// Strip the trailing `::h<hex>` hash that rustc appends to symbol names.
@@ -197,13 +190,17 @@ impl<F: Future> Future for TaskDump<F> {
             Poll::Pending => {}
         };
 
+        let mut logs = Vec::new();
+
         // Tracing poll with a noop waker. If the future is at a yield
         // point, trace_leaf fires our callback and returns Pending. We discard
         // the result — this poll is purely for capturing the backtrace.
         let noop = futures::task::noop_waker();
         let mut noop_cx = Context::from_waker(&noop);
-        let logs = this.logs.clone();
-        let trace_poll = trace_with(|| this.f.as_mut().poll(&mut noop_cx), trace_leaf_for_test);
+        let trace_poll = trace_with(
+            || this.f.as_mut().poll(&mut noop_cx),
+            |meta| trace_leaf_for_test(meta, &mut logs),
+        );
         // trace should always produce poll pending
         assert!(
             matches!(trace_poll, Poll::Pending),
@@ -211,11 +208,7 @@ impl<F: Future> Future for TaskDump<F> {
         );
 
         // Drain any frames captured by trace_leaf_for_test into our log.
-        TRACE_WITH_LOG.with(|tl| {
-            let mut tl = tl.borrow_mut();
-            let mut dest = logs.lock().unwrap();
-            dest.append(&mut tl);
-        });
+        this.logs.lock().unwrap().extend(logs);
         Poll::Pending
     }
 }
