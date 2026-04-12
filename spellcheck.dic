@@ -148,6 +148,7 @@ implementor
 implementors
 incrementing
 inlining
+interleavings
 interoperate
 invariants
 Invariants
@@ -188,6 +189,7 @@ Multithreaded
 mut
 mutex
 Mutex
+mutexes
 Nagle
 namespace
 nonblocking
@@ -284,6 +286,7 @@ tx
 udp
 UDP
 UID
+uncontended
 unhandled
 unix
 unlink
