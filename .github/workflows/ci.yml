@@ -1332,7 +1332,7 @@ jobs:
         with:
           release: "14.4"
           usesh: true
-          envs: "TOKIO_STABLE_FEATURES RUST_NIGHTLY"
+          envs: "TOKIO_STABLE_FEATURES RUST_NIGHTLY RUSTDOCFLAGS RUSTFLAGS"
           prepare: |
             pkg install -y curl
           run: |
