@@ -111,7 +111,7 @@ async fn task_trace_self() {
 /// `backtrace::trace`, resolve them, and store pretty-printed symbol names
 /// (with compiler hashes stripped) into `logs`.
 #[inline(never)]
-fn trace_leaf_for_test(meta: &TraceMeta, log: &mut Vec<Vec<String>>) {
+fn trace_leaf_for_test(meta: &TraceMeta<'_>, log: &mut Vec<Vec<String>>) {
     let mut frames: Vec<backtrace::BacktraceFrame> = vec![];
     let mut above_leaf = false;
 
@@ -184,21 +184,16 @@ impl<F: Future> Future for TaskDump<F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<F::Output> {
         let mut this = self.project();
 
-        // Poll the future with a real waker. if it returns Ready, exit immediately
-        match this.f.as_mut().poll(cx) {
-            Poll::Ready(result) => return Poll::Ready(result),
-            Poll::Pending => {}
+        // if the future is ready, exit immediately
+        if let Poll::Ready(result) = this.f.as_mut().poll(cx) {
+            return Poll::Ready(result);
         };
 
+        // if is pending, trace its location:
         let mut logs = Vec::new();
 
-        // Tracing poll with a noop waker. If the future is at a yield
-        // point, trace_leaf fires our callback and returns Pending. We discard
-        // the result — this poll is purely for capturing the backtrace.
-        let noop = futures::task::noop_waker();
-        let mut noop_cx = Context::from_waker(&noop);
         let trace_poll = trace_with(
-            || this.f.as_mut().poll(&mut noop_cx),
+            || this.f.as_mut().poll(cx),
             |meta| trace_leaf_for_test(meta, &mut logs),
         );
         // trace should always produce poll pending

@@ -267,7 +267,7 @@ impl Trace {
     where
         F: FnOnce() -> R,
     {
-        let (res, trace) = super::task::trace::Trace::capture(f);
+        let (res, trace) = super::task::trace::Trace::capture_and_defer_wake(f);
         (res, Trace { inner: trace })
     }
 

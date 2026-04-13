@@ -11,7 +11,7 @@ use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::task::{self, Poll};
+use std::task::{self, Poll, Waker};
 
 mod symbol;
 mod trace_impl;
@@ -35,7 +35,7 @@ pub(crate) struct Context {
     ///
     /// For example, within tokio::time:sleep, sockets. etc.
     #[allow(clippy::type_complexity)]
-    trace_leaf_fn: Cell<Option<NonNull<dyn FnMut(&TraceMeta)>>>,
+    trace_leaf_fn: Cell<Option<NonNull<dyn for<'a> FnMut(&TraceMeta<'a>)>>>,
 }
 
 /// A [`Frame`] in an intrusive, doubly-linked tree of [`Frame`]s.
@@ -118,7 +118,7 @@ impl Context {
     /// Calls the provided closure if we are being traced.
     fn try_with_current_trace_leaf_fn<F, R>(f: F) -> Option<R>
     where
-        F: for<'a> FnOnce(&'a mut dyn FnMut(&TraceMeta)) -> R,
+        F: for<'a> FnOnce(&'a mut dyn for<'b> FnMut(&TraceMeta<'b>)) -> R,
     {
         let mut ret = None;
 
@@ -153,7 +153,7 @@ impl Context {
 /// Metadata passed into the `trace_leaf` callback for [`trace_with`]
 #[non_exhaustive]
 #[derive(Debug)]
-pub struct TraceMeta {
+pub struct TraceMeta<'a> {
     /// The root boundary address set by [`Root::poll`] if any.
     ///
     /// When using unwinding the stack, this is the address at which
@@ -165,6 +165,12 @@ pub struct TraceMeta {
     /// When capturing a backtrace, use this as the lower bound — frames at or below
     /// this address are internal implementation details and should be excluded.
     pub trace_leaf_addr: *const c_void,
+
+    /// The [`Waker`] for the task context being traced.
+    ///
+    /// Trace callbacks that need to re-schedule the task (e.g. during a full
+    /// runtime dump) can use this to defer a wakeup.
+    pub waker: &'a Waker,
 }
 
 /// Runs `f`. If `f` hits a Tokio yield point `trace_leaf` will be invoked.
@@ -189,7 +195,7 @@ pub struct TraceMeta {
 ///     static LEAF_COUNT: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
 /// }
 ///
-/// fn my_trace_leaf(_meta: &TraceMeta) {
+/// fn my_trace_leaf(_meta: &TraceMeta<'_>) {
 ///     LEAF_COUNT.with(|c| c.set(c.get() + 1));
 /// }
 ///
@@ -212,15 +218,15 @@ pub struct TraceMeta {
 pub fn trace_with<FN, FT, R>(f: FN, mut trace_leaf: FT) -> R
 where
     FN: FnOnce() -> R,
-    FT: FnMut(&TraceMeta),
+    FT: for<'a> FnMut(&TraceMeta<'a>),
 {
-    let trace_leaf_dyn = (&mut trace_leaf) as &mut (dyn FnMut(&TraceMeta) + '_);
+    let trace_leaf_dyn = (&mut trace_leaf) as &mut (dyn for<'a> FnMut(&TraceMeta<'a>) + '_);
     // SAFETY: The raw pointer is removed from the thread local before `trace_leaf` is dropped, so
     // this transmute cannot lead to the violation of any lifetime requirements.
     let trace_leaf_dyn = unsafe {
         std::mem::transmute::<
-            *mut (dyn FnMut(&TraceMeta) + '_),
-            *mut (dyn FnMut(&TraceMeta) + 'static),
+            *mut (dyn for<'a> FnMut(&TraceMeta<'a>) + '_),
+            *mut (dyn for<'a> FnMut(&TraceMeta<'a>) + 'static),
         >(trace_leaf_dyn)
     };
     // SAFETY: Pointer comes from reference, so not null.
@@ -257,12 +263,35 @@ where
 impl Trace {
     /// Invokes `f`, returning both its result and the collection of backtraces
     /// captured at each sub-invocation of [`trace_leaf`].
+    ///
+    /// After the tracing is complete, a deferred wakeup is scheduled
     #[inline(never)]
-    pub(crate) fn capture<F, R>(f: F) -> (R, Trace)
+    pub(crate) fn capture_and_defer_wake<F, R>(f: F) -> (R, Trace)
     where
         F: FnOnce() -> R,
     {
-        trace_impl::capture(f)
+        let mut trace = Trace::empty();
+
+        let result = trace_with(f, |meta| {
+            // Capture the backtrace.
+            trace_impl::trace_leaf(meta, &mut trace);
+
+            // Use the same logic that `yield_now` uses to send out wakeups
+            // after the task yields. This is only needed during a full
+            // runtime dump so that tasks are re-queued after being polled
+            // for tracing.
+            context::with_scheduler(|scheduler| {
+                if let Some(scheduler) = scheduler {
+                    match scheduler {
+                        scheduler::Context::CurrentThread(s) => s.defer.defer(meta.waker),
+                        #[cfg(feature = "rt-multi-thread")]
+                        scheduler::Context::MultiThread(s) => s.defer.defer(meta.waker),
+                    }
+                }
+            });
+        });
+
+        (result, trace)
     }
 
     pub(crate) fn empty() -> Self {
@@ -301,20 +330,9 @@ pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
         let meta = TraceMeta {
             root_addr,
             trace_leaf_addr: trace_leaf as *const c_void,
+            waker: cx.waker(),
         };
         leaf_fn(&meta);
-
-        // Use the same logic that `yield_now` uses to send out wakeups after
-        // the task yields.
-        context::with_scheduler(|scheduler| {
-            if let Some(scheduler) = scheduler {
-                match scheduler {
-                    scheduler::Context::CurrentThread(s) => s.defer.defer(cx.waker()),
-                    #[cfg(feature = "rt-multi-thread")]
-                    scheduler::Context::MultiThread(s) => s.defer.defer(cx.waker()),
-                }
-            }
-        });
     });
 
     match ret {
@@ -464,7 +482,7 @@ fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -
         .map(|task| {
             let local_notified = owned.assert_owner(task);
             let id = local_notified.task.id();
-            let ((), trace) = Trace::capture(|| local_notified.run());
+            let ((), trace) = Trace::capture_and_defer_wake(|| local_notified.run());
             (id, trace)
         })
         .collect()
