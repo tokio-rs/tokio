@@ -987,14 +987,7 @@ impl Inner {
         }
 
         // Fallback: spawn_blocking
-        let join = spawn_blocking(move || {
-            let mut buf = buf;
-            // SAFETY: the `Read` implementation of `std` does not
-            // read from the buffer it is borrowing and correctly
-            // reports the length of the data written into the buffer.
-            let res = unsafe { buf.read_from(&mut &*std, max_buf_size) };
-            (Operation::Read(res), buf)
-        });
+        let join = Self::spawn_blocking_read(buf, std, max_buf_size);
         Ok(join)
     }
 
@@ -1052,16 +1045,7 @@ impl Inner {
             let fd: crate::io::uring::utils::ArcFd = std;
             Self::uring_read(fd, buf, max_buf_size).await
         } else {
-            match spawn_blocking(move || {
-                let mut buf = buf;
-                // SAFETY: the `Read` implementation of `std` does not
-                // read from the buffer it is borrowing and correctly
-                // reports the length of the data written into the buffer.
-                let res = unsafe { buf.read_from(&mut &*std, max_buf_size) };
-                (Operation::Read(res), buf)
-            })
-            .await
-            {
+            match Self::spawn_blocking_read(buf, std, max_buf_size).await {
                 Ok(result) => result,
                 Err(e) => (
                     Operation::Read(Err(io::Error::new(io::ErrorKind::Other, e))),
@@ -1069,6 +1053,21 @@ impl Inner {
                 ),
             }
         }
+    }
+
+    fn spawn_blocking_read(
+        buf: Buf,
+        std: Arc<StdFile>,
+        max_buf_size: usize,
+    ) -> JoinHandle<(Operation, Buf)> {
+        spawn_blocking(move || {
+            let mut buf = buf;
+            // SAFETY: the `Read` implementation of `std` does not
+            // read from the buffer it is borrowing and correctly
+            // reports the length of the data written into the buffer.
+            let res = unsafe { buf.read_from(&mut &*std, max_buf_size) };
+            (Operation::Read(res), buf)
+        })
     }
 
     async fn complete_inflight(&mut self) {
