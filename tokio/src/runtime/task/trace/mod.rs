@@ -11,7 +11,7 @@ use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::task::{self, Poll};
+use std::task::{self, Poll, Waker};
 
 mod symbol;
 mod trace_impl;
@@ -34,7 +34,8 @@ pub(crate) struct Context {
     /// The function that is invoked at each leaf future inside of Tokio
     ///
     /// For example, within tokio::time:sleep, sockets. etc.
-    trace_leaf_fn: Cell<Option<fn(&TraceMeta)>>,
+    #[allow(clippy::type_complexity)]
+    trace_leaf_fn: Cell<Option<NonNull<dyn for<'a> FnMut(&TraceMeta<'a>)>>>,
 }
 
 /// A [`Frame`] in an intrusive, doubly-linked tree of [`Frame`]s.
@@ -114,26 +115,45 @@ impl Context {
         }
     }
 
+    /// Calls the provided closure if we are being traced.
     fn try_with_current_trace_leaf_fn<F, R>(f: F) -> Option<R>
     where
-        F: FnOnce(&Cell<Option<fn(&TraceMeta)>>) -> R,
+        F: for<'a> FnOnce(&'a mut dyn for<'b> FnMut(&TraceMeta<'b>)) -> R,
     {
+        let mut ret = None;
+
+        let inner = |context: &Context| {
+            if let Some(mut trace_leaf_fn) = context.trace_leaf_fn.get() {
+                context.trace_leaf_fn.set(None);
+                let _restore = defer(move || {
+                    context.trace_leaf_fn.set(Some(trace_leaf_fn));
+                });
+
+                // SAFETY: The trace leaf fn is valid for the duration in which it's stored in the
+                // context. Furthermore, re-entrant calls are not possible since we store `None` for
+                // the duration in which we hold a mutable reference, so access is exclusive for that
+                // duration.
+                ret = Some(f(unsafe { trace_leaf_fn.as_mut() }));
+            }
+        };
+
         // SAFETY: This call can only access the trace_leaf_fn field, so it cannot
         // break the trace frame linked list.
-        unsafe { Self::try_with_current(|context| f(&context.trace_leaf_fn)) }
+        unsafe { Self::try_with_current(inner) };
+
+        ret
     }
 
     /// Produces `true` if the current task is being traced; otherwise false.
     pub(crate) fn is_tracing() -> bool {
-        Self::try_with_current_trace_leaf_fn(|maybe_trace_leaf| maybe_trace_leaf.get().is_some())
-            .unwrap_or(false)
+        Self::try_with_current_trace_leaf_fn(|_| ()).is_some()
     }
 }
 
 /// Metadata passed into the `trace_leaf` callback for [`trace_with`]
 #[non_exhaustive]
 #[derive(Debug)]
-pub struct TraceMeta {
+pub struct TraceMeta<'a> {
     /// The root boundary address set by [`Root::poll`] if any.
     ///
     /// When using unwinding the stack, this is the address at which
@@ -145,6 +165,12 @@ pub struct TraceMeta {
     /// When capturing a backtrace, use this as the lower bound — frames at or below
     /// this address are internal implementation details and should be excluded.
     pub trace_leaf_addr: *const c_void,
+
+    /// The [`Waker`] for the task context being traced.
+    ///
+    /// Trace callbacks that need to re-schedule the task (e.g. during a full
+    /// runtime dump) can use this to defer a wakeup.
+    pub waker: &'a Waker,
 }
 
 /// Runs `f`. If `f` hits a Tokio yield point `trace_leaf` will be invoked.
@@ -169,7 +195,7 @@ pub struct TraceMeta {
 ///     static LEAF_COUNT: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
 /// }
 ///
-/// fn my_trace_leaf(_meta: &TraceMeta) {
+/// fn my_trace_leaf(_meta: &TraceMeta<'_>) {
 ///     LEAF_COUNT.with(|c| c.set(c.get() + 1));
 /// }
 ///
@@ -189,20 +215,46 @@ pub struct TraceMeta {
 /// assert!(count > 0);
 /// # }
 /// ```
-pub fn trace_with<F, R>(f: F, trace_leaf: fn(&TraceMeta)) -> R
+pub fn trace_with<FN, FT, R>(f: FN, mut trace_leaf: FT) -> R
 where
-    F: FnOnce() -> R,
+    FN: FnOnce() -> R,
+    FT: for<'a> FnMut(&TraceMeta<'a>),
 {
-    // store our new trace_leaf function
-    let previous =
-        Context::try_with_current_trace_leaf_fn(|current| current.replace(Some(trace_leaf)));
+    let trace_leaf_dyn = (&mut trace_leaf) as &mut (dyn for<'a> FnMut(&TraceMeta<'a>) + '_);
+    // SAFETY: The raw pointer is removed from the thread local before `trace_leaf` is dropped, so
+    // this transmute cannot lead to the violation of any lifetime requirements.
+    let trace_leaf_dyn = unsafe {
+        std::mem::transmute::<
+            *mut (dyn for<'a> FnMut(&TraceMeta<'a>) + '_),
+            *mut (dyn for<'a> FnMut(&TraceMeta<'a>) + 'static),
+        >(trace_leaf_dyn)
+    };
+    // SAFETY: Pointer comes from reference, so not null.
+    let trace_leaf_dyn = unsafe { NonNull::new_unchecked(trace_leaf_dyn) };
 
-    // restore previous on drop. This is ensures state remains consistent
-    // even if the trace_leaf function panics
+    let mut old_trace_leaf_fn = None;
+
+    // Even if this access fails, that's okay. In that case, we still call the closure without
+    // actually performing any tracing.
+    //
+    // SAFETY: This call can only access the trace_leaf_fn field, so it cannot
+    // break the trace frame linked list.
+    unsafe {
+        Context::try_with_current(|ctx| {
+            old_trace_leaf_fn = ctx.trace_leaf_fn.replace(Some(trace_leaf_dyn));
+        })
+    };
+
     let _restore = defer(move || {
-        if let Some(previous) = previous {
-            Context::try_with_current_trace_leaf_fn(|current| current.set(previous));
-        }
+        // This ensures that `trace_leaf_fn` cannot be accessed after this call returns.
+        //
+        // SAFETY: This call can only access the trace_leaf_fn field, so it cannot
+        // break the trace frame linked list.
+        unsafe {
+            Context::try_with_current(|ctx| {
+                ctx.trace_leaf_fn.set(old_trace_leaf_fn);
+            })
+        };
     });
 
     f()
@@ -211,12 +263,35 @@ where
 impl Trace {
     /// Invokes `f`, returning both its result and the collection of backtraces
     /// captured at each sub-invocation of [`trace_leaf`].
+    ///
+    /// After the tracing is complete, a deferred wakeup is scheduled
     #[inline(never)]
-    pub(crate) fn capture<F, R>(f: F) -> (R, Trace)
+    pub(crate) fn capture_and_defer_wake<F, R>(f: F) -> (R, Trace)
     where
         F: FnOnce() -> R,
     {
-        trace_impl::capture(f)
+        let mut trace = Trace::empty();
+
+        let result = trace_with(f, |meta| {
+            // Capture the backtrace.
+            trace_impl::trace_leaf(meta, &mut trace);
+
+            // Use the same logic that `yield_now` uses to send out wakeups
+            // after the task yields. This is only needed during a full
+            // runtime dump so that tasks are re-queued after being polled
+            // for tracing.
+            context::with_scheduler(|scheduler| {
+                if let Some(scheduler) = scheduler {
+                    match scheduler {
+                        scheduler::Context::CurrentThread(s) => s.defer.defer(meta.waker),
+                        #[cfg(feature = "rt-multi-thread")]
+                        scheduler::Context::MultiThread(s) => s.defer.defer(meta.waker),
+                    }
+                }
+            });
+        });
+
+        (result, trace)
     }
 
     pub(crate) fn empty() -> Self {
@@ -249,29 +324,20 @@ impl Trace {
 // internal implementation details of this crate).
 #[inline(never)]
 pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
-    let trace_leaf_fn = Context::try_with_current_trace_leaf_fn(|cell| cell.get()).flatten();
-    if let Some(trace_leaf_fn) = trace_leaf_fn {
+    let root_addr = Context::current_frame_addr();
+
+    let ret = Context::try_with_current_trace_leaf_fn(|leaf_fn| {
         let meta = TraceMeta {
-            root_addr: Context::current_frame_addr(),
+            root_addr,
             trace_leaf_addr: trace_leaf as *const c_void,
+            waker: cx.waker(),
         };
-        trace_leaf_fn(&meta);
+        leaf_fn(&meta);
+    });
 
-        // Use the same logic that `yield_now` uses to send out wakeups after
-        // the task yields.
-        context::with_scheduler(|scheduler| {
-            if let Some(scheduler) = scheduler {
-                match scheduler {
-                    scheduler::Context::CurrentThread(s) => s.defer.defer(cx.waker()),
-                    #[cfg(feature = "rt-multi-thread")]
-                    scheduler::Context::MultiThread(s) => s.defer.defer(cx.waker()),
-                }
-            }
-        });
-
-        Poll::Pending
-    } else {
-        Poll::Ready(())
+    match ret {
+        Some(()) => Poll::Pending,
+        None => Poll::Ready(()),
     }
 }
 
@@ -416,7 +482,7 @@ fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -
         .map(|task| {
             let local_notified = owned.assert_owner(task);
             let id = local_notified.task.id();
-            let ((), trace) = Trace::capture(|| local_notified.run());
+            let ((), trace) = Trace::capture_and_defer_wake(|| local_notified.run());
             (id, trace)
         })
         .collect()
