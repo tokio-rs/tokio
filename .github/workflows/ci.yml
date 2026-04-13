@@ -1317,3 +1317,52 @@ jobs:
             RUSTDOCFLAGS="--cfg tokio_unstable" \
               cargo test \
                 --features $TOKIO_STABLE_FEATURES,io-uring,tracing
+
+  freebsd-docs:
+    name: FreeBSD docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test in FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        env:
+          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
+          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
+          RUST_NIGHTLY: nightly-2025-10-12
+        with:
+          release: "14.4"
+          usesh: true
+          envs: "TOKIO_STABLE_FEATURES RUST_NIGHTLY"
+          prepare: |
+            pkg install -y curl
+          run: |
+            curl https://sh.rustup.rs -sSf --output rustup.sh
+            sh rustup.sh -y --profile minimal --default-toolchain $RUST_NIGHTLY
+            . $HOME/.cargo/env
+            rustc --version
+            # We use `--features $TOKIO_STABLE_FEATURES,io-uring,tracing` instead of
+            # `--all-features` to exclude `taskdump`, which is Linux-only.
+            cargo doc --lib --no-deps --features $TOKIO_STABLE_FEATURES,io-uring,tracing \
+              --document-private-items
+
+  freebsd-i686:
+    name: FreeBSD i686
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test in FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "14.4"
+          usesh: true
+          envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
+          prepare: |
+            pkg install -y curl
+          run: |
+            curl https://sh.rustup.rs -sSf --output rustup.sh
+            sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
+            . $HOME/.cargo/env
+            rustup target add i686-unknown-freebsd
+            rustc --version
+            cargo test --workspace --features $TOKIO_STABLE_FEATURES \
+              --target i686-unknown-freebsd
