@@ -1295,6 +1295,7 @@ jobs:
 
   freebsd:
     name: FreeBSD
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -1320,6 +1321,7 @@ jobs:
 
   freebsd-docs:
     name: FreeBSD docs
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -1347,6 +1349,7 @@ jobs:
 
   freebsd-i686:
     name: FreeBSD i686
+    needs: basics
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
