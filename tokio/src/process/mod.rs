@@ -1135,7 +1135,7 @@ where
     type Output = Result<T, E>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 

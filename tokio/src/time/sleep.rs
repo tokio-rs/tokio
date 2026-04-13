@@ -417,7 +417,7 @@ impl Sleep {
     fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
         let me = self.project();
 
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         // Keep track of task budget
         #[cfg(all(tokio_unstable, feature = "tracing"))]

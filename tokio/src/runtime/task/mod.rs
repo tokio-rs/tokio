@@ -509,6 +509,22 @@ impl<S: Schedule> LocalNotified<S> {
         mem::forget(self);
         raw.poll();
     }
+
+    /// Returns a new `Waker` for this task.
+    ///
+    /// The returned `Waker` is ref-counted independently of this
+    /// `LocalNotified`; it remains valid after the task is polled.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "taskdump",
+        feature = "rt",
+        target_os = "linux",
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+    ))]
+    pub(crate) fn waker(&self) -> std::task::Waker {
+        let header_ptr = self.task.raw.header_ptr();
+        waker::waker_ref::<S>(&header_ptr).clone()
+    }
 }
 
 impl<S: Schedule> UnownedTask<S> {
