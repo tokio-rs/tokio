@@ -9,9 +9,9 @@ use crate::runtime::Handle;
 use io_uring::cqueue;
 use io_uring::squeue::Entry;
 use std::future::Future;
-use std::os::fd::OwnedFd;
 use std::io::{self, Error};
 use std::mem;
+use std::os::fd::OwnedFd;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
 
