@@ -3,16 +3,13 @@
 ## Added
 
 - io: `AioSource::register_borrowed` for I/O safety support ([#7992])
-- net: add `try_io` function to `unix::pipe` sender and receiver types 
-  ([#8030])
+- net: add `try_io` function to `unix::pipe` sender and receiver types ([#8030])
 
 ## Added (unstable)
 
-- runtime: `Builder::enable_eager_driver_handoff` setting enable eager hand  
-  off of the I/O and time drivers before polling tasks ([#8010])
+- runtime: `Builder::enable_eager_driver_handoff` setting enable eager hand off of the I/O and time drivers before polling tasks ([#8010])
 - taskdump: add `trace_with()` for customized task dumps ([#8025])
-- taskdump: allow `impl FnMut()` in `trace_with` instead of just `fn()` 
-  ([#8040])
+- taskdump: allow `impl FnMut()` in `trace_with` instead of just `fn()` ([#8040])
 - fs: support `io_uring` in `AsyncRead` for `File` ([#7907])
 
 ## Changed
@@ -22,8 +19,7 @@
 
 ## Fixed
 
-- runtime: overflow second half of tasks when local queue is filled instead of
-  first half ([#8029])
+- runtime: overflow second half of tasks when local queue is filled instead of first half ([#8029])
 
 ## Documented
 
