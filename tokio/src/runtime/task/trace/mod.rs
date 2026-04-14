@@ -136,8 +136,8 @@ impl Context {
             }
         };
 
-        // SAFETY: This call can only access the trace_leaf_fn field, so it cannot
-        // break the trace frame linked list.
+        // SAFETY: This call can only access the trace_leaf_fn field, so it cannot break the trace
+        // frame linked list.
         unsafe { Self::try_with_current(inner) };
 
         ret
@@ -145,8 +145,8 @@ impl Context {
 
     /// Produces `true` if the current task is being traced; otherwise false.
     pub(crate) fn is_tracing() -> bool {
-        // SAFETY: This call can only access the trace_leaf_fn field, so it cannot
-        // break the trace frame linked list.
+        // SAFETY: This call can only access the trace_leaf_fn field, so it cannot break the trace
+        // frame linked list.
         unsafe { Self::try_with_current(|ctx| ctx.trace_leaf_fn.get().is_some()).unwrap_or(false) }
     }
 }
@@ -226,8 +226,8 @@ where
     // Even if this access fails, that's okay. In that case, we still call the closure without
     // actually performing any tracing.
     //
-    // SAFETY: This call can only access the trace_leaf_fn field, so it cannot
-    // break the trace frame linked list.
+    // SAFETY: This call can only access the trace_leaf_fn field, so it cannot break the trace
+    // frame linked list.
     unsafe {
         Context::try_with_current(|ctx| {
             old_trace_leaf_fn = ctx.trace_leaf_fn.replace(Some(trace_leaf_dyn));
