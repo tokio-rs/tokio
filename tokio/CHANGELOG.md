@@ -11,7 +11,7 @@
 - runtime: `Builder::enable_eager_driver_handoff` setting enable eager hand  
   off of the I/O and time drivers before polling tasks ([#8010])
 - taskdump: add `trace_with()` for customized task dumps ([#8025])
-- taskdump: allow `impl FnMut()` in `trace_with`` instead of just `fn()` 
+- taskdump: allow `impl FnMut()` in `trace_with` instead of just `fn()` 
   ([#8040])
 - fs: support `io_uring` in `AsyncRead` for `File` ([#7907])
 
