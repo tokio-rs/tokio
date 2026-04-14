@@ -16,10 +16,10 @@ env:
   RUSTUP_WINDOWS_PATH_ADD_BIN: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2025-10-12
   # Pin a specific miri version
   rust_miri_nightly: nightly-2025-11-13
   rust_clippy: '1.88'
+  rust_valgrind: '1.82'
   # When updating this, also update:
   # - README.md
   # - tokio/README.md
@@ -66,9 +66,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -98,9 +98,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -128,6 +128,8 @@ jobs:
     needs: basics
     name: test all crates in the workspace with all features and panic=abort
     runs-on: ${{ matrix.os }}
+    env:
+      RUSTC_BOOTSTRAP: 1
     strategy:
       matrix:
         os:
@@ -136,10 +138,10 @@ jobs:
           - macos-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -170,9 +172,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-hack
         uses: taiki-e/install-action@v2
         with:
@@ -210,9 +212,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
 
       - name: Enable parking_lot send_guard feature
         # Inserts the line "plsend = ["parking_lot/send_guard"]" right after [features]
@@ -235,10 +237,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_valgrind }}
+        uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: 1.82
+          toolchain: ${{ env.rust_valgrind }}
 
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
@@ -277,9 +279,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -311,9 +313,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
@@ -345,9 +347,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
         with:
@@ -374,7 +376,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_miri_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_miri_nightly }}
           components: miri
@@ -397,7 +399,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_miri_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_miri_nightly }}
           components: miri
@@ -420,7 +422,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_miri_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_miri_nightly }}
           components: miri
@@ -436,22 +438,24 @@ jobs:
     name: asan
     needs: basics
     runs-on: ubuntu-latest
+    env:
+      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@v5
       - name: Install llvm
         # Required to resolve symbols in sanitizer output
         run: sudo apt-get install -y llvm
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_stable }}
 
       - uses: Swatinem/rust-cache@v2
       - name: asan
         run: cargo test --workspace --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
         env:
           RUSTFLAGS: -Z sanitizer=address --cfg tokio_no_tuning_tests
-          # Ignore `trybuild` errors as they are irrelevant and flaky on nightly
+          # Ignore `trybuild` errors as they are irrelevant
           TRYBUILD: overwrite
 
   semver:
@@ -490,7 +494,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
@@ -505,6 +509,8 @@ jobs:
     name: cross-check-tier3
     needs: basics
     runs-on: ubuntu-latest
+    env:
+      RUSTC_BOOTSTRAP: 1
     strategy:
       matrix:
         target:
@@ -514,10 +520,10 @@ jobs:
 #           exclude_features: "process,signal,rt-process-signal,full,taskdump"
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_stable }}
           components: rust-src
       - name: Install cargo-hack
         uses: taiki-e/install-action@v2
@@ -549,7 +555,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
@@ -599,7 +605,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
@@ -637,12 +643,14 @@ jobs:
     name: Test tokio --all-features on i686-unknown-linux-gnu without AtomicU64
     needs: basics
     runs-on: ubuntu-latest
+    env:
+      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_stable }}
           components: rust-src
 
       - name: Install cargo-nextest
@@ -669,12 +677,14 @@ jobs:
     name: Check tokio --feature-powerset --depth 2 on i686-unknown-linux-gnu without AtomicU64
     needs: basics
     runs-on: ubuntu-latest
+    env:
+      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_stable }}
           components: rust-src
       - name: Install cargo-hack
         uses: taiki-e/install-action@v2
@@ -695,6 +705,8 @@ jobs:
     name: features exclude ${{ matrix.name }}
     needs: basics
     runs-on: ubuntu-latest
+    env:
+      RUSTC_BOOTSTRAP: 1
     strategy:
       matrix:
         include:
@@ -709,10 +721,10 @@ jobs:
             exclude_features: ""
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_stable }}
           target: ${{ matrix.target }}
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
@@ -729,7 +741,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_min }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_min }}
       - name: Install cargo-hack
@@ -755,12 +767,14 @@ jobs:
     name: minimal-versions
     needs: basics
     runs-on: ubuntu-latest
+    env:
+      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_stable }}
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
@@ -791,7 +805,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
           components: rustfmt
@@ -811,7 +825,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_clippy }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_clippy }}
           components: clippy
@@ -840,6 +854,8 @@ jobs:
   docs:
     name: docs
     runs-on: ${{ matrix.run.os }}
+    env:
+      RUSTC_BOOTSTRAP: 1
     strategy:
       matrix:
         run:
@@ -850,10 +866,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
       - name: "doc --lib --all-features"
         run: cargo doc --lib --no-deps --document-private-items --features $TOKIO_STABLE_FEATURES,${{ matrix.run.extra_features }}
@@ -868,7 +884,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
@@ -903,7 +919,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
 
@@ -955,7 +971,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
 
@@ -996,12 +1012,14 @@ jobs:
     name: build tokio for x86_64-fortanix-unknown-sgx
     needs: basics
     runs-on: ubuntu-latest
+    env:
+      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_stable }}
           target: x86_64-fortanix-unknown-sgx
       - uses: Swatinem/rust-cache@v2
       # NOTE: Currently the only test we can run is to build tokio with rt and sync features.
@@ -1013,12 +1031,14 @@ jobs:
     name: build tokio for redox-os
     needs: basics
     runs-on: ubuntu-latest
+    env:
+      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust ${{ env.rust_nightly }}
+      - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_stable }}
           target: x86_64-unknown-redox
       - name: check tokio on redox
         run: cargo check --target x86_64-unknown-redox --features $TOKIO_STABLE_FEATURES
@@ -1040,7 +1060,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
       - name: Install wasm-pack
@@ -1063,7 +1083,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
           targets: ${{ matrix.target }}
@@ -1124,7 +1144,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
           targets: wasm32-wasip2
@@ -1147,6 +1167,9 @@ jobs:
     name: check-external-types (${{ matrix.os }})
     needs: basics
     runs-on: ${{ matrix.os }}
+    env:
+      rust_version: nightly-2025-08-06
+      # ^ sync with https://github.com/awslabs/cargo-check-external-types/blob/main/rust-toolchain.toml
     strategy:
       matrix:
         include:
@@ -1158,12 +1181,10 @@ jobs:
             extra_features: "tracing,io-uring,taskdump"
     steps:
       - uses: actions/checkout@v5
-      - name: Install Rust ${{ matrix.rust }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_version }}
+        uses: dtolnay/rust-toolchain@master
         with:
-          # `check-external-types` requires a specific Rust nightly version. See
-          # the README for details: https://github.com/awslabs/cargo-check-external-types
-          toolchain: nightly-2025-08-06
+          toolchain: ${{ env.rust_version }}
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-check-external-types
         uses: taiki-e/cache-cargo-install-action@v1
@@ -1180,12 +1201,14 @@ jobs:
     name: check-fuzzing
     needs: basics
     runs-on: ubuntu-latest
+    env:
+      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust ${{ env.rust_nightly }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_stable }}
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
@@ -1203,7 +1226,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.rust_stable }}
       - name: Install cargo-spellcheck

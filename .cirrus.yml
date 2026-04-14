@@ -4,7 +4,6 @@ freebsd_instance:
   image: freebsd-14-4-release-amd64-ufs
 env:
   RUST_STABLE: stable
-  RUST_NIGHTLY: nightly-2025-10-12
   RUSTFLAGS: -D warnings
   # This excludes unstable features like io_uring, which require '--cfg tokio_unstable'.
   TOKIO_STABLE_FEATURES: full,test-util
@@ -39,12 +38,13 @@ task:
 task:
   name: FreeBSD docs
   env:
+    RUSTC_BOOTSTRAP: '1'
     RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
     RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
   setup_script:
     - pkg install -y bash
     - curl https://sh.rustup.rs -sSf --output rustup.sh
-    - sh rustup.sh -y --profile minimal --default-toolchain $RUST_NIGHTLY
+    - sh rustup.sh -y --profile minimal --default-toolchain $RUST_STABLE
     - . $HOME/.cargo/env
     - |
       echo "~~~~ rustc --version ~~~~"
