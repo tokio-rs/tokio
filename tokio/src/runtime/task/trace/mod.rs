@@ -129,7 +129,7 @@ impl Context {
                 });
 
                 // SAFETY: The trace leaf fn is valid for the duration in which it's stored in the
-                // context. Furthermore, re-entrant calls are not possible since we store `None` for
+                // context. Furthermore, re-entrant calls are not possible because we store `None` for
                 // the duration in which we hold a mutable reference, so access is exclusive for that
                 // duration.
                 ret = Some(f(unsafe { trace_leaf_fn.as_mut() }));
