@@ -51,7 +51,8 @@ cfg_not_loom! {
 /// Upper bound on shard count. More shards reduce push contention but
 /// make `is_empty`/`len` (which scan every shard) slower, and those are
 /// called in the worker hot loop. Contention drops off steeply past a
-/// handful of shards, so a small cap captures the win.
+/// handful of shards, so a small cap captures the win. Must be a power
+/// of two.
 ///
 /// Under loom, additional shards would multiply the modeled state space
 /// without testing any new interleavings: each shard is an independent
@@ -138,8 +139,7 @@ impl<T: 'static> Sharded<T> {
     /// Pushes a task into the queue.
     ///
     /// Selects a shard using the calling thread's home-shard index. Does
-    /// nothing if the selected shard is closed (which implies all shards
-    /// are closed, as `close` is the only path that sets the flag).
+    /// nothing if the queue is closed.
     pub(crate) fn push(&self, task: task::Notified<T>) {
         let idx = self.next_push_shard();
         let shard = &*self.shards[idx];
