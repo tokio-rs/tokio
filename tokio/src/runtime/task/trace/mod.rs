@@ -123,8 +123,7 @@ impl Context {
         let mut ret = None;
 
         let inner = |context: &Context| {
-            if let Some(mut trace_leaf_fn) = context.trace_leaf_fn.get() {
-                context.trace_leaf_fn.set(None);
+            if let Some(mut trace_leaf_fn) = context.trace_leaf_fn.replace(None) {
                 let _restore = defer(move || {
                     context.trace_leaf_fn.set(Some(trace_leaf_fn));
                 });
