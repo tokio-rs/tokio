@@ -146,7 +146,9 @@ impl Context {
 
     /// Produces `true` if the current task is being traced; otherwise false.
     pub(crate) fn is_tracing() -> bool {
-        Self::try_with_current_trace_leaf_fn(|_| ()).is_some()
+        // SAFETY: This call can only access the trace_leaf_fn field, so it cannot
+        // break the trace frame linked list.
+        unsafe { Self::try_with_current(|ctx| ctx.trace_leaf_fn.get().is_some()).unwrap_or(false) }
     }
 }
 
