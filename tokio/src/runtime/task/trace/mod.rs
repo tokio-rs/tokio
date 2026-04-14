@@ -169,13 +169,9 @@ pub struct TraceMeta {
 
 /// Runs `f`. If `f` hits a Tokio yield point `trace_leaf` will be invoked.
 ///
-/// This allows taking a task dump with caller-provided task dump machinery. If `f` is the poll function of a future
-/// and that future returns `Poll::Pending`, then `trace_leaf` will be invoked. `trace_leaf` can then take a backtrace
-/// to determine exactly where the yield occurred.
-///
-/// `trace_leaf` is a function pointer (`fn`) rather than a closure (`Fn`) because it must be stored
-/// in thread-local state via a `Cell`. Use thread-locals to communicate between the callback and
-/// calling code (see example below).
+/// This allows taking a task dump with caller-provided task dump machinery. If `f` is the poll
+/// function of a future and that future returns `Poll::Pending`, then `trace_leaf` will be
+/// invoked. `trace_leaf` can then take a backtrace to determine exactly where the yield occurred.
 ///
 /// # Example
 ///
@@ -184,29 +180,27 @@ pub struct TraceMeta {
 /// use std::task::Poll;
 /// use tokio::runtime::dump::{trace_with, Trace, TraceMeta};
 ///
-/// // Thread-local storage for the custom trace function.
-/// std::thread_local! {
-///     static LEAF_COUNT: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+/// fn my_trace_leaf(_meta: &TraceMeta, count: &mut u32) {
+///     *count += 1;
 /// }
 ///
-/// fn my_trace_leaf(_meta: &TraceMeta) {
-///     LEAF_COUNT.with(|c| c.set(c.get() + 1));
-/// }
-///
-/// # async fn example() {
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
 /// let mut fut = std::pin::pin!(async {
 ///     tokio::task::yield_now().await;
 /// });
 ///
-/// LEAF_COUNT.with(|c| c.set(0));
+/// let mut leaf_count = 0;
 ///
 /// Trace::root(std::future::poll_fn(|cx| {
-///     trace_with(|| { let _ = fut.as_mut().poll(cx); }, my_trace_leaf);
+///     trace_with(
+///         || { let _ = fut.as_mut().poll(cx); },
+///         |meta| my_trace_leaf(meta, &mut leaf_count),
+///     );
 ///     Poll::Ready(())
 /// })).await;
 ///
-/// let count = LEAF_COUNT.with(|c| c.get());
-/// assert!(count > 0);
+/// assert!(leaf_count > 0);
 /// # }
 /// ```
 pub fn trace_with<FN, FT, R>(f: FN, mut trace_leaf: FT) -> R
