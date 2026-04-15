@@ -1302,16 +1302,16 @@ jobs:
       - name: Test in FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
-          release: "14.4"
+          release: '14.4'
           usesh: true
           envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
           prepare: |
             pkg install -y curl
-          run: |
             curl https://sh.rustup.rs -sSf --output rustup.sh
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
             . $HOME/.cargo/env
             rustc --version
+          run: |
             cargo test --workspace --features $TOKIO_STABLE_FEATURES
             # Enable all unstable features except `taskdump`, which is Linux-only.
             RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
@@ -1332,16 +1332,16 @@ jobs:
           RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
           RUST_NIGHTLY: nightly-2025-10-12
         with:
-          release: "14.4"
+          release: '14.4'
           usesh: true
           envs: "TOKIO_STABLE_FEATURES RUST_NIGHTLY RUSTDOCFLAGS RUSTFLAGS"
           prepare: |
             pkg install -y curl
-          run: |
             curl https://sh.rustup.rs -sSf --output rustup.sh
             sh rustup.sh -y --profile minimal --default-toolchain $RUST_NIGHTLY
             . $HOME/.cargo/env
             rustc --version
+          run: |
             # We use `--features $TOKIO_STABLE_FEATURES,io-uring,tracing` instead of
             # `--all-features` to exclude `taskdump`, which is Linux-only.
             cargo doc --lib --no-deps --features $TOKIO_STABLE_FEATURES,io-uring,tracing \
@@ -1356,16 +1356,16 @@ jobs:
       - name: Test in FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
-          release: "14.4"
+          release: '14.4'
           usesh: true
           envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
           prepare: |
             pkg install -y curl
-          run: |
             curl https://sh.rustup.rs -sSf --output rustup.sh
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
             . $HOME/.cargo/env
             rustup target add i686-unknown-freebsd
             rustc --version
+          run: |
             cargo test --workspace --features $TOKIO_STABLE_FEATURES \
               --target i686-unknown-freebsd
