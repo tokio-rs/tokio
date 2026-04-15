@@ -1152,7 +1152,8 @@ impl RuntimeMetrics {
         #![all(
             tokio_unstable,
             target_has_atomic = "64",
-            target_pointer_width = "64"
+            target_pointer_width = "64",
+            feature = "schedule-latency"
         )]
         /// Returns the number of times the given worker polled tasks with a schedule
         /// latency within the given bucket's range.

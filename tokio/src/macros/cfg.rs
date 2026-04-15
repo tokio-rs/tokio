@@ -711,3 +711,22 @@ macro_rules! cfg_io_uring {
         )*
     };
 }
+
+macro_rules! cfg_schedule_latency {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(tokio_unstable, feature = "schedule-latency", target_pointer_width = "64"))]
+            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "schedule-latency"))))]
+            $item
+        )*
+    };
+}
+
+macro_rules! cfg_not_schedule_latency {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(not(tokio_unstable), not(feature = "schedule-latency"), not(target_pointer_width = "64")))]
+            $item
+        )*
+    }
+}

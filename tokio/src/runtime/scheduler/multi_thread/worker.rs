@@ -92,9 +92,9 @@ use crate::loom::sync::atomic::AtomicBool;
 #[cfg(all(tokio_unstable, feature = "time"))]
 use crate::runtime::time_alt;
 
+use crate::runtime::metrics::ScheduleLatencyInstant;
 #[cfg(all(tokio_unstable, feature = "time"))]
 use crate::runtime::scheduler::util;
-use crate::runtime::task::schedule_latency::ScheduleLatencyInstant;
 
 /// A scheduler worker
 pub(super) struct Worker {

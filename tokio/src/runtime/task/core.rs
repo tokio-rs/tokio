@@ -21,8 +21,8 @@
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::context;
+use crate::runtime::metrics::ScheduleLatencyInstant;
 use crate::runtime::task::raw::{self, Vtable};
-use crate::runtime::task::schedule_latency::ScheduleLatencyInstant;
 use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule, TaskHarnessScheduleHooks};
 use crate::util::linked_list;

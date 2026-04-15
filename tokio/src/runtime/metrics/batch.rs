@@ -4,7 +4,7 @@ cfg_unstable_metrics! {
     use crate::runtime::metrics::HistogramBatch;
 }
 
-use crate::runtime::task::schedule_latency::ScheduleLatencyContext;
+use crate::runtime::metrics::ScheduleLatencyContext;
 use std::sync::atomic::Ordering::Relaxed;
 use std::time::{Duration, Instant};
 

@@ -663,7 +663,7 @@ cfg_unstable_metrics! {
     }
 }
 
-use crate::runtime::task::schedule_latency::ScheduleLatencyInstant;
+use crate::runtime::metrics::ScheduleLatencyInstant;
 use std::num::NonZeroU64;
 
 impl Handle {

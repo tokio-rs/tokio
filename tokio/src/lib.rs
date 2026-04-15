@@ -354,6 +354,7 @@
 //! Some feature flags are only available when specifying the `tokio_unstable` flag:
 //!
 //! - `tracing`: Enables tracing events.
+//! - `schedule-latency`: Allows measurement of task scheduling latencies.
 //! - `io-uring`: Enables `io-uring` (Linux only).
 //! - `taskdump`: Enables `taskdump` (Linux only).
 //!

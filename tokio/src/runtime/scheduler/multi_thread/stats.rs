@@ -1,4 +1,4 @@
-use crate::runtime::task::schedule_latency::ScheduleLatencyContext;
+use crate::runtime::metrics::ScheduleLatencyContext;
 use crate::runtime::{Config, MetricsBatch, WorkerMetrics};
 
 use std::time::{Duration, Instant};
