@@ -1293,8 +1293,8 @@ jobs:
     with:
       kernel_version: ${{ matrix.kernel_version }}
 
-  freebsd:
-    name: FreeBSD
+  freebsd-x86_64:
+    name: FreeBSD x86_64
     needs: basics
     runs-on: ubuntu-latest
     steps:
@@ -1309,9 +1309,8 @@ jobs:
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
-            . $HOME/.cargo/env
-            rustc --version
           run: |
+            . $HOME/.cargo/env
             cargo test --workspace --features $TOKIO_STABLE_FEATURES
             # Enable all unstable features except `taskdump`, which is Linux-only.
             RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
@@ -1339,9 +1338,8 @@ jobs:
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
             sh rustup.sh -y --profile minimal --default-toolchain $RUST_NIGHTLY
-            . $HOME/.cargo/env
-            rustc --version
           run: |
+            . $HOME/.cargo/env
             # We use `--features $TOKIO_STABLE_FEATURES,io-uring,tracing` instead of
             # `--all-features` to exclude `taskdump`, which is Linux-only.
             cargo doc --lib --no-deps --features $TOKIO_STABLE_FEATURES,io-uring,tracing \
@@ -1363,9 +1361,8 @@ jobs:
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
+          run: |
             . $HOME/.cargo/env
             rustup target add i686-unknown-freebsd
-            rustc --version
-          run: |
             cargo test --workspace --features $TOKIO_STABLE_FEATURES \
               --target i686-unknown-freebsd
