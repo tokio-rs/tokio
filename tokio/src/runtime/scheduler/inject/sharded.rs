@@ -174,17 +174,17 @@ impl<T: 'static> Sharded<T> {
             let idx = (start + i) & self.shard_mask;
             let shard = &*self.shards[idx];
 
-            // Fast path: skip empty shards without locking.
-            if shard.shared.is_empty() {
-                continue;
+            // Fast path: skip empty shards without locking. Skip under loom to
+            // minimize the number of atomic ops to model.
+            #[cfg(not(loom))]
+            {
+                if shard.shared.is_empty() {
+                    continue;
+                }
             }
 
             let mut synced = shard.synced.lock();
-            // Re-check under the lock: another worker may have drained
-            // this shard between the atomic check and the lock.
-            if shard.shared.is_empty() {
-                continue;
-            }
+
             // safety: `synced` belongs to `shard.shared`
             if let Some(task) = unsafe { shard.shared.pop(&mut synced) } {
                 return Some(task);
@@ -217,19 +217,25 @@ impl<T: 'static> Sharded<T> {
             let idx = (start + i) & self.shard_mask;
             let shard = &*self.shards[idx];
 
-            if shard.shared.is_empty() {
-                continue;
+            // Skip under loom to minimize the number of atomic ops to be
+            // tracked.
+            #[cfg(not(loom))]
+            {
+                if shard.shared.is_empty() {
+                    continue;
+                }
             }
 
             let mut synced = shard.synced.lock();
-            // Re-check under the lock: another worker may have drained
-            // this shard between the atomic check and the lock.
-            if shard.shared.is_empty() {
-                continue;
-            }
 
             // safety: `synced` belongs to `shard.shared`
             let pop = unsafe { shard.shared.pop_n(&mut synced, n) };
+
+            // Check the length of the pop result rathern than pre-checking
+            // `shard.shared.is_empty()` to avoid needing to check 2x.
+            if pop.len() == 0 {
+                continue;
+            }
             return Some(f(pop));
         }
 
