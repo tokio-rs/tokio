@@ -14,7 +14,7 @@ jobs:
     env:
       KERNEL_VERSION: ${{ inputs.kernel_version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Install system dependencies
         run: |
@@ -25,7 +25,7 @@ jobs:
 
       - name: Cache Linux source
         id: cache-kernel
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: linux-${{ env.KERNEL_VERSION }}
           key: kernel-${{ env.KERNEL_VERSION }}
