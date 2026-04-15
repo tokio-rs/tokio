@@ -61,18 +61,11 @@ impl Shard {
             let mut new_queue = VecDeque::with_capacity(new_cap);
 
             queue = self.queue.lock();
-            // If the queue is:
-            // a) Not full anymore => push to the current queue
-            // b) Full and our new queue is big enough => copy items to the new
-            //    queue and push to it.
-            // c) Full and our new queue is too small => try again.
-            if queue.len() == queue.capacity() {
-                if new_queue.capacity() > queue.len() {
-                    new_queue.extend(queue.drain(..));
-                    *queue = new_queue;
-                    break;
-                }
-            } else {
+            // We went to the effort to allocate this memory, so use it to increase the capacity
+            // even if the queue now has capacity.
+            if new_queue.capacity() > queue.capacity() {
+                new_queue.extend(queue.drain(..));
+                *queue = new_queue;
                 break;
             }
         }
