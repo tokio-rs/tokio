@@ -571,125 +571,6 @@ impl RuntimeMetrics {
         pub fn blocking_queue_depth(&self) -> usize {
             self.handle.inner.blocking_queue_depth()
         }
-
-        /// Returns `true` if the runtime is tracking the distribution of task
-        /// schedule latencies.
-        ///
-        /// Task schedule latencies are not instrumented by default as doing so
-        /// requires calling [`Instant::now()`] when a task is scheduled and when
-        /// it is polled. The feature is enabled by calling
-        /// [`enable_metrics_schedule_latency_histogram()`] when building the runtime.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::{self, Handle};
-        ///
-        /// fn main() {
-        ///     runtime::Builder::new_current_thread()
-        ///         .enable_metrics_schedule_latency_histogram()
-        ///         .build()
-        ///         .unwrap()
-        ///         .block_on(async {
-        ///             let metrics = Handle::current().metrics();
-        ///             let enabled = metrics.schedule_latency_histogram_enabled();
-        ///
-        ///             println!("Tracking task schedule latency distribution: {:?}", enabled);
-        ///         });
-        /// }
-        /// ```
-        ///
-        /// [`enable_metrics_schedule_latency_histogram()`]: crate::runtime::Builder::enable_metrics_schedule_latency_histogram
-        /// [`Instant::now()`]: std::time::Instant::now
-        pub fn schedule_latency_histogram_enabled(&self) -> bool {
-            self.handle.inner.worker_metrics(0).schedule_latency_histogram.is_some()
-        }
-
-        /// Returns the number of histogram buckets tracking the distribution of
-        /// task schedule latencies.
-        ///
-        /// This value is configured by calling
-        /// [`metrics_schedule_latency_histogram_configuration()`] when building the runtime.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::{self, Handle};
-        ///
-        /// fn main() {
-        ///     runtime::Builder::new_current_thread()
-        ///         .enable_metrics_schedule_latency_histogram()
-        ///         .build()
-        ///         .unwrap()
-        ///         .block_on(async {
-        ///             let metrics = Handle::current().metrics();
-        ///             let buckets = metrics.schedule_latency_histogram_num_buckets();
-        ///
-        ///             println!("Histogram buckets: {:?}", buckets);
-        ///         });
-        /// }
-        /// ```
-        ///
-        /// [`metrics_schedule_latency_histogram_configuration()`]: crate::runtime::Builder::metrics_schedule_latency_histogram_configuration
-        pub fn schedule_latency_histogram_num_buckets(&self) -> usize {
-            self.handle
-                .inner
-                .worker_metrics(0)
-                .schedule_latency_histogram
-                .as_ref()
-                .map(|histogram| histogram.num_buckets())
-                .unwrap_or_default()
-        }
-
-        /// Returns the range of task schedule latencies tracked by the given bucket.
-        ///
-        /// This value is configured by calling
-        /// [`metrics_schedule_latency_histogram_configuration()`] when building the runtime.
-        ///
-        /// # Panics
-        ///
-        /// The method panics if `bucket` represents an invalid bucket index, i.e.
-        /// is greater than or equal to `schedule_latency_histogram_num_buckets()`.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime::{self, Handle};
-        ///
-        /// fn main() {
-        ///     runtime::Builder::new_current_thread()
-        ///         .enable_metrics_schedule_latency_histogram()
-        ///         .build()
-        ///         .unwrap()
-        ///         .block_on(async {
-        ///             let metrics = Handle::current().metrics();
-        ///             let buckets = metrics.schedule_latency_histogram_num_buckets();
-        ///
-        ///             for i in 0..buckets {
-        ///                 let range = metrics.schedule_latency_histogram_bucket_range(i);
-        ///                 println!("Histogram bucket {} range: {:?}", i, range);
-        ///             }
-        ///         });
-        /// }
-        /// ```
-        ///
-        /// [`metrics_schedule_latency_histogram_configuration()`]: crate::runtime::Builder::metrics_schedule_latency_histogram_configuration
-        #[track_caller]
-        pub fn schedule_latency_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
-            self.handle
-                .inner
-                .worker_metrics(0)
-                .schedule_latency_histogram
-                .as_ref()
-                .map(|histogram| {
-                    let range = histogram.bucket_range(bucket);
-                    std::ops::Range {
-                        start: Duration::from_nanos(range.start),
-                        end: Duration::from_nanos(range.end),
-                    }
-                })
-                .unwrap_or_default()
-        }
     }
 
     feature! {
@@ -1155,6 +1036,125 @@ impl RuntimeMetrics {
             target_pointer_width = "64",
             feature = "schedule-latency"
         )]
+        /// Returns `true` if the runtime is tracking the distribution of task
+        /// schedule latencies.
+        ///
+        /// Task schedule latencies are not instrumented by default as doing so
+        /// requires calling [`Instant::now()`] when a task is scheduled and when
+        /// it is polled. The feature is enabled by calling
+        /// [`enable_metrics_schedule_latency_histogram()`] when building the runtime.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::{self, Handle};
+        ///
+        /// fn main() {
+        ///     runtime::Builder::new_current_thread()
+        ///         .enable_metrics_schedule_latency_histogram()
+        ///         .build()
+        ///         .unwrap()
+        ///         .block_on(async {
+        ///             let metrics = Handle::current().metrics();
+        ///             let enabled = metrics.schedule_latency_histogram_enabled();
+        ///
+        ///             println!("Tracking task schedule latency distribution: {:?}", enabled);
+        ///         });
+        /// }
+        /// ```
+        ///
+        /// [`enable_metrics_schedule_latency_histogram()`]: crate::runtime::Builder::enable_metrics_schedule_latency_histogram
+        /// [`Instant::now()`]: std::time::Instant::now
+        pub fn schedule_latency_histogram_enabled(&self) -> bool {
+            self.handle.inner.worker_metrics(0).schedule_latency_histogram.is_some()
+        }
+
+        /// Returns the number of histogram buckets tracking the distribution of
+        /// task schedule latencies.
+        ///
+        /// This value is configured by calling
+        /// [`metrics_schedule_latency_histogram_configuration()`] when building the runtime.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::{self, Handle};
+        ///
+        /// fn main() {
+        ///     runtime::Builder::new_current_thread()
+        ///         .enable_metrics_schedule_latency_histogram()
+        ///         .build()
+        ///         .unwrap()
+        ///         .block_on(async {
+        ///             let metrics = Handle::current().metrics();
+        ///             let buckets = metrics.schedule_latency_histogram_num_buckets();
+        ///
+        ///             println!("Histogram buckets: {:?}", buckets);
+        ///         });
+        /// }
+        /// ```
+        ///
+        /// [`metrics_schedule_latency_histogram_configuration()`]: crate::runtime::Builder::metrics_schedule_latency_histogram_configuration
+        pub fn schedule_latency_histogram_num_buckets(&self) -> usize {
+            self.handle
+                .inner
+                .worker_metrics(0)
+                .schedule_latency_histogram
+                .as_ref()
+                .map(|histogram| histogram.num_buckets())
+                .unwrap_or_default()
+        }
+
+        /// Returns the range of task schedule latencies tracked by the given bucket.
+        ///
+        /// This value is configured by calling
+        /// [`metrics_schedule_latency_histogram_configuration()`] when building the runtime.
+        ///
+        /// # Panics
+        ///
+        /// The method panics if `bucket` represents an invalid bucket index, i.e.
+        /// is greater than or equal to `schedule_latency_histogram_num_buckets()`.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::{self, Handle};
+        ///
+        /// fn main() {
+        ///     runtime::Builder::new_current_thread()
+        ///         .enable_metrics_schedule_latency_histogram()
+        ///         .build()
+        ///         .unwrap()
+        ///         .block_on(async {
+        ///             let metrics = Handle::current().metrics();
+        ///             let buckets = metrics.schedule_latency_histogram_num_buckets();
+        ///
+        ///             for i in 0..buckets {
+        ///                 let range = metrics.schedule_latency_histogram_bucket_range(i);
+        ///                 println!("Histogram bucket {} range: {:?}", i, range);
+        ///             }
+        ///         });
+        /// }
+        /// ```
+        ///
+        /// [`metrics_schedule_latency_histogram_configuration()`]: crate::runtime::Builder::metrics_schedule_latency_histogram_configuration
+        #[track_caller]
+        pub fn schedule_latency_histogram_bucket_range(&self, bucket: usize) -> Range<Duration> {
+            self.handle
+                .inner
+                .worker_metrics(0)
+                .schedule_latency_histogram
+                .as_ref()
+                .map(|histogram| {
+                    let range = histogram.bucket_range(bucket);
+                    std::ops::Range {
+                        start: Duration::from_nanos(range.start),
+                        end: Duration::from_nanos(range.end),
+                    }
+                })
+                .unwrap_or_default()
+        }
+
         /// Returns the number of times the given worker polled tasks with a schedule
         /// latency within the given bucket's range.
         ///
