@@ -658,6 +658,8 @@ impl Sender {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_write(&self, buf: &[u8]) -> io::Result<usize> {
         self.io
             .registration()
@@ -732,6 +734,8 @@ impl Sender {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_write_vectored(&self, buf: &[io::IoSlice<'_>]) -> io::Result<usize> {
         self.io
             .registration()
@@ -1181,6 +1185,8 @@ impl Receiver {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_read(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
@@ -1263,6 +1269,8 @@ impl Receiver {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_read_vectored(&self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
         self.io
             .registration()
@@ -1334,6 +1342,8 @@ impl Receiver {
         ///     Ok(())
         /// }
         /// ```
+        ///
+        /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
         pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
             self.io.registration().try_io(Interest::READABLE, || {
                 use std::io::Read;
