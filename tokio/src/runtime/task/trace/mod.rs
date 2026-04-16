@@ -394,21 +394,14 @@ pub(in crate::runtime) fn trace_current_thread(
 }
 
 cfg_rt_multi_thread! {
-    use crate::loom::sync::Mutex;
     use crate::runtime::scheduler::multi_thread;
-    use crate::runtime::scheduler::multi_thread::Synced;
-    use crate::runtime::scheduler::inject::Shared;
+    use crate::runtime::scheduler::inject::Sharded;
 
     /// Trace and poll all tasks of the `current_thread` runtime.
-    ///
-    /// ## Safety
-    ///
-    /// Must be called with the same `synced` that `injection` was created with.
-    pub(in crate::runtime) unsafe fn trace_multi_thread(
+    pub(in crate::runtime) fn trace_multi_thread(
         owned: &OwnedTasks<Arc<multi_thread::Handle>>,
         local: &mut multi_thread::queue::Local<Arc<multi_thread::Handle>>,
-        synced: &Mutex<Synced>,
-        injection: &Shared<Arc<multi_thread::Handle>>,
+        injection: &Sharded<Arc<multi_thread::Handle>>,
     ) -> Vec<(Id, Trace)> {
         let mut dequeued = Vec::new();
 
@@ -418,13 +411,9 @@ cfg_rt_multi_thread! {
         }
 
         // clear the injection queue
-        let mut synced = synced.lock();
-        // Safety: exactly the same safety requirements as `trace_multi_thread` function.
-        while let Some(notified) = unsafe { injection.pop(&mut synced.inject) } {
+        while let Some(notified) = injection.pop(0) {
             dequeued.push(notified);
         }
-
-        drop(synced);
 
         // precondition: we have drained the tasks from the local and injection
         // queues.

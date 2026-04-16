@@ -14,6 +14,9 @@ pub(crate) use synced::Synced;
 
 cfg_rt_multi_thread! {
     mod rt_multi_thread;
+
+    mod sharded;
+    pub(crate) use sharded::Sharded;
 }
 
 mod metrics;
