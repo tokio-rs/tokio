@@ -22,13 +22,16 @@ use std::time::Duration;
 
 use super::pool::Task;
 
-/// Number of shards. Must be a power of 2.
-/// Under loom, use a single shard to keep the state space tractable —
-/// the concurrency properties we need to verify (condvar signaling,
-/// shutdown ordering) are independent of shard count.
-#[cfg(not(loom))]
-const NUM_SHARDS: usize = 16;
-#[cfg(loom)]
+// TODO(eliza): make this configurable and swap between 1/16 shards based on
+// whether the runtime builder enables the sharded queue...
+//
+// /// Number of shards. Must be a power of 2.
+// /// Under loom, use a single shard to keep the state space tractable —
+// /// the concurrency properties we need to verify (condvar signaling,
+// /// shutdown ordering) are independent of shard count.
+// #[cfg(not(loom))]
+// const NUM_SHARDS: usize = 16;
+// #[cfg(loom)]
 const NUM_SHARDS: usize = 1;
 
 /// A single shard containing a queue protected by its own mutex.
