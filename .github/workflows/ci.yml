@@ -1166,7 +1166,7 @@ jobs:
           toolchain: nightly-2025-08-06
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-check-external-types
-        uses: taiki-e/cache-cargo-install-action@v1
+        uses: taiki-e/cache-cargo-install-action@v3
         with:
           tool: cargo-check-external-types@0.3.0
       - name: check-external-types
