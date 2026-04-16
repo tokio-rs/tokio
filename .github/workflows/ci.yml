@@ -1303,7 +1303,6 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           release: '14.4'
-          usesh: true
           envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
           prepare: |
             pkg install -y curl
@@ -1312,11 +1311,12 @@ jobs:
           run: |
             . $HOME/.cargo/env
             cargo test --workspace --features $TOKIO_STABLE_FEATURES
-            # Enable all unstable features except `taskdump`, which is Linux-only.
+            # Enable all unstable features except `io_uring` and `taskdump`,
+            # which are Linux-only features.
             RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
             RUSTDOCFLAGS="--cfg tokio_unstable" \
               cargo test \
-                --features $TOKIO_STABLE_FEATURES,io-uring,tracing
+                --features $TOKIO_STABLE_FEATURES,tracing
 
   freebsd-docs:
     name: FreeBSD docs
@@ -1332,7 +1332,6 @@ jobs:
           RUST_NIGHTLY: nightly-2025-10-12
         with:
           release: '14.4'
-          usesh: true
           envs: "TOKIO_STABLE_FEATURES RUST_NIGHTLY RUSTDOCFLAGS RUSTFLAGS"
           prepare: |
             pkg install -y curl
@@ -1341,8 +1340,9 @@ jobs:
           run: |
             . $HOME/.cargo/env
             # We use `--features $TOKIO_STABLE_FEATURES,io-uring,tracing` instead of
-            # `--all-features` to exclude `taskdump`, which is Linux-only.
-            cargo doc --lib --no-deps --features $TOKIO_STABLE_FEATURES,io-uring,tracing \
+            # `--all-features` to exclude `taskdump` and `io_uring`, which are Linux-only
+            # features.
+            cargo doc --lib --no-deps --features $TOKIO_STABLE_FEATURES,tracing \
               --document-private-items
 
   freebsd-i686:
@@ -1355,7 +1355,6 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           release: '14.4'
-          usesh: true
           envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
           prepare: |
             pkg install -y curl
