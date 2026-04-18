@@ -9,7 +9,7 @@ pub(crate) use handle::Handle;
 mod overflow;
 pub(crate) use overflow::Overflow;
 
-mod idle;
+pub(crate) mod idle;
 use self::idle::Idle;
 
 mod stats;

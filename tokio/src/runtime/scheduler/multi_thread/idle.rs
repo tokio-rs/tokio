@@ -6,7 +6,7 @@ use crate::runtime::scheduler::multi_thread::Shared;
 use std::fmt;
 use std::sync::atomic::Ordering::{self, SeqCst};
 
-pub(super) struct Idle {
+pub(crate) struct Idle {
     /// Tracks both the number of searching workers and the number of unparked
     /// workers.
     ///
@@ -18,7 +18,7 @@ pub(super) struct Idle {
 }
 
 /// Data synchronized by the scheduler mutex
-pub(super) struct Synced {
+pub(crate) struct Synced {
     /// Sleeping workers
     sleepers: Vec<usize>,
 }
@@ -37,7 +37,7 @@ const SEARCH_MASK: usize = (1 << UNPARK_SHIFT) - 1;
 struct State(usize);
 
 impl Idle {
-    pub(super) fn new(num_workers: usize) -> (Idle, Synced) {
+    pub(crate) fn new(num_workers: usize) -> (Idle, Synced) {
         assert!(
             num_workers <= UNPARK_MASK,
             "{num_workers} is too many workers (max is {UNPARK_MASK})"
@@ -154,15 +154,15 @@ impl Idle {
         false
     }
 
-    pub(super) fn put_lifo(&self) -> bool {
+    pub(crate) fn put_lifo(&self) -> bool {
         State(self.state.fetch_or(ANY_LIFO, SeqCst)).any_lifo()
     }
 
-    pub(super) fn clear_lifo(&self) {
+    pub(crate) fn clear_lifo(&self) {
         self.state.fetch_and(!ANY_LIFO, SeqCst);
     }
 
-    pub(super) fn should_attempt_lifo_steal(&self) -> bool {
+    pub(crate) fn should_attempt_lifo_steal(&self) -> bool {
         let state = State(self.state.fetch_add(0, SeqCst));
         state.any_lifo()
     }
