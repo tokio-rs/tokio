@@ -163,15 +163,59 @@ enum State {
 
 // The `ScheduledIo::readiness` (`AtomicUsize`) is packed full of goodness.
 //
-// | shutdown | driver tick | readiness |
-// |----------+-------------+-----------|
-// |   1 bit  |   15 bits   |  16 bits  |
+// | shutdown | write tick | read tick | readiness |
+// |----------+------------+-----------+-----------|
+// |   1 bit  |   8 bits   |  8 bits   |  16 bits  |
 
 const READINESS: bit::Pack = bit::Pack::least_significant(16);
 
-const TICK: bit::Pack = READINESS.then(15);
+const READ_TICK: bit::Pack = READINESS.then(8);
 
-const SHUTDOWN: bit::Pack = TICK.then(1);
+const WRITE_TICK: bit::Pack = READ_TICK.then(8);
+
+const SHUTDOWN: bit::Pack = WRITE_TICK.then(1);
+
+/// Pack readiness and both generation counters plus shutdown into one word.
+fn pack_io_state(ready: usize, read_tick: usize, write_tick: usize, shutdown: usize) -> usize {
+    let mut x = READINESS.pack(ready, 0);
+    x = READ_TICK.pack(read_tick, x);
+    x = WRITE_TICK.pack(write_tick, x);
+    SHUTDOWN.pack(shutdown, x)
+}
+
+/// Returns true if a poll event with this readiness should bump the read-side tick.
+fn tick_increments_read(r: Ready) -> bool {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        r.is_readable() || r.is_read_closed() || r.is_error() || r.is_priority()
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    {
+        r.is_readable() || r.is_read_closed() || r.is_error()
+    }
+}
+
+/// Returns true if a poll event with this readiness should bump the write-side tick.
+fn tick_increments_write(r: Ready) -> bool {
+    r.is_writable() || r.is_write_closed()
+}
+
+/// Bits whose clearing is validated against [`ReadyEvent::read_tick`].
+fn read_side_tick_mask() -> Ready {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        Ready::READABLE | Ready::READ_CLOSED | Ready::ERROR | Ready::PRIORITY
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    {
+        Ready::READABLE | Ready::READ_CLOSED | Ready::ERROR
+    }
+}
+
+/// Bits whose clearing is validated against [`ReadyEvent::write_tick`].
+fn write_side_tick_mask() -> Ready {
+    Ready::WRITABLE | Ready::WRITE_CLOSED
+}
 
 // ===== impl ScheduledIo =====
 
@@ -198,30 +242,67 @@ impl ScheduledIo {
         self.wake(Ready::ALL);
     }
 
-    /// Sets the readiness on this `ScheduledIo` by invoking the given closure on
-    /// the current value, returning the previous readiness value.
+    /// Merges readiness from the I/O driver after `mio` reports `incoming`.
     ///
-    /// # Arguments
-    /// - `tick`: whether setting the tick or trying to clear readiness for a
-    ///   specific tick.
-    /// - `f`: a closure returning a new readiness value given the previous
-    ///   readiness.
-    pub(super) fn set_readiness(&self, tick_op: Tick, f: impl Fn(Ready) -> Ready) {
+    /// Read-side and write-side ticks are advanced independently so that a
+    /// write-only notification does not invalidate a pending read-side
+    /// [`clear_readiness`] (see tokio-rs/tokio#8054).
+    pub(super) fn merge_readiness_from_driver(&self, incoming: Ready) {
         let _ = self.readiness.fetch_update(AcqRel, Acquire, |curr| {
-            // If the io driver is shut down, then you are only allowed to clear readiness.
-            debug_assert!(SHUTDOWN.unpack(curr) == 0 || matches!(tick_op, Tick::Clear(_)));
+            if SHUTDOWN.unpack(curr) != 0 {
+                return None;
+            }
+            let read_t = READ_TICK.unpack(curr);
+            let write_t = WRITE_TICK.unpack(curr);
+            let old_ready = Ready::from_usize(READINESS.unpack(curr));
+            let new_ready = old_ready | incoming;
 
-            const MAX_TICK: usize = TICK.max_value() + 1;
-            let tick = TICK.unpack(curr);
+            let mut nr = read_t;
+            let mut nw = write_t;
+            if tick_increments_read(incoming) {
+                nr = (nr + 1) % (READ_TICK.max_value() + 1);
+            }
+            if tick_increments_write(incoming) {
+                nw = (nw + 1) % (WRITE_TICK.max_value() + 1);
+            }
 
-            let new_tick = match tick_op {
-                // Trying to clear readiness with an old event!
-                Tick::Clear(t) if tick as u8 != t => return None,
-                Tick::Clear(t) => t as usize,
-                Tick::Set => tick.wrapping_add(1) % MAX_TICK,
-            };
+            Some(pack_io_state(
+                new_ready.as_usize(),
+                nr,
+                nw,
+                SHUTDOWN.unpack(curr),
+            ))
+        });
+    }
+
+    /// Clears readiness by invoking `f` on the current value, after validating
+    /// tick(s) for the directions being cleared.
+    pub(super) fn set_readiness(&self, tick_op: Tick, f: impl Fn(Ready) -> Ready) {
+        let Tick::Clear { read, write } = tick_op;
+
+        let _ = self.readiness.fetch_update(AcqRel, Acquire, |curr| {
+            let curr_read = READ_TICK.unpack(curr) as u8;
+            let curr_write = WRITE_TICK.unpack(curr) as u8;
+
+            if let Some(t) = read {
+                if curr_read != t {
+                    return None;
+                }
+            }
+            if let Some(t) = write {
+                if curr_write != t {
+                    return None;
+                }
+            }
+
             let ready = Ready::from_usize(READINESS.unpack(curr));
-            Some(TICK.pack(new_tick, f(ready).as_usize()))
+            let new_ready = f(ready);
+            Some(pack_io_state(
+                new_ready.as_usize(),
+                READ_TICK.unpack(curr),
+                WRITE_TICK.unpack(curr),
+                SHUTDOWN.unpack(curr),
+            ))
         });
     }
 
@@ -291,7 +372,8 @@ impl ScheduledIo {
         let curr = self.readiness.load(Acquire);
 
         ReadyEvent {
-            tick: TICK.unpack(curr) as u8,
+            read_tick: READ_TICK.unpack(curr) as u8,
+            write_tick: WRITE_TICK.unpack(curr) as u8,
             ready: interest.mask() & Ready::from_usize(READINESS.unpack(curr)),
             is_shutdown: SHUTDOWN.unpack(curr) != 0,
         }
@@ -334,7 +416,8 @@ impl ScheduledIo {
             let is_shutdown = SHUTDOWN.unpack(curr) != 0;
             if is_shutdown {
                 Poll::Ready(ReadyEvent {
-                    tick: TICK.unpack(curr) as u8,
+                    read_tick: READ_TICK.unpack(curr) as u8,
+                    write_tick: WRITE_TICK.unpack(curr) as u8,
                     ready: direction.mask(),
                     is_shutdown,
                 })
@@ -342,14 +425,16 @@ impl ScheduledIo {
                 Poll::Pending
             } else {
                 Poll::Ready(ReadyEvent {
-                    tick: TICK.unpack(curr) as u8,
+                    read_tick: READ_TICK.unpack(curr) as u8,
+                    write_tick: WRITE_TICK.unpack(curr) as u8,
                     ready,
                     is_shutdown,
                 })
             }
         } else {
             Poll::Ready(ReadyEvent {
-                tick: TICK.unpack(curr) as u8,
+                read_tick: READ_TICK.unpack(curr) as u8,
+                write_tick: WRITE_TICK.unpack(curr) as u8,
                 ready,
                 is_shutdown,
             })
@@ -360,7 +445,21 @@ impl ScheduledIo {
         // This consumes the current readiness state **except** for closed
         // states. Closed states are excluded because they are final states.
         let mask_no_closed = event.ready - Ready::READ_CLOSED - Ready::WRITE_CLOSED;
-        self.set_readiness(Tick::Clear(event.tick), |curr| curr - mask_no_closed);
+        let read_mask = mask_no_closed & read_side_tick_mask();
+        let write_mask = mask_no_closed & write_side_tick_mask();
+
+        let read = if !read_mask.is_empty() {
+            Some(event.read_tick)
+        } else {
+            None
+        };
+        let write = if !write_mask.is_empty() {
+            Some(event.write_tick)
+        } else {
+            None
+        };
+
+        self.set_readiness(Tick::Clear { read, write }, |curr| curr - mask_no_closed);
     }
 
     pub(crate) fn clear_wakers(&self) {
@@ -454,10 +553,10 @@ impl Future for Readiness<'_> {
 
                     if !ready.is_empty() || is_shutdown {
                         // Currently ready!
-                        let tick = TICK.unpack(curr) as u8;
                         *state = State::Done;
                         return Poll::Ready(ReadyEvent {
-                            tick,
+                            read_tick: READ_TICK.unpack(curr) as u8,
+                            write_tick: WRITE_TICK.unpack(curr) as u8,
                             ready,
                             is_shutdown,
                         });
@@ -478,10 +577,10 @@ impl Future for Readiness<'_> {
 
                     if !ready.is_empty() || is_shutdown {
                         // Currently ready!
-                        let tick = TICK.unpack(curr) as u8;
                         *state = State::Done;
                         return Poll::Ready(ReadyEvent {
-                            tick,
+                            read_tick: READ_TICK.unpack(curr) as u8,
+                            write_tick: WRITE_TICK.unpack(curr) as u8,
                             ready,
                             is_shutdown,
                         });
@@ -538,10 +637,9 @@ impl Future for Readiness<'_> {
                     let curr = scheduled_io.readiness.load(Acquire);
                     let is_shutdown = SHUTDOWN.unpack(curr) != 0;
 
-                    // The returned tick might be newer than the event
+                    // The returned ticks might be newer than the event
                     // which notified our waker. This is ok because the future
                     // still didn't return `Poll::Ready`.
-                    let tick = TICK.unpack(curr) as u8;
 
                     // Safety: We don't need to acquire the lock here because
                     //   1. `State::Done`` means `waiter` is no longer shared,
@@ -555,7 +653,8 @@ impl Future for Readiness<'_> {
                     let ready = Ready::from_usize(READINESS.unpack(curr)).intersection(interest);
 
                     return Poll::Ready(ReadyEvent {
-                        tick,
+                        read_tick: READ_TICK.unpack(curr) as u8,
+                        write_tick: WRITE_TICK.unpack(curr) as u8,
                         ready,
                         is_shutdown,
                     });

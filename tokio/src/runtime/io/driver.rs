@@ -72,7 +72,10 @@ pub(crate) struct Handle {
 
 #[derive(Debug)]
 pub(crate) struct ReadyEvent {
-    pub(super) tick: u8,
+    /// Generation counter for read-side readiness (readable, read closed, error, …).
+    pub(super) read_tick: u8,
+    /// Generation counter for write-side readiness (writable, write closed).
+    pub(super) write_tick: u8,
     pub(crate) ready: Ready,
     pub(super) is_shutdown: bool,
 }
@@ -82,7 +85,8 @@ cfg_net_unix!(
         pub(crate) fn with_ready(&self, ready: Ready) -> Self {
             Self {
                 ready,
-                tick: self.tick,
+                read_tick: self.read_tick,
+                write_tick: self.write_tick,
                 is_shutdown: self.is_shutdown,
             }
         }
@@ -96,8 +100,11 @@ pub(super) enum Direction {
 }
 
 pub(super) enum Tick {
-    Set,
-    Clear(u8),
+    /// Clear readiness bits; only the tick(s) for directions present in the mask are checked.
+    Clear {
+        read: Option<u8>,
+        write: Option<u8>,
+    },
 }
 
 const TOKEN_WAKEUP: mio::Token = mio::Token(0);
@@ -215,7 +222,7 @@ impl Driver {
                 // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
                 let io: &ScheduledIo = unsafe { &*ptr };
 
-                io.set_readiness(Tick::Set, |curr| curr | ready);
+                io.merge_readiness_from_driver(ready);
                 io.wake(ready);
 
                 ready_count += 1;

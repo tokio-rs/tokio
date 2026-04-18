@@ -1,3 +1,9 @@
+# 1.52.2 (unreleased)
+
+## Fixed
+
+- io: split read/write ticks in the I/O driver so write-only `mio` notifications no longer invalidate read-side `clear_readiness` ([#8054])
+
 # 1.52.1 (April 16th, 2026)
 
 ## Fixed
@@ -7,6 +13,7 @@
 [#7757]: https://github.com/tokio-rs/tokio/pull/7757
 [#8056]: https://github.com/tokio-rs/tokio/pull/8056
 [#8057]: https://github.com/tokio-rs/tokio/pull/8057
+[#8054]: https://github.com/tokio-rs/tokio/issues/8054
 
 # 1.52.0 (April 14th, 2026)
 
