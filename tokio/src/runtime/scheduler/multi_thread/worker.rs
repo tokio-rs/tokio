@@ -830,7 +830,7 @@ impl Context {
                     break;
                 }
 
-                if self.steal_stranded_lifo(&mut core) {
+                if self.steal_stranded_lifo() {
                     break;
                 }
             }
@@ -842,23 +842,21 @@ impl Context {
         core
     }
 
-    fn steal_stranded_lifo(&self, _core: &mut Core) -> bool {
-        if !self.worker.handle.shared.idle.should_attempt_lifo_steal() {
+    fn steal_stranded_lifo(&self) -> bool {
+        let shared = &self.worker.handle.shared;
+        if !shared.idle.should_attempt_lifo_steal() {
             return false;
         }
 
-        let remotes = self.worker.handle.shared.remotes.iter().enumerate();
-        for (i, remote) in remotes {
+        for (i, remote) in shared.remotes.iter().enumerate() {
             if i != self.worker.index && remote.steal.has_lifo() {
-                self.worker
-                    .handle
-                    .shared
-                    .idle
-                    .unpark_worker_by_id(&self.worker.handle.shared, self.worker.index);
+                shared.idle.unpark_worker_by_id(shared, self.worker.index);
                 return true;
             }
         }
 
+        // didn't find any lifo task, unset the lifo steal bit.
+        shared.idle.clear_lifo();
         false
     }
 
