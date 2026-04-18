@@ -150,6 +150,12 @@ impl Idle {
         lock.idle.sleepers.contains(&worker_id)
     }
 
+    /// Returns `true` if all other workers are currently parked.
+    pub(super) fn all_parked(&self) -> bool {
+        let state = State(self.state.fetch_add(0, SeqCst));
+        state.num_unparked() <= 1
+    }
+
     fn notify_should_wakeup(&self) -> bool {
         let state = State(self.state.fetch_add(0, SeqCst));
         state.num_searching() == 0 && state.num_unparked() < self.num_workers

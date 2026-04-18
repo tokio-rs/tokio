@@ -1352,8 +1352,6 @@ impl Handle {
         let should_notify = if is_yield || !core.lifo_enabled {
             core.run_queue
                 .push_back_or_overflow(task, self, &mut core.stats);
-            // Always notify another parked worker when pushing a yielded task
-            // to the main run queue if we are not currently parked.
             true
         } else {
             // Push to the LIFO slot
@@ -1362,19 +1360,9 @@ impl Handle {
                 // to be pushed to the back of the run queue.
                 core.run_queue
                     .push_back_or_overflow(prev, self, &mut core.stats);
-                // We have pushed the previous LIFO task to the back of the run
-                // queue, so we should attempt to notify another worker if we
-                // are not currently parked.
                 true
             } else {
-                // If the scheduled task was pushed to the LIFO slot and there
-                // is no other task previously in the slot, skip notifying
-                // another worker, so that we can preferentially poll the LIFO
-                // task next. It can still be stolen if another worker is
-                // searching. This reduces cross thread notifications, and
-                // reduces the chance of the LIFO task moving across threads if
-                // the next poll is short.
-                false
+                self.shared.idle.all_parked()
             }
         };
 
