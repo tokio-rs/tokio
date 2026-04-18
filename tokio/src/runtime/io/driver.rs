@@ -101,10 +101,7 @@ pub(super) enum Direction {
 
 pub(super) enum Tick {
     /// Clear readiness bits; only the tick(s) for directions present in the mask are checked.
-    Clear {
-        read: Option<u8>,
-        write: Option<u8>,
-    },
+    Clear { read: Option<u8>, write: Option<u8> },
 }
 
 const TOKEN_WAKEUP: mio::Token = mio::Token(0);

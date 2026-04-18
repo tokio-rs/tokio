@@ -165,13 +165,17 @@ enum State {
 //
 // | shutdown | write tick | read tick | readiness |
 // |----------+------------+-----------+-----------|
-// |   1 bit  |   8 bits   |  8 bits   |  16 bits  |
+// |   1 bit  |   7 bits   |  7 bits   |  16 bits  |
+//
+// Read and write ticks use 7 bits each so the full layout fits in `usize` on
+// 32-bit targets (including `wasm32`), where the previous single 15-bit tick
+// fit with 16 bits of readiness.
 
 const READINESS: bit::Pack = bit::Pack::least_significant(16);
 
-const READ_TICK: bit::Pack = READINESS.then(8);
+const READ_TICK: bit::Pack = READINESS.then(7);
 
-const WRITE_TICK: bit::Pack = READ_TICK.then(8);
+const WRITE_TICK: bit::Pack = READ_TICK.then(7);
 
 const SHUTDOWN: bit::Pack = WRITE_TICK.then(1);
 
@@ -246,7 +250,8 @@ impl ScheduledIo {
     ///
     /// Read-side and write-side ticks are advanced independently so that a
     /// write-only notification does not invalidate a pending read-side
-    /// [`clear_readiness`] (see tokio-rs/tokio#8054).
+    /// [`Registration::clear_readiness`](crate::runtime::io::Registration::clear_readiness)
+    /// (see <https://github.com/tokio-rs/tokio/issues/8054>).
     pub(super) fn merge_readiness_from_driver(&self, incoming: Ready) {
         let _ = self.readiness.fetch_update(AcqRel, Acquire, |curr| {
             if SHUTDOWN.unpack(curr) != 0 {
