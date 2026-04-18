@@ -256,6 +256,15 @@ type Notified = task::Notified<Arc<Handle>>;
 /// improvements.
 const MAX_LIFO_POLLS_PER_TICK: usize = 3;
 
+/// Maximum time a parked worker will sleep before waking to check
+/// for tasks stranded in other workers' LIFO slots.
+const LIFO_EXCLUSIVITY_TIMEOUT: Duration = Duration::from_millis(100);
+
+enum TransitionToParked {
+    No,
+    Yes(Option<Duration>),
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn create(
     size: usize,
@@ -804,13 +813,13 @@ impl Context {
             f();
         }
 
-        if core.transition_to_parked(&self.worker) {
+        if let TransitionToParked::Yes(timeout) = core.transition_to_parked(&self.worker) {
             while !core.is_shutdown && !core.is_traced {
                 core.stats.about_to_park();
                 core.stats
                     .submit(&self.worker.handle.shared.worker_metrics[self.worker.index]);
 
-                core = self.park_internal(core, None);
+                core = self.park_internal(core, timeout);
 
                 core.stats.unparked();
 
@@ -820,6 +829,10 @@ impl Context {
                 if core.transition_from_parked(&self.worker) {
                     break;
                 }
+
+                if self.steal_stranded_lifo(&mut core) {
+                    break;
+                }
             }
         }
 
@@ -827,6 +840,26 @@ impl Context {
             f();
         }
         core
+    }
+
+    fn steal_stranded_lifo(&self, _core: &mut Core) -> bool {
+        if !self.worker.handle.shared.idle.should_attempt_lifo_steal() {
+            return false;
+        }
+
+        let remotes = self.worker.handle.shared.remotes.iter().enumerate();
+        for (i, remote) in remotes {
+            if i != self.worker.index && remote.steal.has_lifo() {
+                self.worker
+                    .handle
+                    .shared
+                    .idle
+                    .unpark_worker_by_id(&self.worker.handle.shared, self.worker.index);
+                return true;
+            }
+        }
+
+        false
     }
 
     fn park_yield(&self, core: Box<Core>) -> Box<Core> {
@@ -1193,16 +1226,19 @@ impl Core {
     /// Prepares the worker state for parking.
     ///
     /// Returns true if the transition happened, false if there is work to do first.
-    fn transition_to_parked(&mut self, worker: &Worker) -> bool {
+    fn transition_to_parked(&mut self, worker: &Worker) -> TransitionToParked {
         // Workers should not park if they have work to do
         if self.has_tasks() || self.is_traced {
-            return false;
+            return TransitionToParked::No;
         }
 
         // When the final worker transitions **out** of searching to parked, it
         // must check all the queues one last time in case work materialized
         // between the last work scan and transitioning out of searching.
-        let is_last_searcher = worker.handle.shared.idle.transition_worker_to_parked(
+        let idle::TransitionToParked {
+            is_last_searcher,
+            any_lifo,
+        } = worker.handle.shared.idle.transition_worker_to_parked(
             &worker.handle.shared,
             worker.index,
             self.is_searching,
@@ -1216,7 +1252,11 @@ impl Core {
             worker.handle.notify_if_work_pending();
         }
 
-        true
+        TransitionToParked::Yes(if any_lifo {
+            Some(LIFO_EXCLUSIVITY_TIMEOUT)
+        } else {
+            None
+        })
     }
 
     /// Returns `true` if the transition happened.
@@ -1362,7 +1402,7 @@ impl Handle {
                     .push_back_or_overflow(prev, self, &mut core.stats);
                 true
             } else {
-                self.shared.idle.all_parked()
+                !self.shared.idle.put_lifo()
             }
         };
 
