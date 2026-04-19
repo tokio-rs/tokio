@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.51.1"
+version = "1.52.1"
 edition = "2021"
 rust-version = "1.71"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -115,6 +115,9 @@ libc = { version = "0.2.168", optional = true }
 mio = { version = "1.2.0", default-features = false, features = ["os-poll", "os-ext"], optional = true }
 slab = { version = "0.4.9", optional = true }
 backtrace = { version = "0.3.58", optional = true }
+
+[target.'cfg(all(tokio_unstable, target_os = "linux"))'.dev-dependencies]
+backtrace = "0.3.58"
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.168", optional = true }

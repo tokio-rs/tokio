@@ -5,7 +5,7 @@
 use crate::task::Id;
 use std::{fmt, future::Future, path::Path};
 
-pub use crate::runtime::task::trace::Root;
+pub use crate::runtime::task::trace::{trace_with, Root, TraceMeta};
 
 /// A snapshot of a runtime's state.
 ///

@@ -1071,12 +1071,27 @@ impl Core {
                 return None;
             }
 
-            // Other threads can only **remove** tasks from the current worker's
-            // `run_queue`. So, we can be confident that by the time we call
-            // `run_queue.push_back` below, there will be *at least* `cap`
-            // available slots in the queue.
             let cap = usize::min(
+                // Other threads can only **remove** tasks from the current
+                // worker's `run_queue`. So, we can be confident that by the
+                // time we call `run_queue.push_back` below, there will be *at
+                // least* `cap` available slots in the queue.
+                //
+                // Note that even though `next_local_task()` just returned
+                // `None`, this may be different from `max_capacity()` if
+                // another worker is currently stealing tasks from us.
                 self.run_queue.remaining_slots(),
+                // We want to make sure that all of the tasks we take end up in
+                // the first half of the local queue. This ensures that the
+                // tasks do not get pushed to the inject queue again if overflow
+                // occurs, as overflow only affects tasks in the second half of
+                // the local queue.
+                //
+                // Note that even if there are concurrent stealers, we do not
+                // need to consider the value of `remaining_slots()` because a
+                // future call to `push_overflow()` can only succeed once that
+                // concurrent stealer has finished stealing, so at that point
+                // the tasks we are adding now will be in the first half.
                 self.run_queue.max_capacity() / 2,
             );
 

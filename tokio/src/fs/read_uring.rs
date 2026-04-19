@@ -116,7 +116,7 @@ async fn op_read(
     read_len: u32,
 ) -> io::Result<(OwnedFd, Vec<u8>, bool)> {
     loop {
-        let (res, r_fd, r_buf) = Op::read(fd, buf, read_len, *offset).await;
+        let (res, r_fd, r_buf) = Op::read_at(fd, buf, read_len as usize, *offset).await;
 
         match res {
             Err(e) if e.kind() == ErrorKind::Interrupted => {
