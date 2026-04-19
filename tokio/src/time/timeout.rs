@@ -142,6 +142,7 @@ where
 /// }
 /// # }
 /// ```
+#[track_caller]
 pub fn timeout_at<F>(deadline: Instant, future: F) -> Timeout<F::IntoFuture>
 where
     F: IntoFuture,
