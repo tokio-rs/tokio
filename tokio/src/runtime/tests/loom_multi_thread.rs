@@ -1,3 +1,4 @@
+mod lifo_bit_race;
 mod queue;
 mod shutdown;
 mod yield_now;
