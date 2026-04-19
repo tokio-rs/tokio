@@ -166,11 +166,7 @@ where
     F: IntoFuture,
 {
     let delay = sleep_until(deadline);
-
-    Timeout {
-        value: future.into_future(),
-        delay,
-    }
+    Timeout::new_with_delay(future.into_future(), delay)
 }
 
 pin_project! {
