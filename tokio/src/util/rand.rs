@@ -41,16 +41,15 @@ impl RngSeed {
         let one = (seed >> 32) as u32;
         let mut two = seed as u32;
 
-        if two == 0 {
-            // This value cannot be zero
-            two = 1;
-        }
-
         Self::from_pair(one, two)
     }
 
     fn from_pair(s: u32, r: u32) -> Self {
-        Self { s, r }
+        if s == 0 && r == 0 {
+            Self { s: 0, r: 1 }
+        } else {
+            Self { s, r }
+        }
     }
 }
 
