@@ -14,7 +14,7 @@
 // * This module is doing the low-level task management that requires tons of unsafe
 //   operations.
 // * Excessive `unsafe {}` blocks hurt readability significantly.
-// TODO: replace with `#[expect(unsafe_op_in_unsafe_fn)]` after bumpping
+// TODO: replace with `#[expect(unsafe_op_in_unsafe_fn)]` after bumping
 // the MSRV to 1.81.0.
 #![allow(unsafe_op_in_unsafe_fn)]
 
