@@ -556,7 +556,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
             }
             _ => quote! {
                 if false {
-                    let _: &dyn ::core::future::Future<Output = #output_type> = &body;
+                    let _ = &body;
                 }
             },
         };
