@@ -39,7 +39,7 @@ impl RngSeed {
 
     fn from_u64(seed: u64) -> Self {
         let one = (seed >> 32) as u32;
-        let mut two = seed as u32;
+        let two = seed as u32;
 
         Self::from_pair(one, two)
     }
