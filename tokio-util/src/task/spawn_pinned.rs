@@ -387,7 +387,8 @@ impl LocalWorkerHandle {
 
         let runtime_handle = handle_receiver
             .recv()
-            .expect("Failed to get local runtime handle");
+            .expect("Failed to recv local runtime init result")
+            .expect("Failed to start local runtime");
 
         LocalWorkerHandle {
             runtime_handle,
@@ -397,16 +398,22 @@ impl LocalWorkerHandle {
     }
 
     fn run(
-        handle_sender: std::sync::mpsc::Sender<tokio::runtime::Handle>,
+        handle_sender: std::sync::mpsc::Sender<std::io::Result<tokio::runtime::Handle>>,
         mut task_receiver: UnboundedReceiver<PinnedFutureSpawner>,
         task_count: Arc<AtomicUsize>,
     ) {
-        let runtime = tokio::runtime::LocalRuntime::new().expect("Failed to start local runtime");
+        let runtime = match tokio::runtime::LocalRuntime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => {
+                let _ = handle_sender.send(Err(err));
+                return;
+            }
+        };
 
         let runtime_handle = runtime.handle().clone();
 
         handle_sender
-            .send(runtime_handle)
+            .send(Ok(runtime_handle))
             .expect("Failed to send local runtime handle");
 
         runtime.block_on(async {
@@ -416,7 +423,7 @@ impl LocalWorkerHandle {
             }
         });
 
-        // If there are any tasks on the runtime  that has already completed,
+        // If there are any tasks on the runtime that has already completed,
         // but whose output has not yet been reported, let that task complete.
         //
         // Since the task_count is decremented when the runtime task exits,
