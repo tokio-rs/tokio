@@ -53,7 +53,7 @@ fn issue_8056_regression_test() {
             // failure. On working code this needs like a millisecond, so any
             // timeout will do.
             tokio::time::timeout(Duration::from_secs(1), async {
-                // Test case is derived from the failing test in omnicron:
+                // Test case is derived from the failing test in omicron:
                 // We start with a few very quick `spawn_blocking` operations.
                 // Those awaits return the async worker to the pool briefly,
                 // letting blocking-pool workers transition between the idle
