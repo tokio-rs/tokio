@@ -6,6 +6,7 @@ use std::path::Path;
 cfg_io_uring! {
     mod uring_open_options;
     pub(crate) use uring_open_options::UringOpenOptions;
+    use crate::runtime::driver::op::Op;
 }
 
 #[cfg(test)]
@@ -522,7 +523,7 @@ impl OpenOptions {
 
     async fn open_inner(&self, path: &Path) -> io::Result<File> {
         match &self.inner {
-            Kind::Std(opts) => Self::std_open(opts.clone(), path).await,
+            Kind::Std(opts) => Self::std_open(opts, path).await,
             #[cfg(all(
                 tokio_unstable,
                 feature = "io-uring",
@@ -531,11 +532,6 @@ impl OpenOptions {
                 target_os = "linux"
             ))]
             Kind::Uring(opts) => {
-                #[cfg(test)]
-                use super::mocks::MockFile as StdFile;
-                #[cfg(not(test))]
-                use std::fs::File as StdFile;
-
                 let handle = crate::runtime::Handle::current();
                 let driver_handle = handle.inner.driver().io();
 
@@ -543,17 +539,19 @@ impl OpenOptions {
                     .check_and_init(io_uring::opcode::OpenAt::CODE)
                     .await?
                 {
-                    Op::open(path.as_ref(), opts)?.await
+                    Op::open(path, opts)?.await
                 } else {
                     let opts = opts.clone().into();
-                    Self::std_open(opts, path).await
+                    Self::std_open(&opts, path).await
                 }
             }
         }
     }
 
-    async fn std_open(opts: StdOpenOptions, path: &Path) -> io::Result<File> {
+    async fn std_open(opts: &StdOpenOptions, path: &Path) -> io::Result<File> {
         let path = path.to_owned();
+        let opts = opts.clone();
+
         let std = asyncify(move || opts.open(path).map(File::from_std)).await?;
         Ok(std)
     }

@@ -1,4 +1,4 @@
-use crate::fs::UringOpenOptions;
+use crate::fs::OpenOptions;
 use crate::runtime::driver::op::Op;
 
 use std::io;
@@ -17,13 +17,17 @@ const PROBE_SIZE_U32: u32 = PROBE_SIZE as u32;
 const MAX_READ_SIZE: usize = 64 * 1024 * 1024;
 
 pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
-    let fd = UringOpenOptions::new().read(true).open(path).await?;
+    let file = OpenOptions::new().read(true).open(path).await?;
 
-    let (size_hint, fd) = Op::metadata_fd(fd).await;
+    let size_hint = Op::file_metadata(&file)?
+        .await
+        .map(|m| m.len() as usize)
+        .ok();
 
-    let size_hint: Option<usize> = size_hint
-        .ok()
-        .map(|m| usize::try_from(m.len()).unwrap_or(usize::MAX));
+    let fd: OwnedFd = file
+        .try_into_std()
+        .expect("unexpected in-flight operation detected")
+        .into();
 
     let mut buf = Vec::new();
 

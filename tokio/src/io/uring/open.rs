@@ -6,7 +6,7 @@ use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult
 use io_uring::{opcode, types};
 use std::ffi::CString;
 use std::io::{self, Error};
-use std::os::fd::{FromRawFd, OwnedFd};
+use std::os::fd::FromRawFd;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -18,10 +18,10 @@ pub(crate) struct Open {
 }
 
 impl Completable for Open {
-    type Output = io::Result<OwnedFd>;
+    type Output = io::Result<crate::fs::File>;
     fn complete(self, cqe: CqeResult) -> Self::Output {
         cqe.result
-            .map(|fd| unsafe { OwnedFd::from_raw_fd(fd as i32) })
+            .map(|fd| unsafe { crate::fs::File::from_raw_fd(fd as i32) })
     }
 
     fn complete_with_error(self, err: Error) -> Self::Output {
