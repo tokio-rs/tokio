@@ -1,5 +1,5 @@
-use std::os::fd::{AsRawFd, OwnedFd, RawFd};
 use std::mem::MaybeUninit;
+use std::os::fd::{AsRawFd, OwnedFd, RawFd};
 use std::os::unix::ffi::OsStrExt;
 use std::sync::Arc;
 use std::{ffi::CString, io, path::Path};
@@ -38,7 +38,11 @@ pub(crate) fn box_new_uninit<T>() -> Box<MaybeUninit<T>> {
 }
 
 // TODO(MSRV 1.82): When bumping MSRV, switch to `Box::<MaybeUninit<T>>::assume_init()`.
+// It is up to the caller to guarantee that the value really is in an initialized state.
+// Calling this when the content is not yet fully initialized causes immediate undefined behavior.
 pub(crate) unsafe fn box_assume_init<T>(boxed: Box<MaybeUninit<T>>) -> Box<T> {
     let raw = Box::into_raw(boxed);
+    // SAFETY: If the caller guarantees that the MaybeUninit is initialized, then
+    // costructing the box from a raw mut ptr of MaybeUninit<T> should be safe.
     unsafe { Box::from_raw(raw as *mut T) }
 }

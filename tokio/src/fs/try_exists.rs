@@ -30,12 +30,16 @@ pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
         feature = "io-uring",
         feature = "rt",
         feature = "fs",
-        target_os = "linux"
+        // libc::statx is only supported on these platforms
+        any(target_env = "gnu", target_os = "android", target_env = "musl")
     ))]
     {
         let handle = crate::runtime::Handle::current();
         let driver_handle = handle.inner.driver().io();
-        if driver_handle.check_and_init()? {
+        if driver_handle
+            .check_and_init(io_uring::opcode::Statx::CODE)
+            .await?
+        {
             return try_exists_uring(path).await;
         }
     }
@@ -44,6 +48,7 @@ pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
 }
 
 cfg_io_uring! {
+    #[inline]
     async fn try_exists_uring(path: &Path) -> io::Result<bool> {
         use crate::runtime::driver::op::Op;
 
