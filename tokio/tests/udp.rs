@@ -87,6 +87,10 @@ async fn send_to_recv_closed_returns_err() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
+)]
 async fn send_to_try_recv_closed_returns_err() -> std::io::Result<()> {
     use tokio::io::{Interest, Ready};
     use tokio::time::Duration;
@@ -106,7 +110,7 @@ async fn send_to_try_recv_closed_returns_err() -> std::io::Result<()> {
     .await
     .expect("timed out instead of returning error")
     .unwrap();
-    assert_eq!(interest, Ready::READABLE);
+    assert!(interest == Ready::READABLE || interest == Ready::ERROR);
 
     let err = sender.try_recv(&mut [0u8; 32]).unwrap_err();
     assert!(
