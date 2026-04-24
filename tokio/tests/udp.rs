@@ -87,6 +87,39 @@ async fn send_to_recv_closed_returns_err() -> std::io::Result<()> {
 }
 
 #[tokio::test]
+async fn send_to_try_recv_closed_returns_err() -> std::io::Result<()> {
+    use tokio::io::{Interest, Ready};
+    use tokio::time::Duration;
+
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let receiver_addr = receiver.local_addr()?;
+    drop(receiver);
+    sender.connect(receiver_addr).await?;
+    sender.send(MSG).await?;
+
+    let interest = time::timeout(
+        Duration::from_secs(5),
+        sender.ready(Interest::READABLE | Interest::ERROR),
+    )
+    .await
+    .expect("timed out instead of returning error")
+    .unwrap();
+    assert_eq!(interest, Ready::READABLE);
+
+    let err = sender.try_recv(&mut [0u8; 32]).unwrap_err();
+    assert!(
+        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
+        matches!(
+            err.kind(),
+            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
+        )
+    );
+    Ok(())
+}
+
+#[tokio::test]
 #[cfg_attr(
     target_os = "wasi",
     ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"

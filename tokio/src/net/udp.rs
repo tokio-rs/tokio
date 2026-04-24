@@ -889,7 +889,7 @@ impl UdpSocket {
     pub fn try_recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .try_io(Interest::READABLE, || self.io.recv(buf))
+            .try_io(Interest::READABLE | Interest::ERROR, || self.io.recv(buf))
     }
 
     cfg_io_util! {
@@ -943,7 +943,7 @@ impl UdpSocket {
         /// }
         /// ```
         pub fn try_recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
-            self.io.registration().try_io(Interest::READABLE, || {
+            self.io.registration().try_io(Interest::READABLE | Interest::ERROR, || {
                 let dst = buf.chunk_mut();
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
