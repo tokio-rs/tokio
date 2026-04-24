@@ -256,7 +256,7 @@ impl Interest {
     }
 
     pub(crate) fn mask(self) -> Ready {
-      Ready::from_interest(self)
+        Ready::from_interest(self)
     }
 }
 
