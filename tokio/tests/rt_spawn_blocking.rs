@@ -36,16 +36,36 @@ fn issue_8056_regression_test() {
     // Regression test for the lost-spawn race in the blocking pool introduced
     // by #7757. See https://github.com/tokio-rs/tokio/issues/8056 for complete
     // details.
-
-    // The bug was a race condition in task spawning when deciding whether to
-    // spawn a new blocking worker or to wake an idle one.
+    //
+    // The bug was a race condition in `Spawner::spawn_task` - after pushing a
+    // task to the queue, it chose between "wake an idle worker" and "spawn a
+    // new worker", by reading the `num_idle_threads` `AtomicUsize`. The
+    // `num_idle_threads` counter was incremented by a worker before it calls
+    // `wait_for_task`, and was deremented after `Inner::run` after
+    // `wait_for_task` had already returned a `Task`.
+    //
+    // In that window, the counter indicates a worker is idle even though it
+    // has already claimed a notification and is about to run a task. In the
+    // the omnicron test case that reproduced this, this task was long lived,
+    // which would essential result in "under spawning" workers.
+    //
+    // This test attempts to reproduce that scenario by doing the following on
+    // a fresh runtime
+    // - Two awaited `spawn_blocking` calls to get pool workers cycling through
+    //   idle → notified → busy transitions.
+    // - `make_writer` spawns two closures that park in
+    //   `mpsc::Receiver::blocking_recv` — long-lived blocking tasks that turn
+    //    a stranded spawn into a real deadlock instead of a transient stall.
+    // - Two more rounds of "create a writer and immediately drop it" churn the
+    //   worker pool while those persistent tasks are still blocked, and then a
+    //   second persistent writer is created — this `spawn_blocking` is most
+    //   likely to trigger the bug, because the prior churn has left a worker
+    //   mid-transition with a stale `num_idle_threads`.
+    // - Finally, we finish all the tasks -- if any of them never got pulled
+    //   from the `spawn_blocking` queue then it hits the timeout.
 
     // Run multiple times to make hitting the race condition very likely.
     for _ in 0..512 {
-        // Fresh runtime per iteration, matching `#[tokio::test]`
-        // semantics in omicron. On the buggy code, a freshly-created
-        // blocking pool growing its first few workers is apparently
-        // where the stale-read race fires most reliably.
         let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
         let completed = rt.block_on(async {
@@ -53,11 +73,6 @@ fn issue_8056_regression_test() {
             // failure. On working code this needs like a millisecond, so any
             // timeout will do.
             tokio::time::timeout(Duration::from_secs(1), async {
-                // Test case is derived from the failing test in omicron:
-                // We start with a few very quick `spawn_blocking` operations.
-                // Those awaits return the async worker to the pool briefly,
-                // letting blocking-pool workers transition between the idle
-                // and running states.
                 let quick = || async {
                     tokio::task::spawn_blocking(|| {}).await.unwrap();
                 };
