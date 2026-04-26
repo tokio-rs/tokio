@@ -311,6 +311,34 @@ fn bench_contention(c: &mut Criterion) {
     contention_bounded_full_recv_many(&mut group);
     contention_unbounded(&mut group);
     contention_unbounded_recv_many(&mut group);
+
+    // Measure how bounded-full performance scales with producer count.
+    // Total messages fixed at 5000 to isolate contention effects.
+    let rt = rt();
+    for num_producers in [1, 10, 50, 100] {
+        let msgs_per_producer = 5000 / num_producers;
+
+        group.bench_function(format!("bounded_full_{num_producers}p"), |b| {
+            b.iter(|| {
+                rt.block_on(async {
+                    let (tx, mut rx) = mpsc::channel::<usize>(64);
+
+                    for _ in 0..num_producers {
+                        let tx = tx.clone();
+                        tokio::spawn(async move {
+                            for i in 0..msgs_per_producer {
+                                tx.send(i).await.unwrap();
+                            }
+                        });
+                    }
+
+                    drop(tx);
+                    while rx.recv().await.is_some() {}
+                })
+            })
+        });
+    }
+
     group.finish();
 }
 
