@@ -730,18 +730,6 @@ fn lifo_stealable() {
         .unwrap();
 
     rt.block_on(async {
-        // Keep the runtime busy so that the workers that might steal the
-        // blocked task don't all park themselves forever.
-        //
-        // Since this task will always be woken by whichever worker is holding
-        // the time driver, rather than a worker that's executing tasks, it
-        // shouldn't ever kick the victim task out of its worker's LIFO slot.
-        let churn = tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(Duration::from_millis(4)).await;
-            }
-        });
-
         let victim_task_joined = tokio::spawn(async move {
             println!("[victim] task started");
             task_started_tx.send(()).unwrap();
@@ -791,7 +779,6 @@ fn lifo_stealable() {
         // Before possibly panicking, make sure that we wake up the blocker task
         // so that it doesn't stop the runtime from shutting down.
         block_thread_tx.send(()).unwrap();
-        churn.abort();
         result
             .expect("task in LIFO slot should complete within 30 seconds")
             .expect("task in LIFO slot should not panic");
