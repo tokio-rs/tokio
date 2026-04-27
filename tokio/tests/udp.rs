@@ -15,7 +15,7 @@ use std::io;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::{
-    io::{Interest, ReadBuf, Ready},
+    io::{Interest, ReadBuf},
     net::UdpSocket,
     time,
 };
@@ -70,8 +70,6 @@ fn assert_connection_refused_or_reset(err: std::io::Error) {
 }
 
 async fn setup_sender_with_closed_receiver() -> std::io::Result<UdpSocket> {
-    use tokio::time::Duration;
-
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
@@ -87,7 +85,7 @@ async fn setup_sender_with_closed_receiver() -> std::io::Result<UdpSocket> {
     .await
     .expect("timed out instead of returning error")
     .unwrap();
-    assert!(interest == Ready::READABLE || interest == Ready::ERROR);
+    assert!(interest.is_readable() || interest.is_read_closed() || interest.is_error());
 
     std::io::Result::Ok(sender)
 }
@@ -128,7 +126,21 @@ async fn send_to_try_recv_closed_returns_err() -> std::io::Result<()> {
 )]
 async fn send_to_try_recv_buf_closed_returns_err() -> std::io::Result<()> {
     let sender = setup_sender_with_closed_receiver().await?;
-    let err = sender.try_recv_buf(&mut Vec::new()).unwrap_err();
+    let err = sender
+        .try_recv_buf(&mut Vec::with_capacity(32))
+        .unwrap_err();
+    assert_connection_refused_or_reset(err);
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
+)]
+async fn send_to_try_recv_from_closed_returns_err() -> std::io::Result<()> {
+    let sender = setup_sender_with_closed_receiver().await?;
+    let err = sender.try_recv_from(&mut [0u8; 32]).unwrap_err();
     assert_connection_refused_or_reset(err);
     Ok(())
 }
@@ -140,7 +152,9 @@ async fn send_to_try_recv_buf_closed_returns_err() -> std::io::Result<()> {
 )]
 async fn send_to_try_recv_buf_from_closed_returns_err() -> std::io::Result<()> {
     let sender = setup_sender_with_closed_receiver().await?;
-    let err = sender.try_recv_buf_from(&mut Vec::new()).unwrap_err();
+    let err = sender
+        .try_recv_buf_from(&mut Vec::with_capacity(32))
+        .unwrap_err();
     assert_connection_refused_or_reset(err);
     Ok(())
 }
