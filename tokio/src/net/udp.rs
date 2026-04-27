@@ -1069,7 +1069,7 @@ impl UdpSocket {
         /// }
         /// ```
         pub fn try_recv_buf_from<B: BufMut>(&self, buf: &mut B) -> io::Result<(usize, SocketAddr)> {
-            self.io.registration().try_io(Interest::READABLE, || {
+            self.io.registration().try_io(Interest::READABLE | Interest::ERROR, || {
                 let dst = buf.chunk_mut();
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
@@ -1442,7 +1442,9 @@ impl UdpSocket {
     pub fn try_recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
-            .try_io(Interest::READABLE, || self.io.recv_from(buf))
+            .try_io(Interest::READABLE | Interest::ERROR, || {
+                self.io.recv_from(buf)
+            })
     }
 
     /// Tries to read or write from the socket using a user-provided IO operation.
@@ -1661,7 +1663,7 @@ impl UdpSocket {
     pub fn try_peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .try_io(Interest::READABLE, || self.io.peek(buf))
+            .try_io(Interest::READABLE | Interest::ERROR, || self.io.peek(buf))
     }
 
     /// Receives data from the socket, without removing it from the input queue.
@@ -1811,7 +1813,9 @@ impl UdpSocket {
     pub fn try_peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
-            .try_io(Interest::READABLE, || self.io.peek_from(buf))
+            .try_io(Interest::READABLE | Interest::ERROR, || {
+                self.io.peek_from(buf)
+            })
     }
 
     /// Retrieve the sender of the data at the head of the input queue, waiting if empty.
@@ -1877,7 +1881,9 @@ impl UdpSocket {
     pub fn try_peek_sender(&self) -> io::Result<SocketAddr> {
         self.io
             .registration()
-            .try_io(Interest::READABLE, || self.peek_sender_inner())
+            .try_io(Interest::READABLE | Interest::ERROR, || {
+                self.peek_sender_inner()
+            })
     }
 
     #[inline]
