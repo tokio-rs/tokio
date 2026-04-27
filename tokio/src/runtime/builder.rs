@@ -1336,39 +1336,39 @@ impl Builder {
             self.disable_lifo_slot = true;
             self
         }
+    }
 
-        /// Specifies the random number generation seed to use within all
-        /// threads associated with the runtime being built.
-        ///
-        /// This option is intended to make certain parts of the runtime
-        /// deterministic (e.g. the [`tokio::select!`] macro). In the case of
-        /// [`tokio::select!`] it will ensure that the order that branches are
-        /// polled is deterministic.
-        ///
-        /// In addition to the code specifying `rng_seed` and interacting with
-        /// the runtime, the internals of Tokio and the Rust compiler may affect
-        /// the sequences of random numbers. In order to ensure repeatable
-        /// results, the version of Tokio, the versions of all other
-        /// dependencies that interact with Tokio, and the Rust compiler version
-        /// should also all remain constant.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// # use tokio::runtime::{self, RngSeed};
-        /// # pub fn main() {
-        /// let seed = RngSeed::from_bytes(b"place your seed here");
-        /// let rt = runtime::Builder::new_current_thread()
-        ///     .rng_seed(seed)
-        ///     .build();
-        /// # }
-        /// ```
-        ///
-        /// [`tokio::select!`]: crate::select
-        pub fn rng_seed(&mut self, seed: RngSeed) -> &mut Self {
-            self.seed_generator = RngSeedGenerator::new(seed);
-            self
-        }
+    /// Specifies the random number generation seed to use within all
+    /// threads associated with the runtime being built.
+    ///
+    /// This option is intended to make certain parts of the runtime
+    /// deterministic (e.g. the [`tokio::select!`] macro). In the case of
+    /// [`tokio::select!`] it will ensure that the order that branches are
+    /// polled is deterministic.
+    ///
+    /// In addition to the code specifying `rng_seed` and interacting with
+    /// the runtime, the internals of Tokio and the Rust compiler may affect
+    /// the sequences of random numbers. In order to ensure repeatable
+    /// results, the version of Tokio, the versions of all other
+    /// dependencies that interact with Tokio, and the Rust compiler version
+    /// should also all remain constant.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use tokio::runtime::{self, RngSeed};
+    /// # pub fn main() {
+    /// let seed = RngSeed::from_bytes(b"place your seed here");
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .rng_seed(seed)
+    ///     .build();
+    /// # }
+    /// ```
+    ///
+    /// [`tokio::select!`]: crate::select
+    pub fn rng_seed(&mut self, seed: RngSeed) -> &mut Self {
+        self.seed_generator = RngSeedGenerator::new(seed);
+        self
     }
 
     cfg_unstable_metrics! {

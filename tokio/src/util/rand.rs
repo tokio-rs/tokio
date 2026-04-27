@@ -1,10 +1,6 @@
 cfg_rt! {
     mod rt;
     pub(crate) use rt::RngSeedGenerator;
-
-    cfg_unstable! {
-        mod rt_unstable;
-    }
 }
 
 /// A seed for random number generation.
@@ -51,6 +47,27 @@ impl RngSeed {
 
     fn from_pair(s: u32, r: u32) -> Self {
         Self { s, r }
+    }
+}
+
+cfg_rt! {
+    impl RngSeed {
+        /// Generates a seed from the provided byte slice.
+        ///
+        /// # Example
+        ///
+        /// ```
+        /// # use tokio::runtime::RngSeed;
+        /// let seed = RngSeed::from_bytes(b"make me a seed");
+        /// ```
+        pub fn from_bytes(bytes: &[u8]) -> Self {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::Hasher;
+
+            let mut hasher = DefaultHasher::default();
+            hasher.write(bytes);
+            Self::from_u64(hasher.finish())
+        }
     }
 }
 

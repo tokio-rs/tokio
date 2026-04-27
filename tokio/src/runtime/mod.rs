@@ -571,9 +571,9 @@ cfg_rt! {
 
     mod builder;
     pub use self::builder::Builder;
+    pub use crate::util::rand::RngSeed;
     cfg_unstable! {
         pub use self::builder::UnhandledPanic;
-        pub use crate::util::rand::RngSeed;
 
         /// Returns the index of the current worker thread, if called from a
         /// runtime worker thread.

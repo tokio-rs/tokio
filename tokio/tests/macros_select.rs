@@ -7,6 +7,7 @@ use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 #[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
 use tokio::test as maybe_tokio_test;
 
+use tokio::runtime::RngSeed;
 use tokio::sync::oneshot;
 use tokio_test::{assert_ok, assert_pending, assert_ready};
 
@@ -629,85 +630,80 @@ async fn mut_ref_patterns() {
     };
 }
 
-#[cfg(tokio_unstable)]
-mod unstable {
-    use tokio::runtime::RngSeed;
+#[test]
+fn deterministic_select_current_thread() {
+    let seed = b"bytes used to generate seed";
+    let rt1 = tokio::runtime::Builder::new_current_thread()
+        .rng_seed(RngSeed::from_bytes(seed))
+        .build()
+        .unwrap();
+    let rt1_values = rt1.block_on(async { (select_0_to_9().await, select_0_to_9().await) });
 
-    #[test]
-    fn deterministic_select_current_thread() {
-        let seed = b"bytes used to generate seed";
-        let rt1 = tokio::runtime::Builder::new_current_thread()
-            .rng_seed(RngSeed::from_bytes(seed))
-            .build()
-            .unwrap();
-        let rt1_values = rt1.block_on(async { (select_0_to_9().await, select_0_to_9().await) });
+    let rt2 = tokio::runtime::Builder::new_current_thread()
+        .rng_seed(RngSeed::from_bytes(seed))
+        .build()
+        .unwrap();
+    let rt2_values = rt2.block_on(async { (select_0_to_9().await, select_0_to_9().await) });
 
-        let rt2 = tokio::runtime::Builder::new_current_thread()
-            .rng_seed(RngSeed::from_bytes(seed))
-            .build()
-            .unwrap();
-        let rt2_values = rt2.block_on(async { (select_0_to_9().await, select_0_to_9().await) });
+    assert_eq!(rt1_values, rt2_values);
+}
 
-        assert_eq!(rt1_values, rt2_values);
-    }
+#[test]
+#[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
+fn deterministic_select_multi_thread() {
+    let seed = b"bytes used to generate seed";
+    let (tx, rx) = std::sync::mpsc::channel();
+    let rt1 = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .on_thread_park(move || tx.send(()).unwrap())
+        .rng_seed(RngSeed::from_bytes(seed))
+        .build()
+        .unwrap();
 
-    #[test]
-    #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
-    fn deterministic_select_multi_thread() {
-        let seed = b"bytes used to generate seed";
-        let (tx, rx) = std::sync::mpsc::channel();
-        let rt1 = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(1)
-            .on_thread_park(move || tx.send(()).unwrap())
-            .rng_seed(RngSeed::from_bytes(seed))
-            .build()
-            .unwrap();
+    // This makes sure that `enter_runtime()` from worker thread is called before the one from main thread,
+    // ensuring that the RNG state is consistent. See also https://github.com/tokio-rs/tokio/pull/7495.
+    rx.recv().unwrap();
 
-        // This makes sure that `enter_runtime()` from worker thread is called before the one from main thread,
-        // ensuring that the RNG state is consistent. See also https://github.com/tokio-rs/tokio/pull/7495.
-        rx.recv().unwrap();
+    let rt1_values = rt1.block_on(async {
+        tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) })
+            .await
+            .unwrap()
+    });
 
-        let rt1_values = rt1.block_on(async {
-            tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) })
-                .await
-                .unwrap()
-        });
+    let (tx, rx) = std::sync::mpsc::channel();
+    let rt2 = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .on_thread_park(move || tx.send(()).unwrap())
+        .rng_seed(RngSeed::from_bytes(seed))
+        .build()
+        .unwrap();
 
-        let (tx, rx) = std::sync::mpsc::channel();
-        let rt2 = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(1)
-            .on_thread_park(move || tx.send(()).unwrap())
-            .rng_seed(RngSeed::from_bytes(seed))
-            .build()
-            .unwrap();
+    // This makes sure that `enter_runtime()` from worker thread is called before the one from main thread,
+    // ensuring that the RNG state is consistent. See also https://github.com/tokio-rs/tokio/pull/7495.
+    rx.recv().unwrap();
 
-        // This makes sure that `enter_runtime()` from worker thread is called before the one from main thread,
-        // ensuring that the RNG state is consistent. See also https://github.com/tokio-rs/tokio/pull/7495.
-        rx.recv().unwrap();
+    let rt2_values = rt2.block_on(async {
+        tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) })
+            .await
+            .unwrap()
+    });
 
-        let rt2_values = rt2.block_on(async {
-            tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) })
-                .await
-                .unwrap()
-        });
+    assert_eq!(rt1_values, rt2_values);
+}
 
-        assert_eq!(rt1_values, rt2_values);
-    }
-
-    async fn select_0_to_9() -> u32 {
-        tokio::select!(
-            x = async { 0 } => x,
-            x = async { 1 } => x,
-            x = async { 2 } => x,
-            x = async { 3 } => x,
-            x = async { 4 } => x,
-            x = async { 5 } => x,
-            x = async { 6 } => x,
-            x = async { 7 } => x,
-            x = async { 8 } => x,
-            x = async { 9 } => x,
-        )
-    }
+async fn select_0_to_9() -> u32 {
+    tokio::select!(
+        x = async { 0 } => x,
+        x = async { 1 } => x,
+        x = async { 2 } => x,
+        x = async { 3 } => x,
+        x = async { 4 } => x,
+        x = async { 5 } => x,
+        x = async { 6 } => x,
+        x = async { 7 } => x,
+        x = async { 8 } => x,
+        x = async { 9 } => x,
+    )
 }
 
 #[tokio::test]
