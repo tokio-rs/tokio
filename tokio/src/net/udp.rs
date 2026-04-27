@@ -676,6 +676,7 @@ impl UdpSocket {
     /// # Examples
     ///
     /// ```no_run
+    /// use tokio::io::Interest;
     /// use tokio::net::UdpSocket;
     /// use std::io;
     ///
@@ -850,6 +851,7 @@ impl UdpSocket {
     /// # Examples
     ///
     /// ```no_run
+    /// use tokio::io::Interest;
     /// use tokio::net::UdpSocket;
     /// use std::io;
     ///
@@ -908,6 +910,7 @@ impl UdpSocket {
         /// # Examples
         ///
         /// ```no_run
+        /// use tokio::io::Interest;
         /// use tokio::net::UdpSocket;
         /// use std::io;
         ///
@@ -1035,6 +1038,7 @@ impl UdpSocket {
         /// # Examples
         ///
         /// ```no_run
+        /// use tokio::io::Interest;
         /// use tokio::net::UdpSocket;
         /// use std::io;
         ///
@@ -1404,6 +1408,7 @@ impl UdpSocket {
     /// # Examples
     ///
     /// ```no_run
+    /// use tokio::io::Interest;
     /// use tokio::net::UdpSocket;
     /// use std::io;
     ///
