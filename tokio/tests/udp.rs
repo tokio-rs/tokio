@@ -55,6 +55,16 @@ async fn send_recv_poll() -> std::io::Result<()> {
     Ok(())
 }
 
+fn assert_connection_refused_or_reset(err: std::io::Error) {
+    assert!(
+        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
+        matches!(
+            err.kind(),
+            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
+        )
+    );
+}
+
 #[tokio::test]
 #[cfg_attr(
     target_os = "wasi",
@@ -74,15 +84,7 @@ async fn send_to_recv_closed_returns_err() -> std::io::Result<()> {
         .await
         .expect("timed out instead of returning error")
         .unwrap_err();
-    let errno = err.kind();
-
-    assert!(
-        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
-        matches!(
-            errno,
-            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
-        )
-    );
+    assert_connection_refused_or_reset(err);
     Ok(())
 }
 
@@ -113,13 +115,7 @@ async fn send_to_try_recv_closed_returns_err() -> std::io::Result<()> {
     assert!(interest == Ready::READABLE || interest == Ready::ERROR);
 
     let err = sender.try_recv(&mut [0u8; 32]).unwrap_err();
-    assert!(
-        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
-        matches!(
-            err.kind(),
-            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
-        )
-    );
+    assert_connection_refused_or_reset(err);
     Ok(())
 }
 
@@ -150,13 +146,7 @@ async fn send_to_try_recv_buf_closed_returns_err() -> std::io::Result<()> {
     assert!(interest == Ready::READABLE || interest == Ready::ERROR);
 
     let err = sender.try_recv_buf(&mut Vec::new()).unwrap_err();
-    assert!(
-        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
-        matches!(
-            err.kind(),
-            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
-        )
-    );
+    assert_connection_refused_or_reset(err);
     Ok(())
 }
 
@@ -187,13 +177,7 @@ async fn send_to_try_recv_buf_from_closed_returns_err() -> std::io::Result<()> {
     assert!(interest == Ready::READABLE || interest == Ready::ERROR);
 
     let err = sender.try_recv_buf_from(&mut Vec::new()).unwrap_err();
-    assert!(
-        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
-        matches!(
-            err.kind(),
-            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
-        )
-    );
+    assert_connection_refused_or_reset(err);
     Ok(())
 }
 
@@ -224,13 +208,7 @@ async fn send_to_try_peek_closed_returns_err() -> std::io::Result<()> {
     assert!(interest == Ready::READABLE || interest == Ready::ERROR);
 
     let err = sender.try_peek(&mut [0u8; 32]).unwrap_err();
-    assert!(
-        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
-        matches!(
-            err.kind(),
-            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
-        )
-    );
+    assert_connection_refused_or_reset(err);
     Ok(())
 }
 
@@ -261,13 +239,7 @@ async fn send_to_try_peek_from_closed_returns_err() -> std::io::Result<()> {
     assert!(interest == Ready::READABLE || interest == Ready::ERROR);
 
     let err = sender.try_peek_from(&mut [0u8; 32]).unwrap_err();
-    assert!(
-        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
-        matches!(
-            err.kind(),
-            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
-        )
-    );
+    assert_connection_refused_or_reset(err);
     Ok(())
 }
 
@@ -298,13 +270,7 @@ async fn send_to_try_peek_sender_closed_returns_err() -> std::io::Result<()> {
     assert!(interest == Ready::READABLE || interest == Ready::ERROR);
 
     let err = sender.try_peek_sender().unwrap_err();
-    assert!(
-        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
-        matches!(
-            err.kind(),
-            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
-        )
-    );
+    assert_connection_refused_or_reset(err);
     Ok(())
 }
 
