@@ -23,4 +23,30 @@ async fn test_socket_pair() {
 
     assert_eq!(cred_a.uid(), uid);
     assert_eq!(cred_a.gid(), gid);
+
+    // On platforms where `UCred::pid` is implemented, both ends of a
+    // `socketpair` must report the current process's PID.
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "openbsd",
+        all(target_os = "freebsd", target_pointer_width = "64"),
+        target_os = "netbsd",
+        target_os = "nto",
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "tvos",
+        target_os = "watchos",
+        target_os = "visionos",
+        target_os = "solaris",
+        target_os = "illumos",
+        target_os = "redox",
+        target_os = "haiku",
+        target_os = "cygwin",
+    ))]
+    {
+        let pid = unsafe { libc::getpid() };
+        assert_eq!(cred_a.pid(), Some(pid));
+        assert_eq!(cred_b.pid(), Some(pid));
+    }
 }
