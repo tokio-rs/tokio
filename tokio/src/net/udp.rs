@@ -687,7 +687,7 @@ impl UdpSocket {
     ///
     ///     loop {
     ///         // Wait for the socket to be readable
-    ///         socket.readable().await?;
+    ///         socket.ready(Interest::READABLE | Interest::ERROR).await?;
     ///
     ///         // The buffer is **not** included in the async task and will
     ///         // only exist on the stack.
@@ -861,7 +861,7 @@ impl UdpSocket {
     ///
     ///     loop {
     ///         // Wait for the socket to be readable
-    ///         socket.readable().await?;
+    ///         socket.ready(Interest::READABLE | Interest::ERROR).await?;
     ///
     ///         // The buffer is **not** included in the async task and will
     ///         // only exist on the stack.
@@ -919,7 +919,7 @@ impl UdpSocket {
         ///
         ///     loop {
         ///         // Wait for the socket to be readable
-        ///         socket.readable().await?;
+        ///         socket.ready(Interest::READABLE | Interest::ERROR).await?;
         ///
         ///         let mut buf = Vec::with_capacity(1024);
         ///
@@ -1045,7 +1045,7 @@ impl UdpSocket {
         ///
         ///     loop {
         ///         // Wait for the socket to be readable
-        ///         socket.readable().await?;
+        ///         socket.ready(Interest::READABLE | Interest::ERROR).await?;
         ///
         ///         let mut buf = Vec::with_capacity(1024);
         ///
@@ -1414,7 +1414,7 @@ impl UdpSocket {
     ///
     ///     loop {
     ///         // Wait for the socket to be readable
-    ///         socket.readable().await?;
+    ///         socket.ready(Interest::READABLE | Interest::ERROR).await?;
     ///
     ///         // The buffer is **not** included in the async task and will
     ///         // only exist on the stack.
