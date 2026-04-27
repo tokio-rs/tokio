@@ -14,7 +14,11 @@ use std::future::poll_fn;
 use std::io;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::{io::ReadBuf, net::UdpSocket, time};
+use tokio::{
+    io::{Interest, ReadBuf, Ready},
+    net::UdpSocket,
+    time,
+};
 use tokio_test::assert_ok;
 
 const MSG: &[u8] = b"hello";
@@ -65,12 +69,9 @@ fn assert_connection_refused_or_reset(err: std::io::Error) {
     );
 }
 
-#[tokio::test]
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
-)]
-async fn send_to_recv_closed_returns_err() -> std::io::Result<()> {
+async fn setup_sender_with_closed_receiver() -> std::io::Result<UdpSocket> {
+    use tokio::time::Duration;
+
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
 
@@ -78,6 +79,26 @@ async fn send_to_recv_closed_returns_err() -> std::io::Result<()> {
     drop(receiver);
     sender.connect(receiver_addr).await?;
     sender.send(MSG).await?;
+
+    let interest = time::timeout(
+        Duration::from_secs(5),
+        sender.ready(Interest::READABLE | Interest::ERROR),
+    )
+    .await
+    .expect("timed out instead of returning error")
+    .unwrap();
+    assert!(interest == Ready::READABLE || interest == Ready::ERROR);
+
+    std::io::Result::Ok(sender)
+}
+
+#[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
+)]
+async fn send_to_recv_closed_returns_err() -> std::io::Result<()> {
+    let sender = setup_sender_with_closed_receiver().await?;
 
     let mut recv_buf = [0u8; 32];
     let err = time::timeout(Duration::from_secs(5), sender.recv(&mut recv_buf))
@@ -94,26 +115,7 @@ async fn send_to_recv_closed_returns_err() -> std::io::Result<()> {
     ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
 )]
 async fn send_to_try_recv_closed_returns_err() -> std::io::Result<()> {
-    use tokio::io::{Interest, Ready};
-    use tokio::time::Duration;
-
-    let sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
-
-    let receiver_addr = receiver.local_addr()?;
-    drop(receiver);
-    sender.connect(receiver_addr).await?;
-    sender.send(MSG).await?;
-
-    let interest = time::timeout(
-        Duration::from_secs(5),
-        sender.ready(Interest::READABLE | Interest::ERROR),
-    )
-    .await
-    .expect("timed out instead of returning error")
-    .unwrap();
-    assert!(interest == Ready::READABLE || interest == Ready::ERROR);
-
+    let sender = setup_sender_with_closed_receiver().await?;
     let err = sender.try_recv(&mut [0u8; 32]).unwrap_err();
     assert_connection_refused_or_reset(err);
     Ok(())
@@ -125,26 +127,7 @@ async fn send_to_try_recv_closed_returns_err() -> std::io::Result<()> {
     ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
 )]
 async fn send_to_try_recv_buf_closed_returns_err() -> std::io::Result<()> {
-    use tokio::io::{Interest, Ready};
-    use tokio::time::Duration;
-
-    let sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
-
-    let receiver_addr = receiver.local_addr()?;
-    drop(receiver);
-    sender.connect(receiver_addr).await?;
-    sender.send(MSG).await?;
-
-    let interest = time::timeout(
-        Duration::from_secs(5),
-        sender.ready(Interest::READABLE | Interest::ERROR),
-    )
-    .await
-    .expect("timed out instead of returning error")
-    .unwrap();
-    assert!(interest == Ready::READABLE || interest == Ready::ERROR);
-
+    let sender = setup_sender_with_closed_receiver().await?;
     let err = sender.try_recv_buf(&mut Vec::new()).unwrap_err();
     assert_connection_refused_or_reset(err);
     Ok(())
@@ -156,26 +139,7 @@ async fn send_to_try_recv_buf_closed_returns_err() -> std::io::Result<()> {
     ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
 )]
 async fn send_to_try_recv_buf_from_closed_returns_err() -> std::io::Result<()> {
-    use tokio::io::{Interest, Ready};
-    use tokio::time::Duration;
-
-    let sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
-
-    let receiver_addr = receiver.local_addr()?;
-    drop(receiver);
-    sender.connect(receiver_addr).await?;
-    sender.send(MSG).await?;
-
-    let interest = time::timeout(
-        Duration::from_secs(5),
-        sender.ready(Interest::READABLE | Interest::ERROR),
-    )
-    .await
-    .expect("timed out instead of returning error")
-    .unwrap();
-    assert!(interest == Ready::READABLE || interest == Ready::ERROR);
-
+    let sender = setup_sender_with_closed_receiver().await?;
     let err = sender.try_recv_buf_from(&mut Vec::new()).unwrap_err();
     assert_connection_refused_or_reset(err);
     Ok(())
@@ -187,26 +151,7 @@ async fn send_to_try_recv_buf_from_closed_returns_err() -> std::io::Result<()> {
     ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
 )]
 async fn send_to_try_peek_closed_returns_err() -> std::io::Result<()> {
-    use tokio::io::{Interest, Ready};
-    use tokio::time::Duration;
-
-    let sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
-
-    let receiver_addr = receiver.local_addr()?;
-    drop(receiver);
-    sender.connect(receiver_addr).await?;
-    sender.send(MSG).await?;
-
-    let interest = time::timeout(
-        Duration::from_secs(5),
-        sender.ready(Interest::READABLE | Interest::ERROR),
-    )
-    .await
-    .expect("timed out instead of returning error")
-    .unwrap();
-    assert!(interest == Ready::READABLE || interest == Ready::ERROR);
-
+    let sender = setup_sender_with_closed_receiver().await?;
     let err = sender.try_peek(&mut [0u8; 32]).unwrap_err();
     assert_connection_refused_or_reset(err);
     Ok(())
@@ -218,26 +163,7 @@ async fn send_to_try_peek_closed_returns_err() -> std::io::Result<()> {
     ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
 )]
 async fn send_to_try_peek_from_closed_returns_err() -> std::io::Result<()> {
-    use tokio::io::{Interest, Ready};
-    use tokio::time::Duration;
-
-    let sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
-
-    let receiver_addr = receiver.local_addr()?;
-    drop(receiver);
-    sender.connect(receiver_addr).await?;
-    sender.send(MSG).await?;
-
-    let interest = time::timeout(
-        Duration::from_secs(5),
-        sender.ready(Interest::READABLE | Interest::ERROR),
-    )
-    .await
-    .expect("timed out instead of returning error")
-    .unwrap();
-    assert!(interest == Ready::READABLE || interest == Ready::ERROR);
-
+    let sender = setup_sender_with_closed_receiver().await?;
     let err = sender.try_peek_from(&mut [0u8; 32]).unwrap_err();
     assert_connection_refused_or_reset(err);
     Ok(())
@@ -249,26 +175,7 @@ async fn send_to_try_peek_from_closed_returns_err() -> std::io::Result<()> {
     ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
 )]
 async fn send_to_try_peek_sender_closed_returns_err() -> std::io::Result<()> {
-    use tokio::io::{Interest, Ready};
-    use tokio::time::Duration;
-
-    let sender = UdpSocket::bind("127.0.0.1:0").await?;
-    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
-
-    let receiver_addr = receiver.local_addr()?;
-    drop(receiver);
-    sender.connect(receiver_addr).await?;
-    sender.send(MSG).await?;
-
-    let interest = time::timeout(
-        Duration::from_secs(5),
-        sender.ready(Interest::READABLE | Interest::ERROR),
-    )
-    .await
-    .expect("timed out instead of returning error")
-    .unwrap();
-    assert!(interest == Ready::READABLE || interest == Ready::ERROR);
-
+    let sender = setup_sender_with_closed_receiver().await?;
     let err = sender.try_peek_sender().unwrap_err();
     assert_connection_refused_or_reset(err);
     Ok(())
