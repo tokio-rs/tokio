@@ -236,17 +236,28 @@ pub(crate) mod impl_freebsd {
                 &mut len,
             );
 
-            if ret != 0 || len as usize != size_of::<xucred>() {
+            if ret != 0 {
                 return Err(io::Error::last_os_error());
+            }
+            if len as usize != size_of::<xucred>() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "unexpected xucred size from LOCAL_PEERCRED",
+                ));
             }
 
             let xucred = xucred.assume_init();
 
-            // `cr_pid` is populated by the kernel since FreeBSD 13. The 32-bit
-            // syscall ABI (FreeBSD COMPAT32) does not translate `cr_pid` and
-            // returns zero, so PID retrieval is restricted to 64-bit targets.
+            // `cr_pid` is populated by the kernel since FreeBSD 13. On older
+            // kernels (FreeBSD 12 and earlier) and on the FreeBSD COMPAT32
+            // ABI the field is left as the zeroed value we passed in. PID 0
+            // is the kernel scheduler and never a real userland peer, so we
+            // surface it as `None` rather than a misleading `Some(0)`.
             #[cfg(target_pointer_width = "64")]
-            let pid = Some(xucred.cr_pid__c_anonymous_union.cr_pid as unix::pid_t);
+            let pid = match xucred.cr_pid__c_anonymous_union.cr_pid {
+                0 => None,
+                p => Some(p as unix::pid_t),
+            };
             #[cfg(not(target_pointer_width = "64"))]
             let pid = None;
 
