@@ -7,6 +7,11 @@ cfg_rt! {
 ///
 /// In order to make certain functions within a runtime deterministic, a seed
 /// can be specified at the time of creation.
+///
+/// The random number sequence generated from a given seed is **not**
+/// guaranteed to remain consistent across Tokio versions; the internal
+/// generator algorithm may change. A fixed seed makes a single program run
+/// reproducible, but is not a stable interface across releases.
 #[allow(unreachable_pub)]
 #[derive(Clone, Debug)]
 pub struct RngSeed {
@@ -53,6 +58,11 @@ impl RngSeed {
 cfg_rt! {
     impl RngSeed {
         /// Generates a seed from the provided byte slice.
+        ///
+        /// The bytes are hashed using [`std::hash::DefaultHasher`], whose
+        /// algorithm is unspecified and may change between Rust releases, so
+        /// the resulting seed is not guaranteed to be consistent across Rust
+        /// version changes.
         ///
         /// # Example
         ///

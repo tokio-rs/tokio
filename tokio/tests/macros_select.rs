@@ -7,6 +7,7 @@ use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 #[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
 use tokio::test as maybe_tokio_test;
 
+#[cfg(feature = "rt")]
 use tokio::runtime::RngSeed;
 use tokio::sync::oneshot;
 use tokio_test::{assert_ok, assert_pending, assert_ready};
@@ -631,6 +632,7 @@ async fn mut_ref_patterns() {
 }
 
 #[test]
+#[cfg(feature = "rt")]
 fn deterministic_select_current_thread() {
     let seed = b"bytes used to generate seed";
     let rt1 = tokio::runtime::Builder::new_current_thread()
@@ -691,6 +693,7 @@ fn deterministic_select_multi_thread() {
     assert_eq!(rt1_values, rt2_values);
 }
 
+#[cfg(feature = "rt")]
 async fn select_0_to_9() -> u32 {
     tokio::select!(
         x = async { 0 } => x,
