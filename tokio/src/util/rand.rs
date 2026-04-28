@@ -9,9 +9,9 @@ cfg_rt! {
 /// can be specified at the time of creation.
 ///
 /// The random number sequence generated from a given seed is **not**
-/// guaranteed to remain consistent across Tokio versions; the internal
+/// guaranteed to remain consistent across Tokio versions: The internal
 /// generator algorithm may change. A fixed seed makes a single program run
-/// reproducible, but is not a stable interface across releases.
+/// reproducible but is not a stable interface across releases.
 #[allow(unreachable_pub)]
 #[derive(Clone, Debug)]
 pub struct RngSeed {
@@ -62,7 +62,7 @@ cfg_rt! {
         /// The bytes are hashed using [`std::hash::DefaultHasher`], whose
         /// algorithm is unspecified and may change between Rust releases, so
         /// the resulting seed is not guaranteed to be consistent across Rust
-        /// version changes.
+        /// or Tokio version changes.
         ///
         /// # Example
         ///
