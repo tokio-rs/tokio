@@ -24,13 +24,18 @@ async fn test_socket_pair() {
     assert_eq!(cred_a.uid(), uid);
     assert_eq!(cred_a.gid(), gid);
 
-    // On platforms where `UCred::pid` is implemented, both ends of a
-    // `socketpair` must report the current process's PID.
+    // On platforms where `UCred::pid` is implemented and the kernel
+    // populates it, both ends of a `socketpair` must report the current
+    // process's PID.
+    //
+    // FreeBSD COMPAT32 (32-bit binary on a 64-bit kernel) leaves `cr_pid`
+    // zeroed pending FreeBSD bug 294833; the assertion is gated on 64-bit
+    // FreeBSD until that fix ships.
     #[cfg(any(
         target_os = "linux",
         target_os = "android",
         target_os = "openbsd",
-        target_os = "freebsd",
+        all(target_os = "freebsd", target_pointer_width = "64"),
         target_os = "netbsd",
         target_os = "nto",
         target_os = "macos",
