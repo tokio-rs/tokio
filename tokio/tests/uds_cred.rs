@@ -30,7 +30,7 @@ async fn test_socket_pair() {
         target_os = "linux",
         target_os = "android",
         target_os = "openbsd",
-        all(target_os = "freebsd", target_pointer_width = "64"),
+        target_os = "freebsd",
         target_os = "netbsd",
         target_os = "nto",
         target_os = "macos",
