@@ -21,7 +21,7 @@ fn basic() {
             let mut n = 0;
 
             for _ in 0..3 {
-                if steal.steal_into(&mut local, &mut stats).is_some() {
+                if steal.steal_into(&mut local, &mut stats, false).is_some() {
                     n += 1;
                 }
 
@@ -76,7 +76,7 @@ fn basic_lifo() {
             let mut n = 0;
 
             for _ in 0..3 {
-                if steal.steal_into(&mut local, &mut stats).is_some() {
+                if steal.steal_into(&mut local, &mut stats, false).is_some() {
                     n += 1;
                 }
 
@@ -133,7 +133,7 @@ fn steal_overflow() {
             let (_, mut local) = queue::local();
             let mut n = 0;
 
-            if steal.steal_into(&mut local, &mut stats).is_some() {
+            if steal.steal_into(&mut local, &mut stats, false).is_some() {
                 n += 1;
             }
 
@@ -256,7 +256,7 @@ fn steal_tasks(steal: queue::Steal<NoopSchedule>) -> usize {
     let mut stats = new_stats();
     let (_, mut local) = queue::local();
 
-    if steal.steal_into(&mut local, &mut stats).is_none() {
+    if steal.steal_into(&mut local, &mut stats, false).is_none() {
         return 0;
     }
 
@@ -290,7 +290,7 @@ fn chained_steal() {
         let th = thread::spawn(move || {
             let mut stats = new_stats();
             let (_, mut local) = queue::local();
-            s1.steal_into(&mut local, &mut stats);
+            s1.steal_into(&mut local, &mut stats, false);
 
             while local.pop().is_some() {}
         });
@@ -298,7 +298,7 @@ fn chained_steal() {
         // Drain our tasks, then attempt to steal
         while l1.pop().is_some() {}
 
-        s2.steal_into(&mut l1, &mut stats);
+        s2.steal_into(&mut l1, &mut stats, false);
 
         th.join().unwrap();
 

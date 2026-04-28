@@ -43,6 +43,12 @@ pub(crate) struct Config {
     /// future version.
     pub(crate) disable_lifo_slot: bool,
 
+    /// Can work stealing occur for tasks in the per-worker LIFO slot?
+    pub(crate) enable_lifo_stealing: bool,
+
+    /// Should a worker be woken up when a task is pushed to the per-worker LIFO slot?
+    pub(crate) enable_eager_lifo_handoff: bool,
+
     /// Random number generator seed to configure runtimes to act in a
     /// deterministic way.
     pub(crate) seed_generator: RngSeedGenerator,

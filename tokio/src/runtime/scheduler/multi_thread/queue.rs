@@ -427,6 +427,7 @@ impl<T> Local<T> {
 
 impl<T> Steal<T> {
     /// Returns the number of entries in the queue
+    #[cfg(tokio_unstable)]
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.0.head.load(Acquire));
         let tail = self.0.tail.load(Acquire);
@@ -436,8 +437,10 @@ impl<T> Steal<T> {
 
     /// Return true if the queue is empty,
     /// false if there are any entries in the queue
-    pub(crate) fn is_empty(&self) -> bool {
-        self.len() == 0
+    pub(crate) fn can_steal(&self, steal_lifo: bool) -> bool {
+        let (_, head) = unpack(self.0.head.load(Acquire));
+        let tail = self.0.tail.load(Acquire);
+        (len(head, tail) > 0) || (steal_lifo && self.0.lifo.is_some())
     }
 
     /// Steals half the tasks from self and place them into `dst`.
@@ -445,6 +448,7 @@ impl<T> Steal<T> {
         &self,
         dst: &mut Local<T>,
         dst_stats: &mut Stats,
+        steal_lifo: bool,
     ) -> Option<task::Notified<T>> {
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
@@ -466,14 +470,17 @@ impl<T> Steal<T> {
         let mut n = self.steal_into2(dst, dst_tail);
 
         if n == 0 {
-            // If no tasks were stolen, let's see if there's one in the LIFO
-            // slot.
-            let lifo = self.0.lifo.take();
-            if lifo.is_some() {
-                dst_stats.incr_steal_count(1);
-                dst_stats.incr_steal_operations();
+            if steal_lifo {
+                // If no tasks were stolen, let's see if there's one in the LIFO
+                // slot.
+                let lifo = self.0.lifo.take();
+                if lifo.is_some() {
+                    dst_stats.incr_steal_count(1);
+                    dst_stats.incr_steal_operations();
+                }
+                return lifo;
             }
-            return lifo;
+            return None;
         }
 
         dst_stats.incr_steal_count(n as u16);
