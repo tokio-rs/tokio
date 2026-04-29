@@ -1533,4 +1533,38 @@ fn drop_all_elements_during_panic() {
     // `mpsc::Chan`'s drop is called, freeing the `Block` memory allocation.
 }
 
+/// A task's wakers keep its memory allocation alive. This test ensures
+/// `mpsc::channel` releases the rx waker immediately upon drop to potentially
+/// free up resources.
+#[test]
+fn release_waker_on_rx_drop() {
+    use std::task::{Context, Wake, Waker};
+
+    struct DummyWaker;
+    impl Wake for DummyWaker {
+        fn wake(self: Arc<Self>) {}
+    }
+
+    // Create a dummy Arc<impl Wake> to count waker references
+    let dummy = Arc::new(DummyWaker);
+    let waker = Waker::from(dummy.clone());
+    let mut cx = Context::from_waker(&waker);
+
+    // Baseline: 2 references (`dummy` and `waker`)
+    assert_eq!(Arc::strong_count(&dummy), 2);
+
+    // Register `waker` in rx
+    let (_tx, mut rx) = mpsc::channel::<()>(1);
+    assert_pending!(rx.poll_recv(&mut cx));
+    assert_eq!(Arc::strong_count(&dummy), 3);
+
+    // Drop rx, releasing the stored waker
+    drop(rx);
+    assert_eq!(
+        Arc::strong_count(&dummy),
+        2,
+        "dropping rx did not drop its waker",
+    );
+}
+
 fn is_debug<T: fmt::Debug>(_: &T) {}

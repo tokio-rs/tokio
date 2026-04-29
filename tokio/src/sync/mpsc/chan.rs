@@ -519,6 +519,10 @@ impl<T, S: Semaphore> Drop for Rx<T, S> {
 
             guard.drain();
         });
+
+        // When Rx is dropped, there is nothing for a task to poll anymore.
+        // This means we can drop our waker here to potentially free up resources.
+        self.inner.rx_waker.take_waker();
     }
 }
 
