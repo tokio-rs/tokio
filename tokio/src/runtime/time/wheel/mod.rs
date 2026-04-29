@@ -5,7 +5,7 @@ mod level;
 pub(crate) use self::level::Expiration;
 use self::level::Level;
 
-use std::{array, ptr::NonNull};
+use std::ptr::NonNull;
 
 use super::entry::STATE_DEREGISTERED;
 use super::EntryList;
@@ -50,9 +50,13 @@ pub(super) const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
 impl Wheel {
     /// Creates a new timing wheel.
     pub(crate) fn new() -> Wheel {
+        let mut levels = Vec::with_capacity(NUM_LEVELS);
+        for i in 0..NUM_LEVELS {
+            levels.push(Level::new(i));
+        }
         Wheel {
             elapsed: 0,
-            levels: Box::new(array::from_fn(Level::new)),
+            levels: levels.into_boxed_slice().try_into().unwrap(),
             pending: EntryList::new(),
         }
     }
