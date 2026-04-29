@@ -49,6 +49,8 @@ cfg_io_util! {
     mod read_buf;
     mod read_exact;
     mod read_int;
+    mod read_interruptible;
+    pub use read_interruptible::ReadInterruptible;
     mod read_line;
     mod fill_buf;
 

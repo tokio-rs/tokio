@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use crate::io::util::chain::{chain, Chain};
 use crate::io::util::read::{read, Read};
 use crate::io::util::read_buf::{read_buf, ReadBuf};
@@ -9,10 +11,11 @@ use crate::io::util::read_int::{
 use crate::io::util::read_int::{
     ReadU128, ReadU128Le, ReadU16, ReadU16Le, ReadU32, ReadU32Le, ReadU64, ReadU64Le, ReadU8,
 };
+use crate::io::util::read_interruptible::read_interruptible;
 use crate::io::util::read_to_end::{read_to_end, ReadToEnd};
 use crate::io::util::read_to_string::{read_to_string, ReadToString};
 use crate::io::util::take::{take, Take};
-use crate::io::AsyncRead;
+use crate::io::{AsyncRead, ReadInterruptible};
 
 use bytes::BufMut;
 
@@ -1447,6 +1450,62 @@ cfg_io_util! {
             Self: Sized,
         {
             take(self, limit)
+        }
+
+        /// Creates an adaptor which will stop reading once a signal future resolves.
+        ///
+        /// This function returns an implementation of `AsyncRead` wrapping `Self`
+        /// which will read from the underlying reader until the provided `signal`
+        /// future resolves, after which it will always return EOF (`Ok(0)`).
+        ///
+        /// When the signal resolves, reading stops immediately:
+        /// even data that is already buffered in the underlying
+        /// reader is not returned.
+        /// Any subsequent calls to [`read()`] will return EOF.
+        ///
+        /// The returned `AsyncRead` implementation also implements `AsyncWrite` and `AsyncSeek`;
+        /// it performs writing and seeking regardless of the `signal` future;
+        /// only reading is interrupted by the `signal`.
+        /// The returned type can therefore be used for bi-directional I/O.
+        ///
+        /// [`read()`]: fn@crate::io::AsyncReadExt::read
+        ///
+        /// # Examples
+        ///
+        /// Using a `oneshot` channel as the signal:
+        ///
+        /// ```
+        /// use tokio::io::{self, AsyncReadExt};
+        /// use tokio::sync::oneshot;
+        ///
+        /// #[tokio::main]
+        /// async fn main() -> io::Result<()> {
+        ///     let reader = io::repeat(0xff);
+        ///     let (tx, rx) = oneshot::channel::<()>();
+        ///
+        ///     // Signal that reading should stop.
+        ///     tx.send(()).unwrap();
+        ///
+        ///     let mut buffer = vec![0u8; 10];
+        ///     let mut interruptible = reader.read_interruptible(async move {
+        ///         let _ = rx.await;
+        ///     });
+        ///
+        ///     // Even though `repeat` has data available, no bytes are read
+        ///     // because the signal has already resolved.
+        ///     let n = interruptible.read(&mut buffer).await?;
+        ///     assert_eq!(n, 0);
+        ///
+        ///     assert!(interruptible.is_stopped());
+        ///
+        ///     Ok(())
+        /// }
+        /// ```
+        fn read_interruptible<F: Future>(self, signal: F) -> ReadInterruptible<Self, F>
+        where
+            Self: Sized,
+        {
+            read_interruptible(self, signal)
         }
     }
 }
