@@ -5,7 +5,9 @@ use crate::runtime::{
     blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback, TimerFlavor,
 };
 #[cfg(tokio_unstable)]
-use crate::runtime::{metrics::HistogramConfiguration, LocalOptions, LocalRuntime, TaskMeta};
+use crate::runtime::{metrics::HistogramConfiguration, TaskMeta};
+
+use crate::runtime::{LocalOptions, LocalRuntime};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use crate::runtime::blocking::BlockingPool;
@@ -53,6 +55,9 @@ use std::time::Duration;
 pub struct Builder {
     /// Runtime type
     kind: Kind,
+
+    /// Name of the runtime.
+    name: Option<String>,
 
     /// Whether or not to enable the I/O driver
     enable_io: bool,
@@ -143,6 +148,10 @@ pub struct Builder {
     pub(super) unhandled_panic: UnhandledPanic,
 
     timer_flavor: TimerFlavor,
+
+    /// Whether or not to enable eager hand-off for the I/O and time drivers (in
+    /// `tokio_unstable`).
+    enable_eager_driver_handoff: bool,
 }
 
 cfg_unstable! {
@@ -244,7 +253,7 @@ impl Builder {
     /// Configuration methods can be chained on the return value.
     ///
     /// To spawn non-`Send` tasks on the resulting runtime, combine it with a
-    /// [`LocalSet`], or call [`build_local`] to create a [`LocalRuntime`] (unstable).
+    /// [`LocalSet`], or call [`build_local`] to create a [`LocalRuntime`].
     ///
     /// [`LocalSet`]: crate::task::LocalSet
     /// [`LocalRuntime`]: crate::runtime::LocalRuntime
@@ -276,6 +285,9 @@ impl Builder {
     pub(crate) fn new(kind: Kind, event_interval: u32) -> Builder {
         Builder {
             kind,
+
+            // Default runtime name
+            name: None,
 
             // I/O defaults to "off"
             enable_io: false,
@@ -336,6 +348,9 @@ impl Builder {
             disable_lifo_slot: false,
 
             timer_flavor: TimerFlavor::Traditional,
+
+            // Eager driver handoff is disabled by default.
+            enable_eager_driver_handoff: false,
         }
     }
 
@@ -413,6 +428,40 @@ impl Builder {
     pub fn enable_alt_timer(&mut self) -> &mut Self {
         self.enable_time();
         self.timer_flavor = TimerFlavor::Alternative;
+        self
+    }
+
+    /// Enable eager hand-off of the I/O and time drivers for multi-threaded
+    /// runtimes, which is disabled by default.
+    ///
+    /// When this option is enabled, a worker thread which has parked on the I/O
+    /// or time driver will notify another worker thread once it is preparing to
+    /// begin polling a task from the run queue, so that the notified worker can
+    /// begin polling the I/O or time driver. This can reduce the latency with
+    /// which I/O and timer notifications are processed, especially when some
+    /// tasks have polls that take a long time to complete. In addition, it can
+    /// reduce the risk of a deadlock which may occur when a task blocks the
+    /// worker thread which is holding the I/O or time driver until some other
+    /// task, which is waiting for a notification from *that* driver, unblocks
+    /// it.
+    ///
+    /// This option is disabled by default, as enabling it may potentially
+    /// increase contention due to extra synchronization in cross-driver
+    /// wakeups.
+    ///
+    /// This option only applies to multi-threaded runtimes. Attempting to use
+    /// this option with any other runtime type will have no effect.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. Eager driver hand-off is
+    /// an experimental feature whose behavior may be removed or changed in 1.x
+    /// releases. See [the documentation on unstable features][unstable] for
+    /// details.
+    ///
+    /// [unstable]: crate#unstable-features
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
+    pub fn enable_eager_driver_handoff(&mut self) -> &mut Self {
+        self.enable_eager_driver_handoff = true;
         self
     }
 
@@ -545,6 +594,34 @@ impl Builder {
     pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
         let val = val.into();
         self.thread_name = std::sync::Arc::new(move || val.clone());
+        self
+    }
+
+    /// Sets the name of the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// # use tokio::runtime;
+    ///
+    /// # pub fn main() {
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .name("my-runtime")
+    ///     .build();
+    /// # }
+    /// # }
+    /// ```
+    /// # Panics
+    ///
+    /// This function will panic if an empty value is passed as an argument.
+    ///
+    #[track_caller]
+    pub fn name(&mut self, val: impl Into<String>) -> &mut Self {
+        let val = val.into();
+        assert!(!val.trim().is_empty(), "runtime name shouldn't be empty");
+        self.name = Some(val);
         self
     }
 
@@ -1024,8 +1101,6 @@ impl Builder {
     /// });
     /// ```
     #[allow(unused_variables, unreachable_patterns)]
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn build_local(&mut self, options: LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
@@ -1233,22 +1308,21 @@ impl Builder {
         /// scheduled task being polled first.
         ///
         /// To implement this heuristic, each worker thread has a slot which
-        /// holds the task that should be polled next. However, this slot cannot
-        /// be stolen by other worker threads, which can result in lower total
-        /// throughput when tasks tend to have longer poll times.
+        /// holds the task that should be polled next. In earlier versions of
+        /// Tokio, this slot could not be stolen by other worker threads, which
+        /// can result in lower total throughput when tasks tend to have longer
+        /// poll times.
         ///
         /// This configuration option will disable this heuristic resulting in
-        /// all scheduled tasks being pushed into the worker-local queue, which
-        /// is stealable.
-        ///
-        /// Consider trying this option when the task "scheduled" time is high
-        /// but the runtime is underutilized. Use [tokio-rs/tokio-metrics] to
-        /// collect this data.
+        /// all scheduled tasks being pushed into the worker-local queue. This
+        /// was intended as a workaround for the LIFO slot not being stealable.
+        /// As of Tokio 1.51, tasks can be stolen from the LIFO slot. In a
+        /// future version, this option may be deprecated.
         ///
         /// # Unstable
         ///
-        /// This configuration option is considered a workaround for the LIFO
-        /// slot not being stealable. When the slot becomes stealable, we will
+        /// This configuration option was considered a workaround for the LIFO
+        /// slot not being stealable. Since this is no longer the case, we will
         /// revisit whether or not this option is necessary. See
         /// issue [tokio-rs/tokio#4941].
         ///
@@ -1581,7 +1655,6 @@ impl Builder {
         ))
     }
 
-    #[cfg(tokio_unstable)]
     fn build_current_thread_local_runtime(&mut self) -> io::Result<LocalRuntime> {
         use crate::runtime::local_runtime::LocalRuntimeScheduler;
 
@@ -1639,12 +1712,17 @@ impl Builder {
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
+                // This setting never makes sense for a current thread runtime,
+                // as it only configures how the I/O driver is stolen across
+                // workers.
+                enable_eager_driver_handoff: false,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 metrics_schedule_latency_histogram: self
                     .metrics_schedule_latency_histogram_builder(),
             },
             local_tid,
+            self.name.clone(),
         );
 
         let handle = Handle {
@@ -1959,11 +2037,13 @@ cfg_rt_multi_thread! {
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
+                    enable_eager_driver_handoff: self.enable_eager_driver_handoff,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                     metrics_schedule_latency_histogram: self.metrics_schedule_latency_histogram_builder(),
                 },
                 self.timer_flavor,
+                self.name.clone(),
             );
 
             let handle = Handle { inner: scheduler::Handle::MultiThread(handle) };
@@ -1979,7 +2059,13 @@ cfg_rt_multi_thread! {
 
 impl fmt::Debug for Builder {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Builder")
+        let mut debug = fmt.debug_struct("Builder");
+
+        if let Some(name) = &self.name {
+            debug.field("name", name);
+        }
+
+        debug
             .field("worker_threads", &self.worker_threads)
             .field("max_blocking_threads", &self.max_blocking_threads)
             .field(
@@ -1991,6 +2077,15 @@ impl fmt::Debug for Builder {
             .field("before_stop", &self.before_stop.as_ref().map(|_| "..."))
             .field("before_park", &self.before_park.as_ref().map(|_| "..."))
             .field("after_unpark", &self.after_unpark.as_ref().map(|_| "..."))
-            .finish()
+            .field(
+                "enable_eager_driver_handoff",
+                &self.enable_eager_driver_handoff,
+            );
+
+        if self.name.is_none() {
+            debug.finish_non_exhaustive()
+        } else {
+            debug.finish()
+        }
     }
 }

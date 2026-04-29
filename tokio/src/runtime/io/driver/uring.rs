@@ -2,12 +2,14 @@ use io_uring::{squeue::Entry, IoUring, Probe};
 use mio::unix::SourceFd;
 use slab::Slab;
 
+use crate::runtime::driver::op::CancelData;
+use crate::runtime::driver::op::CqeResult;
 use crate::runtime::driver::op::{Cancellable, Lifecycle};
 use crate::{io::Interest, loom::sync::Mutex};
 
 use super::{Handle, TOKEN_WAKEUP};
 
-use std::os::fd::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::{io, mem, task::Waker};
 
 const DEFAULT_RING_SIZE: u32 = 256;
@@ -77,9 +79,16 @@ impl UringContext {
                     waker.wake_by_ref();
                     *ops.get_mut(idx).unwrap() = Lifecycle::Completed(cqe);
                 }
-                Some(Lifecycle::Cancelled(_)) => {
+                Some(Lifecycle::Cancelled(cancel_data)) => {
+                    if let CancelData::Open(_) = cancel_data {
+                        if let Ok(fd) = CqeResult::from(cqe).result {
+                            // SAFETY: the successful CQE result provides
+                            // a non-negative integer, and the event is
+                            // related to an open operation.
+                            unsafe { OwnedFd::from_raw_fd(fd as i32) };
+                        }
+                    }
                     // Op future was cancelled, so we discard the result.
-                    // We just remove the entry from the slab.
                     ops.remove(idx);
                 }
                 Some(other) => {
@@ -147,6 +156,16 @@ impl Drop for UringContext {
 
             for cqe in self.ring_mut().completion() {
                 let idx = cqe.user_data() as usize;
+
+                if let Some(Lifecycle::Cancelled(CancelData::Open(_))) = ops.get_mut(idx) {
+                    if let Ok(fd) = CqeResult::from(cqe).result {
+                        // SAFETY: the successful CQE result provides
+                        // a non-negative integer, and the event is
+                        // related to an open operation.
+                        unsafe { OwnedFd::from_raw_fd(fd as i32) };
+                    }
+                };
+
                 ops.remove(idx);
             }
         }
@@ -162,6 +181,26 @@ impl Handle {
 
     pub(crate) fn get_uring(&self) -> &Mutex<UringContext> {
         &self.uring_context
+    }
+
+    /// Returns `true` if io_uring has already been initialized and the given
+    /// opcode is supported. Returns `false` if io_uring hasn't been
+    /// initialized yet or is unsupported. Unlike `check_and_init`, this
+    /// doesn't attempt initialization.
+    #[cfg_attr(test, allow(dead_code))]
+    pub(crate) fn is_uring_ready(&self, opcode: u8) -> bool {
+        self.uring_probe
+            .get()
+            .and_then(|opt| opt.as_ref())
+            .is_some_and(|probe| probe.is_supported(opcode))
+    }
+
+    /// Returns `true` if the io_uring probe has already been attempted
+    /// (regardless of whether io_uring is supported). Returns `false` if
+    /// no probe has been attempted yet.
+    #[cfg_attr(test, allow(dead_code))]
+    pub(crate) fn is_uring_probed(&self) -> bool {
+        self.uring_probe.get().is_some()
     }
 
     /// Check if the io_uring context is initialized. If not, it will try to initialize it.
@@ -272,7 +311,15 @@ impl Handle {
         match mem::replace(lifecycle, Lifecycle::Cancelled(cancel_data)) {
             Lifecycle::Submitted | Lifecycle::Waiting(_) => (),
             // The driver saw the completion, but it was never polled.
-            Lifecycle::Completed(_) => {
+            Lifecycle::Completed(cqe) => {
+                if let Lifecycle::Cancelled(CancelData::Open(_)) = lifecycle {
+                    if let Ok(fd) = CqeResult::from(cqe).result {
+                        // SAFETY: the successful CQE result provides
+                        // a non-negative integer, and the event is
+                        // related to an open operation.
+                        unsafe { OwnedFd::from_raw_fd(fd as i32) };
+                    }
+                }
                 // We can safely remove the entry from the slab, as it has already been completed.
                 ops.remove(index);
             }

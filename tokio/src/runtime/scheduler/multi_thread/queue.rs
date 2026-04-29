@@ -52,6 +52,13 @@ pub(crate) struct Inner<T: 'static> {
     /// Only updated by producer thread but read by many threads.
     tail: AtomicUnsignedShort,
 
+    /// When a task is scheduled from a worker, it is stored in this slot. The
+    /// worker will check this slot for a task **before** checking the run
+    /// queue. This effectively results in the **last** scheduled task to be run
+    /// next (LIFO). This is an optimization for improving locality which
+    /// benefits message passing patterns and helps to reduce latency.
+    lifo: task::AtomicNotified<T>,
+
     /// Elements
     buffer: Box<[UnsafeCell<MaybeUninit<task::Notified<T>>>; LOCAL_QUEUE_CAPACITY]>,
 }
@@ -92,6 +99,7 @@ pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
     let inner = Arc::new(Inner {
         head: AtomicUnsignedLong::new(0),
         tail: AtomicUnsignedShort::new(0),
+        lifo: task::AtomicNotified::empty(),
         buffer: make_fixed_size(buffer.into_boxed_slice()),
     });
 
@@ -108,9 +116,10 @@ impl<T> Local<T> {
     /// Returns the number of entries in the queue
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.inner.head.load(Acquire));
+        let lifo = self.inner.lifo.is_some() as usize;
         // safety: this is the **only** thread that updates this cell.
         let tail = unsafe { self.inner.tail.unsync_load() };
-        len(head, tail)
+        len(head, tail) + lifo
     }
 
     /// How many tasks can be pushed into the queue
@@ -274,9 +283,7 @@ impl<T> Local<T> {
             "queue is not full; tail = {tail}; head = {head}"
         );
 
-        let prev = pack(head, head);
-
-        // Claim a bunch of tasks
+        // Claim all tasks.
         //
         // We are claiming the tasks **before** reading them out of the buffer.
         // This is safe because only the **current** thread is able to push new
@@ -289,15 +296,7 @@ impl<T> Local<T> {
         if self
             .inner
             .head
-            .compare_exchange(
-                prev,
-                pack(
-                    head.wrapping_add(NUM_TASKS_TAKEN),
-                    head.wrapping_add(NUM_TASKS_TAKEN),
-                ),
-                Release,
-                Relaxed,
-            )
+            .compare_exchange_weak(pack(head, head), pack(tail, tail), Release, Relaxed)
             .is_err()
         {
             // We failed to claim the tasks, losing the race. Return out of
@@ -305,6 +304,29 @@ impl<T> Local<T> {
             // may not be full anymore.
             return Err(task);
         }
+
+        // Add back the first half of tasks.
+        //
+        // We are doing it this way instead of just taking half of the tasks because we want the
+        // *second* half of the tasks, and if you just incremented `head` by `NUM_TASKS_TAKEN`,
+        // then you would be taking the first half instead of the second half.
+        //
+        // Pushing the second half of the local queue to the injection queue is better because when
+        // we take tasks *out* of the injection queue, we always place them in the first half. This
+        // means that if a task is in the second half, then we know for sure that this task is not
+        // a task we just got from the injection queue. This ensures that when we take a task out
+        // of the injection queue, then it will not be moved back into the injection queue (at
+        // least not until after we have polled it at least once).
+        //
+        // Note that if a concurrent worker tries to steal from us between these two operations and
+        // sees that the worker queue is empty, then that worker may go to sleep, and we do not
+        // notify it about these tasks becoming available for stealing again. Ordinarily this would
+        // be a problem, but it isn't in this case because the worker will be notified about the
+        // tasks we are adding to the injection queue instead, which ensures that the stealer wakes
+        // up again to take the tasks from the injection queue.
+        self.inner
+            .tail
+            .store(tail.wrapping_add(NUM_TASKS_TAKEN), Release);
 
         /// An iterator that takes elements out of the run queue.
         struct BatchTaskIter<'a, T: 'static> {
@@ -337,7 +359,7 @@ impl<T> Local<T> {
         // values again, and we are the only producer.
         let batch_iter = BatchTaskIter {
             buffer: &self.inner.buffer,
-            head: head as UnsignedLong,
+            head: head.wrapping_add(NUM_TASKS_TAKEN) as UnsignedLong,
             i: 0,
         };
         overflow.push_batch(batch_iter.chain(std::iter::once(task)));
@@ -378,7 +400,7 @@ impl<T> Local<T> {
             let res = self
                 .inner
                 .head
-                .compare_exchange(head, next, AcqRel, Acquire);
+                .compare_exchange_weak(head, next, AcqRel, Acquire);
 
             match res {
                 Ok(_) => break real as usize & MASK,
@@ -388,6 +410,19 @@ impl<T> Local<T> {
 
         Some(self.inner.buffer[idx].with(|ptr| unsafe { ptr::read(ptr).assume_init() }))
     }
+
+    /// Pushes a task to the LIFO slot, returning the task previously in the
+    /// LIFO slot (if there was one).
+    pub(crate) fn push_lifo(&self, task: task::Notified<T>) -> Option<task::Notified<T>> {
+        self.inner.lifo.swap(Some(task))
+    }
+
+    /// Pops the task currently held in the LIFO slot, if there is one;
+    /// otherwise, returns `None`.
+    pub(crate) fn pop_lifo(&self) -> Option<task::Notified<T>> {
+        // LIFO-suction!
+        self.inner.lifo.take()
+    }
 }
 
 impl<T> Steal<T> {
@@ -395,7 +430,8 @@ impl<T> Steal<T> {
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.0.head.load(Acquire));
         let tail = self.0.tail.load(Acquire);
-        len(head, tail)
+        let lifo = self.0.lifo.is_some() as usize;
+        len(head, tail) + lifo
     }
 
     /// Return true if the queue is empty,
@@ -430,8 +466,14 @@ impl<T> Steal<T> {
         let mut n = self.steal_into2(dst, dst_tail);
 
         if n == 0 {
-            // No tasks were stolen
-            return None;
+            // If no tasks were stolen, let's see if there's one in the LIFO
+            // slot.
+            let lifo = self.0.lifo.take();
+            if lifo.is_some() {
+                dst_stats.incr_steal_count(1);
+                dst_stats.incr_steal_operations();
+            }
+            return lifo;
         }
 
         dst_stats.incr_steal_count(n as u16);
@@ -494,7 +536,7 @@ impl<T> Steal<T> {
             let res = self
                 .0
                 .head
-                .compare_exchange(prev_packed, next_packed, AcqRel, Acquire);
+                .compare_exchange_weak(prev_packed, next_packed, AcqRel, Acquire);
 
             match res {
                 Ok(_) => break n,
@@ -543,17 +585,11 @@ impl<T> Steal<T> {
             let res = self
                 .0
                 .head
-                .compare_exchange(prev_packed, next_packed, AcqRel, Acquire);
+                .compare_exchange_weak(prev_packed, next_packed, AcqRel, Acquire);
 
             match res {
                 Ok(_) => return n,
-                Err(actual) => {
-                    let (actual_steal, actual_real) = unpack(actual);
-
-                    assert_ne!(actual_steal, actual_real);
-
-                    prev_packed = actual;
-                }
+                Err(actual) => prev_packed = actual,
             }
         }
     }
@@ -569,6 +605,7 @@ impl<T> Drop for Local<T> {
     fn drop(&mut self) {
         if !std::thread::panicking() {
             assert!(self.pop().is_none(), "queue not empty");
+            assert!(self.pop_lifo().is_none(), "LIFO slot not empty");
         }
     }
 }

@@ -1,3 +1,4 @@
+use futures_core::FusedStream;
 use tokio_stream::{Stream, StreamExt};
 
 use std::pin::Pin;
@@ -37,16 +38,22 @@ async fn basic_usage() {
     // however, once it is fused
     let mut stream = stream.fuse();
 
+    assert!(!stream.is_terminated());
     assert_eq!(stream.size_hint(), (0, None));
     assert_eq!(stream.next().await, Some(4));
 
+    assert!(!stream.is_terminated());
     assert_eq!(stream.size_hint(), (0, None));
     assert_eq!(stream.next().await, None);
+
+    assert!(stream.is_terminated());
 
     // it will always return `None` after the first time.
     assert_eq!(stream.size_hint(), (0, Some(0)));
     assert_eq!(stream.next().await, None);
     assert_eq!(stream.size_hint(), (0, Some(0)));
+
+    assert!(stream.is_terminated());
 }
 
 #[tokio::test]

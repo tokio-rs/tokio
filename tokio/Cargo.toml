@@ -6,7 +6,7 @@ name = "tokio"
 #   - README.md
 # - Update CHANGELOG.md.
 # - Create "v1.x.y" git tag.
-version = "1.50.0"
+version = "1.52.1"
 edition = "2021"
 rust-version = "1.71"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -92,17 +92,17 @@ taskdump = ["dep:backtrace"]
 schedule-latency = []
 
 [dependencies]
-tokio-macros = { version = "~2.6.0", optional = true }
+tokio-macros = { version = "~2.7.0", optional = true }
 
 pin-project-lite = "0.2.11"
 
 # Everything else is optional...
 bytes = { version = "1.2.1", optional = true }
-mio = { version = "1.0.1", optional = true, default-features = false }
+mio = { version = "1.2.0", optional = true, default-features = false }
 parking_lot = { version = "0.12.0", optional = true }
 
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-socket2 = { version = "0.6.0", optional = true, features = ["all"] }
+[target.'cfg(any(not(target_family = "wasm"), all(target_os = "wasi", not(target_env = "p1"))))'.dependencies]
+socket2 = { version = "0.6.3", optional = true, features = ["all"] }
 
 # Currently unstable. The API exposed by these features may be broken at any time.
 # Requires `--cfg tokio_unstable` to enable.
@@ -114,17 +114,23 @@ tracing = { version = "0.1.29", default-features = false, features = ["std"], op
 [target.'cfg(all(tokio_unstable, target_os = "linux"))'.dependencies]
 io-uring = { version = "0.7.11", default-features = false, optional = true }
 libc = { version = "0.2.168", optional = true }
-mio = { version = "1.0.1", default-features = false, features = ["os-poll", "os-ext"], optional = true }
+mio = { version = "1.2.0", default-features = false, features = ["os-poll", "os-ext"], optional = true }
 slab = { version = "0.4.9", optional = true }
 backtrace = { version = "0.3.58", optional = true }
+
+[target.'cfg(all(tokio_unstable, target_os = "linux"))'.dev-dependencies]
+backtrace = "0.3.58"
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.168", optional = true }
 signal-hook-registry = { version = "1.1.1", optional = true }
 
+[target.'cfg(target_os = "wasi")'.dependencies]
+libc = { version = "0.2.168", optional = true }
+
 [target.'cfg(unix)'.dev-dependencies]
 libc = { version = "0.2.168" }
-nix = { version = "0.29.0", default-features = false, features = ["aio", "fs", "socket"] }
+nix = { version = "0.31.0", default-features = false, features = ["aio", "fs", "socket"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.61"
@@ -159,7 +165,7 @@ rand = "0.9"
 wasm-bindgen-test = "0.3.0"
 
 [target.'cfg(target_os = "freebsd")'.dev-dependencies]
-mio-aio = { version = "1", features = ["tokio"] }
+mio-aio = { version = "2", features = ["tokio"] }
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = { version = "0.7", features = ["futures", "checkpoint"] }

@@ -61,6 +61,7 @@ fn allocated_bytes() -> usize {
 #[tokio::test]
 async fn memory_leak_when_fd_closed_before_drop() {
     use nix::sys::socket::{self, AddressFamily, SockFlag, SockType};
+    use std::os::fd::OwnedFd;
     use std::os::unix::io::{AsRawFd, RawFd};
     use std::sync::Arc;
     use tokio::io::unix::AsyncFd;
@@ -83,7 +84,7 @@ async fn memory_leak_when_fd_closed_before_drop() {
         }
     }
 
-    fn set_nonblocking(fd: RawFd) {
+    fn set_nonblocking(fd: &OwnedFd) {
         use nix::fcntl::{OFlag, F_GETFL, F_SETFL};
 
         let flags = nix::fcntl::fcntl(fd, F_GETFL).expect("fcntl(F_GETFL)");
@@ -119,7 +120,7 @@ async fn memory_leak_when_fd_closed_before_drop() {
         .unwrap();
 
         let raw_fd = fd_a.as_raw_fd();
-        set_nonblocking(raw_fd);
+        set_nonblocking(&fd_a);
         std::mem::forget(fd_a);
 
         let wrapper = Arc::new(RawFdWrapper { fd: raw_fd });
@@ -148,7 +149,7 @@ async fn memory_leak_when_fd_closed_before_drop() {
         .unwrap();
 
         let raw_fd = fd_a.as_raw_fd();
-        set_nonblocking(raw_fd);
+        set_nonblocking(&fd_a);
         std::mem::forget(fd_a);
 
         let wrapper = Arc::new(RawFdWrapper { fd: raw_fd });
@@ -175,7 +176,7 @@ async fn memory_leak_when_fd_closed_before_drop() {
         .unwrap();
 
         let raw_fd = fd_a.as_raw_fd();
-        set_nonblocking(raw_fd);
+        set_nonblocking(&fd_a);
         std::mem::forget(fd_a);
 
         let wrapper = Arc::new(RawFdWrapper { fd: raw_fd });

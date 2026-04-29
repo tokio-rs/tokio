@@ -37,7 +37,7 @@ help: consider importing this trait
  1 + use std::future::Future;
    |
 
-error[E0433]: failed to resolve: use of undeclared type `Pin`
+error[E0433]: cannot find type `Pin` in this scope
   --> tests/fail/macros_join.rs:35:17
    |
 35 |         let _ = Pin::new(&mut x);

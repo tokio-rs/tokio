@@ -1,3 +1,104 @@
+# 1.52.1 (April 16th, 2026)
+
+## Fixed
+
+- runtime: revert [#7757] to fix [a regression][#8056] that causes `spawn_blocking` to hang ([#8057])
+
+[#7757]: https://github.com/tokio-rs/tokio/pull/7757
+[#8056]: https://github.com/tokio-rs/tokio/pull/8056
+[#8057]: https://github.com/tokio-rs/tokio/pull/8057
+
+# 1.52.0 (April 14th, 2026)
+
+## Added
+
+- io: `AioSource::register_borrowed` for I/O safety support ([#7992])
+- net: add `try_io` function to `unix::pipe` sender and receiver types ([#8030])
+
+## Added (unstable)
+
+- runtime: `Builder::enable_eager_driver_handoff` setting enable eager hand off of the I/O and time drivers before polling tasks ([#8010])
+- taskdump: add `trace_with()` for customized task dumps ([#8025])
+- taskdump: allow `impl FnMut()` in `trace_with` instead of just `fn()` ([#8040])
+- fs: support `io_uring` in `AsyncRead` for `File` ([#7907])
+
+## Changed
+
+- runtime: improve `spawn_blocking` scalability with sharded queue ([#7757])
+- runtime: use `compare_exchange_weak()` in worker queue ([#8028])
+
+## Fixed
+
+- runtime: overflow second half of tasks when local queue is filled instead of first half ([#8029])
+
+## Documented
+
+- docs: fix typo in `oneshot::Sender::send` docs ([#8026])
+- docs: hide #[tokio::main] attribute in the docs of `sync::watch` ([#8035])
+- net: add docs on `ConnectionRefused` errors with UDP sockets ([#7870])
+
+[#7757]: https://github.com/tokio-rs/tokio/pull/7757
+[#7870]: https://github.com/tokio-rs/tokio/pull/7870
+[#7907]: https://github.com/tokio-rs/tokio/pull/7907
+[#7992]: https://github.com/tokio-rs/tokio/pull/7992
+[#8010]: https://github.com/tokio-rs/tokio/pull/8010
+[#8025]: https://github.com/tokio-rs/tokio/pull/8025
+[#8026]: https://github.com/tokio-rs/tokio/pull/8026
+[#8028]: https://github.com/tokio-rs/tokio/pull/8028
+[#8029]: https://github.com/tokio-rs/tokio/pull/8029
+[#8030]: https://github.com/tokio-rs/tokio/pull/8030
+[#8035]: https://github.com/tokio-rs/tokio/pull/8035
+[#8040]: https://github.com/tokio-rs/tokio/pull/8040
+
+# 1.51.1 (April 8th, 2026)
+
+### Fixed
+
+- sync: fix semaphore reopens after forget ([#8021])
+- net: surface errors from `SO_ERROR` on `recv` for UDP sockets on Linux ([#8001])
+
+### Fixed (unstable)
+
+- metrics: fix `worker_local_schedule_count` test ([#8008])
+- rt: do not leak fd when cancelling io\_uring open operation ([#7983])
+
+[#7983]: https://github.com/tokio-rs/tokio/pull/7983
+[#8001]: https://github.com/tokio-rs/tokio/pull/8001
+[#8008]: https://github.com/tokio-rs/tokio/pull/8008
+[#8021]: https://github.com/tokio-rs/tokio/pull/8021
+
+# 1.51.0 (April 3rd, 2026)
+
+### Added
+
+- net: implement `get_peer_cred` on Hurd ([#7989])
+- runtime: add `tokio::runtime::worker_index()` ([#7921])
+- runtime: add runtime name ([#7924])
+- runtime: stabilize `LocalRuntime` ([#7557])
+- wasm: add wasm32-wasip2 networking support ([#7933])
+
+### Changed
+
+- runtime: steal tasks from the LIFO slot ([#7431])
+
+### Fixed
+
+- docs: do not show "Available on non-loom only." doc label ([#7977])
+- macros: improve overall macro hygiene ([#7997])
+- sync: fix `notify_waiters` priority in `Notify` ([#7996])
+- sync: fix panic in `Chan::recv_many` when called with non-empty vector on closed channel ([#7991])
+
+[#7431]: https://github.com/tokio-rs/tokio/pull/7431
+[#7557]: https://github.com/tokio-rs/tokio/pull/7557
+[#7921]: https://github.com/tokio-rs/tokio/pull/7921
+[#7924]: https://github.com/tokio-rs/tokio/pull/7924
+[#7933]: https://github.com/tokio-rs/tokio/pull/7933
+[#7977]: https://github.com/tokio-rs/tokio/pull/7977
+[#7989]: https://github.com/tokio-rs/tokio/pull/7989
+[#7991]: https://github.com/tokio-rs/tokio/pull/7991
+[#7996]: https://github.com/tokio-rs/tokio/pull/7996
+[#7997]: https://github.com/tokio-rs/tokio/pull/7997
+
 # 1.50.0 (Mar 3rd, 2026)
 
 ### Added
@@ -273,7 +374,15 @@ The MSRV is increased to 1.71.
 [#7672]: https://github.com/tokio-rs/tokio/pull/7672
 [#7675]: https://github.com/tokio-rs/tokio/pull/7675
 
-# 1.47.3 (Januar 3rd, 2026)
+# 1.47.4 (April 2nd, 2026)
+
+### Fixed
+
+* sync: fix panic in `Chan::recv_many` when called with non-empty vector on closed channel ([#7991])
+
+[#7991]: https://github.com/tokio-rs/tokio/pull/7991
+
+# 1.47.3 (January 3rd, 2026)
 
 ### Fixed
 

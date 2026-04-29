@@ -73,16 +73,11 @@ use proc_macro::TokenStream;
 ///
 /// ## Local
 ///
-/// [Unstable API][unstable] only.
-///
 /// To use the [local runtime], the macro can be configured using
 ///
 /// ```rust
-/// # #[cfg(tokio_unstable)]
 /// #[tokio::main(flavor = "local")]
 /// # async fn main() {}
-/// # #[cfg(not(tokio_unstable))]
-/// # fn main() {}
 /// ```
 ///
 /// # Function arguments
@@ -90,6 +85,30 @@ use proc_macro::TokenStream;
 /// Arguments are allowed for any functions, aside from `main` which is special.
 ///
 /// # Usage
+///
+/// ## Set the name of the runtime
+///
+/// ```rust
+/// #[tokio::main(name = "my-runtime")]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new_multi_thread()
+///         .enable_all()
+///         .name("my-runtime")
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
 ///
 /// ## Using the multi-threaded runtime
 ///
@@ -141,25 +160,19 @@ use proc_macro::TokenStream;
 ///
 /// ## Using the local runtime
 ///
-/// Available in the [unstable API][unstable] only.
-///
 /// The [local runtime] is similar to the current-thread runtime but
 /// supports [`task::spawn_local`](../tokio/task/fn.spawn_local.html).
 ///
 /// ```rust
-/// # #[cfg(tokio_unstable)]
 /// #[tokio::main(flavor = "local")]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
-/// # #[cfg(not(tokio_unstable))]
-/// # fn main() {}
 /// ```
 ///
 /// Equivalent code not using `#[tokio::main]`
 ///
 /// ```rust
-/// # #[cfg(tokio_unstable)]
 /// fn main() {
 ///     tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
@@ -169,8 +182,6 @@ use proc_macro::TokenStream;
 ///             println!("Hello world");
 ///         })
 /// }
-/// # #[cfg(not(tokio_unstable))]
-/// # fn main() {}
 /// ```
 ///
 ///
@@ -407,6 +418,31 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// ## Usage
+///
+/// ### Set the name of the runtime
+///
+/// ```no_run
+/// #[tokio::test(name = "my-test-runtime")]
+/// async fn my_test() {
+///     assert!(true);
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::test]`
+///
+/// ```no_run
+/// #[test]
+/// fn my_test() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .name("my-test-runtime")
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             assert!(true);
+///         })
+/// }
+/// ```
 ///
 /// ### Using the multi-thread runtime
 ///

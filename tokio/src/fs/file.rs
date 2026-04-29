@@ -30,6 +30,11 @@ use crate::blocking::{spawn_blocking, spawn_mandatory_blocking};
 #[cfg(not(test))]
 use std::fs::File as StdFile;
 
+cfg_io_uring! {
+    #[cfg(not(test))]
+    use crate::spawn;
+}
+
 /// A reference to an open file on the filesystem.
 ///
 /// This is a specialized version of [`std::fs::File`] for usage from the
@@ -613,13 +618,7 @@ impl AsyncRead for File {
                     let std = me.std.clone();
 
                     let max_buf_size = cmp::min(dst.remaining(), me.max_buf_size);
-                    inner.state = State::Busy(spawn_blocking(move || {
-                        // SAFETY: the `Read` implementation of `std` does not
-                        // read from the buffer it is borrowing and correctly
-                        // reports the length of the data written into the buffer.
-                        let res = unsafe { buf.read_from(&mut &*std, max_buf_size) };
-                        (Operation::Read(res), buf)
-                    }));
+                    inner.state = State::Busy(Inner::poll_read_inner(std, buf, max_buf_size)?);
                 }
                 State::Busy(ref mut rx) => {
                     let (op, mut buf) = ready!(Pin::new(rx).poll(cx))?;
@@ -952,6 +951,125 @@ cfg_windows! {
 }
 
 impl Inner {
+    fn poll_read_inner(
+        std: Arc<StdFile>,
+        buf: Buf,
+        max_buf_size: usize,
+    ) -> io::Result<JoinHandle<(Operation, Buf)>> {
+        // Unit tests use `MockFile` and the mock `spawn_blocking` infrastructure,
+        // which can't drive real io_uring operations. The io_uring read path
+        // is tested through integration tests in `tests/fs_uring_file_read.rs`.
+        #[cfg(all(
+            not(test),
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        {
+            if let Ok(handle) = crate::runtime::Handle::try_current() {
+                let driver_handle = handle.inner.driver().io();
+
+                if driver_handle.is_uring_ready(io_uring::opcode::Read::CODE) {
+                    // Fast path: uring already initialized and Read supported.
+                    let fd: crate::io::uring::utils::ArcFd = std;
+                    return Ok(spawn(Self::uring_read(fd, buf, max_buf_size)));
+                }
+
+                if !driver_handle.is_uring_probed() {
+                    // Not yet probed: lazy init inside an async task so
+                    // `File::from_std()` can still benefit from io-uring.
+                    return Ok(spawn(Self::lazy_init_read(std, buf, max_buf_size)));
+                }
+                // Probed but unsupported: fall through to spawn_blocking.
+            }
+        }
+
+        // Fallback: spawn_blocking
+        let join = Self::spawn_blocking_read(buf, std, max_buf_size);
+        Ok(join)
+    }
+
+    /// Perform an io-uring read with interrupt retry.
+    #[cfg(all(
+        not(test),
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    async fn uring_read(
+        mut fd: crate::io::uring::utils::ArcFd,
+        mut buf: Buf,
+        max_buf_size: usize,
+    ) -> (Operation, Buf) {
+        use crate::runtime::driver::op::Op;
+
+        loop {
+            let (res, r_fd, r_buf) =
+                // u64::MAX to use and advance the file position
+                Op::read_at(fd, buf, max_buf_size, u64::MAX).await;
+            match res {
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => {
+                    buf = r_buf;
+                    fd = r_fd;
+                    continue;
+                }
+                Err(e) => break (Operation::Read(Err(e)), r_buf),
+                Ok(n) => break (Operation::Read(Ok(n as usize)), r_buf),
+            }
+        }
+    }
+
+    /// Attempt lazy io-uring initialization, then read via uring or fall back
+    /// to a blocking read. Covers the `File::from_std()` path where
+    /// `check_and_init()` hasn't been called yet.
+    #[cfg(all(
+        not(test),
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    async fn lazy_init_read(std: Arc<StdFile>, buf: Buf, max_buf_size: usize) -> (Operation, Buf) {
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+        if driver_handle
+            .check_and_init(io_uring::opcode::Read::CODE)
+            .await
+            .unwrap_or(false)
+        {
+            let fd: crate::io::uring::utils::ArcFd = std;
+            Self::uring_read(fd, buf, max_buf_size).await
+        } else {
+            match Self::spawn_blocking_read(buf, std, max_buf_size).await {
+                Ok(result) => result,
+                Err(e) => (
+                    Operation::Read(Err(io::Error::new(io::ErrorKind::Other, e))),
+                    Buf::with_capacity(0),
+                ),
+            }
+        }
+    }
+
+    fn spawn_blocking_read(
+        buf: Buf,
+        std: Arc<StdFile>,
+        max_buf_size: usize,
+    ) -> JoinHandle<(Operation, Buf)> {
+        spawn_blocking(move || {
+            let mut buf = buf;
+            // SAFETY: the `Read` implementation of `std` does not
+            // read from the buffer it is borrowing and correctly
+            // reports the length of the data written into the buffer.
+            let res = unsafe { buf.read_from(&mut &*std, max_buf_size) };
+            (Operation::Read(res), buf)
+        })
+    }
+
     async fn complete_inflight(&mut self) {
         use std::future::poll_fn;
 

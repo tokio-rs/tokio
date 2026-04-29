@@ -254,9 +254,9 @@ impl UdpSocket {
     /// [`std::net::UdpSocket`]: std::net::UdpSocket
     /// [`set_nonblocking`]: fn@std::net::UdpSocket::set_nonblocking
     pub fn into_std(self) -> io::Result<std::net::UdpSocket> {
-        #[cfg(unix)]
+        #[cfg(not(windows))]
         {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
             self.io
                 .into_inner()
                 .map(IntoRawFd::into_raw_fd)
@@ -531,7 +531,12 @@ impl UdpSocket {
     /// The [`connect`] method will connect this socket to a remote address.
     /// This method will fail if the socket is not connected.
     ///
+    /// This method may fail with a [`ConnectionRefused`] error if the remote
+    /// address has replied with ICMP Unreachable to a previously sent packet.
+    /// However, this behavior depends on the OS.
+    ///
     /// [`connect`]: method@Self::connect
+    /// [`ConnectionRefused`]: std::io::ErrorKind::ConnectionRefused
     ///
     /// # Return
     ///
@@ -785,7 +790,7 @@ impl UdpSocket {
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.io.recv(buf))
+            .async_io(Interest::READABLE | Interest::ERROR, || self.io.recv(buf))
             .await
     }
 
@@ -986,7 +991,9 @@ impl UdpSocket {
         /// }
         /// ```
         pub async fn recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
-            self.io.registration().async_io(Interest::READABLE, || {
+            self.io
+                .registration()
+                .async_io(Interest::READABLE | Interest::ERROR, || {
                 let dst = buf.chunk_mut();
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
@@ -1000,7 +1007,8 @@ impl UdpSocket {
                 }
 
                 Ok(n)
-            }).await
+            })
+            .await
         }
 
         /// Tries to receive a single datagram message on the socket. On success,
@@ -1117,7 +1125,9 @@ impl UdpSocket {
         /// }
         /// ```
         pub async fn recv_buf_from<B: BufMut>(&self, buf: &mut B) -> io::Result<(usize, SocketAddr)> {
-            self.io.registration().async_io(Interest::READABLE, || {
+            self.io
+                .registration()
+                .async_io(Interest::READABLE | Interest::ERROR, || {
                 let dst = buf.chunk_mut();
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
@@ -1130,8 +1140,9 @@ impl UdpSocket {
                     buf.advance_mut(n);
                 }
 
-                Ok((n,addr))
-            }).await
+                Ok((n, addr))
+            })
+            .await
         }
     }
 
@@ -1315,7 +1326,9 @@ impl UdpSocket {
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.io.recv_from(buf))
+            .async_io(Interest::READABLE | Interest::ERROR, || {
+                self.io.recv_from(buf)
+            })
             .await
     }
 
@@ -1556,7 +1569,7 @@ impl UdpSocket {
     pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.io.peek(buf))
+            .async_io(Interest::READABLE | Interest::ERROR, || self.io.peek(buf))
             .await
     }
 
@@ -1698,7 +1711,9 @@ impl UdpSocket {
     pub async fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.io.peek_from(buf))
+            .async_io(Interest::READABLE | Interest::ERROR, || {
+                self.io.peek_from(buf)
+            })
             .await
     }
 
@@ -1815,7 +1830,9 @@ impl UdpSocket {
     pub async fn peek_sender(&self) -> io::Result<SocketAddr> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.peek_sender_inner())
+            .async_io(Interest::READABLE | Interest::ERROR, || {
+                self.peek_sender_inner()
+            })
             .await
     }
 
@@ -2084,7 +2101,8 @@ impl UdpSocket {
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
-        target_os = "haiku"
+        target_os = "haiku",
+        target_os = "wasi",
     )))]
     #[cfg_attr(
         docsrs,
@@ -2093,7 +2111,8 @@ impl UdpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
-            target_os = "haiku"
+            target_os = "haiku",
+            target_os = "wasi",
         ))))
     )]
     pub fn tos_v4(&self) -> io::Result<u32> {
@@ -2112,7 +2131,8 @@ impl UdpSocket {
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
-        target_os = "haiku"
+        target_os = "haiku",
+        target_os = "wasi",
     )))]
     #[cfg_attr(
         docsrs,
@@ -2121,7 +2141,8 @@ impl UdpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
-            target_os = "haiku"
+            target_os = "haiku",
+            target_os = "wasi",
         ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
@@ -2144,7 +2165,8 @@ impl UdpSocket {
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
-        target_os = "haiku"
+        target_os = "haiku",
+        target_os = "wasi",
     )))]
     #[cfg_attr(
         docsrs,
@@ -2153,7 +2175,8 @@ impl UdpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
-            target_os = "haiku"
+            target_os = "haiku",
+            target_os = "wasi",
         ))))
     )]
     pub fn set_tos_v4(&self, tos: u32) -> io::Result<()> {
@@ -2172,7 +2195,8 @@ impl UdpSocket {
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
-        target_os = "haiku"
+        target_os = "haiku",
+        target_os = "wasi",
     )))]
     #[cfg_attr(
         docsrs,
@@ -2181,7 +2205,8 @@ impl UdpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
-            target_os = "haiku"
+            target_os = "haiku",
+            target_os = "wasi",
         ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
@@ -2297,10 +2322,10 @@ impl fmt::Debug for UdpSocket {
     }
 }
 
-#[cfg(unix)]
+#[cfg(not(windows))]
 mod sys {
     use super::UdpSocket;
-    use std::os::unix::prelude::*;
+    use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
 
     impl AsRawFd for UdpSocket {
         fn as_raw_fd(&self) -> RawFd {

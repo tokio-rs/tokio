@@ -384,7 +384,7 @@ impl Semaphore {
             let new = curr.saturating_sub(n);
             match self.permits.compare_exchange_weak(
                 curr_bits,
-                new << Self::PERMIT_SHIFT,
+                (new << Self::PERMIT_SHIFT) | (curr_bits & Self::CLOSED),
                 AcqRel,
                 Acquire,
             ) {
