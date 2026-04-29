@@ -42,7 +42,7 @@ async fn filter_terminated_after_inner_done() {
 
 #[tokio::test]
 async fn filter_map_not_terminated_before_done() {
-    let stream = fused_iter(vec![1, 2]).filter_map(|x| Some(x));
+    let stream = fused_iter(vec![1, 2]).filter_map(Some);
     assert!(!stream.is_terminated());
 }
 
