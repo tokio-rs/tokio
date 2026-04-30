@@ -130,7 +130,7 @@ pub struct Builder {
     pub(super) disable_lifo_slot: bool,
 
     /// When true, the LIFO slot can be work stolen.
-    enable_lifo_stealing: bool,
+    enable_lifo_slot_stealing: bool,
 
     /// Whether or not to enable eager hand-off for tasks in the LIFO slot.
     enable_eager_lifo_handoff: bool,
@@ -342,7 +342,7 @@ impl Builder {
             metrics_poll_count_histogram: HistogramBuilder::default(),
 
             disable_lifo_slot: false,
-            enable_lifo_stealing: false,
+            enable_lifo_slot_stealing: false,
             enable_eager_lifo_handoff: false,
 
             timer_flavor: TimerFlavor::Traditional,
@@ -1362,6 +1362,12 @@ impl Builder {
         /// See the docs for [`disable_lifo_slot`] for more details on what the
         /// LIFO slot is.
         ///
+        /// # Panics
+        ///
+        /// This option requires the LIFO slot to be enabled. If this option is
+        /// set together with [`disable_lifo_slot`], then building the runtime
+        /// will fail with a panic.
+        ///
         /// # Unstable
         ///
         /// This configuration option is unstable because we are considering
@@ -1371,7 +1377,7 @@ impl Builder {
         /// [`disable_lifo_slot`]: Self::disable_lifo_slot()
         /// [`enable_eager_lifo_handoff`]: Self::enable_eager_lifo_handoff()
         pub fn enable_lifo_slot_stealing(&mut self) -> &mut Self {
-            self.enable_lifo_stealing = true;
+            self.enable_lifo_slot_stealing = true;
             self
         }
 
@@ -1387,6 +1393,12 @@ impl Builder {
         /// blocks and the LIFO slot needs to be stolen. This can hurt the
         /// performance of some workloads. See [tokio-rs/tokio#8065] for
         /// details.
+        ///
+        /// # Panics
+        ///
+        /// This option requires that LIFO slot stealing is enabled. If this
+        /// option is enabled without [`enable_lifo_slot_stealing`], then this
+        /// results in a panic when building the runtime.
         ///
         /// # Unstable
         ///
@@ -1765,7 +1777,7 @@ impl Builder {
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
-                enable_lifo_stealing: self.enable_lifo_stealing,
+                enable_lifo_slot_stealing: self.enable_lifo_slot_stealing,
                 enable_eager_lifo_handoff: self.enable_eager_lifo_handoff,
                 // This setting never makes sense for a current thread runtime,
                 // as it only configures how the I/O driver is stolen across
@@ -1933,6 +1945,15 @@ cfg_rt_multi_thread! {
             let seed_generator_1 = self.seed_generator.next_generator();
             let seed_generator_2 = self.seed_generator.next_generator();
 
+            if self.disable_lifo_slot {
+                assert!(!self.enable_lifo_slot_stealing, "Enabling LIFO slot stealing does not make sense when LIFO slot is disabled");
+                assert!(!self.enable_eager_lifo_handoff, "Enabling eager LIFO handoff does not make sense when LIFO slot is disabled");
+            }
+
+            if self.enable_eager_lifo_handoff {
+                assert!(self.enable_lifo_slot_stealing, "Enabling eager LIFO handoff requires LIFO slot stealing to be enabled");
+            }
+
             let (scheduler, handle, launch) = MultiThread::new(
                 worker_threads,
                 driver,
@@ -1953,7 +1974,7 @@ cfg_rt_multi_thread! {
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
-                    enable_lifo_stealing: self.enable_lifo_stealing,
+                    enable_lifo_slot_stealing: self.enable_lifo_slot_stealing,
                     enable_eager_lifo_handoff: self.enable_eager_lifo_handoff,
                     enable_eager_driver_handoff: self.enable_eager_driver_handoff,
                     seed_generator: seed_generator_1,

@@ -1149,7 +1149,7 @@ impl Core {
             }
 
             let target = &shared.remotes[i];
-            let steal_lifo = shared.config.enable_lifo_stealing;
+            let steal_lifo = shared.config.enable_lifo_slot_stealing;
             if let Some(task) =
                 target
                     .steal
@@ -1458,7 +1458,7 @@ impl Handle {
     }
 
     fn notify_if_work_pending(&self) {
-        let steal_lifo = self.shared.config.enable_lifo_stealing;
+        let steal_lifo = self.shared.config.enable_lifo_slot_stealing;
         for remote in &self.shared.remotes[..] {
             if remote.steal.can_steal(steal_lifo) {
                 self.notify_parked_local();

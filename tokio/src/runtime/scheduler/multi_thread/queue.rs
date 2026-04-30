@@ -443,7 +443,10 @@ impl<T> Steal<T> {
         (len(head, tail) > 0) || (steal_lifo && self.0.lifo.is_some())
     }
 
-    /// Steals half the tasks from self and place them into `dst`.
+    /// Steals half the tasks from the run queue and places them into `dst`.
+    ///
+    /// When `steal_lifo` is set, this will also attempt to steal from the LIFO
+    /// slot if the queue is otherwise empty.
     pub(crate) fn steal_into(
         &self,
         dst: &mut Local<T>,
