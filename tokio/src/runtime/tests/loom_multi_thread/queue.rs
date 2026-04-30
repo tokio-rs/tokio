@@ -306,3 +306,66 @@ fn chained_steal() {
         while l2.pop().is_some() {}
     });
 }
+
+#[test]
+fn concurrent_steal_and_pop_lifo() {
+    loom::model(|| {
+        let (steal, local) = queue::local();
+
+        // Push a task to the LIFO slot
+        let (task, _) = unowned(async {});
+        local.push_lifo(task);
+
+        let th = thread::spawn({
+            let steal = steal.clone();
+            move || {
+                let mut stats = new_stats();
+                let (_, mut local) = queue::local();
+
+                // Attempt to steal, with steal_lifo = true
+                steal.steal_into(&mut local, &mut stats, true).is_some()
+            }
+        });
+
+        // Concurrently attempt to pop LIFO locally
+        let popped = local.pop_lifo().is_some();
+
+        let stolen = th.join().unwrap();
+
+        // Exactly one of them should have succeeded in getting the task.
+        assert!(stolen ^ popped, "exactly one should get the task");
+
+        // Verify that the LIFO slot is now empty.
+        assert!(local.pop_lifo().is_none());
+    });
+}
+
+#[test]
+fn concurrent_push_and_steal_lifo() {
+    loom::model(|| {
+        let (steal, local) = queue::local();
+
+        let th = thread::spawn({
+            let steal = steal.clone();
+            move || {
+                let mut stats = new_stats();
+                let (_, mut local) = queue::local();
+
+                // Attempt to steal, with steal_lifo = true
+                steal.steal_into(&mut local, &mut stats, true).is_some()
+            }
+        });
+
+        // Concurrently push a task to LIFO
+        let (task, _) = unowned(async {});
+        local.push_lifo(task);
+
+        let stolen = th.join().unwrap();
+
+        // Check if the task is still in the local LIFO slot
+        let in_local = local.pop_lifo().is_some();
+
+        // The task must be in exactly one place: either stolen or still local.
+        assert!(stolen ^ in_local, "task must be in exactly one place");
+    });
+}
