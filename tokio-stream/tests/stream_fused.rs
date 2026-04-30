@@ -101,8 +101,8 @@ async fn take_terminated_when_remaining_zero() {
     assert!(!stream.is_terminated());
     assert_eq!(stream.next().await, Some(2));
     // remaining hits 0 after getting the second item
-    assert_eq!(stream.next().await, None);
     assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
 }
 
 #[tokio::test]
