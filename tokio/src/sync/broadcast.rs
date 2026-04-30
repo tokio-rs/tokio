@@ -550,18 +550,16 @@ impl<T> Sender<T> {
         // Round to a power of two
         capacity = capacity.next_power_of_two();
 
-        let mut buffer = Vec::with_capacity(capacity);
-
-        for i in 0..capacity {
-            buffer.push(Mutex::new(Slot {
+        let buffer = (0..capacity).map(|i| {
+            Mutex::new(Slot {
                 rem: AtomicUsize::new(0),
                 pos: (i as u64).wrapping_sub(capacity as u64),
                 val: None,
-            }));
-        }
+            })
+        });
 
         let shared = Arc::new(Shared {
-            buffer: buffer.into_boxed_slice(),
+            buffer: buffer.collect(),
             mask: capacity - 1,
             tail: Mutex::new(Tail {
                 pos: 0,
