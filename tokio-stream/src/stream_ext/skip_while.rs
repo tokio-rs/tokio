@@ -75,8 +75,8 @@ where
 
 impl<St, F> FusedStream for SkipWhile<St, F>
 where
+    Self: Stream,
     St: FusedStream,
-    F: FnMut(&St::Item) -> bool,
 {
     fn is_terminated(&self) -> bool {
         self.stream.is_terminated()
