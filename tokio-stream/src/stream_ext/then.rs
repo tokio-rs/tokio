@@ -85,8 +85,9 @@ where
 
 impl<St, F, Fut> FusedStream for Then<St, Fut, F>
 where
-    Self: Stream,
     St: FusedStream,
+    Fut: Future,
+    F: FnMut(St::Item) -> Fut,
 {
     fn is_terminated(&self) -> bool {
         self.future.is_none() && self.stream.is_terminated()
