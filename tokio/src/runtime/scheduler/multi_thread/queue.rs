@@ -435,8 +435,10 @@ impl<T> Steal<T> {
         len(head, tail) + lifo
     }
 
-    /// Return true if the queue is empty,
-    /// false if there are any entries in the queue
+    /// Returns true if `steal_into` might be able to steal tasks.
+    ///
+    /// The `steal_lifo` parameter indicates whether the LIFO slot should be counted in this
+    /// analysis. Use the same value as what is passed to `steal_into`.
     pub(crate) fn can_steal(&self, steal_lifo: bool) -> bool {
         let (_, head) = unpack(self.0.head.load(Acquire));
         let tail = self.0.tail.load(Acquire);
