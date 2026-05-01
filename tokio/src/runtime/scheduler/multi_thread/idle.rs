@@ -23,8 +23,14 @@ pub(super) struct Synced {
     sleepers: Vec<usize>,
 }
 
-const UNPARK_SHIFT: usize = 16;
-const UNPARK_MASK: usize = !SEARCH_MASK;
+pub(super) struct TransitionToParked {
+    pub(super) is_last_searcher: bool,
+    pub(super) any_lifo: bool,
+}
+
+const UNPARK_SHIFT: usize = (usize::BITS as usize / 2) - 2;
+const ANY_LIFO: usize = 1 << (usize::BITS - 1);
+const UNPARK_MASK: usize = !(SEARCH_MASK | ANY_LIFO);
 const SEARCH_MASK: usize = (1 << UNPARK_SHIFT) - 1;
 
 #[derive(Copy, Clone)]
@@ -32,6 +38,10 @@ struct State(usize);
 
 impl Idle {
     pub(super) fn new(num_workers: usize) -> (Idle, Synced) {
+        assert!(
+            num_workers <= UNPARK_MASK,
+            "{num_workers} is too many workers (max is {UNPARK_MASK})"
+        );
         let init = State::new(num_workers);
 
         let idle = Idle {
@@ -88,7 +98,7 @@ impl Idle {
         shared: &Shared,
         worker: usize,
         is_searching: bool,
-    ) -> bool {
+    ) -> TransitionToParked {
         // Acquire the lock
         let mut lock = shared.synced.lock();
 
@@ -144,6 +154,19 @@ impl Idle {
         false
     }
 
+    pub(super) fn put_lifo(&self) -> bool {
+        State(self.state.fetch_or(ANY_LIFO, SeqCst)).any_lifo()
+    }
+
+    pub(super) fn clear_lifo(&self) {
+        self.state.fetch_and(!ANY_LIFO, SeqCst);
+    }
+
+    pub(super) fn should_attempt_lifo_steal(&self) -> bool {
+        let state = State(self.state.fetch_add(0, SeqCst));
+        state.any_lifo()
+    }
+
     /// Returns `true` if `worker_id` is contained in the sleep set.
     pub(super) fn is_parked(&self, shared: &Shared, worker_id: usize) -> bool {
         let lock = shared.synced.lock();
@@ -186,7 +209,7 @@ impl State {
     /// Track a sleeping worker
     ///
     /// Returns `true` if this is the final searching worker.
-    fn dec_num_unparked(cell: &AtomicUsize, is_searching: bool) -> bool {
+    fn dec_num_unparked(cell: &AtomicUsize, is_searching: bool) -> TransitionToParked {
         let mut dec = 1 << UNPARK_SHIFT;
 
         if is_searching {
@@ -194,7 +217,11 @@ impl State {
         }
 
         let prev = State(cell.fetch_sub(dec, SeqCst));
-        is_searching && prev.num_searching() == 1
+        let is_last_searcher = is_searching && prev.num_searching() == 1;
+        TransitionToParked {
+            is_last_searcher,
+            any_lifo: prev.any_lifo(),
+        }
     }
 
     /// Number of workers currently searching
@@ -205,6 +232,10 @@ impl State {
     /// Number of workers currently unparked
     fn num_unparked(self) -> usize {
         (self.0 & UNPARK_MASK) >> UNPARK_SHIFT
+    }
+
+    fn any_lifo(self) -> bool {
+        self.0 & ANY_LIFO == ANY_LIFO
     }
 }
 
@@ -237,4 +268,12 @@ fn test_state() {
     let state = State::new(10);
     assert_eq!(10, state.num_unparked());
     assert_eq!(0, state.num_searching());
+}
+
+#[test]
+fn masks() {
+    println!("UNPARK_SHIFT = {UNPARK_SHIFT}");
+    println!("UNPARK_MASK  = {UNPARK_MASK:064b}");
+    println!("SEARCH_MASK  = {SEARCH_MASK:064b}");
+    println!("ANY_LIFO     = {ANY_LIFO:064b}");
 }
