@@ -3,6 +3,7 @@ use crate::Stream;
 
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -46,5 +47,15 @@ where
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         super::merge_size_hints(self.a.size_hint(), self.b.size_hint())
+    }
+}
+
+impl<T, U> FusedStream for Chain<T, U>
+where
+    T: Stream,
+    U: FusedStream<Item = T::Item>,
+{
+    fn is_terminated(&self) -> bool {
+        self.a.is_terminated() && self.b.is_terminated()
     }
 }

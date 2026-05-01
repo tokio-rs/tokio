@@ -4,6 +4,7 @@ use core::fmt;
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -79,5 +80,16 @@ where
         let upper = upper.and_then(|upper| upper.checked_add(future_len));
 
         (lower, upper)
+    }
+}
+
+impl<St, F, Fut> FusedStream for Then<St, Fut, F>
+where
+    St: FusedStream,
+    Fut: Future,
+    F: FnMut(St::Item) -> Fut,
+{
+    fn is_terminated(&self) -> bool {
+        self.future.is_none() && self.stream.is_terminated()
     }
 }
