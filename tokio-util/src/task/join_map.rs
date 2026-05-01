@@ -468,6 +468,60 @@ where
         }
     }
 
+    /// Tries to join one of the tasks in the map that has completed and
+    /// returns its output, along with the key corresponding to that task.
+    ///
+    /// Returns `None` if there are no completed tasks, or if the map is empty.
+    ///
+    /// # Returns
+    ///
+    /// This function returns:
+    ///
+    ///  * `Some((key, Ok(value)))` if one of the tasks in this `JoinMap` has
+    ///    completed. The `value` is the return value of that task, and `key`
+    ///    is the key associated with the task.
+    ///  * `Some((key, Err(err)))` if one of the tasks in this `JoinMap` has
+    ///    panicked or been aborted. `key` is the key associated with the task
+    ///    that panicked or was aborted.
+    ///  * `None` if there are no completed tasks ready to be joined, or the
+    ///    `JoinMap` is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio_util::task::JoinMap;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut map = JoinMap::new();
+    /// map.spawn("answer", async { 42 });
+    ///
+    /// let (key, res) = loop {
+    ///     if let Some(joined) = map.try_join_next() {
+    ///         break joined;
+    ///     }
+    ///     tokio::task::yield_now().await;
+    /// };
+    ///
+    /// assert_eq!(key, "answer");
+    /// assert_eq!(res.unwrap(), 42);
+    /// # }
+    /// ```
+    pub fn try_join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
+        loop {
+            let (res, id) = match self.tasks.try_join_next_with_id()? {
+                Ok((id, output)) => (Ok(output), id),
+                Err(e) => {
+                    let id = e.id();
+                    (Err(e), id)
+                }
+            };
+            if let Some(key) = self.remove_by_id(id) {
+                break Some((key, res));
+            }
+        }
+    }
+
     /// Aborts all tasks and waits for them to finish shutting down.
     ///
     /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_next`] in
