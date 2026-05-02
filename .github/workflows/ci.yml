@@ -1314,8 +1314,7 @@ jobs:
             # Enable all unstable features except `io_uring` and `taskdump`,
             # which are Linux-only features.
             RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
-            RUSTDOCFLAGS="--cfg tokio_unstable" \
-              cargo test \
+            cargo test \
                 --features $TOKIO_STABLE_FEATURES,tracing
 
   freebsd-docs:
@@ -1329,14 +1328,13 @@ jobs:
         env:
           RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
           RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
-          RUST_NIGHTLY: nightly-2025-10-12
         with:
           release: '14.4'
-          envs: "TOKIO_STABLE_FEATURES RUST_NIGHTLY RUSTDOCFLAGS RUSTFLAGS"
+          envs: "TOKIO_STABLE_FEATURES RUSTDOCFLAGS RUSTFLAGS"
           prepare: |
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
-            sh rustup.sh -y --profile minimal --default-toolchain $RUST_NIGHTLY
+            sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_nightly }}
           run: |
             . $HOME/.cargo/env
             # We use `--features $TOKIO_STABLE_FEATURES,io-uring,tracing` instead of
