@@ -788,6 +788,91 @@ async fn drop_permit_iterator_releases_permits() {
     }
 }
 
+#[test]
+fn dropping_last_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permit);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn dropping_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permit);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn dropping_last_permit_iterator_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permits = tx.try_reserve_many(1).unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permits);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn sending_last_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    permit.send(());
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn sending_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    permit.send(());
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn releasing_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    let inert_sender = permit.release();
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+    drop(inert_sender);
+}
+
 #[maybe_tokio_test]
 async fn dropping_rx_closes_channel() {
     let (tx, rx) = mpsc::channel(100);
