@@ -217,14 +217,13 @@ use proc_macro::TokenStream;
 ///         panic!("This panic will shutdown the runtime.");
 ///     }).await;
 /// }
+/// # #[cfg(not(tokio_unstable))]
 /// # fn main() { }
 /// ```
 ///
 /// Equivalent code not using `#[tokio::main]`
 ///
 /// ```no_run
-/// use tokio::runtime::UnhandledPanic;
-///
 /// #[cfg(tokio_unstable)]
 /// fn main() {
 ///     tokio::runtime::Builder::new_current_thread()
@@ -238,6 +237,7 @@ use proc_macro::TokenStream;
 ///             }).await;
 ///         })
 /// }
+/// # #[cfg(not(tokio_unstable))]
 /// # fn main() { }
 /// ```
 ///
