@@ -1253,8 +1253,7 @@ jobs:
             # Enable all unstable features except `io_uring` and `taskdump`,
             # which are Linux-only features.
             RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
-            RUSTDOCFLAGS="--cfg tokio_unstable" \
-              cargo test \
+            cargo test \
                 --features full,test-util,tracing
 
   freebsd-docs:
