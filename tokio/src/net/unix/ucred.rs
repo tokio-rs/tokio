@@ -41,7 +41,13 @@ impl UCred {
 ))]
 pub(crate) use self::impl_linux::get_peer_cred;
 
-#[cfg(any(target_os = "netbsd", target_os = "nto"))]
+// QNX legacy io-pkt (nto70, nto71) exposes LOCAL_PEEREID + unpcbid like
+// NetBSD; the io-sock stack (nto71_iosock, nto80) drops them, so route
+// io-sock variants to impl_noproc below.
+#[cfg(any(
+    target_os = "netbsd",
+    all(target_os = "nto", any(target_env = "nto70", target_env = "nto71")),
+))]
 pub(crate) use self::impl_netbsd::get_peer_cred;
 
 #[cfg(any(target_os = "dragonfly", target_os = "freebsd"))]
@@ -62,7 +68,12 @@ pub(crate) use self::impl_solaris::get_peer_cred;
 #[cfg(target_os = "aix")]
 pub(crate) use self::impl_aix::get_peer_cred;
 
-#[cfg(any(target_os = "espidf", target_os = "vita", target_os = "hurd"))]
+#[cfg(any(
+    target_os = "espidf",
+    target_os = "vita",
+    target_os = "hurd",
+    all(target_os = "nto", any(target_env = "nto71_iosock", target_env = "nto80")),
+))]
 pub(crate) use self::impl_noproc::get_peer_cred;
 
 #[cfg(any(
@@ -130,7 +141,10 @@ pub(crate) mod impl_linux {
     }
 }
 
-#[cfg(any(target_os = "netbsd", target_os = "nto"))]
+#[cfg(any(
+    target_os = "netbsd",
+    all(target_os = "nto", any(target_env = "nto70", target_env = "nto71")),
+))]
 pub(crate) mod impl_netbsd {
     use crate::net::unix::{self, UnixStream};
 
@@ -317,7 +331,12 @@ pub(crate) mod impl_aix {
     }
 }
 
-#[cfg(any(target_os = "espidf", target_os = "vita", target_os = "hurd"))]
+#[cfg(any(
+    target_os = "espidf",
+    target_os = "vita",
+    target_os = "hurd",
+    all(target_os = "nto", any(target_env = "nto71_iosock", target_env = "nto80")),
+))]
 pub(crate) mod impl_noproc {
     use crate::net::unix::UnixStream;
     use std::io;
