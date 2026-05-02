@@ -222,3 +222,50 @@ fn nonempty_after_send() {
         join.join().unwrap();
     });
 }
+
+#[test]
+fn is_empty_during_close() {
+    loom::model(|| {
+        let (tx, rx) = mpsc::channel::<()>(1);
+
+        let th1 = thread::spawn(move || {
+            assert!(rx.is_empty());
+        });
+
+        drop(tx);
+
+        th1.join().unwrap();
+    });
+}
+
+#[test]
+fn len_zero_during_close() {
+    loom::model(|| {
+        let (tx, rx) = mpsc::channel::<()>(1);
+
+        let th1 = thread::spawn(move || {
+            assert_eq!(rx.len(), 0);
+        });
+
+        drop(tx);
+
+        th1.join().unwrap();
+    });
+}
+
+#[test]
+fn len_accurate_during_close() {
+    loom::model(|| {
+        let (tx, rx) = mpsc::channel::<()>(2);
+
+        tx.try_send(()).unwrap();
+
+        let th1 = thread::spawn(move || {
+            assert_eq!(rx.len(), 1);
+        });
+
+        drop(tx);
+
+        th1.join().unwrap();
+    });
+}

@@ -99,6 +99,7 @@ impl<T> Tx<T> {
         unsafe { block.as_ref().tx_close() }
     }
 
+
     fn find_block(&self, slot_index: usize) -> NonNull<Block<T>> {
         // The start index of the block that contains `index`.
         let start_index = block::start_index(slot_index);
@@ -224,15 +225,6 @@ impl<T> Tx<T> {
             let _ = Box::from_raw(block.as_ptr());
         }
     }
-
-    pub(crate) fn is_closed(&self) -> bool {
-        let tail = self.block_tail.load(Acquire);
-
-        unsafe {
-            let tail_block = &*tail;
-            tail_block.is_closed()
-        }
-    }
 }
 
 impl<T> fmt::Debug for Tx<T> {
@@ -256,11 +248,39 @@ impl<T> Rx<T> {
         self.len(tx) == 0
     }
 
+    fn has_value(&self, slot_index: usize) -> bool {
+        let start_index = block::start_index(slot_index);
+        let mut block_ptr = Some(self.head);
+
+        while let Some(block) = block_ptr {
+            let block_ref = unsafe { block.as_ref() };
+            if block_ref.is_at_index(start_index) {
+                return block_ref.has_value(slot_index);
+            }
+            block_ptr = block_ref.load_next(Acquire);
+        }
+        false
+    }
+
     pub(crate) fn len(&self, tx: &Tx<T>) -> usize {
-        // When all the senders are dropped, there will be a last block in the tail position,
-        // but it will be closed
         let tail_position = tx.tail_position.load(Acquire);
-        tail_position - self.index - (tx.is_closed() as usize)
+        let mut len = tail_position.wrapping_sub(self.index);
+        debug_assert!(0 <= len as isize);
+        if len == 0 {
+            return 0;
+        }
+        // There are messages present in the queue. However, it's possible that the last message is
+        // a fake "closed" message that we do not wish to count. To avoid counting it, we do not
+        // count the last message if the ready bit is unset.
+        //
+        // Note that it is also possible for the ready bit to be unset on a normal message, but
+        // this happens only if that message is currently being sent *right now* in parallel on
+        // another thread. That is okay because it is optional to count messages that are currently
+        // being sent.
+        if !self.has_value(tail_position.wrapping_sub(1)) {
+            len -= 1;
+        }
+        len
     }
 
     /// Pops the next value off the queue.
