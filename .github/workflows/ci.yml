@@ -241,7 +241,7 @@ jobs:
             toolchain: 1.82
 
       - name: Install Valgrind
-        uses: taiki-e/install-action@valgrind
+        run: sudo apt-get update && sudo apt-get install -y valgrind
 
       - uses: Swatinem/rust-cache@v2
       # Compile tests
