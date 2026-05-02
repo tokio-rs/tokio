@@ -1135,7 +1135,8 @@ impl Core {
             return None;
         }
 
-        let num = worker.handle.shared.remotes.len();
+        let shared = &worker.handle.shared;
+        let num = shared.remotes.len();
         // Start from a random worker
         let start = self.rand.fastrand_n(num as u32) as usize;
 
@@ -1147,10 +1148,12 @@ impl Core {
                 continue;
             }
 
-            let target = &worker.handle.shared.remotes[i];
-            if let Some(task) = target
-                .steal
-                .steal_into(&mut self.run_queue, &mut self.stats)
+            let target = &shared.remotes[i];
+            let steal_lifo = shared.config.enable_lifo_slot_stealing;
+            if let Some(task) =
+                target
+                    .steal
+                    .steal_into(&mut self.run_queue, &mut self.stats, steal_lifo)
             {
                 return Some(task);
             }
@@ -1349,9 +1352,10 @@ impl Handle {
         // task must always be pushed to the back of the queue, enabling other
         // tasks to be executed. If **not** a yield, then there is more
         // flexibility and the task may go to the front of the queue.
-        if is_yield || !core.lifo_enabled {
+        let should_notify = if is_yield || !core.lifo_enabled {
             core.run_queue
                 .push_back_or_overflow(task, self, &mut core.stats);
+            true
         } else {
             // Push to the LIFO slot
             if let Some(prev) = core.run_queue.push_lifo(task) {
@@ -1359,13 +1363,18 @@ impl Handle {
                 // to be pushed to the back of the run queue.
                 core.run_queue
                     .push_back_or_overflow(prev, self, &mut core.stats);
+                true
+            } else {
+                // We pushed to the LIFO slot, and it was empty, so only notify if eager lifo
+                // handoff is enabled.
+                self.shared.config.enable_eager_lifo_handoff
             }
         };
 
         // Only notify if not currently parked. If `park` is `None`, then the
         // scheduling is from a resource driver. As notifications often come in
         // batches, the notification is delayed until the park is complete.
-        if core.park.is_some() {
+        if should_notify && core.park.is_some() {
             self.notify_parked_local();
         }
     }
@@ -1449,8 +1458,9 @@ impl Handle {
     }
 
     fn notify_if_work_pending(&self) {
+        let steal_lifo = self.shared.config.enable_lifo_slot_stealing;
         for remote in &self.shared.remotes[..] {
-            if !remote.steal.is_empty() {
+            if remote.steal.can_steal(steal_lifo) {
                 self.notify_parked_local();
                 return;
             }

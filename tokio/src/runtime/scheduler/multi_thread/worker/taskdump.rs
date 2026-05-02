@@ -67,8 +67,8 @@ impl Shared {
 
         for remote in self.remotes.iter() {
             let steal = &remote.steal;
-            while !steal.is_empty() {
-                if let Some(task) = steal.steal_into(&mut local, &mut stats) {
+            while steal.can_steal(true) {
+                if let Some(task) = steal.steal_into(&mut local, &mut stats, true) {
                     local.push_back([task].into_iter());
                 }
             }

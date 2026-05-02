@@ -129,6 +129,12 @@ pub struct Builder {
     /// This option should only be exposed as unstable.
     pub(super) disable_lifo_slot: bool,
 
+    /// When true, the LIFO slot can be work stolen.
+    enable_lifo_slot_stealing: bool,
+
+    /// Whether or not to enable eager hand-off for tasks in the LIFO slot.
+    enable_eager_lifo_handoff: bool,
+
     /// Specify a random number generator seed to provide deterministic results
     pub(super) seed_generator: RngSeedGenerator,
 
@@ -336,6 +342,8 @@ impl Builder {
             metrics_poll_count_histogram: HistogramBuilder::default(),
 
             disable_lifo_slot: false,
+            enable_lifo_slot_stealing: false,
+            enable_eager_lifo_handoff: false,
 
             timer_flavor: TimerFlavor::Traditional,
 
@@ -1306,15 +1314,16 @@ impl Builder {
         /// This configuration option will disable this heuristic resulting in
         /// all scheduled tasks being pushed into the worker-local queue. This
         /// was intended as a workaround for the LIFO slot not being stealable.
-        /// As of Tokio 1.51, tasks can be stolen from the LIFO slot. In a
-        /// future version, this option may be deprecated.
+        /// As of Tokio 1.51, tasks can be stolen from the LIFO slot when
+        /// [`enable_lifo_slot_stealing`] is enabled. In a future version, this
+        /// option may be deprecated.
         ///
         /// # Unstable
         ///
         /// This configuration option was considered a workaround for the LIFO
-        /// slot not being stealable. Since this is no longer the case, we will
-        /// revisit whether or not this option is necessary. See
-        /// issue [tokio-rs/tokio#4941].
+        /// slot not being stealable. Since LIFO slot stealing can now be
+        /// enabled, we will revisit whether or not this option is necessary.
+        /// See issue [tokio-rs/tokio#4941].
         ///
         /// # Examples
         ///
@@ -1332,8 +1341,74 @@ impl Builder {
         ///
         /// [tokio-rs/tokio-metrics]: https://github.com/tokio-rs/tokio-metrics
         /// [tokio-rs/tokio#4941]: https://github.com/tokio-rs/tokio/issues/4941
+        /// [`enable_lifo_slot_stealing`]: Self::enable_lifo_slot_stealing()
         pub fn disable_lifo_slot(&mut self) -> &mut Self {
             self.disable_lifo_slot = true;
+            self
+        }
+
+        /// Makes it possible to steal the task in the LIFO slot.
+        ///
+        /// When a worker thread tries to steal work from other workers, it will
+        /// normally never steal the work stored in the LIFO slot. When enabling
+        /// this option, workers will steal the LIFO slot task when the queue is
+        /// otherwise empty.
+        ///
+        /// Note that the LIFO slot is only stolen if another worker thread
+        /// attempts work stealing while the LIFO slot is non-empty, but the
+        /// runtime will not wake up other workers to steal the task unless the
+        /// [`enable_eager_lifo_handoff`] option is also enabled.
+        ///
+        /// See the docs for [`disable_lifo_slot`] for more details on what the
+        /// LIFO slot is.
+        ///
+        /// # Panics
+        ///
+        /// This option requires the LIFO slot to be enabled. If this option is
+        /// set together with [`disable_lifo_slot`], then building the runtime
+        /// will fail with a panic.
+        ///
+        /// # Unstable
+        ///
+        /// This configuration option is unstable because we are considering
+        /// enabling it by default. See issue [tokio-rs/tokio#4941].
+        ///
+        /// [tokio-rs/tokio#4941]: https://github.com/tokio-rs/tokio/issues/4941
+        /// [`disable_lifo_slot`]: Self::disable_lifo_slot()
+        /// [`enable_eager_lifo_handoff`]: Self::enable_eager_lifo_handoff()
+        pub fn enable_lifo_slot_stealing(&mut self) -> &mut Self {
+            self.enable_lifo_slot_stealing = true;
+            self
+        }
+
+        /// Enable eager hand-off of the LIFO slot on multi-threaded runtimes.
+        ///
+        /// Normally when a task is pushed to the LIFO slot, no worker thread is
+        /// woken up, which means that if the task that pushed it to the LIFO
+        /// slot does not yield and all other workers are idle, then even if
+        /// [`enable_lifo_slot_stealing`] is enabled the task may not be stolen.
+        ///
+        /// This option may significantly increase [the number of noop
+        /// wakes][noop-wake], where a worker is woken just in case the task
+        /// blocks and the LIFO slot needs to be stolen. This can hurt the
+        /// performance of some workloads. See [tokio-rs/tokio#8065] for
+        /// details.
+        ///
+        /// # Panics
+        ///
+        /// This option requires that LIFO slot stealing is enabled. If this
+        /// option is enabled without [`enable_lifo_slot_stealing`], then this
+        /// results in a panic when building the runtime.
+        ///
+        /// # Unstable
+        ///
+        /// This configuration option is unstable.
+        ///
+        /// [noop-wake]: crate::runtime::RuntimeMetrics::worker_noop_count
+        /// [tokio-rs/tokio#8065]: https://github.com/tokio-rs/tokio/issues/8065
+        /// [`enable_lifo_slot_stealing`]: Self::enable_lifo_slot_stealing()
+        pub fn enable_eager_lifo_handoff(&mut self) -> &mut Self {
+            self.enable_eager_lifo_handoff = true;
             self
         }
 
@@ -1702,6 +1777,8 @@ impl Builder {
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
+                enable_lifo_slot_stealing: self.enable_lifo_slot_stealing,
+                enable_eager_lifo_handoff: self.enable_eager_lifo_handoff,
                 // This setting never makes sense for a current thread runtime,
                 // as it only configures how the I/O driver is stolen across
                 // workers.
@@ -1868,6 +1945,15 @@ cfg_rt_multi_thread! {
             let seed_generator_1 = self.seed_generator.next_generator();
             let seed_generator_2 = self.seed_generator.next_generator();
 
+            if self.disable_lifo_slot {
+                assert!(!self.enable_lifo_slot_stealing, "Enabling LIFO slot stealing does not make sense when LIFO slot is disabled");
+                assert!(!self.enable_eager_lifo_handoff, "Enabling eager LIFO handoff does not make sense when LIFO slot is disabled");
+            }
+
+            if self.enable_eager_lifo_handoff {
+                assert!(self.enable_lifo_slot_stealing, "Enabling eager LIFO handoff requires LIFO slot stealing to be enabled");
+            }
+
             let (scheduler, handle, launch) = MultiThread::new(
                 worker_threads,
                 driver,
@@ -1888,6 +1974,8 @@ cfg_rt_multi_thread! {
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
+                    enable_lifo_slot_stealing: self.enable_lifo_slot_stealing,
+                    enable_eager_lifo_handoff: self.enable_eager_lifo_handoff,
                     enable_eager_driver_handoff: self.enable_eager_driver_handoff,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),

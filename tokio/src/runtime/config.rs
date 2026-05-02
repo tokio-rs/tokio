@@ -39,9 +39,15 @@ pub(crate) struct Config {
     /// In Tokio versions before 1.51, tasks in the LIFO slot could not be
     /// stolen, which could cause issues in applications with long poll times.
     /// As a stop-gap, this unstable option lets users disable the LIFO task.
-    /// Now that the LIFO slot is stealable, we may remove this option in a
-    /// future version.
+    /// Now that the LIFO slot is stealable, we may remove this option when the
+    /// LIFO slot stealing will be enabled by default.
     pub(crate) disable_lifo_slot: bool,
+
+    /// Can work stealing occur for tasks in the per-worker LIFO slot?
+    pub(crate) enable_lifo_slot_stealing: bool,
+
+    /// Should a worker be woken up when a task is pushed to the per-worker LIFO slot?
+    pub(crate) enable_eager_lifo_handoff: bool,
 
     /// Random number generator seed to configure runtimes to act in a
     /// deterministic way.

@@ -427,6 +427,7 @@ impl<T> Local<T> {
 
 impl<T> Steal<T> {
     /// Returns the number of entries in the queue
+    #[cfg(tokio_unstable)]
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.0.head.load(Acquire));
         let tail = self.0.tail.load(Acquire);
@@ -434,17 +435,25 @@ impl<T> Steal<T> {
         len(head, tail) + lifo
     }
 
-    /// Return true if the queue is empty,
-    /// false if there are any entries in the queue
-    pub(crate) fn is_empty(&self) -> bool {
-        self.len() == 0
+    /// Returns true if `steal_into` might be able to steal tasks.
+    ///
+    /// The `steal_lifo` parameter indicates whether the LIFO slot should be counted in this
+    /// analysis. Use the same value as what is passed to `steal_into`.
+    pub(crate) fn can_steal(&self, steal_lifo: bool) -> bool {
+        let (_, head) = unpack(self.0.head.load(Acquire));
+        let tail = self.0.tail.load(Acquire);
+        (len(head, tail) > 0) || (steal_lifo && self.0.lifo.is_some())
     }
 
-    /// Steals half the tasks from self and place them into `dst`.
+    /// Steals half the tasks from the run queue and places them into `dst`.
+    ///
+    /// When `steal_lifo` is set, this will also attempt to steal from the LIFO
+    /// slot if the queue is otherwise empty.
     pub(crate) fn steal_into(
         &self,
         dst: &mut Local<T>,
         dst_stats: &mut Stats,
+        steal_lifo: bool,
     ) -> Option<task::Notified<T>> {
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
@@ -466,14 +475,17 @@ impl<T> Steal<T> {
         let mut n = self.steal_into2(dst, dst_tail);
 
         if n == 0 {
-            // If no tasks were stolen, let's see if there's one in the LIFO
-            // slot.
-            let lifo = self.0.lifo.take();
-            if lifo.is_some() {
-                dst_stats.incr_steal_count(1);
-                dst_stats.incr_steal_operations();
+            if steal_lifo {
+                // If no tasks were stolen, let's see if there's one in the LIFO
+                // slot.
+                let lifo = self.0.lifo.take();
+                if lifo.is_some() {
+                    dst_stats.incr_steal_count(1);
+                    dst_stats.incr_steal_operations();
+                }
+                return lifo;
             }
-            return lifo;
+            return None;
         }
 
         dst_stats.incr_steal_count(n as u16);
