@@ -231,11 +231,13 @@ impl Handle {
     pub(crate) fn register_waker(&self, waker: &Waker) {
         let mut lock = self.entry.state.lock();
         if !lock.cancelled && !lock.woken_up {
+            // PANIC: no intermediary state is possible should the user-controllable `Waker`
+            // panic on `Clone` or `Drop`.
             let maybe_old_waker = match &lock.waker {
                 Some(current_waker) if current_waker.will_wake(waker) => None,
                 _ => lock.waker.replace(waker.clone()),
             };
-            // unlock before calling waker
+            // unlock before dropping waker
             drop(lock);
             drop(maybe_old_waker);
         }
