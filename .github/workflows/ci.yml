@@ -1292,3 +1292,74 @@ jobs:
     uses: ./.github/workflows/uring-kernel-version-test.yml
     with:
       kernel_version: ${{ matrix.kernel_version }}
+
+  freebsd-x86_64:
+    name: FreeBSD x86_64
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test in FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '14.4'
+          envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
+          prepare: |
+            pkg install -y curl
+            curl https://sh.rustup.rs -sSf --output rustup.sh
+            sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
+          run: |
+            . $HOME/.cargo/env
+            cargo test --workspace --features $TOKIO_STABLE_FEATURES
+            # Enable all unstable features except `io_uring` and `taskdump`,
+            # which are Linux-only features.
+            RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
+            cargo test \
+                --features $TOKIO_STABLE_FEATURES,tracing
+
+  freebsd-docs:
+    name: FreeBSD docs
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test in FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        env:
+          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
+          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
+        with:
+          release: '14.4'
+          envs: "TOKIO_STABLE_FEATURES RUSTDOCFLAGS RUSTFLAGS"
+          prepare: |
+            pkg install -y curl
+            curl https://sh.rustup.rs -sSf --output rustup.sh
+            sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_nightly }}
+          run: |
+            . $HOME/.cargo/env
+            # We use `--features $TOKIO_STABLE_FEATURES,io-uring,tracing` instead of
+            # `--all-features` to exclude `taskdump` and `io_uring`, which are Linux-only
+            # features.
+            cargo doc --lib --no-deps --features $TOKIO_STABLE_FEATURES,tracing \
+              --document-private-items
+
+  freebsd-i686:
+    name: FreeBSD i686
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test in FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '14.4'
+          envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
+          prepare: |
+            pkg install -y curl
+            curl https://sh.rustup.rs -sSf --output rustup.sh
+            sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
+          run: |
+            . $HOME/.cargo/env
+            rustup target add i686-unknown-freebsd
+            cargo test --workspace --features $TOKIO_STABLE_FEATURES \
+              --target i686-unknown-freebsd
