@@ -1000,6 +1000,19 @@ fn try_recv_after_receiver_close() {
 }
 
 #[test]
+fn try_recv_after_receiver_close_with_permit() {
+    let (tx, mut rx) = mpsc::channel::<()>(5);
+
+    let permit = tx.try_reserve().unwrap();
+
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    rx.close();
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    drop(permit);
+    assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+}
+
+#[test]
 fn try_recv_close_while_empty_bounded() {
     let (tx, mut rx) = mpsc::channel::<()>(5);
 
