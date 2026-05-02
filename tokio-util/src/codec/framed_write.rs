@@ -12,6 +12,8 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use super::FramedParts;
+
 pin_project! {
     /// A [`Sink`] of frames encoded to an `AsyncWrite`.
     ///
@@ -33,10 +35,7 @@ pin_project! {
     }
 }
 
-impl<T, E> FramedWrite<T, E>
-where
-    T: AsyncWrite,
-{
+impl<T, E> FramedWrite<T, E> {
     /// Creates a new `FramedWrite` with the given `encoder`.
     pub fn new(inner: T, encoder: E) -> FramedWrite<T, E> {
         FramedWrite {
@@ -47,9 +46,22 @@ where
             },
         }
     }
-}
 
-impl<T, E> FramedWrite<T, E> {
+    /// Creates a new `FramedWrite` with the given `encoder` and a buffer of `capacity`
+    /// initial size.
+    pub fn with_capacity(inner: T, encoder: E, capacity: usize) -> FramedWrite<T, E> {
+        FramedWrite {
+            inner: FramedImpl {
+                inner,
+                codec: encoder,
+                state: WriteFrame {
+                    buffer: BytesMut::with_capacity(capacity),
+                    backpressure_boundary: capacity,
+                },
+            },
+        }
+    }
+
     /// Returns a reference to the underlying I/O stream wrapped by
     /// `FramedWrite`.
     ///
@@ -143,6 +155,18 @@ impl<T, E> FramedWrite<T, E> {
     /// Updates backpressure boundary
     pub fn set_backpressure_boundary(&mut self, boundary: usize) {
         self.inner.state.backpressure_boundary = boundary;
+    }
+
+    /// Consumes the `FramedWrite`, returning its underlying I/O stream, the buffer
+    /// with unprocessed data, and the codec.
+    pub fn into_parts(self) -> FramedParts<T, E> {
+        FramedParts {
+            io: self.inner.inner,
+            codec: self.inner.codec,
+            read_buf: BytesMut::new(),
+            write_buf: self.inner.state.buffer,
+            _priv: (),
+        }
     }
 }
 

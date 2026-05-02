@@ -82,9 +82,7 @@ async fn respond(req: Request<()>) -> Result<Response<String>, Box<dyn Error>> {
             String::new()
         }
     };
-    let response = response
-        .body(body)
-        .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+    let response = response.body(body).map_err(io::Error::other)?;
 
     Ok(response)
 }
@@ -160,7 +158,7 @@ impl Decoder for Http {
             let mut r = httparse::Request::new(&mut parsed_headers);
             let status = r.parse(src).map_err(|e| {
                 let msg = format!("failed to parse http request: {e:?}");
-                io::Error::new(io::ErrorKind::Other, msg)
+                io::Error::other(msg)
             })?;
 
             let amt = match status {
@@ -180,8 +178,7 @@ impl Decoder for Http {
                 headers[i] = Some((k, v));
             }
 
-            let method = http::Method::try_from(r.method.unwrap())
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            let method = http::Method::try_from(r.method.unwrap()).map_err(io::Error::other)?;
 
             (
                 method,
@@ -191,10 +188,7 @@ impl Decoder for Http {
             )
         };
         if version != 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "only HTTP/1.1 accepted",
-            ));
+            return Err(io::Error::other("only HTTP/1.1 accepted"));
         }
         let data = src.split_to(amt).freeze();
         let mut ret = Request::builder();
@@ -209,13 +203,11 @@ impl Decoder for Http {
                 None => break,
             };
             let value = HeaderValue::from_bytes(data.slice(v.0..v.1).as_ref())
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "header decode error"))?;
+                .map_err(|_| io::Error::other("header decode error"))?;
             ret = ret.header(&data[k.0..k.1], value);
         }
 
-        let req = ret
-            .body(())
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let req = ret.body(()).map_err(io::Error::other)?;
         Ok(Some(req))
     }
 }

@@ -4,6 +4,7 @@ use core::cmp;
 use core::fmt;
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -72,5 +73,14 @@ where
         };
 
         (lower, upper)
+    }
+}
+
+impl<St> FusedStream for Take<St>
+where
+    St: Stream,
+{
+    fn is_terminated(&self) -> bool {
+        self.remaining == 0
     }
 }

@@ -1,25 +1,25 @@
 use crate::Stream;
 
 use core::future::Future;
-use core::marker::PhantomPinned;
+use core::marker::{PhantomData, PhantomPinned};
 use core::mem;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
 use pin_project_lite::pin_project;
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque};
+use std::hash::Hash;
 
 // Do not export this struct until `FromStream` can be unsealed.
 pin_project! {
     /// Future returned by the [`collect`](super::StreamExt::collect) method.
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     #[derive(Debug)]
-    pub struct Collect<T, U>
-    where
-        T: Stream,
-        U: FromStream<T::Item>,
+    pub struct Collect<T, U, C>
     {
         #[pin]
         stream: T,
-        collection: U::InternalCollection,
+        collection: C,
+        _output: PhantomData<U>,
         // Make this future `!Unpin` for compatibility with async trait methods.
         #[pin]
         _pin: PhantomPinned,
@@ -38,24 +38,25 @@ pin_project! {
 /// enhancements to the Rust language.
 pub trait FromStream<T>: sealed::FromStreamPriv<T> {}
 
-impl<T, U> Collect<T, U>
+impl<T, U> Collect<T, U, U::InternalCollection>
 where
     T: Stream,
     U: FromStream<T::Item>,
 {
-    pub(super) fn new(stream: T) -> Collect<T, U> {
+    pub(super) fn new(stream: T) -> Collect<T, U, U::InternalCollection> {
         let (lower, upper) = stream.size_hint();
         let collection = U::initialize(sealed::Internal, lower, upper);
 
         Collect {
             stream,
             collection,
+            _output: PhantomData,
             _pin: PhantomPinned,
         }
     }
 }
 
-impl<T, U> Future for Collect<T, U>
+impl<T, U> Future for Collect<T, U, U::InternalCollection>
 where
     T: Stream,
     U: FromStream<T::Item>,
@@ -132,6 +133,139 @@ impl<T> sealed::FromStreamPriv<T> for Vec<T> {
     }
 
     fn finalize(_: sealed::Internal, collection: &mut Vec<T>) -> Vec<T> {
+        mem::take(collection)
+    }
+}
+
+impl<T> FromStream<T> for VecDeque<T> {}
+
+impl<T> sealed::FromStreamPriv<T> for VecDeque<T> {
+    type InternalCollection = VecDeque<T>;
+
+    fn initialize(_: sealed::Internal, lower: usize, _upper: Option<usize>) -> VecDeque<T> {
+        VecDeque::with_capacity(lower)
+    }
+
+    fn extend(_: sealed::Internal, collection: &mut VecDeque<T>, item: T) -> bool {
+        collection.push_back(item);
+        true
+    }
+
+    fn finalize(_: sealed::Internal, collection: &mut VecDeque<T>) -> VecDeque<T> {
+        mem::take(collection)
+    }
+}
+
+impl<T> FromStream<T> for LinkedList<T> {}
+
+impl<T> sealed::FromStreamPriv<T> for LinkedList<T> {
+    type InternalCollection = LinkedList<T>;
+
+    fn initialize(_: sealed::Internal, _lower: usize, _upper: Option<usize>) -> LinkedList<T> {
+        LinkedList::new()
+    }
+
+    fn extend(_: sealed::Internal, collection: &mut LinkedList<T>, item: T) -> bool {
+        collection.push_back(item);
+        true
+    }
+
+    fn finalize(_: sealed::Internal, collection: &mut LinkedList<T>) -> LinkedList<T> {
+        mem::take(collection)
+    }
+}
+
+impl<T: Ord> FromStream<T> for BTreeSet<T> {}
+
+impl<T: Ord> sealed::FromStreamPriv<T> for BTreeSet<T> {
+    type InternalCollection = BTreeSet<T>;
+
+    fn initialize(_: sealed::Internal, _lower: usize, _upper: Option<usize>) -> BTreeSet<T> {
+        BTreeSet::new()
+    }
+
+    fn extend(_: sealed::Internal, collection: &mut BTreeSet<T>, item: T) -> bool {
+        collection.insert(item);
+        true
+    }
+
+    fn finalize(_: sealed::Internal, collection: &mut BTreeSet<T>) -> BTreeSet<T> {
+        mem::take(collection)
+    }
+}
+
+impl<K: Ord, V> FromStream<(K, V)> for BTreeMap<K, V> {}
+
+impl<K: Ord, V> sealed::FromStreamPriv<(K, V)> for BTreeMap<K, V> {
+    type InternalCollection = BTreeMap<K, V>;
+
+    fn initialize(_: sealed::Internal, _lower: usize, _upper: Option<usize>) -> BTreeMap<K, V> {
+        BTreeMap::new()
+    }
+
+    fn extend(_: sealed::Internal, collection: &mut BTreeMap<K, V>, (key, value): (K, V)) -> bool {
+        collection.insert(key, value);
+        true
+    }
+
+    fn finalize(_: sealed::Internal, collection: &mut BTreeMap<K, V>) -> BTreeMap<K, V> {
+        mem::take(collection)
+    }
+}
+
+impl<T: Eq + Hash> FromStream<T> for HashSet<T> {}
+
+impl<T: Eq + Hash> sealed::FromStreamPriv<T> for HashSet<T> {
+    type InternalCollection = HashSet<T>;
+
+    fn initialize(_: sealed::Internal, lower: usize, _upper: Option<usize>) -> HashSet<T> {
+        HashSet::with_capacity(lower)
+    }
+
+    fn extend(_: sealed::Internal, collection: &mut HashSet<T>, item: T) -> bool {
+        collection.insert(item);
+        true
+    }
+
+    fn finalize(_: sealed::Internal, collection: &mut HashSet<T>) -> HashSet<T> {
+        mem::take(collection)
+    }
+}
+
+impl<K: Eq + Hash, V> FromStream<(K, V)> for HashMap<K, V> {}
+
+impl<K: Eq + Hash, V> sealed::FromStreamPriv<(K, V)> for HashMap<K, V> {
+    type InternalCollection = HashMap<K, V>;
+
+    fn initialize(_: sealed::Internal, lower: usize, _upper: Option<usize>) -> HashMap<K, V> {
+        HashMap::with_capacity(lower)
+    }
+
+    fn extend(_: sealed::Internal, collection: &mut HashMap<K, V>, (key, value): (K, V)) -> bool {
+        collection.insert(key, value);
+        true
+    }
+
+    fn finalize(_: sealed::Internal, collection: &mut HashMap<K, V>) -> HashMap<K, V> {
+        mem::take(collection)
+    }
+}
+
+impl<T: Ord> FromStream<T> for BinaryHeap<T> {}
+
+impl<T: Ord> sealed::FromStreamPriv<T> for BinaryHeap<T> {
+    type InternalCollection = BinaryHeap<T>;
+
+    fn initialize(_: sealed::Internal, lower: usize, _upper: Option<usize>) -> BinaryHeap<T> {
+        BinaryHeap::with_capacity(lower)
+    }
+
+    fn extend(_: sealed::Internal, collection: &mut BinaryHeap<T>, item: T) -> bool {
+        collection.push(item);
+        true
+    }
+
+    fn finalize(_: sealed::Internal, collection: &mut BinaryHeap<T>) -> BinaryHeap<T> {
         mem::take(collection)
     }
 }

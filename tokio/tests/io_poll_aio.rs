@@ -5,8 +5,8 @@ use mio_aio::{AioFsyncMode, SourceApi};
 use std::{
     future::Future,
     io, mem,
-    os::fd::AsFd,
-    os::unix::io::{AsRawFd, RawFd},
+    os::fd::{AsFd, BorrowedFd},
+    os::unix::io::AsRawFd,
     pin::{pin, Pin},
     task::{Context, Poll},
 };
@@ -21,7 +21,7 @@ mod aio {
     struct TokioSource<'fd>(mio_aio::Source<nix::sys::aio::AioFsync<'fd>>);
 
     impl<'fd> AioSource for TokioSource<'fd> {
-        fn register(&mut self, kq: RawFd, token: usize) {
+        fn register_borrowed(&mut self, kq: BorrowedFd<'_>, token: usize) {
             self.0.register_raw(kq, token)
         }
         fn deregister(&mut self) {
@@ -81,10 +81,10 @@ mod aio {
     }
 
     impl AioSource for LlSource {
-        fn register(&mut self, kq: RawFd, token: usize) {
+        fn register_borrowed(&mut self, kq: BorrowedFd<'_>, token: usize) {
             let mut sev: libc::sigevent = unsafe { mem::MaybeUninit::zeroed().assume_init() };
             sev.sigev_notify = libc::SIGEV_KEVENT;
-            sev.sigev_signo = kq;
+            sev.sigev_signo = kq.as_raw_fd();
             sev.sigev_value = libc::sigval {
                 sival_ptr: token as *mut libc::c_void,
             };
@@ -222,10 +222,10 @@ mod lio {
     }
 
     impl<'a> AioSource for LioSource<'a> {
-        fn register(&mut self, kq: RawFd, token: usize) {
+        fn register_borrowed(&mut self, kq: BorrowedFd<'_>, token: usize) {
             let mut sev: libc::sigevent = unsafe { mem::MaybeUninit::zeroed().assume_init() };
             sev.sigev_notify = libc::SIGEV_KEVENT;
-            sev.sigev_signo = kq;
+            sev.sigev_signo = kq.as_raw_fd();
             sev.sigev_value = libc::sigval {
                 sival_ptr: token as *mut libc::c_void,
             };

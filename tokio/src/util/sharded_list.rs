@@ -27,6 +27,7 @@ pub(crate) struct ShardedList<L, T> {
 /// call to call.
 pub(crate) unsafe trait ShardedListItem: Link {
     /// # Safety
+    ///
     /// The provided pointer must point at a valid list item.
     unsafe fn get_shard_id(target: NonNull<Self::Target>) -> usize;
 }
@@ -37,12 +38,9 @@ impl<L, T> ShardedList<L, T> {
         assert!(sharded_size.is_power_of_two());
 
         let shard_mask = sharded_size - 1;
-        let mut lists = Vec::with_capacity(sharded_size);
-        for _ in 0..sharded_size {
-            lists.push(Mutex::new(LinkedList::<L, T>::new()))
-        }
+        let lists = std::iter::repeat_with(|| Mutex::new(LinkedList::new()));
         Self {
-            lists: lists.into_boxed_slice(),
+            lists: lists.take(sharded_size).collect(),
             added: MetricAtomicU64::new(0),
             count: MetricAtomicUsize::new(0),
             shard_mask,
@@ -79,7 +77,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
     /// - `node` is not contained by any list,
     /// - `node` is currently contained by some other `GuardedLinkedList`.
     pub(crate) unsafe fn remove(&self, node: NonNull<L::Target>) -> Option<L::Handle> {
-        let id = L::get_shard_id(node);
+        let id = unsafe { L::get_shard_id(node) };
         let mut lock = self.shard_inner(id);
         // SAFETY: Since the shard id cannot change, it's not possible for this node
         // to be in any other list of the same sharded list.
@@ -106,10 +104,12 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
         self.count.load(Ordering::Relaxed)
     }
 
-    cfg_64bit_metrics! {
-        /// Gets the total number of elements added to this list.
-        pub(crate) fn added(&self) -> u64 {
-            self.added.load(Ordering::Relaxed)
+    cfg_unstable_metrics! {
+        cfg_64bit_metrics! {
+            /// Gets the total number of elements added to this list.
+            pub(crate) fn added(&self) -> u64 {
+                self.added.load(Ordering::Relaxed)
+            }
         }
     }
 

@@ -10,11 +10,14 @@
     rust_2018_idioms,
     unreachable_pub
 )]
-#![deny(unused_must_use)]
+#![deny(unused_must_use, unsafe_op_in_unsafe_fn)]
 #![doc(test(
     no_crate_inject,
     attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
 ))]
+// loom is an internal implementation detail.
+// Do not show "Available on non-loom only" label
+#![cfg_attr(docsrs, doc(auto_cfg(hide(loom))))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(docsrs, allow(unused_attributes))]
 #![cfg_attr(loom, allow(dead_code, unreachable_pub))]
@@ -194,6 +197,8 @@
 //! [`thread_keep_alive`]: crate::runtime::Builder::thread_keep_alive()
 //!
 //! ```
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! #[tokio::main]
 //! async fn main() {
 //!     // This is running on a core thread.
@@ -208,6 +213,7 @@
 //!     // panic.
 //!     blocking_task.await.unwrap();
 //! }
+//! # }
 //! ```
 //!
 //! If your code is CPU-bound and you wish to limit the number of threads used
@@ -266,6 +272,8 @@
 //! A simple TCP echo server:
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::net::TcpListener;
 //! use tokio::io::{AsyncReadExt, AsyncWriteExt};
 //!
@@ -300,6 +308,7 @@
 //!         });
 //!     }
 //! }
+//! # }
 //! ```
 //!
 //! # Feature flags
@@ -314,28 +323,28 @@
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all features listed below except `test-util` and `tracing`.
+//! - `full`: Enables all features listed below except `test-util` and unstable features.
 //! - `rt`: Enables `tokio::spawn`, the current-thread scheduler,
-//!         and non-scheduler utilities.
+//!   and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
 //! - `io-util`: Enables the IO based `Ext` traits.
 //! - `io-std`: Enable `Stdout`, `Stdin` and `Stderr` types.
 //! - `net`: Enables `tokio::net` types such as `TcpStream`, `UnixStream` and
-//!          `UdpSocket`, as well as (on Unix-like systems) `AsyncFd` and (on
-//!          FreeBSD) `PollAio`.
+//!   `UdpSocket`, as well as (on Unix-like systems) `AsyncFd` and (on
+//!   FreeBSD) `PollAio`.
 //! - `time`: Enables `tokio::time` types and allows the schedulers to enable
-//!           the built in timer.
+//!   the built-in timer.
 //! - `process`: Enables `tokio::process` types.
 //! - `macros`: Enables `#[tokio::main]` and `#[tokio::test]` macros.
 //! - `sync`: Enables all `tokio::sync` types.
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
-//! - `parking_lot`: As a potential optimization, use the `_parking_lot_` crate's
-//!                  synchronization primitives internally. Also, this
-//!                  dependency is necessary to construct some of our primitives
-//!                  in a `const` context. `MSRV` may increase according to the
-//!                  `_parking_lot_` release in use.
+//! - `parking_lot`: As a potential optimization, use the [`parking_lot`] crate's
+//!   synchronization primitives internally. Also, this
+//!   dependency is necessary to construct some of our primitives
+//!   in a `const` context. `MSRV` may increase according to the
+//!   [`parking_lot`] release in use.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._
@@ -345,16 +354,10 @@
 //! Some feature flags are only available when specifying the `tokio_unstable` flag:
 //!
 //! - `tracing`: Enables tracing events.
+//! - `io-uring`: Enables `io-uring` (Linux only).
+//! - `taskdump`: Enables `taskdump` (Linux only).
 //!
-//! Likewise, some parts of the API are only available with the same flag:
-//!
-//! - [`task::Builder`]
-//! - Some methods on [`task::JoinSet`]
-//! - [`runtime::RuntimeMetrics`]
-//! - [`runtime::Builder::on_task_spawn`]
-//! - [`runtime::Builder::on_task_terminate`]
-//! - [`runtime::Builder::unhandled_panic`]
-//! - [`runtime::TaskMeta`]
+//! Likewise, this flag enables access to unstable APIs.
 //!
 //! This flag enables **unstable** features. The public API of these features
 //! may break in 1.x releases. To enable these features, the `--cfg
@@ -479,11 +482,14 @@ compile_error! {
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
-#[cfg(all(not(tokio_unstable), tokio_taskdump))]
-compile_error!("The `tokio_taskdump` feature requires `--cfg tokio_unstable`.");
+#[cfg(all(not(tokio_unstable), feature = "io-uring"))]
+compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");
+
+#[cfg(all(not(tokio_unstable), feature = "taskdump"))]
+compile_error!("The `taskdump` feature requires `--cfg tokio_unstable`.");
 
 #[cfg(all(
-    tokio_taskdump,
+    feature = "taskdump",
     not(doc),
     not(all(
         target_os = "linux",
@@ -491,7 +497,7 @@ compile_error!("The `tokio_taskdump` feature requires `--cfg tokio_unstable`.");
     ))
 ))]
 compile_error!(
-    "The `tokio_taskdump` feature is only currently supported on \
+    "The `taskdump` feature is only currently supported on \
 linux, on `aarch64`, `x86` and `x86_64`."
 );
 
@@ -551,6 +557,11 @@ cfg_not_sync! {
     mod sync;
 }
 
+// Currently, task module does not expose any public API outside `rt`
+// feature, so we mark it in the docs. This happens only to docs to
+// avoid introducing breaking changes by restricting the visibility
+// of the task module.
+#[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub mod task;
 cfg_rt! {
     pub use task::spawn;
@@ -561,10 +572,6 @@ cfg_time! {
 }
 
 mod trace {
-    use std::future::Future;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
-
     cfg_taskdump! {
         pub(crate) use crate::runtime::task::trace::trace_leaf;
     }
@@ -578,19 +585,8 @@ mod trace {
     }
 
     #[cfg_attr(not(feature = "sync"), allow(dead_code))]
-    pub(crate) fn async_trace_leaf() -> impl Future<Output = ()> {
-        struct Trace;
-
-        impl Future for Trace {
-            type Output = ();
-
-            #[inline(always)]
-            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-                trace_leaf(cx)
-            }
-        }
-
-        Trace
+    pub(crate) async fn async_trace_leaf() {
+        std::future::poll_fn(trace_leaf).await
     }
 }
 

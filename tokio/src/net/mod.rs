@@ -10,9 +10,9 @@
 //! * [`TcpListener`] and [`TcpStream`] provide functionality for communication over TCP
 //! * [`UdpSocket`] provides functionality for communication over UDP
 //! * [`UnixListener`] and [`UnixStream`] provide functionality for communication over a
-//! Unix Domain Stream Socket **(available on Unix only)**
+//!   Unix Domain Stream Socket **(available on Unix only)**
 //! * [`UnixDatagram`] provides functionality for communication
-//! over Unix Domain Datagram Socket **(available on Unix only)**
+//!   over Unix Domain Datagram Socket **(available on Unix only)**
 //! * [`tokio::net::unix::pipe`] for FIFO pipes **(available on Unix only)**
 //! * [`tokio::net::windows::named_pipe`] for Named Pipes **(available on Windows only)**
 //!
@@ -29,7 +29,7 @@
 //! [`AsyncFd`]: crate::io::unix::AsyncFd
 
 mod addr;
-cfg_not_wasi! {
+cfg_not_wasip1! {
     #[cfg(feature = "net")]
     pub(crate) use addr::to_socket_addrs;
 }
@@ -42,7 +42,7 @@ cfg_net! {
     pub mod tcp;
     pub use tcp::listener::TcpListener;
     pub use tcp::stream::TcpStream;
-    cfg_not_wasi! {
+    cfg_not_wasip1! {
         pub use tcp::socket::TcpSocket;
 
         mod udp;

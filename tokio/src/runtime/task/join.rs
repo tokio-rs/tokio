@@ -1,4 +1,4 @@
-use crate::runtime::task::{Header, RawTask};
+use crate::runtime::task::{AbortHandle, Header, RawTask};
 
 use std::fmt;
 use std::future::Future;
@@ -21,6 +21,10 @@ cfg_rt! {
     ///
     /// This `struct` is created by the [`task::spawn`] and [`task::spawn_blocking`]
     /// functions.
+    ///
+    /// It is guaranteed that the destructor of the spawned task has finished
+    /// before task completion is observed via `JoinHandle` `await`,
+    /// [`JoinHandle::is_finished`] or [`AbortHandle::is_finished`].
     ///
     /// # Cancel safety
     ///
@@ -91,21 +95,23 @@ cfg_rt! {
     /// use tokio::task;
     /// use std::io;
     ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
-    ///         Ok(5 + 3)
-    ///     });
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> io::Result<()> {
+    /// let join_handle: task::JoinHandle<Result<i32, io::Error>> = tokio::spawn(async {
+    ///     Ok(5 + 3)
+    /// });
     ///
-    ///     let result = join_handle.await??;
-    ///     assert_eq!(result, 8);
-    ///     Ok(())
-    /// }
+    /// let result = join_handle.await??;
+    /// assert_eq!(result, 8);
+    /// Ok(())
+    /// # }
     /// ```
     ///
     /// If the task panics, the error is a [`JoinError`] that contains the panic:
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::task;
     /// use std::io;
     /// use std::panic;
@@ -120,7 +126,7 @@ cfg_rt! {
     ///     assert!(err.is_panic());
     ///     Ok(())
     /// }
-    ///
+    /// # }
     /// ```
     /// Child being detached and outliving its parent:
     ///
@@ -129,7 +135,8 @@ cfg_rt! {
     /// use tokio::time;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main] async fn main() {
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
     /// let original_task = task::spawn(async {
     ///     let _detached_task = task::spawn(async {
     ///         // Here we sleep to make sure that the first task returns before.
@@ -297,9 +304,9 @@ impl<T> JoinHandle<T> {
     /// ```
     /// [cancelled]: method@super::error::JoinError::is_cancelled
     #[must_use = "abort handles do nothing unless `.abort` is called"]
-    pub fn abort_handle(&self) -> super::AbortHandle {
+    pub fn abort_handle(&self) -> AbortHandle {
         self.raw.ref_inc();
-        super::AbortHandle::new(self.raw)
+        AbortHandle::new(self.raw)
     }
 
     /// Returns a [task ID] that uniquely identifies this task relative to other
@@ -336,8 +343,7 @@ impl<T> Future for JoinHandle<T> {
         //
         // The type of `T` must match the task's output type.
         unsafe {
-            self.raw
-                .try_read_output(&mut ret as *mut _ as *mut (), cx.waker());
+            self.raw.try_read_output(&mut ret, cx.waker());
         }
 
         if ret.is_ready() {

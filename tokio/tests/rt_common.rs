@@ -53,40 +53,6 @@ macro_rules! rt_test {
                     .into()
             }
         }
-
-        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
-        #[cfg(tokio_unstable)]
-        mod alt_threaded_scheduler_4_threads {
-            $($t)*
-
-            const NUM_WORKERS: usize = 4;
-
-            fn rt() -> Arc<Runtime> {
-                tokio::runtime::Builder::new_multi_thread()
-                    .worker_threads(4)
-                    .enable_all()
-                    .build()
-                    .unwrap()
-                    .into()
-            }
-        }
-
-        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
-        #[cfg(tokio_unstable)]
-        mod alt_threaded_scheduler_1_thread {
-            $($t)*
-
-            const NUM_WORKERS: usize = 1;
-
-            fn rt() -> Arc<Runtime> {
-                tokio::runtime::Builder::new_multi_thread()
-                    .worker_threads(1)
-                    .enable_all()
-                    .build()
-                    .unwrap()
-                    .into()
-            }
-        }
     }
 }
 

@@ -15,6 +15,22 @@ async fn path_read_write() {
     assert_eq!(out, b"bytes");
 }
 
+#[tokio::test]
+async fn try_clone_should_preserve_max_buf_size() {
+    let buf_size = 128;
+    let temp = tempdir();
+    let dir = temp.path();
+
+    let mut file = fs::File::create(dir.join("try_clone_should_preserve_max_buf_size"))
+        .await
+        .unwrap();
+    file.set_max_buf_size(buf_size);
+
+    let cloned = file.try_clone().await.unwrap();
+
+    assert_eq!(cloned.max_buf_size(), buf_size);
+}
+
 fn tempdir() -> tempfile::TempDir {
     tempfile::tempdir().unwrap()
 }

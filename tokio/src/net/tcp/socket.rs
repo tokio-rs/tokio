@@ -4,8 +4,8 @@ use std::fmt;
 use std::io;
 use std::net::SocketAddr;
 
-#[cfg(unix)]
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+#[cfg(not(windows))]
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 use std::time::Duration;
 
 cfg_windows! {
@@ -68,6 +68,9 @@ cfg_net! {
     ///     socket.set_reuseaddr(true)?;
     ///     socket.bind(addr)?;
     ///
+    ///     // Note: the actual backlog used by `TcpListener::bind` is platform-dependent,
+    ///     // as Tokio relies on Mio's default backlog value configuration. The `1024` here is only
+    ///     // illustrative and does not reflect the real value used.
     ///     let listener = socket.listen(1024)?;
     /// # drop(listener);
     ///
@@ -79,9 +82,9 @@ cfg_net! {
     /// accessing the `RawFd`/`RawSocket` using [`AsRawFd`]/[`AsRawSocket`] and
     /// setting the option with a crate like [`socket2`].
     ///
-    /// [`RawFd`]: https://doc.rust-lang.org/std/os/unix/io/type.RawFd.html
+    /// [`RawFd`]: https://doc.rust-lang.org/std/os/fd/type.RawFd.html
     /// [`RawSocket`]: https://doc.rust-lang.org/std/os/windows/io/type.RawSocket.html
-    /// [`AsRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
+    /// [`AsRawFd`]: https://doc.rust-lang.org/std/os/fd/trait.AsRawFd.html
     /// [`AsRawSocket`]: https://doc.rust-lang.org/std/os/windows/io/trait.AsRawSocket.html
     /// [`socket2`]: https://docs.rs/socket2/
     #[cfg_attr(docsrs, doc(alias = "connect_std"))]
@@ -167,7 +170,8 @@ impl TcpSocket {
             target_os = "illumos",
             target_os = "linux",
             target_os = "netbsd",
-            target_os = "openbsd"
+            target_os = "openbsd",
+            target_os = "wasi",
         ))]
         let ty = ty.nonblocking();
         let inner = socket2::Socket::new(domain, ty, Some(socket2::Protocol::TCP))?;
@@ -179,7 +183,8 @@ impl TcpSocket {
             target_os = "illumos",
             target_os = "linux",
             target_os = "netbsd",
-            target_os = "openbsd"
+            target_os = "openbsd",
+            target_os = "wasi",
         )))]
         inner.set_nonblocking(true)?;
         Ok(TcpSocket { inner })
@@ -252,7 +257,7 @@ impl TcpSocket {
     }
 
     /// Allows the socket to bind to an in-use port. Only available for unix systems
-    /// (excluding Solaris & Illumos).
+    /// (excluding Solaris, Illumos, and Cygwin).
     ///
     /// Behavior is platform specific. Refer to the target platform's
     /// documentation for more details.
@@ -276,17 +281,27 @@ impl TcpSocket {
     ///     Ok(())
     /// }
     /// ```
-    #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]
+    #[cfg(all(
+        unix,
+        not(target_os = "solaris"),
+        not(target_os = "illumos"),
+        not(target_os = "cygwin"),
+    ))]
     #[cfg_attr(
         docsrs,
-        doc(cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos"))))
+        doc(cfg(all(
+            unix,
+            not(target_os = "solaris"),
+            not(target_os = "illumos"),
+            not(target_os = "cygwin"),
+        )))
     )]
     pub fn set_reuseport(&self, reuseport: bool) -> io::Result<()> {
         self.inner.set_reuse_port(reuseport)
     }
 
     /// Allows the socket to bind to an in-use port. Only available for unix systems
-    /// (excluding Solaris & Illumos).
+    /// (excluding Solaris, Illumos, and Cygwin).
     ///
     /// Behavior is platform specific. Refer to the target platform's
     /// documentation for more details.
@@ -311,10 +326,20 @@ impl TcpSocket {
     ///     Ok(())
     /// }
     /// ```
-    #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]
+    #[cfg(all(
+        unix,
+        not(target_os = "solaris"),
+        not(target_os = "illumos"),
+        not(target_os = "cygwin"),
+    ))]
     #[cfg_attr(
         docsrs,
-        doc(cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos"))))
+        doc(cfg(all(
+            unix,
+            not(target_os = "solaris"),
+            not(target_os = "illumos"),
+            not(target_os = "cygwin"),
+        )))
     )]
     pub fn reuseport(&self) -> io::Result<bool> {
         self.inner.reuse_port()
@@ -368,7 +393,7 @@ impl TcpSocket {
     ///
     /// Note that if [`set_recv_buffer_size`] has been called on this socket
     /// previously, the value returned by this function may not be the same as
-    /// the argument provided to `set_send_buffer_size`. This is for the
+    /// the argument provided to `set_recv_buffer_size`. This is for the
     /// following reasons:
     ///
     /// * Most operating systems have minimum and maximum allowed sizes for the
@@ -396,16 +421,51 @@ impl TcpSocket {
     ///
     /// If `SO_LINGER` is not specified, and the socket is closed, the system handles the call in a
     /// way that allows the process to continue as quickly as possible.
+    ///
+    /// This option is deprecated because setting `SO_LINGER` on a socket used with Tokio is always
+    /// incorrect as it leads to blocking the thread when the socket is closed. For more details,
+    /// please see:
+    ///
+    /// > Volumes of communications have been devoted to the intricacies of `SO_LINGER` versus
+    /// > non-blocking (`O_NONBLOCK`) sockets. From what I can tell, the final word is: don't do
+    /// > it. Rely on the `shutdown()`-followed-by-`read()`-eof technique instead.
+    /// >
+    /// > From [The ultimate `SO_LINGER` page, or: why is my tcp not reliable](https://blog.netherlabs.nl/articles/2009/01/18/the-ultimate-so_linger-page-or-why-is-my-tcp-not-reliable)
+    ///
+    /// Although this method is deprecated, it will not be removed from Tokio.
+    ///
+    /// Note that the special case of setting `SO_LINGER` to zero does not lead to blocking. Tokio
+    /// provides [`set_zero_linger`](Self::set_zero_linger) for this purpose.
+    #[deprecated = "`SO_LINGER` causes the socket to block the thread on drop"]
     pub fn set_linger(&self, dur: Option<Duration>) -> io::Result<()> {
         self.inner.set_linger(dur)
+    }
+
+    /// Sets a linger duration of zero on this socket by setting the `SO_LINGER` option.
+    ///
+    /// This causes the connection to be forcefully aborted ("abortive close") when the socket is
+    /// dropped or closed. Instead of the normal TCP shutdown handshake (`FIN`/`ACK`), a TCP `RST`
+    /// (reset) segment is sent to the peer, and the socket immediately discards any unsent data
+    /// residing in the socket send buffer. This prevents the socket from entering the `TIME_WAIT`
+    /// state after closing it.
+    ///
+    /// This is a destructive action. Any data currently buffered by the OS but not yet transmitted
+    /// will be lost. The peer will likely receive a "Connection Reset" error rather than a clean
+    /// end-of-stream.
+    ///
+    /// See the documentation for [`set_linger`](Self::set_linger) for additional details on how
+    /// `SO_LINGER` works.
+    pub fn set_zero_linger(&self) -> io::Result<()> {
+        self.inner.set_linger(Some(Duration::ZERO))
     }
 
     /// Reads the linger duration for this socket by getting the `SO_LINGER`
     /// option.
     ///
-    /// For more information about this option, see [`set_linger`].
+    /// For more information about this option, see [`set_zero_linger`] and [`set_linger`].
     ///
     /// [`set_linger`]: TcpSocket::set_linger
+    /// [`set_zero_linger`]: TcpSocket::set_zero_linger
     pub fn linger(&self) -> io::Result<Option<Duration>> {
         self.inner.linger()
     }
@@ -430,7 +490,7 @@ impl TcpSocket {
     /// # }
     /// ```
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
-        self.inner.set_nodelay(nodelay)
+        self.inner.set_tcp_nodelay(nodelay)
     }
 
     /// Gets the value of the `TCP_NODELAY` option on this socket.
@@ -452,24 +512,95 @@ impl TcpSocket {
     /// # }
     /// ```
     pub fn nodelay(&self) -> io::Result<bool> {
-        self.inner.nodelay()
+        self.inner.tcp_nodelay()
+    }
+
+    /// Gets the value of the `IPV6_TCLASS` option for this socket.
+    ///
+    /// For more information about this option, see [`set_tclass_v6`].
+    ///
+    /// [`set_tclass_v6`]: Self::set_tclass_v6
+    // https://docs.rs/socket2/0.6.1/src/socket2/sys/unix.rs.html#2541
+    #[cfg(any(
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "fuchsia",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "cygwin",
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "android",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "fuchsia",
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "netbsd",
+            target_os = "openbsd",
+            target_os = "cygwin",
+        )))
+    )]
+    pub fn tclass_v6(&self) -> io::Result<u32> {
+        self.inner.tclass_v6()
+    }
+
+    /// Sets the value for the `IPV6_TCLASS` option on this socket.
+    ///
+    /// Specifies the traffic class field that is used in every packet
+    /// sent from this socket.
+    ///
+    /// # Note
+    ///
+    /// This may not have any effect on IPv4 sockets.
+    // https://docs.rs/socket2/0.6.1/src/socket2/sys/unix.rs.html#2566
+    #[cfg(any(
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "fuchsia",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "cygwin",
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "android",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "fuchsia",
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "netbsd",
+            target_os = "openbsd",
+            target_os = "cygwin",
+        )))
+    )]
+    pub fn set_tclass_v6(&self, tclass: u32) -> io::Result<()> {
+        self.inner.set_tclass_v6(tclass)
     }
 
     /// Gets the value of the `IP_TOS` option for this socket.
     ///
-    /// For more information about this option, see [`set_tos`].
+    /// For more information about this option, see [`set_tos_v4`].
     ///
-    /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
-    /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
-    ///
-    /// [`set_tos`]: Self::set_tos
-    // https://docs.rs/socket2/0.5.3/src/socket2/socket.rs.html#1464
+    /// [`set_tos_v4`]: Self::set_tos_v4
+    // https://docs.rs/socket2/0.6.1/src/socket2/socket.rs.html#1585
     #[cfg(not(any(
         target_os = "fuchsia",
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
-        target_os = "haiku"
+        target_os = "haiku",
+        target_os = "wasi",
     )))]
     #[cfg_attr(
         docsrs,
@@ -478,11 +609,42 @@ impl TcpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
-            target_os = "haiku"
+            target_os = "haiku",
+            target_os = "wasi",
+        ))))
+    )]
+    pub fn tos_v4(&self) -> io::Result<u32> {
+        self.inner.tos_v4()
+    }
+
+    /// Deprecated. Use [`tos_v4()`] instead.
+    ///
+    /// [`tos_v4()`]: Self::tos_v4
+    #[deprecated(
+        note = "`tos` related methods have been renamed `tos_v4` since they are IPv4-specific."
+    )]
+    #[doc(hidden)]
+    #[cfg(not(any(
+        target_os = "fuchsia",
+        target_os = "redox",
+        target_os = "solaris",
+        target_os = "illumos",
+        target_os = "haiku",
+        target_os = "wasi",
+    )))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(not(any(
+            target_os = "fuchsia",
+            target_os = "redox",
+            target_os = "solaris",
+            target_os = "illumos",
+            target_os = "haiku",
+            target_os = "wasi",
         ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
-        self.inner.tos()
+        self.tos_v4()
     }
 
     /// Sets the value for the `IP_TOS` option on this socket.
@@ -490,15 +652,19 @@ impl TcpSocket {
     /// This value sets the type-of-service field that is used in every packet
     /// sent from this socket.
     ///
-    /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
-    /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
-    // https://docs.rs/socket2/0.5.3/src/socket2/socket.rs.html#1446
+    /// # Note
+    ///
+    /// - This may not have any effect on IPv6 sockets.
+    /// - On Windows, `IP_TOS` is only supported on [Windows 8+ or
+    ///   Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
+    // https://docs.rs/socket2/0.6.1/src/socket2/socket.rs.html#1566
     #[cfg(not(any(
         target_os = "fuchsia",
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
-        target_os = "haiku"
+        target_os = "haiku",
+        target_os = "wasi",
     )))]
     #[cfg_attr(
         docsrs,
@@ -507,11 +673,42 @@ impl TcpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
-            target_os = "haiku"
+            target_os = "haiku",
+            target_os = "wasi",
+        ))))
+    )]
+    pub fn set_tos_v4(&self, tos: u32) -> io::Result<()> {
+        self.inner.set_tos_v4(tos)
+    }
+
+    /// Deprecated. Use [`set_tos_v4()`] instead.
+    ///
+    /// [`set_tos_v4()`]: Self::set_tos_v4
+    #[deprecated(
+        note = "`tos` related methods have been renamed `tos_v4` since they are IPv4-specific."
+    )]
+    #[doc(hidden)]
+    #[cfg(not(any(
+        target_os = "fuchsia",
+        target_os = "redox",
+        target_os = "solaris",
+        target_os = "illumos",
+        target_os = "haiku",
+        target_os = "wasi",
+    )))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(not(any(
+            target_os = "fuchsia",
+            target_os = "redox",
+            target_os = "solaris",
+            target_os = "illumos",
+            target_os = "haiku",
+            target_os = "wasi",
         ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
-        self.inner.set_tos(tos)
+        self.set_tos_v4(tos)
     }
 
     /// Gets the value for the `SO_BINDTODEVICE` option on this socket
@@ -639,7 +836,7 @@ impl TcpSocket {
     /// ```
     pub async fn connect(self, addr: SocketAddr) -> io::Result<TcpStream> {
         if let Err(err) = self.inner.connect(&addr.into()) {
-            #[cfg(unix)]
+            #[cfg(not(windows))]
             if err.raw_os_error() != Some(libc::EINPROGRESS) {
                 return Err(err);
             }
@@ -648,9 +845,9 @@ impl TcpSocket {
                 return Err(err);
             }
         }
-        #[cfg(unix)]
+        #[cfg(not(windows))]
         let mio = {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
 
             let raw_fd = self.inner.into_raw_fd();
             unsafe { mio::net::TcpStream::from_raw_fd(raw_fd) }
@@ -704,9 +901,9 @@ impl TcpSocket {
     /// ```
     pub fn listen(self, backlog: u32) -> io::Result<TcpListener> {
         self.inner.listen(backlog as i32)?;
-        #[cfg(unix)]
+        #[cfg(not(windows))]
         let mio = {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
 
             let raw_fd = self.inner.into_raw_fd();
             unsafe { mio::net::TcpListener::from_raw_fd(raw_fd) }
@@ -743,12 +940,12 @@ impl TcpSocket {
     /// # Examples
     ///
     /// ```
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::TcpSocket;
     /// use socket2::{Domain, Socket, Type};
     ///
     /// #[tokio::main]
     /// async fn main() -> std::io::Result<()> {
+    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
     ///     let socket2_socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
     ///     socket2_socket.set_nonblocking(true)?;
     ///
@@ -758,9 +955,9 @@ impl TcpSocket {
     /// }
     /// ```
     pub fn from_std_stream(std_stream: std::net::TcpStream) -> TcpSocket {
-        #[cfg(unix)]
+        #[cfg(not(windows))]
         {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
 
             let raw_fd = std_stream.into_raw_fd();
             unsafe { TcpSocket::from_raw_fd(raw_fd) }
@@ -794,8 +991,8 @@ impl fmt::Debug for TcpSocket {
 
 // These trait implementations can't be build on Windows, so we completely
 // ignore them, even when building documentation.
-#[cfg(unix)]
-cfg_unix! {
+#[cfg(any(unix, target_os = "wasi"))]
+cfg_unix_or_wasi! {
     impl AsRawFd for TcpSocket {
         fn as_raw_fd(&self) -> RawFd {
             self.inner.as_raw_fd()
@@ -816,7 +1013,9 @@ cfg_unix! {
         /// The caller is responsible for ensuring that the socket is in
         /// non-blocking mode.
         unsafe fn from_raw_fd(fd: RawFd) -> TcpSocket {
-            let inner = socket2::Socket::from_raw_fd(fd);
+            // Safety: exactly the same safety requirements as the
+            // `FromRawFd::from_raw_fd` trait method.
+            let inner = unsafe { socket2::Socket::from_raw_fd(fd) };
             TcpSocket { inner }
         }
     }
@@ -855,7 +1054,7 @@ cfg_windows! {
         /// The caller is responsible for ensuring that the socket is in
         /// non-blocking mode.
         unsafe fn from_raw_socket(socket: RawSocket) -> TcpSocket {
-            let inner = socket2::Socket::from_raw_socket(socket);
+            let inner = unsafe { socket2::Socket::from_raw_socket(socket) };
             TcpSocket { inner }
         }
     }

@@ -15,6 +15,13 @@ members = [
   "tests-integration",
 ]
 
+[patch.crates-io]
+tokio = { path = "tokio" }
+tokio-macros = { path = "tokio-macros" }
+tokio-stream = { path = "tokio-stream" }
+tokio-test = { path = "tokio-test" }
+tokio-util = { path = "tokio-util" }
+
 [workspace.metadata.spellcheck]
 config = "spellcheck.toml"
 
@@ -27,6 +34,6 @@ unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(tokio_internal_mt_counters)',
   'cfg(tokio_no_parking_lot)',
   'cfg(tokio_no_tuning_tests)',
-  'cfg(tokio_taskdump)',
   'cfg(tokio_unstable)',
+  'cfg(target_os, values("cygwin"))',
 ] }

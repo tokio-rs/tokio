@@ -126,6 +126,17 @@ fn unbounded_mpsc_channel() {
     })
 }
 
+#[test]
+fn yield_in_block_in_place() {
+    test_with_runtimes(|| {
+        Handle::current().block_on(async {
+            tokio::task::block_in_place(|| {
+                Handle::current().block_on(tokio::task::yield_now());
+            });
+        });
+    })
+}
+
 #[cfg(not(target_os = "wasi"))] // Wasi doesn't support file operations or bind
 rt_test! {
     use tokio::fs;
@@ -207,6 +218,24 @@ rt_test! {
         let answer = Handle::current().block_on(handle).unwrap();
 
         assert_eq!(answer, 42);
+    }
+
+    #[test]
+    fn thread_park_ok() {
+        use core::task::Poll;
+        let rt = rt();
+        let mut exit = false;
+        rt.handle().block_on(core::future::poll_fn(move |cx| {
+            if exit {
+                return Poll::Ready(());
+            }
+            cx.waker().wake_by_ref();
+            // Verify that consuming the park token does not result in a hang.
+            std::thread::current().unpark();
+            std::thread::park();
+            exit = true;
+            Poll::Pending
+        }));
     }
 
     // ==== net ======

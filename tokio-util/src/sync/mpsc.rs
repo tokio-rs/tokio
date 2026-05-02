@@ -200,7 +200,7 @@ impl<T: Send> PollSender<T> {
         result
     }
 
-    /// Checks whether this sender is been closed.
+    /// Checks whether this sender is closed.
     ///
     /// The underlying channel that this sender was wrapping may still be open.
     pub fn is_closed(&self) -> bool {

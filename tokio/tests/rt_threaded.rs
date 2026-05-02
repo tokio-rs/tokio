@@ -6,7 +6,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime;
 use tokio::sync::oneshot;
-use tokio_test::{assert_err, assert_ok};
+use tokio_test::{assert_err, assert_ok, assert_pending};
 
 use std::future::{poll_fn, Future};
 use std::pin::Pin;
@@ -647,6 +647,192 @@ fn test_nested_block_in_place_with_block_on_between() {
     }
 }
 
+#[test]
+fn yield_now_in_block_in_place() {
+    let rt = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        tokio::spawn(async {
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(tokio::task::yield_now());
+            })
+        })
+        .await
+        .unwrap()
+    })
+}
+
+#[test]
+fn mutex_in_block_in_place() {
+    const BUDGET: usize = 128;
+
+    let rt = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let lock = tokio::sync::Mutex::new(0);
+
+        tokio::spawn(async move {
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    for i in 0..(BUDGET + 1) {
+                        let mut guard = lock.lock().await;
+                        *guard = i;
+                    }
+                });
+            })
+        })
+        .await
+        .unwrap();
+    })
+}
+
+// Tests that when a task is notified by another task and is placed in the LIFO
+// slot, and then the notifying task blocks the runtime, the notified task will
+// be stolen by another worker thread.
+//
+// Integration test for: https://github.com/tokio-rs/tokio/issues/4941
+#[test]
+fn lifo_stealable() {
+    use std::time::Duration;
+
+    // This test constructs a scenario where a task (the "blocker task")
+    // notifies another task (the "victim task") and then blocks that worker
+    // thread indefinitely. The victim task is placed in the worker's LIFO
+    // slot, and will only run to completion if another worker steals it from
+    // the LIFO slot, as the current worker remains blocked running the blocker
+    // task.
+    //
+    // To make the blocker task block its worker thread without yielding, we use
+    // a `std::sync` blocking channel, so that we can eventually unblock it when
+    // the test completes.
+    let (block_thread_tx, block_thread_rx) = mpsc::channel::<()>();
+    // We use this channel to wait until the victim task has started running. If
+    // we just spawned the victim task and then immediately blocked the worker
+    // thread, it would be in the global inject queue, rather than in the
+    // worker's LIFO slot.
+    let (task_started_tx, task_started_rx) = tokio::sync::oneshot::channel();
+    // Finally, this channel is used by the blocker task to wake up the victim
+    // task, so that it is placed in the worker's LIFO slot.
+    let (notify_tx, notify_rx) = tokio::sync::oneshot::channel();
+    let rt = runtime::Builder::new_multi_thread()
+        // Make sure there are enough workers that one can be parked running the
+        // I/O driver and another can be parked running the timer wheel and
+        // there's still at least one worker free to steal the blocked task.
+        .worker_threads(4)
+        .enable_time()
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let victim_task_joined = tokio::spawn(async move {
+            println!("[victim] task started");
+            task_started_tx.send(()).unwrap();
+            println!("[victim] task waiting for wakeup...");
+            notify_rx.await.unwrap();
+            println!("[victim] task running after wakeup");
+        });
+
+        // Wait for the victim task to have been polled once and have yielded
+        // before we spawn the task that will notify it. This ensures that it
+        // will be placed in the LIFO slot of the same worker thread as the
+        // blocker task, rather than on the global injector queue.
+        task_started_rx.await.unwrap();
+        println!("[main] victim slot task start acked!");
+
+        // Now, spawn a task that will notify the victim task before going
+        // blocking forever.
+        tokio::spawn(async move {
+            println!("[blocker] sending wakeup");
+            notify_tx.send(()).unwrap();
+
+            println!("[blocker] blocking the worker thread...");
+            // Block the worker thread indefinitely by waiting for a message on
+            // a blocking channel. Since we just notified the victim task, it
+            // went into the current worker thread's LIFO slot, and will only
+            // be able to complete if another worker thread successfully steals
+            // it from the LIFO slot.
+            //
+            // Using a channel rather than e.g. `loop {}` allows us to terminate
+            // the task cleanly when the test finishes.
+            let _ = block_thread_rx.recv();
+            println!("[blocker] done");
+        });
+
+        println!("[main] blocker task spawned");
+
+        // Wait for the victim task to join. If it does, then it has been stolen
+        // by another worker thread successfully.
+        //
+        // The 30-second timeout is chosen arbitrarily: its purpose is to ensure
+        // that the failure mode for this test is a panic, rather than hanging
+        // indefinitely. 30 seconds should be plenty of time for the task to be
+        // stolen, if it's going to work.
+        let result = tokio::time::timeout(Duration::from_secs(30), victim_task_joined).await;
+        println!("[main] result: {result:?}");
+
+        // Before possibly panicking, make sure that we wake up the blocker task
+        // so that it doesn't stop the runtime from shutting down.
+        block_thread_tx.send(()).unwrap();
+        result
+            .expect("task in LIFO slot should complete within 30 seconds")
+            .expect("task in LIFO slot should not panic");
+    })
+}
+
+#[test]
+/// Deferred tasks should be woken before starting the [`tokio::task::block_in_place`]
+// https://github.com/tokio-rs/tokio/issues/7877
+fn wake_deferred_tasks_before_block_in_place() {
+    let (tx1, rx1) = oneshot::channel::<()>();
+    let (tx2, rx2) = oneshot::channel::<()>();
+
+    let deferred_task = tokio_test::task::spawn(tokio::task::yield_now());
+    let deffered_task = Arc::new(Mutex::new(deferred_task));
+
+    let rt = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    let jh = {
+        let deferred_task = Arc::clone(&deffered_task);
+        rt.spawn(async move {
+            {
+                let mut lock = deferred_task.lock().unwrap();
+                assert_pending!(lock.poll());
+            }
+            tokio::task::block_in_place(|| {
+                // signal that the `block_in_place` has started
+                tx2.send(()).unwrap();
+                // wait for the shutdown signal
+                rx1.blocking_recv().unwrap();
+            });
+        })
+    };
+
+    // wait for the `block_in_place` to start
+    rx2.blocking_recv().unwrap();
+
+    // check that the deferred task was woken before the `block_in_place` ends
+    let is_woken = {
+        let lock = deffered_task.lock().unwrap();
+        lock.is_woken()
+    };
+
+    // signal the `block_in_place` to shutdown
+    tx1.send(()).unwrap();
+
+    rt.block_on(jh).unwrap();
+
+    assert!(is_woken);
+}
+
 // Testing the tuning logic is tricky as it is inherently timing based, and more
 // of a heuristic than an exact behavior. This test checks that the interval
 // changes over time based on load factors. There are no assertions, completion
@@ -765,6 +951,27 @@ fn test_tuning() {
     }
 
     flag.store(false, Relaxed);
+}
+
+#[test]
+fn default_runtime_name_should_be_none() {
+    let rt1 = runtime::Builder::new_multi_thread().build().unwrap();
+
+    assert!(rt1.handle().name().is_none());
+}
+
+#[test]
+fn different_runtime_names() {
+    let rt1 = runtime::Builder::new_multi_thread()
+        .name("test-runtime-1")
+        .build()
+        .unwrap();
+    let rt2 = runtime::Builder::new_multi_thread()
+        .name("test-runtime-2")
+        .build()
+        .unwrap();
+
+    assert_ne!(rt1.handle().name().unwrap(), rt2.handle().name().unwrap());
 }
 
 fn rt() -> runtime::Runtime {

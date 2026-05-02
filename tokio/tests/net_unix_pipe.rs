@@ -8,8 +8,8 @@ use tokio_test::{assert_err, assert_ok, assert_pending, assert_ready_ok};
 
 use std::fs::File;
 use std::io;
+use std::os::fd::AsFd;
 use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 
 /// Helper struct which will clean up temporary files once dropped.
@@ -68,7 +68,7 @@ async fn fifo_simple_send() -> io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(miri, ignore)] // No `mkfifo` in miri.
 async fn fifo_simple_send_sender_first() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
@@ -134,7 +134,7 @@ async fn fifo_multiple_writes() -> io::Result<()> {
 /// Checks behavior of a resilient reader (Receiver in O_RDWR access mode)
 /// with writers sequentially opening and closing a FIFO.
 #[tokio::test]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn fifo_resilient_reader() -> io::Result<()> {
     const DATA: &[u8] = b"this is some data to write to the fifo";
@@ -226,7 +226,6 @@ async fn from_file() -> io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `fstat` in miri.
 async fn from_file_detects_not_a_fifo() -> io::Result<()> {
     let dir = tempfile::Builder::new()
         .prefix("tokio-fifo-tests")
@@ -259,11 +258,11 @@ async fn from_file_detects_wrong_access_mode() -> io::Result<()> {
     let _reader = pipe::OpenOptions::new().open_receiver(&fifo)?;
 
     // Check if Receiver detects write-only access mode.
-    let wronly = std::fs::OpenOptions::new()
+    let write_only = std::fs::OpenOptions::new()
         .write(true)
         .custom_flags(libc::O_NONBLOCK)
         .open(&fifo)?;
-    let err = assert_err!(pipe::Receiver::from_file(wronly));
+    let err = assert_err!(pipe::Receiver::from_file(write_only));
     assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
 
     // Check if Sender detects read-only access mode.
@@ -277,8 +276,8 @@ async fn from_file_detects_wrong_access_mode() -> io::Result<()> {
     Ok(())
 }
 
-fn is_nonblocking<T: AsRawFd>(fd: &T) -> io::Result<bool> {
-    let flags = nix::fcntl::fcntl(fd.as_raw_fd(), nix::fcntl::F_GETFL)?;
+fn is_nonblocking<T: AsFd>(fd: &T) -> io::Result<bool> {
+    let flags = nix::fcntl::fcntl(fd.as_fd(), nix::fcntl::F_GETFL)?;
     Ok((flags & libc::O_NONBLOCK) != 0)
 }
 
@@ -298,9 +297,9 @@ async fn from_file_sets_nonblock() -> io::Result<()> {
     assert!(is_nonblocking(&reader)?);
 
     // Check if Sender sets the pipe in non-blocking mode.
-    let wronly = std::fs::OpenOptions::new().write(true).open(&fifo)?;
-    assert!(!is_nonblocking(&wronly)?);
-    let writer = pipe::Sender::from_file(wronly)?;
+    let write_only = std::fs::OpenOptions::new().write(true).open(&fifo)?;
+    assert!(!is_nonblocking(&write_only)?);
+    let writer = pipe::Sender::from_file(write_only)?;
     assert!(is_nonblocking(&writer)?);
 
     Ok(())
@@ -469,7 +468,7 @@ async fn anon_pipe_simple_send() -> io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
+#[cfg_attr(miri, ignore)] // No `pidfd_spawnp` in miri.
 async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
     use tokio::process::Command;
 
@@ -500,7 +499,6 @@ async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
 
 #[tokio::test]
 #[cfg(target_os = "linux")]
-#[cfg_attr(miri, ignore)] // No `fstat` in miri.
 async fn anon_pipe_from_owned_fd() -> std::io::Result<()> {
     use nix::fcntl::OFlag;
 
@@ -520,7 +518,6 @@ async fn anon_pipe_from_owned_fd() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn anon_pipe_into_nonblocking_fd() -> std::io::Result<()> {
     let (tx, rx) = pipe::pipe()?;
 
@@ -534,7 +531,6 @@ async fn anon_pipe_into_nonblocking_fd() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No F_GETFL for fcntl in miri.
 async fn anon_pipe_into_blocking_fd() -> std::io::Result<()> {
     let (tx, rx) = pipe::pipe()?;
 
@@ -543,6 +539,108 @@ async fn anon_pipe_into_blocking_fd() -> std::io::Result<()> {
 
     assert!(!is_nonblocking(&tx_fd)?);
     assert!(!is_nonblocking(&rx_fd)?);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn try_io_writable() -> std::io::Result<()> {
+    let (tx, _rx) = pipe::pipe()?;
+
+    // Give the runtime some time to update bookkeeping.
+    tokio::task::yield_now().await;
+
+    {
+        let mut called = false;
+        let _ = tx.try_io(|| {
+            called = true;
+            Ok(())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should still be marked as writable"
+        );
+    }
+    {
+        let mut called = false;
+        let _ = tx.try_io(|| {
+            called = true;
+            io::Result::<()>::Err(io::ErrorKind::WouldBlock.into())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should still be marked as writable"
+        );
+    }
+
+    {
+        let mut called = false;
+        let _ = tx.try_io(|| {
+            called = true;
+            Ok(())
+        });
+        assert!(!called, "closure should not have been called, since socket writable state should have been cleared");
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn try_io_readable() -> io::Result<()> {
+    let (mut tx, rx) = pipe::pipe()?;
+
+    // Give the runtime some time to update bookkeeping.
+    tokio::task::yield_now().await;
+
+    {
+        let mut called = false;
+        let _ = rx.try_io(|| {
+            called = true;
+            Ok(())
+        });
+        assert!(
+            !called,
+            "closure should not have been called, since socket should not be readable"
+        );
+    }
+
+    // Make `a` readable by writing to `b`.
+    // Give the runtime some time to update bookkeeping.
+    tx.write_all(&[0]).await?;
+    tokio::task::yield_now().await;
+
+    {
+        let mut called = false;
+        let _ = rx.try_io(|| {
+            called = true;
+            Ok(())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should have data available to read"
+        );
+    }
+
+    {
+        let mut called = false;
+        let _ = rx.try_io(|| {
+            called = true;
+            io::Result::<()>::Err(io::ErrorKind::WouldBlock.into())
+        });
+        assert!(
+            called,
+            "closure should have been called, since socket should have data available to read"
+        );
+    }
+
+    {
+        let mut called = false;
+        let _ = rx.try_io(|| {
+            called = true;
+            Ok(())
+        });
+        assert!(!called, "closure should not have been called, since socket readable state should have been cleared");
+    }
 
     Ok(())
 }

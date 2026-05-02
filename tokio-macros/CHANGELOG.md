@@ -1,3 +1,32 @@
+# 2.7.0 (April 3rd, 2026)
+
+- macros: stabilize `LocalRuntime` ([#7557])
+- macros: add runtime name ([#7924])
+
+[#7557]: https://github.com/tokio-rs/tokio/pull/7557
+[#7924]: https://github.com/tokio-rs/tokio/pull/7924
+
+# 2.6.1 (Mar 2nd, 2026)
+
+- macros: improve error message for return type mismatch in #[tokio::main] ([#7856])
+- macros: use call_site hygiene to avoid unused qualification ([#7866])
+
+[#7856]: https://github.com/tokio-rs/tokio/pull/7856
+[#7866]: https://github.com/tokio-rs/tokio/pull/7866
+
+# 2.6.0 (Oct 14th, 2025)
+
+The MSRV is raised to 1.71.
+
+- msrv: increase MSRV to 1.71 ([#7658])
+- macros: add `local` runtime flavor ([#7375], [#7597])
+- macros: suppress `clippy::unwrap_in_result` in `#[tokio::main]` ([#7651])
+
+[#7375]: https://github.com/tokio-rs/tokio/pull/7375
+[#7597]: https://github.com/tokio-rs/tokio/pull/7597
+[#7651]: https://github.com/tokio-rs/tokio/pull/7651
+[#7658]: https://github.com/tokio-rs/tokio/pull/7658
+
 # 2.5.0 (Jan 8th, 2025)
 
 - macros: suppress `clippy::needless_return` in `#[tokio::main]` ([#6874])

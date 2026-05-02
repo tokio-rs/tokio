@@ -259,13 +259,10 @@ async fn reset_after_firing() {
         .poll(&mut Context::from_waker(noop_waker_ref())));
 }
 
-const NUM_LEVELS: usize = 6;
-const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
-
 #[tokio::test]
 async fn exactly_max() {
     time::pause();
-    time::sleep(ms(MAX_DURATION)).await;
+    time::sleep(Duration::MAX).await;
 }
 
 #[tokio::test]
@@ -285,7 +282,7 @@ async fn issue_5183() {
 #[tokio::test]
 async fn no_out_of_bounds_close_to_max() {
     time::pause();
-    time::sleep(ms(MAX_DURATION - 1)).await;
+    time::sleep(Duration::MAX - Duration::from_millis(1)).await;
 }
 
 fn ms(n: u64) -> Duration {

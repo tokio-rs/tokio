@@ -22,16 +22,16 @@ impl<I> Unpin for Once<I> {}
 /// ```
 /// use tokio_stream::{self as stream, StreamExt};
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     // one is the loneliest number
-///     let mut one = stream::once(1);
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// // one is the loneliest number
+/// let mut one = stream::once(1);
 ///
-///     assert_eq!(Some(1), one.next().await);
+/// assert_eq!(Some(1), one.next().await);
 ///
-///     // just one, that's all we get
-///     assert_eq!(None, one.next().await);
-/// }
+/// // just one, that's all we get
+/// assert_eq!(None, one.next().await);
+/// # }
 /// ```
 pub fn once<T>(value: T) -> Once<T> {
     Once {

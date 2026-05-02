@@ -16,7 +16,7 @@ pin_project! {
     /// # Example
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> std::io::Result<()> {
     /// use tokio_stream::StreamExt;
     /// use tokio_util::io::ReaderStream;
@@ -57,6 +57,11 @@ pin_project! {
 impl<R: AsyncRead> ReaderStream<R> {
     /// Convert an [`AsyncRead`] into a [`Stream`] with item type
     /// `Result<Bytes, std::io::Error>`.
+    ///
+    /// Currently, the default capacity 4096 bytes (4 KiB).
+    /// This capacity is not part of the semver contract
+    /// and may be tweaked in future releases without
+    /// requiring a major version bump.
     ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`Stream`]: futures_core::Stream

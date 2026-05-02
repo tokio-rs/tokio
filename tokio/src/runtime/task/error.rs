@@ -46,6 +46,8 @@ impl JoinError {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::panic;
     ///
     /// #[tokio::main]
@@ -56,6 +58,7 @@ impl JoinError {
     ///
     ///     assert!(err.is_panic());
     /// }
+    /// # }
     /// ```
     pub fn is_panic(&self) -> bool {
         matches!(&self.repr, Repr::Panic(_))
@@ -71,7 +74,7 @@ impl JoinError {
     ///
     /// # Examples
     ///
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use std::panic;
     ///
     /// #[tokio::main]
@@ -98,7 +101,7 @@ impl JoinError {
     ///
     /// # Examples
     ///
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use std::panic;
     ///
     /// #[tokio::main]

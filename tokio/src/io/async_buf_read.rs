@@ -84,15 +84,15 @@ impl<T: ?Sized + AsyncBufRead + Unpin> AsyncBufRead for &mut T {
 
 impl<P> AsyncBufRead for Pin<P>
 where
-    P: DerefMut + Unpin,
+    P: DerefMut,
     P::Target: AsyncBufRead,
 {
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        self.get_mut().as_mut().poll_fill_buf(cx)
+        crate::util::pin_as_deref_mut(self).poll_fill_buf(cx)
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        self.get_mut().as_mut().consume(amt);
+        crate::util::pin_as_deref_mut(self).consume(amt);
     }
 }
 

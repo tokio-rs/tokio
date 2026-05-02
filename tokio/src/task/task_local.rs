@@ -275,6 +275,16 @@ impl<T: Clone + 'static> LocalKey<T> {
     pub fn get(&'static self) -> T {
         self.with(|v| v.clone())
     }
+
+    /// Returns a copy of the task-local value
+    /// if the task-local value implements `Clone`.
+    ///
+    /// If the task-local with the associated key is not present, this
+    /// method will return an `AccessError`. For a panicking variant,
+    /// see `get`.
+    pub fn try_get(&'static self) -> Result<T, AccessError> {
+        self.try_with(|v| v.clone())
+    }
 }
 
 impl<T: 'static> fmt::Debug for LocalKey<T> {

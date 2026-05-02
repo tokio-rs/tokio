@@ -36,6 +36,8 @@
 //! can do the same with [`tokio::fs::File`][`File`]:
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::io::{self, AsyncReadExt};
 //! use tokio::fs::File;
 //!
@@ -50,6 +52,7 @@
 //!     println!("The bytes: {:?}", &buffer[..n]);
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! [`File`]: crate::fs::File
@@ -73,6 +76,8 @@
 //! extra methods to any async reader:
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::io::{self, BufReader, AsyncBufReadExt};
 //! use tokio::fs::File;
 //!
@@ -88,6 +93,7 @@
 //!     println!("{}", buffer);
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! [`BufWriter`] doesn't add any new ways of writing; it just buffers every call
@@ -95,6 +101,8 @@
 //! [`BufWriter`] to ensure that any buffered data is written.
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::io::{self, BufWriter, AsyncWriteExt};
 //! use tokio::fs::File;
 //!
@@ -114,6 +122,7 @@
 //!
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! [stdbuf]: std::io#bufreader-and-bufwriter
@@ -218,7 +227,7 @@ cfg_io_driver_impl! {
     pub(crate) mod interest;
     pub(crate) mod ready;
 
-    cfg_net! {
+    cfg_net_or_uring! {
         pub use interest::Interest;
         pub use ready::Ready;
     }
@@ -275,7 +284,7 @@ cfg_io_util! {
     pub(crate) mod util;
     pub use util::{
         copy, copy_bidirectional, copy_bidirectional_with_sizes, copy_buf, duplex, empty, repeat, sink, simplex, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
-        BufReader, BufStream, BufWriter, DuplexStream, Empty, Lines, Repeat, Sink, Split, Take, SimplexStream,
+        BufReader, BufStream, BufWriter, Chain, DuplexStream, Empty, Lines, Repeat, Sink, Split, Take, SimplexStream,
     };
 }
 
@@ -292,4 +301,8 @@ cfg_io_blocking! {
         pub(crate) use crate::blocking::spawn_blocking as run;
         pub(crate) use crate::blocking::JoinHandle as Blocking;
     }
+}
+
+cfg_io_uring! {
+    pub(crate) mod uring;
 }

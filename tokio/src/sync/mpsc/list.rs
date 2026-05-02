@@ -35,8 +35,14 @@ pub(crate) enum TryPopResult<T> {
     /// Successfully popped a value.
     Ok(T),
     /// The channel is empty.
+    ///
+    /// Note that `list.rs` only tracks the close state set by senders. If the
+    /// channel is closed by `Rx::close()`, then `TryPopResult::Empty` is still
+    /// returned, and the close state needs to be handled by `chan.rs`.
     Empty,
     /// The channel is empty and closed.
+    ///
+    /// Returned when the send half is closed (all senders dropped).
     Closed,
     /// The channel is not empty, but the first value is being written.
     Busy,
@@ -178,6 +184,13 @@ impl<T> Tx<T> {
         }
     }
 
+    /// # Safety
+    ///
+    /// Behavior is undefined if any of the following conditions are violated:
+    ///
+    /// - The `block` was created by [`Box::into_raw`].
+    /// - The `block` is not currently part of any linked list.
+    /// - The `block` is a valid pointer to a [`Block<T>`].
     pub(crate) unsafe fn reclaim_block(&self, mut block: NonNull<Block<T>>) {
         // The block has been removed from the linked list and ownership
         // is reclaimed.
@@ -186,24 +199,28 @@ impl<T> Tx<T> {
         // inserting it back at the end of the linked list.
         //
         // First, reset the data
-        block.as_mut().reclaim();
+        //
+        // Safety: caller guarantees the block is valid and not in any list.
+        unsafe {
+            block.as_mut().reclaim();
+        }
 
         let mut reused = false;
 
         // Attempt to insert the block at the end
         //
         // Walk at most three times
-        //
         let curr_ptr = self.block_tail.load(Acquire);
 
         // The pointer can never be null
         debug_assert!(!curr_ptr.is_null());
 
-        let mut curr = NonNull::new_unchecked(curr_ptr);
+        // Safety: curr_ptr is never null.
+        let mut curr = unsafe { NonNull::new_unchecked(curr_ptr) };
 
         // TODO: Unify this logic with Block::grow
         for _ in 0..3 {
-            match curr.as_ref().try_push(&mut block, AcqRel, Acquire) {
+            match unsafe { curr.as_ref().try_push(&mut block, AcqRel, Acquire) } {
                 Ok(()) => {
                     reused = true;
                     break;
@@ -215,7 +232,11 @@ impl<T> Tx<T> {
         }
 
         if !reused {
-            let _ = Box::from_raw(block.as_ptr());
+            // Safety:
+            //
+            // 1. Caller guarantees the block is valid and not in any list.
+            // 2. The block was created by `Box::into_raw`.
+            let _ = unsafe { Box::from_raw(block.as_ptr()) };
         }
     }
 
@@ -381,8 +402,8 @@ impl<T> Rx<T> {
         }
 
         while let Some(block) = cur {
-            cur = block.as_ref().load_next(Relaxed);
-            drop(Box::from_raw(block.as_ptr()));
+            cur = unsafe { block.as_ref() }.load_next(Relaxed);
+            drop(unsafe { Box::from_raw(block.as_ptr()) });
         }
     }
 }

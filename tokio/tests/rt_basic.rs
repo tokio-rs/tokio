@@ -1,8 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
-#![cfg(not(miri))] // Possible bug on Miri.
 
-use tokio::runtime::Runtime;
+use tokio::runtime::{self, Runtime};
 use tokio::sync::oneshot;
 use tokio::time::{timeout, Duration};
 use tokio_test::{assert_err, assert_ok};
@@ -302,6 +301,27 @@ fn timeout_panics_when_no_time_handle() {
     });
 }
 
+#[test]
+fn default_runtime_name_should_be_none() {
+    let rt1 = runtime::Builder::new_current_thread().build().unwrap();
+
+    assert!(rt1.handle().name().is_none());
+}
+
+#[test]
+fn different_runtime_names() {
+    let rt1 = runtime::Builder::new_current_thread()
+        .name("test-runtime-1")
+        .build()
+        .unwrap();
+    let rt2 = runtime::Builder::new_current_thread()
+        .name("test-runtime-2")
+        .build()
+        .unwrap();
+
+    assert_ne!(rt1.handle().name().unwrap(), rt2.handle().name().unwrap());
+}
+
 #[cfg(tokio_unstable)]
 mod unstable {
     use tokio::runtime::{Builder, RngSeed, UnhandledPanic};
@@ -366,13 +386,13 @@ mod unstable {
             .unwrap();
 
         let rt = Arc::new(rt);
-        let mut ths = vec![];
+        let mut threads = vec![];
         let (tx, rx) = mpsc::channel();
 
         for _ in 0..N {
             let rt = rt.clone();
             let tx = tx.clone();
-            ths.push(std::thread::spawn(move || {
+            threads.push(std::thread::spawn(move || {
                 rt.block_on(async {
                     tx.send(()).unwrap();
                     futures::future::pending::<()>().await;
@@ -388,8 +408,8 @@ mod unstable {
             panic!("boom");
         });
 
-        for th in ths {
-            assert!(th.join().is_err());
+        for thread in threads {
+            assert!(thread.join().is_err());
         }
     }
 
@@ -456,4 +476,45 @@ fn rt() -> Runtime {
         .enable_all()
         .build()
         .unwrap()
+}
+
+#[test]
+fn before_park_yields() {
+    use futures::task::ArcWake;
+    use std::sync::Arc;
+    use tokio::runtime::Builder;
+    use tokio::sync::Notify;
+
+    struct MyWaker(Notify);
+
+    impl ArcWake for MyWaker {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            arc_self.0.notify_one();
+        }
+    }
+
+    let notify = Arc::new(MyWaker(Notify::new()));
+    let notify2 = notify.clone();
+    let waker = futures::task::waker(notify2);
+    let woken = Arc::new(AtomicBool::new(false));
+    let woken2 = woken.clone();
+
+    let rt = Builder::new_current_thread()
+        .enable_all()
+        .on_thread_park(move || {
+            if !woken2.swap(true, Ordering::SeqCst) {
+                let mut cx = Context::from_waker(&waker);
+                // `yield_now` pushes the waker to the defer slot.
+                let fut = std::pin::pin!(tokio::task::yield_now());
+                let _ = fut.poll(&mut cx);
+            }
+        })
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        notify.0.notified().await;
+    });
+
+    assert!(woken.load(Ordering::SeqCst));
 }

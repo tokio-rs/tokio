@@ -171,20 +171,20 @@ fn try_recv() {
             assert_ok!(ctx.tx.clone().try_send(()));
         }
 
-        let mut ths = Vec::new();
+        let mut threads = Vec::new();
 
         for _ in 0..TASKS {
             let ctx = ctx.clone();
 
-            ths.push(thread::spawn(move || {
+            threads.push(thread::spawn(move || {
                 run(&ctx);
             }));
         }
 
         run(&ctx);
 
-        for th in ths {
-            th.join().unwrap();
+        for thread in threads {
+            thread.join().unwrap();
         }
     });
 }

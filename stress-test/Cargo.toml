@@ -12,7 +12,7 @@ publish = false
 tokio = { version = "1.0.0", path = "../tokio/", features = ["full"] }
 
 [dev-dependencies]
-rand = "0.8"
+rand = "0.9"
 
 [lints]
 workspace = true

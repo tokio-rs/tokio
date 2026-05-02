@@ -9,21 +9,29 @@ cfg_rt! {
         /// The original size of the future or function being spawned
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         pub(crate) original_size: usize,
+        /// The source code location where the task was spawned.
+        ///
+        /// This is wrapped in a type that may be empty when `tokio_unstable` is
+        /// not enabled.
+        pub(crate) spawned_at: crate::runtime::task::SpawnLocation,
         _pd: PhantomData<&'a ()>,
     }
 
     impl<'a> SpawnMeta<'a> {
         /// Create new spawn meta with a name and original size (before possible auto-boxing)
         #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[track_caller]
         pub(crate) fn new(name: Option<&'a str>, original_size: usize) -> Self {
             Self {
                 name,
                 original_size,
+                spawned_at: crate::runtime::task::SpawnLocation::capture(),
                 _pd: PhantomData,
             }
         }
 
         /// Create a new unnamed spawn meta with the original size (before possible auto-boxing)
+        #[track_caller]
         pub(crate) fn new_unnamed(original_size: usize) -> Self {
             #[cfg(not(all(tokio_unstable, feature = "tracing")))]
             let _original_size = original_size;
@@ -33,6 +41,7 @@ cfg_rt! {
                 name: None,
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 original_size,
+                spawned_at: crate::runtime::task::SpawnLocation::capture(),
                 _pd: PhantomData,
             }
         }
@@ -50,11 +59,8 @@ cfg_rt! {
         pub(crate) use tracing::instrument::Instrumented;
 
         #[inline]
-        #[track_caller]
         pub(crate) fn task<F>(task: F, kind: &'static str, meta: SpawnMeta<'_>, id: u64) -> Instrumented<F> {
-            #[track_caller]
             fn get_span(kind: &'static str, spawn_meta: SpawnMeta<'_>, id: u64, task_size: usize) -> tracing::Span {
-                let location = std::panic::Location::caller();
                 let original_size = if spawn_meta.original_size != task_size {
                     Some(spawn_meta.original_size)
                 } else {
@@ -69,9 +75,9 @@ cfg_rt! {
                     task.id = id,
                     original_size.bytes = original_size,
                     size.bytes = task_size,
-                    loc.file = location.file(),
-                    loc.line = location.line(),
-                    loc.col = location.column(),
+                    loc.file = spawn_meta.spawned_at.0.file(),
+                    loc.line = spawn_meta.spawned_at.0.line(),
+                    loc.col = spawn_meta.spawned_at.0.column(),
                 )
             }
             use tracing::instrument::Instrument;
@@ -80,10 +86,7 @@ cfg_rt! {
         }
 
         #[inline]
-        #[track_caller]
         pub(crate) fn blocking_task<Fn, Fut>(task: Fut, spawn_meta: SpawnMeta<'_>, id: u64) -> Instrumented<Fut> {
-            let location = std::panic::Location::caller();
-
             let fn_size = mem::size_of::<Fn>();
             let original_size = if spawn_meta.original_size != fn_size {
                 Some(spawn_meta.original_size)
@@ -100,9 +103,9 @@ cfg_rt! {
                 "fn" = %std::any::type_name::<Fn>(),
                 original_size.bytes = original_size,
                 size.bytes = fn_size,
-                loc.file = location.file(),
-                loc.line = location.line(),
-                loc.col = location.column(),
+                loc.file = spawn_meta.spawned_at.0.file(),
+                loc.line = spawn_meta.spawned_at.0.line(),
+                loc.col = spawn_meta.spawned_at.0.column(),
             );
             task.instrument(span)
 

@@ -2,6 +2,11 @@
 cfg_signal_internal_and_unix! {
     mod signal;
 }
+cfg_io_uring! {
+    mod uring;
+    use uring::UringContext;
+    use crate::sync::OnceCell;
+}
 
 use crate::io::interest::Interest;
 use crate::io::ready::Ready;
@@ -45,6 +50,24 @@ pub(crate) struct Handle {
     waker: mio::Waker,
 
     pub(crate) metrics: IoDriverMetrics,
+
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    pub(crate) uring_context: Mutex<UringContext>,
+
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    pub(crate) uring_probe: OnceCell<Option<io_uring::Probe>>,
 }
 
 #[derive(Debug)]
@@ -112,6 +135,22 @@ impl Driver {
             #[cfg(not(target_os = "wasi"))]
             waker,
             metrics: IoDriverMetrics::default(),
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            ))]
+            uring_context: Mutex::new(UringContext::new()),
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            ))]
+            uring_probe: OnceCell::new(),
         };
 
         Ok((driver, handle))
@@ -183,6 +222,19 @@ impl Driver {
             }
         }
 
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        {
+            let mut guard = handle.get_uring().lock();
+            let ctx = &mut *guard;
+            ctx.dispatch_completions();
+        }
+
         handle.metrics.incr_ready_count_by(ready_count);
     }
 }
@@ -244,7 +296,8 @@ impl Handle {
         source: &mut impl Source,
     ) -> io::Result<()> {
         // Deregister the source with the OS poller **first**
-        self.registry.deregister(source)?;
+        // Cleanup ALWAYS happens
+        let os_result = self.registry.deregister(source);
 
         if self
             .registrations
@@ -255,7 +308,7 @@ impl Handle {
 
         self.metrics.dec_fd_count();
 
-        Ok(())
+        os_result // Return error after cleanup
     }
 
     fn release_pending_registrations(&self) {

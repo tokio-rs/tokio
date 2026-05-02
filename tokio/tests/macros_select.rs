@@ -655,22 +655,40 @@ mod unstable {
     #[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
     fn deterministic_select_multi_thread() {
         let seed = b"bytes used to generate seed";
+        let (tx, rx) = std::sync::mpsc::channel();
         let rt1 = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
+            .on_thread_park(move || tx.send(()).unwrap())
             .rng_seed(RngSeed::from_bytes(seed))
             .build()
             .unwrap();
+
+        // This makes sure that `enter_runtime()` from worker thread is called before the one from main thread,
+        // ensuring that the RNG state is consistent. See also https://github.com/tokio-rs/tokio/pull/7495.
+        rx.recv().unwrap();
+
         let rt1_values = rt1.block_on(async {
-            let _ = tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) }).await;
+            tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) })
+                .await
+                .unwrap()
         });
 
+        let (tx, rx) = std::sync::mpsc::channel();
         let rt2 = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
+            .on_thread_park(move || tx.send(()).unwrap())
             .rng_seed(RngSeed::from_bytes(seed))
             .build()
             .unwrap();
+
+        // This makes sure that `enter_runtime()` from worker thread is called before the one from main thread,
+        // ensuring that the RNG state is consistent. See also https://github.com/tokio-rs/tokio/pull/7495.
+        rx.recv().unwrap();
+
         let rt2_values = rt2.block_on(async {
-            let _ = tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) }).await;
+            tokio::spawn(async { (select_0_to_9().await, select_0_to_9().await) })
+                .await
+                .unwrap()
         });
 
         assert_eq!(rt1_values, rt2_values);

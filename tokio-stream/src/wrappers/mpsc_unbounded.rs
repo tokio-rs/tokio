@@ -61,6 +61,20 @@ impl<T> Stream for UnboundedReceiverStream<T> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.inner.poll_recv(cx)
     }
+
+    /// Returns the bounds of the stream based on the underlying receiver.
+    ///
+    /// For open channels, it returns `(receiver.len(), None)`.
+    ///
+    /// For closed channels, it returns `(receiver.len(), receiver.len())`.
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.inner.is_closed() {
+            let len = self.inner.len();
+            (len, Some(len))
+        } else {
+            (self.inner.len(), None)
+        }
+    }
 }
 
 impl<T> AsRef<UnboundedReceiver<T>> for UnboundedReceiverStream<T> {

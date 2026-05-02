@@ -135,12 +135,12 @@ impl UdpSocket {
     /// # Example
     ///
     /// ```no_run
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::UdpSocket;
     /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
+    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
     ///     let sock = UdpSocket::bind("0.0.0.0:8080").await?;
     ///     // use `sock`
     /// #   let _ = sock;
@@ -254,9 +254,9 @@ impl UdpSocket {
     /// [`std::net::UdpSocket`]: std::net::UdpSocket
     /// [`set_nonblocking`]: fn@std::net::UdpSocket::set_nonblocking
     pub fn into_std(self) -> io::Result<std::net::UdpSocket> {
-        #[cfg(unix)]
+        #[cfg(not(windows))]
         {
-            use std::os::unix::io::{FromRawFd, IntoRawFd};
+            use std::os::fd::{FromRawFd, IntoRawFd};
             self.io
                 .into_inner()
                 .map(IntoRawFd::into_raw_fd)
@@ -303,12 +303,12 @@ impl UdpSocket {
     /// # Example
     ///
     /// ```
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::UdpSocket;
     ///
     /// # use std::{io, net::SocketAddr};
     /// # #[tokio::main]
     /// # async fn main() -> io::Result<()> {
+    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
     /// let addr = "0.0.0.0:8080".parse::<SocketAddr>().unwrap();
     /// let peer = "127.0.0.1:11100".parse::<SocketAddr>().unwrap();
     /// let sock = UdpSocket::bind(addr).await?;
@@ -531,7 +531,12 @@ impl UdpSocket {
     /// The [`connect`] method will connect this socket to a remote address.
     /// This method will fail if the socket is not connected.
     ///
+    /// This method may fail with a [`ConnectionRefused`] error if the remote
+    /// address has replied with ICMP Unreachable to a previously sent packet.
+    /// However, this behavior depends on the OS.
+    ///
     /// [`connect`]: method@Self::connect
+    /// [`ConnectionRefused`]: std::io::ErrorKind::ConnectionRefused
     ///
     /// # Return
     ///
@@ -785,7 +790,7 @@ impl UdpSocket {
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.io.recv(buf))
+            .async_io(Interest::READABLE | Interest::ERROR, || self.io.recv(buf))
             .await
     }
 
@@ -986,7 +991,9 @@ impl UdpSocket {
         /// }
         /// ```
         pub async fn recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
-            self.io.registration().async_io(Interest::READABLE, || {
+            self.io
+                .registration()
+                .async_io(Interest::READABLE | Interest::ERROR, || {
                 let dst = buf.chunk_mut();
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
@@ -1000,7 +1007,8 @@ impl UdpSocket {
                 }
 
                 Ok(n)
-            }).await
+            })
+            .await
         }
 
         /// Tries to receive a single datagram message on the socket. On success,
@@ -1117,7 +1125,9 @@ impl UdpSocket {
         /// }
         /// ```
         pub async fn recv_buf_from<B: BufMut>(&self, buf: &mut B) -> io::Result<(usize, SocketAddr)> {
-            self.io.registration().async_io(Interest::READABLE, || {
+            self.io
+                .registration()
+                .async_io(Interest::READABLE | Interest::ERROR, || {
                 let dst = buf.chunk_mut();
                 let dst =
                     unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
@@ -1130,8 +1140,9 @@ impl UdpSocket {
                     buf.advance_mut(n);
                 }
 
-                Ok((n,addr))
-            }).await
+                Ok((n, addr))
+            })
+            .await
         }
     }
 
@@ -1315,7 +1326,9 @@ impl UdpSocket {
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.io.recv_from(buf))
+            .async_io(Interest::READABLE | Interest::ERROR, || {
+                self.io.recv_from(buf)
+            })
             .await
     }
 
@@ -1516,7 +1529,7 @@ impl UdpSocket {
     /// # Notes
     ///
     /// On Windows, if the data is larger than the buffer specified, the buffer
-    /// is filled with the first part of the data, and `peek_from` returns the error
+    /// is filled with the first part of the data, and peek returns the error
     /// `WSAEMSGSIZE(10040)`. The excess data is lost.
     /// Make sure to always use a sufficiently large buffer to hold the
     /// maximum UDP packet size, which can be up to 65536 bytes in size.
@@ -1556,12 +1569,11 @@ impl UdpSocket {
     pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.io.peek(buf))
+            .async_io(Interest::READABLE | Interest::ERROR, || self.io.peek(buf))
             .await
     }
 
     /// Receives data from the connected address, without removing it from the input queue.
-    /// On success, returns the sending address of the datagram.
     ///
     /// # Notes
     ///
@@ -1611,7 +1623,7 @@ impl UdpSocket {
             self.io.peek(b)
         }))?;
 
-        // Safety: We trust `recv` to have filled up `n` bytes in the buffer.
+        // Safety: We trust `peek` to have filled up `n` bytes in the buffer.
         unsafe {
             buf.assume_init(n);
         }
@@ -1699,7 +1711,9 @@ impl UdpSocket {
     pub async fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.io.peek_from(buf))
+            .async_io(Interest::READABLE | Interest::ERROR, || {
+                self.io.peek_from(buf)
+            })
             .await
     }
 
@@ -1816,7 +1830,9 @@ impl UdpSocket {
     pub async fn peek_sender(&self) -> io::Result<SocketAddr> {
         self.io
             .registration()
-            .async_io(Interest::READABLE, || self.peek_sender_inner())
+            .async_io(Interest::READABLE | Interest::ERROR, || {
+                self.peek_sender_inner()
+            })
             .await
     }
 
@@ -1909,7 +1925,7 @@ impl UdpSocket {
     ///
     /// # Note
     ///
-    /// This may not have any affect on IPv6 sockets.
+    /// This may not have any effect on IPv6 sockets.
     pub fn set_multicast_loop_v4(&self, on: bool) -> io::Result<()> {
         self.io.set_multicast_loop_v4(on)
     }
@@ -1931,7 +1947,7 @@ impl UdpSocket {
     ///
     /// # Note
     ///
-    /// This may not have any affect on IPv6 sockets.
+    /// This may not have any effect on IPv6 sockets.
     pub fn set_multicast_ttl_v4(&self, ttl: u32) -> io::Result<()> {
         self.io.set_multicast_ttl_v4(ttl)
     }
@@ -1951,9 +1967,82 @@ impl UdpSocket {
     ///
     /// # Note
     ///
-    /// This may not have any affect on IPv4 sockets.
+    /// This may not have any effect on IPv4 sockets.
     pub fn set_multicast_loop_v6(&self, on: bool) -> io::Result<()> {
         self.io.set_multicast_loop_v6(on)
+    }
+
+    /// Gets the value of the `IPV6_TCLASS` option for this socket.
+    ///
+    /// For more information about this option, see [`set_tclass_v6`].
+    ///
+    /// [`set_tclass_v6`]: Self::set_tclass_v6
+    // https://docs.rs/socket2/0.6.1/src/socket2/sys/unix.rs.html#2541
+    #[cfg(any(
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "fuchsia",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "cygwin",
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "android",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "fuchsia",
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "netbsd",
+            target_os = "openbsd",
+            target_os = "cygwin",
+        )))
+    )]
+    pub fn tclass_v6(&self) -> io::Result<u32> {
+        self.as_socket().tclass_v6()
+    }
+
+    /// Sets the value for the `IPV6_TCLASS` option on this socket.
+    ///
+    /// Specifies the traffic class field that is used in every packet
+    /// sent from this socket.
+    ///
+    /// # Note
+    ///
+    /// This may not have any effect on IPv4 sockets.
+    // https://docs.rs/socket2/0.6.1/src/socket2/sys/unix.rs.html#2566
+    #[cfg(any(
+        target_os = "android",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "fuchsia",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "cygwin",
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            target_os = "android",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "fuchsia",
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "netbsd",
+            target_os = "openbsd",
+            target_os = "cygwin",
+        )))
+    )]
+    pub fn set_tclass_v6(&self, tclass: u32) -> io::Result<()> {
+        self.as_socket().set_tclass_v6(tclass)
     }
 
     /// Gets the value of the `IP_TTL` option for this socket.
@@ -2003,19 +2092,17 @@ impl UdpSocket {
 
     /// Gets the value of the `IP_TOS` option for this socket.
     ///
-    /// For more information about this option, see [`set_tos`].
+    /// For more information about this option, see [`set_tos_v4`].
     ///
-    /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
-    /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
-    ///
-    /// [`set_tos`]: Self::set_tos
-    // https://docs.rs/socket2/0.5.3/src/socket2/socket.rs.html#1464
+    /// [`set_tos_v4`]: Self::set_tos_v4
+    // https://docs.rs/socket2/0.6.1/src/socket2/socket.rs.html#1585
     #[cfg(not(any(
         target_os = "fuchsia",
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
-        target_os = "haiku"
+        target_os = "haiku",
+        target_os = "wasi",
     )))]
     #[cfg_attr(
         docsrs,
@@ -2024,11 +2111,42 @@ impl UdpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
-            target_os = "haiku"
+            target_os = "haiku",
+            target_os = "wasi",
+        ))))
+    )]
+    pub fn tos_v4(&self) -> io::Result<u32> {
+        self.as_socket().tos_v4()
+    }
+
+    /// Deprecated. Use [`tos_v4()`] instead.
+    ///
+    /// [`tos_v4()`]: Self::tos_v4
+    #[deprecated(
+        note = "`tos` related methods have been renamed `tos_v4` since they are IPv4-specific."
+    )]
+    #[doc(hidden)]
+    #[cfg(not(any(
+        target_os = "fuchsia",
+        target_os = "redox",
+        target_os = "solaris",
+        target_os = "illumos",
+        target_os = "haiku",
+        target_os = "wasi",
+    )))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(not(any(
+            target_os = "fuchsia",
+            target_os = "redox",
+            target_os = "solaris",
+            target_os = "illumos",
+            target_os = "haiku",
+            target_os = "wasi",
         ))))
     )]
     pub fn tos(&self) -> io::Result<u32> {
-        self.as_socket().tos()
+        self.tos_v4()
     }
 
     /// Sets the value for the `IP_TOS` option on this socket.
@@ -2036,15 +2154,19 @@ impl UdpSocket {
     /// This value sets the type-of-service field that is used in every packet
     /// sent from this socket.
     ///
-    /// **NOTE:** On Windows, `IP_TOS` is only supported on [Windows 8+ or
-    /// Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
-    // https://docs.rs/socket2/0.5.3/src/socket2/socket.rs.html#1446
+    /// # Note
+    ///
+    /// - This may not have any effect on IPv6 sockets.
+    /// - On Windows, `IP_TOS` is only supported on [Windows 8+ or
+    ///   Windows Server 2012+.](https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)
+    // https://docs.rs/socket2/0.6.1/src/socket2/socket.rs.html#1566
     #[cfg(not(any(
         target_os = "fuchsia",
         target_os = "redox",
         target_os = "solaris",
         target_os = "illumos",
-        target_os = "haiku"
+        target_os = "haiku",
+        target_os = "wasi",
     )))]
     #[cfg_attr(
         docsrs,
@@ -2053,11 +2175,42 @@ impl UdpSocket {
             target_os = "redox",
             target_os = "solaris",
             target_os = "illumos",
-            target_os = "haiku"
+            target_os = "haiku",
+            target_os = "wasi",
+        ))))
+    )]
+    pub fn set_tos_v4(&self, tos: u32) -> io::Result<()> {
+        self.as_socket().set_tos_v4(tos)
+    }
+
+    /// Deprecated. Use [`set_tos_v4()`] instead.
+    ///
+    /// [`set_tos_v4()`]: Self::set_tos_v4
+    #[deprecated(
+        note = "`tos` related methods have been renamed `tos_v4` since they are IPv4-specific."
+    )]
+    #[doc(hidden)]
+    #[cfg(not(any(
+        target_os = "fuchsia",
+        target_os = "redox",
+        target_os = "solaris",
+        target_os = "illumos",
+        target_os = "haiku",
+        target_os = "wasi",
+    )))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(not(any(
+            target_os = "fuchsia",
+            target_os = "redox",
+            target_os = "solaris",
+            target_os = "illumos",
+            target_os = "haiku",
+            target_os = "wasi",
         ))))
     )]
     pub fn set_tos(&self, tos: u32) -> io::Result<()> {
-        self.as_socket().set_tos(tos)
+        self.set_tos_v4(tos)
     }
 
     /// Gets the value for the `SO_BINDTODEVICE` option on this socket
@@ -2130,12 +2283,12 @@ impl UdpSocket {
     ///
     /// # Examples
     /// ```
-    /// # if cfg!(miri) { return } // No `socket` in miri.
     /// use tokio::net::UdpSocket;
     /// use std::io;
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
+    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
     ///     // Create a socket
     ///     let socket = UdpSocket::bind("0.0.0.0:8080").await?;
     ///
@@ -2169,10 +2322,10 @@ impl fmt::Debug for UdpSocket {
     }
 }
 
-#[cfg(unix)]
+#[cfg(not(windows))]
 mod sys {
     use super::UdpSocket;
-    use std::os::unix::prelude::*;
+    use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
 
     impl AsRawFd for UdpSocket {
         fn as_raw_fd(&self) -> RawFd {

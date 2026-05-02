@@ -34,11 +34,17 @@ pub trait AsyncSeek {
 
     /// Waits for a seek operation to complete.
     ///
-    /// If the seek operation completed successfully,
-    /// this method returns the new position from the start of the stream.
-    /// That position can be used later with [`SeekFrom::Start`]. Repeatedly
-    /// calling this function without calling `start_seek` might return the
-    /// same result.
+    /// If the seek operation completed successfully, this method returns the
+    /// new position from the start of the stream. That position can be used
+    /// later with [`SeekFrom::Start`].
+    ///
+    /// The position returned by calling this method can only be relied on right
+    /// after `start_seek`. If you have changed the position by e.g. reading or
+    /// writing since calling `start_seek`, then it is unspecified whether the
+    /// returned position takes that position change into account. Similarly, if
+    /// `start_seek` has never been called, then it is unspecified whether
+    /// `poll_complete` returns the actual position or some other placeholder
+    /// value (such as 0).
     ///
     /// # Errors
     ///
@@ -68,15 +74,15 @@ impl<T: ?Sized + AsyncSeek + Unpin> AsyncSeek for &mut T {
 
 impl<P> AsyncSeek for Pin<P>
 where
-    P: DerefMut + Unpin,
+    P: DerefMut,
     P::Target: AsyncSeek,
 {
     fn start_seek(self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
-        self.get_mut().as_mut().start_seek(pos)
+        crate::util::pin_as_deref_mut(self).start_seek(pos)
     }
 
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        self.get_mut().as_mut().poll_complete(cx)
+        crate::util::pin_as_deref_mut(self).poll_complete(cx)
     }
 }
 

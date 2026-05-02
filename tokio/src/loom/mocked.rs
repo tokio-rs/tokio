@@ -24,11 +24,6 @@ pub(crate) mod sync {
         pub(crate) fn try_lock(&self) -> Option<MutexGuard<'_, T>> {
             self.0.try_lock().ok()
         }
-
-        #[inline]
-        pub(crate) fn get_mut(&mut self) -> &mut T {
-            self.0.get_mut().unwrap()
-        }
     }
 
     #[derive(Debug)]
@@ -63,13 +58,6 @@ pub(crate) mod sync {
     }
 
     pub(crate) use loom::sync::*;
-
-    pub(crate) mod atomic {
-        pub(crate) use loom::sync::atomic::*;
-
-        // TODO: implement a loom version
-        pub(crate) type StaticAtomicU64 = std::sync::atomic::AtomicU64;
-    }
 }
 
 pub(crate) mod rand {

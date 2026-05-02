@@ -181,6 +181,6 @@ fn expect_task_named(name: &str) -> NewSpan {
         .named("runtime.spawn")
         .with_target("tokio::task")
         .with_fields(
-            expect::field("task.name").with_value(&tracing::field::debug(format_args!("{}", name))),
+            expect::field("task.name").with_value(&tracing::field::debug(format_args!("{name}"))),
         )
 }

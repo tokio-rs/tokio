@@ -21,7 +21,7 @@ macro_rules! doc {
         /// The supplied futures are stored inline and do not require allocating a
         /// `Vec`.
         ///
-        /// ### Runtime characteristics
+        /// ## Runtime characteristics
         ///
         /// By running all async expressions on the current task, the expressions are
         /// able to run **concurrently** but not in **parallel**. This means all
@@ -31,6 +31,25 @@ macro_rules! doc {
         /// join handle to `join!`.
         ///
         /// [`tokio::spawn`]: crate::spawn
+        ///
+        /// ## Fairness
+        ///
+        /// By default, `join!`'s generated future rotates which contained
+        /// future is polled first whenever it is woken.
+        ///
+        /// This behavior can be overridden by adding `biased;` to the beginning of the
+        /// macro usage. See the examples for details. This will cause `join` to poll
+        /// the futures in the order they appear from top to bottom.
+        ///
+        /// You may want this if your futures may interact in a way where known polling order is significant.
+        ///
+        /// But there is an important caveat to this mode. It becomes your responsibility
+        /// to ensure that the polling order of your futures is fair. If for example you
+        /// are joining a stream and a shutdown future, and the stream has a
+        /// huge volume of messages that takes a long time to finish processing per poll, you should
+        /// place the shutdown future earlier in the `join!` list to ensure that it is
+        /// always polled, and will not be delayed due to the stream future taking a long time to return
+        /// `Poll::Pending`.
         ///
         /// # Examples
         ///
@@ -45,15 +64,42 @@ macro_rules! doc {
         ///     // more here
         /// }
         ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let (first, second) = tokio::join!(
-        ///         do_stuff_async(),
-        ///         more_async_work());
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let (first, second) = tokio::join!(
+        ///     do_stuff_async(),
+        ///     more_async_work());
         ///
-        ///     // do something with the values
-        /// }
+        /// // do something with the values
+        /// # }
         /// ```
+        ///
+        /// Using the `biased;` mode to control polling order.
+        ///
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// async fn do_stuff_async() {
+        ///     // async work
+        /// }
+        ///
+        /// async fn more_async_work() {
+        ///     // more here
+        /// }
+        ///
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let (first, second) = tokio::join!(
+        ///     biased;
+        ///     do_stuff_async(),
+        ///     more_async_work()
+        /// );
+        ///
+        /// // do something with the values
+        /// # }
+        /// # }
+        /// ```
+
         #[macro_export]
         #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
         $join
@@ -62,12 +108,16 @@ macro_rules! doc {
 
 #[cfg(doc)]
 doc! {macro_rules! join {
-    ($($future:expr),*) => { unimplemented!() }
+    ($(biased;)? $($future:expr),*) => { unimplemented!() }
 }}
 
 #[cfg(not(doc))]
 doc! {macro_rules! join {
     (@ {
+        // Type of rotator that controls which inner future to start with
+        // when polling our output future.
+        rotator_select=$rotator_select:ty;
+
         // One `_` for each branch in the `join!` macro. This is not used once
         // normalization is complete.
         ( $($count:tt)* )
@@ -79,16 +129,13 @@ doc! {macro_rules! join {
         $( ( $($skip:tt)* ) $e:expr, )*
 
     }) => {{
-        use $crate::macros::support::{maybe_done, poll_fn, Future, Pin};
-        use $crate::macros::support::Poll::{Ready, Pending};
-
         // Safety: nothing must be moved out of `futures`. This is to satisfy
         // the requirement of `Pin::new_unchecked` called below.
         //
         // We can't use the `pin!` macro for this because `futures` is a tuple
         // and the standard library provides no way to pin-project to the fields
         // of a tuple.
-        let mut futures = ( $( maybe_done($e), )* );
+        let mut futures = ( $( $crate::macros::support::maybe_done($e), )* );
 
         // This assignment makes sure that the `poll_fn` closure only has a
         // reference to the futures, instead of taking ownership of them. This
@@ -96,25 +143,19 @@ doc! {macro_rules! join {
         // <https://internals.rust-lang.org/t/surprising-soundness-trouble-around-pollfn/17484>
         let mut futures = &mut futures;
 
-        // Each time the future created by poll_fn is polled, a different future will be polled first
-        // to ensure every future passed to join! gets a chance to make progress even if
-        // one of the futures consumes the whole budget.
-        //
-        // This is number of futures that will be skipped in the first loop
-        // iteration the next time.
-        let mut skip_next_time: u32 = 0;
+        // Each time the future created by poll_fn is polled, if not using biased mode,
+        // a different future is polled first to ensure every future passed to join!
+        // can make progress even if one of the futures consumes the whole budget.
+        let mut rotator = <$rotator_select as $crate::macros::support::RotatorSelect>::Rotator::<{$($total)*}>::default();
 
-        poll_fn(move |cx| {
+        $crate::macros::support::poll_fn(move |cx| {
             const COUNT: u32 = $($total)*;
 
             let mut is_pending = false;
-
             let mut to_run = COUNT;
 
             // The number of futures that will be skipped in the first loop iteration.
-            let mut skip = skip_next_time;
-
-            skip_next_time = if skip + 1 == COUNT { 0 } else { skip + 1 };
+            let mut skip = rotator.num_skip();
 
             // This loop runs twice and the first `skip` futures
             // are not polled in the first iteration.
@@ -132,10 +173,10 @@ doc! {macro_rules! join {
 
                     // Safety: future is stored on the stack above
                     // and never moved.
-                    let mut fut = unsafe { Pin::new_unchecked(fut) };
+                    let mut fut = unsafe { $crate::macros::support::Pin::new_unchecked(fut) };
 
                     // Try polling
-                    if fut.poll(cx).is_pending() {
+                    if $crate::macros::support::Future::poll(fut.as_mut(), cx).is_pending() {
                         is_pending = true;
                     }
                 } else {
@@ -146,15 +187,15 @@ doc! {macro_rules! join {
             }
 
             if is_pending {
-                Pending
+                $crate::macros::support::Poll::Pending
             } else {
-                Ready(($({
+                $crate::macros::support::Poll::Ready(($({
                     // Extract the future for this branch from the tuple.
                     let ( $($skip,)* fut, .. ) = &mut futures;
 
                     // Safety: future is stored on the stack above
                     // and never moved.
-                    let mut fut = unsafe { Pin::new_unchecked(fut) };
+                    let mut fut = unsafe { $crate::macros::support::Pin::new_unchecked(fut) };
 
                     fut.take_output().expect("expected completed future")
                 },)*))
@@ -164,15 +205,75 @@ doc! {macro_rules! join {
 
     // ===== Normalize =====
 
-    (@ { ( $($s:tt)* ) ( $($n:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
-        $crate::join!(@{ ($($s)* _) ($($n)* + 1) $($t)* ($($s)*) $e, } $($r)*)
+    (@ { rotator_select=$rotator_select:ty; ( $($s:tt)* ) ( $($n:tt)* ) $($t:tt)* } $e:expr, $($r:tt)* ) => {
+        $crate::join!(@{ rotator_select=$rotator_select; ($($s)* _) ($($n)* + 1) $($t)* ($($s)*) $e, } $($r)*)
     };
 
     // ===== Entry point =====
+    ( biased; $($e:expr),+ $(,)?) => {
+        $crate::join!(@{ rotator_select=$crate::macros::support::SelectBiased; () (0) } $($e,)*)
+    };
 
     ( $($e:expr),+ $(,)?) => {
-        $crate::join!(@{ () (0) } $($e,)*)
+        $crate::join!(@{ rotator_select=$crate::macros::support::SelectNormal; () (0) } $($e,)*)
     };
+
+    (biased;) => { async {}.await };
 
     () => { async {}.await }
 }}
+
+/// Helper trait to select which type of `Rotator` to use.
+// We need this to allow specifying a const generic without
+// colliding with caller const names due to macro hygiene.
+pub trait RotatorSelect {
+    type Rotator<const COUNT: u32>: Default;
+}
+
+/// Marker type indicating that the starting branch should
+/// rotate each poll.
+#[derive(Debug)]
+pub struct SelectNormal;
+/// Marker type indicating that the starting branch should
+/// be the first declared branch each poll.
+#[derive(Debug)]
+pub struct SelectBiased;
+
+impl RotatorSelect for SelectNormal {
+    type Rotator<const COUNT: u32> = Rotator<COUNT>;
+}
+
+impl RotatorSelect for SelectBiased {
+    type Rotator<const COUNT: u32> = BiasedRotator;
+}
+
+/// Rotates by one each [`Self::num_skip`] call up to COUNT - 1.
+#[derive(Default, Debug)]
+pub struct Rotator<const COUNT: u32> {
+    next: u32,
+}
+
+impl<const COUNT: u32> Rotator<COUNT> {
+    /// Rotates by one each [`Self::num_skip`] call up to COUNT - 1
+    #[inline]
+    pub fn num_skip(&mut self) -> u32 {
+        let num_skip = self.next;
+        self.next += 1;
+        if self.next == COUNT {
+            self.next = 0;
+        }
+        num_skip
+    }
+}
+
+/// [`Self::num_skip`] always returns 0.
+#[derive(Default, Debug)]
+pub struct BiasedRotator {}
+
+impl BiasedRotator {
+    /// Always returns 0.
+    #[inline]
+    pub fn num_skip(&mut self) -> u32 {
+        0
+    }
+}

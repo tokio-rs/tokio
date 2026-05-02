@@ -230,7 +230,7 @@ impl TryFrom<std::os::unix::net::UnixListener> for UnixListener {
 
 impl fmt::Debug for UnixListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        (*self.io).fmt(f)
     }
 }
 

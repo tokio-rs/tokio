@@ -295,6 +295,13 @@ cfg_windows! {
     pub use self::symlink_file::symlink_file;
 }
 
+cfg_io_uring! {
+    pub(crate) mod read_uring;
+    pub(crate) use self::read_uring::read_uring;
+
+    pub(crate) use self::open_options::UringOpenOptions;
+}
+
 use std::io;
 
 #[cfg(not(test))]
