@@ -789,7 +789,7 @@ async fn drop_permit_iterator_releases_permits() {
 }
 
 #[test]
-fn dropping_last_permit_closes_channel() {
+fn dropping_last_permit_wakes_closed_receiver() {
     let (tx, mut rx) = mpsc::channel::<()>(100);
 
     let permit = tx.try_reserve().unwrap();
@@ -803,7 +803,7 @@ fn dropping_last_permit_closes_channel() {
 }
 
 #[test]
-fn dropping_last_owned_permit_closes_channel() {
+fn dropping_last_owned_permit_wakes_closed_receiver() {
     let (tx, mut rx) = mpsc::channel::<()>(100);
 
     let permit = tx.try_reserve_owned().unwrap();
@@ -817,7 +817,7 @@ fn dropping_last_owned_permit_closes_channel() {
 }
 
 #[test]
-fn dropping_last_permit_iterator_closes_channel() {
+fn dropping_last_permit_iterator_wakes_closed_receiver() {
     let (tx, mut rx) = mpsc::channel::<()>(100);
 
     let permits = tx.try_reserve_many(1).unwrap();
@@ -831,7 +831,7 @@ fn dropping_last_permit_iterator_closes_channel() {
 }
 
 #[test]
-fn sending_last_permit_closes_channel() {
+fn sending_last_permit_wakes_closed_receiver() {
     let (tx, mut rx) = mpsc::channel::<()>(100);
 
     let permit = tx.try_reserve().unwrap();
@@ -845,7 +845,7 @@ fn sending_last_permit_closes_channel() {
 }
 
 #[test]
-fn sending_last_owned_permit_closes_channel() {
+fn sending_last_owned_permit_wakes_closed_receiver() {
     let (tx, mut rx) = mpsc::channel::<()>(100);
 
     let permit = tx.try_reserve_owned().unwrap();
@@ -859,7 +859,7 @@ fn sending_last_owned_permit_closes_channel() {
 }
 
 #[test]
-fn releasing_last_owned_permit_closes_channel() {
+fn releasing_last_owned_permit_wakes_closed_receiver() {
     let (tx, mut rx) = mpsc::channel::<()>(100);
 
     let permit = tx.try_reserve_owned().unwrap();
