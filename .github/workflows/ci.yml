@@ -1323,7 +1323,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Test in FreeBSD
+      - name: Build docs in FreeBSD
         uses: vmactions/freebsd-vm@v1
         env:
           RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
@@ -1337,7 +1337,7 @@ jobs:
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_nightly }}
           run: |
             . $HOME/.cargo/env
-            # We use `--features $TOKIO_STABLE_FEATURES,io-uring,tracing` instead of
+            # We use `--features $TOKIO_STABLE_FEATURES,tracing` instead of
             # `--all-features` to exclude `taskdump` and `io_uring`, which are Linux-only
             # features.
             cargo doc --lib --no-deps --features $TOKIO_STABLE_FEATURES,tracing \
