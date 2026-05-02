@@ -209,11 +209,6 @@ pub(crate) use self::raw::RawTask;
 mod state;
 use self::state::State;
 
-#[cfg(feature = "rt-multi-thread")]
-mod atomic_notified;
-#[cfg(feature = "rt-multi-thread")]
-pub(crate) use self::atomic_notified::AtomicNotified;
-
 mod waker;
 
 pub(crate) use self::spawn_location::SpawnLocation;
