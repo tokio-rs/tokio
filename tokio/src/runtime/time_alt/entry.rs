@@ -228,10 +228,13 @@ impl Handle {
         }
     }
 
-    pub(crate) fn register_waker(&self, waker: Waker) {
+    pub(crate) fn register_waker(&self, waker: &Waker) {
         let mut lock = self.entry.state.lock();
         if !lock.cancelled && !lock.woken_up {
-            let maybe_old_waker = lock.waker.replace(waker);
+            let maybe_old_waker = match &lock.waker {
+                Some(current_waker) if current_waker.will_wake(waker) => None,
+                _ => lock.waker.replace(waker.clone()),
+            };
             // unlock before calling waker
             drop(lock);
             drop(maybe_old_waker);

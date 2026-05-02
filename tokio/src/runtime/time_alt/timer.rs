@@ -97,7 +97,7 @@ impl Timer {
         match self.entry.as_ref() {
             Some(entry) if entry.is_woken_up() => Poll::Ready(()),
             Some(entry) => {
-                entry.register_waker(cx.waker().clone());
+                entry.register_waker(cx.waker());
                 Poll::Pending
             }
             None => self.register(cx),
