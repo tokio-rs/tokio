@@ -456,6 +456,34 @@ async fn try_join_next_advances_through_multiple() {
 }
 
 #[tokio::test]
+async fn try_join_next_skips_replaced_task() {
+    let mut map = JoinMap::new();
+
+    let (tx1, rx1) = oneshot::channel::<()>();
+    map.spawn(1, async {
+        let _ = rx1.await;
+        11
+    });
+    tx1.send(()).unwrap();
+    tokio::task::yield_now().await;
+
+    let (tx2, rx2) = oneshot::channel::<()>();
+    map.spawn(1, async {
+        let _ = rx2.await;
+        22
+    });
+    tx2.send(()).unwrap();
+    tokio::task::yield_now().await;
+
+    let (key, res) = map.try_join_next().unwrap();
+    assert_eq!(key, 1);
+    assert_eq!(res.unwrap(), 22);
+
+    assert!(map.try_join_next().is_none());
+    assert!(map.is_empty());
+}
+
+#[tokio::test]
 async fn duplicate_keys() {
     let mut map = JoinMap::new();
     map.spawn(1, async { 1 });
