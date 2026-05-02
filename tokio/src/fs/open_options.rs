@@ -518,6 +518,10 @@ impl OpenOptions {
     /// [`Other`]: std::io::ErrorKind::Other
     /// [`PermissionDenied`]: std::io::ErrorKind::PermissionDenied
     pub async fn open(&self, path: impl AsRef<Path>) -> io::Result<File> {
+        self.open_inner(path.as_ref()).await
+    }
+
+    async fn open_inner(&self, path: &Path) -> io::Result<File> {
         match &self.inner {
             Kind::Std(opts) => Self::std_open(opts, path).await,
             #[cfg(all(
@@ -535,7 +539,7 @@ impl OpenOptions {
                     .check_and_init(io_uring::opcode::OpenAt::CODE)
                     .await?
                 {
-                    Op::open(path.as_ref(), opts)?.await
+                    Op::open(path, opts)?.await
                 } else {
                     let opts = opts.clone().into();
                     Self::std_open(&opts, path).await
@@ -544,12 +548,12 @@ impl OpenOptions {
         }
     }
 
-    async fn std_open(opts: &StdOpenOptions, path: impl AsRef<Path>) -> io::Result<File> {
-        let path = path.as_ref().to_owned();
+    async fn std_open(opts: &StdOpenOptions, path: &Path) -> io::Result<File> {
+        let path = path.to_owned();
         let opts = opts.clone();
 
-        let std = asyncify(move || opts.open(path)).await?;
-        Ok(File::from_std(std))
+        let std = asyncify(move || opts.open(path).map(File::from_std)).await?;
+        Ok(std)
     }
 
     #[cfg(windows)]

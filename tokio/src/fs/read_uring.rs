@@ -19,8 +19,10 @@ const MAX_READ_SIZE: usize = 64 * 1024 * 1024;
 pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
     let file = OpenOptions::new().read(true).open(path).await?;
 
-    // TODO: use io uring in the future to obtain metadata
-    let size_hint: Option<usize> = file.metadata().await.map(|m| m.len() as usize).ok();
+    let size_hint = Op::file_metadata(&file)?
+        .await
+        .map(|m| m.len() as usize)
+        .ok();
 
     let fd: OwnedFd = file
         .try_into_std()
