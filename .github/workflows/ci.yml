@@ -1231,3 +1231,74 @@ jobs:
               echo 'Please remove trailing whitespace from these lines.'
               exit 1
           fi
+
+  freebsd-x86_64:
+    name: FreeBSD x86_64
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test in FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '14.4'
+          envs: "RUSTFLAGS"
+          prepare: |
+            pkg install -y curl
+            curl https://sh.rustup.rs -sSf --output rustup.sh
+            sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
+          run: |
+            . $HOME/.cargo/env
+            cargo test --workspace --features full,test-util
+            # Enable all unstable features except `io_uring` and `taskdump`,
+            # which are Linux-only features.
+            RUSTFLAGS="$RUSTFLAGS --cfg tokio_unstable" \
+            cargo test \
+                --features full,test-util,tracing
+
+  freebsd-docs:
+    name: FreeBSD docs
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test in FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        env:
+          RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
+          RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
+        with:
+          release: '14.4'
+          envs: "RUST_NIGHTLY RUSTDOCFLAGS RUSTFLAGS"
+          prepare: |
+            pkg install -y curl
+            curl https://sh.rustup.rs -sSf --output rustup.sh
+            sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_nightly }}
+          run: |
+            . $HOME/.cargo/env
+            # We use `--features full,test-util,io-uring,tracing` instead of
+            # `--all-features` to exclude `taskdump` and `io_uring`, which are Linux-only
+            # features.
+            cargo doc --lib --no-deps --features full,test-util,tracing \
+              --document-private-items
+
+  freebsd-i686:
+    name: FreeBSD i686
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test in FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '14.4'
+          envs: "RUSTFLAGS"
+          prepare: |
+            pkg install -y curl
+            curl https://sh.rustup.rs -sSf --output rustup.sh
+            sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
+          run: |
+            . $HOME/.cargo/env
+            rustup target add i686-unknown-freebsd
+            cargo test --workspace --features full,test-util \
+              --target i686-unknown-freebsd
