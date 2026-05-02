@@ -266,13 +266,13 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// # Panics
     ///
-    /// Panics if `max_reads` is more than `u32::MAX >> 3`.
+    /// Panics if `max_reads` is `0` or is bigger than `u32::MAX >> 3`.
     #[track_caller]
     pub fn with_max_readers(value: T, max_reads: u32) -> RwLock<T>
     where
         T: Sized,
     {
-        assert_ne!(max_reads, 0);
+        assert_ne!(max_reads, 0, "a RwLock may not be created with 0 readers");
         assert!(
             max_reads <= MAX_READS,
             "a RwLock may not be created with more than {MAX_READS} readers"
@@ -368,12 +368,16 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// static LOCK: RwLock<i32> = RwLock::const_with_max_readers(5, 1024);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if `max_reads` is `0` or is bigger than `u32::MAX >> 3`.
     #[cfg(not(all(loom, test)))]
     pub const fn const_with_max_readers(value: T, max_reads: u32) -> RwLock<T>
     where
         T: Sized,
     {
-        assert!(max_reads != 0);
+        assert!(max_reads != 0, "a RwLock may not be created with 0 readers");
         assert!(max_reads <= MAX_READS);
 
         RwLock {

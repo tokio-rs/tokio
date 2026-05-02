@@ -79,13 +79,13 @@ fn exhaust_reading() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "a RwLock may not be created with 0 readers")]
 fn zero_max_readers() {
     RwLock::with_max_readers(100, 0);
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "a RwLock may not be created with 0 readers")]
 fn zero_max_readers_const() {
     RwLock::const_with_max_readers(100, 0);
 }
