@@ -1324,22 +1324,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Test in FreeBSD
+      - name: Build docs in FreeBSD
         uses: vmactions/freebsd-vm@v1
         env:
           RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
           RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
-          RUST_NIGHTLY: nightly-2025-10-12
         with:
           release: '14.4'
-          envs: "TOKIO_STABLE_FEATURES RUST_NIGHTLY RUSTDOCFLAGS RUSTFLAGS"
+          envs: "TOKIO_STABLE_FEATURES RUSTDOCFLAGS RUSTFLAGS"
           prepare: |
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
-            sh rustup.sh -y --profile minimal --default-toolchain $RUST_NIGHTLY
+            sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_nightly }}
           run: |
             . $HOME/.cargo/env
-            # We use `--features $TOKIO_STABLE_FEATURES,io-uring,tracing` instead of
+            # We use `--features $TOKIO_STABLE_FEATURES,tracing` instead of
             # `--all-features` to exclude `taskdump` and `io_uring`, which are Linux-only
             # features.
             cargo doc --lib --no-deps --features $TOKIO_STABLE_FEATURES,tracing \
