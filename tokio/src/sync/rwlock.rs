@@ -272,6 +272,7 @@ impl<T: ?Sized> RwLock<T> {
     where
         T: Sized,
     {
+        assert_ne!(max_reads, 0);
         assert!(
             max_reads <= MAX_READS,
             "a RwLock may not be created with more than {MAX_READS} readers"
@@ -372,6 +373,7 @@ impl<T: ?Sized> RwLock<T> {
     where
         T: Sized,
     {
+        assert!(max_reads != 0);
         assert!(max_reads <= MAX_READS);
 
         RwLock {
@@ -771,6 +773,7 @@ impl<T: ?Sized> RwLock<T> {
     /// ```
     pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
         let acquire_fut = async {
+            debug_assert_ne!(self.mr, 0);
             self.s.acquire(self.mr as usize).await.unwrap_or_else(|_| {
                 // The semaphore was closed. but, we never explicitly close it, and we have a
                 // handle to it through the Arc, which means that this can never happen.
@@ -906,6 +909,7 @@ impl<T: ?Sized> RwLock<T> {
         let resource_span = self.resource_span.clone();
 
         let acquire_fut = async {
+            debug_assert_ne!(self.mr, 0);
             self.s.acquire(self.mr as usize).await.unwrap_or_else(|_| {
                 // The semaphore was closed. but, we never explicitly close it, and we have a
                 // handle to it through the Arc, which means that this can never happen.
@@ -970,6 +974,7 @@ impl<T: ?Sized> RwLock<T> {
     /// }
     /// ```
     pub fn try_write(&self) -> Result<RwLockWriteGuard<'_, T>, TryLockError> {
+        debug_assert_ne!(self.mr, 0);
         match self.s.try_acquire(self.mr as usize) {
             Ok(permit) => permit,
             Err(TryAcquireError::NoPermits) => return Err(TryLockError(())),
@@ -1028,6 +1033,7 @@ impl<T: ?Sized> RwLock<T> {
     /// }
     /// ```
     pub fn try_write_owned(self: Arc<Self>) -> Result<OwnedRwLockWriteGuard<T>, TryLockError> {
+        debug_assert_ne!(self.mr, 0);
         match self.s.try_acquire(self.mr as usize) {
             Ok(permit) => permit,
             Err(TryAcquireError::NoPermits) => return Err(TryLockError(())),
