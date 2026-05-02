@@ -1268,14 +1268,13 @@ jobs:
         env:
           RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
           RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
-          RUST_NIGHTLY: nightly-2025-10-12
         with:
           release: '14.4'
           envs: "RUST_NIGHTLY RUSTDOCFLAGS RUSTFLAGS"
           prepare: |
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
-            sh rustup.sh -y --profile minimal --default-toolchain $RUST_NIGHTLY
+            sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_nightly }}
           run: |
             . $HOME/.cargo/env
             # We use `--features full,test-util,io-uring,tracing` instead of
