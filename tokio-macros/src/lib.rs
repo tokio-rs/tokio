@@ -223,6 +223,7 @@ use proc_macro::TokenStream;
 /// Equivalent code not using `#[tokio::main]`
 ///
 /// ```no_run
+/// # #[cfg(tokio_unstable)]
 /// use tokio::runtime::UnhandledPanic;
 ///
 /// #[cfg(tokio_unstable)]
