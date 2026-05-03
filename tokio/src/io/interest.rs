@@ -256,14 +256,7 @@ impl Interest {
     }
 
     pub(crate) fn mask(self) -> Ready {
-        match self {
-            Interest::READABLE => Ready::READABLE | Ready::READ_CLOSED,
-            Interest::WRITABLE => Ready::WRITABLE | Ready::WRITE_CLOSED,
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            Interest::PRIORITY => Ready::PRIORITY | Ready::READ_CLOSED,
-            Interest::ERROR => Ready::ERROR,
-            _ => Ready::EMPTY,
-        }
+        Ready::from_interest(self)
     }
 }
 
