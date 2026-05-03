@@ -804,6 +804,56 @@ fn io_driver_ready_count() {
     assert_eq!(metrics.io_driver_ready_count(), 1);
 }
 
+// Schedule latency tracking is only supported on 64-bit targets
+#[cfg(all(feature = "schedule-latency", target_pointer_width = "64"))]
+#[test]
+fn schedule_latency_counts() {
+    const N: u64 = 50;
+    let rts = [
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .enable_metrics_schedule_latency_histogram()
+            .metrics_schedule_latency_histogram_configuration(HistogramConfiguration::linear(
+                Duration::from_millis(50),
+                3,
+            ))
+            .build()
+            .unwrap(),
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .enable_metrics_schedule_latency_histogram()
+            .metrics_schedule_latency_histogram_configuration(HistogramConfiguration::linear(
+                Duration::from_millis(50),
+                3,
+            ))
+            .build()
+            .unwrap(),
+    ];
+
+    for rt in rts {
+        let metrics = rt.metrics();
+        rt.block_on(async {
+            for _ in 0..N {
+                tokio::spawn(async {}).await.unwrap();
+            }
+        });
+        drop(rt);
+
+        let num_workers = metrics.num_workers();
+        let num_buckets = metrics.schedule_latency_histogram_num_buckets();
+
+        assert!(metrics.schedule_latency_histogram_enabled());
+        assert_eq!(num_buckets, 3);
+
+        let n = (0..num_workers)
+            .flat_map(|i| (0..num_buckets).map(move |j| (i, j)))
+            .map(|(worker, bucket)| metrics.schedule_latency_histogram_bucket_count(worker, bucket))
+            .sum();
+        assert_eq!(N, n);
+    }
+}
+
 async fn try_spawn_stealable_task() -> Result<(), mpsc::RecvTimeoutError> {
     // We use a blocking channel to synchronize the tasks.
     let (tx, rx) = mpsc::channel();

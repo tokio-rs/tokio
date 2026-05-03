@@ -226,6 +226,7 @@ use crate::future::Future;
 use crate::util::linked_list;
 use crate::util::sharded_list;
 
+use crate::runtime::metrics::ScheduleLatencyInstant;
 use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
 use std::panic::Location;
@@ -252,6 +253,15 @@ impl<S> Notified<S> {
     pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
         self.0.task_meta()
     }
+
+    pub(crate) fn set_scheduled_at(&self, scheduled_at: ScheduleLatencyInstant) {
+        // SAFETY: There are no concurrent writes because there is only ever one `Notified`
+        // reference per task. There are no concurrent reads because this field is only read
+        // when polling the task, which can only happen after it's scheduled.
+        unsafe {
+            self.0.header().set_scheduled_at(scheduled_at);
+        }
+    }
 }
 
 // safety: This type cannot be used to touch the task without first verifying
@@ -272,6 +282,10 @@ impl<S> LocalNotified<S> {
     #[inline]
     pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
         self.task.task_meta()
+    }
+
+    pub(crate) fn get_scheduled_at(&self) -> ScheduleLatencyInstant {
+        self.task.header().get_scheduled_at()
     }
 }
 
