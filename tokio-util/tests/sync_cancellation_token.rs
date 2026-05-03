@@ -563,3 +563,27 @@ fn run_until_cancelled_owned_test() {
         );
     }
 }
+
+#[test]
+fn cloned_cancellation_tokens_are_considered_equal() {
+    let token = CancellationToken::new();
+    let token_clone = token.clone();
+
+    assert_eq!(token, token_clone);
+}
+
+#[test]
+fn child_cancellation_tokens_are_not_considered_equal() {
+    let token = CancellationToken::new();
+    let token_clone = token.child_token();
+
+    assert_ne!(token, token_clone);
+}
+
+#[test]
+fn independent_cancellation_tokens_are_not_considered_equal() {
+    let token1 = CancellationToken::new();
+    let token2 = CancellationToken::new();
+
+    assert_ne!(token1, token2);
+}
