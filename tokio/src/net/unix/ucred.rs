@@ -396,10 +396,9 @@ pub(crate) mod impl_noproc {
     use std::io;
 
     pub(crate) fn get_peer_cred(_sock: &UnixStream) -> io::Result<super::UCred> {
-        Ok(super::UCred {
-            uid: 0,
-            gid: 0,
-            pid: None,
-        })
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "SO_PEERCRED is not available on this target",
+        ))
     }
 }
