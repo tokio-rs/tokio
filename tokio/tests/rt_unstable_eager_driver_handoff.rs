@@ -8,17 +8,17 @@
 use std::sync::mpsc::RecvTimeoutError;
 use std::time::Duration;
 
-/// Test that, without `enable_eager_driver_handoff`, we can reliably reproduce
+/// Test that, without the `Cautious` unparking mode, we can reliably reproduce
 /// a deadlock when a task blocks indefinitely. If this test fails, it means
-/// that the test `eager_driver_handoff_fixes_deadlock` is not actually testing
-/// a condition that can deadlock the runtime.
+/// that the test `cautious_unparking_fixes_deadlock` is not actually testing a
+/// condition that can deadlock the runtime.
 #[test]
 fn deadlocks_consistently() {
     let rt = rt_builder().build().unwrap();
     assert_eq!(
         do_test(rt),
         Err(RecvTimeoutError::Timeout),
-        "runtime did not deadlock! the `eager_driver_handoff_fixes_deadlock` \
+        "runtime did not deadlock! the `cautious_unparking_fixes_deadlock` \
          test may no longer reproduce the bug it is intended to test a fix \
          for!",
     );
@@ -26,12 +26,15 @@ fn deadlocks_consistently() {
 
 /// This is the one that actually tests whether eager driver handoff works as
 /// expected: it runs the same reproducer as `deadlocks_consistently` a single
-/// timebut with `enable_eager_driver_handoff` enabled. If this test fails, it
+/// time, but with the `Cautious` unparking mode selected. If this test fails, it
 /// means that the eager driver handoff fix is not working as expected.
 #[test]
 #[cfg(tokio_unstable)]
-fn eager_driver_handoff_fixes_deadlock() {
-    let rt = rt_builder().enable_eager_driver_handoff().build().unwrap();
+fn cautious_unparking_fixes_deadlock() {
+    let rt = rt_builder()
+        .worker_thread_unparking_mode(tokio::runtime::UnparkingMode::Cautious)
+        .build()
+        .unwrap();
     assert_eq!(
         do_test(rt),
         Ok(()),
@@ -140,7 +143,7 @@ fn do_test(rt: tokio::runtime::Runtime) -> Result<(), RecvTimeoutError> {
 
 /// Base runtime builder for both tests in this module: two worker threads, time
 /// driver enabled. This returns a `Builder`, rather than a `Runtime`, so that
-/// the `eager_driver_handoff_fixes_deadlock` test can configure the runtime to
+/// the `cautious_unparking_fixes_deadlock` test can configure the runtime to
 /// enable eager driver handoff before building it.
 fn rt_builder() -> tokio::runtime::Builder {
     let mut builder = tokio::runtime::Builder::new_multi_thread();

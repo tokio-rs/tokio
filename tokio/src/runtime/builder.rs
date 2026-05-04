@@ -143,9 +143,8 @@ pub struct Builder {
 
     timer_flavor: TimerFlavor,
 
-    /// Whether or not to enable eager hand-off for the I/O and time drivers (in
-    /// `tokio_unstable`).
-    enable_eager_driver_handoff: bool,
+    #[cfg(feature = "rt-multi-thread")]
+    worker_thread_unparking_mode: UnparkingMode,
 }
 
 cfg_unstable! {
@@ -230,6 +229,84 @@ cfg_unstable! {
         /// [`JoinHandle`]: struct@crate::task::JoinHandle
         ShutdownRuntime,
     }
+}
+
+/// Configures the multi-threaded runtime's policy for unparking worker
+/// threads.
+///
+/// Instances of `UnparkingMode` are passed to
+/// [`Builder::worker_thread_unparking_mode`] to configure the runtime
+/// behavior for when worker threads are unparked.
+///
+/// See the individual variants of this enum for more details on each
+/// unparking mode's behavior.
+#[cfg(feature = "rt-multi-thread")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+#[cfg_attr(not(tokio_unstable), allow(unreachable_pub))]
+#[derive(Debug, Default, Clone)]
+#[non_exhaustive]
+pub enum UnparkingMode {
+    /// Traditional pre-Tokio 1.51.0 unparking behavior.
+    ///
+    /// This mode attempts to minimize unnecessary cross-thread wakeups. When
+    /// the traditional unparking behavior is selected, a parked worker thread
+    /// will be woken when A task running on a worker thread notifies another
+    /// task, and it is pushed to that worker thread's local queue (see
+    /// [here][rt-behavior] for details). If the [LIFO slot optimization][lifo]
+    /// is enabled, pushing a task to an *empty* LIFO slot will not notify
+    /// another worker thread. If the LIFO slot already contains a task when
+    /// another task is woken, the previous LIFO task is pushed to the worker's
+    /// local queue, which will unpark a parked worker thread.
+    ///
+    /// This unparking mode reduces the overhead of cross-thread notifications,
+    /// which generally results in better throughput for applications under
+    /// heavy load. However, it is more susceptible to latency bubbles when
+    /// tasks may become CPU-bound for long periods of time, and can deadlock
+    /// if a task blocks the thread indefinitely.
+    ///
+    /// [rt-behavior]: crate::runtime#multi-threaded-runtime-behavior-at-the-time-of-writing
+    /// [lifo]: crate::runtime::Builder::disable_lifo_slot
+    #[default]
+    Traditional,
+    /// Experimental unparking behavior that reduces the risk of deadlocks and
+    /// latency bubbles, at the expense of increased cross-thread notification
+    /// overhead.
+    ///
+    /// In contrast to the [`Traditional`](Self::Traditional) unparking mode,
+    /// this mode unparks worker threads more aggressively. This prevents tasks
+    /// which block their worker thread or execute large amounts of CPU-bound
+    /// code without yielding from starving other tasks from running, as
+    /// described in issues like [#4941] and [#6315]. This can increase overhead
+    /// due to waking parked workers in more frequently, and may not be
+    /// necessary in applications which never expect tasks to go CPU-bound for
+    /// long periods of time without yielding.
+    ///
+    /// In the `Cautious` unparking mode, a parked worker thread is unparked
+    /// whenever a task is notified by another task. Unlike the `Traditional`
+    /// unparking mode, this occurs regardless of whether or not the notified
+    /// task is placed in its worker thread's [LIFO slot]. This ensures that
+    /// there will always be another worker thread available to steal the
+    /// notified task, should the currently executing task block the worker for
+    /// a long period of time. This prevents the issue described in [#4941].
+    ///
+    /// In addition, this mode will also unpark a parked worker thread whenever
+    /// a worker thread which had previously parked on the I/O or timer driver
+    /// transitions to begin polling tasks. This ensures that another worker is
+    /// always available to process I/O events immediately, so that a
+    /// long-running task on the worker which was previously holding the I/O or
+    /// time driver does not preventing I/O or timer notifications from being
+    /// processed in a timely manner.
+    ///
+    /// Applications which are not under constant load at all times may benefit
+    /// from this unparking mode, especially if they anticipate that some tasks
+    /// may perform large amounts of CPU-bound work without yielding.
+    ///
+    /// [#4941]: https://github.com/tokio-rs/tokio/issues/4941
+    /// [#6315]: https://github.com/tokio-rs/tokio/issues/6315
+    /// [LIFO slot]: crate::runtime::Builder::disable_lifo_slot
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    Cautious,
 }
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
@@ -339,8 +416,8 @@ impl Builder {
 
             timer_flavor: TimerFlavor::Traditional,
 
-            // Eager driver handoff is disabled by default.
-            enable_eager_driver_handoff: false,
+            #[cfg(feature = "rt-multi-thread")]
+            worker_thread_unparking_mode: UnparkingMode::default(),
         }
     }
 
@@ -450,8 +527,50 @@ impl Builder {
     /// [unstable]: crate#unstable-features
     #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
     #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
+    #[deprecated(
+        since = "1.53.0",
+        note = "use `worker_thread_unparking_mode(UnparkingMode::Cautious)` instead"
+    )]
     pub fn enable_eager_driver_handoff(&mut self) -> &mut Self {
-        self.enable_eager_driver_handoff = true;
+        self.worker_thread_unparking_mode(UnparkingMode::Cautious)
+    }
+
+    /// Selects the [unparking behavior](UnparkingMode) used by the
+    /// multi-threaded runtime. This configuration determines when the runtime
+    /// will attempt to unpark an idle worker thread.
+    ///
+    /// This option only applies to multi-threaded runtimes. Attempting to use
+    /// this option with any other runtime type will have no effect.
+    ///
+    /// By default, the multi-threaded runtime will use the [`Traditional`]
+    /// unparking mode. This mode attempts to avoid the overhead of unnecessary
+    /// cross-thread notifications, which biases the runtime for improved
+    /// throughput in applications under high levels of load.
+    ///
+    /// Alternatively, this method may be used to select the [`Cautious`]
+    /// unparking mode, which unparks worker threads more aggressively. This
+    /// mode prevents potential deadlocks and/or latency bubbles which may occur
+    /// when tasks perform very large amounts of CPU-bound work without
+    /// yielding, or block the worker thread for other reasons. However, this
+    /// behavior also results in increased runtime overhead, and may not be
+    /// necessary in applications which are always under high load and in which
+    /// tasks always yield within a short period of time.
+    ///
+    /// See the documentation for the [`UnparkingMode`] type and its variants
+    /// for more details on the behaviors of these modes.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. Eager driver hand-off is
+    /// an experimental feature whose behavior may be removed or changed in 1.x
+    /// releases. See [the documentation on unstable features][unstable] for
+    /// details.
+    ///
+    /// [unstable]: crate#unstable-features
+    /// [`Traditional`]: UnparkingMode::Traditional
+    /// [`Cautious`]: UnparkingMode::Cautious
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
+    pub fn worker_thread_unparking_mode(&mut self, mode: UnparkingMode) -> &mut Self {
+        self.worker_thread_unparking_mode = mode;
         self
     }
 
@@ -1708,6 +1827,9 @@ impl Builder {
                 enable_eager_driver_handoff: false,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                // This setting never makes sense for the current thread
+                // runtime, as it has no notion of "waking a parked worker".
+                wake_on_lifo_push: false,
             },
             local_tid,
             self.name.clone(),
@@ -1888,7 +2010,8 @@ cfg_rt_multi_thread! {
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
-                    enable_eager_driver_handoff: self.enable_eager_driver_handoff,
+                    enable_eager_driver_handoff: self.worker_thread_unparking_mode.enable_eager_driver_handoff(),
+                    wake_on_lifo_push: self.worker_thread_unparking_mode.wake_on_lifo_push(),
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 },
@@ -1926,16 +2049,36 @@ impl fmt::Debug for Builder {
             .field("after_start", &self.after_start.as_ref().map(|_| "..."))
             .field("before_stop", &self.before_stop.as_ref().map(|_| "..."))
             .field("before_park", &self.before_park.as_ref().map(|_| "..."))
-            .field("after_unpark", &self.after_unpark.as_ref().map(|_| "..."))
-            .field(
-                "enable_eager_driver_handoff",
-                &self.enable_eager_driver_handoff,
-            );
+            .field("after_unpark", &self.after_unpark.as_ref().map(|_| "..."));
+        #[cfg(feature = "rt-multi-thread")]
+        debug.field(
+            "worker_thread_unparking_mode",
+            &self.worker_thread_unparking_mode,
+        );
 
         if self.name.is_none() {
             debug.finish_non_exhaustive()
         } else {
             debug.finish()
+        }
+    }
+}
+
+#[cfg(feature = "rt-multi-thread")]
+impl UnparkingMode {
+    fn wake_on_lifo_push(&self) -> bool {
+        match self {
+            Self::Traditional => false,
+            #[cfg(tokio_unstable)]
+            Self::Cautious => true,
+        }
+    }
+
+    fn enable_eager_driver_handoff(&self) -> bool {
+        match self {
+            Self::Traditional => false,
+            #[cfg(tokio_unstable)]
+            Self::Cautious => true,
         }
     }
 }

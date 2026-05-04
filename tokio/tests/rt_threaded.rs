@@ -694,10 +694,12 @@ fn mutex_in_block_in_place() {
 
 // Tests that when a task is notified by another task and is placed in the LIFO
 // slot, and then the notifying task blocks the runtime, the notified task will
-// be stolen by another worker thread.
+// be stolen by another worker thread, if the `Cautious` unparking mode is
+// selected.
 //
 // Integration test for: https://github.com/tokio-rs/tokio/issues/4941
 #[test]
+#[cfg(tokio_unstable)]
 fn lifo_stealable() {
     use std::time::Duration;
 
@@ -726,6 +728,7 @@ fn lifo_stealable() {
         // there's still at least one worker free to steal the blocked task.
         .worker_threads(4)
         .enable_time()
+        .worker_thread_unparking_mode(runtime::UnparkingMode::Cautious)
         .build()
         .unwrap();
 

@@ -575,6 +575,10 @@ cfg_rt! {
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
 
+        #[cfg(feature = "rt-multi-thread")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+        pub use self::builder::UnparkingMode;
+
         /// Returns the index of the current worker thread, if called from a
         /// runtime worker thread.
         ///
