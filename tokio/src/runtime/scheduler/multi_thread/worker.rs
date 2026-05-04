@@ -256,6 +256,15 @@ type Notified = task::Notified<Arc<Handle>>;
 /// improvements.
 const MAX_LIFO_POLLS_PER_TICK: usize = 3;
 
+/// Maximum time a parked worker will sleep before waking to check
+/// for tasks stranded in other workers' LIFO slots.
+const LIFO_EXCLUSIVITY_TIMEOUT: Duration = Duration::from_millis(100);
+
+enum TransitionToParked {
+    No,
+    Yes(Option<Duration>),
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn create(
     size: usize,
@@ -804,13 +813,13 @@ impl Context {
             f();
         }
 
-        if core.transition_to_parked(&self.worker) {
+        if let TransitionToParked::Yes(timeout) = core.transition_to_parked(&self.worker) {
             while !core.is_shutdown && !core.is_traced {
                 core.stats.about_to_park();
                 core.stats
                     .submit(&self.worker.handle.shared.worker_metrics[self.worker.index]);
 
-                core = self.park_internal(core, None);
+                core = self.park_internal(core, timeout);
 
                 core.stats.unparked();
 
@@ -820,6 +829,10 @@ impl Context {
                 if core.transition_from_parked(&self.worker) {
                     break;
                 }
+
+                if self.steal_stranded_lifo() {
+                    break;
+                }
             }
         }
 
@@ -827,6 +840,24 @@ impl Context {
             f();
         }
         core
+    }
+
+    fn steal_stranded_lifo(&self) -> bool {
+        let shared = &self.worker.handle.shared;
+        if !shared.idle.should_attempt_lifo_steal() {
+            return false;
+        }
+
+        for (i, remote) in shared.remotes.iter().enumerate() {
+            if i != self.worker.index && remote.steal.has_lifo() {
+                shared.idle.unpark_worker_by_id(shared, self.worker.index);
+                return true;
+            }
+        }
+
+        // didn't find any lifo task, unset the lifo steal bit.
+        shared.idle.clear_lifo();
+        false
     }
 
     fn park_yield(&self, core: Box<Core>) -> Box<Core> {
@@ -1193,16 +1224,19 @@ impl Core {
     /// Prepares the worker state for parking.
     ///
     /// Returns true if the transition happened, false if there is work to do first.
-    fn transition_to_parked(&mut self, worker: &Worker) -> bool {
+    fn transition_to_parked(&mut self, worker: &Worker) -> TransitionToParked {
         // Workers should not park if they have work to do
         if self.has_tasks() || self.is_traced {
-            return false;
+            return TransitionToParked::No;
         }
 
         // When the final worker transitions **out** of searching to parked, it
         // must check all the queues one last time in case work materialized
         // between the last work scan and transitioning out of searching.
-        let is_last_searcher = worker.handle.shared.idle.transition_worker_to_parked(
+        let idle::TransitionToParked {
+            is_last_searcher,
+            any_lifo,
+        } = worker.handle.shared.idle.transition_worker_to_parked(
             &worker.handle.shared,
             worker.index,
             self.is_searching,
@@ -1216,7 +1250,11 @@ impl Core {
             worker.handle.notify_if_work_pending();
         }
 
-        true
+        TransitionToParked::Yes(if any_lifo {
+            Some(LIFO_EXCLUSIVITY_TIMEOUT)
+        } else {
+            None
+        })
     }
 
     /// Returns `true` if the transition happened.
@@ -1349,9 +1387,10 @@ impl Handle {
         // task must always be pushed to the back of the queue, enabling other
         // tasks to be executed. If **not** a yield, then there is more
         // flexibility and the task may go to the front of the queue.
-        if is_yield || !core.lifo_enabled {
+        let should_notify = if is_yield || !core.lifo_enabled {
             core.run_queue
                 .push_back_or_overflow(task, self, &mut core.stats);
+            true
         } else {
             // Push to the LIFO slot
             if let Some(prev) = core.run_queue.push_lifo(task) {
@@ -1359,13 +1398,16 @@ impl Handle {
                 // to be pushed to the back of the run queue.
                 core.run_queue
                     .push_back_or_overflow(prev, self, &mut core.stats);
+                true
+            } else {
+                !self.shared.idle.put_lifo()
             }
         };
 
         // Only notify if not currently parked. If `park` is `None`, then the
         // scheduling is from a resource driver. As notifications often come in
         // batches, the notification is delayed until the park is complete.
-        if core.park.is_some() {
+        if should_notify && core.park.is_some() {
             self.notify_parked_local();
         }
     }

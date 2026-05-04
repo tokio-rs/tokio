@@ -436,6 +436,10 @@ impl<T> Steal<T> {
         self.len() == 0
     }
 
+    pub(crate) fn has_lifo(&self) -> bool {
+        self.0.lifo.is_some()
+    }
+
     /// Steals half the tasks from self and place them into `dst`.
     pub(crate) fn steal_into(
         &self,
