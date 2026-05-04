@@ -38,8 +38,10 @@ pub(crate) fn box_new_uninit<T>() -> Box<MaybeUninit<T>> {
 }
 
 // TODO(MSRV 1.82): When bumping MSRV, switch to `Box::<MaybeUninit<T>>::assume_init()`.
-// It is up to the caller to guarantee that the value really is in an initialized state.
-// Calling this when the content is not yet fully initialized causes immediate undefined behavior.
+/// # Safety
+///
+/// It is up to the caller to guarantee that the value really is in an initialized state.
+/// Calling this when the content is not yet fully initialized causes immediate undefined behavior.
 pub(crate) unsafe fn box_assume_init<T>(boxed: Box<MaybeUninit<T>>) -> Box<T> {
     let raw = Box::into_raw(boxed);
     // SAFETY: If the caller guarantees that the MaybeUninit is initialized, then
