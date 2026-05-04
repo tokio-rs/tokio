@@ -26,6 +26,36 @@ use std::sync::Arc;
 /// To use the `Semaphore` in a poll function, you can use the [`PollSemaphore`]
 /// utility.
 ///
+/// # Memory ordering
+///
+/// Successfully acquiring a permit (via [`acquire`], [`acquire_many`],
+/// [`try_acquire`], [`try_acquire_many`], or their `_owned` variants) performs
+/// an `AcqRel` operation on the semaphore's internal state. Similarly,
+/// releasing permits (by dropping a [`SemaphorePermit`] or
+/// [`OwnedSemaphorePermit`], or by calling [`add_permits`] or
+/// [`forget_permits`]) and closing the semaphore (via [`close`]) are also
+/// `AcqRel` operations.
+///
+/// A failed acquisition attempt (including [`TryAcquireError::NoPermits`] and
+/// [`TryAcquireError::Closed`]) behaves like an `Acquire` load.
+///
+/// The methods [`available_permits`] and [`is_closed`] also behave like an
+/// `Acquire` load.
+///
+/// In practical terms, this means that any memory writes performed before
+/// releasing a permit are guaranteed to be visible to the task that
+/// subsequently acquires that permit.
+///
+/// [`acquire`]: Semaphore::acquire
+/// [`acquire_many`]: Semaphore::acquire_many
+/// [`try_acquire`]: Semaphore::try_acquire
+/// [`try_acquire_many`]: Semaphore::try_acquire_many
+/// [`add_permits`]: Semaphore::add_permits
+/// [`forget_permits`]: Semaphore::forget_permits
+/// [`close`]: Semaphore::close
+/// [`available_permits`]: Semaphore::available_permits
+/// [`is_closed`]: Semaphore::is_closed
+///
 /// # Examples
 ///
 /// Basic usage:
