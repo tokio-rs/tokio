@@ -4,7 +4,7 @@ use crate::runtime::task::{Header, Notified, RawTask};
 use std::marker::PhantomData;
 use std::ptr;
 use std::ptr::NonNull;
-use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::Ordering::{AcqRel, Acquire};
 
 /// An atomic cell which can contain a pointer to a [`Notified`] task.
 ///
@@ -29,7 +29,7 @@ impl<S: 'static> AtomicNotified<S> {
         let new = task
             .map(|t| t.into_raw().header_ptr().as_ptr())
             .unwrap_or_else(ptr::null_mut);
-        let old = self.task.swap(new, SeqCst);
+        let old = self.task.swap(new, AcqRel);
         NonNull::new(old).map(|ptr| unsafe {
             // Safety: since we only allow tasks with the same scheduler type to
             // be placed in this cell, we know that the pointed task's scheduler
@@ -43,7 +43,7 @@ impl<S: 'static> AtomicNotified<S> {
     }
 
     pub(crate) fn is_some(&self) -> bool {
-        !self.task.load(SeqCst).is_null()
+        !self.task.load(Acquire).is_null()
     }
 }
 
