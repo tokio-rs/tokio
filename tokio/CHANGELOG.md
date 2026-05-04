@@ -1,3 +1,11 @@
+# 1.51.2 (May 4th, 2026)
+
+This release reverts the LIFO slot stealing change ([#7431]), due to [its
+performance impact][#8065]. ([#8100])
+
+[#8065]: https://github.com/tokio-rs/tokio/pull/8065
+[#8100]: https://github.com/tokio-rs/tokio/pull/8100
+
 # 1.51.1 (April 8th, 2026)
 
 ### Fixed
