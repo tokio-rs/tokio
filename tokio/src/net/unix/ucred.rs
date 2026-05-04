@@ -72,7 +72,10 @@ pub(crate) use self::impl_aix::get_peer_cred;
     target_os = "espidf",
     target_os = "vita",
     target_os = "hurd",
-    all(target_os = "nto", any(target_env = "nto71_iosock", target_env = "nto80")),
+    all(
+        target_os = "nto",
+        any(target_env = "nto71_iosock", target_env = "nto80")
+    ),
 ))]
 pub(crate) use self::impl_noproc::get_peer_cred;
 
@@ -335,7 +338,10 @@ pub(crate) mod impl_aix {
     target_os = "espidf",
     target_os = "vita",
     target_os = "hurd",
-    all(target_os = "nto", any(target_env = "nto71_iosock", target_env = "nto80")),
+    all(
+        target_os = "nto",
+        any(target_env = "nto71_iosock", target_env = "nto80")
+    ),
 ))]
 pub(crate) mod impl_noproc {
     use crate::net::unix::UnixStream;
