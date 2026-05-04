@@ -135,6 +135,13 @@ impl PartialEq for CancellationToken {
 
 impl Eq for CancellationToken {}
 
+impl core::hash::Hash for CancellationToken {
+    #[inline]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.inner).hash(state);
+    }
+}
+
 impl Drop for CancellationToken {
     fn drop(&mut self) {
         tree_node::decrease_handle_refcount(&self.inner);
