@@ -698,6 +698,7 @@ fn mutex_in_block_in_place() {
 //
 // Integration test for: https://github.com/tokio-rs/tokio/issues/4941
 #[test]
+#[cfg(tokio_unstable)]
 fn lifo_stealable() {
     use std::time::Duration;
 
@@ -725,6 +726,7 @@ fn lifo_stealable() {
         // I/O driver and another can be parked running the timer wheel and
         // there's still at least one worker free to steal the blocked task.
         .worker_threads(4)
+        .enable_eager_worker_wakeup()
         .enable_time()
         .build()
         .unwrap();
