@@ -90,17 +90,13 @@ fn make_fixed_size<T>(buffer: Box<[T]>) -> Box<[T; LOCAL_QUEUE_CAPACITY]> {
 
 /// Create a new local run-queue
 pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
-    let mut buffer = Vec::with_capacity(LOCAL_QUEUE_CAPACITY);
-
-    for _ in 0..LOCAL_QUEUE_CAPACITY {
-        buffer.push(UnsafeCell::new(MaybeUninit::uninit()));
-    }
+    let buffer = std::iter::repeat_with(|| UnsafeCell::new(MaybeUninit::uninit()));
 
     let inner = Arc::new(Inner {
         head: AtomicUnsignedLong::new(0),
         tail: AtomicUnsignedShort::new(0),
         lifo: task::AtomicNotified::empty(),
-        buffer: make_fixed_size(buffer.into_boxed_slice()),
+        buffer: make_fixed_size(buffer.take(LOCAL_QUEUE_CAPACITY).collect()),
     });
 
     let local = Local {

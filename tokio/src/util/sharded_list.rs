@@ -38,12 +38,9 @@ impl<L, T> ShardedList<L, T> {
         assert!(sharded_size.is_power_of_two());
 
         let shard_mask = sharded_size - 1;
-        let mut lists = Vec::with_capacity(sharded_size);
-        for _ in 0..sharded_size {
-            lists.push(Mutex::new(LinkedList::<L, T>::new()))
-        }
+        let lists = std::iter::repeat_with(|| Mutex::new(LinkedList::new()));
         Self {
-            lists: lists.into_boxed_slice(),
+            lists: lists.take(sharded_size).collect(),
             added: MetricAtomicU64::new(0),
             count: MetricAtomicUsize::new(0),
             shard_mask,

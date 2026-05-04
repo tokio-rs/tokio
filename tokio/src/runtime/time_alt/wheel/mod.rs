@@ -5,8 +5,6 @@ use self::level::Level;
 use super::cancellation_queue::Sender;
 use super::{EntryHandle, EntryList, WakeQueue};
 
-use std::array;
-
 /// Hashed timing wheel implementation.
 ///
 /// See [`Driver`] documentation for some implementation notes.
@@ -41,9 +39,10 @@ pub(super) const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
 impl Wheel {
     /// Creates a new timing wheel.
     pub(crate) fn new() -> Wheel {
+        let levels = (0..NUM_LEVELS).map(Level::new).collect::<Box<_>>();
         Wheel {
             elapsed: 0,
-            levels: Box::new(array::from_fn(Level::new)),
+            levels: levels.try_into().unwrap(),
         }
     }
 

@@ -3,6 +3,7 @@ use crate::Stream;
 use core::fmt;
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -75,5 +76,15 @@ where
         let (_, upper) = self.stream.size_hint();
 
         (0, upper)
+    }
+}
+
+impl<St, F> FusedStream for TakeWhile<St, F>
+where
+    St: Stream,
+    F: FnMut(&St::Item) -> bool,
+{
+    fn is_terminated(&self) -> bool {
+        self.done
     }
 }
