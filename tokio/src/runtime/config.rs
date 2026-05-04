@@ -58,4 +58,10 @@ pub(crate) struct Config {
     /// from polling the I/O driver to polling its own tasks (requires
     /// `tokio_unstable`).
     pub(crate) enable_eager_driver_handoff: bool,
+
+    /// If `true`, a parked worker is woken whenever a task is pushed to a
+    /// worker's LIFO slot, to ensure that the LIFO task is always
+    /// stealable.`Otherwise, pushing a task to the LIFO slot does not wake a
+    /// parked worker.
+    pub(crate) wake_on_lifo_push: bool,
 }

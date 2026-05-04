@@ -146,6 +146,10 @@ pub struct Builder {
     /// Whether or not to enable eager hand-off for the I/O and time drivers (in
     /// `tokio_unstable`).
     enable_eager_driver_handoff: bool,
+
+    /// Whether or not to wake parked worker threads on pushes to a worker's
+    /// LIFO slot.
+    wake_on_lifo_push: bool,
 }
 
 cfg_unstable! {
@@ -339,8 +343,9 @@ impl Builder {
 
             timer_flavor: TimerFlavor::Traditional,
 
-            // Eager driver handoff is disabled by default.
+            // Eager worker wakeup behavior is disabled by default.
             enable_eager_driver_handoff: false,
+            wake_on_lifo_push: false,
         }
     }
 
@@ -450,8 +455,17 @@ impl Builder {
     /// [unstable]: crate#unstable-features
     #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
     #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
+    #[deprecated(since = "1.53.0", note = "use `enable_eager_worker_wakeup()` instead")]
     pub fn enable_eager_driver_handoff(&mut self) -> &mut Self {
         self.enable_eager_driver_handoff = true;
+        self
+    }
+
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
+    pub fn enable_eager_worker_wakeup(&mut self) -> &mut Self {
+        self.enable_eager_driver_handoff = true;
+        self.wake_on_lifo_push = true;
         self
     }
 
@@ -1708,6 +1722,9 @@ impl Builder {
                 enable_eager_driver_handoff: false,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                // This setting never makes sense for the current thread
+                // runtime, as it has no notion of "waking a parked worker".
+                wake_on_lifo_push: false,
             },
             local_tid,
             self.name.clone(),
@@ -1889,6 +1906,7 @@ cfg_rt_multi_thread! {
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
                     enable_eager_driver_handoff: self.enable_eager_driver_handoff,
+                    wake_on_lifo_push: self.wake_on_lifo_push,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 },
