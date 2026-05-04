@@ -617,6 +617,14 @@ impl Sender {
     /// number of bytes written. If the pipe is not ready to write data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
+    /// # Notes
+    ///
+    /// To avoid unnecessary syscalls, this will only attempt the write
+    /// operation if the OS has informed Tokio that this pipe has become
+    /// writable. Because of this, `try_write()` may fail with a
+    /// [`WouldBlock`] error if Tokio has not yet heard from the OS that
+    /// this pipe has become writable.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -650,6 +658,8 @@ impl Sender {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_write(&self, buf: &[u8]) -> io::Result<usize> {
         self.io
             .registration()
@@ -680,6 +690,14 @@ impl Sender {
     /// If data is successfully written, `Ok(n)` is returned, where `n` is the
     /// number of bytes written. If the pipe is not ready to write data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Notes
+    ///
+    /// To avoid unnecessary syscalls, this will only attempt the write
+    /// operation if the OS has informed Tokio that this pipe has become
+    /// writable. Because of this, `try_write_vectored()` may fail with a
+    /// [`WouldBlock`] error if Tokio has not yet heard from the OS that
+    /// this pipe has become writable.
     ///
     /// # Examples
     ///
@@ -716,6 +734,8 @@ impl Sender {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_write_vectored(&self, buf: &[io::IoSlice<'_>]) -> io::Result<usize> {
         self.io
             .registration()
@@ -1152,6 +1172,14 @@ impl Receiver {
     /// If the pipe is not ready to read data,
     /// `Err(io::ErrorKind::WouldBlock)` is returned.
     ///
+    /// # Notes
+    ///
+    /// To avoid unnecessary syscalls, this will only attempt the read
+    /// operation if the OS has informed Tokio that this pipe has become
+    /// readable. Because of this, `try_read()` may fail with a
+    /// [`WouldBlock`] error if Tokio has not yet heard from the OS that
+    /// this pipe has become readable.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -1189,6 +1217,8 @@ impl Receiver {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_read(&self, buf: &mut [u8]) -> io::Result<usize> {
         self.io
             .registration()
@@ -1219,6 +1249,14 @@ impl Receiver {
     /// number of bytes read. `Ok(0)` indicates the pipe's writing end is
     /// closed and will no longer write data. If the pipe is not ready to read
     /// data `Err(io::ErrorKind::WouldBlock)` is returned.
+    ///
+    /// # Notes
+    ///
+    /// To avoid unnecessary syscalls, this will only attempt the read
+    /// operation if the OS has informed Tokio that this pipe has become
+    /// readable. Because of this, `try_read_vectored()` may fail with a
+    /// [`WouldBlock`] error if Tokio has not yet heard from the OS that
+    /// this pipe has become readable.
     ///
     /// # Examples
     ///
@@ -1263,6 +1301,8 @@ impl Receiver {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     pub fn try_read_vectored(&self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
         self.io
             .registration()
@@ -1322,6 +1362,14 @@ impl Receiver {
         /// closed and will no longer write data. If the pipe is not ready to read
         /// data `Err(io::ErrorKind::WouldBlock)` is returned.
         ///
+        /// # Notes
+        ///
+        /// To avoid unnecessary syscalls, this will only attempt the read
+        /// operation if the OS has informed Tokio that this pipe has become
+        /// readable. Because of this, `try_read_buf()` may fail with a
+        /// [`WouldBlock`] error if Tokio has not yet heard from the OS that
+        /// this pipe has become readable.
+        ///
         /// # Examples
         ///
         /// ```no_run
@@ -1358,6 +1406,8 @@ impl Receiver {
         ///     Ok(())
         /// }
         /// ```
+        ///
+        /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
         pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
             self.io.registration().try_io(Interest::READABLE, || {
                 use std::io::Read;

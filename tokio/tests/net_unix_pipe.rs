@@ -226,7 +226,6 @@ async fn from_file() -> io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `fstat` in miri.
 async fn from_file_detects_not_a_fifo() -> io::Result<()> {
     let dir = tempfile::Builder::new()
         .prefix("tokio-fifo-tests")
@@ -500,7 +499,6 @@ async fn anon_pipe_spawn_echo() -> std::io::Result<()> {
 
 #[tokio::test]
 #[cfg(target_os = "linux")]
-#[cfg_attr(miri, ignore)] // No `fstat` in miri.
 async fn anon_pipe_from_owned_fd() -> std::io::Result<()> {
     use nix::fcntl::OFlag;
 

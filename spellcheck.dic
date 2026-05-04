@@ -1,4 +1,4 @@
-316
+323
 &
 +
 <
@@ -189,14 +189,17 @@ mutex
 Mutex
 Nagle
 namespace
+NetBSD
 nonblocking
 nondecreasing
 noop
 ntasks
+NTO
 NUMA
 ok
 oneshot
 opcode
+OpenBSD
 ORed
 os
 parker
@@ -213,6 +216,7 @@ RAII
 RCU
 reallocations
 recv's
+Redox
 refactors
 refcount
 refcounting
@@ -279,6 +283,7 @@ tokio's
 Tokio's
 tuple
 Tuple
+tvOS
 tx
 udp
 UDP
@@ -306,6 +311,7 @@ vec
 versa
 versioned
 versioning
+visionOS
 vtable
 waker
 wakers
@@ -313,5 +319,6 @@ Wakers
 wakeup
 wakeups
 WASI
+watchOS
 workstealing
 ZST
