@@ -52,7 +52,7 @@ async fn peek_returns_correct_item() {
 
     assert_eq!(s.peek().await, Some(&10));
     assert_eq!(s.peek().await, Some(&10)); // second peek returns same item
-    assert_eq!(s.next().await, Some(10));  // next() gives same item
+    assert_eq!(s.next().await, Some(10)); // next() gives same item
     assert_eq!(s.next().await, Some(20));
     assert_eq!(s.next().await, Some(30));
     assert_eq!(s.next().await, None);
