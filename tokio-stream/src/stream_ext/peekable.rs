@@ -52,10 +52,7 @@ impl<T: Stream> Stream for Peekable<T> {
         let peek_len = if self.peek.is_some() { 1 } else { 0 };
         let (lo, hi) = self.stream.size_hint();
         let lo = lo.saturating_add(peek_len);
-        let hi = match hi {
-            Some(x) => x.checked_add(peek_len),
-            None => None,
-        };
+        let hi = hi.and_then(|x| x.checked_add(peek_len));
         (lo, hi)
     }
 }

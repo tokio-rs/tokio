@@ -34,6 +34,10 @@ async fn size_hint_with_peek() {
     s.next().await;
     assert_eq!(s.size_hint(), (1, Some(1)));
 
+    // peek the last item
+    let _ = s.peek().await;
+    assert_eq!(s.size_hint(), (1, Some(1)));
+
     s.next().await;
     assert_eq!(s.size_hint(), (0, Some(0)));
 }
@@ -91,4 +95,29 @@ async fn size_hint_overflow() {
     // after peek: peek_len=1, checked_add(1) on usize::MAX must give None not panic
     let _ = s.peek().await;
     assert_eq!(s.size_hint(), (usize::MAX, None));
+}
+
+#[tokio::test]
+async fn size_hint_unbounded_upper() {
+    // A stream that reports unknown upper bound
+    struct Unbounded;
+
+    impl Stream for Unbounded {
+        type Item = u32;
+        fn poll_next(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Option<u32>> {
+            std::task::Poll::Ready(Some(42))
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            (1, None)
+        }
+    }
+
+    let mut s = Unbounded.peekable();
+    assert_eq!(s.size_hint(), (1, None));
+    let _ = s.peek().await;
+    assert_eq!(s.size_hint(), (2, None)); // still unbounded after peek
 }
