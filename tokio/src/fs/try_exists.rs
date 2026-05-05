@@ -31,7 +31,15 @@ pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
         feature = "rt",
         feature = "fs",
         // libc::statx is only supported on these platforms
-        any(target_env = "gnu", target_os = "android", target_env = "musl")
+        // FIXME: Add musl target env when our minimum supported
+        // rust version is 1.93. To clarify, statx support is
+        // introduced to musl in 1.25 as mentioned officially here:
+        // https://musl.libc.org/releases.html.
+        // However, rustup target_env building for *-linux-musl
+        // uses 1.25 musl on all *-linux-musl platforms starting
+        // in 1.93 stable rust version.
+        // https://blog.rust-lang.org/2025/12/05/Updating-musl-1.2.5/
+        any(target_env = "gnu", target_os = "android")
     ))]
     {
         let handle = crate::runtime::Handle::current();
@@ -49,6 +57,22 @@ pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
 
 cfg_io_uring! {
     #[inline]
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        // libc::statx is only supported on these platforms
+        // FIXME: Add musl target env when our minimum supported
+        // rust version is 1.93. To clarify, statx support is
+        // introduced to musl in 1.25 as mentioned officially here:
+        // https://musl.libc.org/releases.html.
+        // However, rustup target_env building for *-linux-musl
+        // uses 1.25 musl on all *-linux-musl platforms starting
+        // in 1.93 stable rust version.
+        // https://blog.rust-lang.org/2025/12/05/Updating-musl-1.2.5/
+        any(target_env = "gnu", target_os = "android")
+    ))]
     async fn try_exists_uring(path: &Path) -> io::Result<bool> {
         use crate::runtime::driver::op::Op;
 

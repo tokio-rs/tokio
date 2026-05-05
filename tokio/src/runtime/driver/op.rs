@@ -6,6 +6,18 @@ use crate::io::uring::write::Write;
 
 use crate::runtime::Handle;
 
+#[cfg(
+    // libc::statx is only supported on these platforms
+    // FIXME: Add musl target env when our minimum supported
+    // rust version is 1.93. To clarify, statx support is
+    // introduced to musl in 1.25 as mentioned officially here:
+    // https://musl.libc.org/releases.html.
+    // However, rustup target_env building for *-linux-musl
+    // uses 1.25 musl on all *-linux-musl platforms starting
+    // in 1.93 stable rust version.
+    // https://blog.rust-lang.org/2025/12/05/Updating-musl-1.2.5/
+    any(target_env = "gnu", target_os = "android")
+)]
 use crate::io::uring::statx::Statx;
 use io_uring::cqueue;
 use io_uring::squeue::Entry;
@@ -25,6 +37,18 @@ pub(crate) enum CancelData {
     Write(Write),
     ReadVec(Read<Vec<u8>, OwnedFd>),
     ReadBuf(Read<Buf, ArcFd>),
+    #[cfg(
+        // libc::statx is only supported on these platforms
+        // FIXME: Add musl target env when our minimum supported
+        // rust version is 1.93. To clarify, statx support is
+        // introduced to musl in 1.25 as mentioned officially here:
+        // https://musl.libc.org/releases.html.
+        // However, rustup target_env building for *-linux-musl
+        // uses 1.25 musl on all *-linux-musl platforms starting
+        // in 1.93 stable rust version.
+        // https://blog.rust-lang.org/2025/12/05/Updating-musl-1.2.5/
+        any(target_env = "gnu", target_os = "android")
+    )]
     Statx(Statx),
 }
 

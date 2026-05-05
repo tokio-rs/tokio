@@ -1,9 +1,11 @@
+#[allow(unused)] // FIXME: remove when MSRV is 1.93 (due to statx on 1.25 musl)
 use crate::fs::OpenOptions;
 use crate::runtime::driver::op::Op;
 
 use std::io;
 use std::io::ErrorKind;
 use std::os::fd::OwnedFd;
+#[allow(unused)] // FIXME: remove when MSRV is 1.93 (due to statx on 1.25 musl)
 use std::path::Path;
 
 // this algorithm is inspired from rust std lib version 1.90.0
@@ -14,8 +16,25 @@ const PROBE_SIZE_U32: u32 = PROBE_SIZE as u32;
 // Max bytes we can read using io uring submission at a time
 // SAFETY: cannot be higher than u32::MAX for safe cast
 // Set to read max 64 MiB at time
+#[allow(unused)] // FIXME: remove when MSRV is 1.93 (due to statx on 1.25 musl)
 const MAX_READ_SIZE: usize = 64 * 1024 * 1024;
 
+#[cfg(all(
+    tokio_unstable,
+    feature = "io-uring",
+    feature = "rt",
+    feature = "fs",
+    // libc::statx is only supported on these platforms
+    // FIXME: Add musl target env when our minimum supported
+    // rust version is 1.93. To clarify, statx support is
+    // introduced to musl in 1.25 as mentioned officially here:
+    // https://musl.libc.org/releases.html.
+    // However, rustup target_env building for *-linux-musl
+    // uses 1.25 musl on all *-linux-musl platforms starting
+    // in 1.93 stable rust version.
+    // https://blog.rust-lang.org/2025/12/05/Updating-musl-1.2.5/
+    any(target_env = "gnu", target_os = "android")
+))]
 pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
     let file = OpenOptions::new().read(true).open(path).await?;
 
@@ -38,6 +57,7 @@ pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
     read_to_end_uring(fd, buf).await
 }
 
+#[allow(unused)] // FIXME: remove when MSRV is 1.93 (due to statx on 1.25 musl)
 async fn read_to_end_uring(mut fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Vec<u8>> {
     let mut offset = 0;
     let start_cap = buf.capacity();
@@ -82,6 +102,7 @@ async fn read_to_end_uring(mut fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Vec<
     }
 }
 
+#[allow(unused)] // FIXME: remove when MSRV is 1.93 (due to statx on 1.25 musl)
 async fn small_probe_read(
     fd: OwnedFd,
     mut buf: Vec<u8>,
@@ -111,6 +132,7 @@ async fn small_probe_read(
 // Takes a length to read and returns a single read in the buffer
 //
 // Returns the file descriptor, buffer and EOF reached or not
+#[allow(unused)] // FIXME: remove when MSRV is 1.93 (due to statx on 1.25 musl)
 async fn op_read(
     mut fd: OwnedFd,
     mut buf: Vec<u8>,
