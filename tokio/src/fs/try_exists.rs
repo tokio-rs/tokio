@@ -86,5 +86,8 @@ cfg_io_uring! {
 
 async fn try_exists_spawn_blocking(path: &Path) -> io::Result<bool> {
     let path = path.to_owned();
+    // FIXME: When MSRV is 1.81, change this to
+    // std::fs::exists() to be consistent with
+    // all other tokio::fs operations
     asyncify(move || path.try_exists()).await
 }
