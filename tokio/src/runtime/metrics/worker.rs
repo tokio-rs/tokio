@@ -66,7 +66,7 @@ pub(crate) struct WorkerMetrics {
     /// If `Some`, tracks the number of polls by duration range.
     pub(super) poll_count_histogram: Option<Histogram>,
 
-    #[cfg(tokio_unstable)]
+    #[cfg(feature = "schedule-latency")]
     /// If `Some`, tracks the number of times tasks were scheduled by duration range.
     pub(super) schedule_latency_histogram: Option<Histogram>,
 }
@@ -97,10 +97,14 @@ impl WorkerMetrics {
                     .metrics_poll_count_histogram
                     .as_ref()
                     .map(|histogram_builder| histogram_builder.build());
-                worker_metrics.schedule_latency_histogram = config
-                    .metrics_schedule_latency_histogram
-                    .as_ref()
-                    .map(|histogram_builder| histogram_builder.build());
+                #[cfg(feature = "schedule-latency")]
+                {
+                    worker_metrics.schedule_latency_histogram = config
+                        .metrics_schedule_latency_histogram
+                        .as_ref()
+                        .map(|histogram_builder| histogram_builder.build());
+                }
+
                 worker_metrics
             }
         }

@@ -1030,12 +1030,7 @@ impl RuntimeMetrics {
     }
 
     feature! {
-        #![all(
-            tokio_unstable,
-            target_has_atomic = "64",
-            target_pointer_width = "64",
-            feature = "schedule-latency"
-        )]
+        #![feature = "schedule-latency"]
         /// Returns `true` if the runtime is tracking the distribution of task
         /// schedule latencies.
         ///

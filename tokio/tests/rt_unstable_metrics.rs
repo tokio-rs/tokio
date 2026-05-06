@@ -800,8 +800,7 @@ fn io_driver_ready_count() {
     assert_eq!(metrics.io_driver_ready_count(), 1);
 }
 
-// Schedule latency tracking is only supported on 64-bit targets
-#[cfg(all(feature = "schedule-latency", target_pointer_width = "64"))]
+#[cfg(feature = "schedule-latency")]
 #[test]
 fn schedule_latency_counts() {
     const N: u64 = 50;

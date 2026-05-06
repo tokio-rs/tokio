@@ -497,6 +497,15 @@ compile_error!(
 linux, on `aarch64`, `x86` and `x86_64`."
 );
 
+#[cfg(all(not(tokio_unstable), feature = "schedule-latency"))]
+compile_error!("The `schedule-latency` feature requires `--cfg tokio_unstable`.");
+
+#[cfg(all(
+    feature = "schedule-latency",
+    not(all(target_pointer_width = "64", target_has_atomic = "64"))
+))]
+compile_error!("The `schedule-latency` feature is only currently supported on 64-bit targets.");
+
 // Includes re-exports used by macros.
 //
 // This module is not intended to be part of the public API. In general, any
