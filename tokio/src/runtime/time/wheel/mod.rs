@@ -50,13 +50,10 @@ pub(super) const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
 impl Wheel {
     /// Creates a new timing wheel.
     pub(crate) fn new() -> Wheel {
-        let mut levels = Vec::with_capacity(NUM_LEVELS);
-        for i in 0..NUM_LEVELS {
-            levels.push(Level::new(i));
-        }
+        let levels = (0..NUM_LEVELS).map(Level::new).collect::<Box<_>>();
         Wheel {
             elapsed: 0,
-            levels: levels.into_boxed_slice().try_into().unwrap(),
+            levels: levels.try_into().unwrap(),
             pending: EntryList::new(),
         }
     }
