@@ -1135,27 +1135,45 @@ impl Core {
             return None;
         }
 
+        // How many passes over the set of worker threads shall we make before
+        // giving up? On the final pass we shall additionally attempt to steal
+        // tasks from each worker's LIFO slot should the run queue be empty.
+        //
+        // Two passes was chosen arbitrarily. The Go runtime makes four similar
+        // workstealing passes, but it also attempts to steal both timers and GC
+        // work as well as goroutines (tasks), so that's a bit different than
+        // our behavior. See:
+        // https://github.com/golang/go/blob/release-branch.go1.26/src/runtime/proc.go#L3828-L3895
+        const PASSES: usize = 2;
+
         let num = worker.handle.shared.remotes.len();
-        // Start from a random worker
-        let start = self.rand.fastrand_n(num as u32) as usize;
+        for i in 1..=PASSES {
+            // If we are making our final pass over the other workers, we shall
+            // also attempt to steal a task from the LIFO slot if we were not
+            // able to steal from the main queue.
+            let steal_lifo = i == PASSES;
 
-        for i in 0..num {
-            let i = (start + i) % num;
+            // Start from a random worker
+            let start = self.rand.fastrand_n(num as u32) as usize;
 
-            // Don't steal from ourself! We know we don't have work.
-            if i == worker.index {
-                continue;
-            }
+            for i in 0..num {
+                let i = (start + i) % num;
 
-            let target = &worker.handle.shared.remotes[i];
-            if let Some(task) = target
-                .steal
-                .steal_into(&mut self.run_queue, &mut self.stats)
-            {
-                return Some(task);
+                // Don't steal from ourself! We know we don't have work.
+                if i == worker.index {
+                    continue;
+                }
+
+                let target = &worker.handle.shared.remotes[i];
+                if let Some(task) =
+                    target
+                        .steal
+                        .steal_into(&mut self.run_queue, &mut self.stats, steal_lifo)
+                {
+                    return Some(task);
+                }
             }
         }
-
         // Fallback on checking the global queue
         worker.handle.next_remote_task()
     }

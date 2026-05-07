@@ -437,10 +437,15 @@ impl<T> Steal<T> {
     }
 
     /// Steals half the tasks from self and place them into `dst`.
+    ///
+    /// If `steal_lifo` is set, this method will attempt to steal from the LIFO
+    /// slot if this worker's run queue is empty. Otherwise, it will only steal
+    /// from the main queue.
     pub(crate) fn steal_into(
         &self,
         dst: &mut Local<T>,
         dst_stats: &mut Stats,
+        steal_lifo: bool,
     ) -> Option<task::Notified<T>> {
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
@@ -462,14 +467,18 @@ impl<T> Steal<T> {
         let mut n = self.steal_into2(dst, dst_tail);
 
         if n == 0 {
-            // If no tasks were stolen, let's see if there's one in the LIFO
-            // slot.
-            let lifo = self.0.lifo.take();
-            if lifo.is_some() {
-                dst_stats.incr_steal_count(1);
-                dst_stats.incr_steal_operations();
+            if steal_lifo {
+                // If no tasks were stolen, let's see if there's one in the
+                // LIFO slot.
+                let lifo = self.0.lifo.take();
+                if lifo.is_some() {
+                    dst_stats.incr_steal_count(1);
+                    dst_stats.incr_steal_operations();
+                }
+                return lifo;
+            } else {
+                return None;
             }
-            return lifo;
         }
 
         dst_stats.incr_steal_count(n as u16);
