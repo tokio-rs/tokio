@@ -1,5 +1,7 @@
 # 1.47.5 (May 7th, 2026)
 
+### Fixed
+
 * sync: fix underflow in mpsc channel `len()` ([#8062])
 * sync: notify receivers in mpsc `OwnedPermit::release()` method ([#8075])
 * sync: require that an `RwLock` has `max_readers != 0` ([#8076])
