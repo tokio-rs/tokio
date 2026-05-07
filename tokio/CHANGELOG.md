@@ -1,3 +1,15 @@
+# 1.47.5 (May 7th, 2026)
+
+* sync: fix underflow in mpsc channel `len()` ([#8062])
+* sync: notify receivers in mpsc `OwnedPermit::release()` method ([#8075])
+* sync: require that an `RwLock` has `max_readers != 0` ([#8076])
+* sync: return `Empty` from `try_recv()` when mpsc is closed with outstanding permits ([#8074])
+
+[#8062]: https://github.com/tokio-rs/tokio/pull/8062
+[#8074]: https://github.com/tokio-rs/tokio/pull/8074
+[#8075]: https://github.com/tokio-rs/tokio/pull/8075
+[#8076]: https://github.com/tokio-rs/tokio/pull/8076
+
 # 1.47.4 (April 2nd, 2026)
 
 ### Fixed
