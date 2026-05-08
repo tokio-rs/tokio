@@ -1268,16 +1268,18 @@ impl<T> Drop for Receiver<T> {
 impl<T> Future for Receiver<T> {
     type Output = Result<T, RecvError>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // If `inner` is `None`, then `poll()` has already completed.
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let _res_span = self.resource_span.clone().entered();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let _ao_span = self.async_op_span.clone().entered();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let _ao_poll_span = self.async_op_poll_span.clone().entered();
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
 
-        let ret = if let Some(inner) = self.as_ref().get_ref().inner.as_ref() {
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _res_span = this.resource_span.enter();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _ao_span = this.async_op_span.enter();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _ao_poll_span = this.async_op_poll_span.enter();
+
+        // If `inner` is `None`, then `poll()` has already completed.
+        let ret = if let Some(inner) = this.inner.as_ref() {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
             let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx)));
 
@@ -1289,7 +1291,7 @@ impl<T> Future for Receiver<T> {
             panic!("called after complete");
         };
 
-        self.inner = None;
+        this.inner = None;
         Ready(ret)
     }
 }
