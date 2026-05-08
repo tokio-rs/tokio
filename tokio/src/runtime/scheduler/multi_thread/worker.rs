@@ -1139,12 +1139,13 @@ impl Core {
         // giving up? On the final pass we shall additionally attempt to steal
         // tasks from each worker's LIFO slot should the run queue be empty.
         //
-        // Two passes was chosen arbitrarily. The Go runtime makes four similar
-        // workstealing passes, but it also attempts to steal both timers and GC
-        // work as well as goroutines (tasks), so that's a bit different than
-        // our behavior. See:
+        // The Go runtime makes four similar work-stealing passes, and only attempts to steal from `runnext` (its name for a LIFO slot) on the final pass. See:
         // https://github.com/golang/go/blob/release-branch.go1.26/src/runtime/proc.go#L3828-L3895
-        const PASSES: usize = 2;
+        //
+        // Empirically, 4 seems to result in better performance on the
+        // `rt_multi_thread` benchmarks than 2 passes, so we'll do the same
+        // thing Go does, I guess.
+        const PASSES: usize = 4;
 
         let num = worker.handle.shared.remotes.len();
         for i in 1..=PASSES {
