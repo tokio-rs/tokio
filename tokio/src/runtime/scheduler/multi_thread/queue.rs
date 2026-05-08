@@ -27,6 +27,9 @@ cfg_not_has_atomic_u64! {
 
 /// Producer handle. May only be used from a single thread.
 pub(crate) struct Local<T: 'static> {
+    // If this is `false`, we DEFINITELY don't have a task in the LIFO slot,
+    // allowing us to avoid an atomic swap to try and pop from it.
+    might_have_lifo: bool,
     inner: Arc<Inner<T>>,
 }
 
@@ -100,6 +103,7 @@ pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
     });
 
     let local = Local {
+        might_have_lifo: false,
         inner: inner.clone(),
     };
 
@@ -112,7 +116,7 @@ impl<T> Local<T> {
     /// Returns the number of entries in the queue
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.inner.head.load(Acquire));
-        let lifo = self.inner.lifo.is_some() as usize;
+        let lifo = (self.might_have_lifo && self.inner.lifo.is_some()) as usize;
         // safety: this is the **only** thread that updates this cell.
         let tail = unsafe { self.inner.tail.unsync_load() };
         len(head, tail) + lifo
@@ -409,13 +413,20 @@ impl<T> Local<T> {
 
     /// Pushes a task to the LIFO slot, returning the task previously in the
     /// LIFO slot (if there was one).
-    pub(crate) fn push_lifo(&self, task: task::Notified<T>) -> Option<task::Notified<T>> {
+    pub(crate) fn push_lifo(&mut self, task: task::Notified<T>) -> Option<task::Notified<T>> {
+        self.might_have_lifo = true;
         self.inner.lifo.swap(Some(task))
     }
 
     /// Pops the task currently held in the LIFO slot, if there is one;
     /// otherwise, returns `None`.
-    pub(crate) fn pop_lifo(&self) -> Option<task::Notified<T>> {
+    pub(crate) fn pop_lifo(&mut self) -> Option<task::Notified<T>> {
+        if !self.might_have_lifo {
+            return None;
+        }
+
+        self.might_have_lifo = false;
+
         // LIFO-suction!
         self.inner.lifo.take()
     }
