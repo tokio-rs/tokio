@@ -1,4 +1,4 @@
-use crate::time::{sleep_until, Duration, Instant, Sleep};
+use crate::time::{safe_delay, sleep_until, Duration, Instant, Sleep};
 use crate::util::trace;
 
 use std::future::{poll_fn, Future};
@@ -139,7 +139,7 @@ fn internal_interval_at(
 
     Interval {
         delay,
-        period,
+        period: safe_delay(period),
         missed_tick_behavior: MissedTickBehavior::default(),
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         resource_span,
@@ -479,9 +479,7 @@ impl Interval {
             self.missed_tick_behavior
                 .next_timeout(timeout, now, self.period)
         } else {
-            timeout
-                .checked_add(self.period)
-                .unwrap_or_else(Instant::far_future)
+            timeout + self.period
         };
 
         // When we arrive here, the internal delay returned `Poll::Ready`.
