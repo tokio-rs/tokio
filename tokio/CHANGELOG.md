@@ -1,3 +1,12 @@
+# 1.51.3 (May 8th, 2026)
+
+### Fixed
+
+* sync: fix underflow in mpsc channel `len()` ([#8062])
+* sync: notify receivers in mpsc `OwnedPermit::release()` method ([#8075])
+* sync: require that an `RwLock` has `max_readers != 0` ([#8076])
+* sync: return `Empty` from `try_recv()` when mpsc is closed with outstanding permits ([#8074])
+
 # 1.51.2 (May 4th, 2026)
 
 This release reverts the LIFO slot stealing change introduced in 1.51.0
