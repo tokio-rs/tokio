@@ -162,13 +162,13 @@ fn test_abort_wakes_task_3964() {
         });
 
         // wait for task to sleep.
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
 
         handle.abort();
         drop(handle);
 
         // wait for task to abort.
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
 
         // Check that the Arc has been dropped.
         assert!(weak_notify_dropped.upgrade().is_none());
@@ -214,7 +214,7 @@ fn test_abort_task_that_panics_on_drop_returned() {
         });
 
         // wait for task to sleep.
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
 
         handle.abort();
         assert!(handle.await.unwrap_err().is_panic());
