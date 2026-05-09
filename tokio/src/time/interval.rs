@@ -460,9 +460,8 @@ impl Interval {
     /// [`Context`] passed to the most recent call is scheduled to receive a
     /// wakeup.
     pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
-        // Wait for the timer to fire.
+        // Wait for the timer to fire
         ready!(Pin::new(&mut self.delay).poll(cx));
-        self.delay.as_mut().remove_timer();
 
         // Get the time when we were scheduled to tick
         let timeout = self.delay.deadline();
