@@ -621,6 +621,9 @@ impl Context {
         ControlFlow::Break(())
     }
 
+    /// Running a task may consume the core. If the core is still available when
+    /// running the task completes, it is returned. Otherwise, the worker will need
+    /// to stop processing.
     fn run_task(&self, task: Notified, mut core: Box<Core>) -> ControlFlow<(), Box<Core>> {
         #[cfg(tokio_unstable)]
         let task_meta = task.task_meta();
