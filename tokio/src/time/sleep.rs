@@ -308,6 +308,10 @@ impl Sleep {
         *self.project().deadline = deadline;
     }
 
+    pub(super) fn remove_timer(self: Pin<&mut Self>) {
+        self.project().timer.set(None);
+    }
+
     /// Returns `true` if `Sleep` has elapsed.
     ///
     /// A `Sleep` instance is elapsed when the requested duration has elapsed.
@@ -461,11 +465,9 @@ impl Future for Sleep {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let _ao_poll_span = self.inner.ctx.async_op_poll_span.clone().entered();
 
-        if let Err(e) = ready!(self.as_mut().poll_elapsed(cx)) {
-            panic!("timer error: {e}");
+        match ready!(self.as_mut().poll_elapsed(cx)) {
+            Ok(()) => Poll::Ready(()),
+            Err(e) => panic!("timer error: {e}"),
         }
-
-        self.project().timer.set(None);
-        Poll::Ready(())
     }
 }
