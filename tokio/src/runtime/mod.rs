@@ -416,7 +416,7 @@ cfg_process_driver! {
     mod process;
 }
 
-#[cfg_attr(not(feature = "time"), allow(dead_code))]
+#[allow(dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) enum TimerFlavor {
     Traditional,
