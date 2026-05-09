@@ -13,11 +13,7 @@ use io_uring::IoUring;
 // able to run some checks (e.g., asserting a poll returns pending). So this utiliy function
 // is useful when we want to run a test only in Linux targets where io_uring is supported.
 pub fn io_uring_supported() -> bool {
-    let mut probe = io_uring::Probe::new();
-
-    let uring = IoUring::new(256).unwrap();
-
-    match uring.submitter().register_probe(&mut probe) {
+    match IoUring::new(256) {
         Ok(_) => true,
         // The Kernel does not support io-uring
         Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => false,
