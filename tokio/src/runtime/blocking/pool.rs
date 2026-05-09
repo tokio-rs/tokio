@@ -74,11 +74,8 @@ impl SpawnerMetrics {
 }
 
 struct Inner {
-    /// State shared between worker threads.
-    shared: Mutex<Shared>,
-
-    /// Pool threads wait on this.
-    condvar: Condvar,
+    /// Queue + notification implementation.
+    impl_: InnerImpl,
 
     /// Spawned threads use this name.
     thread_name: ThreadNameFn,
@@ -102,9 +99,35 @@ struct Inner {
     metrics: SpawnerMetrics,
 }
 
-struct Shared {
+/// Per-variant queue + notification + lock topology.
+enum InnerImpl {
+    Locked(LockedImpl),
+}
+
+/// Single-mutex + condvar implementation.
+struct LockedImpl {
+    inner: Mutex<LockedInner>,
+    condvar: Condvar,
+}
+
+struct LockedInner {
     queue: VecDeque<Task>,
     num_notify: u32,
+    /// Thread-management state. Split apart so that it's re-usable in a
+    /// sharded queue implementation.
+    shared: Shared,
+}
+
+/// State handed back from `InnerImpl::begin_shutdown` to the caller so it
+/// can join the worker threads after the wait completes: an optional
+/// previously-timed-out worker, plus the map of currently-running workers.
+type ShutdownHandles = (
+    Option<thread::JoinHandle<()>>,
+    HashMap<usize, thread::JoinHandle<()>>,
+);
+
+/// Thread-management state shared across `InnerImpl` variants.
+struct Shared {
     shutdown: bool,
     shutdown_tx: Option<shutdown::Sender>,
     /// Prior to shutdown, we clean up `JoinHandles` by having each timed-out
@@ -214,16 +237,20 @@ impl BlockingPool {
         BlockingPool {
             spawner: Spawner {
                 inner: Arc::new(Inner {
-                    shared: Mutex::new(Shared {
-                        queue: VecDeque::new(),
-                        num_notify: 0,
-                        shutdown: false,
-                        shutdown_tx: Some(shutdown_tx),
-                        last_exiting_thread: None,
-                        worker_threads: HashMap::new(),
-                        worker_thread_index: 0,
+                    impl_: InnerImpl::Locked(LockedImpl {
+                        inner: Mutex::new(LockedInner {
+                            queue: VecDeque::new(),
+                            num_notify: 0,
+                            shared: Shared {
+                                shutdown: false,
+                                shutdown_tx: Some(shutdown_tx),
+                                last_exiting_thread: None,
+                                worker_threads: HashMap::new(),
+                                worker_thread_index: 0,
+                            },
+                        }),
+                        condvar: Condvar::new(),
                     }),
-                    condvar: Condvar::new(),
                     thread_name: builder.thread_name.clone(),
                     stack_size: builder.thread_stack_size,
                     after_start: builder.after_start.clone(),
@@ -242,23 +269,13 @@ impl BlockingPool {
     }
 
     pub(crate) fn shutdown(&mut self, timeout: Option<Duration>) {
-        let mut shared = self.spawner.inner.shared.lock();
-
         // The function can be called multiple times. First, by explicitly
         // calling `shutdown` then by the drop handler calling `shutdown`. This
         // prevents shutting down twice.
-        if shared.shutdown {
-            return;
-        }
-
-        shared.shutdown = true;
-        shared.shutdown_tx = None;
-        self.spawner.inner.condvar.notify_all();
-
-        let last_exited_thread = std::mem::take(&mut shared.last_exiting_thread);
-        let workers = std::mem::take(&mut shared.worker_threads);
-
-        drop(shared);
+        let (last_exited_thread, workers) = match self.spawner.inner.impl_.begin_shutdown() {
+            Some(x) => x,
+            None => return,
+        };
 
         if self.shutdown_rx.wait(timeout) {
             let _ = last_exited_thread.map(thread::JoinHandle::join);
@@ -391,27 +408,19 @@ impl Spawner {
     }
 
     fn spawn_task(&self, task: Task, rt: &Handle) -> Result<(), SpawnError> {
-        let mut shared = self.inner.shared.lock();
+        // The `on_no_idle` closure runs under the same lock as the queue
+        // push, exactly like the pre-refactor code that called
+        // `self.spawn_thread` directly while holding `Mutex<Shared>`.
+        self.inner
+            .impl_
+            .spawn_task(task, &self.inner.metrics, |shared| {
+                // No threads are able to process the task.
 
-        if shared.shutdown {
-            // Shutdown the task: it's fine to shutdown this task (even if
-            // mandatory) because it was scheduled after the shutdown of the
-            // runtime began.
-            task.task.shutdown();
+                if self.inner.metrics.num_threads() == self.inner.thread_cap {
+                    // At max number of threads
+                    return Ok(());
+                }
 
-            // no need to even push this task; it would never get picked up
-            return Err(SpawnError::ShuttingDown);
-        }
-
-        shared.queue.push_back(task);
-        self.inner.metrics.inc_queue_depth();
-
-        if self.inner.metrics.num_idle_threads() == 0 {
-            // No threads are able to process the task.
-
-            if self.inner.metrics.num_threads() == self.inner.thread_cap {
-                // At max number of threads
-            } else {
                 assert!(shared.shutdown_tx.is_some());
                 let shutdown_tx = shared.shutdown_tx.clone();
 
@@ -439,19 +448,9 @@ impl Spawner {
                         }
                     }
                 }
-            }
-        } else {
-            // Notify an idle worker thread. The notification counter
-            // is used to count the needed amount of notifications
-            // exactly. Thread libraries may generate spurious
-            // wakeups, this counter is used to keep us in a
-            // consistent state.
-            self.inner.metrics.dec_num_idle_threads();
-            shared.num_notify += 1;
-            self.inner.condvar.notify_one();
-        }
 
-        Ok(())
+                Ok(())
+            })
     }
 
     fn spawn_thread(
@@ -493,6 +492,187 @@ cfg_unstable_metrics! {
     }
 }
 
+// This is the original, single-lock implementation of the `spawn_blocking`
+// queue. Method scope was principally designed around ensuring that when the
+// code was refactored to enable adding a sharded queue implementation, this
+// was self-evidently behaviorally identical to the original implementation.
+impl InnerImpl {
+    /// Push a task and either notify an idle worker or invoke
+    /// `on_no_idle` (which is responsible for spawning a new worker if
+    /// possible).
+    fn spawn_task<F>(
+        &self,
+        task: Task,
+        metrics: &SpawnerMetrics,
+        on_no_idle: F,
+    ) -> Result<(), SpawnError>
+    where
+        F: FnOnce(&mut Shared) -> Result<(), SpawnError>,
+    {
+        match self {
+            InnerImpl::Locked(l) => {
+                let mut shared = l.inner.lock();
+
+                if shared.shared.shutdown {
+                    // Shutdown the task: it's fine to shutdown this task
+                    // (even if mandatory) because it was scheduled after the
+                    // shutdown of the runtime began.
+                    task.task.shutdown();
+                    return Err(SpawnError::ShuttingDown);
+                }
+
+                shared.queue.push_back(task);
+                metrics.inc_queue_depth();
+
+                if metrics.num_idle_threads() == 0 {
+                    on_no_idle(&mut shared.shared)?;
+                } else {
+                    // Notify an idle worker thread. The notification counter
+                    // is used to count the needed amount of notifications
+                    // exactly. Thread libraries may generate spurious
+                    // wakeups, this counter is used to keep us in a
+                    // consistent state.
+                    metrics.dec_num_idle_threads();
+                    shared.num_notify += 1;
+                    l.condvar.notify_one();
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    /// Run a worker thread's main loop.
+    fn run_worker(
+        &self,
+        metrics: &SpawnerMetrics,
+        keep_alive: Duration,
+        worker_thread_id: usize,
+    ) -> Option<thread::JoinHandle<()>> {
+        match self {
+            InnerImpl::Locked(l) => {
+                let mut shared = l.inner.lock();
+                let mut join_on_thread = None;
+                // is this thread currently counted in `num_idle_threads`?
+                let mut is_counted_idle;
+
+                'main: loop {
+                    // BUSY
+                    while let Some(task) = shared.queue.pop_front() {
+                        metrics.dec_queue_depth();
+                        drop(shared);
+                        task.run();
+
+                        shared = l.inner.lock();
+                    }
+
+                    // IDLE
+                    metrics.inc_num_idle_threads();
+                    // mark this thread as currently counted in `num_idle_threads`.
+                    is_counted_idle = true;
+
+                    while !shared.shared.shutdown {
+                        let lock_result = l.condvar.wait_timeout(shared, keep_alive).unwrap();
+
+                        shared = lock_result.0;
+                        let timeout_result = lock_result.1;
+
+                        if shared.num_notify != 0 {
+                            // We have received a legitimate wakeup,
+                            // acknowledge it by decrementing the counter
+                            // and transition to the BUSY state.
+                            shared.num_notify -= 1;
+                            // since this is a legitimate wakeup,
+                            // the `Spawner::spawn_task` has already
+                            // decremented `num_idle_threads`.
+                            is_counted_idle = false;
+                            break;
+                        }
+
+                        // Even if the condvar "timed out", if the pool is
+                        // entering the shutdown phase, we want to perform
+                        // the cleanup logic.
+                        if !shared.shared.shutdown && timeout_result.timed_out() {
+                            // We'll join the prior timed-out thread's
+                            // JoinHandle after dropping the lock. This
+                            // isn't done when shutting down, because the
+                            // thread calling shutdown will handle joining
+                            // everything.
+                            let my_handle = shared.shared.worker_threads.remove(&worker_thread_id);
+                            join_on_thread = std::mem::replace(
+                                &mut shared.shared.last_exiting_thread,
+                                my_handle,
+                            );
+
+                            break 'main;
+                        }
+
+                        // Spurious wakeup detected, go back to sleep.
+                    }
+
+                    if shared.shared.shutdown {
+                        // Drain the queue
+                        while let Some(task) = shared.queue.pop_front() {
+                            metrics.dec_queue_depth();
+                            drop(shared);
+
+                            task.shutdown_or_run_if_mandatory();
+
+                            shared = l.inner.lock();
+                        }
+
+                        break;
+                    }
+                }
+
+                // Thread exit
+                metrics.dec_num_threads();
+
+                // Is this thread currently counted in `num_idle_threads`?
+                if is_counted_idle {
+                    // `num_idle_threads` should now be tracked exactly,
+                    // panic with a descriptive message if it is not the
+                    // case.
+                    let prev_idle = metrics.dec_num_idle_threads();
+                    assert_ne!(
+                        prev_idle, 0,
+                        "`num_idle_threads` underflowed on thread exit"
+                    );
+                }
+
+                if shared.shared.shutdown && metrics.num_threads() == 0 {
+                    l.condvar.notify_one();
+                }
+
+                drop(shared);
+
+                join_on_thread
+            }
+        }
+    }
+
+    /// Begin pool shutdown: set the shutdown flag, drop the shutdown
+    /// sender, wake all waiting workers, and hand back the worker
+    /// `JoinHandle`s for the caller to join.
+    fn begin_shutdown(&self) -> Option<ShutdownHandles> {
+        match self {
+            InnerImpl::Locked(l) => {
+                let mut shared = l.inner.lock();
+                if shared.shared.shutdown {
+                    return None;
+                }
+                shared.shared.shutdown = true;
+                shared.shared.shutdown_tx = None;
+                l.condvar.notify_all();
+
+                let last_exited_thread = std::mem::take(&mut shared.shared.last_exiting_thread);
+                let workers = std::mem::take(&mut shared.shared.worker_threads);
+                Some((last_exited_thread, workers))
+            }
+        }
+    }
+}
+
 // Tells whether the error when spawning a thread is temporary.
 #[inline]
 fn is_temporary_os_thread_error(error: &io::Error) -> bool {
@@ -505,93 +685,9 @@ impl Inner {
             f();
         }
 
-        let mut shared = self.shared.lock();
-        let mut join_on_thread = None;
-        // is this thread currently counted in `num_idle_threads`?
-        let mut is_counted_idle;
-
-        'main: loop {
-            // BUSY
-            while let Some(task) = shared.queue.pop_front() {
-                self.metrics.dec_queue_depth();
-                drop(shared);
-                task.run();
-
-                shared = self.shared.lock();
-            }
-
-            // IDLE
-            self.metrics.inc_num_idle_threads();
-            // mark this thread as currently counted in `num_idle_threads`.
-            is_counted_idle = true;
-
-            while !shared.shutdown {
-                let lock_result = self.condvar.wait_timeout(shared, self.keep_alive).unwrap();
-
-                shared = lock_result.0;
-                let timeout_result = lock_result.1;
-
-                if shared.num_notify != 0 {
-                    // We have received a legitimate wakeup,
-                    // acknowledge it by decrementing the counter
-                    // and transition to the BUSY state.
-                    shared.num_notify -= 1;
-                    // since this is a legitimate wakeup,
-                    // the `Spawner::spawn_task` has already decremented `num_idle_threads`.
-                    is_counted_idle = false;
-                    break;
-                }
-
-                // Even if the condvar "timed out", if the pool is entering the
-                // shutdown phase, we want to perform the cleanup logic.
-                if !shared.shutdown && timeout_result.timed_out() {
-                    // We'll join the prior timed-out thread's JoinHandle after dropping the lock.
-                    // This isn't done when shutting down, because the thread calling shutdown will
-                    // handle joining everything.
-                    let my_handle = shared.worker_threads.remove(&worker_thread_id);
-                    join_on_thread = std::mem::replace(&mut shared.last_exiting_thread, my_handle);
-
-                    break 'main;
-                }
-
-                // Spurious wakeup detected, go back to sleep.
-            }
-
-            if shared.shutdown {
-                // Drain the queue
-                while let Some(task) = shared.queue.pop_front() {
-                    self.metrics.dec_queue_depth();
-                    drop(shared);
-
-                    task.shutdown_or_run_if_mandatory();
-
-                    shared = self.shared.lock();
-                }
-
-                break;
-            }
-        }
-
-        // Thread exit
-        self.metrics.dec_num_threads();
-
-        // Is this thread currently counted in `num_idle_threads`?
-        if is_counted_idle {
-            // `num_idle_threads` should now be tracked exactly, panic
-            // with a descriptive message if it is not the
-            // case.
-            let prev_idle = self.metrics.dec_num_idle_threads();
-            assert_ne!(
-                prev_idle, 0,
-                "`num_idle_threads` underflowed on thread exit"
-            );
-        }
-
-        if shared.shutdown && self.metrics.num_threads() == 0 {
-            self.condvar.notify_one();
-        }
-
-        drop(shared);
+        let join_on_thread =
+            self.impl_
+                .run_worker(&self.metrics, self.keep_alive, worker_thread_id);
 
         if let Some(f) = &self.before_stop {
             f();
