@@ -268,13 +268,13 @@ impl Sleep {
             );
 
             let async_op_span = tracing::trace_span!(
-                parent: resource_span,
+                parent: &resource_span,
                 "runtime.resource.async_op",
                 source = "Sleep::new_timeout",
             );
 
             let async_op_poll_span =
-                tracing::trace_span!(parent: async_op_span, "runtime.resource.async_op.poll");
+                tracing::trace_span!(parent: &async_op_span, "runtime.resource.async_op.poll");
 
             let ctx = trace::AsyncOpTracingCtx {
                 async_op_span,
