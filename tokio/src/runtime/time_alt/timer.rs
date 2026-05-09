@@ -9,9 +9,6 @@ use crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR;
 
 pub(crate) struct Timer {
     /// The entry in the timing wheel.
-    ///
-    /// - `Some` if the timer is registered / pending / woken up / cancelling.
-    /// - `None` if the timer is unregistered.
     entry: EntryHandle,
 }
 

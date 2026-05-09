@@ -353,16 +353,8 @@ impl Sleep {
         *this.deadline = deadline;
 
         let handle = scheduler::Handle::current();
-        let clock = handle.driver().clock();
         let time_source = handle.driver().time().time_source();
         let deadline = time_source.deadline_to_tick(deadline);
-        let now = time_source.now(clock);
-        let is_elapsed = deadline <= now;
-
-        if is_elapsed {
-            this.timer.set(None);
-            return;
-        }
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
@@ -374,6 +366,8 @@ impl Sleep {
             this.inner.ctx.async_op_poll_span =
                 tracing::trace_span!("runtime.resource.async_op.poll");
 
+            let clock = handle.driver().clock();
+            let now = time_source.now(clock);
             tracing::trace!(
                 target: "runtime::resource::state_update",
                 duration = deadline - now,
