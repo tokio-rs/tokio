@@ -366,7 +366,7 @@ impl Sleep {
             let now = time_source.now(clock);
             tracing::trace!(
                 target: "runtime::resource::state_update",
-                duration = deadline - now,
+                duration = deadline.saturating_sub(now),
                 duration.unit = "ms",
                 duration.op = "override",
             );
