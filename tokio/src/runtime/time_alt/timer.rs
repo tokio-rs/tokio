@@ -1,6 +1,5 @@
 use super::{EntryHandle, TempLocalContext};
 use crate::runtime::scheduler;
-use crate::time::Instant;
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -30,16 +29,10 @@ impl Drop for Timer {
 
 impl Timer {
     #[track_caller]
-    pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
-        let tick = handle
-            .driver()
-            .time()
-            .time_source()
-            .deadline_to_tick(deadline);
-
+    pub(crate) fn new(handle: scheduler::Handle, deadline: u64) -> Self {
         let entry = with_current_temp_local_context(|ctx| match ctx {
             Some(TempLocalContext::Running { registration_queue }) => {
-                let entry = EntryHandle::new(tick);
+                let entry = EntryHandle::new(deadline);
                 unsafe { registration_queue.push_front(entry.clone()) }
                 entry
             }
@@ -47,7 +40,7 @@ impl Timer {
             Some(TempLocalContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
 
             _ => {
-                let entry = EntryHandle::new(tick);
+                let entry = EntryHandle::new(deadline);
                 push_from_remote(&handle, entry.clone());
                 entry
             }

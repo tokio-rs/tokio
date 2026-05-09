@@ -60,7 +60,6 @@ use crate::loom::sync::atomic::Ordering;
 
 use crate::runtime::scheduler;
 use crate::sync::AtomicWaker;
-use crate::time::Instant;
 use crate::util::linked_list;
 
 use pin_project_lite::pin_project;
@@ -473,22 +472,17 @@ unsafe impl linked_list::Link for TimerShared {
 // ===== impl Entry =====
 
 impl TimerEntry {
-    #[track_caller]
     pub(crate) fn new(handle: scheduler::Handle) -> Self {
-        // Panic if the time driver is not enabled
-        let _ = handle.driver().time();
-
         Self {
             driver: handle,
             inner: TimerShared::new(),
         }
     }
 
-    pub(crate) fn init(self: Pin<&mut Self>, deadline: Instant) {
-        let tick = self.driver().time_source().deadline_to_tick(deadline);
+    pub(crate) fn init(self: Pin<&mut Self>, deadline: u64) {
         unsafe {
             self.driver()
-                .reregister(&self.driver.driver().io, tick, (&self.inner).into());
+                .reregister(&self.driver.driver().io, deadline, (&self.inner).into());
         }
     }
 
@@ -524,15 +518,14 @@ impl TimerEntry {
         unsafe { self.driver().clear_entry(NonNull::from(&self.inner)) };
     }
 
-    pub(crate) fn reset(self: Pin<&mut Self>, deadline: Instant) {
-        let tick = self.driver().time_source().deadline_to_tick(deadline);
-        if self.inner.extend_expiration(tick).is_ok() {
+    pub(crate) fn reset(self: Pin<&mut Self>, deadline: u64) {
+        if self.inner.extend_expiration(deadline).is_ok() {
             return;
         }
 
         unsafe {
             self.driver()
-                .reregister(&self.driver.driver().io, tick, (&self.inner).into());
+                .reregister(&self.driver.driver().io, deadline, (&self.inner).into());
         }
     }
 

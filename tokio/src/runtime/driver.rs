@@ -126,6 +126,11 @@ impl Handle {
         pub(crate) fn clock(&self) -> &Clock {
             &self.clock
         }
+
+        #[cfg(test)]
+        pub(crate) fn now(&self) -> u64 {
+            self.time().time_source().now(&self.clock)
+        }
     }
 }
 

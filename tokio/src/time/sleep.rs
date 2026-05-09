@@ -1,4 +1,4 @@
-use crate::runtime::Timer;
+use crate::runtime::{scheduler, Timer};
 use crate::time::{error::Error, Duration, Instant};
 use crate::util::trace;
 
@@ -228,7 +228,7 @@ pin_project! {
 
         // The link between the `Sleep` instance and the timer that drives it.
         #[pin]
-        entry: Option<Timer>,
+        timer: Option<Timer>,
     }
 }
 
@@ -252,18 +252,10 @@ impl Sleep {
         deadline: Instant,
         location: Option<&'static Location<'static>>,
     ) -> Sleep {
-        use crate::runtime::scheduler;
-        let handle = scheduler::Handle::current();
-        // Panic if the time driver is not enabled
-        _ = handle.driver().time();
+        // Panic if the time driver is not enabled (backwards compat)
+        _ = scheduler::Handle::current().driver().time();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
-            let clock = handle.driver().clock();
-            let handle = &handle.driver().time();
-            let time_source = handle.time_source();
-            let deadline_tick = time_source.deadline_to_tick(deadline);
-            let duration = deadline_tick.saturating_sub(time_source.now(clock));
-
             let location = location.expect("should have location if tracing");
             let resource_span = tracing::trace_span!(
                 parent: None,
@@ -275,19 +267,14 @@ impl Sleep {
                 loc.col = location.column(),
             );
 
-            let async_op_span = resource_span.in_scope(|| {
-                tracing::trace!(
-                    target: "runtime::resource::state_update",
-                    duration = duration,
-                    duration.unit = "ms",
-                    duration.op = "override",
-                );
-
-                tracing::trace_span!("runtime.resource.async_op", source = "Sleep::new_timeout")
-            });
+            let async_op_span = tracing::trace_span!(
+                parent: resource_span,
+                "runtime.resource.async_op",
+                source = "Sleep::new_timeout",
+            );
 
             let async_op_poll_span =
-                async_op_span.in_scope(|| tracing::trace_span!("runtime.resource.async_op.poll"));
+                tracing::trace_span!(parent: async_op_span, "runtime.resource.async_op.poll");
 
             let ctx = trace::AsyncOpTracingCtx {
                 async_op_span,
@@ -304,7 +291,7 @@ impl Sleep {
         Sleep {
             deadline,
             inner,
-            entry: None,
+            timer: None,
         }
     }
 
@@ -317,11 +304,19 @@ impl Sleep {
         self.deadline
     }
 
+    pub(super) fn set_deadline(self: Pin<&mut Self>, deadline: Instant) {
+        *self.project().deadline = deadline;
+    }
+
+    pub(super) fn remove_timer(self: Pin<&mut Self>) {
+        self.project().timer.set(None);
+    }
+
     /// Returns `true` if `Sleep` has elapsed.
     ///
     /// A `Sleep` instance is elapsed when the requested duration has elapsed.
     pub fn is_elapsed(&self) -> bool {
-        self.entry.as_ref().is_some_and(Timer::is_elapsed)
+        self.timer.as_ref().is_some_and(Timer::is_elapsed)
     }
 
     /// Resets the `Sleep` instance to a new deadline.
@@ -353,27 +348,24 @@ impl Sleep {
     /// See also the top-level examples.
     ///
     /// [`Pin::as_mut`]: fn@std::pin::Pin::as_mut
-    pub fn reset(mut self: Pin<&mut Self>, deadline: Instant) {
-        let mut this = self.as_mut().project();
+    pub fn reset(self: Pin<&mut Self>, deadline: Instant) {
+        let mut this = self.project();
         *this.deadline = deadline;
 
-        match this.entry.as_mut().as_pin_mut() {
-            Some(mut entry) => match entry.as_ref().flavor() {
-                crate::runtime::TimerFlavor::Traditional => entry.as_mut().reset(deadline),
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                crate::runtime::TimerFlavor::Alternative => entry.set(Timer::new(deadline)),
-            },
-            None => {
-                self.as_mut().register_timer();
-            }
+        let handle = scheduler::Handle::current();
+        let clock = handle.driver().clock();
+        let time_source = handle.driver().time().time_source();
+        let deadline = time_source.deadline_to_tick(deadline);
+        let now = time_source.now(clock);
+        let is_elapsed = deadline <= now;
+
+        if is_elapsed {
+            this.timer.set(None);
+            return;
         }
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
-            use crate::runtime::scheduler;
-
-            let this = self.project();
-
             let _resource_enter = this.inner.ctx.resource_span.enter();
             this.inner.ctx.async_op_span =
                 tracing::trace_span!("runtime.resource.async_op", source = "Sleep::reset");
@@ -382,43 +374,25 @@ impl Sleep {
             this.inner.ctx.async_op_poll_span =
                 tracing::trace_span!("runtime.resource.async_op.poll");
 
-            let duration = {
-                let handle = scheduler::Handle::current();
-                let clock = handle.driver().clock();
-                let time_source = handle.driver().time().time_source();
-                time_source
-                    .deadline_to_tick(deadline)
-                    .saturating_sub(time_source.now(clock))
-            };
-
             tracing::trace!(
                 target: "runtime::resource::state_update",
-                duration = duration,
+                duration = deadline - now,
                 duration.unit = "ms",
                 duration.op = "override",
             );
         }
+
+        match this.timer.as_mut().as_pin_mut() {
+            Some(timer) => timer.reset(handle, deadline),
+            None => {
+                let timer = Timer::new(handle, deadline);
+                this.timer.set(Some(timer));
+                this.timer.as_pin_mut().unwrap().init(deadline);
+            }
+        }
     }
 
-    fn register_timer(self: Pin<&mut Self>) -> Pin<&mut Timer> {
-        let entry = Timer::new(self.deadline);
-        let mut this = self.project();
-        this.entry.set(Some(entry));
-        let mut entry = this.entry.as_pin_mut().unwrap();
-        entry.as_mut().init(*this.deadline);
-        entry
-    }
-
-    pub(crate) fn reset_without_timer(self: Pin<&mut Self>, deadline: Instant) {
-        let mut this = self.project();
-        *this.deadline = deadline;
-        this.entry.set(None);
-    }
-
-    fn poll_elapsed(
-        mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
-    ) -> Poll<Result<(), Error>> {
+    fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
         ready!(crate::trace::trace_leaf(cx));
 
         // Keep track of task budget
@@ -430,13 +404,41 @@ impl Sleep {
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         let coop = ready!(crate::task::coop::poll_proceed(cx));
+        let mut this = self.project();
 
-        let entry = match self.as_mut().project().entry.as_pin_mut() {
-            Some(entry) => entry,
-            None => self.register_timer(),
+        let timer = match this.timer.as_mut().as_pin_mut() {
+            Some(timer) => timer,
+            None => {
+                let handle = scheduler::Handle::current();
+                let clock = handle.driver().clock();
+                let time_source = handle.driver().time().time_source();
+                let deadline = time_source.deadline_to_tick(*this.deadline);
+                let now = time_source.now(clock);
+                let is_elapsed = deadline <= now;
+
+                if is_elapsed {
+                    return Poll::Ready(Ok(()));
+                }
+
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                {
+                    tracing::trace!(
+                        target: "runtime::resource::state_update",
+                        duration = deadline - now,
+                        duration.unit = "ms",
+                        duration.op = "override",
+                    );
+                }
+
+                let timer = Timer::new(handle, deadline);
+                this.timer.set(Some(timer));
+                let mut timer = this.timer.as_pin_mut().unwrap();
+                timer.as_mut().init(deadline);
+                timer
+            }
         };
 
-        let result = entry.poll_elapsed(cx).map(move |r| {
+        let result = timer.poll_elapsed(cx).map(move |r| {
             coop.made_progress();
             r
         });
