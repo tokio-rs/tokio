@@ -1,4 +1,4 @@
-use crate::sync::mpsc;
+use crate::sync::mpsc::{self, BLOCK_CAP};
 
 use loom::future::block_on;
 use loom::sync::Arc;
@@ -221,4 +221,57 @@ fn nonempty_after_send() {
 
         join.join().unwrap();
     });
+}
+
+#[test]
+fn is_empty_during_close() {
+    loom::model(|| {
+        let (tx, rx) = mpsc::channel::<()>(1);
+
+        let th1 = thread::spawn(move || {
+            assert!(rx.is_empty());
+        });
+
+        drop(tx);
+
+        th1.join().unwrap();
+    });
+}
+
+fn len_during_close_helper(n: usize) {
+    loom::model(move || {
+        let (tx, rx) = mpsc::channel::<()>(n + 1);
+
+        for _ in 0..n {
+            tx.try_send(()).unwrap();
+        }
+
+        let th1 = thread::spawn(move || {
+            assert_eq!(rx.len(), n);
+        });
+
+        drop(tx);
+
+        th1.join().unwrap();
+    });
+}
+
+#[test]
+fn len_during_close_0() {
+    len_during_close_helper(0);
+}
+
+#[test]
+fn len_during_close_1() {
+    len_during_close_helper(1);
+}
+
+#[test]
+fn len_during_close_block_cap() {
+    len_during_close_helper(BLOCK_CAP);
+}
+
+#[test]
+fn len_during_close_block_cap_plus_1() {
+    len_during_close_helper(BLOCK_CAP + 1);
 }

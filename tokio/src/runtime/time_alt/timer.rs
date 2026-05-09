@@ -95,11 +95,7 @@ impl Timer {
 
     pub(crate) fn poll_elapsed(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         match self.entry.as_ref() {
-            Some(entry) if entry.is_woken_up() => Poll::Ready(()),
-            Some(entry) => {
-                entry.register_waker(cx.waker());
-                Poll::Pending
-            }
+            Some(entry) => entry.poll(cx),
             None => self.register(cx),
         }
     }
