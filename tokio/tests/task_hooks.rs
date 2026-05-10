@@ -77,6 +77,128 @@ fn terminate_task_hook_fires() {
     assert_eq!(TASKS, count.load(Ordering::SeqCst));
 }
 
+#[test]
+fn spawn_blocking_task_hooks_are_balanced() {
+    let (spawned_tx, spawned_rx) = std::sync::mpsc::channel();
+    let (terminated_tx, terminated_rx) = std::sync::mpsc::channel();
+
+    let runtime = Builder::new_current_thread()
+        .on_task_spawn(move |meta, parent| {
+            assert!(parent.is_none());
+            spawned_tx.send(meta.id()).unwrap();
+        })
+        .on_task_terminate(move |meta| {
+            terminated_tx.send(meta.id()).unwrap();
+        })
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        tokio::task::spawn_blocking(|| {}).await.unwrap();
+    });
+
+    let spawned = spawned_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("spawn_blocking task did not fire spawn hook");
+    let terminated = terminated_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("spawn_blocking task did not fire terminate hook");
+
+    assert_eq!(spawned, terminated);
+    assert!(matches!(
+        spawned_rx.try_recv(),
+        Err(std::sync::mpsc::TryRecvError::Empty)
+    ));
+    assert!(matches!(
+        terminated_rx.try_recv(),
+        Err(std::sync::mpsc::TryRecvError::Empty)
+    ));
+}
+
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not support multi-threaded runtime"
+)]
+#[test]
+fn internal_runtime_blocking_tasks_do_not_fire_task_hooks() {
+    let spawned = Arc::new(Mutex::new(Vec::new()));
+    let spawned2 = Arc::clone(&spawned);
+    let terminated = Arc::new(Mutex::new(Vec::new()));
+    let terminated2 = Arc::clone(&terminated);
+
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(1)
+        .on_task_spawn(move |meta, _parent| {
+            spawned2.lock().unwrap().push(meta.spawned_at().file());
+        })
+        .on_task_terminate(move |meta| {
+            terminated2.lock().unwrap().push(meta.spawned_at().file());
+        })
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        tokio::spawn(async {
+            tokio::task::block_in_place(|| {});
+        })
+        .await
+        .unwrap();
+    });
+
+    runtime.shutdown_timeout(Duration::from_secs(5));
+
+    let spawned = spawned.lock().unwrap();
+    assert!(
+        !spawned.iter().any(is_multi_thread_worker_file),
+        "internal worker task fired spawn hook: {spawned:?}"
+    );
+
+    let terminated = terminated.lock().unwrap();
+    assert!(
+        !terminated.iter().any(is_multi_thread_worker_file),
+        "internal worker task fired terminate hook: {terminated:?}"
+    );
+}
+
+fn is_multi_thread_worker_file(file: &&'static str) -> bool {
+    file.ends_with("runtime/scheduler/multi_thread/worker.rs")
+        || file.ends_with(r"runtime\scheduler\multi_thread\worker.rs")
+}
+
+#[test]
+fn spawn_blocking_after_shutdown_terminate_hook_can_reenter_pool() {
+    let handle: Arc<Mutex<Option<tokio::runtime::Handle>>> = Arc::new(Mutex::new(None));
+    let hook_handle = Arc::clone(&handle);
+    let terminated = Arc::new(AtomicUsize::new(0));
+    let terminated2 = Arc::clone(&terminated);
+
+    let runtime = Builder::new_current_thread()
+        .on_task_terminate(move |_meta| {
+            if terminated2.fetch_add(1, Ordering::SeqCst) == 0 {
+                let handle = hook_handle.lock().unwrap().clone().unwrap();
+                drop(handle.spawn_blocking(|| {}));
+            }
+        })
+        .build()
+        .unwrap();
+
+    let runtime_handle = runtime.handle().clone();
+    *handle.lock().unwrap() = Some(runtime_handle.clone());
+    runtime.shutdown_timeout(Duration::from_secs(5));
+
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        drop(runtime_handle.spawn_blocking(|| {}));
+        done_tx.send(()).unwrap();
+    });
+
+    done_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("terminate hook deadlocked while re-entering the blocking pool");
+
+    assert_eq!(terminated.load(Ordering::SeqCst), 2);
+}
+
 /// Test that the correct spawn location is provided to the task hooks on a
 /// current thread runtime.
 #[test]

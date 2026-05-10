@@ -20,7 +20,10 @@ pub(crate) struct BlockingSchedule {
 
 impl BlockingSchedule {
     #[cfg_attr(not(feature = "test-util"), allow(unused_variables))]
-    pub(crate) fn new(handle: &Handle) -> Self {
+    pub(crate) fn new(
+        handle: &Handle,
+        #[cfg(tokio_unstable)] run_task_hooks: bool,
+    ) -> Self {
         #[cfg(feature = "test-util")]
         {
             match &handle.inner {
@@ -35,7 +38,11 @@ impl BlockingSchedule {
             #[cfg(feature = "test-util")]
             handle: handle.clone(),
             #[cfg(tokio_unstable)]
-            task_terminate_callback: handle.inner.hooks().task_terminate_callback.clone(),
+            task_terminate_callback: if run_task_hooks {
+                handle.inner.hooks().task_terminate_callback.clone()
+            } else {
+                None
+            },
         }
     }
 }

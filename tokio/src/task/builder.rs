@@ -242,6 +242,8 @@ impl<'a> Builder<'a> {
                 SpawnMeta::new(name, fn_size),
                 handle,
                 data,
+                #[cfg(tokio_unstable)]
+                true,
             )
         } else {
             handle.inner.blocking_spawner().spawn_blocking_inner(
@@ -250,6 +252,8 @@ impl<'a> Builder<'a> {
                 SpawnMeta::new(name, fn_size),
                 handle,
                 data,
+                #[cfg(tokio_unstable)]
+                true,
             )
         };
 

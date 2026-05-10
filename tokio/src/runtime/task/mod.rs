@@ -537,6 +537,15 @@ impl<S: Schedule> UnownedTask<S> {
         task
     }
 
+    /// # Safety
+    ///
+    /// The returned metadata must have exclusive access to hook data for as long
+    /// as it can expose mutable references.
+    #[cfg(tokio_unstable)]
+    pub(crate) unsafe fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
+        unsafe { self.raw.task_meta() }
+    }
+
     pub(crate) fn run(self) {
         let raw = self.raw;
         mem::forget(self);
