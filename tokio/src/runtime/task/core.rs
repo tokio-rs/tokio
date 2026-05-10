@@ -406,10 +406,7 @@ impl<T: Future, S: Schedule> Core<T, S> {
     /// # Safety
     ///
     /// The caller must ensure it is safe to mutate the `stage` field.
-    pub(super) fn drop_future_or_output(
-        &self,
-        #[cfg(tokio_unstable)] header: NonNull<Header>,
-    ) {
+    pub(super) fn drop_future_or_output(&self, #[cfg(tokio_unstable)] header: NonNull<Header>) {
         #[cfg(tokio_unstable)]
         let _current_task = {
             let dropping_future = self.stage.stage.with(|ptr| {
