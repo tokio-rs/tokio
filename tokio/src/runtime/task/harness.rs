@@ -48,6 +48,21 @@ where
     fn core(&self) -> &Core<T, S> {
         unsafe { &self.cell.as_ref().core }
     }
+
+    /// # Safety
+    ///
+    /// The returned metadata must only be used while the caller has exclusive
+    /// access to task hook data.
+    #[cfg(tokio_unstable)]
+    unsafe fn task_meta<'meta>(&self) -> TaskMeta<'meta> {
+        unsafe {
+            TaskMeta::new(
+                self.core().task_id,
+                self.core().spawned_at.into(),
+                Some(self.trailer().user_data_ptr()),
+            )
+        }
+    }
 }
 
 /// Task operations that can be implemented without being generic over the
@@ -204,10 +219,56 @@ where
                         TransitionToIdle::Cancelled => PollFuture::Complete,
                     }
                 }
+
+                #[cfg(tokio_unstable)]
+                {
+                    // Safety: the task is in the RUNNING state, which excludes
+                    // concurrent shutdown and termination metadata access.
+                    let mut task_meta = unsafe { self.task_meta() };
+                    let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                        self.core()
+                            .scheduler
+                            .task_poll_start_callback(&mut task_meta);
+                    }));
+
+                    if let Err(panic) = res {
+                        poll_hook_panic(self.core(), panic);
+                        return PollFuture::Complete;
+                    }
+
+                    if self.state().load().is_cancelled() {
+                        cancel_task(self.core());
+                        return PollFuture::Complete;
+                    }
+                }
+
                 let header_ptr = self.header_ptr();
                 let waker_ref = waker_ref::<S>(&header_ptr);
                 let cx = Context::from_waker(&waker_ref);
-                let res = poll_future(self.core(), cx);
+                let res = poll_future(
+                    self.core(),
+                    #[cfg(tokio_unstable)]
+                    header_ptr,
+                    cx,
+                );
+
+                #[cfg(tokio_unstable)]
+                {
+                    // Safety: the task is still in the RUNNING state, which
+                    // excludes concurrent shutdown and termination metadata
+                    // access.
+                    let mut task_meta = unsafe { self.task_meta() };
+                    let hook_res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                        self.core()
+                            .scheduler
+                            .task_poll_stop_callback(&mut task_meta);
+                    }));
+
+                    if let Err(panic) = hook_res {
+                        poll_hook_panic(self.core(), panic);
+                        return PollFuture::Complete;
+                    }
+                }
 
                 if res == Poll::Ready(()) {
                     // The future completed. Move on to complete the task.
@@ -255,6 +316,8 @@ where
         // because we are going to drop them. This only matters when running
         // under loom.
         self.trailer().waker.with_mut(|_| ());
+        #[cfg(tokio_unstable)]
+        self.trailer().user_data.with_mut(|_| ());
         self.core().stage.with_mut(|_| ());
 
         // Safety: The caller of this method just transitioned our ref-count to
@@ -369,13 +432,12 @@ where
         // We call this in a separate block so that it runs after the task appears to have
         // completed and will still run if the destructor panics.
         #[cfg(tokio_unstable)]
-        if let Some(f) = self.trailer().hooks.task_terminate_callback.as_ref() {
+        {
+            // Safety: completion owns the task lifecycle transition, and the
+            // terminate hook is invoked synchronously with exclusive metadata access.
+            let mut meta = unsafe { self.task_meta() };
             let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                f(&TaskMeta {
-                    id: self.core().task_id,
-                    spawned_at: self.core().spawned_at.into(),
-                    _phantom: Default::default(),
-                })
+                self.core().scheduler.task_terminate_callback(&mut meta)
             }));
         }
 
@@ -516,9 +578,35 @@ fn panic_result_to_join_error(
     }
 }
 
+#[cfg(tokio_unstable)]
+fn poll_hook_panic<T: Future, S: Schedule>(
+    core: &Core<T, S>,
+    hook_panic: Box<dyn Any + Send + 'static>,
+) {
+    let drop_res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        core.drop_future_or_output();
+    }));
+    let join_error = match drop_res {
+        Ok(()) => panic_to_error(&core.scheduler, core.task_id, hook_panic),
+        Err(drop_panic) => panic_to_error(&core.scheduler, core.task_id, drop_panic),
+    };
+
+    let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        core.store_output(Err(join_error));
+    }));
+
+    if res.is_err() {
+        core.scheduler.unhandled_panic();
+    }
+}
+
 /// Polls the future. If the future completes, the output is written to the
 /// stage field.
-fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Poll<()> {
+fn poll_future<T: Future, S: Schedule>(
+    core: &Core<T, S>,
+    #[cfg(tokio_unstable)] header: NonNull<Header>,
+    cx: Context<'_>,
+) -> Poll<()> {
     // Poll the future.
     let output = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         struct Guard<'a, T: Future, S: Schedule> {
@@ -532,7 +620,11 @@ fn poll_future<T: Future, S: Schedule>(core: &Core<T, S>, cx: Context<'_>) -> Po
             }
         }
         let guard = Guard { core };
-        let res = guard.core.poll(cx);
+        let res = guard.core.poll(
+            #[cfg(tokio_unstable)]
+            header,
+            cx,
+        );
         mem::forget(guard);
         res
     }));

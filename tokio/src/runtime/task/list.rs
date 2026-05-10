@@ -86,19 +86,50 @@ impl<S: 'static> OwnedTasks<S> {
 
     /// Binds the provided task to this `OwnedTasks` instance. This fails if the
     /// `OwnedTasks` has been closed.
+    #[cfg_attr(tokio_unstable, allow(dead_code))]
     pub(crate) fn bind<T>(
         &self,
         task: T,
         scheduler: S,
         id: super::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        );
+        let notified = unsafe { self.bind_inner(task, notified) };
+        (join, notified)
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn bind_with_spawn_hook<T>(
+        &self,
+        task: T,
+        scheduler: S,
+        id: super::Id,
+        spawned_at: SpawnLocation,
+        user_data: Option<crate::runtime::TaskData>,
+        before_bind: impl FnOnce(&Task<S>),
+    ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
+    where
+        S: Schedule,
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+    {
+        let (task, notified, join) =
+            super::new_task(task, scheduler, id, spawned_at, user_data);
+        before_bind(&task);
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
@@ -108,19 +139,53 @@ impl<S: 'static> OwnedTasks<S> {
     /// # Safety
     ///
     /// Only use this in `LocalRuntime` where the task cannot move
+    #[cfg_attr(tokio_unstable, allow(dead_code))]
     pub(crate) unsafe fn bind_local<T>(
         &self,
         task: T,
         scheduler: S,
         id: super::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        );
+        let notified = unsafe { self.bind_inner(task, notified) };
+        (join, notified)
+    }
+
+    /// # Safety
+    ///
+    /// Only use this in `LocalRuntime` where the task cannot move.
+    #[cfg(tokio_unstable)]
+    pub(crate) unsafe fn bind_local_with_spawn_hook<T>(
+        &self,
+        task: T,
+        scheduler: S,
+        id: super::Id,
+        spawned_at: SpawnLocation,
+        user_data: Option<crate::runtime::TaskData>,
+        before_bind: impl FnOnce(&Task<S>),
+    ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
+    where
+        S: Schedule,
+        T: Future + 'static,
+        T::Output: 'static,
+    {
+        let (task, notified, join) =
+            super::new_task(task, scheduler, id, spawned_at, user_data);
+        before_bind(&task);
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
@@ -264,13 +329,21 @@ impl<S: 'static> LocalOwnedTasks<S> {
         scheduler: S,
         id: super::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        );
 
         unsafe {
             // safety: We just created the task, so we have exclusive access

@@ -307,6 +307,8 @@ impl Spawner {
                 Mandatory::NonMandatory,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
+                #[cfg(tokio_unstable)]
+                None,
             )
         } else {
             self.spawn_blocking_inner(
@@ -314,6 +316,8 @@ impl Spawner {
                 Mandatory::NonMandatory,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
+                #[cfg(tokio_unstable)]
+                None,
             )
         };
 
@@ -345,6 +349,8 @@ impl Spawner {
                     Mandatory::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,
+                    #[cfg(tokio_unstable)]
+                    None,
                 )
             } else {
                 self.spawn_blocking_inner(
@@ -352,6 +358,8 @@ impl Spawner {
                     Mandatory::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,
+                    #[cfg(tokio_unstable)]
+                    None,
                 )
             };
 
@@ -370,6 +378,7 @@ impl Spawner {
         is_mandatory: Mandatory,
         spawn_meta: SpawnMeta<'_>,
         rt: &Handle,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> (JoinHandle<R>, Result<(), SpawnError>)
     where
         F: FnOnce() -> R + Send + 'static,
@@ -384,6 +393,8 @@ impl Spawner {
             BlockingSchedule::new(rt),
             id,
             task::SpawnLocation::capture(),
+            #[cfg(tokio_unstable)]
+            user_data,
         );
 
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);

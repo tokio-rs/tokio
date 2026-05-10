@@ -589,9 +589,11 @@ cfg_rt! {
     }
 
     mod task_hooks;
-    pub(crate) use task_hooks::{TaskHooks, TaskCallback};
+    pub(crate) use task_hooks::{TaskCallback, TaskHooks, TaskSpawnCallback};
+    #[cfg(tokio_unstable)]
+    pub(crate) use task_hooks::TaskData;
     cfg_unstable! {
-        pub use task_hooks::TaskMeta;
+        pub use task_hooks::{TaskMeta, TaskMetaRef};
     }
     #[cfg(not(tokio_unstable))]
     pub(crate) use task_hooks::TaskMeta;

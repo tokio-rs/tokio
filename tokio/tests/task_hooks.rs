@@ -2,8 +2,12 @@
 #![cfg(all(feature = "full", tokio_unstable, target_has_atomic = "64"))]
 
 use std::collections::HashSet;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
+use std::task::{Context, Poll};
+use std::time::Duration;
 
 use tokio::runtime::Builder;
 
@@ -19,7 +23,8 @@ fn spawn_task_hook_fires() {
     let ids2 = Arc::clone(&ids);
 
     let runtime = Builder::new_current_thread()
-        .on_task_spawn(move |data| {
+        .on_task_spawn(move |data, _parent| {
+            assert!(data.data::<usize>().is_none());
             ids2.lock().unwrap().insert(data.id());
 
             count2.fetch_add(1, Ordering::SeqCst);
@@ -85,11 +90,11 @@ fn task_hook_spawn_location_current_thread() {
             "(current_thread) on_task_spawn",
             &spawns,
         ))
-        .on_before_task_poll(mk_spawn_location_hook(
+        .on_before_task_poll(mk_poll_location_hook(
             "(current_thread) on_before_task_poll",
             &poll_starts,
         ))
-        .on_after_task_poll(mk_spawn_location_hook(
+        .on_after_task_poll(mk_poll_location_hook(
             "(current_thread) on_after_task_poll",
             &poll_ends,
         ))
@@ -136,11 +141,11 @@ fn task_hook_spawn_location_multi_thread() {
             "(multi_thread) on_task_spawn",
             &spawns,
         ))
-        .on_before_task_poll(mk_spawn_location_hook(
+        .on_before_task_poll(mk_poll_location_hook(
             "(multi_thread) on_before_task_poll",
             &poll_starts,
         ))
-        .on_after_task_poll(mk_spawn_location_hook(
+        .on_after_task_poll(mk_poll_location_hook(
             "(multi_thread) on_after_task_poll",
             &poll_ends,
         ))
@@ -174,21 +179,430 @@ fn task_hook_spawn_location_multi_thread() {
     assert_eq!(poll_starts, poll_ends.fetch_add(0, Ordering::SeqCst));
 }
 
+#[derive(Debug)]
+struct PollState {
+    before: usize,
+    after: usize,
+}
+
+#[test]
+fn task_data_mutates_across_current_thread_hooks() {
+    let terminated = Arc::new(Mutex::new(Vec::new()));
+    let terminated2 = Arc::clone(&terminated);
+
+    let runtime = Builder::new_current_thread()
+        .on_task_spawn(|meta, parent| {
+            assert!(parent.is_none());
+            assert!(!meta.clear_data());
+            meta.set_data(PollState {
+                before: 0,
+                after: 0,
+            });
+        })
+        .on_before_task_poll(|meta| {
+            meta.data_mut::<PollState>().unwrap().before += 1;
+        })
+        .on_after_task_poll(|meta| {
+            if let Some(data) = meta.data_mut::<PollState>() {
+                data.after += 1;
+            }
+        })
+        .on_task_terminate(move |meta| {
+            let data = meta.take_data::<PollState>().unwrap();
+            assert!(meta.data::<PollState>().is_none());
+            terminated2.lock().unwrap().push((data.before, data.after));
+        })
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        tokio::spawn(async {
+            for _ in 0..3 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+    });
+
+    let terminated = terminated.lock().unwrap();
+    assert_eq!(terminated.len(), 1);
+    let (before, after) = terminated[0];
+    assert!(before > 1);
+    assert_eq!(before, after);
+}
+
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not support multi-threaded runtime"
+)]
+#[test]
+fn task_data_mutates_across_multi_thread_hooks() {
+    let terminated = Arc::new(Mutex::new(Vec::new()));
+    let terminated2 = Arc::clone(&terminated);
+
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(2)
+        .on_task_spawn(|meta, _parent| {
+            meta.set_data(PollState {
+                before: 0,
+                after: 0,
+            });
+        })
+        .on_before_task_poll(|meta| {
+            meta.data_mut::<PollState>().unwrap().before += 1;
+        })
+        .on_after_task_poll(|meta| {
+            if let Some(data) = meta.data_mut::<PollState>() {
+                data.after += 1;
+            }
+        })
+        .on_task_terminate(move |meta| {
+            let data = meta.take_data::<PollState>().unwrap();
+            terminated2.lock().unwrap().push((data.before, data.after));
+        })
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        tokio::spawn(async {
+            for _ in 0..3 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+    });
+
+    runtime.shutdown_timeout(std::time::Duration::from_secs(60));
+
+    let terminated = terminated.lock().unwrap();
+    assert_eq!(terminated.len(), 1);
+    let (before, after) = terminated[0];
+    assert!(before > 1);
+    assert_eq!(before, after);
+}
+
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not support multi-threaded runtime"
+)]
+#[test]
+fn poll_hook_data_is_not_terminated_during_multi_thread_shutdown() {
+    let entered = Arc::new((Mutex::new(false), Condvar::new()));
+    let entered2 = Arc::clone(&entered);
+    let release = Arc::new((Mutex::new(false), Condvar::new()));
+    let release2 = Arc::clone(&release);
+    let terminated = Arc::new(Mutex::new(Vec::new()));
+    let terminated2 = Arc::clone(&terminated);
+
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(2)
+        .on_task_spawn(|meta, _parent| {
+            meta.set_data(Vec::<&'static str>::new());
+        })
+        .on_before_task_poll(move |meta| {
+            let (lock, cvar) = &*entered2;
+            *lock.lock().unwrap() = true;
+            cvar.notify_one();
+
+            let (lock, cvar) = &*release2;
+            let mut released = lock.lock().unwrap();
+            while !*released {
+                released = cvar.wait(released).unwrap();
+            }
+
+            meta.data_mut::<Vec<&'static str>>()
+                .unwrap()
+                .push("before_done");
+        })
+        .on_task_terminate(move |meta| {
+            let data = meta.take_data::<Vec<&'static str>>().unwrap();
+            terminated2.lock().unwrap().push(*data);
+        })
+        .build()
+        .unwrap();
+
+    drop(runtime.spawn(std::future::pending::<()>()));
+
+    let (lock, cvar) = &*entered;
+    let entered_guard = lock.lock().unwrap();
+    let (entered_guard, wait_result) = cvar
+        .wait_timeout_while(entered_guard, Duration::from_secs(5), |entered| !*entered)
+        .unwrap();
+    assert!(*entered_guard);
+    assert!(!wait_result.timed_out());
+
+    let shutdown = std::thread::spawn(move || {
+        runtime.shutdown_timeout(Duration::from_secs(5));
+    });
+
+    std::thread::sleep(Duration::from_millis(50));
+
+    let (lock, cvar) = &*release;
+    *lock.lock().unwrap() = true;
+    cvar.notify_one();
+
+    shutdown.join().unwrap();
+
+    assert_eq!(*terminated.lock().unwrap(), vec![vec!["before_done"]]);
+}
+
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not support multi-threaded runtime"
+)]
+#[test]
+fn abort_during_before_poll_hook_does_not_poll_future() {
+    struct CountPolls {
+        polls: Arc<AtomicUsize>,
+    }
+
+    impl Future for CountPolls {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+            self.polls.fetch_add(1, Ordering::SeqCst);
+            Poll::Pending
+        }
+    }
+
+    let entered = Arc::new((Mutex::new(false), Condvar::new()));
+    let entered2 = Arc::clone(&entered);
+    let release = Arc::new((Mutex::new(false), Condvar::new()));
+    let release2 = Arc::clone(&release);
+    let polls = Arc::new(AtomicUsize::new(0));
+
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(2)
+        .on_before_task_poll(move |_meta| {
+            let (lock, cvar) = &*entered2;
+            *lock.lock().unwrap() = true;
+            cvar.notify_one();
+
+            let (lock, cvar) = &*release2;
+            let mut released = lock.lock().unwrap();
+            while !*released {
+                released = cvar.wait(released).unwrap();
+            }
+        })
+        .build()
+        .unwrap();
+
+    let task = runtime.spawn(CountPolls {
+        polls: Arc::clone(&polls),
+    });
+
+    let (lock, cvar) = &*entered;
+    let entered_guard = lock.lock().unwrap();
+    let (entered_guard, wait_result) = cvar
+        .wait_timeout_while(entered_guard, Duration::from_secs(5), |entered| !*entered)
+        .unwrap();
+    assert!(*entered_guard);
+    assert!(!wait_result.timed_out());
+
+    task.abort();
+
+    let (lock, cvar) = &*release;
+    *lock.lock().unwrap() = true;
+    cvar.notify_one();
+
+    let err = runtime.block_on(task).unwrap_err();
+    assert!(err.is_cancelled());
+    assert_eq!(polls.load(Ordering::SeqCst), 0);
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct Lineage {
+    depth: usize,
+}
+
+#[test]
+fn spawn_hook_can_inherit_parent_task_data() {
+    let terminated = Arc::new(Mutex::new(Vec::new()));
+    let terminated2 = Arc::clone(&terminated);
+
+    let runtime = Builder::new_current_thread()
+        .on_task_spawn(|meta, parent| {
+            let depth = match parent {
+                Some(parent) => parent
+                    .data::<Lineage>()
+                    .map_or(0, |parent| parent.depth + 1),
+                None => 0,
+            };
+
+            meta.set_data(Lineage { depth });
+        })
+        .on_task_terminate(move |meta| {
+            let data = meta.take_data::<Lineage>().unwrap();
+            terminated2.lock().unwrap().push(data.depth);
+        })
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        tokio::spawn(async {
+            tokio::spawn(async {}).await.unwrap();
+        })
+        .await
+        .unwrap();
+    });
+
+    let mut terminated = terminated.lock().unwrap().clone();
+    terminated.sort_unstable();
+    assert_eq!(terminated, vec![0, 1]);
+}
+
+#[test]
+fn spawn_hook_runs_before_terminate_when_current_thread_runtime_is_closed() {
+    struct ClosedSpawnData;
+
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let events2 = Arc::clone(&events);
+    let events3 = Arc::clone(&events);
+
+    let runtime = Builder::new_current_thread()
+        .on_task_spawn(move |meta, _parent| {
+            meta.set_data(ClosedSpawnData);
+            events2.lock().unwrap().push("spawn");
+        })
+        .on_task_terminate(move |meta| {
+            if meta.take_data::<ClosedSpawnData>().is_some() {
+                events3.lock().unwrap().push("terminate_with_data");
+            }
+        })
+        .build()
+        .unwrap();
+
+    let handle = runtime.handle().clone();
+    drop(runtime);
+
+    drop(handle.spawn(async {}));
+
+    assert_eq!(*events.lock().unwrap(), ["spawn", "terminate_with_data"]);
+}
+
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not support multi-threaded runtime"
+)]
+#[test]
+fn spawn_hook_runs_before_terminate_when_multi_thread_runtime_is_closed() {
+    struct ClosedSpawnData;
+
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let events2 = Arc::clone(&events);
+    let events3 = Arc::clone(&events);
+
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(1)
+        .on_task_spawn(move |meta, _parent| {
+            meta.set_data(ClosedSpawnData);
+            events2.lock().unwrap().push("spawn");
+        })
+        .on_task_terminate(move |meta| {
+            if meta.take_data::<ClosedSpawnData>().is_some() {
+                events3.lock().unwrap().push("terminate_with_data");
+            }
+        })
+        .build()
+        .unwrap();
+
+    let handle = runtime.handle().clone();
+    drop(runtime);
+
+    drop(handle.spawn(async {}));
+
+    assert_eq!(*events.lock().unwrap(), ["spawn", "terminate_with_data"]);
+}
+
+#[cfg(feature = "tracing")]
+#[test]
+fn task_builder_data_is_visible_to_hooks() {
+    let terminated = Arc::new(Mutex::new(Vec::new()));
+    let terminated2 = Arc::clone(&terminated);
+
+    let runtime = Builder::new_current_thread()
+        .on_task_spawn(|meta, _parent| {
+            let value = meta.data_mut::<usize>().unwrap();
+            *value += 1;
+        })
+        .on_task_terminate(move |meta| {
+            let value = meta.take_data::<usize>().unwrap();
+            terminated2.lock().unwrap().push(*value);
+        })
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        tokio::task::Builder::new()
+            .data(41usize)
+            .spawn(async {})
+            .unwrap()
+            .await
+            .unwrap();
+    });
+
+    assert_eq!(*terminated.lock().unwrap(), vec![42]);
+}
+
+#[cfg(feature = "tracing")]
+#[test]
+fn task_builder_data_is_not_dropped_for_spawn_blocking() {
+    let terminated = Arc::new(Mutex::new(Vec::new()));
+    let terminated2 = Arc::clone(&terminated);
+
+    let runtime = Builder::new_current_thread()
+        .on_task_terminate(move |meta| {
+            if let Some(value) = meta.take_data::<usize>() {
+                terminated2.lock().unwrap().push(*value);
+            }
+        })
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        tokio::task::Builder::new()
+            .data(7usize)
+            .spawn_blocking(|| {})
+            .unwrap()
+            .await
+            .unwrap();
+    });
+
+    assert_eq!(*terminated.lock().unwrap(), vec![7]);
+}
+
 fn mk_spawn_location_hook(
     event: &'static str,
     count: &Arc<AtomicUsize>,
-) -> impl Fn(&tokio::runtime::TaskMeta<'_>) {
+) -> impl Fn(&mut tokio::runtime::TaskMeta<'_>, Option<tokio::runtime::TaskMetaRef<'_>>) {
+    let count = Arc::clone(count);
+    move |data, _parent| {
+        assert_spawn_location(event, count.as_ref(), data);
+    }
+}
+
+fn mk_poll_location_hook(
+    event: &'static str,
+    count: &Arc<AtomicUsize>,
+) -> impl Fn(&mut tokio::runtime::TaskMeta<'_>) {
     let count = Arc::clone(count);
     move |data| {
-        eprintln!("{event} ({:?}): {:?}", data.id(), data.spawned_at());
-        // Assert that the spawn location is in this file.
-        // Don't make assertions about line number/column here, as these
-        // may change as new code is added to the test file...
-        assert_eq!(
-            data.spawned_at().file(),
-            file!(),
-            "incorrect spawn location in {event} hook",
-        );
-        count.fetch_add(1, Ordering::SeqCst);
+        assert_spawn_location(event, count.as_ref(), data);
     }
+}
+
+fn assert_spawn_location(
+    event: &'static str,
+    count: &AtomicUsize,
+    data: &tokio::runtime::TaskMeta<'_>,
+) {
+    eprintln!("{event} ({:?}): {:?}", data.id(), data.spawned_at());
+    assert_eq!(
+        data.spawned_at().file(),
+        file!(),
+        "incorrect spawn location in {event} hook",
+    );
+    count.fetch_add(1, Ordering::SeqCst);
 }

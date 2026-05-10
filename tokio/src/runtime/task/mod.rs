@@ -119,6 +119,12 @@
 //!    the `JoinHandle` exclusive access again so that it is able to drop the waker
 //!    at a later point.
 //!
+//!  * The `user_data` field is accessed only through scoped task hook metadata.
+//!    The spawn hook runs before the task is scheduled, poll hooks run while
+//!    the task holds the RUNNING lock but outside the actual future poll, and
+//!    the terminate hook runs after completion. Parent task metadata exposed to
+//!    spawn hooks is read-only.
+//!
 //! All other fields are immutable and can be accessed immutably without
 //! synchronization by anyone.
 //!
@@ -221,7 +227,6 @@ use crate::future::Future;
 use crate::util::linked_list;
 use crate::util::sharded_list;
 
-use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
 use std::panic::Location;
 use std::ptr::NonNull;
@@ -241,14 +246,6 @@ unsafe impl<S> Sync for Task<S> {}
 #[repr(transparent)]
 pub(crate) struct Notified<S: 'static>(Task<S>);
 
-impl<S> Notified<S> {
-    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-    #[inline]
-    pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
-        self.0.task_meta()
-    }
-}
-
 // safety: This type cannot be used to touch the task without first verifying
 // that the value is on a thread where it is safe to poll the task.
 unsafe impl<S: Schedule> Send for Notified<S> {}
@@ -260,14 +257,6 @@ unsafe impl<S: Schedule> Sync for Notified<S> {}
 pub(crate) struct LocalNotified<S: 'static> {
     task: Task<S>,
     _not_send: PhantomData<*const ()>,
-}
-
-impl<S> LocalNotified<S> {
-    #[cfg(tokio_unstable)]
-    #[inline]
-    pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
-        self.task.task_meta()
-    }
 }
 
 /// A task that is not owned by any `OwnedTasks`. Used for blocking tasks.
@@ -284,12 +273,6 @@ unsafe impl<S> Sync for UnownedTask<S> {}
 /// Task result sent back.
 pub(crate) type Result<T> = std::result::Result<T, JoinError>;
 
-/// Hooks for scheduling tasks which are needed in the task harness.
-#[derive(Clone)]
-pub(crate) struct TaskHarnessScheduleHooks {
-    pub(crate) task_terminate_callback: Option<TaskCallback>,
-}
-
 pub(crate) trait Schedule: Sync + Sized + 'static {
     /// The task has completed work and is ready to be released. The scheduler
     /// should release it immediately and return it. The task module will batch
@@ -301,8 +284,6 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     /// Schedule the task
     fn schedule(&self, task: Notified<Self>);
 
-    fn hooks(&self) -> TaskHarnessScheduleHooks;
-
     /// Schedule the task to run in the near future, yielding the thread to
     /// other tasks.
     fn yield_now(&self, task: Notified<Self>) {
@@ -313,6 +294,15 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     fn unhandled_panic(&self) {
         // By default, do nothing. This maintains the 1.0 behavior.
     }
+
+    #[cfg(tokio_unstable)]
+    fn task_terminate_callback(&self, _meta: &mut crate::runtime::TaskMeta<'_>) {}
+
+    #[cfg(tokio_unstable)]
+    fn task_poll_start_callback(&self, _meta: &mut crate::runtime::TaskMeta<'_>) {}
+
+    #[cfg(tokio_unstable)]
+    fn task_poll_stop_callback(&self, _meta: &mut crate::runtime::TaskMeta<'_>) {}
 }
 
 cfg_rt! {
@@ -325,6 +315,7 @@ cfg_rt! {
         scheduler: S,
         id: Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> (Task<S>, Notified<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
@@ -336,6 +327,8 @@ cfg_rt! {
             scheduler,
             id,
             spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
         );
         let task = Task {
             raw,
@@ -359,6 +352,7 @@ cfg_rt! {
         scheduler: S,
         id: Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> (UnownedTask<S>, JoinHandle<T::Output>)
     where
         S: Schedule,
@@ -370,6 +364,8 @@ cfg_rt! {
             scheduler,
             id,
             spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
         );
 
         // This transfers the ref-count of task and notified into an UnownedTask.
@@ -429,22 +425,16 @@ impl<S: 'static> Task<S> {
         unsafe { Header::get_id(self.raw.header_ptr()) }
     }
 
-    #[cfg(tokio_unstable)]
-    pub(crate) fn spawned_at(&self) -> &'static Location<'static> {
-        // Safety: The header pointer is valid.
-        unsafe { Header::get_spawn_location(self.raw.header_ptr()) }
-    }
-
     // Explicit `'task` and `'meta` lifetimes are necessary here, as otherwise,
     // the compiler infers the lifetimes to be the same, and considers the task
     // to be borrowed for the lifetime of the returned `TaskMeta`.
     #[cfg(tokio_unstable)]
-    pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
-        crate::runtime::TaskMeta {
-            id: self.id(),
-            spawned_at: self.spawned_at().into(),
-            _phantom: PhantomData,
-        }
+    /// # Safety
+    ///
+    /// The returned metadata must have exclusive access to hook data for as long
+    /// as it can expose mutable references.
+    pub(crate) unsafe fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
+        unsafe { self.raw.task_meta() }
     }
 
     cfg_taskdump! {
@@ -676,4 +666,16 @@ impl SpawnLocation {
     pub(crate) fn capture() -> Self {
         Self::from(Location::caller())
     }
+}
+
+#[cfg(tokio_unstable)]
+pub(crate) fn current_task_meta<'meta>() -> Option<crate::runtime::TaskMetaRef<'meta>> {
+    let ptr = crate::runtime::context::current_task()?;
+
+    // Safety: the context stores this pointer only while the referenced task is
+    // being polled, so the allocation is alive for the duration of this call.
+    let raw = unsafe { RawTask::from_raw(ptr.cast()) };
+    // Safety: parent metadata is exposed read-only during synchronous spawn
+    // hook invocation while no mutable parent hook metadata is live.
+    Some(unsafe { raw.task_meta_ref() })
 }

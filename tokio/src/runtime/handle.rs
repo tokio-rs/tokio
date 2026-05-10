@@ -376,6 +376,40 @@ impl Handle {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
+        self.spawn_named_inner(
+            future,
+            meta,
+            #[cfg(tokio_unstable)]
+            None,
+        )
+    }
+
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[track_caller]
+    pub(crate) fn spawn_named_with_data<F>(
+        &self,
+        future: F,
+        meta: SpawnMeta<'_>,
+        user_data: Option<crate::runtime::TaskData>,
+    ) -> JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.spawn_named_inner(future, meta, user_data)
+    }
+
+    #[track_caller]
+    fn spawn_named_inner<F>(
+        &self,
+        future: F,
+        meta: SpawnMeta<'_>,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
+    ) -> JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(
             tokio_unstable,
@@ -387,7 +421,13 @@ impl Handle {
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", meta, id.as_u64());
-        self.inner.spawn(future, id, meta.spawned_at)
+        self.inner.spawn(
+            future,
+            id,
+            meta.spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        )
     }
 
     #[track_caller]
@@ -405,6 +445,47 @@ impl Handle {
         F: Future + 'static,
         F::Output: 'static,
     {
+        unsafe {
+            self.spawn_local_named_inner(
+                future,
+                meta,
+                #[cfg(tokio_unstable)]
+                None,
+            )
+        }
+    }
+
+    /// # Safety
+    ///
+    /// This must only be called in `LocalRuntime` if the runtime has been verified to be owned
+    /// by the current thread.
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[track_caller]
+    #[allow(dead_code)]
+    pub(crate) unsafe fn spawn_local_named_with_data<F>(
+        &self,
+        future: F,
+        meta: SpawnMeta<'_>,
+        user_data: Option<crate::runtime::TaskData>,
+    ) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        unsafe { self.spawn_local_named_inner(future, meta, user_data) }
+    }
+
+    #[track_caller]
+    unsafe fn spawn_local_named_inner<F>(
+        &self,
+        future: F,
+        meta: SpawnMeta<'_>,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
+    ) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
         let id = crate::runtime::task::Id::next();
         #[cfg(all(
             tokio_unstable,
@@ -416,7 +497,15 @@ impl Handle {
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", meta, id.as_u64());
-        unsafe { self.inner.spawn_local(future, id, meta.spawned_at) }
+        unsafe {
+            self.inner.spawn_local(
+                future,
+                id,
+                meta.spawned_at,
+                #[cfg(tokio_unstable)]
+                user_data,
+            )
+        }
     }
 
     /// Returns the flavor of the current `Runtime`.

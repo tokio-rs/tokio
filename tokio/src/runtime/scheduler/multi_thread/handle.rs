@@ -1,7 +1,7 @@
 use crate::future::Future;
 use crate::loom::sync::Arc;
 use crate::runtime::scheduler::multi_thread::worker;
-use crate::runtime::task::{Notified, Task, TaskHarnessScheduleHooks};
+use crate::runtime::task::{Notified, Task};
 use crate::runtime::{
     blocking, driver,
     task::{self, JoinHandle, SpawnLocation},
@@ -57,12 +57,20 @@ impl Handle {
         future: F,
         id: task::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        Self::bind_new_task(me, future, id, spawned_at)
+        Self::bind_new_task(
+            me,
+            future,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        )
     }
 
     #[cfg(all(tokio_unstable, feature = "time"))]
@@ -83,18 +91,35 @@ impl Handle {
         future: T,
         id: task::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
-
-        me.task_hooks.spawn(&TaskMeta {
+        #[cfg(tokio_unstable)]
+        let parent = task::current_task_meta();
+        #[cfg(tokio_unstable)]
+        let (handle, notified) = me.shared.owned.bind_with_spawn_hook(
+            future,
+            me.clone(),
             id,
             spawned_at,
-            _phantom: Default::default(),
-        });
+            user_data,
+            |task| {
+                // Safety: the task is freshly allocated and not published yet.
+                let mut meta = unsafe { task.task_meta() };
+                me.task_hooks.spawn(&mut meta, parent);
+            },
+        );
+        #[cfg(not(tokio_unstable))]
+        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
+
+        #[cfg(not(tokio_unstable))]
+        {
+            let mut meta = TaskMeta::new(id, spawned_at);
+            me.task_hooks.spawn(&mut meta, None);
+        }
 
         me.schedule_option_task_without_yield(notified);
 
@@ -111,14 +136,23 @@ impl task::Schedule for Arc<Handle> {
         self.schedule_task(task, false);
     }
 
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
-        }
-    }
-
     fn yield_now(&self, task: Notified<Self>) {
         self.schedule_task(task, true);
+    }
+
+    #[cfg(tokio_unstable)]
+    fn task_terminate_callback(&self, meta: &mut TaskMeta<'_>) {
+        self.task_hooks.task_terminate_callback(meta);
+    }
+
+    #[cfg(tokio_unstable)]
+    fn task_poll_start_callback(&self, meta: &mut TaskMeta<'_>) {
+        self.task_hooks.poll_start_callback(meta);
+    }
+
+    #[cfg(tokio_unstable)]
+    fn task_poll_stop_callback(&self, meta: &mut TaskMeta<'_>) {
+        self.task_hooks.poll_stop_callback(meta);
     }
 }
 

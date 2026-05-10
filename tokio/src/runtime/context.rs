@@ -21,6 +21,8 @@ cfg_rt! {
 
     use crate::runtime::{scheduler, task::Id};
 
+    #[cfg(tokio_unstable)]
+    use std::ptr::NonNull;
     use std::task::Waker;
 
     cfg_taskdump! {
@@ -48,6 +50,9 @@ struct Context {
 
     #[cfg(feature = "rt")]
     current_task_id: Cell<Option<Id>>,
+
+    #[cfg(all(feature = "rt", tokio_unstable))]
+    current_task: Cell<Option<NonNull<()>>>,
 
     /// Tracks if the current thread is currently driving a runtime.
     /// Note, that if this is set to "entered", the current scheduler
@@ -91,6 +96,9 @@ tokio_thread_local! {
 
             #[cfg(feature = "rt")]
             current_task_id: Cell::new(None),
+
+            #[cfg(all(feature = "rt", tokio_unstable))]
+            current_task: Cell::new(None),
 
             // Tracks if the current thread is currently driving a runtime.
             // Note, that if this is set to "entered", the current scheduler
@@ -157,6 +165,20 @@ cfg_rt! {
 
     pub(crate) fn current_task_id() -> Option<Id> {
         CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or(None)
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn set_current_task(task: Option<NonNull<()>>) -> Option<NonNull<()>> {
+        CONTEXT
+            .try_with(|ctx| ctx.current_task.replace(task))
+            .unwrap_or(None)
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn current_task() -> Option<NonNull<()>> {
+        CONTEXT
+            .try_with(|ctx| ctx.current_task.get())
+            .unwrap_or(None)
     }
 
     #[cfg(tokio_unstable)]

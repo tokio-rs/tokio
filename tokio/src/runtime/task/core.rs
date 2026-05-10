@@ -23,7 +23,9 @@ use crate::loom::cell::UnsafeCell;
 use crate::runtime::context;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
-use crate::runtime::task::{Id, Schedule, TaskHarnessScheduleHooks};
+use crate::runtime::task::{Id, Schedule};
+#[cfg(tokio_unstable)]
+use crate::runtime::TaskData;
 use crate::util::linked_list;
 
 use std::num::NonZeroU64;
@@ -203,9 +205,8 @@ pub(super) struct Trailer {
     pub(super) owned: linked_list::Pointers<Header>,
     /// Consumer task waiting on completion of this task.
     pub(super) waker: UnsafeCell<Option<Waker>>,
-    /// Optional hooks needed in the harness.
-    #[cfg_attr(not(tokio_unstable), allow(dead_code))] //TODO: remove when hooks are stabilized
-    pub(super) hooks: TaskHarnessScheduleHooks,
+    #[cfg(tokio_unstable)]
+    pub(super) user_data: UnsafeCell<Option<TaskData>>,
 }
 
 generate_addr_of_methods! {
@@ -233,6 +234,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         state: State,
         task_id: Id,
         #[cfg(tokio_unstable)] spawned_at: &'static Location<'static>,
+        #[cfg(tokio_unstable)] user_data: Option<TaskData>,
     ) -> Box<Cell<T, S>> {
         // Separated into a non-generic function to reduce LLVM codegen
         fn new_header(
@@ -254,7 +256,10 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         let tracing_id = future.id();
         let vtable = raw::vtable::<T, S>();
         let result = Box::new(Cell {
-            trailer: Trailer::new(scheduler.hooks()),
+            trailer: Trailer::new(
+                #[cfg(tokio_unstable)]
+                user_data,
+            ),
             header: new_header(
                 state,
                 vtable,
@@ -359,7 +364,11 @@ impl<T: Future, S: Schedule> Core<T, S> {
     ///
     /// `self` must also be pinned. This is handled by storing the task on the
     /// heap.
-    pub(super) fn poll(&self, mut cx: Context<'_>) -> Poll<T::Output> {
+    pub(super) fn poll(
+        &self,
+        #[cfg(tokio_unstable)] header: NonNull<Header>,
+        mut cx: Context<'_>,
+    ) -> Poll<T::Output> {
         let res = {
             self.stage.stage.with_mut(|ptr| {
                 // Safety: The caller ensures mutual exclusion to the field.
@@ -372,6 +381,8 @@ impl<T: Future, S: Schedule> Core<T, S> {
                 let future = unsafe { Pin::new_unchecked(future) };
 
                 let _guard = TaskIdGuard::enter(self.task_id);
+                #[cfg(tokio_unstable)]
+                let _current_task = CurrentTaskGuard::enter(header);
                 future.poll(&mut cx)
             })
         };
@@ -427,6 +438,27 @@ impl<T: Future, S: Schedule> Core<T, S> {
     unsafe fn set_stage(&self, stage: Stage<T>) {
         let _guard = TaskIdGuard::enter(self.task_id);
         self.stage.stage.with_mut(|ptr| *ptr = stage);
+    }
+}
+
+#[cfg(tokio_unstable)]
+pub(crate) struct CurrentTaskGuard {
+    parent_task: Option<NonNull<()>>,
+}
+
+#[cfg(tokio_unstable)]
+impl CurrentTaskGuard {
+    fn enter(header: NonNull<Header>) -> Self {
+        CurrentTaskGuard {
+            parent_task: context::set_current_task(Some(header.cast())),
+        }
+    }
+}
+
+#[cfg(tokio_unstable)]
+impl Drop for CurrentTaskGuard {
+    fn drop(&mut self) {
+        context::set_current_task(self.parent_task);
     }
 }
 
@@ -537,12 +569,19 @@ impl Header {
 }
 
 impl Trailer {
-    fn new(hooks: TaskHarnessScheduleHooks) -> Self {
+    fn new(#[cfg(tokio_unstable)] user_data: Option<TaskData>) -> Self {
         Trailer {
             waker: UnsafeCell::new(None),
             owned: linked_list::Pointers::new(),
-            hooks,
+            #[cfg(tokio_unstable)]
+            user_data: UnsafeCell::new(user_data),
         }
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(super) fn user_data_ptr(&self) -> NonNull<Option<TaskData>> {
+        self.user_data
+            .with_mut(|ptr| unsafe { NonNull::new_unchecked(ptr) })
     }
 
     pub(super) unsafe fn set_waker(&self, waker: Option<Waker>) {

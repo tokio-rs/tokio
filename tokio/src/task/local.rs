@@ -2,9 +2,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
-use crate::runtime::task::{
-    self, JoinHandle, LocalOwnedTasks, SpawnLocation, Task, TaskHarnessScheduleHooks,
-};
+use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, SpawnLocation, Task};
 use crate::runtime::{context, ThreadId, BOX_FUTURE_THRESHOLD};
 use crate::sync::AtomicWaker;
 use crate::util::trace::SpawnMeta;
@@ -399,21 +397,37 @@ cfg_rt! {
     {
         let fut_size = std::mem::size_of::<F>();
         if fut_size > BOX_FUTURE_THRESHOLD {
-            spawn_local_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+            spawn_local_inner(
+                Box::pin(future),
+                SpawnMeta::new_unnamed(fut_size),
+                #[cfg(tokio_unstable)]
+                None,
+            )
         } else {
-            spawn_local_inner(future, SpawnMeta::new_unnamed(fut_size))
+            spawn_local_inner(
+                future,
+                SpawnMeta::new_unnamed(fut_size),
+                #[cfg(tokio_unstable)]
+                None,
+            )
         }
     }
 
 
     #[track_caller]
-    pub(super) fn spawn_local_inner<F>(future: F, meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
+    pub(super) fn spawn_local_inner<F>(
+        future: F,
+        meta: SpawnMeta<'_>,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
+    ) -> JoinHandle<F::Output>
     where F: Future + 'static,
           F::Output: 'static
     {
         use crate::runtime::{context, task};
 
         let mut future = Some(future);
+        #[cfg(tokio_unstable)]
+        let mut user_data = Some(user_data);
 
         let res = context::with_current(|handle| {
             Some(if handle.is_local() {
@@ -439,11 +453,24 @@ cfg_rt! {
                 let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
                 // safety: we have verified that this is a `LocalRuntime` owned by the current thread
-                unsafe { handle.spawn_local(task, id, meta.spawned_at) }
+                unsafe {
+                    handle.spawn_local(
+                        task,
+                        id,
+                        meta.spawned_at,
+                        #[cfg(tokio_unstable)]
+                        user_data.take().unwrap(),
+                    )
+                }
             } else {
                 match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
                     None => panic!("`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"),
-                    Some(cx) => cx.spawn(future.take().unwrap(), meta)
+                    Some(cx) => cx.spawn(
+                        future.take().unwrap(),
+                        meta,
+                        #[cfg(tokio_unstable)]
+                        user_data.take().unwrap(),
+                    )
                 }
             })
         });
@@ -453,7 +480,12 @@ cfg_rt! {
             Ok(Some(join_handle)) => join_handle,
             Err(_) => match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
                 None => panic!("`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"),
-                Some(cx) => cx.spawn(future.unwrap(), meta)
+                Some(cx) => cx.spawn(
+                    future.unwrap(),
+                    meta,
+                    #[cfg(tokio_unstable)]
+                    user_data.unwrap(),
+                )
             }
         }
     }
@@ -729,16 +761,46 @@ impl LocalSet {
         F: Future + 'static,
         F::Output: 'static,
     {
-        self.spawn_named_inner(future, meta)
+        self.spawn_named_inner(
+            future,
+            meta,
+            #[cfg(tokio_unstable)]
+            None,
+        )
     }
 
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
     #[track_caller]
-    fn spawn_named_inner<F>(&self, future: F, meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
+    pub(in crate::task) fn spawn_named_with_data<F>(
+        &self,
+        future: F,
+        meta: SpawnMeta<'_>,
+        user_data: Option<crate::runtime::TaskData>,
+    ) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,
     {
-        let handle = self.context.spawn(future, meta);
+        self.spawn_named_inner(future, meta, user_data)
+    }
+
+    #[track_caller]
+    fn spawn_named_inner<F>(
+        &self,
+        future: F,
+        meta: SpawnMeta<'_>,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
+    ) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        let handle = self.context.spawn(
+            future,
+            meta,
+            #[cfg(tokio_unstable)]
+            user_data,
+        );
 
         // Because a task was spawned from *outside* the `LocalSet`, wake the
         // `LocalSet` future to execute the new task, if it hasn't been woken.
@@ -1024,7 +1086,12 @@ impl Drop for LocalSet {
 
 impl Context {
     #[track_caller]
-    fn spawn<F>(&self, future: F, meta: SpawnMeta<'_>) -> JoinHandle<F::Output>
+    fn spawn<F>(
+        &self,
+        future: F,
+        meta: SpawnMeta<'_>,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
+    ) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,
@@ -1040,6 +1107,8 @@ impl Context {
                 self.shared.clone(),
                 id,
                 SpawnLocation::capture(),
+                #[cfg(tokio_unstable)]
+                user_data,
             )
         };
 
@@ -1146,13 +1215,6 @@ impl task::Schedule for Arc<Shared> {
 
     fn schedule(&self, task: task::Notified<Self>) {
         Shared::schedule(self, task);
-    }
-
-    // localset does not currently support task hooks
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: None,
-        }
     }
 
     cfg_unstable! {

@@ -6,7 +6,7 @@ use self::noop_scheduler::NoopSchedule;
 use self::unowned_wrapper::unowned;
 
 mod noop_scheduler {
-    use crate::runtime::task::{self, Task, TaskHarnessScheduleHooks};
+    use crate::runtime::task::{self, Task};
 
     /// `task::Schedule` implementation that does nothing, for testing.
     pub(crate) struct NoopSchedule;
@@ -20,11 +20,6 @@ mod noop_scheduler {
             unreachable!();
         }
 
-        fn hooks(&self) -> TaskHarnessScheduleHooks {
-            TaskHarnessScheduleHooks {
-                task_terminate_callback: None,
-            }
-        }
     }
 }
 
@@ -43,7 +38,14 @@ mod unowned_wrapper {
         let span = tracing::trace_span!("test_span");
         let task = task.instrument(span);
         let (task, handle) =
-            crate::runtime::task::unowned(task, NoopSchedule, Id::next(), SpawnLocation::capture());
+            crate::runtime::task::unowned(
+                task,
+                NoopSchedule,
+                Id::next(),
+                SpawnLocation::capture(),
+                #[cfg(tokio_unstable)]
+                None,
+            );
         (task.into_notified(), handle)
     }
 
@@ -55,7 +57,14 @@ mod unowned_wrapper {
         T::Output: Send + 'static,
     {
         let (task, handle) =
-            crate::runtime::task::unowned(task, NoopSchedule, Id::next(), SpawnLocation::capture());
+            crate::runtime::task::unowned(
+                task,
+                NoopSchedule,
+                Id::next(),
+                SpawnLocation::capture(),
+                #[cfg(tokio_unstable)]
+                None,
+            );
         (task.into_notified(), handle)
     }
 }

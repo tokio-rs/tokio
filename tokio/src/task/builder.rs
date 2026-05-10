@@ -4,7 +4,7 @@ use crate::{
     task::{JoinHandle, LocalSet},
     util::trace::SpawnMeta,
 };
-use std::{future::Future, io, mem};
+use std::{any::Any, fmt, future::Future, io, mem};
 
 /// Factory which is used to configure the properties of a new task.
 ///
@@ -14,10 +14,11 @@ use std::{future::Future, io, mem};
 ///
 /// Methods can be chained in order to configure it.
 ///
-/// Currently, there is only one configuration option:
+/// Configuration options include:
 ///
 /// - [`name`], which specifies an associated name for
 ///   the task
+/// - [`data`], which stores user data for runtime task hooks
 ///
 /// There are three types of task that can be spawned from a Builder:
 /// - [`spawn_local`] for executing not [`Send`] futures
@@ -55,13 +56,15 @@ use std::{future::Future, io, mem};
 /// ```
 /// [unstable]: crate#unstable-features
 /// [`name`]: Builder::name
+/// [`data`]: Builder::data
 /// [`spawn_local`]: Builder::spawn_local
 /// [`spawn`]: Builder::spawn
 /// [`spawn_blocking`]: Builder::spawn_blocking
-#[derive(Default, Debug)]
+#[derive(Default)]
 #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
 pub struct Builder<'a> {
     name: Option<&'a str>,
+    data: Option<crate::runtime::TaskData>,
 }
 
 impl<'a> Builder<'a> {
@@ -71,8 +74,22 @@ impl<'a> Builder<'a> {
     }
 
     /// Assigns a name to the task which will be spawned.
-    pub fn name(&self, name: &'a str) -> Self {
-        Self { name: Some(name) }
+    pub fn name(self, name: &'a str) -> Self {
+        Self {
+            name: Some(name),
+            ..self
+        }
+    }
+
+    /// Sets task data visible to runtime task hooks.
+    pub fn data<T>(self, data: T) -> Self
+    where
+        T: Any + Send + Sync + 'static,
+    {
+        Self {
+            data: Some(Box::new(data)),
+            ..self
+        }
     }
 
     /// Spawns a task with this builder's settings on the current runtime.
@@ -89,11 +106,12 @@ impl<'a> Builder<'a> {
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
+        let Builder { name, data } = self;
         let fut_size = mem::size_of::<Fut>();
         Ok(if fut_size > BOX_FUTURE_THRESHOLD {
-            super::spawn::spawn_inner(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            super::spawn::spawn_inner(Box::pin(future), SpawnMeta::new(name, fut_size), data)
         } else {
-            super::spawn::spawn_inner(future, SpawnMeta::new(self.name, fut_size))
+            super::spawn::spawn_inner(future, SpawnMeta::new(name, fut_size), data)
         })
     }
 
@@ -110,11 +128,12 @@ impl<'a> Builder<'a> {
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
+        let Builder { name, data } = self;
         let fut_size = mem::size_of::<Fut>();
         Ok(if fut_size > BOX_FUTURE_THRESHOLD {
-            handle.spawn_named(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            handle.spawn_named_with_data(Box::pin(future), SpawnMeta::new(name, fut_size), data)
         } else {
-            handle.spawn_named(future, SpawnMeta::new(self.name, fut_size))
+            handle.spawn_named_with_data(future, SpawnMeta::new(name, fut_size), data)
         })
     }
 
@@ -141,11 +160,12 @@ impl<'a> Builder<'a> {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
+        let Builder { name, data } = self;
         let fut_size = mem::size_of::<Fut>();
         Ok(if fut_size > BOX_FUTURE_THRESHOLD {
-            super::local::spawn_local_inner(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            super::local::spawn_local_inner(Box::pin(future), SpawnMeta::new(name, fut_size), data)
         } else {
-            super::local::spawn_local_inner(future, SpawnMeta::new(self.name, fut_size))
+            super::local::spawn_local_inner(future, SpawnMeta::new(name, fut_size), data)
         })
     }
 
@@ -166,11 +186,12 @@ impl<'a> Builder<'a> {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
+        let Builder { name, data } = self;
         let fut_size = mem::size_of::<Fut>();
         Ok(if fut_size > BOX_FUTURE_THRESHOLD {
-            local_set.spawn_named(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            local_set.spawn_named_with_data(Box::pin(future), SpawnMeta::new(name, fut_size), data)
         } else {
-            local_set.spawn_named(future, SpawnMeta::new(self.name, fut_size))
+            local_set.spawn_named_with_data(future, SpawnMeta::new(name, fut_size), data)
         })
     }
 
@@ -212,24 +233,36 @@ impl<'a> Builder<'a> {
         Output: Send + 'static,
     {
         use crate::runtime::Mandatory;
+        let Builder { name, data } = self;
         let fn_size = mem::size_of::<Function>();
         let (join_handle, spawn_result) = if fn_size > BOX_FUTURE_THRESHOLD {
             handle.inner.blocking_spawner().spawn_blocking_inner(
                 Box::new(function),
                 Mandatory::NonMandatory,
-                SpawnMeta::new(self.name, fn_size),
+                SpawnMeta::new(name, fn_size),
                 handle,
+                data,
             )
         } else {
             handle.inner.blocking_spawner().spawn_blocking_inner(
                 function,
                 Mandatory::NonMandatory,
-                SpawnMeta::new(self.name, fn_size),
+                SpawnMeta::new(name, fn_size),
                 handle,
+                data,
             )
         };
 
         spawn_result?;
         Ok(join_handle)
+    }
+}
+
+impl fmt::Debug for Builder<'_> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("Builder")
+            .field("name", &self.name)
+            .field("data", &self.data.as_ref().map(|_| "<task data>"))
+            .finish()
     }
 }
