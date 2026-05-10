@@ -20,10 +20,7 @@ pub(crate) struct BlockingSchedule {
 
 impl BlockingSchedule {
     #[cfg_attr(not(feature = "test-util"), allow(unused_variables))]
-    pub(crate) fn new(
-        handle: &Handle,
-        #[cfg(tokio_unstable)] run_task_hooks: bool,
-    ) -> Self {
+    pub(crate) fn new(handle: &Handle, #[cfg(tokio_unstable)] run_task_hooks: bool) -> Self {
         #[cfg(feature = "test-util")]
         {
             match &handle.inner {

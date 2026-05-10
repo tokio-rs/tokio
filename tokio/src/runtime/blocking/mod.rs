@@ -4,9 +4,9 @@
 //! compilation.
 
 mod pool;
-pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
 #[cfg(feature = "rt-multi-thread")]
 pub(crate) use pool::spawn_blocking_internal;
+pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
 
 cfg_fs! {
     pub(crate) use pool::spawn_mandatory_blocking;

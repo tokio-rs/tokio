@@ -196,7 +196,9 @@ where
     R: Send + 'static,
 {
     let rt = Handle::current();
-    rt.inner.blocking_spawner().spawn_blocking_internal(&rt, func)
+    rt.inner
+        .blocking_spawner()
+        .spawn_blocking_internal(&rt, func)
 }
 
 cfg_fs! {
