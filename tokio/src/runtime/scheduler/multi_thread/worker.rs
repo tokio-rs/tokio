@@ -72,6 +72,7 @@ use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
+use std::convert::Infallible;
 use std::ops::ControlFlow;
 use std::task::Waker;
 use std::thread;
@@ -541,7 +542,7 @@ fn run(worker: Arc<Worker>) {
         context::set_scheduler(&cx, || {
             let cx = cx.expect_multi_thread();
 
-            assert!(cx.run(core).is_break());
+            _ = cx.run(core);
 
             // Check if there are any deferred tasks to notify. This can happen when
             // the worker core is lost due to `block_in_place()` being called from
@@ -552,7 +553,7 @@ fn run(worker: Arc<Worker>) {
 }
 
 impl Context {
-    fn run(&self, mut core: Box<Core>) -> ControlFlow<(), Box<Core>> {
+    fn run(&self, mut core: Box<Core>) -> ControlFlow<(), Infallible> {
         // Reset `lifo_enabled` here in case the core was previously stolen from
         // a task that had the LIFO slot disabled.
         self.reset_lifo_enabled(&mut core);
