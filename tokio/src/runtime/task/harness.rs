@@ -220,6 +220,8 @@ where
                     }
                 }
 
+                let header_ptr = self.header_ptr();
+
                 #[cfg(tokio_unstable)]
                 {
                     // Safety: the task is in the RUNNING state, so shutdown
@@ -235,17 +237,20 @@ where
                     if let Err(panic) = res {
                         // Safety: the task is still in the RUNNING state, so we
                         // have exclusive access to the future/output storage.
-                        unsafe { poll_hook_panic(self.core(), panic) };
+                        unsafe { poll_hook_panic(self.core(), header_ptr, panic) };
                         return PollFuture::Complete;
                     }
 
                     if self.state().load().is_cancelled() {
-                        cancel_task(self.core());
+                        cancel_task(
+                            self.core(),
+                            #[cfg(tokio_unstable)]
+                            header_ptr,
+                        );
                         return PollFuture::Complete;
                     }
                 }
 
-                let header_ptr = self.header_ptr();
                 let waker_ref = waker_ref::<S>(&header_ptr);
                 let cx = Context::from_waker(&waker_ref);
                 // Safety: `transition_to_running` succeeded, so this thread has
@@ -275,7 +280,7 @@ where
                     if let Err(panic) = hook_res {
                         // Safety: the task is still in the RUNNING state, so we
                         // have exclusive access to the future/output storage.
-                        unsafe { poll_hook_panic(self.core(), panic) };
+                        unsafe { poll_hook_panic(self.core(), header_ptr, panic) };
                         return PollFuture::Complete;
                     }
                 }
@@ -289,12 +294,20 @@ where
                 if let TransitionToIdle::Cancelled = transition_res {
                     // The transition to idle failed because the task was
                     // cancelled during the poll.
-                    cancel_task(self.core());
+                    cancel_task(
+                        self.core(),
+                        #[cfg(tokio_unstable)]
+                        header_ptr,
+                    );
                 }
                 transition_result_to_poll_future(transition_res)
             }
             TransitionToRunning::Cancelled => {
-                cancel_task(self.core());
+                cancel_task(
+                    self.core(),
+                    #[cfg(tokio_unstable)]
+                    self.header_ptr(),
+                );
                 PollFuture::Complete
             }
             TransitionToRunning::Failed => PollFuture::Done,
@@ -317,7 +330,11 @@ where
 
         // By transitioning the lifecycle to `Running`, we have permission to
         // drop the future.
-        cancel_task(self.core());
+        cancel_task(
+            self.core(),
+            #[cfg(tokio_unstable)]
+            self.header_ptr(),
+        );
         self.complete();
     }
 
@@ -373,7 +390,10 @@ where
             // they are dropping the `JoinHandle`, we assume they are not
             // interested in the panic and swallow it.
             let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                self.core().drop_future_or_output();
+                self.core().drop_future_or_output(
+                    #[cfg(tokio_unstable)]
+                    self.header_ptr(),
+                );
             }));
         }
 
@@ -414,7 +434,10 @@ where
                 // this task. It is our responsibility to drop the
                 // output. The join waker was already dropped by the
                 // `JoinHandle` before.
-                self.core().drop_future_or_output();
+                self.core().drop_future_or_output(
+                    #[cfg(tokio_unstable)]
+                    self.header_ptr(),
+                );
             } else if snapshot.is_join_waker_set() {
                 // Notify the waker. Reading the waker field is safe per rule 4
                 // in task/mod.rs, since the JOIN_WAKER bit is set and the call
@@ -569,10 +592,16 @@ enum PollFuture {
 }
 
 /// Cancels the task and store the appropriate error in the stage field.
-fn cancel_task<T: Future, S: Schedule>(core: &Core<T, S>) {
+fn cancel_task<T: Future, S: Schedule>(
+    core: &Core<T, S>,
+    #[cfg(tokio_unstable)] header: NonNull<Header>,
+) {
     // Drop the future from a panic guard.
     let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        core.drop_future_or_output();
+        core.drop_future_or_output(
+            #[cfg(tokio_unstable)]
+            header,
+        );
     }));
 
     core.store_output(Err(panic_result_to_join_error(core.task_id, res)));
@@ -597,10 +626,11 @@ fn panic_result_to_join_error(
 #[cfg(tokio_unstable)]
 unsafe fn poll_hook_panic<T: Future, S: Schedule>(
     core: &Core<T, S>,
+    header: NonNull<Header>,
     hook_panic: Box<dyn Any + Send + 'static>,
 ) {
     let drop_res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        core.drop_future_or_output();
+        core.drop_future_or_output(header);
     }));
     let join_error = match drop_res {
         Ok(()) => panic_to_error(&core.scheduler, core.task_id, hook_panic),
@@ -635,15 +665,24 @@ unsafe fn poll_future<T: Future, S: Schedule>(
     let output = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         struct Guard<'a, T: Future, S: Schedule> {
             core: &'a Core<T, S>,
+            #[cfg(tokio_unstable)]
+            header: NonNull<Header>,
         }
         impl<'a, T: Future, S: Schedule> Drop for Guard<'a, T, S> {
             fn drop(&mut self) {
                 // If the future panics on poll, we drop it inside the panic
                 // guard.
-                self.core.drop_future_or_output();
+                self.core.drop_future_or_output(
+                    #[cfg(tokio_unstable)]
+                    self.header,
+                );
             }
         }
-        let guard = Guard { core };
+        let guard = Guard {
+            core,
+            #[cfg(tokio_unstable)]
+            header,
+        };
         // Safety: the caller guarantees the mutual-exclusion requirements of
         // `Core::poll` and that `header` identifies this live task allocation.
         let res = unsafe {

@@ -392,7 +392,10 @@ impl<T: Future, S: Schedule> Core<T, S> {
         };
 
         if res.is_ready() {
-            self.drop_future_or_output();
+            self.drop_future_or_output(
+                #[cfg(tokio_unstable)]
+                header,
+            );
         }
 
         res
@@ -403,7 +406,24 @@ impl<T: Future, S: Schedule> Core<T, S> {
     /// # Safety
     ///
     /// The caller must ensure it is safe to mutate the `stage` field.
-    pub(super) fn drop_future_or_output(&self) {
+    pub(super) fn drop_future_or_output(
+        &self,
+        #[cfg(tokio_unstable)] header: NonNull<Header>,
+    ) {
+        #[cfg(tokio_unstable)]
+        let _current_task = {
+            let dropping_future = self.stage.stage.with(|ptr| {
+                // Safety: the caller ensures mutual exclusion to the field.
+                matches!(unsafe { &*ptr }, Stage::Running(_))
+            });
+
+            if dropping_future {
+                Some(CurrentTaskGuard::enter(header))
+            } else {
+                None
+            }
+        };
+
         // Safety: the caller ensures mutual exclusion to the field.
         unsafe {
             self.set_stage(Stage::Consumed);

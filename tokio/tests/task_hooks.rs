@@ -454,6 +454,62 @@ fn spawn_hook_can_inherit_parent_task_data() {
 }
 
 #[test]
+fn spawn_hook_can_inherit_parent_task_data_from_future_drop() {
+    struct SpawnOnDrop;
+
+    impl Future for SpawnOnDrop {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+            Poll::Pending
+        }
+    }
+
+    impl Drop for SpawnOnDrop {
+        fn drop(&mut self) {
+            tokio::spawn(async {});
+        }
+    }
+
+    let terminated = Arc::new(Mutex::new(Vec::new()));
+    let terminated2 = Arc::clone(&terminated);
+
+    let runtime = Builder::new_current_thread()
+        .on_task_spawn(|meta, parent| {
+            let depth = match parent {
+                Some(parent) => parent
+                    .data::<Lineage>()
+                    .map_or(0, |parent| parent.depth + 1),
+                None => 0,
+            };
+
+            meta.set_data(Lineage { depth });
+        })
+        .on_task_terminate(move |meta| {
+            let data = meta.take_data::<Lineage>().unwrap();
+            terminated2.lock().unwrap().push(data.depth);
+        })
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        let task = tokio::spawn(SpawnOnDrop);
+        tokio::task::yield_now().await;
+
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+
+        for _ in 0..4 {
+            tokio::task::yield_now().await;
+        }
+    });
+
+    let mut terminated = terminated.lock().unwrap().clone();
+    terminated.sort_unstable();
+    assert_eq!(terminated, vec![0, 1]);
+}
+
+#[test]
 fn spawn_hook_runs_before_terminate_when_current_thread_runtime_is_closed() {
     struct ClosedSpawnData;
 
