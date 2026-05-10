@@ -358,13 +358,18 @@ impl Sleep {
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
-            let _resource_enter = this.inner.ctx.resource_span.enter();
-            this.inner.ctx.async_op_span =
-                tracing::trace_span!("runtime.resource.async_op", source = "Sleep::reset");
-            let _async_op_enter = this.inner.ctx.async_op_span.enter();
+            this.inner.ctx.async_op_span = tracing::trace_span!(
+                parent: &this.inner.ctx.resource_span,
+                "runtime.resource.async_op",
+                source = "Sleep::reset",
+            );
+            this.inner.ctx.async_op_poll_span = tracing::trace_span!(
+                parent: &this.inner.ctx.async_op_span,
+                "runtime.resource.async_op.poll",
+            );
 
-            this.inner.ctx.async_op_poll_span =
-                tracing::trace_span!("runtime.resource.async_op.poll");
+            let _resource_enter = this.inner.ctx.resource_span.enter();
+            let _async_op_enter = this.inner.ctx.async_op_span.enter();
 
             let clock = handle.driver().clock();
             let now = time_source.now(clock);
