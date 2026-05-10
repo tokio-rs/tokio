@@ -98,20 +98,20 @@ impl Handle {
         T::Output: Send + 'static,
     {
         #[cfg(tokio_unstable)]
-        let parent = task::current_task_meta();
-        #[cfg(tokio_unstable)]
-        let (handle, notified) = me.shared.owned.bind_with_spawn_hook(
-            future,
-            me.clone(),
-            id,
-            spawned_at,
-            user_data,
-            |task| {
-                // Safety: the task is freshly allocated and not published yet.
-                let mut meta = unsafe { task.task_meta() };
-                me.task_hooks.spawn(&mut meta, parent);
-            },
-        );
+        let (handle, notified) = task::with_current_task_meta(|parent| {
+            me.shared.owned.bind_with_spawn_hook(
+                future,
+                me.clone(),
+                id,
+                spawned_at,
+                user_data,
+                |task| {
+                    // Safety: the task is freshly allocated and not published yet.
+                    let mut meta = unsafe { task.task_meta() };
+                    me.task_hooks.spawn(&mut meta, parent);
+                },
+            )
+        });
         #[cfg(not(tokio_unstable))]
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
 

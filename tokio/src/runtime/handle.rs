@@ -475,6 +475,10 @@ impl Handle {
         unsafe { self.spawn_local_named_inner(future, meta, user_data) }
     }
 
+    /// # Safety
+    ///
+    /// This must only be called in `LocalRuntime` if the runtime has been verified to be owned
+    /// by the current thread.
     #[track_caller]
     unsafe fn spawn_local_named_inner<F>(
         &self,

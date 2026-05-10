@@ -549,13 +549,12 @@ fn task_builder_data_is_visible_to_hooks() {
 #[cfg(feature = "tracing")]
 #[test]
 fn task_builder_data_is_not_dropped_for_spawn_blocking() {
-    let terminated = Arc::new(Mutex::new(Vec::new()));
-    let terminated2 = Arc::clone(&terminated);
+    let (terminated_tx, terminated_rx) = std::sync::mpsc::channel();
 
     let runtime = Builder::new_current_thread()
         .on_task_terminate(move |meta| {
             if let Some(value) = meta.take_data::<usize>() {
-                terminated2.lock().unwrap().push(*value);
+                terminated_tx.send(*value).unwrap();
             }
         })
         .build()
@@ -570,7 +569,10 @@ fn task_builder_data_is_not_dropped_for_spawn_blocking() {
             .unwrap();
     });
 
-    assert_eq!(*terminated.lock().unwrap(), vec![7]);
+    let terminated = terminated_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("spawn_blocking task terminate hook did not receive task data");
+    assert_eq!(terminated, 7);
 }
 
 fn mk_spawn_location_hook(

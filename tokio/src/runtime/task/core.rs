@@ -364,7 +364,11 @@ impl<T: Future, S: Schedule> Core<T, S> {
     ///
     /// `self` must also be pinned. This is handled by storing the task on the
     /// heap.
-    pub(super) fn poll(
+    ///
+    /// When `tokio_unstable` is enabled, `header` must point to the header for
+    /// this exact task allocation, and the allocation must remain live until
+    /// this function returns.
+    pub(super) unsafe fn poll(
         &self,
         #[cfg(tokio_unstable)] header: NonNull<Header>,
         mut cx: Context<'_>,

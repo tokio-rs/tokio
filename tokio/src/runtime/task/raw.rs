@@ -278,8 +278,8 @@ impl RawTask {
     /// The task allocation must be live, and the returned metadata must have
     /// exclusive access to hook data for as long as it can expose mutable references.
     pub(crate) unsafe fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
-        // Safety: `self` holds a live task reference, and callers use the
-        // metadata only for the current hook invocation.
+        // Safety: the caller guarantees that the task allocation is live and that
+        // the returned metadata has exclusive access to hook data.
         unsafe {
             crate::runtime::TaskMeta::new(
                 Header::get_id(self.ptr),
@@ -295,8 +295,8 @@ impl RawTask {
     /// The task allocation must be live, and hook data must not be mutated while
     /// references exposed through the returned metadata are live.
     pub(crate) unsafe fn task_meta_ref<'meta>(&self) -> crate::runtime::TaskMetaRef<'meta> {
-        // Safety: `self` holds a live task reference, and this only exposes
-        // shared access to task data.
+        // Safety: the caller guarantees that the task allocation is live and that
+        // hook data is not mutated while exposed references are live.
         unsafe {
             crate::runtime::TaskMetaRef::new(
                 Header::get_id(self.ptr),

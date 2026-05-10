@@ -475,20 +475,20 @@ impl Handle {
         F::Output: Send + 'static,
     {
         #[cfg(tokio_unstable)]
-        let parent = task::current_task_meta();
-        #[cfg(tokio_unstable)]
-        let (handle, notified) = me.shared.owned.bind_with_spawn_hook(
-            future,
-            me.clone(),
-            id,
-            spawned_at,
-            user_data,
-            |task| {
-                // Safety: the task is freshly allocated and not published yet.
-                let mut meta = unsafe { task.task_meta() };
-                me.task_hooks.spawn(&mut meta, parent);
-            },
-        );
+        let (handle, notified) = task::with_current_task_meta(|parent| {
+            me.shared.owned.bind_with_spawn_hook(
+                future,
+                me.clone(),
+                id,
+                spawned_at,
+                user_data,
+                |task| {
+                    // Safety: the task is freshly allocated and not published yet.
+                    let mut meta = unsafe { task.task_meta() };
+                    me.task_hooks.spawn(&mut meta, parent);
+                },
+            )
+        });
         #[cfg(not(tokio_unstable))]
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
 
@@ -524,26 +524,25 @@ impl Handle {
         F: crate::future::Future + 'static,
         F::Output: 'static,
     {
-        // Safety: the caller guarantees that this is only called on a `LocalRuntime`.
         #[cfg(tokio_unstable)]
-        let parent = task::current_task_meta();
-        #[cfg(tokio_unstable)]
-        let before_bind = |task: &Task<Arc<Handle>>| {
-            // Safety: the task is freshly allocated and not published yet.
-            let mut meta = unsafe { task.task_meta() };
-            me.task_hooks.spawn(&mut meta, parent);
-        };
-        #[cfg(tokio_unstable)]
-        let (handle, notified) = unsafe {
-            me.shared.owned.bind_local_with_spawn_hook(
-                future,
-                me.clone(),
-                id,
-                spawned_at,
-                user_data,
-                before_bind,
-            )
-        };
+        let (handle, notified) = task::with_current_task_meta(|parent| {
+            let before_bind = |task: &Task<Arc<Handle>>| {
+                // Safety: the task is freshly allocated and not published yet.
+                let mut meta = unsafe { task.task_meta() };
+                me.task_hooks.spawn(&mut meta, parent);
+            };
+            // Safety: the caller guarantees that this is only called on a `LocalRuntime`.
+            unsafe {
+                me.shared.owned.bind_local_with_spawn_hook(
+                    future,
+                    me.clone(),
+                    id,
+                    spawned_at,
+                    user_data,
+                    before_bind,
+                )
+            }
+        });
         #[cfg(not(tokio_unstable))]
         let (handle, notified) = unsafe {
             me.shared

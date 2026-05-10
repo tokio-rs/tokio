@@ -215,8 +215,11 @@ pub struct TaskMetaRef<'a> {
 impl<'a> TaskMetaRef<'a> {
     /// # Safety
     ///
-    /// If `user_data` is present, it must point to live task storage for the
-    /// duration of any references exposed through this metadata value.
+    /// If `user_data` is present, it must point to live task storage for the duration
+    /// of any references exposed through this metadata value.
+    ///
+    /// While any references exposed through this metadata value are live, the task
+    /// data must not be mutably accessed, replaced, cleared, or dropped.
     #[cfg(tokio_unstable)]
     pub(crate) unsafe fn new(
         id: super::task::Id,
@@ -251,7 +254,8 @@ impl<'a> TaskMetaRef<'a> {
         let user_data = self.user_data?;
 
         // Safety: `TaskMetaRef` is only constructed while the task allocation is
-        // known to be alive, and it does not expose mutation.
+        // known to be alive. Its constructor requires that the data is not mutated
+        // while exposed references are live.
         unsafe { user_data.as_ref().as_ref()?.downcast_ref::<T>() }
     }
 }

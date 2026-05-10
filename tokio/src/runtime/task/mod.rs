@@ -669,13 +669,18 @@ impl SpawnLocation {
 }
 
 #[cfg(tokio_unstable)]
-pub(crate) fn current_task_meta<'meta>() -> Option<crate::runtime::TaskMetaRef<'meta>> {
-    let ptr = crate::runtime::context::current_task()?;
+pub(crate) fn with_current_task_meta<R>(
+    f: impl for<'meta> FnOnce(Option<crate::runtime::TaskMetaRef<'meta>>) -> R,
+) -> R {
+    let Some(ptr) = crate::runtime::context::current_task() else {
+        return f(None);
+    };
 
     // Safety: the context stores this pointer only while the referenced task is
-    // being polled, so the allocation is alive for the duration of this call.
+    // being polled, so the allocation is alive for this synchronous call.
     let raw = unsafe { RawTask::from_raw(ptr.cast()) };
-    // Safety: parent metadata is exposed read-only during synchronous spawn
-    // hook invocation while no mutable parent hook metadata is live.
-    Some(unsafe { raw.task_meta_ref() })
+    // Safety: parent metadata is exposed read-only during this synchronous call
+    // while no mutable parent hook metadata is live. The closure-bound lifetime
+    // prevents references exposed through the metadata from escaping.
+    f(Some(unsafe { raw.task_meta_ref() }))
 }

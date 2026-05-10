@@ -222,8 +222,9 @@ where
 
                 #[cfg(tokio_unstable)]
                 {
-                    // Safety: the task is in the RUNNING state, which excludes
-                    // concurrent shutdown and termination metadata access.
+                    // Safety: the task is in the RUNNING state, so shutdown
+                    // cannot take ownership of the task contents and termination
+                    // cannot access hook data concurrently.
                     let mut task_meta = unsafe { self.task_meta() };
                     let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                         self.core()
@@ -232,7 +233,9 @@ where
                     }));
 
                     if let Err(panic) = res {
-                        poll_hook_panic(self.core(), panic);
+                        // Safety: the task is still in the RUNNING state, so we
+                        // have exclusive access to the future/output storage.
+                        unsafe { poll_hook_panic(self.core(), panic) };
                         return PollFuture::Complete;
                     }
 
@@ -245,18 +248,23 @@ where
                 let header_ptr = self.header_ptr();
                 let waker_ref = waker_ref::<S>(&header_ptr);
                 let cx = Context::from_waker(&waker_ref);
-                let res = poll_future(
-                    self.core(),
-                    #[cfg(tokio_unstable)]
-                    header_ptr,
-                    cx,
-                );
+                // Safety: `transition_to_running` succeeded, so this thread has
+                // exclusive access to the future/output storage. The header pointer
+                // comes from this harness and remains live while the task is running.
+                let res = unsafe {
+                    poll_future(
+                        self.core(),
+                        #[cfg(tokio_unstable)]
+                        header_ptr,
+                        cx,
+                    )
+                };
 
                 #[cfg(tokio_unstable)]
                 {
-                    // Safety: the task is still in the RUNNING state, which
-                    // excludes concurrent shutdown and termination metadata
-                    // access.
+                    // Safety: the task is still in the RUNNING state, so
+                    // shutdown cannot take ownership of the task contents and
+                    // termination cannot access hook data concurrently.
                     let mut task_meta = unsafe { self.task_meta() };
                     let hook_res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                         self.core()
@@ -265,7 +273,9 @@ where
                     }));
 
                     if let Err(panic) = hook_res {
-                        poll_hook_panic(self.core(), panic);
+                        // Safety: the task is still in the RUNNING state, so we
+                        // have exclusive access to the future/output storage.
+                        unsafe { poll_hook_panic(self.core(), panic) };
                         return PollFuture::Complete;
                     }
                 }
@@ -578,8 +588,14 @@ fn panic_result_to_join_error(
     }
 }
 
+/// Convert a poll hook panic into the task output.
+///
+/// # Safety
+///
+/// The caller must have exclusive access to the task's future/output storage,
+/// such as by holding the task in the RUNNING state.
 #[cfg(tokio_unstable)]
-fn poll_hook_panic<T: Future, S: Schedule>(
+unsafe fn poll_hook_panic<T: Future, S: Schedule>(
     core: &Core<T, S>,
     hook_panic: Box<dyn Any + Send + 'static>,
 ) {
@@ -602,7 +618,15 @@ fn poll_hook_panic<T: Future, S: Schedule>(
 
 /// Polls the future. If the future completes, the output is written to the
 /// stage field.
-fn poll_future<T: Future, S: Schedule>(
+///
+/// # Safety
+///
+/// The caller must satisfy the mutual-exclusion requirements of `Core::poll`.
+///
+/// When `tokio_unstable` is enabled, `header` must point to the header for this
+/// exact task allocation, and the allocation must remain live until this
+/// function returns.
+unsafe fn poll_future<T: Future, S: Schedule>(
     core: &Core<T, S>,
     #[cfg(tokio_unstable)] header: NonNull<Header>,
     cx: Context<'_>,
@@ -620,11 +644,15 @@ fn poll_future<T: Future, S: Schedule>(
             }
         }
         let guard = Guard { core };
-        let res = guard.core.poll(
-            #[cfg(tokio_unstable)]
-            header,
-            cx,
-        );
+        // Safety: the caller guarantees the mutual-exclusion requirements of
+        // `Core::poll` and that `header` identifies this live task allocation.
+        let res = unsafe {
+            guard.core.poll(
+                #[cfg(tokio_unstable)]
+                header,
+                cx,
+            )
+        };
         mem::forget(guard);
         res
     }));
