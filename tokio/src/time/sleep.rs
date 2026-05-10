@@ -363,6 +363,7 @@ impl Sleep {
                 "runtime.resource.async_op",
                 source = "Sleep::reset",
             );
+
             this.inner.ctx.async_op_poll_span = tracing::trace_span!(
                 parent: &this.inner.ctx.async_op_span,
                 "runtime.resource.async_op.poll",
@@ -403,8 +404,8 @@ impl Sleep {
 
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         let coop = ready!(crate::task::coop::poll_proceed(cx));
-        let mut this = self.project();
 
+        let mut this = self.project();
         let timer = match this.timer.as_mut().as_pin_mut() {
             Some(timer) => timer,
             None => {
@@ -469,7 +470,6 @@ impl Future for Sleep {
         let _ao_span = self.inner.ctx.async_op_span.clone().entered();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let _ao_poll_span = self.inner.ctx.async_op_poll_span.clone().entered();
-
         match ready!(self.as_mut().poll_elapsed(cx)) {
             Ok(()) => Poll::Ready(()),
             Err(e) => panic!("timer error: {e}"),
