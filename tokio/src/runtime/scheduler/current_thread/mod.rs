@@ -2,9 +2,7 @@ use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
-use crate::runtime::task::{
-    self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task,
-};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task};
 use crate::runtime::{
     blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
 };

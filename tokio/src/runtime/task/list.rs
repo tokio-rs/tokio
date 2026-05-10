@@ -127,8 +127,7 @@ impl<S: 'static> OwnedTasks<S> {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (task, notified, join) =
-            super::new_task(task, scheduler, id, spawned_at, user_data);
+        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at, user_data);
         before_bind(&task);
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
@@ -183,8 +182,7 @@ impl<S: 'static> OwnedTasks<S> {
         T: Future + 'static,
         T::Output: 'static,
     {
-        let (task, notified, join) =
-            super::new_task(task, scheduler, id, spawned_at, user_data);
+        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at, user_data);
         before_bind(&task);
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
