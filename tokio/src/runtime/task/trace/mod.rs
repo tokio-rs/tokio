@@ -455,15 +455,17 @@ fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -
             // same mechanism `yield_now` uses; the defer queue is drained
             // after `trace_current_thread` / `trace_multi_thread` returns.
             //
-            // We do this before polling so that the waker lives independently
-            // of the `LocalNotified` we are about to consume in `run()`.
-            let waker = local_notified.waker();
+            // We do this before polling so the borrow of the task ends before
+            // the `LocalNotified` is consumed in `run()`. `defer` clones the
+            // waker into its own queue, so the deferred entry outlives the
+            // `WakerRef` here.
+            let waker_ref = local_notified.waker_ref();
             context::with_scheduler(|scheduler| {
                 if let Some(scheduler) = scheduler {
                     match scheduler {
-                        scheduler::Context::CurrentThread(s) => s.defer.defer(&waker),
+                        scheduler::Context::CurrentThread(s) => s.defer.defer(&waker_ref),
                         #[cfg(feature = "rt-multi-thread")]
-                        scheduler::Context::MultiThread(s) => s.defer.defer(&waker),
+                        scheduler::Context::MultiThread(s) => s.defer.defer(&waker_ref),
                     }
                 }
             });

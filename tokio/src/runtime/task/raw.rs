@@ -242,6 +242,17 @@ impl RawTask {
         self.ptr
     }
 
+    #[cfg(all(
+        tokio_unstable,
+        feature = "taskdump",
+        feature = "rt",
+        target_os = "linux",
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+    ))]
+    pub(super) fn header_ptr_ref(&self) -> &NonNull<Header> {
+        &self.ptr
+    }
+
     pub(super) fn trailer_ptr(&self) -> NonNull<Trailer> {
         unsafe { Header::get_trailer(self.ptr) }
     }
