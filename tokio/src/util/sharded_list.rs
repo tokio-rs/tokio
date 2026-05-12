@@ -154,7 +154,7 @@ cfg_taskdump! {
                 guards.push(list.lock());
             }
             for g in &mut guards {
-                g.iter().for_each(&mut f);
+                g.for_each(&mut f);
             }
         }
     }

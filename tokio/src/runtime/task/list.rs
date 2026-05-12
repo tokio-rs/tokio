@@ -241,7 +241,7 @@ cfg_taskdump! {
         where
             F: FnMut(&Task<S>),
         {
-            self.list.iter().for_each(f);
+            self.list.for_each(f);
         }
     }
 }
