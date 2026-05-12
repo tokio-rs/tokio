@@ -51,7 +51,7 @@ pub(crate) struct TreeNode {
     ///
     /// Monotonic: once it transitions `false` -> `true`, it never goes back.
     /// Stored with `Release`, loaded with `Acquire`, so an observer that sees
-    /// `true` synchronises with the `cancel()` call that set it (and thus
+    /// `true` synchronizes with the `cancel()` call that set it (and thus
     /// with any data the canceller wrote first).
     ///
     /// This pair is *not* sufficient on its own for the `WaitForCancellationFuture::poll`
