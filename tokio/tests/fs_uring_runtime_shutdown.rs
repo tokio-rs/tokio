@@ -14,10 +14,21 @@ use std::future::poll_fn;
 use std::task::Poll;
 use tempfile::NamedTempFile;
 use tokio::runtime::Builder;
+use tokio_test::assert_pending;
+
+use crate::support::io_uring::io_uring_supported;
+
+mod support {
+    pub(crate) mod io_uring;
+}
 
 // see: https://github.com/tokio-rs/tokio/issues/7979
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
+    if !io_uring_supported() {
+        return;
+    }
+
     let tmp = NamedTempFile::new().unwrap();
     let path = tmp.path().to_path_buf();
 
@@ -41,10 +52,8 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
                     let fut = opt.open(&path);
 
                     // If io_uring is enabled (and not falling back to the thread pool),
-                    // the first poll should return Pending. We don't check if the result
-                    // is actually a pending because we run some CI checks based on old
-                    // kernels that don't support uring.
-                    let _pending = Box::pin(fut).poll_unpin(cx);
+                    // the first poll should return Pending.
+                    assert_pending!(Box::pin(fut).poll_unpin(cx));
 
                     tx.send(()).unwrap();
 

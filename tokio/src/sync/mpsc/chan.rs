@@ -289,7 +289,7 @@ impl<T, S: Semaphore> Rx<T, S> {
     pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         use super::block::Read;
 
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
@@ -349,7 +349,7 @@ impl<T, S: Semaphore> Rx<T, S> {
     ) -> Poll<usize> {
         use super::block::Read;
 
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));

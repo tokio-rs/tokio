@@ -4,20 +4,7 @@
 
 use std::ptr;
 
-use crate::runtime::task::trace::{trace_with, Trace, TraceMeta};
-
-/// Capture using the default `backtrace::trace`-based implementation.
-#[inline(never)]
-pub(super) fn capture<F, R>(f: F) -> (R, Trace)
-where
-    F: FnOnce() -> R,
-{
-    let mut trace = Trace::empty();
-
-    let result = trace_with(f, |meta| trace_leaf(meta, &mut trace));
-
-    (result, trace)
-}
+use crate::runtime::task::trace::{Trace, TraceMeta};
 
 /// Capture a backtrace via `backtrace::trace` and collect it into `trace`.
 pub(crate) fn trace_leaf(meta: &TraceMeta, trace: &mut Trace) {

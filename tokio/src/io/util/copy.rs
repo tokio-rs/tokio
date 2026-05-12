@@ -82,7 +82,7 @@ impl CopyBuffer {
         R: AsyncRead + ?Sized,
         W: AsyncWrite + ?Sized,
     {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         #[cfg(any(
             feature = "fs",
             feature = "io-std",

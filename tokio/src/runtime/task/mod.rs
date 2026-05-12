@@ -509,6 +509,20 @@ impl<S: Schedule> LocalNotified<S> {
         mem::forget(self);
         raw.poll();
     }
+
+    /// Returns a `WakerRef` borrowing from this task.
+    ///
+    /// `WakerRef` derefs to `Waker` without bumping the task's refcount.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "taskdump",
+        feature = "rt",
+        target_os = "linux",
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+    ))]
+    pub(crate) fn waker_ref(&self) -> waker::WakerRef<'_, S> {
+        waker::waker_ref::<S>(self.task.raw.header_ptr_ref())
+    }
 }
 
 impl<S: Schedule> UnownedTask<S> {
