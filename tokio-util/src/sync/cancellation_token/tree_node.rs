@@ -50,16 +50,18 @@ pub(crate) struct TreeNode {
     /// Whether the node has been cancelled.
     ///
     /// Monotonic: once it transitions `false` -> `true`, it never goes back.
+    /// Stored with `Release`, loaded with `Acquire`, so an observer that sees
+    /// `true` synchronises with the `cancel()` call that set it (and thus
+    /// with any data the canceller wrote first).
     ///
-    /// All read-modify-write operations on this field use `AcqRel` ordering,
-    /// so a read that observes `false` and a write that stores `true` form a
-    /// release-acquire pair in either direction. This bidirectional ordering
-    /// is required for the lost-wakeup avoidance argument in
-    /// `WaitForCancellationFuture::poll`: the check-then-register pattern (poll
-    /// reads `false`, registers a `Notified` waker) must happen-before
-    /// `cancel()` storing `true` and calling `notify_waiters`. A plain
-    /// `load(Acquire)` would only synchronise in the opposite direction and
-    /// would allow a lost wakeup.
+    /// This pair is *not* sufficient on its own for the `WaitForCancellationFuture::poll`
+    /// check-then-register pattern, where a load returning `false` must
+    /// happen-before the corresponding store of `true`. That use site takes
+    /// the mutex via [`is_cancelled_with_sync`] instead — the lock pair
+    /// supplies the missing direction. Keeping the public `is_cancelled` as
+    /// a plain `load(Acquire)` matters because RMWs (e.g. `lock cmpxchg`)
+    /// take the cache line exclusive and would defeat the fast path for
+    /// many concurrent readers on different cores.
     is_cancelled: AtomicBool,
     inner: Mutex<Inner>,
     waker: tokio::sync::Notify,
@@ -81,29 +83,6 @@ impl TreeNode {
     pub(crate) fn notified(&self) -> tokio::sync::futures::Notified<'_> {
         self.waker.notified()
     }
-
-    /// Reads the cancellation flag without locking the mutex, using a
-    /// read-modify-write so that observers form a release-acquire pair with
-    /// `mark_cancelled` in either direction.
-    fn read_is_cancelled(&self) -> bool {
-        // `compare_exchange(false, false, AcqRel, Acquire)` reads the current
-        // value as an RMW: on `Ok(_)` the value was `false` (no change), on
-        // `Err(true)` the value was already `true`. Either way the operation
-        // carries `AcqRel`/`Acquire` ordering, which `load(Acquire)` does not.
-        match self
-            .is_cancelled
-            .compare_exchange(false, false, Ordering::AcqRel, Ordering::Acquire)
-        {
-            Ok(_) => false,
-            Err(actual) => actual,
-        }
-    }
-
-    /// Sets the cancellation flag to `true` with `AcqRel` ordering and returns
-    /// the previous value.
-    fn mark_cancelled(&self) -> bool {
-        self.is_cancelled.swap(true, Ordering::AcqRel)
-    }
 }
 
 /// The data contained inside a `TreeNode`.
@@ -120,9 +99,32 @@ struct Inner {
 /// Returns whether or not the node is cancelled.
 ///
 /// This is a lock-free, non-blocking fast path: it never acquires the node's
-/// mutex.
+/// mutex and never performs an atomic read-modify-write. It is the right
+/// choice for callers that just want to ask "is this token cancelled?" —
+/// including tight loops on real-time threads.
+///
+/// Note: if you intend to read this flag and then register a `Notified` for
+/// wakeup on cancellation, use [`is_cancelled_with_sync`] instead.
 pub(crate) fn is_cancelled(node: &Arc<TreeNode>) -> bool {
-    node.read_is_cancelled()
+    node.is_cancelled.load(Ordering::Acquire)
+}
+
+/// Returns whether or not the node is cancelled, providing a full
+/// happens-before with the `cancel()` that sets the flag.
+///
+/// This is used by `WaitForCancellationFuture::poll`'s check-then-register
+/// pattern: the caller has already created a `Notified` future, will read
+/// the flag here, and — if it observes `false` — will then register itself
+/// on the `Notify`'s waiter list. For that registration to be guaranteed to
+/// happen-before the next `cancel()`'s `notify_waiters()`, the load must
+/// happen-before any concurrent `cancel()` write. A plain `load(Acquire)`
+/// does not establish that direction; taking the node's mutex does, because
+/// `cancel()` does its work under the same mutex.
+pub(crate) fn is_cancelled_with_sync(node: &Arc<TreeNode>) -> bool {
+    // The mutex's release/acquire chain with `cancel()` carries the
+    // happens-before, so the atomic read itself only needs `Relaxed`.
+    let _guard = node.inner.lock().unwrap();
+    node.is_cancelled.load(Ordering::Relaxed)
 }
 
 /// Creates a child node
@@ -384,7 +386,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
             if locked_grandchild.children.is_empty() {
                 // Cancel the grandchild
                 locked_grandchild.children = Vec::new();
-                grandchild.mark_cancelled();
+                grandchild.is_cancelled.store(true, Ordering::Release);
                 drop(locked_grandchild);
                 grandchild.waker.notify_waiters();
             } else {
@@ -398,7 +400,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
 
         // Cancel the child
         locked_child.children = Vec::new();
-        child.mark_cancelled();
+        child.is_cancelled.store(true, Ordering::Release);
         drop(locked_child);
         child.waker.notify_waiters();
 
@@ -408,7 +410,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
 
     // Cancel the node itself.
     locked_node.children = Vec::new();
-    node.mark_cancelled();
+    node.is_cancelled.store(true, Ordering::Release);
     drop(locked_node);
     node.waker.notify_waiters();
 }
