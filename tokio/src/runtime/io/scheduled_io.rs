@@ -236,55 +236,34 @@ impl ScheduledIo {
     /// than 32 wakers to notify, if the stack array fills up, the lock is
     /// released, the array is cleared, and the iteration continues.
     pub(super) fn wake(&self, ready: Ready) {
+        let mut lock = self.waiters.lock();
+
         let mut wakers = WakeList::new();
+        wakers.extend(ready.is_readable().then(|| lock.reader.take()).flatten());
+        wakers.extend(ready.is_writable().then(|| lock.writer.take()).flatten());
 
-        let mut waiters = self.waiters.lock();
-
-        // check for AsyncRead slot
-        if ready.is_readable() {
-            if let Some(waker) = waiters.reader.take() {
-                wakers.push(waker);
-            }
-        }
-
-        // check for AsyncWrite slot
-        if ready.is_writable() {
-            if let Some(waker) = waiters.writer.take() {
-                wakers.push(waker);
-            }
-        }
-
-        'outer: loop {
-            let mut iter = waiters.list.drain_filter(|w| ready.satisfies(w.interest));
-
-            while wakers.can_push() {
-                match iter.next() {
-                    Some(waiter) => {
-                        let waiter = unsafe { &mut *waiter.as_ptr() };
-
-                        if let Some(waker) = waiter.waker.take() {
+        loop {
+            wakers.extend(
+                lock.list
+                    .drain_filter(|w| ready.satisfies(w.interest))
+                    .flat_map(|mut waiter| {
+                        let waiter = unsafe { waiter.as_mut() };
+                        if waiter.waker.is_some() {
                             waiter.is_ready = true;
-                            wakers.push(waker);
                         }
-                    }
-                    None => {
-                        break 'outer;
-                    }
-                }
-            }
+                        waiter.waker.take()
+                    }),
+            );
 
-            drop(waiters);
-
+            let satisfies = lock.list.iter().any(|w| ready.satisfies(w.interest));
+            // Release the lock before notifying
+            drop(lock);
             wakers.wake_all();
-
-            // Acquire the lock again.
-            waiters = self.waiters.lock();
+            if !satisfies {
+                break;
+            }
+            lock = self.waiters.lock();
         }
-
-        // Release the lock before notifying
-        drop(waiters);
-
-        wakers.wake_all();
     }
 
     pub(super) fn ready_event(&self, interest: Interest) -> ReadyEvent {

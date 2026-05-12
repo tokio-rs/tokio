@@ -81,3 +81,19 @@ impl Drop for WakeList {
         unsafe { ptr::drop_in_place(slice) };
     }
 }
+
+impl Extend<Waker> for WakeList {
+    fn extend<T: IntoIterator<Item = Waker>>(&mut self, iter: T) {
+        for waker in iter.into_iter().take(NUM_WAKERS - self.curr) {
+            self.push(waker);
+        }
+    }
+}
+
+impl FromIterator<Waker> for WakeList {
+    fn from_iter<T: IntoIterator<Item = Waker>>(iter: T) -> Self {
+        let mut list = WakeList::new();
+        list.extend(iter);
+        list
+    }
+}

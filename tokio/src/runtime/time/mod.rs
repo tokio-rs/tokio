@@ -294,8 +294,6 @@ impl Handle {
     }
 
     pub(self) fn process_at_time(&self, mut now: u64) {
-        let mut waker_list = WakeList::new();
-
         let mut lock = self.inner.lock();
 
         if now < lock.wheel.elapsed() {
@@ -308,32 +306,30 @@ impl Handle {
             now = lock.wheel.elapsed();
         }
 
-        while let Some(entry) = lock.wheel.poll(now) {
-            debug_assert!(unsafe { entry.is_pending() });
+        loop {
+            let mut wakers = lock
+                .wheel
+                .drain(now)
+                // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
+                .filter_map(|timer| unsafe { timer.fire(Ok(())) })
+                .collect::<WakeList>();
 
-            // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
-            if let Some(waker) = unsafe { entry.fire(Ok(())) } {
-                waker_list.push(waker);
-
-                if !waker_list.can_push() {
-                    // Wake a batch of wakers. To avoid deadlock, we must do this with the lock temporarily dropped.
-                    drop(lock);
-
-                    waker_list.wake_all();
-
-                    lock = self.inner.lock();
-                }
+            let contains_elapsed = lock.wheel.contains_elapsed(now);
+            if !contains_elapsed {
+                lock.next_wake = lock
+                    .wheel
+                    .next_expiration_time()
+                    .map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
             }
+
+            // Wake a batch of wakers. To avoid deadlock, we must do this with the lock temporarily dropped.
+            drop(lock);
+            wakers.wake_all();
+            if !contains_elapsed {
+                break;
+            }
+            lock = self.inner.lock();
         }
-
-        lock.next_wake = lock
-            .wheel
-            .poll_at()
-            .map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
-
-        drop(lock);
-
-        waker_list.wake_all();
     }
 
     #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]

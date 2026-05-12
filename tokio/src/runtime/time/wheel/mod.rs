@@ -132,36 +132,50 @@ impl Wheel {
         }
     }
 
-    /// Instant at which to poll.
-    pub(crate) fn poll_at(&self) -> Option<u64> {
-        self.next_expiration().map(|expiration| expiration.deadline)
+    /// Returns true if the wheel contains elapsed timers.
+    pub(super) fn contains_elapsed(&self, now: u64) -> bool {
+        !self.pending.is_empty()
+            || match self.next_expiration() {
+                Some(expiration) => expiration.deadline <= now,
+                None => false,
+            }
     }
 
-    /// Advances the timer up to the instant represented by `now`.
-    pub(crate) fn poll(&mut self, now: u64) -> Option<TimerHandle> {
-        loop {
-            if let Some(handle) = self.pending.pop_back() {
-                return Some(handle);
-            }
+    /// Returns an iterator over elapsed timers.
+    pub(super) fn drain(&mut self, now: u64) -> impl Iterator<Item = TimerHandle> + '_ {
+        struct Iter<'a> {
+            now: u64,
+            wheel: &'a mut Wheel,
+        }
 
-            match self.next_expiration() {
-                Some(ref expiration) if expiration.deadline <= now => {
-                    self.process_expiration(expiration);
+        impl Iterator for Iter<'_> {
+            type Item = TimerHandle;
 
-                    self.set_elapsed(expiration.deadline);
-                }
-                _ => {
-                    // in this case the poll did not indicate an expiration
-                    // _and_ we were not able to find a next expiration in
-                    // the current list of timers.  advance to the poll's
-                    // current time and do nothing else.
-                    self.set_elapsed(now);
-                    break;
+            fn next(&mut self) -> Option<Self::Item> {
+                loop {
+                    if let Some(handle) = self.wheel.pending.pop_back() {
+                        return Some(handle);
+                    }
+
+                    match self.wheel.next_expiration() {
+                        Some(expiration) if expiration.deadline <= self.now => {
+                            self.wheel.process_expiration(&expiration);
+                            self.wheel.set_elapsed(expiration.deadline);
+                        }
+                        _ => {
+                            // in this case the poll did not indicate an expiration
+                            // _and_ we were not able to find a next expiration in
+                            // the current list of timers.  advance to the poll's
+                            // current time and do nothing else.
+                            self.wheel.set_elapsed(self.now);
+                            return None;
+                        }
+                    }
                 }
             }
         }
 
-        self.pending.pop_back()
+        Iter { now, wheel: self }.inspect(|timer| debug_assert!(unsafe { timer.is_pending() }))
     }
 
     /// Returns the instant at which the next timeout expires.
