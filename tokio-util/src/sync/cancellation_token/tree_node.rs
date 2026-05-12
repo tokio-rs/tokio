@@ -52,16 +52,16 @@ pub(crate) struct TreeNode {
     /// Monotonic: once it transitions `false` -> `true`, it never goes back.
     /// Stored with `Release`, loaded with `Acquire`, so an observer that sees
     /// `true` synchronizes with the `cancel()` call that set it (and thus
-    /// with any data the canceller wrote first).
+    /// with any data the cancelling thread wrote first).
     ///
     /// This pair is *not* sufficient on its own for the `WaitForCancellationFuture::poll`
     /// check-then-register pattern, where a load returning `false` must
     /// happen-before the corresponding store of `true`. That use site takes
     /// the mutex via [`is_cancelled_with_sync`] instead — the lock pair
     /// supplies the missing direction. Keeping the public `is_cancelled` as
-    /// a plain `load(Acquire)` matters because RMWs (e.g. `lock cmpxchg`)
-    /// take the cache line exclusive and would defeat the fast path for
-    /// many concurrent readers on different cores.
+    /// a plain `load(Acquire)` matters because read-modify-write atomics
+    /// (e.g. `lock cmpxchg`) take the cache line exclusive and would defeat
+    /// the fast path for many concurrent readers on different cores.
     is_cancelled: AtomicBool,
     inner: Mutex<Inner>,
     waker: tokio::sync::Notify,
