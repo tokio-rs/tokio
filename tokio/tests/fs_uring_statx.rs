@@ -26,6 +26,12 @@ use tokio::runtime::{Builder, Runtime};
 use tokio_test::assert_pending;
 use tokio_util::task::TaskTracker;
 
+use crate::support::io_uring::io_uring_supported;
+
+mod support {
+    pub(crate) mod io_uring;
+}
+
 fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
     Box::new(move || {
         Builder::new_multi_thread()
@@ -53,6 +59,10 @@ fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
 
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
+    if !io_uring_supported() {
+        return;
+    }
+
     fn run(rt: Runtime) {
         let (done_tx, done_rx) = mpsc::channel();
         let (_tmp, path) = create_tmp_files(1);
@@ -221,6 +231,10 @@ async fn stat_path_name_too_long() {
 
 #[tokio::test]
 async fn cancel_op_future() {
+    if !io_uring_supported() {
+        return;
+    }
+
     let (_tmp_file, path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
     let path = path[0].clone();
 
@@ -230,13 +244,9 @@ async fn cancel_op_future() {
         poll_fn(|cx| {
             let fut = try_exists(path.clone());
 
-            // If io_uring is enabled (and not falling back to the thread pool),
-            // the first poll should return Pending. We don't check if the result
-            // is actually pending because we run some checks on old kernel that
-            // do not support uring.
-            let _pending = Box::pin(fut).poll_unpin(cx);
-
-            tx.send(()).unwrap();
+            // the first poll should return Pending.
+            assert_pending!(Box::pin(fut).poll_unpin(cx));
+            tx.send(true).unwrap();
 
             Poll::<()>::Pending
         })
@@ -244,7 +254,8 @@ async fn cancel_op_future() {
     });
 
     // Wait for the first poll
-    rx.recv().await.unwrap();
+    let val = rx.recv().await;
+    assert!(val.unwrap());
 
     handle.abort();
 

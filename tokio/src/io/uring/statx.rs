@@ -90,7 +90,7 @@ impl Op<Statx> {
             buffer.as_mut_ptr().cast(),
         )
         .flags(flags)
-        .mask(libc::STATX_BASIC_STATS)
+        .mask(libc::STATX_BASIC_STATS | libc::STATX_BTIME)
         .build();
 
         // SAFETY: Parameters are valid for the entire duration of the operation

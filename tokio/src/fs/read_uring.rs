@@ -19,42 +19,40 @@ const PROBE_SIZE_U32: u32 = PROBE_SIZE as u32;
 #[allow(unused)] // FIXME: remove when MSRV is 1.93 (due to statx on 1.25 musl)
 const MAX_READ_SIZE: usize = 64 * 1024 * 1024;
 
-#[cfg(all(
-    tokio_unstable,
-    feature = "io-uring",
-    feature = "rt",
-    feature = "fs",
-    // libc::statx is only supported on these platforms
-    // FIXME: Add musl target env when our minimum supported
-    // rust version is 1.93. To clarify, statx support is
-    // introduced to musl in 1.25 as mentioned officially here:
-    // https://musl.libc.org/releases.html.
-    // However, rustup target_env building for *-linux-musl
-    // uses 1.25 musl on all *-linux-musl platforms starting
-    // in 1.93 stable rust version.
-    // https://blog.rust-lang.org/2025/12/05/Updating-musl-1.2.5/
-    any(target_env = "gnu", target_os = "android")
-))]
-pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
-    let file = OpenOptions::new().read(true).open(path).await?;
+cfg_io_uring! {
+    #[cfg(
+        // libc::statx is only supported on these platforms
+        // FIXME: Add musl target env when our minimum supported
+        // rust version is 1.93. To clarify, statx support is
+        // introduced to musl in 1.25 as mentioned officially here:
+        // https://musl.libc.org/releases.html.
+        // However, rustup target_env building for *-linux-musl
+        // uses 1.25 musl on all *-linux-musl platforms starting
+        // in 1.93 stable rust version.
+        // https://blog.rust-lang.org/2025/12/05/Updating-musl-1.2.5/
+        any(target_env = "gnu", target_os = "android")
+    )]
+    pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
+        let file = OpenOptions::new().read(true).open(path).await?;
 
-    let size_hint = Op::file_metadata(&file)?
-        .await
-        .map(|m| m.len() as usize)
-        .ok();
+        let size_hint = Op::file_metadata(&file)?
+            .await
+            .map(|m| m.len() as usize)
+            .ok();
 
-    let fd: OwnedFd = file
-        .try_into_std()
-        .expect("unexpected in-flight operation detected")
-        .into();
+        let fd: OwnedFd = file
+            .try_into_std()
+            .expect("unexpected in-flight operation detected")
+            .into();
 
-    let mut buf = Vec::new();
+        let mut buf = Vec::new();
 
-    if let Some(size_hint) = size_hint {
-        buf.try_reserve(size_hint)?;
+        if let Some(size_hint) = size_hint {
+            buf.try_reserve(size_hint)?;
+        }
+
+        read_to_end_uring(fd, buf).await
     }
-
-    read_to_end_uring(fd, buf).await
 }
 
 #[allow(unused)] // FIXME: remove when MSRV is 1.93 (due to statx on 1.25 musl)
