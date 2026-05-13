@@ -704,7 +704,8 @@ impl Notify {
 
         impl Drop for DropGuard<'_> {
             fn drop(&mut self) {
-                let Some(mut list) = self.list.take().filter(GuardedLinkedList::is_empty) else {
+                // If the list is not empty, we unlink all waiters from it.
+                let Some(mut list) = self.list.take().filter(|list| !list.is_empty()) else {
                     return;
                 };
 

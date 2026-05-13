@@ -948,11 +948,13 @@ impl<T> Shared<T> {
 
         impl<T> Drop for DropGuard<'_, T> {
             fn drop(&mut self) {
-                let Some(mut list) = self.list.take().filter(GuardedLinkedList::is_empty) else {
+                // If the list is not empty, we unlink all waiters from it.
+                let Some(mut list) = self.list.take().filter(|list| !list.is_empty()) else {
                     return;
                 };
 
                 let _lock = self.shared.tail.lock();
+                // We do not wake the waiters to avoid double panics.
                 for _ in list.drain() {}
             }
         }
@@ -969,6 +971,7 @@ impl<T> Shared<T> {
             let mut wakers = list
                 .drain()
                 .filter_map(|waiter| {
+                    // Safety: accessing `waker` is safe because the tail lock is held.
                     let waker = unsafe { (*waiter.as_ptr()).waker.take() };
                     // Safety: `queued` is atomic.
                     let queued = unsafe { &(*waiter.as_ptr()).queued };
