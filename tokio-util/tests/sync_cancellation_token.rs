@@ -656,6 +656,7 @@ fn cancel_descendant_waker_can_access_ancestor() {
 // Verifies that `is_cancelled` provides a happens-before relationship with the
 // `cancel` that flipped it: data written before `cancel()` must be observable
 // after `is_cancelled()` returns `true`.
+#[cfg(not(target_family = "wasm"))] // requires `std::thread::spawn`
 #[test]
 fn is_cancelled_publishes_writes_from_cancel() {
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -694,6 +695,7 @@ fn is_cancelled_publishes_writes_from_cancel() {
 // contention. With the previous mutex-based implementation, all readers
 // would serialise; this test mostly exists as a regression guard for the
 // fast path.
+#[cfg(not(target_family = "wasm"))] // requires `std::thread::spawn`
 #[test]
 fn is_cancelled_concurrent_readers() {
     use std::sync::Arc;
@@ -753,6 +755,7 @@ fn is_cancelled_concurrent_readers() {
 // poll path under racy conditions; with insufficient ordering between
 // `is_cancelled` and `cancel`, the future could deadlock waiting for a
 // `Notified` that was never woken.
+#[cfg(not(target_family = "wasm"))] // requires `std::thread::spawn`
 #[test]
 fn cancelled_future_completes_under_race() {
     use std::sync::Arc;
