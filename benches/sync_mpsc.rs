@@ -19,6 +19,15 @@ impl Default for Large {
     }
 }
 
+#[cfg(target_pointer_width = "64")]
+const ARRAY_CAP: usize = 32;
+
+#[cfg(not(target_pointer_width = "64"))]
+const ARRAY_CAP: usize = 16;
+
+const LIST_CAP: usize = ARRAY_CAP + 1;
+const ROUNDTRIP_ITERS: usize = 1_000;
+
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(6)
@@ -34,6 +43,14 @@ fn create_medium<const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>) {
     });
 }
 
+fn create_data<T, const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>, prefix: &str) {
+    g.bench_function(format!("{prefix}_{SIZE}"), |b| {
+        b.iter(|| {
+            black_box(mpsc::channel::<T>(SIZE));
+        })
+    });
+}
+
 fn send_data<T: Default, const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>, prefix: &str) {
     let rt = rt();
 
@@ -44,6 +61,22 @@ fn send_data<T: Default, const SIZE: usize>(g: &mut BenchmarkGroup<WallTime>, pr
             let _ = rt.block_on(tx.send(T::default()));
 
             rt.block_on(rx.recv()).unwrap();
+        })
+    });
+}
+
+fn roundtrip_try_send_recv_data<T: Default, const SIZE: usize>(
+    g: &mut BenchmarkGroup<WallTime>,
+    prefix: &str,
+) {
+    let (tx, mut rx) = mpsc::channel::<T>(SIZE);
+
+    g.bench_function(format!("{prefix}_{SIZE}"), |b| {
+        b.iter(|| {
+            for _ in 0..ROUNDTRIP_ITERS {
+                tx.try_send(T::default()).unwrap();
+                black_box(rx.try_recv().unwrap());
+            }
         })
     });
 }
@@ -296,10 +329,36 @@ fn bench_create_medium(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_create_small(c: &mut Criterion) {
+    let mut group = c.benchmark_group("create_small");
+    create_data::<Medium, 1>(&mut group, "medium");
+    create_data::<Medium, 10>(&mut group, "medium");
+    create_data::<Medium, ARRAY_CAP>(&mut group, "medium");
+    create_data::<Medium, LIST_CAP>(&mut group, "medium");
+    create_data::<Large, 1>(&mut group, "large");
+    create_data::<Large, 10>(&mut group, "large");
+    create_data::<Large, ARRAY_CAP>(&mut group, "large");
+    create_data::<Large, LIST_CAP>(&mut group, "large");
+    group.finish();
+}
+
 fn bench_send(c: &mut Criterion) {
     let mut group = c.benchmark_group("send");
+    send_data::<Medium, 1>(&mut group, "medium");
+    send_data::<Medium, 10>(&mut group, "medium");
     send_data::<Medium, 1000>(&mut group, "medium");
+    send_data::<Large, 1>(&mut group, "large");
+    send_data::<Large, 10>(&mut group, "large");
     send_data::<Large, 1000>(&mut group, "large");
+    group.finish();
+}
+
+fn bench_roundtrip_try_send_recv(c: &mut Criterion) {
+    let mut group = c.benchmark_group("roundtrip_try_send_recv");
+    roundtrip_try_send_recv_data::<Medium, 1>(&mut group, "medium");
+    roundtrip_try_send_recv_data::<Medium, 10>(&mut group, "medium");
+    roundtrip_try_send_recv_data::<Medium, ARRAY_CAP>(&mut group, "medium");
+    roundtrip_try_send_recv_data::<Medium, LIST_CAP>(&mut group, "medium");
     group.finish();
 }
 
@@ -324,8 +383,17 @@ fn bench_uncontented(c: &mut Criterion) {
 }
 
 criterion_group!(create, bench_create_medium);
+criterion_group!(create_small, bench_create_small);
 criterion_group!(send, bench_send);
+criterion_group!(roundtrip_try_send_recv, bench_roundtrip_try_send_recv);
 criterion_group!(contention, bench_contention);
 criterion_group!(uncontented, bench_uncontented);
 
-criterion_main!(create, send, contention, uncontented);
+criterion_main!(
+    create,
+    create_small,
+    send,
+    roundtrip_try_send_recv,
+    contention,
+    uncontented
+);
