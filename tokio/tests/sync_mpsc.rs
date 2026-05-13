@@ -70,6 +70,20 @@ async fn send_recv_with_buffer() {
     assert!(val.is_none());
 }
 
+#[test]
+#[cfg(tokio_unstable)]
+fn array_wraps_with_non_power_of_two_capacity() {
+    let (tx, mut rx) = mpsc::channel(3);
+
+    // Exercise several wraps of the queue position. In particular, capacity
+    // three does not divide the native integer range, so relying on integer
+    // overflow to wrap the position would eventually select the wrong slot.
+    for value in 0..12 {
+        tx.try_send(value).unwrap();
+        assert_eq!(rx.try_recv(), Ok(value));
+    }
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn reserve_disarm() {
