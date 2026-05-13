@@ -120,7 +120,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
 use crate::task::coop::cooperative;
-use crate::util::linked_list::{self, LinkedList};
+use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
 use crate::util::WakeList;
 
 use std::fmt;
@@ -406,6 +406,17 @@ struct Waiter {
 
     /// Should not be `Unpin`.
     _p: PhantomPinned,
+}
+
+impl Waiter {
+    fn new() -> Self {
+        Self {
+            queued: AtomicBool::new(false),
+            waker: None,
+            pointers: linked_list::Pointers::new(),
+            _p: PhantomPinned,
+        }
+    }
 }
 
 generate_addr_of_methods! {
@@ -930,39 +941,68 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
 
 impl<T> Shared<T> {
     fn notify_rx<'a, 'b: 'a>(&'b self, mut tail: MutexGuard<'a, Tail>) {
-        struct DropGuard(LinkedList<Waiter, <Waiter as linked_list::Link>::Target>);
+        struct DropGuard<'a, T> {
+            list: Option<GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::Target>>,
+            shared: &'a Shared<T>,
+        }
 
-        impl Drop for DropGuard {
+        impl<T> Drop for DropGuard<'_, T> {
             fn drop(&mut self) {
-                for waiter in self.0.drain() {
-                    let waiter = unsafe { waiter.as_ref() };
-                    assert!(waiter.queued.load(Relaxed));
-                    // `Release` is needed to synchronize with `Recv::drop`.
-                    waiter.queued.store(false, Release);
-                }
+                let Some(mut list) = self.list.take().filter(GuardedLinkedList::is_empty) else {
+                    return;
+                };
+
+                let _lock = self.shared.tail.lock();
+                for _ in list.drain() {}
             }
         }
 
-        let mut list = std::mem::take(&mut tail.waiters);
-        drop(tail);
+        // It is critical for `GuardedLinkedList` safety that the guard node is
+        // pinned in memory and is not dropped until the guarded list is dropped.
+        let guard = Waiter::new();
+        pin!(guard);
 
-        while !list.is_empty() {
+        let mut list =
+            std::mem::take(&mut tail.waiters).into_guarded(guard.as_ref().get_ref().into());
+
+        loop {
             let mut wakers = list
                 .drain()
-                .filter_map(|mut waiter| {
-                    let waiter = unsafe { waiter.as_mut() };
-                    assert!(waiter.queued.load(Relaxed));
+                .filter_map(|waiter| {
+                    let waker = unsafe { (*waiter.as_ptr()).waker.take() };
+                    // Safety: `queued` is atomic.
+                    let queued = unsafe { &(*waiter.as_ptr()).queued };
+                    // `Relaxed` suffices because the tail lock is held.
+                    assert!(queued.load(Relaxed));
                     // `Release` is needed to synchronize with `Recv::drop`.
-                    waiter.queued.store(false, Release);
-                    waiter.waker.take()
+                    // It is critical to set this variable **after** waker
+                    // is extracted, otherwise we may data race with `Recv::drop`.
+                    queued.store(false, Release);
+                    waker
                 })
                 .collect::<WakeList>();
 
-            let mut guard = DropGuard(list);
-            // One of the wakers may panic, but the remaining waiters will still
-            // be unlinked from the list by `DropGuard`.
+            let is_empty = list.is_empty();
+            // Release the lock before waking.
+            drop(tail);
+
+            // Before we acquire the lock again all sorts of things can happen:
+            // some waiters may remove themselves from the list and new waiters
+            // may be added. This is fine since at worst we will unnecessarily
+            // wake up waiters which will then queue themselves again.
+
+            let mut guard = DropGuard {
+                list: Some(list),
+                shared: self,
+            };
             wakers.wake_all();
-            list = std::mem::take(&mut guard.0);
+
+            if is_empty {
+                break;
+            }
+            list = guard.list.take().unwrap();
+            // Acquire the lock again.
+            tail = self.tail.lock();
         }
     }
 }

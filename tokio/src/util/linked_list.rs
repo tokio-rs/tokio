@@ -246,10 +246,6 @@ impl<L: Link> LinkedList<L, L::Target> {
             _marker: PhantomData,
         }
     }
-
-    pub(crate) fn drain(&mut self) -> Drain<'_, L, L::Target> {
-        Drain { list: self }
-    }
 }
 
 impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
@@ -293,18 +289,6 @@ impl<'a, L: Link> Iterator for Iter<'a, L, L::Target> {
         let next = self.next?;
         self.next = unsafe { L::pointers(next).as_ref() }.get_next();
         Some(unsafe { next.as_ref() })
-    }
-}
-
-pub(crate) struct Drain<'a, L, T> {
-    list: &'a mut LinkedList<L, T>,
-}
-
-impl<'a, L: Link> Iterator for Drain<'a, L, L::Target> {
-    type Item = L::Handle;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.list.pop_front()
     }
 }
 
@@ -369,6 +353,116 @@ cfg_taskdump! {
                     next = T::pointers(curr).as_ref().get_next();
                 }
             }
+        }
+    }
+}
+
+// ===== impl GuardedLinkedList =====
+
+feature! {
+    #![any(
+        feature = "process",
+        feature = "sync",
+        feature = "rt",
+        feature = "signal",
+    )]
+
+    /// An intrusive linked list, but instead of keeping pointers to the head
+    /// and tail nodes, it uses a special guard node linked with those nodes.
+    /// It means that the list is circular and every pointer of a node from
+    /// the list is not `None`, including pointers from the guard node.
+    ///
+    /// If a list is empty, then both pointers of the guard node are pointing
+    /// at the guard node itself.
+    pub(crate) struct GuardedLinkedList<L, T> {
+        /// Pointer to the guard node.
+        guard: NonNull<T>,
+
+        /// Node type marker.
+        _marker: PhantomData<*const L>,
+    }
+
+    impl<L: Link> LinkedList<L, L::Target> {
+        /// Turns a linked list into the guarded version by linking the guard node
+        /// with the head and tail nodes. Like with other nodes, you should guarantee
+        /// that the guard node is pinned in memory.
+        pub(crate) fn into_guarded(self, guard_handle: L::Handle) -> GuardedLinkedList<L, L::Target> {
+            // `guard_handle` is a NonNull pointer, we don't have to care about dropping it.
+            let guard = L::as_raw(&guard_handle);
+
+            unsafe {
+                if let Some(head) = self.head {
+                    debug_assert!(L::pointers(head).as_ref().get_prev().is_none());
+                    L::pointers(head).as_mut().set_prev(Some(guard));
+                    L::pointers(guard).as_mut().set_next(Some(head));
+
+                    // The list is not empty, so the tail cannot be `None`.
+                    let tail = self.tail.unwrap();
+                    debug_assert!(L::pointers(tail).as_ref().get_next().is_none());
+                    L::pointers(tail).as_mut().set_next(Some(guard));
+                    L::pointers(guard).as_mut().set_prev(Some(tail));
+                } else {
+                    // The list is empty.
+                    L::pointers(guard).as_mut().set_prev(Some(guard));
+                    L::pointers(guard).as_mut().set_next(Some(guard));
+                }
+            }
+
+            GuardedLinkedList { guard, _marker: PhantomData }
+        }
+    }
+
+    impl<L: Link> GuardedLinkedList<L, L::Target> {
+        pub(crate) fn is_empty(&self) -> bool {
+            self.tail().is_none()
+        }
+
+        pub(crate) fn drain(&mut self) -> Drain<'_, L, L::Target> {
+            Drain { list: self }
+        }
+
+        fn tail(&self) -> Option<NonNull<L::Target>> {
+            let tail_ptr = unsafe {
+                L::pointers(self.guard).as_ref().get_prev().unwrap()
+            };
+
+            // Compare the tail pointer with the address of the guard node itself.
+            // If the guard points at itself, then there are no other nodes and
+            // the list is considered empty.
+            if tail_ptr != self.guard {
+                Some(tail_ptr)
+            } else {
+                None
+            }
+        }
+
+        /// Removes the last element from a list and returns it, or None if it is
+        /// empty.
+        fn pop_back(&mut self) -> Option<L::Handle> {
+            unsafe {
+                let last = self.tail()?;
+                let before_last = L::pointers(last).as_ref().get_prev().unwrap();
+
+                L::pointers(self.guard).as_mut().set_prev(Some(before_last));
+                L::pointers(before_last).as_mut().set_next(Some(self.guard));
+
+                L::pointers(last).as_mut().set_prev(None);
+                L::pointers(last).as_mut().set_next(None);
+
+                Some(L::from_raw(last))
+            }
+        }
+    }
+
+    pub(crate) struct Drain<'a, L, T> {
+        list: &'a mut GuardedLinkedList<L, T>,
+    }
+
+    impl<'a, L: Link> Iterator for Drain<'a, L, L::Target> {
+        type Item = L::Handle;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.list.pop_back()
         }
     }
 }
