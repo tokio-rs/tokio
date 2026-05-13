@@ -1279,10 +1279,10 @@ impl<T> Future for Receiver<T> {
 
         let ret = if let Some(inner) = self.as_ref().get_ref().inner.as_ref() {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx))).map_err(Into::into);
+            let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx)));
 
             #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-            let res = ready!(inner.poll_recv(cx)).map_err(Into::into);
+            let res = ready!(inner.poll_recv(cx));
 
             res
         } else {
