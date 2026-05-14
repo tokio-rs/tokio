@@ -227,9 +227,10 @@ impl Trace {
     /// should not be much slower than calling `f` directly.
     ///
     /// Due to the way tracing is implemented, Tokio leaf futures will usually, instead of doing their
-    /// actual work, do the equivalent of a `yield_now` (returning a `Poll::Pending` and scheduling the
-    /// current context for execution), which means forward progress will probably not happen unless
-    /// you eventually call your future outside of `capture`.
+    /// actual work, return `Poll::Pending` without registering the task's waker with any driver.
+    /// This means forward progress will probably not happen unless you eventually call your future
+    /// outside of `capture`, or explicitly re-schedule the task (e.g. by calling
+    /// [`cx.waker().wake_by_ref()`][std::task::Waker::wake_by_ref]) after `capture` returns.
     ///
     /// [`Handle::dump`]: crate::runtime::Handle::dump
     ///

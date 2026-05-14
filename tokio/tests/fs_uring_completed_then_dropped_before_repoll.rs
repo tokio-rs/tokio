@@ -6,6 +6,11 @@
     target_os = "linux"
 ))]
 
+mod support {
+    pub(crate) mod io_uring;
+}
+
+use std::fmt::Debug;
 use std::fs;
 use std::future::Future;
 use std::path::PathBuf;
@@ -16,6 +21,9 @@ use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::timeout;
+use tokio_test::assert_pending;
+
+use crate::support::io_uring::io_uring_supported;
 
 /// Count currently-open fds in this process.
 fn fd_count() -> usize {
@@ -42,14 +50,17 @@ struct PollOpenOnceThenNeverRepoll<F> {
     polled_once: bool,
 }
 
-impl<F: Future> Future for PollOpenOnceThenNeverRepoll<F> {
-    type Output = ();
+impl<F: Future> Future for PollOpenOnceThenNeverRepoll<F>
+where
+    F::Output: Debug,
+{
+    type Output = F::Output;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if !self.polled_once {
-            // We don't check if the result is actually pending because
-            // we run some checks on old kernel that do not support uring.
-            let _pending = self.inner.as_mut().poll(cx);
+            // If io_uring is enabled (and not falling back to the thread pool),
+            // the first poll should return Pending.
+            assert_pending!(self.inner.as_mut().poll(cx));
 
             self.polled_once = true;
             self.first_poll_tx.take().unwrap().send(()).unwrap();
@@ -80,7 +91,7 @@ async fn completed_then_dropped_before_repoll(path: PathBuf) {
             second_poll_tx: Some(second_tx),
             polled_once: false,
         }
-        .await;
+        .await
     });
 
     // Wait until the inner open has been polled once and registered with io_uring.
@@ -98,6 +109,10 @@ async fn completed_then_dropped_before_repoll(path: PathBuf) {
 
 #[test]
 fn uring_completed_then_dropped() {
+    if !io_uring_supported() {
+        return;
+    }
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(1)
         .enable_all()
