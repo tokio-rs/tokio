@@ -110,6 +110,9 @@ jobs:
           tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: "false"
 
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }}
         run: |
@@ -185,6 +188,9 @@ jobs:
           tool: cargo-hack
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: "false"
 
       # Run integration tests for each feature
       - name: test tests-integration --each-feature
@@ -293,6 +299,9 @@ jobs:
           tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: "false"
       # Run `tokio` with "unstable" cfg flag.
       - name: test tokio full --cfg unstable
         run: |
@@ -995,7 +1004,6 @@ jobs:
           workspaces: "./quinn"
           # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
           cache-bin: "false"
-          
 
       - name: Test Quinn
         working-directory: quinn
