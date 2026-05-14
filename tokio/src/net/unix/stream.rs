@@ -86,7 +86,17 @@ impl UnixStream {
         #[cfg(not(any(target_os = "linux", target_os = "android")))]
         let addr = StdSocketAddr::from_pathname(path)?;
 
-        let stream = mio::net::UnixStream::connect_addr(&addr)?;
+        let addr = SocketAddr::from(addr);
+        UnixStream::connect_addr(&addr).await
+    }
+
+    /// Connects to the socket named by `socket_addr`.
+    ///
+    /// This function will create a new Unix socket and connect to the address
+    /// specified, associating the returned stream with the default event
+    /// loop's handle.
+    pub async fn connect_addr(socket_addr: &SocketAddr) -> io::Result<UnixStream> {
+        let stream = mio::net::UnixStream::connect_addr(&socket_addr.0)?;
         let stream = UnixStream::new(stream)?;
 
         poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;

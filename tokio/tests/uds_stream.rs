@@ -8,6 +8,7 @@ use std::io;
 use std::os::android::net::SocketAddrExt;
 #[cfg(target_os = "linux")]
 use std::os::linux::net::SocketAddrExt;
+use std::os::unix::net::SocketAddr;
 use std::task::Poll;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
@@ -28,6 +29,34 @@ async fn accept_read_write() -> std::io::Result<()> {
 
     let accept = listener.accept();
     let connect = UnixStream::connect(&sock_path);
+    let ((mut server, _), mut client) = try_join(accept, connect).await?;
+
+    // Write to the client.
+    client.write_all(b"hello").await?;
+    drop(client);
+
+    // Read from the server.
+    let mut buf = vec![];
+    server.read_to_end(&mut buf).await?;
+    assert_eq!(&buf, b"hello");
+    let len = server.read(&mut buf).await?;
+    assert_eq!(len, 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn accept_read_write_socketaddr() -> std::io::Result<()> {
+    let dir = tempfile::Builder::new()
+        .prefix("tokio-uds-tests")
+        .tempdir()
+        .unwrap();
+    let sock_path = dir.path().join("connect.sock");
+    let addr = SocketAddr::from_pathname(&sock_path)?.into();
+
+    let listener = UnixListener::bind_addr(&addr)?;
+
+    let accept = listener.accept();
+    let connect = UnixStream::connect_addr(&addr);
     let ((mut server, _), mut client) = try_join(accept, connect).await?;
 
     // Write to the client.
