@@ -242,11 +242,7 @@ where
                     }
 
                     if self.state().load().is_cancelled() {
-                        cancel_task(
-                            self.core(),
-                            #[cfg(tokio_unstable)]
-                            header_ptr,
-                        );
+                        cancel_task(self.core(), header_ptr);
                         return PollFuture::Complete;
                     }
                 }
@@ -256,14 +252,7 @@ where
                 // Safety: `transition_to_running` succeeded, so this thread has
                 // exclusive access to the future/output storage. The header pointer
                 // comes from this harness and remains live while the task is running.
-                let res = unsafe {
-                    poll_future(
-                        self.core(),
-                        #[cfg(tokio_unstable)]
-                        header_ptr,
-                        cx,
-                    )
-                };
+                let res = unsafe { poll_future(self.core(), header_ptr, cx) };
 
                 #[cfg(tokio_unstable)]
                 {
@@ -294,20 +283,12 @@ where
                 if let TransitionToIdle::Cancelled = transition_res {
                     // The transition to idle failed because the task was
                     // cancelled during the poll.
-                    cancel_task(
-                        self.core(),
-                        #[cfg(tokio_unstable)]
-                        header_ptr,
-                    );
+                    cancel_task(self.core(), header_ptr);
                 }
                 transition_result_to_poll_future(transition_res)
             }
             TransitionToRunning::Cancelled => {
-                cancel_task(
-                    self.core(),
-                    #[cfg(tokio_unstable)]
-                    self.header_ptr(),
-                );
+                cancel_task(self.core(), self.header_ptr());
                 PollFuture::Complete
             }
             TransitionToRunning::Failed => PollFuture::Done,
@@ -330,11 +311,7 @@ where
 
         // By transitioning the lifecycle to `Running`, we have permission to
         // drop the future.
-        cancel_task(
-            self.core(),
-            #[cfg(tokio_unstable)]
-            self.header_ptr(),
-        );
+        cancel_task(self.core(), self.header_ptr());
         self.complete();
     }
 
@@ -390,10 +367,7 @@ where
             // they are dropping the `JoinHandle`, we assume they are not
             // interested in the panic and swallow it.
             let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                self.core().drop_future_or_output(
-                    #[cfg(tokio_unstable)]
-                    self.header_ptr(),
-                );
+                self.core().drop_future_or_output(self.header_ptr());
             }));
         }
 
@@ -434,10 +408,7 @@ where
                 // this task. It is our responsibility to drop the
                 // output. The join waker was already dropped by the
                 // `JoinHandle` before.
-                self.core().drop_future_or_output(
-                    #[cfg(tokio_unstable)]
-                    self.header_ptr(),
-                );
+                self.core().drop_future_or_output(self.header_ptr());
             } else if snapshot.is_join_waker_set() {
                 // Notify the waker. Reading the waker field is safe per rule 4
                 // in task/mod.rs, since the JOIN_WAKER bit is set and the call
@@ -592,16 +563,10 @@ enum PollFuture {
 }
 
 /// Cancels the task and store the appropriate error in the stage field.
-fn cancel_task<T: Future, S: Schedule>(
-    core: &Core<T, S>,
-    #[cfg(tokio_unstable)] header: NonNull<Header>,
-) {
+fn cancel_task<T: Future, S: Schedule>(core: &Core<T, S>, header: NonNull<Header>) {
     // Drop the future from a panic guard.
     let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        core.drop_future_or_output(
-            #[cfg(tokio_unstable)]
-            header,
-        );
+        core.drop_future_or_output(header);
     }));
 
     core.store_output(Err(panic_result_to_join_error(core.task_id, res)));
@@ -653,45 +618,33 @@ unsafe fn poll_hook_panic<T: Future, S: Schedule>(
 ///
 /// The caller must satisfy the mutual-exclusion requirements of `Core::poll`.
 ///
-/// When `tokio_unstable` is enabled, `header` must point to the header for this
-/// exact task allocation, and the allocation must remain live until this
-/// function returns.
+/// `header` must point to the header for this exact task allocation, and the
+/// allocation must remain live until this function returns.
 unsafe fn poll_future<T: Future, S: Schedule>(
     core: &Core<T, S>,
-    #[cfg(tokio_unstable)] header: NonNull<Header>,
+    header: NonNull<Header>,
     cx: Context<'_>,
 ) -> Poll<()> {
     // Poll the future.
     let output = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         struct Guard<'a, T: Future, S: Schedule> {
             core: &'a Core<T, S>,
-            #[cfg(tokio_unstable)]
             header: NonNull<Header>,
         }
         impl<'a, T: Future, S: Schedule> Drop for Guard<'a, T, S> {
             fn drop(&mut self) {
                 // If the future panics on poll, we drop it inside the panic
                 // guard.
-                self.core.drop_future_or_output(
-                    #[cfg(tokio_unstable)]
-                    self.header,
-                );
+                self.core.drop_future_or_output(self.header);
             }
         }
         let guard = Guard {
             core,
-            #[cfg(tokio_unstable)]
             header,
         };
         // Safety: the caller guarantees the mutual-exclusion requirements of
         // `Core::poll` and that `header` identifies this live task allocation.
-        let res = unsafe {
-            guard.core.poll(
-                #[cfg(tokio_unstable)]
-                header,
-                cx,
-            )
-        };
+        let res = unsafe { guard.core.poll(header, cx) };
         mem::forget(guard);
         res
     }));

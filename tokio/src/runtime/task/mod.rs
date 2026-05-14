@@ -186,7 +186,7 @@
 
 mod core;
 use self::core::Cell;
-use self::core::Header;
+pub(crate) use self::core::Header;
 
 mod error;
 pub use self::error::JoinError;
@@ -687,7 +687,7 @@ pub(crate) fn with_current_task_meta<R>(
 
     // Safety: the context stores this pointer only while the referenced task is
     // being polled, so the allocation is alive for this synchronous call.
-    let raw = unsafe { RawTask::from_raw(ptr.cast()) };
+    let raw = unsafe { RawTask::from_raw(ptr) };
     // Safety: parent metadata is exposed read-only during this synchronous call
     // while no mutable parent hook metadata is live. The closure-bound lifetime
     // prevents references exposed through the metadata from escaping.
