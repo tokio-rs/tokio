@@ -638,10 +638,7 @@ unsafe fn poll_future<T: Future, S: Schedule>(
                 self.core.drop_future_or_output(self.header);
             }
         }
-        let guard = Guard {
-            core,
-            header,
-        };
+        let guard = Guard { core, header };
         // Safety: the caller guarantees the mutual-exclusion requirements of
         // `Core::poll` and that `header` identifies this live task allocation.
         let res = unsafe { guard.core.poll(header, cx) };
