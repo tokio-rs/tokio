@@ -75,6 +75,9 @@ jobs:
           tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: "false"
 
       # Run `tokio` with stable features. This excludes testing utilities which
       # can alter the runtime behavior of Tokio.
@@ -146,6 +149,9 @@ jobs:
           tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: "false"
 
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }} panic=abort
         run: |
@@ -937,7 +943,8 @@ jobs:
           # relative to the `$workspace` and defaults to "target" if not explicitly given.
           # default: ". -> target"
           workspaces: "./hyper"
-          cache-bin: false # tmp fix for the macos-runner issues: https://github.com/actions/runner-images/issues/14097
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: "false"
 
       - name: Test hyper
         run: cargo test --features full
@@ -986,6 +993,9 @@ jobs:
           # relative to the `$workspace` and defaults to "target" if not explicitly given.
           # default: ". -> target"
           workspaces: "./quinn"
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: "false"
+          
 
       - name: Test Quinn
         working-directory: quinn
