@@ -1,0 +1,117 @@
+[package]
+name = "examples"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "MIT"
+
+# If you copy one of the examples into a new project, you should be using
+# [dependencies] instead, and delete the **path**.
+[dev-dependencies]
+tokio = { version = "1.0.0", path = "../tokio", features = ["full", "tracing"] }
+tokio-util = { version = "0.7.0", path = "../tokio-util", features = ["full"] }
+tokio-stream = { version = "0.1", path = "../tokio-stream" }
+
+tracing = "0.1"
+tracing-subscriber = { version = "0.3.1", default-features = false, features = ["fmt", "ansi", "env-filter", "tracing-log"] }
+bytes = "1.0.0"
+futures = { version = "0.3.0", features = ["thread-pool"]}
+http = "1"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+httparse = "1.0"
+httpdate = "1.0"
+once_cell = "1.5.2"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+libc = "0.2"
+
+[target.'cfg(all(tokio_unstable, target_os = "linux"))'.dev-dependencies]
+tokio = { version = "1.0.0", path = "../tokio", features = ["full", "tracing", "taskdump"] }
+
+[target.'cfg(windows)'.dev-dependencies.windows-sys]
+version = "0.61"
+
+[[example]]
+name = "chat"
+path = "chat.rs"
+
+[[example]]
+name = "connect-tcp"
+path = "connect-tcp.rs"
+
+[[example]]
+name = "connect-udp"
+path = "connect-udp.rs"
+
+[[example]]
+name = "echo-tcp"
+path = "echo-tcp.rs"
+
+[[example]]
+name = "graceful-shutdown"
+path = "graceful-shutdown.rs"
+
+[[example]]
+name = "echo-udp"
+path = "echo-udp.rs"
+
+[[example]]
+name = "hello_world"
+path = "hello_world.rs"
+
+[[example]]
+name = "print_each_packet"
+path = "print_each_packet.rs"
+
+[[example]]
+name = "proxy"
+path = "proxy.rs"
+
+[[example]]
+name = "tinydb"
+path = "tinydb.rs"
+
+[[example]]
+name = "udp-client"
+path = "udp-client.rs"
+
+[[example]]
+name = "udp-codec"
+path = "udp-codec.rs"
+
+[[example]]
+name = "tinyhttp"
+path = "tinyhttp.rs"
+
+[[example]]
+name = "custom-executor"
+path = "custom-executor.rs"
+
+[[example]]
+name = "custom-executor-tokio-context"
+path = "custom-executor-tokio-context.rs"
+
+[[example]]
+name = "named-pipe"
+path = "named-pipe.rs"
+
+[[example]]
+name = "named-pipe-ready"
+path = "named-pipe-ready.rs"
+
+[[example]]
+name = "named-pipe-multi-client"
+path = "named-pipe-multi-client.rs"
+
+[[example]]
+name = "dump"
+path = "dump.rs"
+
+[[example]]
+name = "prewarm-fd-table"
+path = "prewarm-fd-table.rs"
+
+[lints]
+workspace = true

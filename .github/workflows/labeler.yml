@@ -1,0 +1,25 @@
+name: "Pull Request Labeler"
+on:
+- pull_request_target
+
+# See .github/labeler.yml file
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  triage:
+    permissions:
+      contents: read  # for actions/labeler to determine modified files
+      pull-requests: write  # for actions/labeler to add labels to PRs
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'tokio-rs'
+    steps:
+    - uses: actions/labeler@v6
+      with:
+        repo-token: "${{ secrets.GITHUB_TOKEN }}"
+        sync-labels: true

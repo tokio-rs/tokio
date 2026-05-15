@@ -1,0 +1,11 @@
+error: function `f` is never used
+ --> $DIR/macros_dead_code.rs:6:10
+  |
+6 | async fn f() {}
+  |          ^
+  |
+note: the lint level is defined here
+ --> $DIR/macros_dead_code.rs:1:9
+  |
+1 | #![deny(dead_code)]
+  |         ^^^^^^^^^

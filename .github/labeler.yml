@@ -1,0 +1,40 @@
+R-loom-blocking:
+- changed-files:
+  - any-glob-to-any-file:
+    - tokio/src/runtime/blocking/*
+    - tokio/src/runtime/blocking/**/*
+
+R-loom-sync:
+- changed-files:
+  - any-glob-to-any-file:
+    - tokio/src/sync/*
+    - tokio/src/sync/**/*
+
+R-loom-time-driver:
+- changed-files:
+  - any-glob-to-any-file:
+    - tokio/src/runtime/time/*
+    - tokio/src/runtime/time/**/*
+
+R-loom-current-thread:
+- changed-files:
+  - any-glob-to-any-file:
+    - tokio/src/runtime/scheduler/*
+    - tokio/src/runtime/scheduler/current_thread/*
+    - tokio/src/runtime/task/*
+    - tokio/src/runtime/task/**
+
+R-loom-multi-thread:
+- changed-files:
+  - any-glob-to-any-file:
+    - tokio/src/runtime/scheduler/*
+    - tokio/src/runtime/scheduler/multi_thread/*
+    - tokio/src/runtime/scheduler/multi_thread/**
+    - tokio/src/runtime/task/*
+    - tokio/src/runtime/task/**
+
+R-loom-util:
+- changed-files:
+  - any-glob-to-any-file:
+    - tokio-util/src/*
+    - tokio-util/src/**/*

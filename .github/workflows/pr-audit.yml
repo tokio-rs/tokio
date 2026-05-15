@@ -1,0 +1,23 @@
+name: Pull Request Security Audit
+
+on:
+  push:
+    paths:
+      - '**/Cargo.toml'
+  pull_request:
+    paths:
+      - '**/Cargo.toml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-deny:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: EmbarkStudios/cargo-deny-action@v2

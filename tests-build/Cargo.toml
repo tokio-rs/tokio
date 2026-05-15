@@ -1,0 +1,20 @@
+[package]
+name = "tests-build"
+version = "0.1.0"
+authors = ["Tokio Contributors <team@tokio.rs>"]
+edition = "2021"
+license = "MIT"
+publish = false
+
+[features]
+full = ["tokio/full"]
+rt = ["tokio/rt", "tokio/macros"]
+
+[dependencies]
+tokio = { version = "1.0.0", path = "../tokio", optional = true }
+
+[dev-dependencies]
+trybuild = "1.0"
+
+[lints]
+workspace = true

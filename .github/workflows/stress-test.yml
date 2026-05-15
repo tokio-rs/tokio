@@ -1,0 +1,45 @@
+name: Stress Test
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  RUSTFLAGS: -Dwarnings
+  RUST_BACKTRACE: 1
+  # Change to specific Rust release to pin
+  rust_stable: 1.82
+
+permissions:
+  contents: read
+
+jobs:
+  stress-test:
+    name: Stress Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        stress-test:
+          - simple_echo_tcp
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - name: Install Valgrind
+        uses: taiki-e/install-action@valgrind
+
+      - uses: Swatinem/rust-cache@v2
+      # Compiles each of the stress test examples.
+      - name: Compile stress test examples
+        run: cargo build -p stress-test --release --example ${{ matrix.stress-test }}
+
+      # Runs each of the examples using Valgrind. Detects leaks and displays them.
+      - name: Run valgrind
+        run: valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all --fair-sched=yes ./target/release/examples/${{ matrix.stress-test }}

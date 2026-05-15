@@ -1,0 +1,110 @@
+[package]
+name = "benches"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "MIT"
+
+[features]
+test-util = ["tokio/test-util"]
+
+[dependencies]
+tokio = { version = "1.5.0", path = "../tokio", features = ["full"] }
+criterion = "0.5.1"
+rand = "0.9"
+rand_chacha = "0.9"
+
+[dev-dependencies]
+tokio-util = { version = "0.7.0", path = "../tokio-util", features = ["full"] }
+tokio-stream = { version = "0.1", path = "../tokio-stream" }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.42"
+
+[[bench]]
+name = "spawn"
+path = "spawn.rs"
+harness = false
+
+[[bench]]
+name = "sync_broadcast"
+path = "sync_broadcast.rs"
+harness = false
+
+[[bench]]
+name = "sync_mpsc"
+path = "sync_mpsc.rs"
+harness = false
+
+[[bench]]
+name = "sync_mpsc_oneshot"
+path = "sync_mpsc_oneshot.rs"
+harness = false
+
+[[bench]]
+name = "sync_watch"
+path = "sync_watch.rs"
+harness = false
+
+[[bench]]
+name = "rt_current_thread"
+path = "rt_current_thread.rs"
+harness = false
+
+[[bench]]
+name = "rt_multi_threaded"
+path = "rt_multi_threaded.rs"
+harness = false
+
+[[bench]]
+name = "sync_notify"
+path = "sync_notify.rs"
+harness = false
+
+[[bench]]
+name = "sync_rwlock"
+path = "sync_rwlock.rs"
+harness = false
+
+[[bench]]
+name = "sync_semaphore"
+path = "sync_semaphore.rs"
+harness = false
+
+[[bench]]
+name = "signal"
+path = "signal.rs"
+harness = false
+
+[[bench]]
+name = "fs"
+path = "fs.rs"
+harness = false
+
+[[bench]]
+name = "copy"
+path = "copy.rs"
+harness = false
+
+[[bench]]
+name = "time_now"
+path = "time_now.rs"
+harness = false
+
+[[bench]]
+name = "time_timeout"
+path = "time_timeout.rs"
+harness = false
+
+[[bench]]
+name = "spawn_blocking"
+path = "spawn_blocking.rs"
+harness = false
+
+[[bench]]
+name = "remote_spawn"
+path = "remote_spawn.rs"
+harness = false
+
+[lints]
+workspace = true
