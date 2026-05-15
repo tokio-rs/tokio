@@ -147,49 +147,57 @@ fn remote_abort_local_set_3929() {
 
 /// Checks that a suspended task can be aborted even if the `JoinHandle` is immediately dropped.
 /// issue #3964: <https://github.com/tokio-rs/tokio/issues/3964>.
-#[tokio::test(start_paused = true)]
-async fn test_abort_wakes_task_3964() {
-    let notify_dropped = Arc::new(());
-    let weak_notify_dropped = Arc::downgrade(&notify_dropped);
+#[test]
+fn test_abort_wakes_task_3964() {
+    let rt = Builder::new_current_thread().enable_time().build().unwrap();
 
-    let handle = tokio::spawn(async move {
-        // Make sure the Arc is moved into the task
-        let _notify_dropped = notify_dropped;
-        tokio::time::sleep(Duration::new(100, 0)).await
+    rt.block_on(async move {
+        let notify_dropped = Arc::new(());
+        let weak_notify_dropped = Arc::downgrade(&notify_dropped);
+
+        let handle = tokio::spawn(async move {
+            // Make sure the Arc is moved into the task
+            let _notify_dropped = notify_dropped;
+            tokio::time::sleep(Duration::new(100, 0)).await
+        });
+
+        // wait for task to sleep.
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        handle.abort();
+        drop(handle);
+
+        // wait for task to abort.
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // Check that the Arc has been dropped.
+        assert!(weak_notify_dropped.upgrade().is_none());
     });
-
-    // wait for task to sleep.
-    tokio::time::sleep(Duration::from_millis(20)).await;
-
-    handle.abort();
-    drop(handle);
-
-    // wait for task to abort.
-    tokio::time::sleep(Duration::from_millis(20)).await;
-
-    // Check that the Arc has been dropped.
-    assert!(weak_notify_dropped.upgrade().is_none());
 }
 
 /// Checks that aborting a task whose destructor panics does not allow the
 /// panic to escape the task.
-#[tokio::test(start_paused = true)]
+#[test]
 #[cfg(panic = "unwind")]
-async fn test_abort_task_that_panics_on_drop_contained() {
-    let handle = tokio::spawn(async move {
-        // Make sure the Arc is moved into the task
-        let _panic_dropped = PanicOnDrop;
-        tokio::time::sleep(Duration::new(100, 0)).await
+fn test_abort_task_that_panics_on_drop_contained() {
+    let rt = Builder::new_current_thread().enable_time().build().unwrap();
+
+    rt.block_on(async move {
+        let handle = tokio::spawn(async move {
+            // Make sure the Arc is moved into the task
+            let _panic_dropped = PanicOnDrop;
+            tokio::time::sleep(Duration::new(100, 0)).await
+        });
+
+        // wait for task to sleep.
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        handle.abort();
+        drop(handle);
+
+        // wait for task to abort.
+        tokio::time::sleep(Duration::from_millis(10)).await;
     });
-
-    // wait for task to sleep.
-    tokio::time::sleep(Duration::from_millis(10)).await;
-
-    handle.abort();
-    drop(handle);
-
-    // wait for task to abort.
-    tokio::time::sleep(Duration::from_millis(10)).await;
 }
 
 /// Checks that aborting a task whose destructor panics has the expected result.
@@ -206,7 +214,7 @@ fn test_abort_task_that_panics_on_drop_returned() {
         });
 
         // wait for task to sleep.
-        tokio::time::sleep(Duration::from_millis(20)).await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
 
         handle.abort();
         assert!(handle.await.unwrap_err().is_panic());

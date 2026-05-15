@@ -131,7 +131,6 @@ fn worker_park_count() {
     let rt = current_thread();
     let metrics = rt.metrics();
     rt.block_on(async {
-        time::pause();
         time::sleep(Duration::from_millis(1)).await;
     });
     drop(rt);
