@@ -364,3 +364,96 @@ async fn drop_from_wake() {
         }
     }
 }
+
+// Regression test for https://github.com/tokio-rs/tokio/issues/7883
+//
+// An eager combinator that calls wake() synchronously on every poll starves the
+// timer driver in a current_thread runtime (the driver only runs between task
+// polls). Sleep must self-complete via a wall-clock check so it doesn't rely on
+// the driver being invoked.
+#[tokio::test(flavor = "current_thread")]
+async fn sleep_not_starved_by_eager_combinator() {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::task::{Context, Poll, Wake, Waker};
+
+    // Calls wake() on every poll — simulates a continuous work source.
+    struct AlwaysWake;
+    impl Future for AlwaysWake {
+        type Output = ();
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
+
+    // Records whether wake() was called during a poll.
+    struct TrackingWaker {
+        woken: Arc<Mutex<bool>>,
+        inner: Waker,
+    }
+    impl Wake for TrackingWaker {
+        fn wake(self: Arc<Self>) {
+            *self.woken.lock().unwrap() = true;
+            self.inner.wake_by_ref();
+        }
+        fn wake_by_ref(self: &Arc<Self>) {
+            *self.woken.lock().unwrap() = true;
+            self.inner.wake_by_ref();
+        }
+    }
+
+    // Eager combinator: re-polls immediately whenever any inner future woke us
+    // during the current poll, never returning Poll::Pending to the runtime.
+    struct EagerSelect {
+        always_wake: AlwaysWake,
+        sleep: Pin<Box<tokio::time::Sleep>>,
+        poll_count: Arc<AtomicU64>,
+    }
+    impl Future for EagerSelect {
+        type Output = ();
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            loop {
+                self.poll_count.fetch_add(1, Ordering::Relaxed);
+
+                let woken = Arc::new(Mutex::new(false));
+                let tracker = Arc::new(TrackingWaker {
+                    woken: woken.clone(),
+                    inner: cx.waker().clone(),
+                });
+                let waker = Waker::from(tracker);
+                let mut inner_cx = Context::from_waker(&waker);
+
+                let _ = Pin::new(&mut self.always_wake).poll(&mut inner_cx);
+
+                if self.sleep.as_mut().poll(&mut inner_cx).is_ready() {
+                    return Poll::Ready(());
+                }
+
+                if *woken.lock().unwrap() {
+                    continue;
+                }
+                return Poll::Pending;
+            }
+        }
+    }
+
+    let poll_count = Arc::new(AtomicU64::new(0));
+
+    // A 1ms sleep should complete in ~1000 polls via the wall-clock check.
+    // Without the fix the loop spins until this assertion fires.
+    EagerSelect {
+        always_wake: AlwaysWake,
+        sleep: Box::pin(tokio::time::sleep(Duration::from_millis(1))),
+        poll_count: poll_count.clone(),
+    }
+    .await;
+
+    let polls = poll_count.load(Ordering::Relaxed);
+    assert!(
+        polls < 100_000,
+        "Sleep was polled {polls} times — timer driver starvation regression (issue #7883)",
+    );
+}

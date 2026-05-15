@@ -419,6 +419,20 @@ impl Sleep {
 
         ready!(crate::trace::trace_leaf());
 
+        // If the deadline has already passed according to the wall clock, complete
+        // immediately. This prevents starvation of the timer driver when an eager
+        // combinator loops without yielding to the runtime (issue #7883): coop
+        // budget exhaustion defers the wake but the task never returns Pending, so
+        // the timer driver never runs. Checking the clock here lets Sleep
+        // self-complete in that scenario.
+        //
+        // When time is paused (test-util), skip this shortcut: the timer driver is
+        // responsible for advancing the mock clock, and bypassing it breaks tests
+        // that assert on how much mock time has elapsed.
+        if !crate::time::clock::is_paused() && me.entry.deadline() <= crate::time::Instant::now() {
+            return Poll::Ready(Ok(()));
+        }
+
         // Keep track of task budget
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let coop = ready!(trace_poll_op!(

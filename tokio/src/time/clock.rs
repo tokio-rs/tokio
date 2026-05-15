@@ -16,6 +16,10 @@ cfg_not_test_util! {
         Instant::from_std(std::time::Instant::now())
     }
 
+    pub(crate) fn is_paused() -> bool {
+        false
+    }
+
     impl Clock {
         pub(crate) fn new(_enable_pausing: bool, _start_paused: bool) -> Clock {
             Clock {}
@@ -291,6 +295,21 @@ cfg_test_util! {
                 clock.now()
             } else {
                 Instant::from_std(std::time::Instant::now())
+            })
+        })
+    }
+
+    /// Returns `true` if the clock is currently paused.
+    pub(crate) fn is_paused() -> bool {
+        if !DID_PAUSE_CLOCK.load(Ordering::Acquire) {
+            return false;
+        }
+
+        with_clock(|maybe_clock| {
+            Ok(if let Some(clock) = maybe_clock {
+                clock.inner.lock().unfrozen.is_none()
+            } else {
+                false
             })
         })
     }
