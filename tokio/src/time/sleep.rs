@@ -407,21 +407,16 @@ impl Sleep {
             Some(timer) => timer,
             None => {
                 let handle = scheduler::Handle::current();
-                let clock = handle.driver().clock();
                 let time_source = handle.driver().time().time_source();
                 let deadline = time_source.deadline_to_tick(*this.deadline);
-                let now = time_source.now(clock);
-                let is_elapsed = deadline <= now;
-
-                if is_elapsed {
-                    return Poll::Ready(Ok(()));
-                }
 
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 {
+                    let clock = handle.driver().clock();
+                    let now = time_source.now(clock);
                     tracing::trace!(
                         target: "runtime::resource::state_update",
-                        duration = deadline - now,
+                        duration = deadline.saturating_sub(now),
                         duration.unit = "ms",
                         duration.op = "override",
                     );
