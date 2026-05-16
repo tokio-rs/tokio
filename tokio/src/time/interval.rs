@@ -131,14 +131,8 @@ fn internal_interval_at(
         )
     };
 
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    let delay = resource_span.in_scope(|| Box::pin(sleep_until(start)));
-
-    #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-    let delay = Box::pin(sleep_until(start));
-
     Interval {
-        delay,
+        delay: Box::pin(sleep_until(start)),
         period,
         missed_tick_behavior: MissedTickBehavior::default(),
         #[cfg(all(tokio_unstable, feature = "tracing"))]

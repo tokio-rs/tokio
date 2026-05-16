@@ -364,7 +364,7 @@ impl Sleep {
             let _async_op_enter = this.inner.ctx.async_op_span.enter();
 
             this.inner.ctx.async_op_poll_span =
-                tracing::trace_span!("runtime.resource.async_op.poll",);
+                tracing::trace_span!("runtime.resource.async_op.poll");
 
             let _resource_enter = this.inner.ctx.resource_span.enter();
             let _async_op_enter = this.inner.ctx.async_op_span.enter();
