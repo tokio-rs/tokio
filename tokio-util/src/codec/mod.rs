@@ -105,6 +105,15 @@
 //! The decoder should _not_ return an error just because it has yet to receive
 //! a full frame.
 //!
+//! # Buffer management
+//!
+//! Decoders receive a shared [`BytesMut`] buffer that grows as more data arrives.
+//! After decoding a frame, use [`split_to`] or [`advance`] to remove consumed bytes
+//! while keeping any trailing data for the next frame. If the buffer grows very
+//! large because old capacity is retained, call [`truncate`] after processing data
+//! (this clears the buffer but does not shrink capacity) or construct a fresh
+//! [`BytesMut`] when appropriate for your protocol.
+//!
 //! It is guaranteed that, from one call to `decode` to another, the provided
 //! buffer will contain the exact same data as before, except that if more data
 //! has arrived through the IO resource, that data will have been appended to
@@ -322,6 +331,8 @@
 //! [`decode`]: fn@crate::codec::Decoder::decode
 //! [`encode`]: fn@crate::codec::Encoder::encode
 //! [`split_to`]: fn@bytes::BytesMut::split_to
+//! [`truncate`]: fn@bytes::BytesMut::truncate
+//! [`advance`]: trait@bytes::Buf::advance
 //! [`advance`]: fn@bytes::Buf::advance
 
 mod bytes_codec;
