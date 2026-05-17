@@ -78,7 +78,7 @@ where
     }
 
     /// Obtains a reference to the underlying reader.
-    pub fn get_ref(&mut self) -> &R {
+    pub fn get_ref(&self) -> &R {
         &self.reader
     }
 
