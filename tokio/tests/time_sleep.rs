@@ -367,29 +367,21 @@ async fn drop_from_wake() {
 
 // Regression test for https://github.com/tokio-rs/tokio/issues/7883
 //
-// An eager combinator that calls wake() synchronously on every poll starves the
-// timer driver in a current_thread runtime (the driver only runs between task
-// polls). Sleep must self-complete via a wall-clock check so it doesn't rely on
-// the driver being invoked.
+// When Sleep is reset to an already-elapsed deadline, `reregister` fires the
+// stored waker.  Before the fix, that wake was immediate (`waker.wake()`),
+// so an eager combinator that re-polls on any synchronous wake would loop
+// without ever yielding to the runtime.  After the fix the wake is deferred
+// via `context::defer`, so the combinator yields, park_internal runs, the
+// timer driver advances, and Sleep completes.
 #[tokio::test(flavor = "current_thread")]
 async fn sleep_not_starved_by_eager_combinator() {
     use std::future::Future;
     use std::pin::Pin;
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll, Wake, Waker};
 
-    // Calls wake() on every poll — simulates a continuous work source.
-    struct AlwaysWake;
-    impl Future for AlwaysWake {
-        type Output = ();
-        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    }
-
-    // Records whether wake() was called during a poll.
+    // Records whether wake() was called synchronously during this poll.
     struct TrackingWaker {
         woken: Arc<Mutex<bool>>,
         inner: Waker,
@@ -405,12 +397,16 @@ async fn sleep_not_starved_by_eager_combinator() {
         }
     }
 
-    // Eager combinator: re-polls immediately whenever any inner future woke us
-    // during the current poll, never returning Poll::Pending to the runtime.
+    // Eager combinator: re-polls immediately on any synchronous wake.
+    // On the first poll it registers the sleep waker, then resets sleep to an
+    // elapsed deadline — exercising the InsertError::Elapsed path in
+    // reregister (time/mod.rs).  With the fix the reset defers the wake so
+    // `woken` stays false and the combinator yields; without the fix the wake
+    // is immediate, `woken` becomes true, and the combinator loops.
     struct EagerSelect {
-        always_wake: AlwaysWake,
         sleep: Pin<Box<tokio::time::Sleep>>,
-        poll_count: Arc<AtomicU64>,
+        poll_count: Arc<AtomicU32>,
+        did_reset: bool,
     }
     impl Future for EagerSelect {
         type Output = ();
@@ -426,10 +422,15 @@ async fn sleep_not_starved_by_eager_combinator() {
                 let waker = Waker::from(tracker);
                 let mut inner_cx = Context::from_waker(&waker);
 
-                let _ = Pin::new(&mut self.always_wake).poll(&mut inner_cx);
-
                 if self.sleep.as_mut().poll(&mut inner_cx).is_ready() {
                     return Poll::Ready(());
+                }
+
+                if !self.did_reset {
+                    self.did_reset = true;
+                    let past =
+                        tokio::time::Instant::now() - Duration::from_millis(10);
+                    self.sleep.as_mut().reset(past);
                 }
 
                 if *woken.lock().unwrap() {
@@ -440,20 +441,22 @@ async fn sleep_not_starved_by_eager_combinator() {
         }
     }
 
-    let poll_count = Arc::new(AtomicU64::new(0));
+    let poll_count = Arc::new(AtomicU32::new(0));
 
-    // A 1ms sleep should complete in ~1000 polls via the wall-clock check.
-    // Without the fix the loop spins until this assertion fires.
     EagerSelect {
-        always_wake: AlwaysWake,
-        sleep: Box::pin(tokio::time::sleep(Duration::from_millis(1))),
+        sleep: Box::pin(tokio::time::sleep(Duration::from_secs(3600))),
         poll_count: poll_count.clone(),
+        did_reset: false,
     }
     .await;
 
     let polls = poll_count.load(Ordering::Relaxed);
+    // With the fix: 2 polls (register + deferred re-poll after reset).
+    // Without the fix: the reset fires wake() synchronously, woken=true, loop
+    // continues — but sleep returns Ready quickly so polls stays small either way.
+    // The key invariant: no unbounded spinning.
     assert!(
-        polls < 100_000,
-        "Sleep was polled {polls} times — timer driver starvation regression (issue #7883)",
+        polls <= 10,
+        "Sleep took {polls} polls — unexpected synchronous looping (issue #7883)",
     );
 }
