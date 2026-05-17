@@ -428,8 +428,7 @@ async fn sleep_not_starved_by_eager_combinator() {
 
                 if !self.did_reset {
                     self.did_reset = true;
-                    let past =
-                        tokio::time::Instant::now() - Duration::from_millis(10);
+                    let past = tokio::time::Instant::now() - Duration::from_millis(10);
                     self.sleep.as_mut().reset(past);
                 }
 
