@@ -203,6 +203,9 @@ pub use self::join::JoinHandle;
 mod list;
 pub(crate) use self::list::{LocalOwnedTasks, OwnedTasks};
 
+mod local_queue;
+pub(crate) use self::local_queue::LocalQueue;
+
 mod raw;
 pub(crate) use self::raw::RawTask;
 

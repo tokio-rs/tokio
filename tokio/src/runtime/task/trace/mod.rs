@@ -5,7 +5,6 @@ use crate::task::Id;
 
 use backtrace::BacktraceFrame;
 use std::cell::Cell;
-use std::collections::VecDeque;
 use std::ffi::c_void;
 use std::fmt;
 use std::future::Future;
@@ -20,7 +19,7 @@ mod tree;
 use symbol::Symbol;
 use tree::Tree;
 
-use super::{Notified, OwnedTasks, Schedule};
+use super::{LocalQueue, Notified, OwnedTasks, Schedule};
 
 type Backtrace = Vec<BacktraceFrame>;
 type SymbolTrace = Vec<Symbol>;
@@ -364,14 +363,14 @@ impl<T: Future> Future for Root<T> {
 /// Trace and poll all tasks of the `current_thread` runtime.
 pub(in crate::runtime) fn trace_current_thread(
     owned: &OwnedTasks<Arc<current_thread::Handle>>,
-    local: &mut VecDeque<Notified<Arc<current_thread::Handle>>>,
+    local: &mut LocalQueue<Arc<current_thread::Handle>>,
     injection: &Inject<Arc<current_thread::Handle>>,
 ) -> Vec<(Id, Trace)> {
     // clear the local and injection queues
 
     let mut dequeued = Vec::new();
 
-    while let Some(task) = local.pop_back() {
+    while let Some(task) = local.pop_front() {
         dequeued.push(task);
     }
 

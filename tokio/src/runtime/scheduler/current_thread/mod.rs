@@ -3,7 +3,8 @@ use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
 use crate::runtime::task::{
-    self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task, TaskHarnessScheduleHooks,
+    self, JoinHandle, LocalQueue, OwnedTasks, Schedule, SpawnLocation, Task,
+    TaskHarnessScheduleHooks,
 };
 use crate::runtime::{
     blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
@@ -13,7 +14,6 @@ use crate::util::atomic_cell::AtomicCell;
 use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 
 use std::cell::RefCell;
-use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
@@ -60,7 +60,7 @@ pub(crate) struct Handle {
 /// a function that will perform the scheduling work and acts as a capability token.
 struct Core {
     /// Scheduler run queue
-    tasks: VecDeque<Notified>,
+    tasks: LocalQueue<Arc<Handle>>,
 
     /// Current tick
     tick: u32,
@@ -119,9 +119,6 @@ pub(crate) struct Context {
 
 type Notified = task::Notified<Arc<Handle>>;
 
-/// Initial queue capacity.
-const INITIAL_CAPACITY: usize = 64;
-
 /// Used if none is specified. This is a temporary constant and will be removed
 /// as we unify tuning logic between the multi-thread and current-thread
 /// schedulers.
@@ -170,7 +167,7 @@ impl CurrentThread {
         });
 
         let core = AtomicCell::new(Some(Box::new(Core {
-            tasks: VecDeque::with_capacity(INITIAL_CAPACITY),
+            tasks: LocalQueue::new(),
             tick: 0,
             driver: Some(driver),
             metrics: MetricsBatch::new(&handle.shared.worker_metrics),
