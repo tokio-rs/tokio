@@ -26,7 +26,7 @@ pub async fn consume_budget() {
     let mut status = std::task::Poll::Pending;
 
     std::future::poll_fn(move |cx| {
-        std::task::ready!(crate::trace::trace_leaf(cx));
+        std::task::ready!(crate::trace::trace_leaf());
         if status.is_ready() {
             return status;
         }

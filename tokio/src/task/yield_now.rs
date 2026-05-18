@@ -38,7 +38,7 @@ use std::task::{ready, Poll};
 pub async fn yield_now() {
     let mut yielded = false;
     poll_fn(|cx| {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         if yielded {
             return Poll::Ready(());

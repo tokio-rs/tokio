@@ -13,10 +13,21 @@ use std::fs;
 use std::future::poll_fn;
 use std::task::Poll;
 use tempfile::NamedTempFile;
+use tokio_test::assert_pending;
+
+use crate::support::io_uring::io_uring_supported;
+
+mod support {
+    pub(crate) mod io_uring;
+}
 
 // see: https://github.com/tokio-rs/tokio/issues/7979
 #[tokio::test]
 async fn file_descriptors_are_closed_when_cancelling_open_op() {
+    if !io_uring_supported() {
+        return;
+    }
+
     let tmp = NamedTempFile::new().unwrap();
     let path = tmp.path().to_path_buf();
 
@@ -37,10 +48,8 @@ async fn file_descriptors_are_closed_when_cancelling_open_op() {
                 let fut = opt.open(&path);
 
                 // If io_uring is enabled (and not falling back to the thread pool),
-                // the first poll should return Pending. We don't check if the result
-                // is actually pending because we run some checks on old kernel that
-                // do not support uring.
-                let _pending = Box::pin(fut).poll_unpin(cx);
+                // the first poll should return Pending.
+                assert_pending!(Box::pin(fut).poll_unpin(cx));
 
                 tx.send(()).unwrap();
 

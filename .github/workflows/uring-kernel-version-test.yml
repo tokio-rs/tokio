@@ -40,6 +40,8 @@ jobs:
           make defconfig
           make -j$(nproc)
 
+      # We are running tests also on a Kernel version that does not support io_uring
+      # to check if the fallback mechanism works
       - name: Generate test binaries with io_uring enabled
         run: |
           # Build both integration (tokio/tests/) and unit (e.g., tokio/src/fs/file/tests.rs) tests with io_uring enabled

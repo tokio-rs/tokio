@@ -137,10 +137,10 @@ pub mod error;
 /// This value must be a power of 2. It also must be smaller than the number of
 /// bits in `usize`.
 #[cfg(all(target_pointer_width = "64", not(loom)))]
-const BLOCK_CAP: usize = 32;
+pub(crate) const BLOCK_CAP: usize = 32;
 
 #[cfg(all(not(target_pointer_width = "64"), not(loom)))]
-const BLOCK_CAP: usize = 16;
+pub(crate) const BLOCK_CAP: usize = 16;
 
 #[cfg(loom)]
-const BLOCK_CAP: usize = 2;
+pub(crate) const BLOCK_CAP: usize = 2;
