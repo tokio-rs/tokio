@@ -75,6 +75,9 @@ jobs:
           tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: ${{ matrix.os != 'macos-latest' }}
 
       # Run `tokio` with stable features. This excludes testing utilities which
       # can alter the runtime behavior of Tokio.
@@ -107,6 +110,9 @@ jobs:
           tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: ${{ matrix.os != 'macos-latest' }}
 
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }}
         run: |
@@ -146,6 +152,9 @@ jobs:
           tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: ${{ matrix.os != 'macos-latest' }}
 
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }} panic=abort
         run: |
@@ -179,6 +188,9 @@ jobs:
           tool: cargo-hack
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: ${{ matrix.os != 'macos-latest' }}
 
       # Run integration tests for each feature
       - name: test tests-integration --each-feature
@@ -287,6 +299,9 @@ jobs:
           tool: cargo-nextest
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: ${{ matrix.os != 'macos-latest' }}
       # Run `tokio` with "unstable" cfg flag.
       - name: test tokio full --cfg unstable
         run: |
@@ -937,6 +952,8 @@ jobs:
           # relative to the `$workspace` and defaults to "target" if not explicitly given.
           # default: ". -> target"
           workspaces: "./hyper"
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: ${{ matrix.os != 'macos-latest' }}
 
       - name: Test hyper
         run: cargo test --features full
@@ -985,6 +1002,8 @@ jobs:
           # relative to the `$workspace` and defaults to "target" if not explicitly given.
           # default: ". -> target"
           workspaces: "./quinn"
+          # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
+          cache-bin: ${{ matrix.os != 'macos-latest' }}
 
       - name: Test Quinn
         working-directory: quinn
