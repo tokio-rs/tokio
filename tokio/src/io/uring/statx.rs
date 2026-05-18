@@ -101,12 +101,7 @@ impl Op<Statx> {
     /// if the path provided points to a symlink location.
     #[inline]
     pub(crate) fn metadata(path: &Path) -> io::Result<Op<Statx>> {
-        Op::statx(
-            path,
-            // we don't need to pass in AT_SYMLINK_FOLLOW here, it'll follow
-            // by default it seems
-            libc::AT_STATX_SYNC_AS_STAT,
-        )
+        Op::statx(path, libc::AT_STATX_SYNC_AS_STAT)
     }
 
     /// Retrieves the metadata information of the given file
@@ -142,6 +137,11 @@ impl Op<Statx> {
         })
     }
 
+    // TODO: Once `Metadata::from_statx` is stabilized, we can use use this function
+    // to enable io-uring support on `tokio::fs::symlink_metadata`.
+    // See this PR for more detail: https://github.com/tokio-rs/tokio/pull/8080
+    // See `Metadata::from_statx` tracking issue to see progress:
+    // https://github.com/rust-lang/rust/issues/156268
     /// Retrieves the metadata information of the given path without following symlinks.
     #[inline]
     #[allow(dead_code)]
