@@ -1,16 +1,17 @@
 use crate::io::blocking;
-use crate::io::uring::utils::ArcFd;
+use crate::io::uring::utils::{ArcFd, UringFd};
 use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
 
 use io_uring::{opcode, types};
 use std::io::{self, Error};
+use std::os::fd::OwnedFd;
 
-pub(crate) struct Write {
+pub(crate) struct Write<F: UringFd> {
     buf: blocking::Buf,
-    fd: ArcFd,
+    fd: F,
 }
 
-impl std::fmt::Debug for Write {
+impl<F: UringFd> std::fmt::Debug for Write<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Write")
             .field("buf_len", &self.buf.len())
@@ -19,8 +20,8 @@ impl std::fmt::Debug for Write {
     }
 }
 
-impl Completable for Write {
-    type Output = (io::Result<u32>, blocking::Buf, ArcFd);
+impl<F: UringFd> Completable for Write<F> {
+    type Output = (io::Result<u32>, blocking::Buf, F);
     fn complete(mut self, cqe: CqeResult) -> Self::Output {
         if let Ok(n) = cqe.result.as_ref() {
             self.buf.advance(*n as usize);
@@ -34,15 +35,24 @@ impl Completable for Write {
     }
 }
 
-impl Cancellable for Write {
+impl Cancellable for Write<ArcFd> {
     fn cancel(self) -> CancelData {
         CancelData::Write(self)
     }
 }
 
-impl Op<Write> {
+impl Cancellable for Write<OwnedFd> {
+    fn cancel(self) -> CancelData {
+        CancelData::WriteOwned(self)
+    }
+}
+
+impl<F: UringFd> Op<Write<F>>
+where
+    Write<F>: Cancellable,
+{
     /// Issue a write at `file_offset` from the provided `buf`. To use current file cursor, set `file_offset` to `-1` or `u64::MAX`.
-    pub(crate) fn write_at(fd: ArcFd, buf: blocking::Buf, file_offset: u64) -> Self {
+    pub(crate) fn write_at(fd: F, buf: blocking::Buf, file_offset: u64) -> Self {
         // There is a cap on how many bytes we can write in a single uring write operation.
         // ref: https://github.com/axboe/liburing/discussions/497
         let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);

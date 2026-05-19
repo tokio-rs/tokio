@@ -8,6 +8,14 @@
 use crate::io::blocking;
 use crate::{fs::asyncify, util::as_ref::OwnedBuf};
 
+#[cfg(all(
+    tokio_unstable,
+    feature = "io-uring",
+    feature = "rt",
+    feature = "fs",
+    target_os = "linux"
+))]
+use std::os::fd::OwnedFd;
 use std::{io, path::Path};
 
 /// Creates a future that will open a file for writing and write the entire
@@ -66,8 +74,7 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
     target_os = "linux"
 ))]
 async fn write_uring(path: &Path, mut buf: blocking::Buf) -> io::Result<()> {
-    use crate::{fs::OpenOptions, io::uring::utils::ArcFd, runtime::driver::op::Op};
-    use std::sync::Arc;
+    use crate::{fs::OpenOptions, runtime::driver::op::Op};
 
     let file = OpenOptions::new()
         .write(true)
@@ -76,10 +83,10 @@ async fn write_uring(path: &Path, mut buf: blocking::Buf) -> io::Result<()> {
         .open(path)
         .await?;
 
-    let mut fd: ArcFd = Arc::new(
-        file.try_into_std()
-            .expect("unexpected in-flight operation detected"),
-    );
+    let mut fd: OwnedFd = file
+        .try_into_std()
+        .expect("unexpected in-flight operation detected")
+        .into();
 
     let mut file_offset: u64 = 0;
     while !buf.is_empty() {
