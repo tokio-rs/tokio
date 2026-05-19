@@ -4,7 +4,6 @@ use crate::{
         imp::{orphan::Wait, OrphanQueue},
         kill::Kill,
     },
-    util::error::RUNTIME_SHUTTING_DOWN_ERROR,
 };
 
 use libc::{syscall, SYS_pidfd_open, ENOSYS, PIDFD_NONBLOCK};
@@ -95,45 +94,6 @@ where
     pidfd: PollEvented<Pidfd>,
 }
 
-fn display_eq(d: impl std::fmt::Display, s: &str) -> bool {
-    use std::fmt::Write;
-
-    struct FormatEq<'r> {
-        remainder: &'r str,
-        unequal: bool,
-    }
-
-    impl<'r> Write for FormatEq<'r> {
-        fn write_str(&mut self, s: &str) -> std::fmt::Result {
-            if !self.unequal {
-                if let Some(new_remainder) = self.remainder.strip_prefix(s) {
-                    self.remainder = new_remainder;
-                } else {
-                    self.unequal = true;
-                }
-            }
-            Ok(())
-        }
-    }
-
-    let mut fmt_eq = FormatEq {
-        remainder: s,
-        unequal: false,
-    };
-    let _ = write!(fmt_eq, "{d}");
-    fmt_eq.remainder.is_empty() && !fmt_eq.unequal
-}
-
-fn is_rt_shutdown_err(err: &io::Error) -> bool {
-    if let Some(inner) = err.get_ref() {
-        err.kind() == io::ErrorKind::Other
-            && inner.source().is_none()
-            && display_eq(inner, RUNTIME_SHUTTING_DOWN_ERROR)
-    } else {
-        false
-    }
-}
-
 impl<W> Future for PidfdReaperInner<W>
 where
     W: Wait + Unpin,
@@ -150,7 +110,7 @@ where
                 }
                 this.pidfd.registration().clear_readiness(evt);
             }
-            Poll::Ready(Err(err)) if is_rt_shutdown_err(&err) => {}
+            Poll::Ready(Err(err)) if crate::runtime::is_rt_shutdown_err(&err) => {}
             Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
             Poll::Pending => return Poll::Pending,
         };

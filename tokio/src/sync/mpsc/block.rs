@@ -170,7 +170,7 @@ impl<T> Block<T> {
         // 2. The `UnsafeCell` always give us a valid pointer to the value.
         let value = self.values[offset].with(|ptr| unsafe { ptr::read(ptr) });
 
-        // Safety: the redy bit is set, so the value has been initialized.
+        // Safety: the ready bit is set, so the value has been initialized.
         Some(Read::Value(unsafe { value.assume_init() }))
     }
 
@@ -218,11 +218,6 @@ impl<T> Block<T> {
     /// Signal to the receiver that the sender half of the list is closed.
     pub(crate) unsafe fn tx_close(&self) {
         self.header.ready_slots.fetch_or(TX_CLOSED, Release);
-    }
-
-    pub(crate) unsafe fn is_closed(&self) -> bool {
-        let ready_bits = self.header.ready_slots.load(Acquire);
-        is_tx_closed(ready_bits)
     }
 
     /// Resets the block to a blank state. This enables reusing blocks in the

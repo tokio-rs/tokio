@@ -6,7 +6,7 @@ use std::ops;
 use std::ptr::NonNull;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
-pub(super) struct WakerRef<'a, S: 'static> {
+pub(crate) struct WakerRef<'a, S: 'static> {
     waker: ManuallyDrop<Waker>,
     _p: PhantomData<(&'a Header, S)>,
 }

@@ -9,17 +9,36 @@ use mio::Token;
 use std::fmt;
 use std::io;
 use std::ops::{Deref, DerefMut};
-use std::os::unix::io::AsRawFd;
-use std::os::unix::prelude::RawFd;
+use std::os::fd::{AsFd, BorrowedFd};
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::task::{ready, Context, Poll};
 
 /// Like [`mio::event::Source`], but for POSIX AIO only.
 ///
 /// Tokio's consumer must pass an implementor of this trait to create a
-/// [`Aio`] object.
+/// [`Aio`] object.  Implementors must implement at least one of [`AioSource::register`] and
+/// [`AioSource::register_borrowed`].
 pub trait AioSource {
     /// Registers this AIO event source with Tokio's reactor.
-    fn register(&mut self, kq: RawFd, token: usize);
+    ///
+    /// # Safety
+    ///
+    /// It's memory-safe, but not I/O safe.  If the file referenced by `kq` gets dropped, then this
+    /// source may end up notifying the wrong file.
+    #[deprecated(since = "1.52.0", note = "use register_borrowed instead")]
+    fn register(&mut self, _kq: RawFd, _token: usize) {
+        // This default implementation exists so new AioSource implementors that implement the
+        // register_borrowed method can compile without the need to implement register.
+        unimplemented!("Use AioSource::register_borrowed instead")
+    }
+
+    /// Registers this AIO event source with Tokio's reactor.
+    fn register_borrowed(&mut self, kq: BorrowedFd<'_>, token: usize) {
+        // This default implementation serves to provide backwards compatibility with AioSource
+        // implementors written before 1.52.0 that only implemented the unsafe `register` method.
+        #[allow(deprecated)]
+        self.register(kq.as_raw_fd(), token)
+    }
 
     /// Deregisters this AIO event source with Tokio's reactor.
     fn deregister(&mut self);
@@ -37,7 +56,8 @@ impl<T: AioSource> Source for MioSource<T> {
         interests: mio::Interest,
     ) -> io::Result<()> {
         assert!(interests.is_aio() || interests.is_lio());
-        self.0.register(registry.as_raw_fd(), usize::from(token));
+        self.0
+            .register_borrowed(registry.as_fd(), usize::from(token));
         Ok(())
     }
 
@@ -53,7 +73,8 @@ impl<T: AioSource> Source for MioSource<T> {
         interests: mio::Interest,
     ) -> io::Result<()> {
         assert!(interests.is_aio() || interests.is_lio());
-        self.0.register(registry.as_raw_fd(), usize::from(token));
+        self.0
+            .register_borrowed(registry.as_fd(), usize::from(token));
         Ok(())
     }
 }

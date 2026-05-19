@@ -4,7 +4,7 @@ use crate::util::linked_list;
 
 type EntryList = linked_list::LinkedList<CancellationQueueEntry, Entry>;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Inner {
     list: EntryList,
 }
@@ -12,7 +12,9 @@ struct Inner {
 impl Drop for Inner {
     fn drop(&mut self) {
         // consume all entries
-        let _ = self.iter().count();
+        while let Some(hdl) = self.list.pop_front() {
+            drop(hdl)
+        }
     }
 }
 
@@ -32,30 +34,18 @@ impl Inner {
         self.list.push_front(hdl);
     }
 
-    fn iter(&mut self) -> impl Iterator<Item = EntryHandle> {
-        struct Iter {
-            list: EntryList,
-        }
-
-        impl Drop for Iter {
-            fn drop(&mut self) {
-                while let Some(hdl) = self.list.pop_front() {
-                    drop(hdl);
-                }
-            }
-        }
+    fn into_iter(self) -> impl Iterator<Item = EntryHandle> {
+        struct Iter(Inner);
 
         impl Iterator for Iter {
             type Item = EntryHandle;
 
             fn next(&mut self) -> Option<Self::Item> {
-                self.list.pop_front()
+                self.0.list.pop_front()
             }
         }
 
-        Iter {
-            list: std::mem::take(&mut self.list),
-        }
+        Iter(self)
     }
 }
 
@@ -84,7 +74,7 @@ pub(crate) struct Receiver {
 
 impl Receiver {
     pub(crate) fn recv_all(&mut self) -> impl Iterator<Item = EntryHandle> {
-        self.inner.lock().iter()
+        std::mem::take(&mut *self.inner.lock()).into_iter()
     }
 }
 

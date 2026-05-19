@@ -93,6 +93,13 @@ pub mod issue_5243 {
     );
 }
 
+#[tokio::test(name = "a valid runtime name")]
+async fn test_macro_should_handle_the_name_if_provided() {
+    let handle = tokio::runtime::Handle::current();
+
+    assert_eq!("a valid runtime name", handle.name().unwrap())
+}
+
 #[cfg(tokio_unstable)]
 pub mod macro_rt_arg_unhandled_panic {
     use tokio_test::assert_err;

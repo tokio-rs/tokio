@@ -29,7 +29,6 @@ use std::time::Duration;
 /// [runtime]: crate::runtime::Runtime
 /// [module]: crate::runtime
 #[derive(Debug)]
-#[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
 pub struct LocalRuntime {
     /// Task scheduler
     scheduler: LocalRuntimeScheduler,

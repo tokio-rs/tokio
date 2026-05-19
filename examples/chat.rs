@@ -79,7 +79,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Note that this is the Tokio TcpListener, which is fully async.
     let listener = TcpListener::bind(&addr).await?;
 
-    tracing::info!("server running on {}", addr);
+    tracing::info!("server running on {addr}");
 
     loop {
         // Asynchronously wait for an inbound TcpStream.
@@ -90,9 +90,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // Spawn our handler to be run asynchronously.
         tokio::spawn(async move {
-            tracing::debug!("accepted connection from {}", addr);
+            tracing::debug!("accepted connection from {addr}");
             if let Err(e) = process(state, stream, addr).await {
-                tracing::warn!("Connection from {} failed: {:?}", addr, e);
+                tracing::warn!("Connection from {addr} failed: {e:?}");
             }
         });
     }
@@ -147,18 +147,16 @@ impl Shared {
         let message = message.to_string(); // Clone once for all sends
 
         for (addr, tx) in self.peers.iter() {
-            if *addr != sender {
-                if tx.send(message.clone()).is_err() {
-                    // Receiver has been dropped, mark for removal
-                    failed_peers.push(*addr);
-                }
+            if *addr != sender && tx.send(message.clone()).is_err() {
+                // Receiver has been dropped, mark for removal
+                failed_peers.push(*addr);
             }
         }
 
         // Clean up disconnected peers
         for addr in failed_peers {
             self.peers.remove(&addr);
-            tracing::debug!("Removed disconnected peer: {}", addr);
+            tracing::debug!("Removed disconnected peer: {addr}");
         }
     }
 }
@@ -194,13 +192,10 @@ async fn process(
     lines.send("Please enter your username:").await?;
 
     // Read the first line from the `LineCodec` stream to get the username.
-    let username = match lines.next().await {
-        Some(Ok(line)) => line,
+    let Some(Ok(username)) = lines.next().await else {
         // We didn't get a line so we return early here.
-        _ => {
-            tracing::error!("Failed to get username from {}. Client disconnected.", addr);
-            return Ok(());
-        }
+        tracing::error!("Failed to get username from {addr}. Client disconnected.");
+        return Ok(());
     };
 
     // Register our peer with state which internally sets up some channels.
@@ -210,7 +205,7 @@ async fn process(
     {
         let mut state = state.lock().await;
         let msg = format!("{username} has joined the chat");
-        tracing::info!("{}", msg);
+        tracing::info!("{msg}");
         state.broadcast(addr, &msg).await;
     }
 
@@ -220,7 +215,7 @@ async fn process(
             // A message was received from a peer. Send it to the current user.
             Some(msg) = peer.rx.recv() => {
                 if let Err(e) = peer.lines.send(&msg).await {
-                    tracing::error!("Failed to send message to {}: {:?}", username, e);
+                    tracing::error!("Failed to send message to {username}: {e:?}");
                     break;
                 }
             }
@@ -236,9 +231,7 @@ async fn process(
                 // An error occurred.
                 Some(Err(e)) => {
                     tracing::error!(
-                        "an error occurred while processing messages for {}; error = {:?}",
-                        username,
-                        e
+                        "an error occurred while processing messages for {username}; error = {e:?}"
                     );
                     break;
                 }
@@ -255,7 +248,7 @@ async fn process(
         state.peers.remove(&addr);
 
         let msg = format!("{username} has left the chat");
-        tracing::info!("{}", msg);
+        tracing::info!("{msg}");
         state.broadcast(addr, &msg).await;
     }
 

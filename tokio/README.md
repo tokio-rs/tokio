@@ -1,6 +1,4 @@
-
-
-*[The TokioConf 2026 Call For Talk Proposals is now open](https://tokio.rs/blog/2025-09-26-announcing-tokio-conf-cfp)*
+*[TokioConf 2026 program and tickets are now available!](https://tokioconf.com)*
 
 ---
 
@@ -62,7 +60,7 @@ Make sure you enable the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.48.0", features = ["full"] }
+tokio = { version = "1.52.3", features = ["full"] }
 ```
 Then, on your main.rs:
 
@@ -131,7 +129,7 @@ question. You can also ask your question on [the discussions page][discussions].
 you! We have a [contributing guide][guide] to help you get involved in the Tokio
 project.
 
-[guide]: https://github.com/tokio-rs/tokio/blob/master/CONTRIBUTING.md
+[guide]: https://github.com/tokio-rs/tokio/blob/master/docs/contributing/README.md
 
 ## Related Projects
 
@@ -223,18 +221,18 @@ warrants a patch release with a fix for the bug, it will be backported and
 released as a new patch release for each LTS minor version. Our current LTS
 releases are:
 
- * `1.43.x` - LTS release until March 2026. (MSRV 1.70)
  * `1.47.x` - LTS release until September 2026. (MSRV 1.70)
+ * `1.51.x` - LTS release until March 2027. (MSRV 1.71)
 
 Each LTS release will continue to receive backported fixes for at least a year.
 If you wish to use a fixed minor release in your project, we recommend that you
 use an LTS release.
 
 To use a fixed minor version, you can specify the version with a tilde. For
-example, to specify that you wish to use the newest `1.43.x` patch release, you
+example, to specify that you wish to use the newest `1.47.x` patch release, you
 can use the following dependency specification:
 ```text
-tokio = { version = "~1.43", features = [...] }
+tokio = { version = "~1.47", features = [...] }
 ```
 
 ### Previous LTS releases
@@ -247,6 +245,7 @@ tokio = { version = "~1.43", features = [...] }
  * `1.32.x` - LTS release until September 2024.
  * `1.36.x` - LTS release until March 2025.
  * `1.38.x` - LTS release until July 2025.
+ * `1.43.x` - LTS release until March 2026.
 
 ## License
 

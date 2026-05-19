@@ -81,12 +81,12 @@ fn notify_multi() {
     loom::model(|| {
         let notify = Arc::new(Notify::new());
 
-        let mut ths = vec![];
+        let mut threads = vec![];
 
         for _ in 0..2 {
             let notify = notify.clone();
 
-            ths.push(thread::spawn(move || {
+            threads.push(thread::spawn(move || {
                 block_on(async {
                     notify.notified().await;
                     notify.notify_one();
@@ -96,8 +96,8 @@ fn notify_multi() {
 
         notify.notify_one();
 
-        for th in ths.drain(..) {
-            th.join().unwrap();
+        for thread in threads.drain(..) {
+            thread.join().unwrap();
         }
 
         block_on(async {

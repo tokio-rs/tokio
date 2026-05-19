@@ -242,6 +242,17 @@ impl RawTask {
         self.ptr
     }
 
+    #[cfg(all(
+        tokio_unstable,
+        feature = "taskdump",
+        feature = "rt",
+        target_os = "linux",
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+    ))]
+    pub(super) fn header_ptr_ref(&self) -> &NonNull<Header> {
+        &self.ptr
+    }
+
     pub(super) fn trailer_ptr(&self) -> NonNull<Trailer> {
         unsafe { Header::get_trailer(self.ptr) }
     }
@@ -281,9 +292,9 @@ impl RawTask {
 
     /// Safety: `dst` must be a `*mut Poll<super::Result<T::Output>>` where `T`
     /// is the future stored by the task.
-    pub(super) unsafe fn try_read_output(self, dst: *mut (), waker: &Waker) {
+    pub(super) unsafe fn try_read_output<O>(self, dst: *mut Poll<super::Result<O>>, waker: &Waker) {
         let vtable = self.header().vtable;
-        (vtable.try_read_output)(self.ptr, dst, waker);
+        (vtable.try_read_output)(self.ptr, dst as *mut _, waker);
     }
 
     pub(super) fn drop_join_handle_slow(self) {

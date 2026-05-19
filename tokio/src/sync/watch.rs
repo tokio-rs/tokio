@@ -111,7 +111,7 @@
 //! ```
 //! use tokio::sync::watch;
 //!
-//! #[tokio::main(flavor = "current_thread")]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! let (tx, mut rx) = watch::channel("hello");
 //! tx.send("goodbye").unwrap();

@@ -1,7 +1,6 @@
 //! Runs `!Send` futures on the current thread.
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex};
-#[cfg(tokio_unstable)]
 use crate::runtime;
 use crate::runtime::task::{
     self, JoinHandle, LocalOwnedTasks, SpawnLocation, Task, TaskHarnessScheduleHooks,
@@ -329,9 +328,8 @@ impl<'a> Drop for LocalDataEnterGuard<'a> {
 cfg_rt! {
     /// Spawns a `!Send` future on the current [`LocalSet`] or [`LocalRuntime`].
     ///
-    /// This is possible when either using one of these types
-    /// explicitly, or (with `tokio_unstable`) by opting to use the
-    /// `"local"` runtime flavor in `tokio::main`:
+    /// This is possible when either using one of these types explicitly, or by
+    /// opting to use the `"local"` runtime flavor in `tokio::main`:
     ///
     /// ```ignore
     /// #[tokio::main(flavor = "local")]
@@ -375,10 +373,9 @@ cfg_rt! {
     /// }).await;
     /// # }
     /// ```
-    /// With local runtime flavor ([Unstable API][unstable] only).
+    /// With local runtime flavor.
     ///
     /// ```rust
-    /// # #[cfg(tokio_unstable)]
     /// #[tokio::main(flavor = "local")]
     /// async fn main() {
     ///     let join = tokio::task::spawn_local(async {
@@ -387,8 +384,6 @@ cfg_rt! {
     ///
     ///    join.await.unwrap()
     ///  }
-    /// # #[cfg(not(tokio_unstable))]
-    /// # fn main() {}
     ///
     /// ```
     ///
@@ -844,6 +839,25 @@ impl LocalSet {
             Err(_access_error) => (f.take().unwrap())(),
         }
     }
+
+    /// Returns the [`Id`] of the current [`LocalSet`] runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use tokio::task;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let local_set = task::LocalSet::new();
+    /// println!("Local set id: {}", local_set.id());
+    /// # }
+    /// ```
+    ///
+    /// [`Id`]: struct@crate::runtime::Id
+    pub fn id(&self) -> runtime::Id {
+        runtime::Id::new(self.context.shared.local_state.owned.id)
+    }
 }
 
 cfg_unstable! {
@@ -913,30 +927,6 @@ cfg_unstable! {
                 .expect("Unhandled Panic behavior modified after starting LocalSet")
                 .unhandled_panic = behavior;
             self
-        }
-
-        /// Returns the [`Id`] of the current `LocalSet` runtime.
-        ///
-        /// # Examples
-        ///
-        /// ```rust
-        /// use tokio::task;
-        ///
-        /// # #[tokio::main(flavor = "current_thread")]
-        /// # async fn main() {
-        /// let local_set = task::LocalSet::new();
-        /// println!("Local set id: {}", local_set.id());
-        /// # }
-        /// ```
-        ///
-        /// **Note**: This is an [unstable API][unstable]. The public API of this type
-        /// may break in 1.x releases. See [the documentation on unstable
-        /// features][unstable] for details.
-        ///
-        /// [unstable]: crate#unstable-features
-        /// [`Id`]: struct@crate::runtime::Id
-        pub fn id(&self) -> runtime::Id {
-            self.context.shared.local_state.owned.id.into()
         }
     }
 }

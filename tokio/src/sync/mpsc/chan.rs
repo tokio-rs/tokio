@@ -289,7 +289,7 @@ impl<T, S: Semaphore> Rx<T, S> {
     pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         use super::block::Read;
 
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
@@ -306,13 +306,11 @@ impl<T, S: Semaphore> Rx<T, S> {
                             return Ready(Some(value));
                         }
                         Some(Read::Closed) => {
-                            // TODO: This check may not be required as it most
-                            // likely can only return `true` at this point. A
-                            // channel is closed when all tx handles are
+                            // A channel is closed when all tx handles are
                             // dropped. Dropping a tx handle releases memory,
                             // which ensures that if dropping the tx handle is
                             // visible, then all messages sent are also visible.
-                            assert!(self.inner.semaphore.is_idle());
+                            debug_assert!(self.inner.semaphore.is_idle());
                             coop.made_progress();
                             return Ready(None);
                         }
@@ -351,7 +349,7 @@ impl<T, S: Semaphore> Rx<T, S> {
     ) -> Poll<usize> {
         use super::block::Read;
 
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
@@ -380,13 +378,11 @@ impl<T, S: Semaphore> Rx<T, S> {
                                 if number_added > 0 {
                                     self.inner.semaphore.add_permits(number_added);
                                 }
-                                // TODO: This check may not be required as it most
-                                // likely can only return `true` at this point. A
-                                // channel is closed when all tx handles are
+                                // A channel is closed when all tx handles are
                                 // dropped. Dropping a tx handle releases memory,
                                 // which ensures that if dropping the tx handle is
                                 // visible, then all messages sent are also visible.
-                                assert!(self.inner.semaphore.is_idle());
+                                debug_assert!(self.inner.semaphore.is_idle());
                                 coop.made_progress();
                                 return Ready(number_added);
                             }
@@ -415,7 +411,7 @@ impl<T, S: Semaphore> Rx<T, S> {
             try_recv!();
 
             if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
-                assert!(buffer.is_empty());
+                debug_assert_eq!(buffer.len(), initial_length);
                 coop.made_progress();
                 Ready(0usize)
             } else {
@@ -440,7 +436,9 @@ impl<T, S: Semaphore> Rx<T, S> {
                         }
                         TryPopResult::Closed => return Err(TryRecvError::Disconnected),
                         // If close() was called, an empty queue should report Disconnected.
-                        TryPopResult::Empty if rx_fields.rx_closed => {
+                        TryPopResult::Empty
+                            if rx_fields.rx_closed && self.inner.semaphore.is_idle() =>
+                        {
                             return Err(TryRecvError::Disconnected)
                         }
                         TryPopResult::Empty => return Err(TryRecvError::Empty),

@@ -313,7 +313,7 @@ impl Inner {
     }
 }
 
-// TODO: Is this really a unsafe function?
+// TODO: Is this really an unsafe function?
 unsafe fn unparker_to_raw_waker(unparker: Arc<Inner>) -> RawWaker {
     RawWaker::new(
         Inner::into_raw(unparker),

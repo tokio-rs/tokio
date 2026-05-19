@@ -358,6 +358,30 @@ async fn send_recv_many_unbounded_capacity() {
     assert_eq!(expected, buffer);
 }
 
+#[maybe_tokio_test]
+async fn recv_many_with_non_empty_buffer_bounded_rx_closed_and_idle() {
+    let (_tx, mut rx) = mpsc::channel::<i32>(1);
+
+    let mut buffer: Vec<i32> = vec![1];
+
+    rx.close();
+
+    assert_eq!(0, rx.recv_many(&mut buffer, 1).await);
+    assert_eq!(vec![1], buffer);
+}
+
+#[maybe_tokio_test]
+async fn recv_many_with_non_empty_buffer_unbounded_rx_closed_and_idle() {
+    let (_tx, mut rx) = mpsc::unbounded_channel::<i32>();
+
+    let mut buffer: Vec<i32> = vec![1];
+
+    rx.close();
+
+    assert_eq!(0, rx.recv_many(&mut buffer, 1).await);
+    assert_eq!(vec![1], buffer);
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn async_send_recv_unbounded() {
@@ -764,6 +788,91 @@ async fn drop_permit_iterator_releases_permits() {
     }
 }
 
+#[test]
+fn dropping_last_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permit);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn dropping_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permit);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn dropping_last_permit_iterator_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permits = tx.try_reserve_many(1).unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permits);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn sending_last_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    permit.send(());
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn sending_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    permit.send(());
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn releasing_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    let inert_sender = permit.release();
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+    drop(inert_sender);
+}
+
 #[maybe_tokio_test]
 async fn dropping_rx_closes_channel() {
     let (tx, rx) = mpsc::channel(100);
@@ -972,6 +1081,19 @@ fn try_recv_after_receiver_close() {
 
     assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
     rx.close();
+    assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+}
+
+#[test]
+fn try_recv_after_receiver_close_with_permit() {
+    let (tx, mut rx) = mpsc::channel::<()>(5);
+
+    let permit = tx.try_reserve().unwrap();
+
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    rx.close();
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    drop(permit);
     assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
 }
 

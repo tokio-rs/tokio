@@ -51,6 +51,31 @@ async fn add_permits() {
 }
 
 #[test]
+fn add_permits_open() {
+    for size in 0..4 {
+        for add in 0..4 {
+            let sem = Arc::new(Semaphore::new(size));
+            sem.add_permits(add);
+            assert_eq!(sem.available_permits(), size + add);
+            assert!(!sem.is_closed());
+        }
+    }
+}
+
+#[test]
+fn add_permits_closed() {
+    for size in 0..4 {
+        for add in 0..4 {
+            let sem = Arc::new(Semaphore::new(size));
+            sem.close();
+            sem.add_permits(add);
+            assert_eq!(sem.available_permits(), size + add);
+            assert!(sem.is_closed());
+        }
+    }
+}
+
+#[test]
 fn forget() {
     let sem = Arc::new(Semaphore::new(1));
     {
@@ -61,6 +86,35 @@ fn forget() {
     }
     assert_eq!(sem.available_permits(), 0);
     assert!(sem.try_acquire().is_err());
+}
+
+#[test]
+fn forget_open() {
+    for size in 0..4 {
+        for sub in 0..4 {
+            let sem = Arc::new(Semaphore::new(size));
+            let actual_sub = sem.forget_permits(sub);
+            let expected = size.saturating_sub(sub);
+            assert_eq!(sem.available_permits(), expected, "case: {size}-{sub}");
+            assert_eq!(actual_sub, size - expected);
+            assert!(!sem.is_closed());
+        }
+    }
+}
+
+#[test]
+fn forget_closed() {
+    for size in 0..4 {
+        for sub in 0..4 {
+            let sem = Arc::new(Semaphore::new(size));
+            sem.close();
+            let actual_sub = sem.forget_permits(sub);
+            let expected = size.saturating_sub(sub);
+            assert_eq!(sem.available_permits(), expected, "case: {size}-{sub}");
+            assert_eq!(actual_sub, size - expected);
+            assert!(sem.is_closed());
+        }
+    }
 }
 
 #[test]

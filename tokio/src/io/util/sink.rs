@@ -57,21 +57,21 @@ impl AsyncWrite for Sink {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(buf.len()))
     }
 
     #[inline]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }
 
     #[inline]
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }

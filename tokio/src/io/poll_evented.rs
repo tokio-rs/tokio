@@ -188,6 +188,7 @@ feature! {
                         // Read more:
                         // https://github.com/tokio-rs/tokio/issues/5866
                         #[cfg(all(
+                            // keep in sync with poll_write
                             not(mio_unsupported_force_poll_poll),
                             any(
                                 // epoll
@@ -240,7 +241,28 @@ feature! {
                         // that the socket buffer is full.  Unfortunately this assumption
                         // fails for level-triggered selectors (like on Windows or poll even for
                         // UNIX): https://github.com/tokio-rs/tokio/issues/5866
-                        if n > 0 && (!cfg!(windows) && !cfg!(mio_unsupported_force_poll_poll) && n < buf.len()) {
+                        #[cfg(all(
+                            // keep in sync with poll_read
+                            not(mio_unsupported_force_poll_poll),
+                            any(
+                                // epoll
+                                target_os = "android",
+                                target_os = "illumos",
+                                target_os = "linux",
+                                target_os = "redox",
+                                // kqueue
+                                target_os = "dragonfly",
+                                target_os = "freebsd",
+                                target_os = "ios",
+                                target_os = "macos",
+                                target_os = "netbsd",
+                                target_os = "openbsd",
+                                target_os = "tvos",
+                                target_os = "visionos",
+                                target_os = "watchos",
+                            )
+                        ))]
+                        if 0 < n && n < buf.len() {
                             self.registration.clear_readiness(evt);
                         }
 

@@ -243,6 +243,13 @@ pub struct Sender<T> {
 ///
 /// [`Future`]: trait@std::future::Future
 ///
+/// # Cancellation safety
+///
+/// The `Receiver` is cancel safe. If it is used as the event in a
+/// [`tokio::select!`](crate::select) statement and some other branch
+/// completes first, it is guaranteed that no message was received on this
+/// channel.
+///
 /// # Examples
 ///
 /// ```
@@ -576,7 +583,7 @@ impl<T> Sender<T> {
     /// not be sent.
     ///
     /// This method consumes `self` as only one value may ever be sent on a `oneshot`
-    /// channel. It is not marked async because sending a message to an `oneshot`
+    /// channel. It is not marked async because sending a message to a `oneshot`
     /// channel never requires any form of waiting.  Because of this, the `send`
     /// method can be used in both synchronous and asynchronous code without
     /// problems.
@@ -811,7 +818,7 @@ impl<T> Sender<T> {
     /// # }
     /// ```
     pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
@@ -1272,10 +1279,10 @@ impl<T> Future for Receiver<T> {
 
         let ret = if let Some(inner) = self.as_ref().get_ref().inner.as_ref() {
             #[cfg(all(tokio_unstable, feature = "tracing"))]
-            let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx))).map_err(Into::into);
+            let res = ready!(trace_poll_op!("poll_recv", inner.poll_recv(cx)));
 
             #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
-            let res = ready!(inner.poll_recv(cx)).map_err(Into::into);
+            let res = ready!(inner.poll_recv(cx));
 
             res
         } else {
@@ -1306,7 +1313,7 @@ impl<T> Inner<T> {
     }
 
     fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 
@@ -1382,6 +1389,19 @@ impl<T> Inner<T> {
             unsafe {
                 self.tx_task.with_task(Waker::wake_by_ref);
             }
+        }
+
+        if prev.is_rx_task_set() && !prev.is_complete() {
+            State::unset_rx_task(&self.state);
+            // SAFETY: The sender only accesses `rx_task` (via
+            // `wake_by_ref`) in `complete()` after successfully setting
+            // `VALUE_SENT`. But `set_complete` will not set `VALUE_SENT`
+            // if `CLOSED` is already set (its CAS loop breaks early).
+            // Since `prev` shows that `VALUE_SENT` was not set before we
+            // set `CLOSED`, the sender can no longer set `VALUE_SENT` and
+            // will never access `rx_task`. Therefore, we have exclusive
+            // access here.
+            unsafe { self.rx_task.drop_task() };
         }
 
         prev

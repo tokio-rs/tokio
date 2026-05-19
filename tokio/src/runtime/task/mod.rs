@@ -178,10 +178,6 @@
 //! poll call will notice it when the poll finishes, and the task is cancelled
 //! at that point.
 
-// Some task infrastructure is here to support `JoinSet`, which is currently
-// unstable. This should be removed once `JoinSet` is stabilized.
-#![cfg_attr(not(tokio_unstable), allow(dead_code))]
-
 mod core;
 use self::core::Cell;
 use self::core::Header;
@@ -193,7 +189,6 @@ mod harness;
 use self::harness::Harness;
 
 mod id;
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub, unused_imports))]
 pub use id::{id, try_id, Id};
 
 #[cfg(feature = "rt")]
@@ -513,6 +508,20 @@ impl<S: Schedule> LocalNotified<S> {
         let raw = self.task.raw;
         mem::forget(self);
         raw.poll();
+    }
+
+    /// Returns a `WakerRef` borrowing from this task.
+    ///
+    /// `WakerRef` derefs to `Waker` without bumping the task's refcount.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "taskdump",
+        feature = "rt",
+        target_os = "linux",
+        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+    ))]
+    pub(crate) fn waker_ref(&self) -> waker::WakerRef<'_, S> {
+        waker::waker_ref::<S>(self.task.raw.header_ptr_ref())
     }
 }
 

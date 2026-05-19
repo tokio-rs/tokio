@@ -101,5 +101,10 @@ name = "spawn_blocking"
 path = "spawn_blocking.rs"
 harness = false
 
+[[bench]]
+name = "remote_spawn"
+path = "remote_spawn.rs"
+harness = false
+
 [lints]
 workspace = true

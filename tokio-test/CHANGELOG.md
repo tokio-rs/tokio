@@ -1,3 +1,21 @@
+# 0.4.5 (January 4th, 2026)
+
+### Added
+
+- test: add `io::Builder::name` for better panic messages ([#7212])
+
+### Fixed
+
+- test: make `Spawn` forward `size_hint` ([#6607])
+
+### Changed
+
+- test: remove unused `async-stream` and `bytes` dependencies ([#7214])
+
+[#6607]: https://github.com/tokio-rs/tokio/pull/6607
+[#7212]: https://github.com/tokio-rs/tokio/pull/7212
+[#7214]: https://github.com/tokio-rs/tokio/pull/7214
+
 # 0.4.4 (March 14, 2024)
 
 - task: mark `Spawn` as `#[must_use]` ([#6371])

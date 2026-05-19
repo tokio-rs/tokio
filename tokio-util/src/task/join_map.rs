@@ -451,7 +451,7 @@ where
     ///    that panicked or was aborted.
     ///  * `None` if the `JoinMap` is empty.
     ///
-    /// [`tokio::select!`]: tokio::select
+    /// [`tokio::select!`]: https://docs.rs/tokio/latest/tokio/macro.select.html
     pub async fn join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
         loop {
             let (res, id) = match self.tasks.join_next_with_id().await {

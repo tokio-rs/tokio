@@ -1,6 +1,14 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support bind
-                                                                   // No `socket` on miri.
+// WASIp1 doesn't support bind
+// No `socket` on miri.
+#![cfg(all(
+    feature = "net",
+    feature = "macros",
+    feature = "rt",
+    feature = "io-util",
+    not(all(target_os = "wasi", target_env = "p1")),
+    not(miri)
+))]
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, oneshot};
@@ -10,8 +18,9 @@ use std::io;
 use std::net::{IpAddr, SocketAddr};
 
 macro_rules! test_accept {
-    ($(($ident:ident, $target:expr),)*) => {
+    ($($(#[$attribute:meta])*($ident:ident, $target:expr),)*) => {
         $(
+            $(#[$attribute])*
             #[tokio::test]
             async fn $ident() {
                 let listener = assert_ok!(TcpListener::bind($target).await);
@@ -35,6 +44,10 @@ macro_rules! test_accept {
 
 test_accept! {
     (ip_str, "127.0.0.1:0"),
+    // Note that WASIp2 _does_ support asynchronous name lookups without
+    // requiring a worker thread, so this test could be ungated if/when that's
+    // implemented.
+    #[cfg_attr(target_os = "wasi", ignore = "net::lookup_host requires multithreading, which WASI does not yet support")]
     (host_str, "localhost:0"),
     (socket_addr, "127.0.0.1:0".parse::<SocketAddr>().unwrap()),
     (str_port_tuple, ("127.0.0.1", 0)),

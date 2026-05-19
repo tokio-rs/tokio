@@ -204,6 +204,7 @@ pub(super) struct Trailer {
     /// Consumer task waiting on completion of this task.
     pub(super) waker: UnsafeCell<Option<Waker>>,
     /// Optional hooks needed in the harness.
+    #[cfg_attr(not(tokio_unstable), allow(dead_code))] //TODO: remove when hooks are stabilized
     pub(super) hooks: TaskHarnessScheduleHooks,
 }
 

@@ -140,6 +140,59 @@ fn external_buf_grows_to_init() {
     assert_eq!(read_buf.capacity(), INITIAL_CAPACITY);
 }
 
+// Regression test: `Framed::from_parts` with an empty read buffer (but with
+// capacity, as produced by `into_parts()` after consuming all data) should NOT
+// call `decode()` before actually reading from the underlying IO.
+//
+// Before the fix, `is_readable` was derived from `buffer.capacity() > 0`, which
+// was always true after `reserve()`. This caused a spurious `decode()` call on
+// the empty buffer before any IO read.
+#[tokio::test]
+async fn from_parts_empty_read_buf_does_not_spuriously_decode() {
+    struct TrackingDecoder {
+        decode_count: usize,
+    }
+
+    impl Decoder for TrackingDecoder {
+        type Item = u32;
+        type Error = io::Error;
+
+        fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<u32>> {
+            self.decode_count += 1;
+            if buf.len() < 4 {
+                return Ok(None);
+            }
+            let n = buf.split_to(4).get_u32();
+            Ok(Some(n))
+        }
+    }
+
+    impl Encoder<u32> for TrackingDecoder {
+        type Error = io::Error;
+        fn encode(&mut self, item: u32, dst: &mut BytesMut) -> io::Result<()> {
+            dst.reserve(4);
+            dst.put_u32(item);
+            Ok(())
+        }
+    }
+
+    // Underlying IO provides exactly one 4-byte frame.
+    let data: &[u8] = &[0, 0, 0, 42];
+    let mut parts = FramedParts::new(data, TrackingDecoder { decode_count: 0 });
+    // Simulate a buffer recycled from a previous Framed via `into_parts()`:
+    // empty but has capacity.
+    parts.read_buf = BytesMut::with_capacity(INITIAL_CAPACITY);
+
+    let mut framed = Framed::from_parts(parts);
+    let num = assert_ok!(framed.next().await.unwrap());
+    assert_eq!(num, 42);
+
+    // With the fix: decode is called once (after reading data from IO).
+    // Before the fix: decode was called twice (once on the empty buffer, then
+    // once after reading), because `is_readable` was incorrectly `true`.
+    assert_eq!(framed.codec().decode_count, 1);
+}
+
 #[test]
 fn external_buf_does_not_shrink() {
     let mut parts = FramedParts::new(DontReadIntoThis, U32Codec::default());
