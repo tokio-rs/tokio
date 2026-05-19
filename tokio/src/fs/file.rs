@@ -31,8 +31,6 @@ use crate::blocking::{spawn_blocking, spawn_mandatory_blocking};
 use std::fs::File as StdFile;
 
 cfg_io_uring! {
-    #[cfg(test)]
-    use super::mocks::spawn;
     #[cfg(not(test))]
     use crate::spawn;
 }
