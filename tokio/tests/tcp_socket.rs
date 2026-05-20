@@ -150,7 +150,7 @@ test!(
 test!(
     #[cfg_attr(
         miri,
-        ignore = "Miri doesn't support setting the reuseaddr socket option"
+        ignore = "Miri doesn't support reading the reuseaddr socket option"
     )]
     reuseaddr,
     set_reuseaddr(true)

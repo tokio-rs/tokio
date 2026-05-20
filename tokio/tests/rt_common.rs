@@ -1168,6 +1168,7 @@ rt_test! {
     }
 
     #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
+    #[cfg_attr(miri, ignore)] // Miri currently only processes host I/O events when switching into the scheduler: See https://github.com/rust-lang/miri/issues/5047
     async fn client_server_local(tx: mpsc::Sender<()>) {
         let server = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
 
@@ -1184,8 +1185,6 @@ rt_test! {
         });
 
         let mut client = TcpStream::connect(&addr).await.unwrap();
-
-        std::thread::yield_now();
 
         let mut buf = vec![];
         client.read_to_end(&mut buf).await.unwrap();

@@ -48,7 +48,6 @@ async fn set_linger() {
 )]
 async fn try_read_write() {
     const DATA: &[u8] = &[2u8; 4000];
-    // const DATA: &[u8] = b"this is some data to write to the socket";
 
     // Create listener
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -114,48 +113,52 @@ async fn try_read_write() {
     written.reserve(10 * 1024 * 1024);
     client.writable().await.unwrap();
 
-    // Fill the write buffer using vectored I/O
-    let data_bufs: Vec<_> = DATA.chunks(10).map(io::IoSlice::new).collect();
-    loop {
-        // Still ready
-        let mut writable = task::spawn(client.writable());
-        assert_ready_ok!(writable.poll());
-
-        match client.try_write_vectored(&data_bufs) {
-            Ok(n) => {
-                written.extend(&DATA[..n]);
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                break;
-            }
-            Err(e) => panic!("error = {e:?}"),
-        }
-    }
-
+    #[cfg(not(miri))]
+    // Miri currently has a memory leak when `readv` returns an error: See https://github.com/rust-lang/miri/pull/5054
     {
-        // Write buffer full
-        let mut writable = task::spawn(client.writable());
-        assert_pending!(writable.poll());
+        // Fill the write buffer using vectored I/O
+        let data_bufs: Vec<_> = DATA.chunks(10).map(io::IoSlice::new).collect();
+        loop {
+            // Still ready
+            let mut writable = task::spawn(client.writable());
+            assert_ready_ok!(writable.poll());
 
-        // Drain the socket from the server end using vectored I/O
-        let mut read = vec![0; written.len()];
-        let mut i = 0;
-
-        while i < read.len() {
-            server.readable().await.unwrap();
-
-            let mut bufs: Vec<_> = read[i..]
-                .chunks_mut(0x10000)
-                .map(io::IoSliceMut::new)
-                .collect();
-            match server.try_read_vectored(&mut bufs) {
-                Ok(n) => i += n,
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            match client.try_write_vectored(&data_bufs) {
+                Ok(n) => {
+                    written.extend(&DATA[..n]);
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    break;
+                }
                 Err(e) => panic!("error = {e:?}"),
             }
         }
 
-        assert_eq!(read, written);
+        {
+            // Write buffer full
+            let mut writable = task::spawn(client.writable());
+            assert_pending!(writable.poll());
+
+            // Drain the socket from the server end using vectored I/O
+            let mut read = vec![0; written.len()];
+            let mut i = 0;
+
+            while i < read.len() {
+                server.readable().await.unwrap();
+
+                let mut bufs: Vec<_> = read[i..]
+                    .chunks_mut(0x10000)
+                    .map(io::IoSliceMut::new)
+                    .collect();
+                match server.try_read_vectored(&mut bufs) {
+                    Ok(n) => i += n,
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(e) => panic!("error = {e:?}"),
+                }
+            }
+
+            assert_eq!(read, written);
+        }
     }
 
     // Now, we listen for shutdown
@@ -315,7 +318,6 @@ fn write_until_pending(stream: &mut TcpStream) -> usize {
 #[tokio::test]
 async fn try_read_buf() {
     const DATA: &[u8] = &[2u8; 4000];
-    // const DATA: &[u8] = b"this is some data to write to the socket";
 
     // Create listener
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
