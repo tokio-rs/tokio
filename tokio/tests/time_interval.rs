@@ -15,7 +15,7 @@ use tokio_test::{assert_pending, assert_ready, assert_ready_eq, task};
 macro_rules! check_interval_poll {
     ($i:ident, $start:ident, $($delta:expr),*$(,)?) => {
         $(
-            assert_ready_eq!(poll_next(&mut $i), $start + ms($delta));
+            assert_ready_eq!(poll_next(&mut $i), $start.checked_add(ms($delta)).unwrap());
         )*
         assert_pending!(poll_next(&mut $i));
     };
@@ -297,7 +297,11 @@ async fn reset_at() {
     time::advance(ms(100)).await;
     check_interval_poll!(i, start);
 
-    i.reset_at(Instant::now() + Duration::from_millis(40));
+    i.reset_at(
+        Instant::now()
+            .checked_add(Duration::from_millis(40))
+            .unwrap(),
+    );
 
     // We add one because when using `reset` method, `Interval` adds the
     // `period` from `Instant::now()`, which will always be off by one
@@ -333,7 +337,11 @@ async fn reset_at_bigger_than_interval() {
     time::advance(ms(100)).await;
     check_interval_poll!(i, start);
 
-    i.reset_at(Instant::now() + Duration::from_millis(1000));
+    i.reset_at(
+        Instant::now()
+            .checked_add(Duration::from_millis(1000))
+            .unwrap(),
+    );
 
     // Validate the interval does not tick until 1000ms have passed
     time::advance(ms(300)).await;
