@@ -1323,6 +1323,8 @@ jobs:
         with:
           release: '14.4'
           envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
+          sync: rsync
+          copyback: false
           prepare: |
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
@@ -1350,6 +1352,8 @@ jobs:
         with:
           release: '14.4'
           envs: "TOKIO_STABLE_FEATURES RUSTDOCFLAGS RUSTFLAGS"
+          sync: rsync
+          copyback: false
           prepare: |
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
@@ -1373,6 +1377,8 @@ jobs:
         with:
           release: '14.4'
           envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
+          sync: rsync
+          copyback: false
           prepare: |
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
