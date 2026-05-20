@@ -63,6 +63,16 @@ pub struct Builder {
     enable_io: bool,
     nevents: usize,
 
+    /// Idle timeout (in milliseconds) for the io_uring SQPOLL kernel thread.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux"
+    ))]
+    uring_setup_sqpoll: Option<u32>,
+
     /// Whether or not to enable the time driver
     enable_time: bool,
 
@@ -286,6 +296,15 @@ impl Builder {
             // I/O defaults to "off"
             enable_io: false,
             nevents: 1024,
+
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux"
+            ))]
+            uring_setup_sqpoll: None,
 
             // Time defaults to "off"
             enable_time: false,
@@ -1672,6 +1691,13 @@ impl Builder {
         cfg.timer_flavor = TimerFlavor::Traditional;
         let (driver, driver_handle) = driver::Driver::new(cfg)?;
 
+        #[cfg(all(tokio_unstable, feature = "io-uring", feature = "rt", feature = "fs", target_os = "linux"))]
+        if let Some(idle_timeout) = self.uring_setup_sqpoll {
+            if let Some(io) = driver_handle.io.as_ref() {
+                io.setup_uring_sqpoll(idle_timeout);
+            }
+        }
+
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
@@ -1821,6 +1847,35 @@ cfg_io_uring! {
             self.enable_io = true;
             self
         }
+
+        /// Configures the io_uring driver to use SQPOLL mode.
+        ///
+        /// When set, the io_uring driver will use a kernel-side thread to poll
+        /// the submission queue, which can reduce latency for I/O operations at
+        /// the cost of increased CPU usage.
+        ///
+        /// The `idle_timeout` parameter specifies how long (in milliseconds) the
+        /// kernel thread should wait before going to sleep when there are no
+        /// submissions to process. A value of 0 means the thread never sleeps.
+        ///
+        /// This option requires `enable_io_uring()` or `enable_all()` to also be called.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_io_uring()
+        ///     .uring_setup_sqpoll(2000)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        #[cfg_attr(docsrs, doc(cfg(all(feature = "io-uring", feature = "rt", feature = "fs"))))]
+        pub fn uring_setup_sqpoll(&mut self, idle_timeout: u32) -> &mut Self {
+            self.uring_setup_sqpoll = Some(idle_timeout);
+            self
+        }
     }
 }
 
@@ -1859,6 +1914,13 @@ cfg_rt_multi_thread! {
             let worker_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
             let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+
+            #[cfg(all(tokio_unstable, feature = "io-uring", feature = "rt", feature = "fs", target_os = "linux"))]
+            if let Some(idle_timeout) = self.uring_setup_sqpoll {
+                if let Some(io) = driver_handle.io.as_ref() {
+                    io.setup_uring_sqpoll(idle_timeout);
+                }
+            }
 
             // Create the blocking pool
             let blocking_pool =
