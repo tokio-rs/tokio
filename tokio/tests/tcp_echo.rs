@@ -13,7 +13,6 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 use tokio_test::assert_ok;
 
-
 #[tokio::test]
 async fn echo_server() {
     const BYTES: &[u8] = b"foo bar baz";
