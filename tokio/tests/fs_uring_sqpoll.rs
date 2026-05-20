@@ -1,3 +1,5 @@
+//! SQPOLL mode tests for io_uring file operations.
+
 #![cfg(all(
     tokio_unstable,
     feature = "io-uring",
@@ -11,8 +13,18 @@ use tempfile::NamedTempFile;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::runtime::Builder;
 
+use crate::support::io_uring::io_uring_supported;
+
+mod support {
+    pub(crate) mod io_uring;
+}
+
 #[test]
 fn test_sqpoll_current_thread() {
+    if !io_uring_supported() {
+        return;
+    }
+
     let rt = Builder::new_current_thread()
         .enable_all()
         .uring_setup_sqpoll(1000)
@@ -48,6 +60,10 @@ fn test_sqpoll_current_thread() {
 
 #[test]
 fn test_sqpoll_multi_thread() {
+    if !io_uring_supported() {
+        return;
+    }
+
     let rt = Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()

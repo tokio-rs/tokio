@@ -1871,7 +1871,7 @@ cfg_io_uring! {
         ///     .build()
         ///     .unwrap();
         /// ```
-        #[cfg_attr(docsrs, doc(cfg(all(feature = "io-uring", feature = "rt", feature = "fs"))))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "io-uring")))]
         pub fn uring_setup_sqpoll(&mut self, idle_timeout: u32) -> &mut Self {
             self.uring_setup_sqpoll = Some(idle_timeout);
             self
