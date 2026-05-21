@@ -412,6 +412,10 @@ cfg_io_driver_impl! {
     pub(crate) mod io;
 }
 
+cfg_async_scope! {
+    pub(crate) mod scope;
+}
+
 cfg_process_driver! {
     mod process;
 }

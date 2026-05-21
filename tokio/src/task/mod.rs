@@ -330,6 +330,11 @@ cfg_rt! {
     }
 }
 
+cfg_async_scope! {
+    pub use spawn::spawn_scoped;
+    pub use crate::runtime::scope::Scope;
+}
+
 cfg_not_rt! {
     pub(crate) mod coop;
 }

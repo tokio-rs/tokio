@@ -746,3 +746,16 @@ macro_rules! cfg_io_uring {
         )*
     };
 }
+
+macro_rules! cfg_async_scope {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(
+                tokio_unstable,
+                feature = "async-scope",
+                feature = "rt",
+            ))]
+            $item
+        )*
+    };
+}

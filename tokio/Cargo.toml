@@ -41,6 +41,7 @@ full = [
   "time",
 ]
 
+async-scope = ["rt"]
 fs = []
 io-util = ["bytes"]
 # stdin, stdout, stderr

@@ -213,3 +213,75 @@ cfg_rt! {
         }
     }
 }
+
+cfg_async_scope! {
+    use crate::runtime::scope::Scope;
+    use std::pin::Pin;
+
+    /// Spawns a new scoped task, returning a [`JoinHandle`] for it.
+    /// this allows for spawning tasks that borrow non-`'static` data.
+    #[track_caller]
+    pub fn spawn_scoped<C, Resources, T>(input: Resources, callback: C) -> JoinHandle<(T, Resources)>
+    where
+        Resources: std::any::Any + Send + Unpin + 'static,
+        // TODO: this should NOT be a Pin<Box<>>, but I couldn't figure out the proper lifetimes/generics without it
+        C: for<'s> FnOnce(
+                &'s Scope<'s>,
+                Pin<&'s mut Resources>,
+            ) -> Pin<Box<dyn Future<Output = T> + Send + 's>>
+            + Send
+            + 'static,
+        T: Send + 'static,
+    {
+        use crate::runtime::{context, task};
+        match context::with_current(|handle| {
+            let id = task::Id::next();
+
+            // needs to be 'static here so that it can be moved into the future
+            let resources: Pin<&'static mut Resources> =
+                handle.driver().scope.store_resources(id, input);
+
+            // it would be unsafe to mem::forget this future. However, we immediately spawn it into a task, so this is fine
+            let future = async move {
+                let scope: Scope<'_> = Scope::new();
+
+                // Reduce the life time of resources and scope to this block
+                let result = {
+                    let resources: Pin<&mut Resources> = resources;
+                    let inner_future = callback(&scope, resources);
+                    inner_future.await
+                };
+
+                // This ensures none of the scope-spawned tasks are running, so it will be safe to regain ownership of resources and drop scope
+                scope.close().await;
+
+                match context::with_current(|handle| {
+                    let resources = handle.driver().scope.pop_resources(id);
+                    (result, resources)
+                }) {
+                    Ok(res) => res,
+                    Err(e) => panic!("{}", e),
+                }
+            };
+
+            let fut_size = std::mem::size_of_val(&future);
+
+            #[cfg(all(
+                tokio_unstable,
+                feature = "taskdump",
+                feature = "rt",
+                target_os = "linux",
+                any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+            ))]
+            let future = task::trace::Trace::root(future);
+
+            let meta = SpawnMeta::new_unnamed(fut_size);
+
+            let task = crate::util::trace::task(future, "task", meta, id.as_u64());
+            handle.spawn(task, id, meta.spawned_at)
+        }) {
+            Ok(join_handle) => join_handle,
+            Err(e) => panic!("{}", e),
+        }
+    }
+}

@@ -29,6 +29,8 @@ pub(crate) struct Handle {
     /// Time driver handle
     pub(crate) time: TimeHandle,
 
+    pub(crate) scope: ScopeDriver,
+
     /// Source of `Instant::now()`
     #[cfg_attr(not(all(feature = "time", feature = "test-util")), allow(dead_code))]
     pub(crate) clock: Clock,
@@ -52,6 +54,8 @@ impl Driver {
         let (time_driver, time_handle) =
             create_time_driver(cfg.enable_time, cfg.timer_flavor, io_stack, &clock);
 
+        let scope = ScopeDriver::new();
+
         Ok((
             Self { inner: time_driver },
             Handle {
@@ -59,6 +63,7 @@ impl Driver {
                 signal: signal_handle,
                 time: time_handle,
                 clock,
+                scope,
             },
         ))
     }
@@ -374,3 +379,54 @@ cfg_not_time! {
 cfg_io_uring! {
     pub(crate) mod op;
 }
+
+// cfg_async_scope! {
+use crate::task::Id;
+use std::any::Any;
+use std::collections::HashMap;
+use std::mem::transmute;
+use std::pin::Pin;
+use std::sync::Mutex;
+
+pub(crate) struct ScopeDriver {
+    resources: Mutex<HashMap<Id, Pin<Box<dyn Any + Send + Unpin + 'static>>>>,
+}
+
+impl std::fmt::Debug for ScopeDriver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ScopeDriver").finish()
+    }
+}
+
+impl ScopeDriver {
+    pub(crate) fn new() -> Self {
+        Self {
+            resources: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub(crate) fn store_resources<R: Send + Any + Unpin + 'static>(
+        &self,
+        task_id: Id,
+        resources: R,
+    ) -> Pin<&'static mut R> {
+        let mut guard = self.resources.lock().unwrap();
+        let mut boxed = Box::pin(resources);
+
+        // SAFETY: R is owned by this driver, and dropped on shutdown. Resources are valid within the lifetime of the async scope, we create a 'static lifetime and manage it in the spawned scoped task.
+        let ret = unsafe { transmute::<Pin<&mut R>, Pin<&'static mut R>>(boxed.as_mut()) };
+
+        guard.insert(task_id, boxed);
+
+        ret
+    }
+
+    pub(crate) fn pop_resources<R: Send + Any + Unpin + 'static>(&self, id: Id) -> R {
+        let mut guard = self.resources.lock().unwrap();
+        let r = guard.remove(&id).unwrap();
+        let b = Pin::into_inner(r);
+        let b2 = b as Box<dyn Any + Send + 'static>;
+        *b2.downcast::<R>().unwrap()
+    }
+}
+// }
