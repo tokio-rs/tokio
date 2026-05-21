@@ -16,6 +16,9 @@ use tokio_test::assert_ok;
 #[tokio::test]
 async fn echo_server() {
     const BYTES: &[u8] = b"foo bar baz";
+    #[cfg(not(miri))]
+    const ITER: usize = 1024;
+    #[cfg(miri)] // Use a lower iteration count with Miri because it's too slow otherwise.
     const ITER: usize = 32;
 
     let (tx, rx) = oneshot::channel();
