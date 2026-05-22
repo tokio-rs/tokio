@@ -356,7 +356,7 @@ impl Sleep {
         let mut this = self.project();
         *this.deadline = deadline;
 
-        let handle = this.driver;
+        let mut handle = this.driver.clone();
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
@@ -380,13 +380,18 @@ impl Sleep {
             );
         }
 
-        match this.state.as_mut().as_timer() {
-            Some(timer) => timer.reset(handle.clone(), deadline),
-            None => {
-                let timer = Timer::new(handle.clone(), deadline);
-                this.state.set(SleepState::Active { timer });
-                this.state.as_timer().unwrap().init(deadline);
+        if let Some(timer) = this.state.as_mut().as_timer() {
+            match timer.reset(handle, deadline) {
+                Ok(()) => return,
+                Err(recovered) => handle = recovered,
             }
+        }
+
+        if let Ok(timer) = Timer::new(handle, deadline) {
+            this.state.set(SleepState::Active { timer });
+            this.state.as_timer().unwrap().init(deadline);
+        } else {
+            this.state.set(SleepState::Elapsed);
         }
     }
 
@@ -432,11 +437,14 @@ impl Sleep {
                     );
                 }
 
-                let timer = Timer::new(handle.clone(), *this.deadline);
-                this.state.set(SleepState::Active { timer });
-                let mut timer = this.state.as_mut().as_timer().unwrap();
-                timer.as_mut().init(*this.deadline);
-                timer.poll_elapsed(cx)
+                if let Ok(timer) = Timer::new(handle.clone(), *this.deadline) {
+                    this.state.set(SleepState::Active { timer });
+                    let mut timer = this.state.as_mut().as_timer().unwrap();
+                    timer.as_mut().init(*this.deadline);
+                    timer.poll_elapsed(cx)
+                } else {
+                    Poll::Ready(Ok(()))
+                }
             }
         };
 
