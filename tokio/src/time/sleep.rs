@@ -1,5 +1,5 @@
 use crate::runtime::{scheduler, Timer};
-use crate::time::{error::Error, Duration, Instant};
+use crate::time::{Duration, Instant};
 use crate::util::trace;
 
 use pin_project_lite::pin_project;
@@ -407,7 +407,7 @@ impl Sleep {
         this.state.set(SleepState::Inactive);
     }
 
-    fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+    fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<()> {
         ready!(crate::trace::trace_leaf());
 
         // Keep track of task budget
@@ -445,10 +445,10 @@ impl Sleep {
                     let mut timer = this.state.as_mut().as_timer().unwrap();
                     match timer.as_mut().init(*this.deadline) {
                         Ok(()) => timer.poll_elapsed(cx),
-                        Err(()) => Poll::Ready(Ok(())),
+                        Err(()) => Poll::Ready(()),
                     }
                 } else {
-                    Poll::Ready(Ok(()))
+                    Poll::Ready(())
                 }
             }
         };
@@ -469,16 +469,7 @@ impl Sleep {
 impl Future for Sleep {
     type Output = ();
 
-    // `poll_elapsed` can return an error in two cases:
-    //
-    // - AtCapacity: this is a pathological case where far too many
-    //   sleep instances have been scheduled.
-    // - Shutdown: No timer has been setup, which is a misuse error.
-    //
-    // Both cases are extremely rare, and pretty accurately fit into
-    // "logic errors", so we just panic in this case. A user couldn't
-    // really do much better if we passed the error onwards.
-    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         if matches!(self.state, SleepState::Elapsed) {
             return Poll::Ready(());
         }
@@ -489,10 +480,7 @@ impl Future for Sleep {
         let _ao_span = self.inner.ctx.async_op_span.clone().entered();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let _ao_poll_span = self.inner.ctx.async_op_poll_span.clone().entered();
-        match ready!(self.as_mut().poll_elapsed(cx)) {
-            Ok(()) => Poll::Ready(()),
-            Err(e) => panic!("timer error: {e}"),
-        }
+        self.poll_elapsed(cx)
     }
 }
 

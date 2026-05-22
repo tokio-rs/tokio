@@ -502,7 +502,7 @@ cfg_time! {
         pub(crate) fn poll_elapsed(
             self: Pin<&mut Self>,
             cx: &mut Context<'_>,
-        ) -> Poll<Result<(), crate::time::error::Error>> {
+        ) -> Poll<()> {
             // Safety: we never move the inner entries.
             let this = unsafe { self.get_unchecked_mut() };
             match this {
@@ -513,7 +513,7 @@ cfg_time! {
                 // Safety: we never move the inner entries.
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 Timer::Alternative(entry) => unsafe {
-                    Pin::new_unchecked(entry).poll_elapsed(cx).map(Ok)
+                    Pin::new_unchecked(entry).poll_elapsed(cx)
                 }
             }
         }

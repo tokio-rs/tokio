@@ -22,8 +22,7 @@
 //! Each timer has a state field associated with it. This field contains either
 //! the current scheduled time, or a special flag value indicating its state.
 //! This state can either indicate that the timer is on the 'pending' queue (and
-//! thus will be fired with an `Ok(())` result soon) or that it has already been
-//! fired/deregistered.
+//! thus will be fired soon) or that it has already been fired/deregistered.
 //!
 //! This single state field allows for code that is firing the timer to
 //! synchronize with any racing `reset` calls reliably.
@@ -54,7 +53,6 @@
 //!
 //! [mark_pending]: TimerHandle::mark_pending
 
-use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::atomic::Ordering;
 
@@ -67,8 +65,6 @@ use pin_project_lite::pin_project;
 use std::task::{Context, Poll, Waker};
 use std::{marker::PhantomPinned, pin::Pin, ptr::NonNull};
 
-type TimerResult = Result<(), crate::time::error::Error>;
-
 pub(in crate::runtime::time) const STATE_DEREGISTERED: u64 = u64::MAX;
 const STATE_PENDING_FIRE: u64 = STATE_DEREGISTERED - 1;
 const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
@@ -78,8 +74,7 @@ const STATE_MIN_VALUE: u64 = STATE_PENDING_FIRE;
 pub(super) const MAX_SAFE_MILLIS_DURATION: u64 = STATE_MIN_VALUE - 1;
 
 /// This structure holds the current shared state of the timer - its scheduled
-/// time (if registered), or otherwise the result of the timer completing, as
-/// well as the registered waker.
+/// time (if registered) as well as the registered waker.
 ///
 /// Generally, the `StateCell` is only permitted to be accessed from two contexts:
 /// Either a thread holding the corresponding `&mut TimerEntry`, or a thread
@@ -92,11 +87,6 @@ pub(super) struct StateCell {
     /// Holds either the scheduled expiration time for this timer, or (if the
     /// timer has been fired and is unregistered), `u64::MAX`.
     state: AtomicU64,
-    /// If the timer is fired (an Acquire order read on state shows
-    /// `u64::MAX`), holds the result that should be returned from
-    /// polling the timer. Otherwise, the contents are unspecified and reading
-    /// without holding the driver lock is undefined behavior.
-    result: UnsafeCell<TimerResult>,
     /// The currently-registered waker
     waker: AtomicWaker,
 }
@@ -117,7 +107,6 @@ impl StateCell {
     fn new() -> Self {
         Self {
             state: AtomicU64::new(STATE_DEREGISTERED),
-            result: UnsafeCell::new(Ok(())),
             waker: AtomicWaker::new(),
         }
     }
@@ -137,9 +126,7 @@ impl StateCell {
         }
     }
 
-    /// If the timer is completed, returns the result of the timer. Otherwise,
-    /// returns None and registers the waker.
-    fn poll(&self, waker: &Waker) -> Poll<TimerResult> {
+    fn poll(&self, waker: &Waker) -> Poll<()> {
         // We must register first. This ensures that either `fire` will
         // observe the new waker, or we will observe a racing fire to have set
         // the state, or both.
@@ -148,14 +135,11 @@ impl StateCell {
         self.read_state()
     }
 
-    fn read_state(&self) -> Poll<TimerResult> {
+    fn read_state(&self) -> Poll<()> {
         let cur_state = self.state.load(Ordering::Acquire);
 
         if cur_state == STATE_DEREGISTERED {
-            // SAFETY: The driver has fired this timer; this involves writing
-            // the result, and then writing (with release ordering) the state
-            // field.
-            Poll::Ready(unsafe { self.result.with(|p| *p) })
+            Poll::Ready(())
         } else {
             Poll::Pending
         }
@@ -178,7 +162,7 @@ impl StateCell {
         Ok(())
     }
 
-    /// Fires the timer, setting the result to the provided result.
+    /// Fires the timer.
     ///
     /// Returns:
     /// * `Some(waker)` - if fired and a waker needs to be invoked once the
@@ -186,14 +170,7 @@ impl StateCell {
     /// * `None` - if fired and a waker does not need to be invoked
     ///
     /// SAFETY: The driver lock must be held.
-    unsafe fn fire(&self, result: TimerResult) -> Option<Waker> {
-        // SAFETY: We assume the driver lock is held and the timer is not
-        // fired, so only the driver is accessing this field.
-        //
-        // We perform a release-ordered store to state below, to ensure this
-        // write is visible before the state update is visible.
-        unsafe { self.result.with_mut(|p| *p = result) };
-
+    unsafe fn fire(&self) -> Option<Waker> {
         self.state.store(STATE_DEREGISTERED, Ordering::Release);
 
         self.waker.take_waker()
@@ -495,10 +472,7 @@ impl TimerEntry {
         self.inner.extend_expiration(tick)
     }
 
-    pub(crate) fn poll_elapsed(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), super::Error>> {
+    pub(crate) fn poll_elapsed(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         assert!(
             !self.driver().is_shutdown(),
             "{}",
@@ -573,7 +547,7 @@ impl TimerHandle {
     ///
     /// SAFETY: The driver lock must be held while invoking this function, and
     /// the entry must not be in any wheel linked lists.
-    pub(super) unsafe fn fire(self, completed_state: TimerResult) -> Option<Waker> {
-        unsafe { self.inner.as_ref().state.fire(completed_state) }
+    pub(super) unsafe fn fire(self) -> Option<Waker> {
+        unsafe { self.inner.as_ref().state.fire() }
     }
 }
