@@ -28,7 +28,7 @@ cargo test --all-features
 > [!NOTE]
 > There are some features that are not available in some systems (e.g., `io-uring`
 > which is Linux only). In that case you cannot use the `--all-features` and you
-> should specify only the features that are supported (e.g., `--full`).
+> should specify only the features that are supported (e.g., `--features=full`).
 
 Ideally, you should use the same version of clippy as the one used in CI
 (defined by `env.rust_clippy` in [ci.yml][ci.yml]), because newer versions
