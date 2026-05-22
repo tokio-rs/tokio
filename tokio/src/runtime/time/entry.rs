@@ -60,6 +60,7 @@ use crate::loom::sync::atomic::Ordering;
 
 use crate::runtime::scheduler;
 use crate::sync::AtomicWaker;
+use crate::time::Instant;
 use crate::util::linked_list;
 
 use pin_project_lite::pin_project;
@@ -479,10 +480,12 @@ impl TimerEntry {
         }
     }
 
-    pub(crate) fn init(self: Pin<&mut Self>, deadline: u64) {
+    pub(crate) fn init(self: Pin<&mut Self>, deadline: Instant) {
+        let tick = self.driver().time_source().deadline_to_tick(deadline);
+
         unsafe {
             self.driver()
-                .reregister(&self.driver.driver().io, deadline, (&self.inner).into());
+                .reregister(&self.driver.driver().io, tick, (&self.inner).into());
         }
     }
 
@@ -518,14 +521,16 @@ impl TimerEntry {
         unsafe { self.driver().clear_entry(NonNull::from(&self.inner)) };
     }
 
-    pub(crate) fn reset(self: Pin<&mut Self>, deadline: u64) {
-        if self.inner.extend_expiration(deadline).is_ok() {
+    pub(crate) fn reset(self: Pin<&mut Self>, deadline: Instant) {
+        let tick = self.driver().time_source().deadline_to_tick(deadline);
+
+        if self.inner.extend_expiration(tick).is_ok() {
             return;
         }
 
         unsafe {
             self.driver()
-                .reregister(&self.driver.driver().io, deadline, (&self.inner).into());
+                .reregister(&self.driver.driver().io, tick, (&self.inner).into());
         }
     }
 

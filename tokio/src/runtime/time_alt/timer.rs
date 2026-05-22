@@ -1,5 +1,6 @@
 use super::{EntryHandle, TempLocalContext};
 use crate::runtime::scheduler;
+use crate::time::Instant;
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -26,10 +27,11 @@ impl Drop for Timer {
 
 impl Timer {
     #[track_caller]
-    pub(crate) fn new(handle: scheduler::Handle, deadline: u64) -> Self {
+    pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
+        let tick = deadline_to_tick(&handle, deadline);
         let entry = with_current_temp_local_context(|ctx| match ctx {
             Some(TempLocalContext::Running { registration_queue }) => {
-                let entry = EntryHandle::new(deadline);
+                let entry = EntryHandle::new(tick);
                 unsafe { registration_queue.push_front(entry.clone()) }
                 entry
             }
@@ -37,7 +39,7 @@ impl Timer {
             Some(TempLocalContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
 
             _ => {
-                let entry = EntryHandle::new(deadline);
+                let entry = EntryHandle::new(tick);
                 push_from_remote(&handle, entry.clone());
                 entry
             }
@@ -88,4 +90,9 @@ fn push_from_remote(sched_hdl: &scheduler::Handle, entry_hdl: EntryHandle) {
         assert!(!sched_hdl.is_shutdown(), "{RUNTIME_SHUTTING_DOWN_ERROR}");
         sched_hdl.push_remote_timer(entry_hdl);
     }
+}
+
+fn deadline_to_tick(sched_hdl: &scheduler::Handle, deadline: Instant) -> u64 {
+    let time_hdl = sched_hdl.driver().time();
+    time_hdl.time_source().deadline_to_tick(deadline)
 }

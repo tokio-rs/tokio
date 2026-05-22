@@ -353,8 +353,6 @@ impl Sleep {
         *this.deadline = deadline;
 
         let handle = scheduler::Handle::current();
-        let time_source = handle.driver().time().time_source();
-        let deadline = time_source.deadline_to_tick(deadline);
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
@@ -367,10 +365,12 @@ impl Sleep {
                 tracing::trace_span!("runtime.resource.async_op.poll");
 
             let clock = handle.driver().clock();
+            let time_source = handle.driver().time().time_source();
             let now = time_source.now(clock);
+            let tick = time_source.deadline_to_tick(deadline);
             tracing::trace!(
                 target: "runtime::resource::state_update",
-                duration = deadline.saturating_sub(now),
+                duration = tick.saturating_sub(now),
                 duration.unit = "ms",
                 duration.op = "override",
             );
@@ -404,25 +404,25 @@ impl Sleep {
             Some(timer) => timer,
             None => {
                 let handle = scheduler::Handle::current();
-                let time_source = handle.driver().time().time_source();
-                let deadline = time_source.deadline_to_tick(*this.deadline);
 
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 {
                     let clock = handle.driver().clock();
+                    let time_source = handle.driver().time().time_source();
                     let now = time_source.now(clock);
+                    let tick = time_source.deadline_to_tick(*this.deadline);
                     tracing::trace!(
                         target: "runtime::resource::state_update",
-                        duration = deadline.saturating_sub(now),
+                        duration = tick.saturating_sub(now),
                         duration.unit = "ms",
                         duration.op = "override",
                     );
                 }
 
-                let timer = Timer::new(handle, deadline);
+                let timer = Timer::new(handle, *this.deadline);
                 this.timer.set(Some(timer));
                 let mut timer = this.timer.as_pin_mut().unwrap();
-                timer.as_mut().init(deadline);
+                timer.as_mut().init(*this.deadline);
                 timer
             }
         };
