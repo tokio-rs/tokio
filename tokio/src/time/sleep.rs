@@ -389,7 +389,10 @@ impl Sleep {
 
         if let Ok(timer) = Timer::new(handle, deadline) {
             this.state.set(SleepState::Active { timer });
-            this.state.as_timer().unwrap().init(deadline);
+            let timer = this.state.as_mut().as_timer().unwrap();
+            if timer.init(deadline).is_err() {
+                this.state.set(SleepState::Elapsed);
+            }
         } else {
             this.state.set(SleepState::Elapsed);
         }
@@ -440,8 +443,10 @@ impl Sleep {
                 if let Ok(timer) = Timer::new(handle.clone(), *this.deadline) {
                     this.state.set(SleepState::Active { timer });
                     let mut timer = this.state.as_mut().as_timer().unwrap();
-                    timer.as_mut().init(*this.deadline);
-                    timer.poll_elapsed(cx)
+                    match timer.as_mut().init(*this.deadline) {
+                        Ok(()) => timer.poll_elapsed(cx),
+                        Err(()) => Poll::Ready(Ok(())),
+                    }
                 } else {
                     Poll::Ready(Ok(()))
                 }
