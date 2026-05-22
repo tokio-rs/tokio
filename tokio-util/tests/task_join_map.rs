@@ -359,6 +359,131 @@ async fn abort_all() {
 }
 
 #[tokio::test]
+async fn try_join_next_empty() {
+    let mut map: JoinMap<usize, ()> = JoinMap::new();
+    assert!(map.try_join_next().is_none());
+}
+
+#[tokio::test]
+async fn try_join_next_no_ready_task() {
+    let mut map = JoinMap::new();
+    let (_tx, rx) = oneshot::channel::<()>();
+    map.spawn("pending", async move {
+        let _ = rx.await;
+    });
+
+    // Task is not yet ready.
+    assert!(map.try_join_next().is_none());
+    assert_eq!(map.len(), 1);
+}
+
+#[tokio::test]
+async fn try_join_next_completed_task() {
+    let mut map = JoinMap::new();
+    map.spawn("hello", async { 42 });
+
+    let mut got = None;
+    while got.is_none() {
+        got = map.try_join_next();
+        if got.is_none() {
+            tokio::task::yield_now().await;
+        }
+    }
+    let (key, res) = got.unwrap();
+    assert_eq!(key, "hello");
+    assert_eq!(res.unwrap(), 42);
+    assert!(map.is_empty());
+}
+
+#[tokio::test]
+async fn try_join_next_aborted_task() {
+    let mut map = JoinMap::new();
+    map.spawn("forever", async {
+        futures::future::pending::<()>().await;
+    });
+
+    assert!(map.abort("forever"));
+
+    let mut got = None;
+    while got.is_none() {
+        got = map.try_join_next();
+        if got.is_none() {
+            tokio::task::yield_now().await;
+        }
+    }
+    let (key, res) = got.unwrap();
+    assert_eq!(key, "forever");
+    assert!(res.unwrap_err().is_cancelled());
+    assert!(map.is_empty());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn try_join_next_advances_through_multiple() {
+    const N: u32 = 8;
+
+    static SEM: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(0);
+
+    let mut map = JoinMap::new();
+    for i in 0..N {
+        map.spawn(i, async move {
+            SEM.add_permits(1);
+            i
+        });
+    }
+
+    // Wait until all tasks have signalled completion. On the current_thread
+    // runtime this means they have actually finished.
+    let _ = SEM.acquire_many(N).await.unwrap();
+
+    let mut seen = vec![false; N as usize];
+    let mut count = 0;
+    loop {
+        match map.try_join_next() {
+            Some((key, res)) => {
+                let v = res.expect("task should have completed successfully");
+                assert_eq!(key, v);
+                seen[v as usize] = true;
+                count += 1;
+            }
+            None if map.is_empty() => break,
+            None => tokio::task::yield_now().await,
+        }
+    }
+
+    assert_eq!(count, N);
+    assert!(seen.into_iter().all(|b| b));
+    assert!(map.try_join_next().is_none());
+}
+
+#[tokio::test]
+async fn try_join_next_skips_replaced_task() {
+    let mut map = JoinMap::new();
+
+    let (tx1, rx1) = oneshot::channel::<()>();
+    map.spawn(1, async {
+        let _ = rx1.await;
+        11
+    });
+    tx1.send(()).unwrap();
+    tokio::task::yield_now().await;
+
+    let (tx2, rx2) = oneshot::channel::<()>();
+    map.spawn(1, async {
+        let _ = rx2.await;
+        22
+    });
+    tx2.send(()).unwrap();
+    tokio::task::yield_now().await;
+
+    let (key, res) = map.try_join_next().unwrap();
+    assert_eq!(key, 1);
+    assert_eq!(res.unwrap(), 22);
+
+    assert!(map.try_join_next().is_none());
+    assert!(map.is_empty());
+}
+
+#[tokio::test]
 async fn duplicate_keys() {
     let mut map = JoinMap::new();
     map.spawn(1, async { 1 });
