@@ -24,7 +24,6 @@ use super::time_alt;
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Mutex;
 use crate::runtime::driver::{self, IoHandle, IoStack};
-use crate::time::error::Error;
 use crate::time::{Clock, Duration};
 use crate::util::WakeList;
 
@@ -312,7 +311,7 @@ impl Handle {
             debug_assert!(unsafe { entry.is_pending() });
 
             // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
-            if let Some(waker) = unsafe { entry.fire(Ok(())) } {
+            if let Some(waker) = unsafe { entry.fire() } {
                 waker_list.push(waker);
 
                 if !waker_list.can_push() {
@@ -417,7 +416,7 @@ impl Handle {
                     Ok(())
                 }
                 Err((entry, crate::time::error::InsertError::Elapsed)) => {
-                    unsafe { entry.fire(Ok(())) };
+                    unsafe { entry.fire() };
                     Err(())
                 }
             }
