@@ -454,9 +454,8 @@ impl Interval {
     /// [`Context`] passed to the most recent call is scheduled to receive a
     /// wakeup.
     pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
-        // Wait for the timer to fire
+        // Wait for the delay to be done
         ready!(Pin::new(&mut self.delay).poll(cx));
-        self.delay.as_mut().remove_timer();
 
         // Get the time when we were scheduled to tick
         let timeout = self.delay.deadline();
@@ -479,9 +478,10 @@ impl Interval {
                 .unwrap_or_else(Instant::far_future)
         };
 
-        // Reset the deadline, but do not register a timer. A timer should be registered
-        // with the next call to [`poll_tick`].
-        self.delay.as_mut().set_deadline(next);
+        // When we arrive here, the internal delay returned `Poll::Ready`.
+        // Reset the delay but do not register it. It should be registered with
+        // the next call to [`poll_tick`].
+        self.delay.as_mut().reset_without_timer(next);
 
         // Return the time when we were scheduled to tick
         Poll::Ready(timeout)
