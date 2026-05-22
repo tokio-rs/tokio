@@ -162,41 +162,21 @@ impl StateCell {
     }
 
     /// Marks this timer as being moved to the pending list, if its scheduled
-    /// time is not after `not_after`.
+    /// time is `registered`.
     ///
-    /// If the timer is scheduled for a time after `not_after`, returns an Err
-    /// containing the current scheduled time.
+    /// If the timer is scheduled for another time, returns an Err containing
+    /// the current scheduled time.
     ///
     /// SAFETY: Must hold the driver lock.
-    unsafe fn mark_pending(&self, not_after: u64) -> Result<(), u64> {
-        // Quick initial debug check to see if the timer is already fired. Since
-        // firing the timer can only happen with the driver lock held, we know
-        // we shouldn't be able to "miss" a transition to a fired state, even
-        // with relaxed ordering.
-        let mut cur_state = self.state.load(Ordering::Relaxed);
-
-        loop {
-            // improve the error message for things like
-            // https://github.com/tokio-rs/tokio/issues/3675
-            assert!(
-                cur_state < STATE_MIN_VALUE,
-                "mark_pending called when the timer entry is in an invalid state"
-            );
-
-            if cur_state > not_after {
-                break Err(cur_state);
-            }
-
-            match self.state.compare_exchange_weak(
-                cur_state,
+    unsafe fn mark_pending(&self, registered: u64) -> Result<(), u64> {
+        self.state
+            .compare_exchange(
+                registered,
                 STATE_PENDING_FIRE,
                 Ordering::AcqRel,
                 Ordering::Acquire,
-            ) {
-                Ok(_) => break Ok(()),
-                Err(actual_state) => cur_state = actual_state,
-            }
-        }
+            )
+            .map(|_| ())
     }
 
     /// Fires the timer, setting the result to the provided result.
@@ -204,20 +184,10 @@ impl StateCell {
     /// Returns:
     /// * `Some(waker)` - if fired and a waker needs to be invoked once the
     ///   driver lock is released
-    /// * `None` - if fired and a waker does not need to be invoked, or if
-    ///   already fired
+    /// * `None` - if fired and a waker does not need to be invoked
     ///
     /// SAFETY: The driver lock must be held.
     unsafe fn fire(&self, result: TimerResult) -> Option<Waker> {
-        // Quick initial check to see if the timer is already fired. Since
-        // firing the timer can only happen with the driver lock held, we know
-        // we shouldn't be able to "miss" a transition to a fired state, even
-        // with relaxed ordering.
-        let cur_state = self.state.load(Ordering::Relaxed);
-        if cur_state == STATE_DEREGISTERED {
-            return None;
-        }
-
         // SAFETY: We assume the driver lock is held and the timer is not
         // fired, so only the driver is accessing this field.
         //
@@ -480,12 +450,12 @@ impl TimerEntry {
         }
     }
 
-    pub(crate) fn init(self: Pin<&mut Self>, deadline: Instant) {
+    pub(crate) fn init(self: Pin<&mut Self>, deadline: Instant) -> Result<(), ()> {
         let tick = self.driver().time_source().deadline_to_tick(deadline);
 
         unsafe {
             self.driver()
-                .reregister(&self.driver.driver().io, tick, (&self.inner).into());
+                .register(&self.driver.driver().io, tick, self.inner.handle())
         }
     }
 
@@ -521,17 +491,9 @@ impl TimerEntry {
         unsafe { self.driver().clear_entry(NonNull::from(&self.inner)) };
     }
 
-    pub(crate) fn reset(self: Pin<&mut Self>, deadline: Instant) {
+    pub(crate) fn reset(self: Pin<&mut Self>, deadline: Instant) -> Result<(), ()> {
         let tick = self.driver().time_source().deadline_to_tick(deadline);
-
-        if self.inner.extend_expiration(tick).is_ok() {
-            return;
-        }
-
-        unsafe {
-            self.driver()
-                .reregister(&self.driver.driver().io, tick, (&self.inner).into());
-        }
+        self.inner.extend_expiration(tick)
     }
 
     pub(crate) fn poll_elapsed(
@@ -575,8 +537,8 @@ impl TimerHandle {
         }
     }
 
-    /// Attempts to mark this entry as pending. If the expiration time is after
-    /// `not_after`, however, returns an Err with the current expiration time.
+    /// Attempts to mark this entry as pending. If the expiration time is not
+    /// `registered`, however, returns an Err with the current expiration time.
     ///
     /// If an `Err` is returned, the `registered_when` value will be updated to this
     /// new expiration time.
@@ -584,8 +546,8 @@ impl TimerHandle {
     /// SAFETY: The caller must ensure that the handle remains valid, the driver
     /// lock is held, and that the timer is not in any wheel linked lists.
     /// After returning Ok, the entry must be added to the pending list.
-    pub(super) unsafe fn mark_pending(&self, not_after: u64) -> Result<(), u64> {
-        match unsafe { self.inner.as_ref().state.mark_pending(not_after) } {
+    pub(super) unsafe fn mark_pending(&self, registered: u64) -> Result<(), u64> {
+        match unsafe { self.inner.as_ref().state.mark_pending(registered) } {
             Ok(()) => {
                 // mark this as being on the pending queue in registered_when
                 unsafe {
@@ -602,8 +564,7 @@ impl TimerHandle {
         }
     }
 
-    /// Attempts to transition to a terminal state. If the state is already a
-    /// terminal state, does nothing.
+    /// Transitions to a terminal state.
     ///
     /// Because the entry might be dropped after the state is moved to a
     /// terminal state, this function consumes the handle to ensure we don't
