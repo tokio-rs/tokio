@@ -514,6 +514,14 @@ cfg_time! {
                 }
             }
         }
+
+        pub(crate) fn handle(&self) -> &scheduler::Handle {
+            match self {
+                Timer::Traditional(entry) => &entry.driver,
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Timer::Alternative(entry) => &entry.driver,
+            }
+        }
     }
 }
 

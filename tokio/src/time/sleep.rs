@@ -225,11 +225,15 @@ pin_project! {
     pub struct Sleep {
         deadline: Instant,
         inner: Inner,
-
-        // The link between the `Sleep` instance and the timer that drives it.
         #[pin]
-        timer: Option<Timer>,
+        state: SleepState,
     }
+}
+
+#[derive(Debug)]
+enum SleepState {
+    Active { timer: Timer },
+    Inactive { handle: scheduler::Handle },
 }
 
 cfg_trace! {
@@ -252,8 +256,9 @@ impl Sleep {
         deadline: Instant,
         location: Option<&'static Location<'static>>,
     ) -> Sleep {
+        let handle = scheduler::Handle::current();
         // Panic if the time driver is not enabled (backwards compat)
-        _ = scheduler::Handle::current().driver().time();
+        _ = handle.driver().time();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let inner = {
             let location = location.expect("should have location if tracing");
@@ -291,7 +296,7 @@ impl Sleep {
         Sleep {
             deadline,
             inner,
-            timer: None,
+            state: SleepState::Inactive { handle },
         }
     }
 
@@ -308,7 +313,7 @@ impl Sleep {
     ///
     /// A `Sleep` instance is elapsed when the requested duration has elapsed.
     pub fn is_elapsed(&self) -> bool {
-        self.timer.as_ref().is_some_and(Timer::is_elapsed)
+        matches!(&self.state, SleepState::Active { timer } if timer.is_elapsed())
     }
 
     /// Resets the `Sleep` instance to a new deadline.
@@ -344,7 +349,7 @@ impl Sleep {
         let mut this = self.project();
         *this.deadline = deadline;
 
-        let handle = scheduler::Handle::current();
+        let handle = this.state.handle();
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
@@ -368,12 +373,12 @@ impl Sleep {
             );
         }
 
-        match this.timer.as_mut().as_pin_mut() {
+        match this.state.as_mut().timer() {
             Some(timer) => timer.reset(handle, deadline),
             None => {
                 let timer = Timer::new(handle, deadline);
-                this.timer.set(Some(timer));
-                this.timer.as_pin_mut().unwrap().init(deadline);
+                this.state.set(SleepState::Active { timer });
+                this.state.timer().unwrap().init(deadline);
             }
         }
     }
@@ -384,7 +389,8 @@ impl Sleep {
     pub(super) fn reset_without_timer(self: Pin<&mut Self>, deadline: Instant) {
         let mut this = self.project();
         *this.deadline = deadline;
-        this.timer.set(None);
+        let handle = this.state.handle();
+        this.state.set(SleepState::Inactive { handle });
     }
 
     fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
@@ -401,10 +407,10 @@ impl Sleep {
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         let mut this = self.project();
-        let timer = match this.timer.as_mut().as_pin_mut() {
+        let timer = match this.state.as_mut().timer() {
             Some(timer) => timer,
             None => {
-                let handle = scheduler::Handle::current();
+                let handle = this.state.handle();
 
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 {
@@ -421,8 +427,8 @@ impl Sleep {
                 }
 
                 let timer = Timer::new(handle, *this.deadline);
-                this.timer.set(Some(timer));
-                let mut timer = this.timer.as_pin_mut().unwrap();
+                this.state.set(SleepState::Active { timer });
+                let mut timer = this.state.timer().unwrap();
                 timer.as_mut().init(*this.deadline);
                 timer
             }
@@ -463,6 +469,22 @@ impl Future for Sleep {
         match ready!(self.as_mut().poll_elapsed(cx)) {
             Ok(()) => Poll::Ready(()),
             Err(e) => panic!("timer error: {e}"),
+        }
+    }
+}
+
+impl SleepState {
+    fn handle(&self) -> scheduler::Handle {
+        match self {
+            SleepState::Active { timer } => timer.handle().clone(),
+            SleepState::Inactive { handle } => handle.clone(),
+        }
+    }
+
+    fn timer(self: Pin<&mut Self>) -> Option<Pin<&mut Timer>> {
+        match unsafe { self.get_unchecked_mut() } {
+            SleepState::Active { timer } => unsafe { Some(Pin::new_unchecked(timer)) },
+            SleepState::Inactive { handle: _ } => None,
         }
     }
 }

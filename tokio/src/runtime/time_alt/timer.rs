@@ -9,6 +9,7 @@ use std::task::{Context, Poll};
 use crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR;
 
 pub(crate) struct Timer {
+    pub(crate) driver: scheduler::Handle,
     /// The entry in the timing wheel.
     entry: EntryHandle,
 }
@@ -45,7 +46,10 @@ impl Timer {
             }
         });
 
-        Timer { entry }
+        Timer {
+            driver: handle,
+            entry,
+        }
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {

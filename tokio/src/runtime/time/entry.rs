@@ -287,7 +287,7 @@ pin_project! {
     pub(crate) struct TimerEntry {
         // Arc reference to the runtime handle. We can only free the driver after
         // deregistering everything from their respective timer wheels.
-        driver: scheduler::Handle,
+        pub(crate) driver: scheduler::Handle,
         // Shared inner structure; this is part of an intrusive linked list, and
         // therefore other references can exist to it while mutable references to
         // Entry exist.
