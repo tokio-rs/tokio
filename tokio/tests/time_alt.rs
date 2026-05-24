@@ -1,8 +1,14 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(tokio_unstable, feature = "time", feature = "rt-multi-thread"))]
 
+use std::future::Future;
+use std::task::Context;
+
+use futures::task::noop_waker_ref;
+
 use tokio::runtime::Runtime;
 use tokio::time::*;
+use tokio_test::assert_ready;
 
 fn rt_combinations() -> Vec<Runtime> {
     let mut rts = vec![];
@@ -102,6 +108,26 @@ fn timeout() {
 
             for jh in jhs {
                 jh.await.unwrap();
+            }
+        });
+    }
+}
+
+#[test]
+fn poll_after_completion_is_ready() {
+    // `unconstrained` removes coop so the assertion only depends on `Sleep`.
+    for rt in rt_combinations() {
+        rt.block_on(async {
+            let timer =
+                tokio::task::coop::unconstrained(tokio::time::sleep(Duration::from_millis(1)));
+            tokio::pin!(timer);
+
+            timer.as_mut().await;
+
+            for _ in 0..1024 {
+                assert_ready!(timer
+                    .as_mut()
+                    .poll(&mut Context::from_waker(noop_waker_ref())));
             }
         });
     }

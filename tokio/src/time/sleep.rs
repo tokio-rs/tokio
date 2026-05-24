@@ -215,6 +215,15 @@ pin_project! {
     /// }
     /// ```
     ///
+    /// # Polling after completion
+    ///
+    /// `Sleep` is safe to poll after completion. Polling a completed
+    /// `Sleep` does not panic, and the timer remains elapsed until you
+    /// [`reset`](Sleep::reset) it, so a completed `Sleep` may remain as
+    /// a branch of a [`select!`] loop. A given `poll` may still return
+    /// `Poll::Pending` for runtime reasons such as cooperative
+    /// scheduling, but this does not change the timer's state.
+    ///
     /// [`select!`]: ../macro.select.html
     /// [`tokio::pin!`]: ../macro.pin.html
     #[project(!Unpin)]
