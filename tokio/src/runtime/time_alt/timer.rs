@@ -33,22 +33,16 @@ impl Timer {
     ) -> Result<Self, scheduler::Handle> {
         let tick = deadline_to_tick(&handle, deadline);
         with_current_temp_local_context(|ctx| match ctx {
-            Some(TempLocalContext::Running {
-                elapsed,
-                registration_queue: _,
-            }) if tick <= elapsed => Err(handle),
-            Some(TempLocalContext::Running {
-                elapsed: _,
-                registration_queue,
-            }) => {
+            Some(TempLocalContext::Running { wheel, canc_tx: _ }) if tick <= wheel.elapsed() => {
+                Err(handle)
+            }
+            Some(TempLocalContext::Running { wheel, canc_tx }) => {
                 let entry = EntryHandle::new(tick);
-                unsafe { registration_queue.push_front(entry.clone()) }
+                unsafe { wheel.insert(entry.clone(), canc_tx.clone()) }
                 Ok(Timer { entry })
             }
-            #[cfg(feature = "rt-multi-thread")]
             Some(TempLocalContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
-
-            _ => {
+            None => {
                 let entry = EntryHandle::new(tick);
                 push_from_remote(&handle, entry.clone());
                 Ok(Timer { entry })

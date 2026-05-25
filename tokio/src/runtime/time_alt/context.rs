@@ -1,10 +1,9 @@
-use super::{cancellation_queue, RegistrationQueue, Wheel};
+use super::{cancellation_queue, Wheel};
 
 /// Local context for the time driver, used when the runtime wants to
 /// fire/cancel timers.
 pub(crate) struct LocalContext {
     pub(crate) wheel: Wheel,
-    pub(crate) registration_queue: RegistrationQueue,
     pub(crate) canc_tx: cancellation_queue::Sender,
     pub(crate) canc_rx: cancellation_queue::Receiver,
 }
@@ -14,7 +13,6 @@ impl LocalContext {
         let (canc_tx, canc_rx) = cancellation_queue::new();
         Self {
             wheel: Wheel::new(),
-            registration_queue: RegistrationQueue::new(),
             canc_tx,
             canc_rx,
         }
@@ -24,24 +22,22 @@ impl LocalContext {
 pub(crate) enum TempLocalContext<'a> {
     /// The runtime is running, we can access it.
     Running {
-        elapsed: u64,
-        registration_queue: &'a mut RegistrationQueue,
+        wheel: &'a mut Wheel,
+        canc_tx: &'a cancellation_queue::Sender,
     },
-    #[cfg(feature = "rt-multi-thread")]
     /// The runtime is shutting down, no timers can be registered.
     Shutdown,
 }
 
 impl<'a> TempLocalContext<'a> {
     pub(crate) fn new_running(cx: &'a mut LocalContext) -> Self {
-        TempLocalContext::Running {
-            elapsed: cx.wheel.elapsed(),
-            registration_queue: &mut cx.registration_queue,
+        Self::Running {
+            wheel: &mut cx.wheel,
+            canc_tx: &cx.canc_tx,
         }
     }
 
-    #[cfg(feature = "rt-multi-thread")]
     pub(crate) fn new_shutdown() -> Self {
-        TempLocalContext::Shutdown
+        Self::Shutdown
     }
 }

@@ -945,12 +945,6 @@ impl Context {
             let core = maybe_core.as_mut().expect("core missing");
             let time_cx = &mut core.time_context;
 
-            util::time_alt::process_registration_queue(
-                &mut time_cx.registration_queue,
-                &mut time_cx.wheel,
-                &time_cx.canc_tx,
-                &mut wake_queue,
-            );
             util::time_alt::insert_inject_timers(
                 &mut time_cx.wheel,
                 &time_cx.canc_tx,
