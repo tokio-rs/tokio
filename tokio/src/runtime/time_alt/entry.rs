@@ -8,7 +8,7 @@ use std::task::{Context, Poll, Waker};
 
 pub(super) type EntryList = linked_list::LinkedList<Entry, Entry>;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct State {
     cancelled: bool,
     woken_up: bool,
@@ -34,7 +34,7 @@ pub(crate) struct Entry {
     ///
     /// And then, before parking the resource driver,
     /// the scheduler removes the entry from the [`RegistrationQueue`]
-    /// [`RegistrationQueue`] and insert it into the [`Wheel`].
+    /// and insert it into the [`Wheel`].
     ///
     /// Finally, after parking the resource driver, the scheduler removes
     /// the entry from the [`Wheel`] and insert it into the [`WakeQueue`].
@@ -186,19 +186,12 @@ impl From<&Handle> for NonNull<Entry> {
 }
 
 impl Handle {
-    pub(crate) fn new(deadline: u64, waker: Waker) -> Self {
-        let state = State {
-            cancelled: false,
-            woken_up: false,
-            waker: Some(waker),
-            cancel_tx: None,
-        };
-
+    pub(crate) fn new(deadline: u64) -> Self {
         let entry = Arc::new(Entry {
             cancel_pointers: linked_list::Pointers::new(),
             extra_pointers: linked_list::Pointers::new(),
             deadline,
-            state: Mutex::new(state),
+            state: Mutex::new(State::default()),
             _pin: PhantomPinned,
         });
 

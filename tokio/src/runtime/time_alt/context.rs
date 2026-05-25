@@ -25,7 +25,6 @@ pub(crate) enum TempLocalContext<'a> {
     /// The runtime is running, we can access it.
     Running {
         registration_queue: &'a mut RegistrationQueue,
-        elapsed: u64,
     },
     #[cfg(feature = "rt-multi-thread")]
     /// The runtime is shutting down, no timers can be registered.
@@ -36,7 +35,6 @@ impl<'a> TempLocalContext<'a> {
     pub(crate) fn new_running(cx: &'a mut LocalContext) -> Self {
         TempLocalContext::Running {
             registration_queue: &mut cx.registration_queue,
-            elapsed: cx.wheel.elapsed(),
         }
     }
 

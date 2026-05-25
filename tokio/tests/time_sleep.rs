@@ -10,15 +10,19 @@ use futures::task::noop_waker_ref;
 use tokio::time::{self, Duration, Instant};
 use tokio_test::{assert_elapsed, assert_pending, assert_ready, task};
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn immediate_sleep() {
-    time::pause();
-
     let now = Instant::now();
 
-    // Ready!
-    time::sleep_until(now).await;
-    assert_elapsed!(now, ms(1));
+    let sleep = time::sleep_until(now);
+
+    tokio::pin!(sleep);
+
+    assert!(!sleep.is_elapsed());
+
+    sleep.as_mut().await;
+    assert_elapsed!(now, ms(0));
+    assert!(sleep.is_elapsed());
 }
 
 #[tokio::test]
