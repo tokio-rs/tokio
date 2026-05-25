@@ -12,7 +12,7 @@
 
 ### Documented
 
-- stream: improve the the docs of `TcpListenerStream` ([#7578])
+- stream: improve the docs of `TcpListenerStream` ([#7578])
 
 [#7024]: https://github.com/tokio-rs/tokio/pull/7024
 [#7492]: https://github.com/tokio-rs/tokio/pull/7492

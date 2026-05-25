@@ -331,7 +331,7 @@ impl AsyncRead for SimplexStream {
             cx: &mut task::Context<'_>,
             buf: &mut ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             let coop = ready!(crate::task::coop::poll_proceed(cx));
 
             let ret = self.poll_read_internal(cx, buf);
@@ -348,7 +348,7 @@ impl AsyncRead for SimplexStream {
             cx: &mut task::Context<'_>,
             buf: &mut ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             self.poll_read_internal(cx, buf)
         }
     }
@@ -361,7 +361,7 @@ impl AsyncWrite for SimplexStream {
             cx: &mut task::Context<'_>,
             buf: &[u8],
         ) -> Poll<std::io::Result<usize>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             let coop = ready!(crate::task::coop::poll_proceed(cx));
 
             let ret = self.poll_write_internal(cx, buf);
@@ -378,7 +378,7 @@ impl AsyncWrite for SimplexStream {
             cx: &mut task::Context<'_>,
             buf: &[u8],
         ) -> Poll<std::io::Result<usize>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             self.poll_write_internal(cx, buf)
         }
     }
@@ -389,7 +389,7 @@ impl AsyncWrite for SimplexStream {
             cx: &mut task::Context<'_>,
             bufs: &[std::io::IoSlice<'_>],
         ) -> Poll<Result<usize, std::io::Error>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             let coop = ready!(crate::task::coop::poll_proceed(cx));
 
             let ret = self.poll_write_vectored_internal(cx, bufs);
@@ -406,7 +406,7 @@ impl AsyncWrite for SimplexStream {
             cx: &mut task::Context<'_>,
             bufs: &[std::io::IoSlice<'_>],
         ) -> Poll<Result<usize, std::io::Error>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             self.poll_write_vectored_internal(cx, bufs)
         }
     }

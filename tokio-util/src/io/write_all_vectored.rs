@@ -147,7 +147,7 @@ fn advance_slices<'a>(bufs: &mut &mut [IoSlice<'a>], n: usize) {
 
     *bufs = &mut std::mem::take(bufs)[remove..];
     if let Some(first) = bufs.first_mut() {
-        let buf = &first[..left];
+        let buf = &first[left..];
         // necessary due to limitating in the borrow checker,
         // when tokio MSRV reaches 1.81.0 this entire function
         // can be replaced with `IoSlice::advance_slices`
