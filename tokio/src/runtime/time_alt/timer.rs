@@ -80,10 +80,16 @@ where
 
             match (sched_hdl, cur_sched_hdl) {
                 (Handle::CurrentThread(_), _) => {
-                    panic!("alternative timer is not supported in the current-thread runtime")
+                    // this case is impossible as `tokio::runtime::Builder::enable_alt_timer`
+                    // is not supported in the current-thread runtime, but we'd better handle it
+                    // in case the API is misused in the future.
+                    unreachable!("alternative timer is not supported in the current-thread runtime")
                 }
                 (_, Handle::CurrentThread(_)) => {
-                    panic!("alternative timer is not supported in the current-thread runtime")
+                    // this case is also impossible as `tokio::runtime::Builder::enable_alt_timer`
+                    // is not supported in the current-thread runtime, but we'd better handle it
+                    // in case the API is misused in the future.
+                    unreachable!("alternative timer is not supported in the current-thread runtime")
                 }
                 (Handle::MultiThread(sched_hdl), Handle::MultiThread(cur_sched_hdl)) => {
                     Arc::as_ptr(sched_hdl) == Arc::as_ptr(cur_sched_hdl)
