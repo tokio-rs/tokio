@@ -294,12 +294,7 @@ pin_project! {
         //
         // This is manipulated only under the inner mutex.
         #[pin]
-        inner: Option<TimerShared>,
-        // Deadline for the timer. This is used to register on the first
-        // poll, as we can't register prior to being pinned.
-        deadline: Instant,
-        // Whether the deadline has been registered.
-        registered: bool,
+        inner: TimerShared,
     }
 
     impl PinnedDrop for TimerEntry {
@@ -478,71 +473,29 @@ unsafe impl linked_list::Link for TimerShared {
 // ===== impl Entry =====
 
 impl TimerEntry {
-    #[track_caller]
-    pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
-        // Panic if the time driver is not enabled
-        let _ = handle.driver().time();
-
+    pub(crate) fn new(handle: scheduler::Handle) -> Self {
         Self {
             driver: handle,
-            inner: None,
-            deadline,
-            registered: false,
+            inner: TimerShared::new(),
         }
     }
 
-    fn inner(&self) -> Option<&TimerShared> {
-        self.inner.as_ref()
-    }
+    pub(crate) fn init(self: Pin<&mut Self>, deadline: Instant) {
+        let tick = self.driver().time_source().deadline_to_tick(deadline);
 
-    fn init_inner(self: Pin<&mut Self>) {
-        match self.inner {
-            Some(_) => {}
-            None => self.project().inner.set(Some(TimerShared::new())),
+        unsafe {
+            self.driver()
+                .reregister(&self.driver.driver().io, tick, (&self.inner).into());
         }
-    }
-
-    pub(crate) fn deadline(&self) -> Instant {
-        self.deadline
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
-        let Some(inner) = self.inner() else {
-            return false;
-        };
-
         // Is this timer still in the timer wheel?
-        let deregistered = !inner.might_be_registered();
-
-        // Once the timer has expired,
-        // it will be taken out of the wheel and be fired.
-        //
-        // So if we have already registered the timer into the wheel,
-        // but now it is not in the wheel, it means that it has been
-        // fired.
-        //
-        // +--------------+-----------------+----------+
-        // | deregistered | self.registered |  output  |
-        // +--------------+-----------------+----------+
-        // |     true     |      false      |  false   | <- never been registered
-        // +--------------+-----------------+----------+
-        // |     false    |      false      |  false   | <- never been registered
-        // +--------------+-----------------+----------+
-        // |     true     |      true       |  true    | <- registered into the wheel,
-        // |              |                 |          |    and then taken out of the wheel.
-        // +--------------+-----------------+----------+
-        // |     false    |      true       |  false   | <- still registered in the wheel
-        // +--------------+-----------------+----------+
-        deregistered && self.registered
+        !self.inner.might_be_registered()
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.
     pub(crate) fn cancel(self: Pin<&mut Self>) {
-        // Avoid calling the `clear_entry` method, because it has not been initialized yet.
-        let Some(inner) = self.inner() else {
-            return;
-        };
-
         // We need to perform an acq/rel fence with the driver thread, and the
         // simplest way to do so is to grab the driver lock.
         //
@@ -565,38 +518,24 @@ impl TimerEntry {
         // driver did so far and happens-before everything the driver does in
         // the future. While we have the lock held, we also go ahead and
         // deregister the entry if necessary.
-        unsafe { self.driver().clear_entry(NonNull::from(inner)) };
+        unsafe { self.driver().clear_entry(NonNull::from(&self.inner)) };
     }
 
-    pub(crate) fn reset(mut self: Pin<&mut Self>, new_time: Instant, reregister: bool) {
-        let this = self.as_mut().project();
-        *this.deadline = new_time;
-        *this.registered = reregister;
+    pub(crate) fn reset(self: Pin<&mut Self>, deadline: Instant) {
+        let tick = self.driver().time_source().deadline_to_tick(deadline);
 
-        let tick = self.driver().time_source().deadline_to_tick(new_time);
-        let inner = match self.inner() {
-            Some(inner) => inner,
-            None => {
-                self.as_mut().init_inner();
-                self.inner()
-                    .expect("inner should already be initialized by `this.init_inner()`")
-            }
-        };
-
-        if inner.extend_expiration(tick).is_ok() {
+        if self.inner.extend_expiration(tick).is_ok() {
             return;
         }
 
-        if reregister {
-            unsafe {
-                self.driver()
-                    .reregister(&self.driver.driver().io, tick, inner.into());
-            }
+        unsafe {
+            self.driver()
+                .reregister(&self.driver.driver().io, tick, (&self.inner).into());
         }
     }
 
     pub(crate) fn poll_elapsed(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), super::Error>> {
         assert!(
@@ -605,24 +544,11 @@ impl TimerEntry {
             crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR
         );
 
-        if !self.registered {
-            let deadline = self.deadline;
-            self.as_mut().reset(deadline, true);
-        }
-
-        let inner = self
-            .inner()
-            .expect("inner should already be initialized by `self.reset()`");
-        inner.state.poll(cx.waker())
+        self.inner.state.poll(cx.waker())
     }
 
-    pub(crate) fn driver(&self) -> &super::Handle {
+    fn driver(&self) -> &super::Handle {
         self.driver.driver().time()
-    }
-
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(crate) fn clock(&self) -> &super::Clock {
-        self.driver.driver().clock()
     }
 }
 
