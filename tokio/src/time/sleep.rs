@@ -421,10 +421,9 @@ impl Sleep {
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         let mut this = self.project();
-        let result = match unsafe { this.state.as_mut().get_unchecked_mut() } {
-            SleepState::Active { timer } => unsafe { Pin::new_unchecked(timer).poll_elapsed(cx) },
-            SleepState::Elapsed => Poll::Ready(()),
-            SleepState::Inactive => {
+        let result = match this.state.as_mut().as_timer() {
+            Some(timer) => timer.poll_elapsed(cx),
+            None => {
                 let handle = this.driver;
 
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -471,6 +470,10 @@ impl Future for Sleep {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+        if matches!(self.state, SleepState::Elapsed) {
+            return Poll::Ready(());
+        }
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let _res_span = self.inner.ctx.resource_span.clone().entered();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
