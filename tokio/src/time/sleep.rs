@@ -136,6 +136,9 @@ pin_project! {
     /// use it with [`select!`] or by calling `poll`, you have to pin it first.
     /// If you use it with `.await`, this does not apply.
     ///
+    /// `Sleep` is safe to poll after completion. Polling a completed `Sleep` does
+    /// not panic and is idempotent, but may spuriously return `Poll::Pending`.
+    ///
     /// # Examples
     ///
     /// Wait 100ms and print "100 ms have elapsed".
@@ -214,11 +217,6 @@ pin_project! {
     ///     }
     /// }
     /// ```
-    ///
-    /// # Polling after completion
-    ///
-    /// `Sleep` is safe to poll after completion. Polling a completed `Sleep` does
-    /// not panic and is idempotent, but may spuriously return `Poll::Pending`.
     ///
     /// [`select!`]: ../macro.select.html
     /// [`tokio::pin!`]: ../macro.pin.html
