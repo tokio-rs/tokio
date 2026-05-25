@@ -31,25 +31,12 @@ fn wake_up_in_the_same_thread() {
     model(|| {
         let mut counts = Vec::new();
 
-        let mut reg_queue = RegistrationQueue::new();
-
+        let mut wake_queue = WakeQueue::new();
         for _ in 0..NUM_ITEMS {
             let (hdl, count) = new_handle();
             counts.push(count);
-            unsafe {
-                reg_queue.push_front(hdl);
-            }
+            unsafe { wake_queue.push_front(hdl) }
         }
-
-        let mut wake_queue = WakeQueue::new();
-        for _ in 0..NUM_ITEMS {
-            if let Some(hdl) = reg_queue.pop_front() {
-                unsafe {
-                    wake_queue.push_front(hdl);
-                }
-            }
-        }
-        assert!(reg_queue.pop_front().is_none());
         wake_queue.wake_all();
 
         assert!(counts.into_iter().all(|c| c.get() == 1));
@@ -62,21 +49,11 @@ fn cancel_in_the_same_thread() {
         let mut counts = Vec::new();
         let (cancel_tx, mut cancel_rx) = cancellation_queue::new();
 
-        let mut reg_queue = RegistrationQueue::new();
-
         for _ in 0..NUM_ITEMS {
             let (hdl, count) = new_handle();
             hdl.register_cancel_tx(cancel_tx.clone());
             counts.push(count);
-            unsafe {
-                reg_queue.push_front(hdl.clone());
-            }
             hdl.cancel();
-        }
-
-        // drain the registration queue
-        while let Some(hdl) = reg_queue.pop_front() {
-            drop(hdl);
         }
 
         let mut wake_queue = WakeQueue::new();
@@ -95,30 +72,20 @@ fn cancel_in_the_same_thread() {
 fn wake_up_in_the_different_thread() {
     model(|| {
         let mut counts = Vec::new();
-
         let mut hdls = Vec::new();
-        let mut reg_queue = RegistrationQueue::new();
 
         for _ in 0..NUM_ITEMS {
             let (hdl, count) = new_handle();
             counts.push(count);
-            hdls.push(hdl.clone());
-            unsafe {
-                reg_queue.push_front(hdl);
-            }
+            hdls.push(hdl);
         }
 
         // wake up all handles in a different thread
         thread::spawn(move || {
             let mut wake_queue = WakeQueue::new();
-            for _ in 0..NUM_ITEMS {
-                if let Some(hdl) = reg_queue.pop_front() {
-                    unsafe {
-                        wake_queue.push_front(hdl);
-                    }
-                }
+            for hdl in hdls {
+                unsafe { wake_queue.push_front(hdl) }
             }
-            assert!(reg_queue.pop_front().is_none());
             wake_queue.wake_all();
             assert!(counts.into_iter().all(|c| c.get() == 1));
         })
@@ -133,16 +100,14 @@ fn cancel_in_the_different_thread() {
         let mut counts = Vec::new();
         let (cancel_tx, mut cancel_rx) = cancellation_queue::new();
         let mut hdls = Vec::new();
-        let mut reg_queue = RegistrationQueue::new();
+        let mut hdls2 = Vec::new();
 
         for _ in 0..NUM_ITEMS {
             let (hdl, count) = new_handle();
             hdl.register_cancel_tx(cancel_tx.clone());
             counts.push(count);
             hdls.push(hdl.clone());
-            unsafe {
-                reg_queue.push_front(hdl);
-            }
+            hdls2.push(hdl);
         }
 
         // this thread cancel all handles concurrently
@@ -154,7 +119,7 @@ fn cancel_in_the_different_thread() {
         });
 
         // cancellation queue concurrently
-        while let Some(hdl) = reg_queue.pop_front() {
+        for hdl in hdls2 {
             drop(hdl);
         }
 

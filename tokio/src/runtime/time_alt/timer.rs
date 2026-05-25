@@ -27,25 +27,27 @@ impl Drop for Timer {
 
 impl Timer {
     #[track_caller]
-    pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
+    pub(crate) fn new(
+        handle: scheduler::Handle,
+        deadline: Instant,
+    ) -> Result<Self, scheduler::Handle> {
         let tick = deadline_to_tick(&handle, deadline);
-        let entry = with_current_temp_local_context(|ctx| match ctx {
-            Some(TempLocalContext::Running { registration_queue }) => {
-                let entry = EntryHandle::new(tick);
-                unsafe { registration_queue.push_front(entry.clone()) }
-                entry
+        with_current_temp_local_context(|ctx| match ctx {
+            Some(TempLocalContext::Running { wheel, canc_tx: _ }) if tick <= wheel.elapsed() => {
+                Err(handle)
             }
-            #[cfg(feature = "rt-multi-thread")]
+            Some(TempLocalContext::Running { wheel, canc_tx }) => {
+                let entry = EntryHandle::new(tick);
+                unsafe { wheel.insert(entry.clone(), canc_tx.clone()) }
+                Ok(Timer { entry })
+            }
             Some(TempLocalContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
-
-            _ => {
+            None => {
                 let entry = EntryHandle::new(tick);
                 push_from_remote(&handle, entry.clone());
-                entry
+                Ok(Timer { entry })
             }
-        });
-
-        Timer { entry }
+        })
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {

@@ -1,6 +1,6 @@
 use crate::runtime::scheduler::driver;
 use crate::runtime::time_alt::cancellation_queue::{Receiver, Sender};
-use crate::runtime::time_alt::{EntryHandle, RegistrationQueue, WakeQueue, Wheel};
+use crate::runtime::time_alt::{EntryHandle, WakeQueue, Wheel};
 use std::time::Duration;
 
 pub(crate) fn min_duration(a: Option<Duration>, b: Option<Duration>) -> Option<Duration> {
@@ -9,26 +9,6 @@ pub(crate) fn min_duration(a: Option<Duration>, b: Option<Duration>) -> Option<D
         (Some(dur_a), None) => Some(dur_a),
         (None, Some(dur_b)) => Some(dur_b),
         (None, None) => None,
-    }
-}
-
-pub(crate) fn process_registration_queue(
-    registration_queue: &mut RegistrationQueue,
-    wheel: &mut Wheel,
-    tx: &Sender,
-    wake_queue: &mut WakeQueue,
-) {
-    while let Some(hdl) = registration_queue.pop_front() {
-        if hdl.deadline() <= wheel.elapsed() {
-            unsafe {
-                wake_queue.push_front(hdl);
-            }
-        } else {
-            // Safety: the entry is not registered yet
-            unsafe {
-                wheel.insert(hdl, tx.clone());
-            }
-        }
     }
 }
 

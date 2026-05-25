@@ -24,7 +24,6 @@ use super::time_alt;
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Mutex;
 use crate::runtime::driver::{self, IoHandle, IoStack};
-use crate::time::error::Error;
 use crate::time::{Clock, Duration};
 use crate::util::WakeList;
 
@@ -312,7 +311,7 @@ impl Handle {
             debug_assert!(unsafe { entry.is_pending() });
 
             // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
-            if let Some(waker) = unsafe { entry.fire(Ok(())) } {
+            if let Some(waker) = unsafe { entry.fire() } {
                 waker_list.push(waker);
 
                 if !waker_list.can_push() {
@@ -384,69 +383,43 @@ impl Handle {
             if entry.as_ref().might_be_registered() {
                 lock.wheel.remove(entry);
             }
-
-            entry.as_ref().handle().fire(Ok(()));
         }
     }
 
-    /// Removes and re-adds an entry to the driver.
+    /// Adds an entry to the driver.
     ///
-    /// SAFETY: The timer must be either unregistered, or registered with this
-    /// driver. No other threads are allowed to concurrently manipulate the
-    /// timer at all (the current thread should hold an exclusive reference to
-    /// the `TimerEntry`)
-    pub(self) unsafe fn reregister(
+    /// SAFETY: The timer must be unregistered.
+    unsafe fn register(
         &self,
         unpark: &IoHandle,
         new_tick: u64,
-        entry: NonNull<TimerShared>,
-    ) {
-        let waker = unsafe {
-            let mut lock = self.inner.lock();
+        entry: TimerHandle,
+    ) -> Result<(), ()> {
+        let mut lock = self.inner.lock();
 
-            // We may have raced with a firing/deregistration, so check before
-            // deregistering.
-            if unsafe { entry.as_ref().might_be_registered() } {
-                lock.wheel.remove(entry);
-            }
-
-            // Now that we have exclusive control of this entry, mint a handle to reinsert it.
-            let entry = entry.as_ref().handle();
-
-            if self.is_shutdown() {
-                unsafe { entry.fire(Err(crate::time::error::Error::shutdown())) }
-            } else {
-                entry.set_expiration(new_tick);
-
-                // Note: We don't have to worry about racing with some other resetting
-                // thread, because add_entry and reregister require exclusive control of
-                // the timer entry.
-                match unsafe { lock.wheel.insert(entry) } {
-                    Ok(when) => {
-                        if lock
-                            .next_wake
-                            .map(|next_wake| when < next_wake.get())
-                            .unwrap_or(true)
-                        {
-                            unpark.unpark();
-                        }
-
-                        None
+        if self.is_shutdown() {
+            panic!("{}", crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR);
+        } else {
+            unsafe { entry.set_expiration(new_tick) }
+            // Note: We don't have to worry about racing with some other resetting
+            // thread, because add_entry and reregister require exclusive control of
+            // the timer entry.
+            match unsafe { lock.wheel.insert(entry) } {
+                Ok(when) => {
+                    if lock
+                        .next_wake
+                        .map(|next_wake| when < next_wake.get())
+                        .unwrap_or(true)
+                    {
+                        unpark.unpark();
                     }
-                    Err((entry, crate::time::error::InsertError::Elapsed)) => unsafe {
-                        entry.fire(Ok(()))
-                    },
+                    Ok(())
+                }
+                Err((entry, crate::time::error::InsertError::Elapsed)) => {
+                    unsafe { entry.fire() };
+                    Err(())
                 }
             }
-
-            // Must release lock before invoking waker to avoid the risk of deadlock.
-        };
-
-        // The timer was fired synchronously as a result of the reregistration.
-        // Wake the waker; this is needed because we might reset _after_ a poll,
-        // and otherwise the task won't be awoken to poll again.
-        if let Some(waker) = waker {
-            waker.wake();
         }
     }
 

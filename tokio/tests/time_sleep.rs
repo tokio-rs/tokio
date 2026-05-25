@@ -167,9 +167,6 @@ async fn reset_sleep_to_past() {
 
     sleep.as_mut().reset(now + ms(40));
 
-    // TODO: is this required?
-    //assert!(sleep.is_woken());
-
     assert_ready!(sleep.poll());
 }
 

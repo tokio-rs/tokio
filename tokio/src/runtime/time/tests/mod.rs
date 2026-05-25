@@ -46,15 +46,13 @@ fn single_timer() {
         let rt = rt(false);
         let handle = rt.handle();
 
-        let handle_ = handle.clone();
+        let mut entry = Box::pin(TimerEntry::new(handle.inner.clone()));
+        entry
+            .as_mut()
+            .init(handle.inner.driver().clock().now() + Duration::from_secs(1))
+            .unwrap();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(handle_.inner.clone());
-            pin!(entry);
-            entry
-                .as_mut()
-                .init(handle_.inner.driver().clock().now() + Duration::from_secs(1));
-
-            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
+            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx)));
         });
 
         thread::yield_now();
@@ -75,14 +73,12 @@ fn drop_timer() {
         let rt = rt(false);
         let handle = rt.handle();
 
-        let handle_ = handle.clone();
+        let mut entry = Box::pin(TimerEntry::new(handle.inner.clone()));
+        entry
+            .as_mut()
+            .init(handle.inner.driver().clock().now() + Duration::from_secs(1))
+            .unwrap();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(handle_.inner.clone());
-            pin!(entry);
-            entry
-                .as_mut()
-                .init(handle_.inner.driver().clock().now() + Duration::from_secs(1));
-
             let _ = entry
                 .as_mut()
                 .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
@@ -109,19 +105,17 @@ fn change_waker() {
         let rt = rt(false);
         let handle = rt.handle();
 
-        let handle_ = handle.clone();
+        let mut entry = Box::pin(TimerEntry::new(handle.inner.clone()));
+        entry
+            .as_mut()
+            .init(handle.inner.driver().clock().now() + Duration::from_secs(1))
+            .unwrap();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(handle_.inner.clone());
-            pin!(entry);
-            entry
-                .as_mut()
-                .init(handle_.inner.driver().clock().now() + Duration::from_secs(1));
-
             let _ = entry
                 .as_mut()
                 .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
 
-            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
+            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx)));
         });
 
         thread::yield_now();
@@ -144,23 +138,22 @@ fn reset_future() {
         let rt = rt(false);
         let handle = rt.handle();
 
-        let handle_ = handle.clone();
         let finished_early_ = finished_early.clone();
         let start = handle.inner.driver().clock().now();
 
+        let mut entry = Box::pin(TimerEntry::new(handle.inner.clone()));
+        entry.as_mut().init(start + Duration::from_secs(1)).unwrap();
+
+        let _ = entry
+            .as_mut()
+            .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+        entry
+            .as_mut()
+            .reset(start + Duration::from_secs(2))
+            .unwrap();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(handle_.inner.clone());
-            pin!(entry);
-            entry.as_mut().init(start + Duration::from_secs(1));
-
-            let _ = entry
-                .as_mut()
-                .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
-
-            entry.as_mut().reset(start + Duration::from_secs(2));
-
             // shouldn't complete before 2s
-            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
+            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx)));
 
             finished_early_.store(true, Ordering::Relaxed);
         });
@@ -206,11 +199,12 @@ fn poll_process_levels() {
 
     let mut entries = vec![];
 
-    for i in 0..normal_or_miri(1024, 64) {
+    for i in 1..normal_or_miri(1024, 64) + 1 {
         let mut entry = Box::pin(TimerEntry::new(handle.inner.clone()));
         entry
             .as_mut()
-            .init(handle.inner.driver().clock().now() + Duration::from_millis(i));
+            .init(handle.inner.driver().clock().now() + Duration::from_millis(i))
+            .unwrap();
 
         let _ = entry
             .as_mut()
@@ -219,12 +213,12 @@ fn poll_process_levels() {
         entries.push(entry);
     }
 
-    for t in 1..normal_or_miri(1024, 64) {
+    for t in 1..normal_or_miri(1024, 64) + 1 {
         handle.inner.driver().time().process_at_time(t as u64);
 
         for (deadline, future) in entries.iter_mut().enumerate() {
             let mut context = Context::from_waker(noop_waker_ref());
-            if deadline <= t {
+            if deadline < t {
                 assert!(future.as_mut().poll_elapsed(&mut context).is_ready());
             } else {
                 assert!(future.as_mut().poll_elapsed(&mut context).is_pending());
@@ -244,7 +238,8 @@ fn poll_process_levels_targeted() {
     let e1 = TimerEntry::new(handle.inner.clone());
     pin!(e1);
     e1.as_mut()
-        .init(handle.inner.driver().clock().now() + Duration::from_millis(193));
+        .init(handle.inner.driver().clock().now() + Duration::from_millis(193))
+        .unwrap();
 
     let handle = handle.inner.driver().time();
 
