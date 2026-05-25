@@ -69,8 +69,8 @@ where
 
     #[cfg(feature = "rt")]
     {
-        use crate::runtime::context;
         use crate::loom::sync::Arc;
+        use crate::runtime::context;
 
         // There is no compile-time guarantee that the timer is
         // always registered in the same runtime as it was created in,
