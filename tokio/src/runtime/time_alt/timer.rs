@@ -85,9 +85,7 @@ where
                     // in case the API is misused in the future.
                     unreachable!("alternative timer is not supported in the current-thread runtime")
                 }
-                (_, Handle::CurrentThread(_)) => {
-                    false
-                }
+                (_, Handle::CurrentThread(_)) => false,
                 (Handle::MultiThread(sched_hdl), Handle::MultiThread(cur_sched_hdl)) => {
                     Arc::as_ptr(sched_hdl) == Arc::as_ptr(cur_sched_hdl)
                 }
