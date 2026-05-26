@@ -1,6 +1,5 @@
 #![warn(rust_2018_idioms)]
-// Too slow on miri.
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))]
+#![cfg(all(feature = "full", not(target_os = "wasi")))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -35,6 +34,7 @@ fn single_thread() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Too slow on miri.
 fn many_oneshot_futures() {
     // used for notifying the main thread
     const NUM: usize = 1_000;
@@ -98,6 +98,7 @@ fn spawn_two() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Too slow on miri
 fn many_multishot_futures() {
     const CHAIN: usize = 200;
     const CYCLES: usize = 5;
@@ -188,7 +189,6 @@ fn lifo_slot_budget() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // No `socket` in miri.
 fn spawn_shutdown() {
     let rt = rt();
     let (tx, rx) = mpsc::channel();
@@ -232,6 +232,7 @@ async fn client_server(tx: mpsc::Sender<()>) {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Too slow on miri
 fn drop_threadpool_drops_futures() {
     for _ in 0..1_000 {
         let num_inc = Arc::new(AtomicUsize::new(0));
@@ -322,8 +323,7 @@ fn start_stop_callbacks_called() {
 }
 
 #[test]
-// too slow on miri
-#[cfg_attr(miri, ignore)]
+#[cfg_attr(miri, ignore)] // Too slow on miri
 fn blocking() {
     // used for notifying the main thread
     const NUM: usize = 1_000;
@@ -747,6 +747,7 @@ fn wake_deferred_tasks_before_block_in_place() {
 // could add limits, but that would be likely to fail on CI.
 #[test]
 #[cfg(not(tokio_no_tuning_tests))]
+#[cfg_attr(miri, ignore)] // Too slow on miri
 fn test_tuning() {
     use std::sync::atomic::AtomicBool;
     use std::time::Duration;
