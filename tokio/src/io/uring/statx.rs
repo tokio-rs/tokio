@@ -122,7 +122,7 @@ impl Op<Statx> {
             buffer.as_mut_ptr().cast(),
         )
         .flags(libc::AT_STATX_SYNC_AS_STAT | libc::AT_EMPTY_PATH)
-        .mask(libc::STATX_BASIC_STATS)
+        .mask(libc::STATX_BASIC_STATS | libc::STATX_BTIME)
         .build();
 
         // SAFETY: Parameters are valid for the entire duration of the operation
