@@ -1,13 +1,11 @@
 #![warn(rust_2018_idioms)]
 // WASIp1 doesn't support bind
-// No `socket` on miri.
 #![cfg(all(
     feature = "net",
     feature = "macros",
     feature = "rt",
     feature = "io-util",
     not(all(target_os = "wasi", target_env = "p1")),
-    not(miri)
 ))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
@@ -24,7 +22,7 @@ use std::time::Duration;
 
 #[tokio::test]
 #[cfg(not(target_os = "wasi"))] // WASI does not yet support `SO_LINGER`
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
+#[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
 #[expect(deprecated)] // set_linger is deprecated
 async fn set_linger() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -48,9 +46,8 @@ async fn set_linger() {
     target_os = "wasi",
     ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
 )]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn try_read_write() {
-    const DATA: &[u8] = b"this is some data to write to the socket";
+    const DATA: &[u8] = &[2u8; 4000];
 
     // Create listener
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -116,48 +113,52 @@ async fn try_read_write() {
     written.reserve(10 * 1024 * 1024);
     client.writable().await.unwrap();
 
-    // Fill the write buffer using vectored I/O
-    let data_bufs: Vec<_> = DATA.chunks(10).map(io::IoSlice::new).collect();
-    loop {
-        // Still ready
-        let mut writable = task::spawn(client.writable());
-        assert_ready_ok!(writable.poll());
-
-        match client.try_write_vectored(&data_bufs) {
-            Ok(n) => {
-                written.extend(&DATA[..n]);
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                break;
-            }
-            Err(e) => panic!("error = {e:?}"),
-        }
-    }
-
+    #[cfg(not(miri))]
+    // Miri currently has a memory leak when `readv` returns an error: See https://github.com/rust-lang/miri/pull/5054
     {
-        // Write buffer full
-        let mut writable = task::spawn(client.writable());
-        assert_pending!(writable.poll());
+        // Fill the write buffer using vectored I/O
+        let data_bufs: Vec<_> = DATA.chunks(10).map(io::IoSlice::new).collect();
+        loop {
+            // Still ready
+            let mut writable = task::spawn(client.writable());
+            assert_ready_ok!(writable.poll());
 
-        // Drain the socket from the server end using vectored I/O
-        let mut read = vec![0; written.len()];
-        let mut i = 0;
-
-        while i < read.len() {
-            server.readable().await.unwrap();
-
-            let mut bufs: Vec<_> = read[i..]
-                .chunks_mut(0x10000)
-                .map(io::IoSliceMut::new)
-                .collect();
-            match server.try_read_vectored(&mut bufs) {
-                Ok(n) => i += n,
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            match client.try_write_vectored(&data_bufs) {
+                Ok(n) => {
+                    written.extend(&DATA[..n]);
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    break;
+                }
                 Err(e) => panic!("error = {e:?}"),
             }
         }
 
-        assert_eq!(read, written);
+        {
+            // Write buffer full
+            let mut writable = task::spawn(client.writable());
+            assert_pending!(writable.poll());
+
+            // Drain the socket from the server end using vectored I/O
+            let mut read = vec![0; written.len()];
+            let mut i = 0;
+
+            while i < read.len() {
+                server.readable().await.unwrap();
+
+                let mut bufs: Vec<_> = read[i..]
+                    .chunks_mut(0x10000)
+                    .map(io::IoSliceMut::new)
+                    .collect();
+                match server.try_read_vectored(&mut bufs) {
+                    Ok(n) => i += n,
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(e) => panic!("error = {e:?}"),
+                }
+            }
+
+            assert_eq!(read, written);
+        }
     }
 
     // Now, we listen for shutdown
@@ -235,7 +236,6 @@ macro_rules! assert_not_writable_by_polling {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn poll_read_ready() {
     let (mut client, mut server) = create_pair().await;
 
@@ -259,7 +259,6 @@ async fn poll_read_ready() {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn poll_write_ready() {
     let (mut client, server) = create_pair().await;
 
@@ -317,9 +316,8 @@ fn write_until_pending(stream: &mut TcpStream) -> usize {
 // it once that issue is fixed and the fix is included in a Wasmtime release.
 #[cfg_attr(target_os = "wasi", ignore)]
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn try_read_buf() {
-    const DATA: &[u8] = b"this is some data to write to the socket";
+    const DATA: &[u8] = &[2u8; 4000];
 
     // Create listener
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -409,7 +407,6 @@ async fn try_read_buf() {
     target_os = "wasi",
     ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
 )]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn read_closed() {
     let (client, mut server) = create_pair().await;
 
@@ -425,7 +422,6 @@ async fn read_closed() {
 
 // write_closed is a best effort event, so test only for no false positives.
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn write_closed() {
     let (mut client, mut server) = create_pair().await;
 

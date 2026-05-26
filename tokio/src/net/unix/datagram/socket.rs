@@ -39,7 +39,7 @@ cfg_net_unix! {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     /// use tokio::net::UnixDatagram;
     /// use tempfile::tempdir;
     ///
@@ -377,7 +377,7 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     /// use tokio::net::UnixDatagram;
     /// use tempfile::tempdir;
     ///
@@ -469,7 +469,7 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     /// use tokio::net::UnixDatagram;
     /// use std::os::unix::net::UnixDatagram as StdUDS;
     /// use tempfile::tempdir;
@@ -536,7 +536,7 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     /// use tokio::net::UnixDatagram;
     /// use tempfile::tempdir;
     ///
@@ -576,7 +576,7 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     /// use tokio::net::UnixDatagram;
     /// use tempfile::tempdir;
     ///
@@ -903,7 +903,7 @@ impl UnixDatagram {
         /// # use std::error::Error;
         /// # #[tokio::main]
         /// # async fn main() -> Result<(), Box<dyn Error>> {
-        /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+        /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
         /// use tokio::net::UnixDatagram;
         /// use tempfile::tempdir;
         ///
@@ -1071,7 +1071,7 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     /// use tokio::net::UnixDatagram;
     /// use tempfile::tempdir;
     ///
@@ -1122,7 +1122,7 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     /// use tokio::net::UnixDatagram;
     /// use tempfile::tempdir;
     ///
@@ -1439,7 +1439,7 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     /// use tokio::net::UnixDatagram;
     /// use tempfile::tempdir;
     ///
@@ -1462,7 +1462,7 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     /// use tokio::net::UnixDatagram;
     ///
     /// // Create an unbound socket
@@ -1487,7 +1487,7 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     /// use tokio::net::UnixDatagram;
     /// use tempfile::tempdir;
     ///
@@ -1535,7 +1535,7 @@ impl UnixDatagram {
     /// # use std::error::Error;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn Error>> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     /// use tokio::net::UnixDatagram;
     ///
     /// // Create an unbound socket
