@@ -29,7 +29,7 @@ impl Timer {
     #[track_caller]
     pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
         let tick = deadline_to_tick(&handle, deadline);
-        let entry = with_current_temp_local_context(|ctx| match ctx {
+        let entry = with_current_temp_local_context(&handle, |ctx| match ctx {
             Some(TempLocalContext::Running { registration_queue }) => {
                 let entry = EntryHandle::new(tick);
                 unsafe { registration_queue.push_front(entry.clone()) }
@@ -57,7 +57,7 @@ impl Timer {
     }
 }
 
-fn with_current_temp_local_context<F, R>(f: F) -> R
+fn with_current_temp_local_context<F, R>(sched_hdl: &scheduler::Handle, f: F) -> R
 where
     F: FnOnce(Option<TempLocalContext<'_>>) -> R,
 {
@@ -69,8 +69,39 @@ where
 
     #[cfg(feature = "rt")]
     {
+        use crate::loom::sync::Arc;
         use crate::runtime::context;
 
+        // There is no compile-time guarantee that the timer is
+        // always registered in the same runtime as it was created in,
+        // so we need to check it at runtime.
+        let is_same_rt = context::with_current(|cur_sched_hdl| {
+            use crate::runtime::scheduler::Handle;
+
+            match (sched_hdl, cur_sched_hdl) {
+                (Handle::CurrentThread(_), _) => {
+                    // this case is impossible as `tokio::runtime::Builder::enable_alt_timer`
+                    // is not supported in the current-thread runtime, but we'd better handle it
+                    // in case the API is misused in the future.
+                    unreachable!("alternative timer is not supported in the current-thread runtime")
+                }
+                (_, Handle::CurrentThread(_)) => false,
+                (Handle::MultiThread(sched_hdl), Handle::MultiThread(cur_sched_hdl)) => {
+                    Arc::as_ptr(sched_hdl) == Arc::as_ptr(cur_sched_hdl)
+                }
+            }
+        })
+        .unwrap_or_default();
+
+        if !is_same_rt {
+            // The timer is being registered from a runtime
+            // that is different from the runtime that the timer is created in,
+            // so we cannot access `TempLocalContext` of the original runtime.
+            return f(None);
+        }
+
+        // The timer is being registered from the same runtime that the timer is created in,
+        // so we can access `TempLocalContext`.
         context::with_scheduler(|maybe_cx| match maybe_cx {
             Some(cx) => cx.expect_multi_thread().with_time_temp_local_context(f),
             None => f(None),
