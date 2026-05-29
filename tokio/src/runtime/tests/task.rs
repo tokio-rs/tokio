@@ -2,6 +2,7 @@ use crate::runtime::task::{
     self, unowned, Id, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task,
 };
 use crate::runtime::tests::NoopSchedule;
+use crate::runtime::TaskHooks;
 
 use std::collections::VecDeque;
 use std::future::Future;
@@ -421,13 +422,22 @@ impl Runtime {
         T: 'static + Send + Future,
         T::Output: 'static + Send,
     {
-        let (handle, notified) = self.0.owned.bind(
+        let task_hooks = TaskHooks {
+            task_spawn_callback: None,
+            task_terminate_callback: None,
+            #[cfg(tokio_unstable)]
+            before_poll_callback: None,
+            #[cfg(tokio_unstable)]
+            after_poll_callback: None,
+        };
+        let (handle, notified) = self.0.owned.bind_with_spawn_hook(
             future,
             self.clone(),
             Id::next(),
             SpawnLocation::capture(),
             #[cfg(tokio_unstable)]
             None,
+            &task_hooks,
         );
 
         if let Some(notified) = notified {

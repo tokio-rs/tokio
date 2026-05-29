@@ -5,8 +5,10 @@ use crate::runtime::task::{Notified, Task};
 use crate::runtime::{
     blocking, driver,
     task::{self, JoinHandle, SpawnLocation},
-    TaskHooks, TaskMeta, TimerFlavor,
+    TaskHooks, TimerFlavor,
 };
+#[cfg(tokio_unstable)]
+use crate::runtime::TaskMeta;
 use crate::util::RngSeedGenerator;
 
 use std::fmt;
