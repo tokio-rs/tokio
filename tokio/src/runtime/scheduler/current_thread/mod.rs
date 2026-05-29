@@ -3,11 +3,11 @@ use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
 use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task};
+#[cfg(tokio_unstable)]
+use crate::runtime::TaskMeta;
 use crate::runtime::{
     blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, WorkerMetrics,
 };
-#[cfg(tokio_unstable)]
-use crate::runtime::TaskMeta;
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};

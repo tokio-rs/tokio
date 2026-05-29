@@ -2,13 +2,13 @@ use crate::future::Future;
 use crate::loom::sync::Arc;
 use crate::runtime::scheduler::multi_thread::worker;
 use crate::runtime::task::{Notified, Task};
+#[cfg(tokio_unstable)]
+use crate::runtime::TaskMeta;
 use crate::runtime::{
     blocking, driver,
     task::{self, JoinHandle, SpawnLocation},
     TaskHooks, TimerFlavor,
 };
-#[cfg(tokio_unstable)]
-use crate::runtime::TaskMeta;
 use crate::util::RngSeedGenerator;
 
 use std::fmt;
