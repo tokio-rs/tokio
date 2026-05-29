@@ -350,29 +350,67 @@ impl Drop for TaskIdGuard {
     }
 }
 
-#[cfg(tokio_unstable)]
 struct TaskContextGuard {
     parent_task_id: Option<Id>,
+    #[cfg(tokio_unstable)]
     parent_task: Option<NonNull<Header>>,
 }
 
-#[cfg(tokio_unstable)]
 impl TaskContextGuard {
     fn enter(id: Id, header: NonNull<Header>) -> Self {
-        let (parent_task_id, parent_task) =
-            context::set_current_task_id_and_task(Some(id), Some(header));
+        #[cfg(tokio_unstable)]
+        {
+            let (parent_task_id, parent_task) =
+                context::set_current_task_id_and_task(Some(id), Some(header));
 
-        TaskContextGuard {
-            parent_task_id,
-            parent_task,
+            TaskContextGuard {
+                parent_task_id,
+                parent_task,
+            }
+        }
+
+        #[cfg(not(tokio_unstable))]
+        {
+            let _ = header;
+            TaskContextGuard {
+                parent_task_id: context::set_current_task_id(Some(id)),
+            }
+        }
+    }
+}
+
+impl Drop for TaskContextGuard {
+    fn drop(&mut self) {
+        #[cfg(tokio_unstable)]
+        {
+            context::set_current_task_id_and_task(self.parent_task_id, self.parent_task);
+        }
+
+        #[cfg(not(tokio_unstable))]
+        {
+            context::set_current_task_id(self.parent_task_id);
         }
     }
 }
 
 #[cfg(tokio_unstable)]
-impl Drop for TaskContextGuard {
+struct CurrentTaskGuard {
+    parent_task: Option<NonNull<Header>>,
+}
+
+#[cfg(tokio_unstable)]
+impl CurrentTaskGuard {
+    fn enter(header: NonNull<Header>) -> Self {
+        CurrentTaskGuard {
+            parent_task: context::set_current_task(Some(header)),
+        }
+    }
+}
+
+#[cfg(tokio_unstable)]
+impl Drop for CurrentTaskGuard {
     fn drop(&mut self) {
-        context::set_current_task_id_and_task(self.parent_task_id, self.parent_task);
+        context::set_current_task(self.parent_task);
     }
 }
 
@@ -409,10 +447,7 @@ impl<T: Future, S: Schedule> Core<T, S> {
                 // Safety: The caller ensures the future is pinned.
                 let future = unsafe { Pin::new_unchecked(future) };
 
-                #[cfg(tokio_unstable)]
                 let _guard = TaskContextGuard::enter(self.task_id, header);
-                #[cfg(not(tokio_unstable))]
-                let _guard = TaskIdGuard::enter(self.task_id);
                 future.poll(&mut cx)
             })
         };
@@ -485,27 +520,6 @@ impl<T: Future, S: Schedule> Core<T, S> {
     unsafe fn set_stage(&self, stage: Stage<T>) {
         let _guard = TaskIdGuard::enter(self.task_id);
         self.stage.stage.with_mut(|ptr| *ptr = stage);
-    }
-}
-
-#[cfg(tokio_unstable)]
-pub(crate) struct CurrentTaskGuard {
-    parent_task: Option<NonNull<Header>>,
-}
-
-#[cfg(tokio_unstable)]
-impl CurrentTaskGuard {
-    fn enter(header: NonNull<Header>) -> Self {
-        CurrentTaskGuard {
-            parent_task: context::set_current_task(Some(header)),
-        }
-    }
-}
-
-#[cfg(tokio_unstable)]
-impl Drop for CurrentTaskGuard {
-    fn drop(&mut self) {
-        context::set_current_task(self.parent_task);
     }
 }
 

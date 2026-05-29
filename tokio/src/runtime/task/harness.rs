@@ -222,57 +222,12 @@ where
 
                 let header_ptr = self.header_ptr();
 
-                #[cfg(tokio_unstable)]
-                {
-                    // Safety: the task is in the RUNNING state, so shutdown
-                    // cannot take ownership of the task contents and termination
-                    // cannot access hook data concurrently.
-                    let mut task_meta = unsafe { self.task_meta() };
-                    let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                        self.core()
-                            .scheduler
-                            .task_poll_start_callback(&mut task_meta);
-                    }));
-
-                    if let Err(panic) = res {
-                        // Safety: the task is still in the RUNNING state, so we
-                        // have exclusive access to the future/output storage.
-                        unsafe { poll_hook_panic(self.core(), header_ptr, panic) };
-                        return PollFuture::Complete;
-                    }
-
-                    if self.state().load().is_cancelled() {
-                        cancel_task(self.core(), header_ptr);
-                        return PollFuture::Complete;
-                    }
-                }
-
                 let waker_ref = waker_ref::<S>(&header_ptr);
                 let cx = Context::from_waker(&waker_ref);
                 // Safety: `transition_to_running` succeeded, so this thread has
                 // exclusive access to the future/output storage. The header pointer
                 // comes from this harness and remains live while the task is running.
                 let res = unsafe { poll_future(self.core(), header_ptr, cx) };
-
-                #[cfg(tokio_unstable)]
-                {
-                    // Safety: the task is still in the RUNNING state, so
-                    // shutdown cannot take ownership of the task contents and
-                    // termination cannot access hook data concurrently.
-                    let mut task_meta = unsafe { self.task_meta() };
-                    let hook_res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                        self.core()
-                            .scheduler
-                            .task_poll_stop_callback(&mut task_meta);
-                    }));
-
-                    if let Err(panic) = hook_res {
-                        // Safety: the task is still in the RUNNING state, so we
-                        // have exclusive access to the future/output storage.
-                        unsafe { poll_hook_panic(self.core(), header_ptr, panic) };
-                        return PollFuture::Complete;
-                    }
-                }
 
                 if res == Poll::Ready(()) {
                     // The future completed. Move on to complete the task.
@@ -582,32 +537,42 @@ fn panic_result_to_join_error(
     }
 }
 
-/// Convert a poll hook panic into the task output.
-///
-/// # Safety
-///
-/// The caller must have exclusive access to the task's future/output storage,
-/// such as by holding the task in the RUNNING state.
 #[cfg(tokio_unstable)]
-unsafe fn poll_hook_panic<T: Future, S: Schedule>(
+unsafe fn task_meta<'meta, T: Future, S: Schedule>(
     core: &Core<T, S>,
     header: NonNull<Header>,
-    hook_panic: Box<dyn Any + Send + 'static>,
-) {
-    let drop_res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        core.drop_future_or_output(header);
-    }));
-    let join_error = match drop_res {
-        Ok(()) => panic_to_error(&core.scheduler, core.task_id, hook_panic),
-        Err(drop_panic) => panic_to_error(&core.scheduler, core.task_id, drop_panic),
-    };
+) -> TaskMeta<'meta> {
+    // Safety: `header` points to this live task allocation.
+    let trailer = unsafe { Header::get_trailer(header).as_ref() };
+    // Safety: the task is in the RUNNING state, so shutdown cannot take
+    // ownership of the task contents and termination cannot access hook data
+    // concurrently.
+    unsafe {
+        TaskMeta::new(
+            core.task_id,
+            core.spawned_at.into(),
+            Some(trailer.user_data_ptr()),
+        )
+    }
+}
 
-    let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        core.store_output(Err(join_error));
-    }));
+#[cfg(tokio_unstable)]
+unsafe fn poll_start_hook<T: Future, S: Schedule>(core: &Core<T, S>, header: NonNull<Header>) {
+    if core.scheduler.has_task_poll_start_callback() {
+        let mut task_meta = unsafe { task_meta(core, header) };
+        let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            core.scheduler.task_poll_start_callback(&mut task_meta);
+        }));
+    }
+}
 
-    if res.is_err() {
-        core.scheduler.unhandled_panic();
+#[cfg(tokio_unstable)]
+unsafe fn poll_stop_hook<T: Future, S: Schedule>(core: &Core<T, S>, header: NonNull<Header>) {
+    if core.scheduler.has_task_poll_stop_callback() {
+        let mut task_meta = unsafe { task_meta(core, header) };
+        let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            core.scheduler.task_poll_stop_callback(&mut task_meta);
+        }));
     }
 }
 
@@ -625,6 +590,16 @@ unsafe fn poll_future<T: Future, S: Schedule>(
     header: NonNull<Header>,
     cx: Context<'_>,
 ) -> Poll<()> {
+    #[cfg(tokio_unstable)]
+    {
+        unsafe { poll_start_hook(core, header) };
+
+        if unsafe { header.as_ref() }.state.load().is_cancelled() {
+            cancel_task(core, header);
+            return Poll::Ready(());
+        }
+    }
+
     // Poll the future.
     let output = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         struct Guard<'a, T: Future, S: Schedule> {
@@ -645,6 +620,11 @@ unsafe fn poll_future<T: Future, S: Schedule>(
         mem::forget(guard);
         res
     }));
+
+    #[cfg(tokio_unstable)]
+    unsafe {
+        poll_stop_hook(core, header);
+    }
 
     // Prepare output for being placed in the core stage.
     let output = match output {

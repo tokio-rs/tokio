@@ -474,29 +474,15 @@ impl Handle {
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        #[cfg(tokio_unstable)]
-        let (handle, notified) = task::with_current_task_meta(|parent| {
-            me.shared.owned.bind_with_spawn_hook(
-                future,
-                me.clone(),
-                id,
-                spawned_at,
-                user_data,
-                |task| {
-                    // Safety: the task is freshly allocated and not published yet.
-                    let mut meta = unsafe { task.task_meta() };
-                    me.task_hooks.spawn(&mut meta, parent);
-                },
-            )
-        });
-        #[cfg(not(tokio_unstable))]
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
-
-        #[cfg(not(tokio_unstable))]
-        {
-            let mut meta = TaskMeta::new(id, spawned_at);
-            me.task_hooks.spawn(&mut meta, None);
-        }
+        let (handle, notified) = me.shared.owned.bind_with_spawn_hook(
+            future,
+            me.clone(),
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+            &me.task_hooks,
+        );
 
         if let Some(notified) = notified {
             me.schedule(notified);
@@ -524,37 +510,18 @@ impl Handle {
         F: crate::future::Future + 'static,
         F::Output: 'static,
     {
-        #[cfg(tokio_unstable)]
-        let (handle, notified) = task::with_current_task_meta(|parent| {
-            let before_bind = |task: &Task<Arc<Handle>>| {
-                // Safety: the task is freshly allocated and not published yet.
-                let mut meta = unsafe { task.task_meta() };
-                me.task_hooks.spawn(&mut meta, parent);
-            };
-            // Safety: the caller guarantees that this is only called on a `LocalRuntime`.
-            unsafe {
-                me.shared.owned.bind_local_with_spawn_hook(
-                    future,
-                    me.clone(),
-                    id,
-                    spawned_at,
-                    user_data,
-                    before_bind,
-                )
-            }
-        });
-        #[cfg(not(tokio_unstable))]
+        // Safety: the caller guarantees that this is only called on a `LocalRuntime`.
         let (handle, notified) = unsafe {
-            me.shared
-                .owned
-                .bind_local(future, me.clone(), id, spawned_at)
+            me.shared.owned.bind_local_with_spawn_hook(
+                future,
+                me.clone(),
+                id,
+                spawned_at,
+                #[cfg(tokio_unstable)]
+                user_data,
+                &me.task_hooks,
+            )
         };
-
-        #[cfg(not(tokio_unstable))]
-        {
-            let mut meta = TaskMeta::new(id, spawned_at);
-            me.task_hooks.spawn(&mut meta, None);
-        }
 
         if let Some(notified) = notified {
             me.schedule(notified);
@@ -727,8 +694,16 @@ impl Schedule for Arc<Handle> {
             self.task_hooks.task_terminate_callback(meta);
         }
 
+        fn has_task_poll_start_callback(&self) -> bool {
+            self.task_hooks.has_poll_start_callback()
+        }
+
         fn task_poll_start_callback(&self, meta: &mut TaskMeta<'_>) {
             self.task_hooks.poll_start_callback(meta);
+        }
+
+        fn has_task_poll_stop_callback(&self) -> bool {
+            self.task_hooks.has_poll_stop_callback()
         }
 
         fn task_poll_stop_callback(&self, meta: &mut TaskMeta<'_>) {

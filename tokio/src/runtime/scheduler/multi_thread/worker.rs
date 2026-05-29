@@ -475,7 +475,7 @@ where
         // Once the blocking task is done executing, we will attempt to
         // steal the core back.
         let worker = cx.worker.clone();
-        runtime::spawn_blocking_internal(move || run(worker));
+        runtime::spawn_blocking_skip_hooks(move || run(worker));
         Ok(())
     });
 
@@ -500,7 +500,7 @@ where
 impl Launch {
     pub(crate) fn launch(mut self) {
         for worker in self.0.drain(..) {
-            runtime::spawn_blocking_internal(move || run(worker));
+            runtime::spawn_blocking_skip_hooks(move || run(worker));
         }
     }
 }

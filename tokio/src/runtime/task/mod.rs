@@ -123,7 +123,9 @@
 //!    The spawn hook runs before the task is scheduled, poll hooks run while
 //!    the task holds the RUNNING lock but outside the actual future poll, and
 //!    the terminate hook runs after completion. Parent task metadata exposed to
-//!    spawn hooks is read-only.
+//!    spawn hooks is read-only. If the data is not taken or cleared by a hook,
+//!    it is dropped when the task allocation is deallocated, after the terminate
+//!    hook has run and all task references are gone.
 //!
 //! All other fields are immutable and can be accessed immutably without
 //! synchronization by anyone.
@@ -299,7 +301,17 @@ pub(crate) trait Schedule: Sync + Sized + 'static {
     fn task_terminate_callback(&self, _meta: &mut crate::runtime::TaskMeta<'_>) {}
 
     #[cfg(tokio_unstable)]
+    fn has_task_poll_start_callback(&self) -> bool {
+        false
+    }
+
+    #[cfg(tokio_unstable)]
     fn task_poll_start_callback(&self, _meta: &mut crate::runtime::TaskMeta<'_>) {}
+
+    #[cfg(tokio_unstable)]
+    fn has_task_poll_stop_callback(&self) -> bool {
+        false
+    }
 
     #[cfg(tokio_unstable)]
     fn task_poll_stop_callback(&self, _meta: &mut crate::runtime::TaskMeta<'_>) {}

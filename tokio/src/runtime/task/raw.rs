@@ -272,11 +272,11 @@ impl RawTask {
         unsafe { &*self.trailer_ptr().as_ptr() }
     }
 
-    #[cfg(tokio_unstable)]
     /// # Safety
     ///
     /// The task allocation must be live, and the returned metadata must have
     /// exclusive access to hook data for as long as it can expose mutable references.
+    #[cfg(tokio_unstable)]
     pub(crate) unsafe fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
         // Safety: the caller guarantees that the task allocation is live and that
         // the returned metadata has exclusive access to hook data.
@@ -289,11 +289,11 @@ impl RawTask {
         }
     }
 
-    #[cfg(tokio_unstable)]
     /// # Safety
     ///
     /// The task allocation must be live, and hook data must not be mutated while
     /// references exposed through the returned metadata are live.
+    #[cfg(tokio_unstable)]
     pub(crate) unsafe fn task_meta_ref<'meta>(&self) -> crate::runtime::TaskMetaRef<'meta> {
         // Safety: the caller guarantees that the task allocation is live and that
         // hook data is not mutated while exposed references are live.

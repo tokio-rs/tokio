@@ -534,6 +534,34 @@ fn abort_during_before_poll_hook_does_not_poll_future() {
     assert_eq!(polls.load(Ordering::SeqCst), 0);
 }
 
+#[test]
+fn poll_hook_panics_do_not_kill_task() {
+    let before = Arc::new(AtomicUsize::new(0));
+    let before2 = Arc::clone(&before);
+    let after = Arc::new(AtomicUsize::new(0));
+    let after2 = Arc::clone(&after);
+
+    let runtime = Builder::new_current_thread()
+        .on_before_task_poll(move |_meta| {
+            if before2.fetch_add(1, Ordering::SeqCst) == 0 {
+                panic!("before poll hook panic");
+            }
+        })
+        .on_after_task_poll(move |_meta| {
+            if after2.fetch_add(1, Ordering::SeqCst) == 0 {
+                panic!("after poll hook panic");
+            }
+        })
+        .build()
+        .unwrap();
+
+    let output = runtime.block_on(async { tokio::spawn(async { 17usize }).await.unwrap() });
+
+    assert_eq!(output, 17);
+    assert_eq!(before.load(Ordering::SeqCst), 1);
+    assert_eq!(after.load(Ordering::SeqCst), 1);
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Lineage {
     depth: usize,

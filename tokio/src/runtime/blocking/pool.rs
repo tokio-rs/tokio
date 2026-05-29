@@ -190,7 +190,7 @@ where
 #[track_caller]
 #[cfg(feature = "rt-multi-thread")]
 #[cfg_attr(target_os = "wasi", allow(dead_code))]
-pub(crate) fn spawn_blocking_internal<F, R>(func: F) -> JoinHandle<R>
+pub(crate) fn spawn_blocking_skip_hooks<F, R>(func: F) -> JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
@@ -198,7 +198,7 @@ where
     let rt = Handle::current();
     rt.inner
         .blocking_spawner()
-        .spawn_blocking_internal(&rt, func)
+        .spawn_blocking_skip_hooks(&rt, func)
 }
 
 cfg_fs! {
@@ -326,7 +326,7 @@ impl Spawner {
 
     #[track_caller]
     #[cfg(feature = "rt-multi-thread")]
-    pub(crate) fn spawn_blocking_internal<F, R>(&self, rt: &Handle, func: F) -> JoinHandle<R>
+    pub(crate) fn spawn_blocking_skip_hooks<F, R>(&self, rt: &Handle, func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,

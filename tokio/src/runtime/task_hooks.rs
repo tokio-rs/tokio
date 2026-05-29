@@ -30,10 +30,22 @@ impl TaskHooks {
 
     #[cfg(tokio_unstable)]
     #[inline]
+    pub(crate) fn has_poll_start_callback(&self) -> bool {
+        self.before_poll_callback.is_some()
+    }
+
+    #[cfg(tokio_unstable)]
+    #[inline]
     pub(crate) fn poll_start_callback(&self, meta: &mut TaskMeta<'_>) {
         if let Some(poll_start) = &self.before_poll_callback {
             (poll_start)(meta);
         }
+    }
+
+    #[cfg(tokio_unstable)]
+    #[inline]
+    pub(crate) fn has_poll_stop_callback(&self) -> bool {
+        self.after_poll_callback.is_some()
     }
 
     #[cfg(tokio_unstable)]

@@ -97,29 +97,15 @@ impl Handle {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        #[cfg(tokio_unstable)]
-        let (handle, notified) = task::with_current_task_meta(|parent| {
-            me.shared.owned.bind_with_spawn_hook(
-                future,
-                me.clone(),
-                id,
-                spawned_at,
-                user_data,
-                |task| {
-                    // Safety: the task is freshly allocated and not published yet.
-                    let mut meta = unsafe { task.task_meta() };
-                    me.task_hooks.spawn(&mut meta, parent);
-                },
-            )
-        });
-        #[cfg(not(tokio_unstable))]
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
-
-        #[cfg(not(tokio_unstable))]
-        {
-            let mut meta = TaskMeta::new(id, spawned_at);
-            me.task_hooks.spawn(&mut meta, None);
-        }
+        let (handle, notified) = me.shared.owned.bind_with_spawn_hook(
+            future,
+            me.clone(),
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+            &me.task_hooks,
+        );
 
         me.schedule_option_task_without_yield(notified);
 
@@ -146,8 +132,18 @@ impl task::Schedule for Arc<Handle> {
     }
 
     #[cfg(tokio_unstable)]
+    fn has_task_poll_start_callback(&self) -> bool {
+        self.task_hooks.has_poll_start_callback()
+    }
+
+    #[cfg(tokio_unstable)]
     fn task_poll_start_callback(&self, meta: &mut TaskMeta<'_>) {
         self.task_hooks.poll_start_callback(meta);
+    }
+
+    #[cfg(tokio_unstable)]
+    fn has_task_poll_stop_callback(&self) -> bool {
+        self.task_hooks.has_poll_stop_callback()
     }
 
     #[cfg(tokio_unstable)]
