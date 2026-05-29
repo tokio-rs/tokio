@@ -131,14 +131,8 @@ fn internal_interval_at(
         )
     };
 
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    let delay = resource_span.in_scope(|| Box::pin(sleep_until(start)));
-
-    #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-    let delay = Box::pin(sleep_until(start));
-
     Interval {
-        delay,
+        delay: Box::pin(sleep_until(start)),
         period,
         missed_tick_behavior: MissedTickBehavior::default(),
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -487,7 +481,7 @@ impl Interval {
         // When we arrive here, the internal delay returned `Poll::Ready`.
         // Reset the delay but do not register it. It should be registered with
         // the next call to [`poll_tick`].
-        self.delay.as_mut().reset_without_reregister(next);
+        self.delay.as_mut().reset_without_timer(next);
 
         // Return the time when we were scheduled to tick
         Poll::Ready(timeout)

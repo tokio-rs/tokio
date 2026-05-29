@@ -1,6 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support mulithreading
-                                                                   // No `socket` on miri.
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support mulithreading
 
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -32,6 +31,7 @@ async fn shutdown() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
 async fn shutdown_after_tcp_reset() {
     let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());

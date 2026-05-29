@@ -1,13 +1,11 @@
 #![warn(rust_2018_idioms)]
 // WASIp1 doesn't support bind
-// No `socket` on miri.
 #![cfg(all(
     feature = "net",
     feature = "macros",
     feature = "rt",
     feature = "io-util",
     not(all(target_os = "wasi", target_env = "p1")),
-    not(miri)
 ))]
 
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
@@ -17,25 +15,28 @@ use tokio_test::assert_ok;
 
 #[tokio::test]
 async fn echo_server() {
+    const BYTES: &[u8] = b"foo bar baz";
+    #[cfg(not(miri))]
     const ITER: usize = 1024;
+    #[cfg(miri)] // Use a lower iteration count with Miri because it's too slow otherwise.
+    const ITER: usize = 32;
 
     let (tx, rx) = oneshot::channel();
 
     let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
 
-    let msg = "foo bar baz";
     tokio::spawn(async move {
         let mut stream = assert_ok!(TcpStream::connect(&addr).await);
 
         for _ in 0..ITER {
             // write
-            assert_ok!(stream.write_all(msg.as_bytes()).await);
+            assert_ok!(stream.write_all(BYTES).await);
 
             // read
-            let mut buf = [0; 11];
+            let mut buf = [0; BYTES.len()];
             assert_ok!(stream.read_exact(&mut buf).await);
-            assert_eq!(&buf[..], msg.as_bytes());
+            assert_eq!(&buf[..], BYTES);
         }
 
         assert_ok!(tx.send(()));
@@ -45,7 +46,7 @@ async fn echo_server() {
     let (mut rd, mut wr) = stream.split();
 
     let n = assert_ok!(io::copy(&mut rd, &mut wr).await);
-    assert_eq!(n, (ITER * msg.len()) as u64);
+    assert_eq!(n, (ITER * BYTES.len()) as u64);
 
     assert_ok!(rx.await);
 }

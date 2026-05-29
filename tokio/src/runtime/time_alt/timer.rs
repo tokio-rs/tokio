@@ -1,5 +1,5 @@
 use super::{EntryHandle, TempLocalContext};
-use crate::runtime::scheduler::Handle as SchedulerHandle;
+use crate::runtime::scheduler;
 use crate::time::Instant;
 
 use std::pin::Pin;
@@ -9,143 +9,107 @@ use std::task::{Context, Poll};
 use crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR;
 
 pub(crate) struct Timer {
-    sched_handle: SchedulerHandle,
-
     /// The entry in the timing wheel.
-    ///
-    /// - `Some` if the timer is registered / pending / woken up / cancelling.
-    /// - `None` if the timer is unregistered.
-    entry: Option<EntryHandle>,
-
-    /// The deadline for the timer.
-    deadline: Instant,
+    entry: EntryHandle,
 }
 
 impl std::fmt::Debug for Timer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Timer")
-            .field("deadline", &self.deadline)
-            .finish()
+        f.debug_struct("Timer").finish()
     }
 }
 
 impl Drop for Timer {
     fn drop(&mut self) {
-        if let Some(entry) = self.entry.take() {
-            entry.cancel();
-        }
+        self.entry.cancel();
     }
 }
 
 impl Timer {
     #[track_caller]
-    pub(crate) fn new(sched_hdl: SchedulerHandle, deadline: Instant) -> Self {
-        // Panic if the time driver is not enabled
-        let _ = sched_hdl.driver().time();
-        Timer {
-            sched_handle: sched_hdl,
-            entry: None,
-            deadline,
-        }
-    }
+    pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
+        let tick = deadline_to_tick(&handle, deadline);
+        let entry = with_current_temp_local_context(&handle, |ctx| match ctx {
+            Some(TempLocalContext::Running { registration_queue }) => {
+                let entry = EntryHandle::new(tick);
+                unsafe { registration_queue.push_front(entry.clone()) }
+                entry
+            }
+            #[cfg(feature = "rt-multi-thread")]
+            Some(TempLocalContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
 
-    pub(crate) fn deadline(&self) -> Instant {
-        self.deadline
+            _ => {
+                let entry = EntryHandle::new(tick);
+                push_from_remote(&handle, entry.clone());
+                entry
+            }
+        });
+
+        Timer { entry }
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
-        self.entry.as_ref().is_some_and(|entry| entry.is_woken_up())
-    }
-
-    fn register(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let this = self.get_mut();
-
-        with_current_temp_local_context(&this.sched_handle, |maybe_time_cx| {
-            let deadline = deadline_to_tick(&this.sched_handle, this.deadline);
-
-            match maybe_time_cx {
-                Some(TempLocalContext::Running {
-                    registration_queue: _,
-                    elapsed,
-                }) if deadline <= elapsed => Poll::Ready(()),
-
-                Some(TempLocalContext::Running {
-                    registration_queue,
-                    elapsed: _,
-                }) => {
-                    let hdl = EntryHandle::new(deadline, cx.waker().clone());
-                    this.entry = Some(hdl.clone());
-                    unsafe {
-                        registration_queue.push_front(hdl);
-                    }
-                    Poll::Pending
-                }
-                #[cfg(feature = "rt-multi-thread")]
-                Some(TempLocalContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
-
-                _ => {
-                    let hdl = EntryHandle::new(deadline, cx.waker().clone());
-                    this.entry = Some(hdl.clone());
-                    push_from_remote(&this.sched_handle, hdl);
-                    Poll::Pending
-                }
-            }
-        })
+        self.entry.is_woken_up()
     }
 
     pub(crate) fn poll_elapsed(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        match self.entry.as_ref() {
-            Some(entry) => entry.poll(cx),
-            None => self.register(cx),
-        }
-    }
-
-    pub(crate) fn scheduler_handle(&self) -> &SchedulerHandle {
-        &self.sched_handle
-    }
-
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(crate) fn driver(&self) -> &crate::runtime::time::Handle {
-        self.sched_handle.driver().time()
-    }
-
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    pub(crate) fn clock(&self) -> &crate::time::Clock {
-        self.sched_handle.driver().clock()
+        self.entry.poll(cx)
     }
 }
 
-fn with_current_temp_local_context<F, R>(hdl: &SchedulerHandle, f: F) -> R
+fn with_current_temp_local_context<F, R>(sched_hdl: &scheduler::Handle, f: F) -> R
 where
     F: FnOnce(Option<TempLocalContext<'_>>) -> R,
 {
     #[cfg(not(feature = "rt"))]
     {
-        let (_, _) = (hdl, f);
+        let _ = f;
         panic!("Tokio runtime is not enabled, cannot access the current wheel");
     }
 
     #[cfg(feature = "rt")]
     {
+        use crate::loom::sync::Arc;
         use crate::runtime::context;
 
-        let is_same_rt =
-            context::with_current(|cur_hdl| cur_hdl.is_same_runtime(hdl)).unwrap_or_default();
+        // There is no compile-time guarantee that the timer is
+        // always registered in the same runtime as it was created in,
+        // so we need to check it at runtime.
+        let is_same_rt = context::with_current(|cur_sched_hdl| {
+            use crate::runtime::scheduler::Handle;
+
+            match (sched_hdl, cur_sched_hdl) {
+                (Handle::CurrentThread(_), _) => {
+                    // this case is impossible as `tokio::runtime::Builder::enable_alt_timer`
+                    // is not supported in the current-thread runtime, but we'd better handle it
+                    // in case the API is misused in the future.
+                    unreachable!("alternative timer is not supported in the current-thread runtime")
+                }
+                (_, Handle::CurrentThread(_)) => false,
+                (Handle::MultiThread(sched_hdl), Handle::MultiThread(cur_sched_hdl)) => {
+                    Arc::as_ptr(sched_hdl) == Arc::as_ptr(cur_sched_hdl)
+                }
+            }
+        })
+        .unwrap_or_default();
 
         if !is_same_rt {
-            // We don't want to create the timer in one runtime,
-            // but register it in a different runtime's timer wheel.
-            f(None)
-        } else {
-            context::with_scheduler(|maybe_cx| match maybe_cx {
-                Some(cx) => cx.with_time_temp_local_context(f),
-                None => f(None),
-            })
+            // The timer is being registered from a runtime
+            // that is different from the runtime that the timer is created in,
+            // so we cannot access `TempLocalContext` of the original runtime.
+            return f(None);
         }
+
+        // The timer is being registered from the same runtime that the timer is created in,
+        // so we can access `TempLocalContext`.
+        context::with_scheduler(|maybe_cx| match maybe_cx {
+            Some(cx) => cx.expect_multi_thread().with_time_temp_local_context(f),
+            None => f(None),
+        })
     }
 }
 
-fn push_from_remote(sched_hdl: &SchedulerHandle, entry_hdl: EntryHandle) {
+fn push_from_remote(sched_hdl: &scheduler::Handle, entry_hdl: EntryHandle) {
     #[cfg(not(feature = "rt"))]
     {
         let (_, _) = (sched_hdl, entry_hdl);
@@ -159,7 +123,7 @@ fn push_from_remote(sched_hdl: &SchedulerHandle, entry_hdl: EntryHandle) {
     }
 }
 
-fn deadline_to_tick(sched_hdl: &SchedulerHandle, deadline: Instant) -> u64 {
+fn deadline_to_tick(sched_hdl: &scheduler::Handle, deadline: Instant) -> u64 {
     let time_hdl = sched_hdl.driver().time();
     time_hdl.time_source().deadline_to_tick(deadline)
 }

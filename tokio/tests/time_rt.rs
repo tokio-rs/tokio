@@ -1,8 +1,10 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use futures_test::task::noop_context;
 use tokio::runtime::Runtime;
 use tokio::time::*;
+use tokio_test::assert_pending;
 
 use std::sync::mpsc;
 
@@ -163,4 +165,32 @@ fn timeout_value() {
             assert!(Instant::now() >= now + dur);
         });
     }
+}
+
+#[test]
+fn tickspace() {
+    use std::future::Future as _;
+    use std::thread;
+    let rt = || {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .start_paused(true)
+            .build()
+            .unwrap()
+    };
+
+    let rt_past = rt();
+    thread::sleep(Duration::from_millis(1));
+    let rt = rt();
+
+    let _guard = rt_past.enter();
+    let mut sleep = std::pin::pin!(sleep(Duration::from_millis(1)));
+    assert_pending!(sleep.as_mut().poll(&mut noop_context()));
+
+    let deadline = sleep.deadline();
+    rt.block_on(async { sleep.as_mut().reset(deadline + Duration::from_millis(1)) });
+
+    let now = Instant::now();
+    rt_past.block_on(sleep);
+    assert_eq!(now.elapsed(), Duration::from_millis(2));
 }

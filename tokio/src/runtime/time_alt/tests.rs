@@ -1,6 +1,8 @@
 use super::*;
 use crate::loom::thread;
 
+use std::task::Context;
+
 use futures_test::task::{new_count_waker, AwokenCount};
 
 #[cfg(loom)]
@@ -11,7 +13,9 @@ const NUM_ITEMS: usize = 64;
 
 fn new_handle() -> (EntryHandle, AwokenCount) {
     let (waker, count) = new_count_waker();
-    (EntryHandle::new(0, waker), count)
+    let entry = EntryHandle::new(0);
+    _ = entry.poll(&mut Context::from_waker(&waker));
+    (entry, count)
 }
 
 fn model<F: Fn() + Send + Sync + 'static>(f: F) {

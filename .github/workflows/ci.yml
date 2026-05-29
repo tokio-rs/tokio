@@ -18,7 +18,7 @@ env:
   rust_stable: stable
   rust_nightly: nightly-2025-10-12
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2026-04-27
+  rust_miri_nightly: nightly-2026-05-20
   rust_clippy: '1.88'
   # When updating this, also update:
   # - README.md
@@ -1323,6 +1323,8 @@ jobs:
         with:
           release: '14.4'
           envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
+          sync: rsync
+          copyback: false
           prepare: |
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
@@ -1350,6 +1352,8 @@ jobs:
         with:
           release: '14.4'
           envs: "TOKIO_STABLE_FEATURES RUSTDOCFLAGS RUSTFLAGS"
+          sync: rsync
+          copyback: false
           prepare: |
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
@@ -1373,6 +1377,8 @@ jobs:
         with:
           release: '14.4'
           envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
+          sync: rsync
+          copyback: false
           prepare: |
             pkg install -y curl
             curl https://sh.rustup.rs -sSf --output rustup.sh
