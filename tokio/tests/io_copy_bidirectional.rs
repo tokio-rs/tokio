@@ -89,7 +89,6 @@ async fn test_transfer_after_close() {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // Miri currently only processes host I/O events when switching into the scheduler: See https://github.com/rust-lang/miri/issues/5047
 async fn blocking_one_side_does_not_block_other() {
     symmetric(|handle, mut a, mut b| async move {
         block_write(&mut a).await;
