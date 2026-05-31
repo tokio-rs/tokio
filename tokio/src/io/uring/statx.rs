@@ -16,10 +16,11 @@
 ))]
 
 use crate::fs::File;
-use crate::io::uring::utils::{box_assume_init, box_new_uninit, cstr};
+use crate::io::uring::utils::cstr;
 use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
 use io_uring::{opcode, types};
 use libc::statx;
+use std::ffi::{CStr, CString};
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::mem::MaybeUninit;
@@ -47,8 +48,7 @@ impl Debug for Metadata {
 pub(crate) struct Statx {
     /// This field will be read by the kernel during the operation, so we
     /// need to ensure it is valid for the entire duration of the operation.
-    #[allow(dead_code)]
-    path: std::ffi::CString,
+    _path: CString,
     buffer: Box<MaybeUninit<statx>>,
 }
 
@@ -58,12 +58,11 @@ impl Completable for Statx {
     fn complete(self, cqe: CqeResult) -> Self::Output {
         // SAFETY: On success, we always receive 0, which should guarantee
         // that the information about a file is stored inside the
-        // statx buffer. On failure, we'll receive an Error value,
-        // avoiding misuse of `.box_assume_init()`.
+        // statx buffer. On failure, we'll receive an Error value.
         // Refer to man page description and return value:
         // https://man7.org/linux/man-pages/man2/statx.2.html
         cqe.result
-            .map(|_| Metadata(*unsafe { box_assume_init(self.buffer) }))
+            .map(|_| Metadata(unsafe { *self.buffer.as_ptr() }))
     }
 
     fn complete_with_error(self, error: io::Error) -> Self::Output {
@@ -82,7 +81,7 @@ impl Op<Statx> {
     #[inline]
     fn statx(path: &Path, flags: i32) -> io::Result<Op<Statx>> {
         let path = cstr(path)?;
-        let mut buffer = box_new_uninit::<statx>();
+        let mut buffer = Box::new(MaybeUninit::<statx>::uninit());
 
         let statx_op = opcode::Statx::new(
             types::Fd(libc::AT_FDCWD),
@@ -94,7 +93,15 @@ impl Op<Statx> {
         .build();
 
         // SAFETY: Parameters are valid for the entire duration of the operation
-        Ok(unsafe { Op::new(statx_op, Statx { path, buffer }) })
+        Ok(unsafe {
+            Op::new(
+                statx_op,
+                Statx {
+                    _path: path,
+                    buffer,
+                },
+            )
+        })
     }
 
     /// Retrieves the metadata information of the given path, following symlinks
@@ -106,8 +113,8 @@ impl Op<Statx> {
 
     /// Retrieves the metadata information of the given file
     pub(crate) fn file_metadata(file: &File) -> io::Result<Op<Statx>> {
-        let mut buffer = box_new_uninit::<statx>();
-        let empty_path = cstr(Path::new(""))?;
+        let mut buffer = Box::new(MaybeUninit::<statx>::uninit());
+        let empty_path: &'static CStr = c"";
 
         // io-uring was introduced in linux 5.1
         // pass in an empty path instead of null to target the file descriptor
@@ -130,7 +137,7 @@ impl Op<Statx> {
             Op::new(
                 statx_op,
                 Statx {
-                    path: empty_path,
+                    _path: empty_path.into(),
                     buffer,
                 },
             )

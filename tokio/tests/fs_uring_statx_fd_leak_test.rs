@@ -64,19 +64,14 @@ where
         let poll_count = self.poll_pending_counts;
         let sender_count = self.poll_senders.len();
         if poll_count < sender_count {
-            // We were polled again after the inner statx completed and woke the task.
-            if poll_count == sender_count - 1 {
-                self.poll_senders[poll_count].send(()).unwrap();
-                self.poll_pending_counts += 1;
-            }
             // The first two poll should return `Poll::Pending`` because it verifies
             //  that io_uring is enabled and then executes the open operation in
             // `tokio::fs::read`
-            else {
+            if poll_count != sender_count - 1 {
                 assert_pending!(self.inner.as_mut().poll(cx));
-                self.poll_pending_counts += 1;
-                self.poll_senders[poll_count].send(()).unwrap();
             }
+            self.poll_pending_counts += 1;
+            self.poll_senders[poll_count].send(()).unwrap();
         }
 
         Poll::Pending

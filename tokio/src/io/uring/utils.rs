@@ -1,4 +1,3 @@
-use std::mem::MaybeUninit;
 use std::os::fd::{AsRawFd, OwnedFd, RawFd};
 use std::os::unix::ffi::OsStrExt;
 use std::sync::Arc;
@@ -29,24 +28,4 @@ impl UringFd for ArcFd {
 
 pub(crate) fn cstr(p: &Path) -> io::Result<CString> {
     Ok(CString::new(p.as_os_str().as_bytes())?)
-}
-
-// TODO(MSRV 1.82): When bumping MSRV, switch to `Box::<T>::new_uninit()`.
-#[allow(unused)] // FIXME: remove when MSRV is 1.93 (due to statx on 1.25 musl)
-pub(crate) fn box_new_uninit<T>() -> Box<MaybeUninit<T>> {
-    // Box::<T>::new_uninit()
-    Box::new(MaybeUninit::uninit())
-}
-
-// TODO(MSRV 1.82): When bumping MSRV, switch to `Box::<MaybeUninit<T>>::assume_init()`.
-/// # Safety
-///
-/// It is up to the caller to guarantee that the value really is in an initialized state.
-/// Calling this when the content is not yet fully initialized causes immediate undefined behavior.
-#[allow(unused)] // FIXME: remove when MSRV is 1.93 (due to statx on 1.25 musl)
-pub(crate) unsafe fn box_assume_init<T>(boxed: Box<MaybeUninit<T>>) -> Box<T> {
-    let raw = Box::into_raw(boxed);
-    // SAFETY: If the caller guarantees that the MaybeUninit is initialized, then
-    // costructing the box from a raw mut ptr of MaybeUninit<T> should be safe.
-    unsafe { Box::from_raw(raw as *mut T) }
 }
