@@ -612,8 +612,8 @@ impl UnixDatagram {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `send` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If `send` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, then it is guaranteed that the message was not sent.
     ///
     /// # Examples
@@ -742,8 +742,8 @@ impl UnixDatagram {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If `recv` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, it is guaranteed that no messages were received on this
     /// socket.
     ///
@@ -1062,8 +1062,8 @@ impl UnixDatagram {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `send_to` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If `send_to` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, then it is guaranteed that the message was not sent.
     ///
     /// # Examples
@@ -1112,8 +1112,8 @@ impl UnixDatagram {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv_from` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If `recv_from` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, it is guaranteed that no messages were received on this
     /// socket.
     ///

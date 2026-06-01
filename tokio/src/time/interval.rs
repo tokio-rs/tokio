@@ -402,8 +402,9 @@ impl Interval {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancellation safe. If `tick` is used as the branch in a `tokio::select!` and
-    /// another branch completes first, then no tick has been consumed.
+    /// This method is cancel safe. If `tick` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch completes first,
+    /// then no tick has been consumed.
     ///
     /// # Examples
     ///
