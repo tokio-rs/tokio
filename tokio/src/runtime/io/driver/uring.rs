@@ -269,9 +269,10 @@ impl Handle {
         let index = ctx.ops.insert(Lifecycle::Waiting(waker));
         let entry = entry.user_data(index as u64);
 
-        let submit_or_remove = |ctx: &mut UringContext| -> io::Result<()> {
+        // `entry` has not been pushed yet, so a submit error here means it never
+        // reached the kernel and we can drop the slot before returning.
+        let submit_before_push = |ctx: &mut UringContext| -> io::Result<()> {
             if let Err(e) = ctx.submit() {
-                // Submission failed, remove the entry from the slab and return the error
                 ctx.remove_op(index);
                 return Err(e);
             }
@@ -281,7 +282,7 @@ impl Handle {
         // SAFETY: entry is valid for the entire duration of the operation
         while unsafe { ctx.ring_mut().submission().push(&entry).is_err() } {
             // If the submission queue is full, flush it to the kernel
-            submit_or_remove(ctx)?;
+            submit_before_push(ctx)?;
         }
 
         // Ensure that the completion queue is not full before submitting the entry.
@@ -290,7 +291,13 @@ impl Handle {
         }
 
         // Note: For now, we submit the entry immediately without utilizing batching.
-        submit_or_remove(ctx)?;
+        //
+        // `entry` is now in the submission queue, so the kernel may already own
+        // the buffer it points at. Keep the slot even if the submit fails: the
+        // operation may still complete, and removing it here would let the `Op`
+        // drop the buffer while it is in use. The slot is released once the
+        // completion is observed.
+        ctx.submit()?;
 
         Ok(index)
     }
@@ -327,3 +334,6 @@ impl Handle {
         };
     }
 }
+
+#[cfg(test)]
+mod tests;
