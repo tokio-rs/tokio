@@ -39,7 +39,7 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// If the method is used as a branch in
+        /// If used as a branch in
         /// [`tokio::select!`](crate::select) and another branch
         /// completes first, then some data may have been partially read. Any
         /// partially read bytes are appended to `buf`, and the method can be
