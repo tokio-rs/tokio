@@ -73,8 +73,8 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
         }
     });
 
-    // Shutdown the runtime and give some time before counting the fds
-    rt.shutdown_timeout(Duration::from_millis(250));
+    // Shutdown the runtime and wait for fds to be closed
+    drop(rt);
 
     let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
     let leaked = fd_count_after_cancel.saturating_sub(fd_count_before_opens);
