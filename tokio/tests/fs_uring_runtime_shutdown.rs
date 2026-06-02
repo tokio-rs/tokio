@@ -12,7 +12,6 @@ use futures::FutureExt;
 use std::fs;
 use std::future::poll_fn;
 use std::task::Poll;
-use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio::runtime::Builder;
 use tokio_test::assert_pending;
