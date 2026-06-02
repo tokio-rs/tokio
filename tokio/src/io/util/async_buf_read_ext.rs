@@ -269,7 +269,7 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is cancel safe. If you use it as a branch in
+        /// This method is cancel safe. If used as a branch in
         /// [`tokio::select!`](crate::select) and another branch
         /// completes first, then it is guaranteed that no data was read.
         ///
