@@ -23,6 +23,11 @@ fn notify_one() {
 
         tx.notify_one();
         th.join().unwrap();
+
+        // The single permit has been consumed by the awaited future; a
+        // subsequent `notified()` must not observe a stored permit.
+        let mut second = tokio_test::task::spawn(tx.notified());
+        assert_pending!(second.poll());
     });
 }
 
@@ -265,6 +270,39 @@ fn notify_waiters_is_atomic() {
     // or at the end of the waiters queue used by `Notify`.
     loom::model(|| notify_waiters_is_atomic_variant(0));
     loom::model(|| notify_waiters_is_atomic_variant(32));
+}
+
+/// Checks invariant `C2` from issue #6266: a `notified()` future created
+/// concurrently with `notify_waiters` is never lost. The wake must reach
+/// it via one of two paths:
+///   - list path: the future registers before the writer drains, and the
+///     writer flips its waker flag.
+///   - mismatch path: the future's snapshot lands pre-bump, and a subsequent
+///     poll observes the counter advanced and resolves `Ready`.
+///
+/// No `thread::join` between the writer and the awaited future; the
+/// `block_on` is what serializes against the spawn, not a separate
+/// join-as-HB-edge. If the cross-atom relationship between the counter
+/// publish and the waker-list drain is broken (e.g. the counter bump
+/// becomes invisible to a `notified()` whose snapshot races with it),
+/// an interleaving exists where the snapshot lands post-bump AND the
+/// register lands post-drain, leaving the future stuck in the list with
+/// no future wake. Loom drives the test to that interleaving and the
+/// model deadlocks.
+#[test]
+fn notify_waiters_concurrent_no_lost_wakeup() {
+    loom::model(|| {
+        let notify = Arc::new(Notify::new());
+        let tx = notify.clone();
+
+        let th = thread::spawn(move || {
+            tx.notify_waiters();
+        });
+
+        block_on(notify.notified());
+
+        th.join().unwrap();
+    });
 }
 
 /// Checks if a single call to `notify_waiters` does not get through two `Notified`
