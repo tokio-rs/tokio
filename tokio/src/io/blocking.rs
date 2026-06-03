@@ -214,7 +214,7 @@ impl Buf {
         self.pos += n;
 
         if self.pos == self.buf.len() {
-            self.buf.truncate(0);
+            self.buf.clear();
             self.pos = 0;
         }
 
@@ -315,7 +315,7 @@ cfg_fs! {
         pub(crate) fn discard_read(&mut self) -> i64 {
             let ret = -(self.bytes().len() as i64);
             self.pos = 0;
-            self.buf.truncate(0);
+            self.buf.clear();
             ret
         }
 

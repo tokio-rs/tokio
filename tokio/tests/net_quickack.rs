@@ -8,7 +8,7 @@
         target_os = "cygwin",
     )
 ))]
-#![cfg(not(miri))] // No `socket` in miri.
+#![cfg(not(miri))] // Miri doesn't support TCP quickack socket option.
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;

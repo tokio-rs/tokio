@@ -81,8 +81,10 @@ The module label provides a more fine grained categorization than **Area**.
 Some extra information.
 
 - **T-docs** This is about documentation.
+- **T-io-uring** This is about io-uring (Linux).
 - **T-performance** This is about performance.
 - **T-v0.1.x** This is about old Tokio.
+- **T-wasm** This is about Web Assembly.
 
 Any label not listed here is not in active use.
 

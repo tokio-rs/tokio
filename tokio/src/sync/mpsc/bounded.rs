@@ -1853,14 +1853,12 @@ impl<T> OwnedPermit<T> {
     ///
     /// [`Sender`]: Sender
     pub fn release(mut self) -> Sender<T> {
-        use chan::Semaphore;
-
         let chan = self.chan.take().unwrap_or_else(|| {
             unreachable!("OwnedPermit channel is only taken when the permit is moved")
         });
 
         // Add the permit back to the semaphore
-        chan.semaphore().add_permit();
+        drop(Permit { chan: &chan });
         Sender { chan }
     }
 
@@ -1919,21 +1917,10 @@ impl<T> OwnedPermit<T> {
 
 impl<T> Drop for OwnedPermit<T> {
     fn drop(&mut self) {
-        use chan::Semaphore;
-
         // Are we still holding onto the sender?
         if let Some(chan) = self.chan.take() {
-            let semaphore = chan.semaphore();
-
-            // Add the permit back to the semaphore
-            semaphore.add_permit();
-
-            // If this `OwnedPermit` is holding the last sender for this
-            // channel, wake the receiver so that it can be notified that the
-            // channel is closed.
-            if semaphore.is_closed() && semaphore.is_idle() {
-                chan.wake_rx();
-            }
+            // Reuse Drop impl of non-owned Permit.
+            drop(Permit { chan: &chan });
         }
 
         // Otherwise, do nothing.
