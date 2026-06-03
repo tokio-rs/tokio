@@ -24,6 +24,7 @@ full = [
     "net",
     "io-util",
     "fs",
+    "rt",
     "sync",
     "signal"
 ]
@@ -32,6 +33,7 @@ time = ["tokio/time"]
 net = ["tokio/net"]
 io-util = ["tokio/io-util"]
 fs = ["tokio/fs"]
+rt = ["tokio/rt"]
 sync = ["tokio/sync", "tokio-util"]
 signal = ["tokio/signal"]
 
