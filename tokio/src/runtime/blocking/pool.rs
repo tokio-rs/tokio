@@ -115,7 +115,7 @@ struct LockedInner {
     num_notify: u32,
     /// Thread-management state. Split apart so that it's re-usable in a
     /// sharded queue implementation.
-    shared: Shared,
+    thread_mgmt_state: ThreadManagementState,
 }
 
 /// State handed back from `InnerImpl::begin_shutdown` to the caller so it
@@ -126,8 +126,8 @@ type ShutdownHandles = (
     HashMap<usize, thread::JoinHandle<()>>,
 );
 
-/// Thread-management state shared across `InnerImpl` variants.
-struct Shared {
+/// Thread-management state used by every `InnerImpl` variant.
+struct ThreadManagementState {
     shutdown: bool,
     shutdown_tx: Option<shutdown::Sender>,
     /// Prior to shutdown, we clean up `JoinHandles` by having each timed-out
@@ -241,7 +241,7 @@ impl BlockingPool {
                         mutex: Mutex::new(LockedInner {
                             queue: VecDeque::new(),
                             num_notify: 0,
-                            shared: Shared {
+                            thread_mgmt_state: ThreadManagementState {
                                 shutdown: false,
                                 shutdown_tx: Some(shutdown_tx),
                                 last_exiting_thread: None,
@@ -410,10 +410,10 @@ impl Spawner {
     fn spawn_task(&self, task: Task, rt: &Handle) -> Result<(), SpawnError> {
         // The `on_no_idle` closure runs under the same lock as the queue
         // push, exactly like the pre-refactor code that called
-        // `self.spawn_thread` directly while holding `Mutex<Shared>`.
+        // `self.spawn_thread` directly while holding `Mutex<ThreadManagementState>`.
         self.inner
             .inner_impl
-            .spawn_task(task, &self.inner.metrics, |shared| {
+            .spawn_task(task, &self.inner.metrics, |thread_mgmt_state| {
                 // No threads are able to process the task.
 
                 if self.inner.metrics.num_threads() == self.inner.thread_cap {
@@ -421,17 +421,17 @@ impl Spawner {
                     return Ok(());
                 }
 
-                assert!(shared.shutdown_tx.is_some());
-                let shutdown_tx = shared.shutdown_tx.clone();
+                assert!(thread_mgmt_state.shutdown_tx.is_some());
+                let shutdown_tx = thread_mgmt_state.shutdown_tx.clone();
 
                 if let Some(shutdown_tx) = shutdown_tx {
-                    let id = shared.worker_thread_index;
+                    let id = thread_mgmt_state.worker_thread_index;
 
                     match self.spawn_thread(shutdown_tx, rt, id) {
                         Ok(handle) => {
                             self.inner.metrics.inc_num_threads();
-                            shared.worker_thread_index += 1;
-                            shared.worker_threads.insert(id, handle);
+                            thread_mgmt_state.worker_thread_index += 1;
+                            thread_mgmt_state.worker_threads.insert(id, handle);
                         }
                         Err(ref e)
                             if is_temporary_os_thread_error(e)
@@ -505,7 +505,7 @@ impl InnerImpl {
         on_no_idle: F,
     ) -> Result<(), SpawnError>
     where
-        F: FnOnce(&mut Shared) -> Result<(), SpawnError>,
+        F: FnOnce(&mut ThreadManagementState) -> Result<(), SpawnError>,
     {
         match self {
             InnerImpl::Locked(l) => l.spawn_task(task, metrics, on_no_idle),
@@ -545,11 +545,11 @@ impl LockedImpl {
         on_no_idle: F,
     ) -> Result<(), SpawnError>
     where
-        F: FnOnce(&mut Shared) -> Result<(), SpawnError>,
+        F: FnOnce(&mut ThreadManagementState) -> Result<(), SpawnError>,
     {
         let mut locked = self.mutex.lock();
 
-        if locked.shared.shutdown {
+        if locked.thread_mgmt_state.shutdown {
             // Shutdown the task: it's fine to shutdown this task
             // (even if mandatory) because it was scheduled after the
             // shutdown of the runtime began.
@@ -561,7 +561,7 @@ impl LockedImpl {
         metrics.inc_queue_depth();
 
         if metrics.num_idle_threads() == 0 {
-            on_no_idle(&mut locked.shared)?;
+            on_no_idle(&mut locked.thread_mgmt_state)?;
         } else {
             // Notify an idle worker thread. The notification counter
             // is used to count the needed amount of notifications
@@ -603,7 +603,7 @@ impl LockedImpl {
             // mark this thread as currently counted in `num_idle_threads`.
             is_counted_idle = true;
 
-            while !locked.shared.shutdown {
+            while !locked.thread_mgmt_state.shutdown {
                 let lock_result = self.condvar.wait_timeout(locked, keep_alive).unwrap();
 
                 locked = lock_result.0;
@@ -624,15 +624,20 @@ impl LockedImpl {
                 // Even if the condvar "timed out", if the pool is
                 // entering the shutdown phase, we want to perform
                 // the cleanup logic.
-                if !locked.shared.shutdown && timeout_result.timed_out() {
+                if !locked.thread_mgmt_state.shutdown && timeout_result.timed_out() {
                     // We'll join the prior timed-out thread's
                     // JoinHandle after dropping the lock. This
                     // isn't done when shutting down, because the
                     // thread calling shutdown will handle joining
                     // everything.
-                    let my_handle = locked.shared.worker_threads.remove(&worker_thread_id);
-                    join_on_thread =
-                        std::mem::replace(&mut locked.shared.last_exiting_thread, my_handle);
+                    let my_handle = locked
+                        .thread_mgmt_state
+                        .worker_threads
+                        .remove(&worker_thread_id);
+                    join_on_thread = std::mem::replace(
+                        &mut locked.thread_mgmt_state.last_exiting_thread,
+                        my_handle,
+                    );
 
                     break 'main;
                 }
@@ -640,7 +645,7 @@ impl LockedImpl {
                 // Spurious wakeup detected, go back to sleep.
             }
 
-            if locked.shared.shutdown {
+            if locked.thread_mgmt_state.shutdown {
                 // Drain the queue
                 while let Some(task) = locked.queue.pop_front() {
                     metrics.dec_queue_depth();
@@ -670,7 +675,7 @@ impl LockedImpl {
             );
         }
 
-        if locked.shared.shutdown && metrics.num_threads() == 0 {
+        if locked.thread_mgmt_state.shutdown && metrics.num_threads() == 0 {
             self.condvar.notify_one();
         }
 
@@ -684,15 +689,15 @@ impl LockedImpl {
     /// `JoinHandle`s for the caller to join.
     fn begin_shutdown(&self) -> Option<ShutdownHandles> {
         let mut locked = self.mutex.lock();
-        if locked.shared.shutdown {
+        if locked.thread_mgmt_state.shutdown {
             return None;
         }
-        locked.shared.shutdown = true;
-        locked.shared.shutdown_tx = None;
+        locked.thread_mgmt_state.shutdown = true;
+        locked.thread_mgmt_state.shutdown_tx = None;
         self.condvar.notify_all();
 
-        let last_exited_thread = std::mem::take(&mut locked.shared.last_exiting_thread);
-        let workers = std::mem::take(&mut locked.shared.worker_threads);
+        let last_exited_thread = std::mem::take(&mut locked.thread_mgmt_state.last_exiting_thread);
+        let workers = std::mem::take(&mut locked.thread_mgmt_state.worker_threads);
         Some((last_exited_thread, workers))
     }
 }
