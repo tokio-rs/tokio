@@ -3,7 +3,9 @@ pub(crate) use self::level::Expiration;
 use self::level::Level;
 
 use super::cancellation_queue::Sender;
-use super::{EntryHandle, EntryList, WakeQueue};
+use super::{Entry, EntryHandle, WakeQueue};
+
+use crate::util::linked_list::LinkedList;
 
 /// Hashed timing wheel implementation.
 ///
@@ -202,7 +204,7 @@ impl Wheel {
     }
 
     /// Obtains the list of entries that need processing for the given expiration.
-    fn take_entries(&mut self, expiration: &Expiration) -> EntryList {
+    fn take_entries(&mut self, expiration: &Expiration) -> LinkedList<Entry> {
         self.levels[expiration.level].take_slot(expiration.slot)
     }
 
