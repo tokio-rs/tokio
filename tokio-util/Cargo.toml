@@ -25,7 +25,7 @@ full = ["codec", "compat", "io-util", "time", "net", "rt", "join-map"]
 
 net = ["tokio/net"]
 compat = ["futures-io"]
-codec = []
+codec = ["libc"]
 time = ["tokio/time", "slab"]
 io = []
 io-util = ["io", "tokio/rt", "tokio/io-util"]
@@ -45,6 +45,9 @@ pin-project-lite = "0.2.11"
 slab = { version = "0.4.4", optional = true } # Backs `DelayQueue`
 tracing = { version = "0.1.29", default-features = false, features = ["std"], optional = true }
 hashbrown = { version = "0.15.0", default-features = false, optional = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = { version = "0.2.168", optional = true } # Backs the LinesCodec delimiter scan via libc::memchr
 
 [dev-dependencies]
 tokio = { version = "1.0.0", features = ["full"] }

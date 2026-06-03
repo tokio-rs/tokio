@@ -69,6 +69,15 @@ impl UnixStream {
     /// This function will create a new Unix socket and connect to the path
     /// specified, associating the returned stream with the default event loop's
     /// handle.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub async fn connect<P>(path: P) -> io::Result<UnixStream>
     where
         P: AsRef<Path>,
@@ -86,7 +95,26 @@ impl UnixStream {
         #[cfg(not(any(target_os = "linux", target_os = "android")))]
         let addr = StdSocketAddr::from_pathname(path)?;
 
-        let stream = mio::net::UnixStream::connect_addr(&addr)?;
+        let addr = SocketAddr::from(addr);
+        UnixStream::connect_addr(&addr).await
+    }
+
+    /// Connects to the socket named by `socket_addr`.
+    ///
+    /// This function will create a new Unix socket and connect to the address
+    /// specified, associating the returned stream with the default event
+    /// loop's handle.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    pub async fn connect_addr(socket_addr: &SocketAddr) -> io::Result<UnixStream> {
+        let stream = mio::net::UnixStream::connect_addr(&socket_addr.0)?;
         let stream = UnixStream::new(stream)?;
 
         poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;
