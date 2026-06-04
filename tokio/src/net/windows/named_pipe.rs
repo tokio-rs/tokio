@@ -533,9 +533,7 @@ impl NamedPipeServer {
     /// }
     /// ```
     pub fn try_read_vectored(&self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
-        self.io
-            .registration()
-            .try_io(Interest::READABLE, || (&*self.io).read_vectored(bufs))
+        read_vectored_inner(&self.io, bufs)
     }
 
     cfg_io_util! {
@@ -809,9 +807,7 @@ impl NamedPipeServer {
     /// }
     /// ```
     pub fn try_write_vectored(&self, buf: &[io::IoSlice<'_>]) -> io::Result<usize> {
-        self.io
-            .registration()
-            .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(buf))
+        write_vectored_inner(&self.io, buf)
     }
 
     /// Tries to read or write from the pipe using a user-provided IO operation.
@@ -1325,9 +1321,7 @@ impl NamedPipeClient {
     /// }
     /// ```
     pub fn try_read_vectored(&self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
-        self.io
-            .registration()
-            .try_io(Interest::READABLE, || (&*self.io).read_vectored(bufs))
+        read_vectored_inner(&self.io, bufs)
     }
 
     cfg_io_util! {
@@ -1598,9 +1592,7 @@ impl NamedPipeClient {
     /// }
     /// ```
     pub fn try_write_vectored(&self, buf: &[io::IoSlice<'_>]) -> io::Result<usize> {
-        self.io
-            .registration()
-            .try_io(Interest::WRITABLE, || (&*self.io).write_vectored(buf))
+        write_vectored_inner(&self.io, buf)
     }
 
     /// Tries to read or write from the pipe using a user-provided IO operation.
@@ -2646,6 +2638,69 @@ pub struct PipeInfo {
     pub out_buffer_size: u32,
     /// The number of bytes to reserve for the input buffer.
     pub in_buffer_size: u32,
+}
+
+/// Coalesces all `bufs` into one allocation and issues a single `write` syscall.
+///
+/// Windows named pipes have no OS-level scatter/gather for pipes
+/// (ReadFileScatter/WriteFileGather are file-only and require page-aligned
+/// buffers), so the correct approach is to coalesce on the write side and
+/// scatter on the read side, preserving in-order and partial-IO semantics.
+fn write_vectored_inner(
+    io: &PollEvented<mio_windows::NamedPipe>,
+    bufs: &[io::IoSlice<'_>],
+) -> io::Result<usize> {
+    match bufs.len() {
+        0 => io
+            .registration()
+            .try_io(Interest::WRITABLE, || (&**io).write(&[])),
+        1 => io
+            .registration()
+            .try_io(Interest::WRITABLE, || (&**io).write(&bufs[0])),
+        _ => {
+            let mut coalesced = Vec::with_capacity(bufs.iter().map(|b| b.len()).sum());
+            for buf in bufs {
+                coalesced.extend_from_slice(buf);
+            }
+            io.registration()
+                .try_io(Interest::WRITABLE, || (&**io).write(&coalesced))
+        }
+    }
+}
+
+/// Issues a single `read` syscall into a temporary buffer, then scatters the
+/// bytes into the caller-supplied `bufs` in order.
+fn read_vectored_inner(
+    io: &PollEvented<mio_windows::NamedPipe>,
+    bufs: &mut [io::IoSliceMut<'_>],
+) -> io::Result<usize> {
+    match bufs.len() {
+        0 => io
+            .registration()
+            .try_io(Interest::READABLE, || (&**io).read(&mut [])),
+        1 => io
+            .registration()
+            .try_io(Interest::READABLE, || (&**io).read(&mut bufs[0])),
+        _ => {
+            let total: usize = bufs.iter().map(|b| b.len()).sum();
+            let mut tmp = vec![0u8; total];
+            // Single syscall; WouldBlock short-circuits here before any copy.
+            let n = io
+                .registration()
+                .try_io(Interest::READABLE, || (&**io).read(&mut tmp))?;
+            // Scatter the n bytes read into destination slices, in order.
+            let mut copied = 0;
+            for buf in bufs {
+                if copied == n {
+                    break;
+                }
+                let take = std::cmp::min(buf.len(), n - copied);
+                buf[..take].copy_from_slice(&tmp[copied..copied + take]);
+                copied += take;
+            }
+            Ok(n)
+        }
+    }
 }
 
 /// Encodes an address so that it is a null-terminated wide string.

@@ -397,3 +397,154 @@ async fn test_named_pipe_access() -> io::Result<()> {
     }
     Ok(())
 }
+
+// ---- vectored I/O regression tests for tokio-rs/tokio#6970 ----
+
+/// Verify that try_write_vectored with ≥3 IoSlice buffers sends all data in
+/// order and reassembles correctly on the read side.
+#[tokio::test]
+async fn test_named_pipe_write_vectored_multi_buffer() -> io::Result<()> {
+    use std::io::IoSlice;
+
+    const PIPE_NAME: &str = r"\\.\pipe\test-write-vectored-multi-6970";
+    const DATA: &[u8] = b"alpha-beta-gamma!!";
+
+    let server = ServerOptions::new().create(PIPE_NAME)?;
+    let client = ClientOptions::new().open(PIPE_NAME)?;
+    server.connect().await?;
+
+    // Write using 3 IoSlice buffers from the client side.
+    let bufs = [
+        IoSlice::new(b"alpha"),
+        IoSlice::new(b"-beta-"),
+        IoSlice::new(b"gamma!!"),
+    ];
+
+    // Flatten to a byte vec so we can re-slice on partial writes.
+    let flat: Vec<u8> = bufs.iter().flat_map(|b| b.iter().copied()).collect();
+    let mut written = 0;
+
+    while written < flat.len() {
+        client.writable().await?;
+        let remaining = &flat[written..];
+        match client.try_write_vectored(&[IoSlice::new(remaining)]) {
+            Ok(n) => written += n,
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(e) => return Err(e),
+        }
+    }
+
+    // Server reads it all back.
+    let mut read_buf = vec![0u8; DATA.len()];
+    let mut read = 0;
+    while read < DATA.len() {
+        server.readable().await?;
+        let dst = &mut read_buf[read..];
+        match server.try_read(dst) {
+            Ok(n) => read += n,
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(e) => return Err(e),
+        }
+    }
+
+    assert_eq!(&read_buf, DATA);
+    Ok(())
+}
+
+/// Verify that try_read_vectored correctly scatters bytes into multiple
+/// IoSliceMut buffers, preserving order across fragmented delivery.
+#[tokio::test]
+async fn test_named_pipe_read_vectored_multi_buffer() -> io::Result<()> {
+    use std::io::IoSliceMut;
+
+    const PIPE_NAME: &str = r"\\.\pipe\test-read-vectored-multi-6970";
+    const DATA: &[u8] = b"alpha-beta-gamma!!";
+
+    let server = ServerOptions::new().create(PIPE_NAME)?;
+    let client = ClientOptions::new().open(PIPE_NAME)?;
+    server.connect().await?;
+
+    // Server writes the full payload.
+    let mut written = 0;
+    while written < DATA.len() {
+        server.writable().await?;
+        match server.try_write(&DATA[written..]) {
+            Ok(n) => written += n,
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(e) => return Err(e),
+        }
+    }
+
+    // Client reads via try_read_vectored into 3 scatter buffers (5 / 6 / 16).
+    // We accumulate into a flat vec to be robust to fragmented delivery.
+    let mut accumulated: Vec<u8> = Vec::with_capacity(DATA.len());
+
+    while accumulated.len() < DATA.len() {
+        client.readable().await?;
+
+        let remaining = DATA.len() - accumulated.len();
+        // Scratch space: extend accumulated to hold up to `remaining` more bytes.
+        let old_len = accumulated.len();
+        accumulated.resize(old_len + remaining, 0u8);
+
+        // Build scatter slices over the tail of accumulated.
+        let (_, tail) = accumulated.split_at_mut(old_len);
+        // Partition the tail into three sub-slices with sizes 5, 6, rest.
+        let (a, rest) = tail.split_at_mut(std::cmp::min(5, tail.len()));
+        let (b, c) = rest.split_at_mut(std::cmp::min(6, rest.len()));
+        let mut scatter = [IoSliceMut::new(a), IoSliceMut::new(b), IoSliceMut::new(c)];
+
+        match client.try_read_vectored(&mut scatter) {
+            Ok(n) => {
+                // Truncate back to old_len + n (discard unfilled tail).
+                accumulated.truncate(old_len + n);
+            }
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                // Undo the resize.
+                accumulated.truncate(old_len);
+                continue;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    assert_eq!(accumulated.len(), 18);
+    assert_eq!(&accumulated[..5], b"alpha");
+    assert_eq!(&accumulated[5..11], b"-beta-");
+    assert_eq!(&accumulated[11..18], b"gamma!!");
+    Ok(())
+}
+
+/// Verify try_write_vectored and try_read_vectored with zero-length inputs.
+#[tokio::test]
+async fn test_named_pipe_vectored_empty_buffers() -> io::Result<()> {
+    use std::io::IoSlice;
+
+    const PIPE_NAME: &str = r"\\.\pipe\test-vectored-empty-6970";
+
+    let server = ServerOptions::new().create(PIPE_NAME)?;
+    let client = ClientOptions::new().open(PIPE_NAME)?;
+    server.connect().await?;
+
+    // Empty IoSlice slice must return Ok(0) strictly.
+    client.writable().await?;
+    assert_eq!(client.try_write_vectored(&[])?, 0);
+
+    // All-empty IoSlice buffers (non-empty slice, zero-length elements) must return Ok(0).
+    client.writable().await?;
+    assert_eq!(
+        client.try_write_vectored(&[IoSlice::new(&[]), IoSlice::new(&[])])?,
+        0
+    );
+
+    // Empty IoSliceMut slice: tolerate both Ok(0) and WouldBlock.
+    server.readable().await?;
+    match server.try_read_vectored(&mut []) {
+        Ok(0) => {}
+        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+        Ok(n) => panic!("expected Ok(0) or WouldBlock, got Ok({})", n),
+        Err(e) => return Err(e),
+    }
+
+    Ok(())
+}
