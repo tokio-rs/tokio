@@ -24,7 +24,7 @@ use tokio::task::{JoinError, JoinSet};
 /// # }
 /// ```
 ///
-/// [`tokio::sync::mpsc::Receiver`]: struct@tokio::sync::mpsc::Receiver
+/// [`tokio::task::JoinSet`]: struct@tokio::task::JoinSet
 /// [`Stream`]: trait@crate::Stream
 #[derive(Debug)]
 pub struct JoinSetStream<T> {
