@@ -91,10 +91,25 @@ cfg_rt! {
 
 use crate::runtime::context;
 
+use std::time::{Duration, Instant};
+
 /// Opaque type tracking the amount of "work" a task may still do before
 /// yielding back to the scheduler.
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct Budget(Option<u8>);
+pub(crate) struct Budget(BudgetInner);
+
+#[derive(Debug, Copy, Clone)]
+enum BudgetInner {
+    /// No budget constraint. Operations will not be limited.
+    Unconstrained,
+    /// Tick-based budget. Each call to [`Budget::decrement`] consumes one tick;
+    /// the budget is exhausted when the counter reaches zero.
+    Ticks(u8),
+    /// Time-based budget. The contained `Instant` is the deadline at which
+    /// the budget is considered exhausted. Each call to [`Budget::decrement`]
+    /// reads `Instant::now()` and compares it against the deadline.
+    Time(Instant),
+}
 
 pub(crate) struct BudgetDecrement {
     success: bool,
@@ -102,7 +117,7 @@ pub(crate) struct BudgetDecrement {
 }
 
 impl Budget {
-    /// Budget assigned to a task on each poll.
+    /// Default tick budget assigned to a task on each poll.
     ///
     /// The value itself is chosen somewhat arbitrarily. It needs to be high
     /// enough to amortize wakeup and scheduling costs, but low enough that we
@@ -112,17 +127,27 @@ impl Budget {
     ///
     /// Note that as more yield points are added in the ecosystem, this value
     /// will probably also have to be raised.
-    const fn initial() -> Budget {
-        Budget(Some(128))
+    const fn initial_ticks() -> Budget {
+        Budget(BudgetInner::Ticks(128))
+    }
+
+    /// Returns a time-based budget that is considered exhausted once
+    /// `Instant::now()` reaches or exceeds the given deadline.
+    fn initial_time(duration: Duration) -> Budget {
+        Budget(BudgetInner::Time(Instant::now() + duration))
     }
 
     /// Returns an unconstrained budget. Operations will not be limited.
     pub(crate) const fn unconstrained() -> Budget {
-        Budget(None)
+        Budget(BudgetInner::Unconstrained)
     }
 
     fn has_remaining(self) -> bool {
-        self.0.map_or(true, |budget| budget > 0)
+        match self.0 {
+            BudgetInner::Unconstrained => true,
+            BudgetInner::Ticks(budget) => budget > 0,
+            BudgetInner::Time(deadline) => Instant::now() < deadline,
+        }
     }
 }
 
@@ -130,7 +155,31 @@ impl Budget {
 /// returns, the budget is reset to the value prior to calling the function.
 #[inline(always)]
 pub(crate) fn budget<R>(f: impl FnOnce() -> R) -> R {
-    with_budget(Budget::initial(), f)
+    with_budget(Budget::initial_ticks(), f)
+}
+
+/// Runs the given closure with a time-based cooperative task budget. The task
+/// is considered out of budget once the elapsed wall-clock duration since
+/// entering this function exceeds `duration`. When the function returns, the
+/// budget is reset to the value prior to calling the function.
+#[inline(always)]
+pub(crate) fn budget_time<R>(duration: Duration, f: impl FnOnce() -> R) -> R {
+    with_budget(Budget::initial_time(duration), f)
+}
+
+/// Runs the given closure with a cooperative task budget chosen by the runtime
+/// configuration. If `time_budget` is `Some(d)`, the closure runs with a
+/// time-based budget of duration `d`; otherwise, it runs with the default
+/// tick-based budget.
+#[inline(always)]
+pub(crate) fn run_with_coop_budget<R>(
+    time_budget: Option<Duration>,
+    f: impl FnOnce() -> R,
+) -> R {
+    match time_budget {
+        Some(d) => budget_time(d, f),
+        None => budget(f),
+    }
 }
 
 /// Runs the given closure with an unconstrained task budget. When the function returns, the budget
@@ -411,23 +460,33 @@ cfg_coop! {
         /// Decrements the budget. Returns `true` if successful. Decrementing fails
         /// when there is not enough remaining budget.
         fn decrement(&mut self) -> BudgetDecrement {
-            if let Some(num) = &mut self.0 {
-                if *num > 0 {
-                    *num -= 1;
-
-                    let hit_zero = *num == 0;
-
-                    BudgetDecrement { success: true, hit_zero }
-                } else {
-                    BudgetDecrement { success: false, hit_zero: false }
+            match &mut self.0 {
+                BudgetInner::Unconstrained => {
+                    BudgetDecrement { success: true, hit_zero: false }
                 }
-            } else {
-                BudgetDecrement { success: true, hit_zero: false }
+                BudgetInner::Ticks(num) => {
+                    if *num > 0 {
+                        *num -= 1;
+
+                        let hit_zero = *num == 0;
+
+                        BudgetDecrement { success: true, hit_zero }
+                    } else {
+                        BudgetDecrement { success: false, hit_zero: false }
+                    }
+                }
+                BudgetInner::Time(deadline) => {
+                    if Instant::now() < *deadline {
+                        BudgetDecrement { success: true, hit_zero: false }
+                    } else {
+                        BudgetDecrement { success: false, hit_zero: false }
+                    }
+                }
             }
         }
 
         fn is_unconstrained(self) -> bool {
-            self.0.is_none()
+            matches!(self.0, BudgetInner::Unconstrained)
         }
     }
 
@@ -503,58 +562,69 @@ mod test {
         context::budget(|cell| cell.get()).unwrap_or(Budget::unconstrained())
     }
 
+    fn ticks(b: Budget) -> Option<u8> {
+        match b.0 {
+            BudgetInner::Ticks(n) => Some(n),
+            _ => None,
+        }
+    }
+
+    fn initial_ticks() -> u8 {
+        ticks(Budget::initial_ticks()).unwrap()
+    }
+
     #[test]
     fn budgeting() {
         use std::future::poll_fn;
         use tokio_test::*;
 
-        assert!(get().0.is_none());
+        assert!(get().is_unconstrained());
 
         let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
 
-        assert!(get().0.is_none());
+        assert!(get().is_unconstrained());
         drop(coop);
-        assert!(get().0.is_none());
+        assert!(get().is_unconstrained());
 
         budget(|| {
-            assert_eq!(get().0, Budget::initial().0);
+            assert_eq!(ticks(get()), Some(initial_ticks()));
 
             let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
-            assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 1);
+            assert_eq!(ticks(get()).unwrap(), initial_ticks() - 1);
             drop(coop);
             // we didn't make progress
-            assert_eq!(get().0, Budget::initial().0);
+            assert_eq!(ticks(get()), Some(initial_ticks()));
 
             let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
-            assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 1);
+            assert_eq!(ticks(get()).unwrap(), initial_ticks() - 1);
             coop.made_progress();
             drop(coop);
             // we _did_ make progress
-            assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 1);
+            assert_eq!(ticks(get()).unwrap(), initial_ticks() - 1);
 
             let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
-            assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 2);
+            assert_eq!(ticks(get()).unwrap(), initial_ticks() - 2);
             coop.made_progress();
             drop(coop);
-            assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 2);
+            assert_eq!(ticks(get()).unwrap(), initial_ticks() - 2);
 
             budget(|| {
-                assert_eq!(get().0, Budget::initial().0);
+                assert_eq!(ticks(get()), Some(initial_ticks()));
 
                 let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
-                assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 1);
+                assert_eq!(ticks(get()).unwrap(), initial_ticks() - 1);
                 coop.made_progress();
                 drop(coop);
-                assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 1);
+                assert_eq!(ticks(get()).unwrap(), initial_ticks() - 1);
             });
 
-            assert_eq!(get().0.unwrap(), Budget::initial().0.unwrap() - 2);
+            assert_eq!(ticks(get()).unwrap(), initial_ticks() - 2);
         });
 
-        assert!(get().0.is_none());
+        assert!(get().is_unconstrained());
 
         budget(|| {
-            let n = get().0.unwrap();
+            let n = ticks(get()).unwrap();
 
             for _ in 0..n {
                 let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
@@ -568,6 +638,28 @@ mod test {
             }));
 
             assert_pending!(task.poll());
+        });
+    }
+
+    #[test]
+    fn time_budget_exhausted() {
+        use std::thread;
+        use tokio_test::*;
+
+        // A small but non-trivial duration; we'll sleep past it to force exhaustion.
+        let dur = Duration::from_millis(10);
+
+        budget_time(dur, || {
+            // First poll_proceed should succeed (time has not yet elapsed).
+            let coop = assert_ready!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
+            coop.made_progress();
+
+            // Sleep past the deadline.
+            thread::sleep(dur + Duration::from_millis(5));
+
+            // Now the budget should be exhausted.
+            assert!(!has_budget_remaining());
+            let _ = assert_pending!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
         });
     }
 }
