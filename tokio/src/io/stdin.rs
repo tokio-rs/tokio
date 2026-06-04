@@ -40,6 +40,75 @@ cfg_io_std! {
     ///
     /// For interactive uses, it is recommended to spawn a thread dedicated to
     /// user input and use blocking IO directly in that thread.
+    ///
+    /// # Examples
+    ///
+    /// Reading all data piped into the process from standard input. This is the
+    /// recommended, non-interactive use of [`Stdin`]: when input is piped in,
+    /// stdin reaches end-of-file and the read completes, so the runtime can shut
+    /// down cleanly.
+    ///
+    /// ```no_run
+    /// use tokio::io::{self, AsyncReadExt};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> io::Result<()> {
+    ///     let mut stdin = io::stdin();
+    ///     let mut buf = Vec::new();
+    ///     stdin.read_to_end(&mut buf).await?;
+    ///
+    ///     println!("read {} bytes from stdin", buf.len());
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// Handling *interactive* input. Reading [`Stdin`] directly from async code
+    /// is not recommended: because the read is performed by an uncancellable
+    /// blocking operation, awaiting it can make runtime shutdown hang until the
+    /// user presses enter. Instead, spawn a dedicated thread that performs the
+    /// blocking reads and forwards each line over a channel. Async code then
+    /// selects over that channel, so it can stop on a shutdown signal without
+    /// waiting for the blocking read to finish:
+    ///
+    /// ```no_run
+    /// use std::io::BufRead;
+    /// use tokio::sync::mpsc;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx) = mpsc::channel::<String>(16);
+    ///
+    ///     // Blocking, uncancellable reads live on this dedicated thread, off
+    ///     // the async runtime. Each line is forwarded to async code.
+    ///     std::thread::spawn(move || {
+    ///         for line in std::io::stdin().lock().lines() {
+    ///             let line = match line {
+    ///                 Ok(line) => line,
+    ///                 Err(_) => break,
+    ///             };
+    ///             // The receiver is dropped once the runtime shuts down; stop.
+    ///             if tx.blocking_send(line).is_err() {
+    ///                 break;
+    ///             }
+    ///         }
+    ///     });
+    ///
+    ///     loop {
+    ///         tokio::select! {
+    ///             maybe_line = rx.recv() => match maybe_line {
+    ///                 Some(line) => println!("read line: {}", line),
+    ///                 None => break, // input thread reached end-of-file
+    ///             },
+    ///             _ = tokio::signal::ctrl_c() => {
+    ///                 // Stop awaiting input so the runtime can shut down, even
+    ///                 // though the reader thread may still be blocked on read.
+    ///                 println!("shutting down");
+    ///                 break;
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub fn stdin() -> Stdin {
         let std = io::stdin();
         // SAFETY: The `Read` implementation of `std` does not read from the
