@@ -672,7 +672,8 @@ impl Context {
         *self.core.borrow_mut() = Some(core);
 
         // Run the task
-        coop::budget(|| {
+        let coop_time_budget = self.worker.handle.shared.config.coop_time_budget;
+        coop::run_with_coop_budget(coop_time_budget, || {
             // Unlike the poll time above, poll start callback is attached to the task id,
             // so it is tightly associated with the actual poll invocation.
             #[cfg(tokio_unstable)]

@@ -124,6 +124,12 @@ pub struct Builder {
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(super) event_interval: u32,
 
+    /// Optional per-poll wall-clock budget used for cooperative scheduling.
+    ///
+    /// When `Some`, the scheduler uses an elapsed-time strategy to determine
+    /// when a task should yield, rather than the default tick-based strategy.
+    pub(super) coop_time_budget: Option<Duration>,
+
     /// When true, the multi-threade scheduler LIFO slot should not be used.
     ///
     /// This option should only be exposed as unstable.
@@ -325,6 +331,9 @@ impl Builder {
             // as parameters.
             global_queue_interval: None,
             event_interval,
+
+            // Default: tick-based cooperative budget.
+            coop_time_budget: None,
 
             seed_generator: RngSeedGenerator::new(RngSeed::new()),
 
@@ -1222,6 +1231,56 @@ impl Builder {
         self
     }
 
+    /// Switch the cooperative scheduling budget to a time-based strategy.
+    ///
+    /// By default, Tokio uses a tick-based budget: each task may consume up
+    /// to a fixed number of cooperative "ticks" (yield points in
+    /// Tokio-aware leaf futures) per poll before being forced to yield back
+    /// to the scheduler. This works well as long as each tick corresponds to
+    /// a roughly similar amount of work, but it can lead to long polls when
+    /// individual ticks are expensive — for example, when CPU-bound work
+    /// sits between yield points.
+    ///
+    /// Calling this method opts the runtime into an alternative,
+    /// time-based budget: instead of counting ticks, the runtime records the
+    /// time when each task poll begins and considers the budget exhausted
+    /// once the configured wall-clock `duration` has elapsed.
+    ///
+    /// This causes Tokio to call `Instant::now()` at every cooperative yield
+    /// point, which is more expensive than decrementing a counter. Tasks
+    /// that perform many cheap yield points may therefore see throughput
+    /// regressions; the time-based mode is most appropriate when tasks
+    /// perform a significant amount of work between yield points and the
+    /// goal is to bound poll latency.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `duration` is zero.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use std::time::Duration;
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .coop_time_budget(Duration::from_micros(100))
+    ///     .build()
+    ///     .unwrap();
+    /// # }
+    /// ```
+    #[track_caller]
+    pub fn coop_time_budget(&mut self, duration: Duration) -> &mut Self {
+        assert!(
+            !duration.is_zero(),
+            "coop_time_budget must be greater than zero"
+        );
+        self.coop_time_budget = Some(duration);
+        self
+    }
+
     cfg_unstable! {
         /// Configure how the runtime responds to an unhandled panic on a
         /// spawned task.
@@ -1700,6 +1759,7 @@ impl Builder {
                 after_termination: self.after_termination.clone(),
                 global_queue_interval: self.global_queue_interval,
                 event_interval: self.event_interval,
+                coop_time_budget: self.coop_time_budget,
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
                 disable_lifo_slot: self.disable_lifo_slot,
@@ -1886,6 +1946,7 @@ cfg_rt_multi_thread! {
                     after_termination: self.after_termination.clone(),
                     global_queue_interval: self.global_queue_interval,
                     event_interval: self.event_interval,
+                    coop_time_budget: self.coop_time_budget,
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,

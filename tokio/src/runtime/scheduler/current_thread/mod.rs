@@ -369,8 +369,11 @@ impl Context {
     /// Execute the closure with the given scheduler core stored in the
     /// thread-local context.
     fn run_task<R>(&self, mut core: Box<Core>, f: impl FnOnce() -> R) -> (Box<Core>, R) {
+        let coop_time_budget = self.handle.shared.config.coop_time_budget;
         core.metrics.start_poll();
-        let mut ret = self.enter(core, || crate::task::coop::budget(f));
+        let mut ret = self.enter(core, || {
+            crate::task::coop::run_with_coop_budget(coop_time_budget, f)
+        });
         ret.0.metrics.end_poll();
         ret
     }
@@ -774,8 +777,11 @@ impl CoreGuard<'_> {
                 let handle = &context.handle;
 
                 if handle.reset_woken() {
+                    let coop_time_budget = handle.shared.config.coop_time_budget;
                     let (c, res) = context.enter(core, || {
-                        crate::task::coop::budget(|| future.as_mut().poll(&mut cx))
+                        crate::task::coop::run_with_coop_budget(coop_time_budget, || {
+                            future.as_mut().poll(&mut cx)
+                        })
                     });
 
                     core = c;
