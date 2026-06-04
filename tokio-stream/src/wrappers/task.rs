@@ -32,8 +32,8 @@ pub struct JoinSetStream<T> {
 }
 impl<T> JoinSetStream<T> {
     /// Create a new `JoinSetStream`.
-    pub fn new(recv: JoinSet<T>) -> Self {
-        Self { inner: recv }
+    pub fn new(join_set: JoinSet<T>) -> Self {
+        Self { inner: join_set }
     }
 
     /// Get back the inner `JoinSet`.
@@ -71,7 +71,7 @@ impl<T> AsMut<JoinSet<T>> for JoinSetStream<T> {
 }
 
 impl<T> From<JoinSet<T>> for JoinSetStream<T> {
-    fn from(recv: JoinSet<T>) -> Self {
-        Self::new(recv)
+    fn from(join_set: JoinSet<T>) -> Self {
+        Self::new(join_set)
     }
 }
