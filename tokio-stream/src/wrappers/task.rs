@@ -1,6 +1,4 @@
 use crate::Stream;
-use core::future::Future;
-use core::pin::pin;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::task::{JoinError, JoinSet};
@@ -48,8 +46,7 @@ impl<T: 'static> Stream for JoinSetStream<T> {
     type Item = Result<T, JoinError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut pinned = pin!(self.inner.join_next());
-        pinned.as_mut().poll(cx)
+        self.inner.poll_join_next(cx)
     }
 
     /// Returns the bounds of the stream based on the underlying `JoinSet`.
