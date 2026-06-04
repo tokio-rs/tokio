@@ -93,13 +93,18 @@ cfg_io_std! {
     ///         }
     ///     });
     ///
+    ///     // Create the Ctrl-C future once and poll it across loop iterations,
+    ///     // rather than building a new one each time through `select!`.
+    ///     let ctrl_c = tokio::signal::ctrl_c();
+    ///     tokio::pin!(ctrl_c);
+    ///
     ///     loop {
     ///         tokio::select! {
     ///             maybe_line = rx.recv() => match maybe_line {
     ///                 Some(line) => println!("read line: {}", line),
     ///                 None => break, // input thread reached end-of-file
     ///             },
-    ///             _ = tokio::signal::ctrl_c() => {
+    ///             _ = &mut ctrl_c => {
     ///                 // Stop awaiting input so the runtime can shut down, even
     ///                 // though the reader thread may still be blocked on read.
     ///                 println!("shutting down");
