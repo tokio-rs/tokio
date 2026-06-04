@@ -24,6 +24,9 @@ async fn join_set_as_stream() {
     assert_eq!(values, HashSet::from([0, 1]));
 }
 
+// Cannot run this test when “unwind” is disabled
+// since `JoinSet` use it to catch futures that panics.
+#[cfg(panic = "unwind")]
 #[tokio::test]
 async fn join_set_as_stream_panics_with_error() {
     let set: JoinSet<_> = std::iter::once(async move { panic!("boom!") }).collect();
