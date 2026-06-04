@@ -63,10 +63,10 @@ cfg_io_std! {
     /// ```
     ///
     /// Handling *interactive* input. Reading [`Stdin`] directly from async code
-    /// is not recommended: because the read is performed by an uncancellable
-    /// blocking operation, awaiting it can make runtime shutdown hang until the
-    /// user presses enter. Instead, spawn a dedicated thread that performs the
-    /// blocking reads and forwards each line over a channel. Async code then
+    /// is not recommended: because the read is performed by a blocking operation
+    /// that cannot be cancelled, awaiting it can make runtime shutdown hang until
+    /// the user presses enter. Instead, spawn a dedicated thread that performs
+    /// the blocking reads and forwards each line over a channel. Async code then
     /// selects over that channel, so it can stop on a shutdown signal without
     /// waiting for the blocking read to finish:
     ///
@@ -78,8 +78,8 @@ cfg_io_std! {
     /// async fn main() {
     ///     let (tx, mut rx) = mpsc::channel::<String>(16);
     ///
-    ///     // Blocking, uncancellable reads live on this dedicated thread, off
-    ///     // the async runtime. Each line is forwarded to async code.
+    ///     // Blocking reads that cannot be cancelled live on this dedicated
+    ///     // thread, off the async runtime. Each line is forwarded to async code.
     ///     std::thread::spawn(move || {
     ///         for line in std::io::stdin().lock().lines() {
     ///             let line = match line {
