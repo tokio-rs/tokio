@@ -1,3 +1,5 @@
+#![cfg(feature = "rt")]
+
 use futures::{Stream, StreamExt};
 use std::collections::HashSet;
 use tokio::task::JoinSet;
