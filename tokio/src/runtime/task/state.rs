@@ -287,7 +287,12 @@ impl State {
         feature = "taskdump",
         feature = "rt",
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64", target_arch = "s390x")
+        any(
+            target_arch = "aarch64",
+            target_arch = "x86",
+            target_arch = "x86_64",
+            target_arch = "s390x"
+        )
     ))]
     pub(super) fn transition_to_notified_for_tracing(&self) -> bool {
         self.fetch_update_action(|mut snapshot| {

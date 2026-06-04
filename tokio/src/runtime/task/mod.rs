@@ -405,7 +405,12 @@ impl<S: 'static> Task<S> {
         feature = "taskdump",
         feature = "rt",
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64", target_arch = "s390x")
+        any(
+            target_arch = "aarch64",
+            target_arch = "x86",
+            target_arch = "x86_64",
+            target_arch = "s390x"
+        )
     ))]
     pub(super) fn as_raw(&self) -> RawTask {
         self.raw
@@ -518,7 +523,12 @@ impl<S: Schedule> LocalNotified<S> {
         feature = "taskdump",
         feature = "rt",
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64", target_arch = "s390x")
+        any(
+            target_arch = "aarch64",
+            target_arch = "x86",
+            target_arch = "x86_64",
+            target_arch = "s390x"
+        )
     ))]
     pub(crate) fn waker_ref(&self) -> waker::WakerRef<'_, S> {
         waker::waker_ref::<S>(self.task.raw.header_ptr_ref())

@@ -247,7 +247,12 @@ impl RawTask {
         feature = "taskdump",
         feature = "rt",
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64", target_arch = "s390x")
+        any(
+            target_arch = "aarch64",
+            target_arch = "x86",
+            target_arch = "x86_64",
+            target_arch = "s390x"
+        )
     ))]
     pub(super) fn header_ptr_ref(&self) -> &NonNull<Header> {
         &self.ptr
