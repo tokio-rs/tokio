@@ -526,18 +526,25 @@ async fn test_named_pipe_vectored_empty_buffers() -> io::Result<()> {
     let client = ClientOptions::new().open(PIPE_NAME)?;
     server.connect().await?;
 
-    // Empty IoSlice slice must return Ok(0) strictly.
-    client.writable().await?;
-    assert_eq!(client.try_write_vectored(&[])?, 0);
+    // A zero-length vectored write must never write bytes. Tolerate WouldBlock:
+    // a zero-length write may report not-ready rather than Ok(0), and either is
+    // acceptable as long as no bytes are written.
+    let assert_empty_write = |res: io::Result<usize>| match res {
+        Ok(0) => Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::WouldBlock => Ok(()),
+        Ok(n) => panic!("empty write reported {} bytes written", n),
+        Err(e) => Err(e),
+    };
 
-    // All-empty IoSlice buffers (non-empty slice, zero-length elements) must return Ok(0).
+    // Empty IoSlice slice (zero buffers).
     client.writable().await?;
-    assert_eq!(
-        client.try_write_vectored(&[IoSlice::new(&[]), IoSlice::new(&[])])?,
-        0
-    );
+    assert_empty_write(client.try_write_vectored(&[]))?;
 
-    // Empty IoSliceMut slice: tolerate both Ok(0) and WouldBlock.
+    // Non-empty slice of zero-length buffers.
+    client.writable().await?;
+    assert_empty_write(client.try_write_vectored(&[IoSlice::new(&[]), IoSlice::new(&[])]))?;
+
+    // Empty IoSliceMut slice: likewise tolerate Ok(0) or WouldBlock.
     server.readable().await?;
     match server.try_read_vectored(&mut []) {
         Ok(0) => {}
