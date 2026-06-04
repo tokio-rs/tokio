@@ -488,7 +488,12 @@ compile_error!("The `taskdump` feature requires `--cfg tokio_unstable`.");
     not(doc),
     not(all(
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64", target_arch = "s390x")
+        any(
+            target_arch = "aarch64",
+            target_arch = "x86",
+            target_arch = "x86_64",
+            target_arch = "s390x"
+        )
     ))
 ))]
 compile_error!(
