@@ -178,3 +178,30 @@ fn into_inner_int_empty_setonce() {
 
     assert!(val.is_none());
 }
+
+#[test]
+fn take_empty() {
+    let mut once = SetOnce::<u32>::new();
+    assert!(once.take().is_none());
+}
+
+#[test]
+fn take_full() {
+    let mut once = SetOnce::<u32>::new();
+    assert!(once.set(42).is_ok());
+    assert_eq!(once.take(), Some(42));
+    assert!(once.get().is_none());
+    assert!(once.take().is_none());
+}
+
+#[test]
+fn drop_take() {
+    let fooer = DropCounter::new();
+    let mut once = SetOnce::new();
+    assert!(once.set(fooer.clone()).is_ok());
+    let val = once.take();
+    fooer.assert_num_drops(0);
+    drop(val);
+    fooer.assert_num_drops(1);
+    assert!(once.get().is_none());
+}

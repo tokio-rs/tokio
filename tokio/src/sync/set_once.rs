@@ -124,11 +124,13 @@ impl<T: Eq> Eq for SetOnce<T> {}
 
 impl<T> Drop for SetOnce<T> {
     fn drop(&mut self) {
-        // TODO: Use get_mut()
-        if self.value_set.load(Ordering::Relaxed) {
+        if *self.value_set.get_mut() {
             // SAFETY: If the value_set is true, then the value is initialized
             // then there is a value to be dropped and this is safe
-            unsafe { self.value.with_mut(|ptr| ptr::drop_in_place(ptr as *mut T)) }
+            unsafe {
+                self.value
+                    .with_mut(|ptr| ptr::drop_in_place((*ptr).as_mut_ptr()));
+            }
         }
     }
 }
@@ -308,24 +310,27 @@ impl<T> SetOnce<T> {
 
     /// Takes the value from the cell, destroying the cell in the process.
     /// Returns `None` if the cell is empty.
-    pub fn into_inner(self) -> Option<T> {
-        // TODO: Use get_mut()
-        let value_set = self.value_set.load(Ordering::Relaxed);
-
-        if value_set {
+    pub fn into_inner(mut self) -> Option<T> {
+        if *self.value_set.get_mut() {
             // Since we have taken ownership of self, its drop implementation
             // will be called by the end of this function, to prevent a double
             // free we will set the value_set to false so that the drop
             // implementation does not try to drop the value again.
-            self.value_set.store(false, Ordering::Relaxed);
+            *self.value_set.get_mut() = false;
 
             // SAFETY: The SetOnce is currently initialized, we can assume the
             // value is initialized and return that, when we return the value
             // we give the drop handler to the return scope.
-            Some(unsafe { self.value.with_mut(|ptr| ptr::read(ptr).assume_init()) })
+            Some(unsafe { self.value.with(|ptr| ptr::read(ptr).assume_init()) })
         } else {
             None
         }
+    }
+
+    /// Takes ownership of the current value, leaving the cell empty. Returns
+    /// `None` if the cell is empty.
+    pub fn take(&mut self) -> Option<T> {
+        std::mem::take(self).into_inner()
     }
 
     /// Waits until the value is set.
