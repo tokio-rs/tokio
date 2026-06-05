@@ -30,6 +30,7 @@ use tokio::task::{JoinError, JoinSet};
 pub struct JoinSetStream<T> {
     inner: JoinSet<T>,
 }
+
 impl<T> JoinSetStream<T> {
     /// Create a new `JoinSetStream`.
     pub fn new(join_set: JoinSet<T>) -> Self {
