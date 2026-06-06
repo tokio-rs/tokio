@@ -59,6 +59,7 @@ pub(crate) struct ShardGuard<'a, L, T> {
 impl<L: ShardedListItem> ShardedList<L, L::Target> {
     /// Removes the last element from a list specified by `shard_id` and returns it, or None if it is
     /// empty.
+    #[cfg_attr(not(feature = "rt"), allow(dead_code))]
     pub(crate) fn pop_back(&self, shard_id: usize) -> Option<L::Handle> {
         let mut lock = self.shard_inner(shard_id);
         let node = lock.pop_back();
@@ -66,6 +67,20 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
             self.count.decrement();
         }
         node
+    }
+
+    /// Locks the shard identified by `shard_id` for draining, returning a guard that can pop
+    /// multiple nodes under a single lock acquisition.
+    ///
+    /// This is used by the wake path to drain a shard in batches without re-locking per node, while
+    /// still inspecting/mutating each popped node before the lock is released (so it cannot race a
+    /// concurrent [`remove`](Self::remove) of that same node).
+    #[cfg_attr(not(feature = "sync"), allow(dead_code))]
+    pub(crate) fn lock_shard_by_id(&self, shard_id: usize) -> ShardDrainGuard<'_, L, L::Target> {
+        ShardDrainGuard {
+            lock: self.shard_inner(shard_id),
+            count: &self.count,
+        }
     }
 
     /// Removes the specified node from the list.
@@ -107,6 +122,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
     cfg_unstable_metrics! {
         cfg_64bit_metrics! {
             /// Gets the total number of elements added to this list.
+            #[cfg_attr(not(feature = "rt"), allow(dead_code))]
             pub(crate) fn added(&self) -> u64 {
                 self.added.load(Ordering::Relaxed)
             }
@@ -140,6 +156,27 @@ impl<'a, L: ShardedListItem> ShardGuard<'a, L, L::Target> {
         self.lock.push_front(val);
         self.added.add(1, Ordering::Relaxed);
         self.count.increment();
+    }
+}
+
+/// Holds a single shard's lock so its nodes can be drained in a batch.
+///
+/// Returned by [`ShardedList::lock_shard_by_id`]. The shard lock is held for the lifetime of the
+/// guard, so the caller can pop several nodes (and inspect each one) without re-locking per node.
+pub(crate) struct ShardDrainGuard<'a, L, T> {
+    lock: MutexGuard<'a, LinkedList<L, T>>,
+    count: &'a MetricAtomicUsize,
+}
+
+impl<'a, L: ShardedListItem> ShardDrainGuard<'a, L, L::Target> {
+    /// Removes the last element from the locked shard and returns it, or `None` if it is empty.
+    #[cfg_attr(not(feature = "sync"), allow(dead_code))]
+    pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
+        let node = self.lock.pop_back();
+        if node.is_some() {
+            self.count.decrement();
+        }
+        node
     }
 }
 
