@@ -44,7 +44,16 @@ async fn shutdown_after_tcp_reset() {
         connected_tx.send(()).unwrap();
 
         dropped_rx.await.unwrap();
-        assert_ok!(AsyncWriteExt::shutdown(&mut stream).await);
+
+        // After the peer's RST (linger = 0), `shutdown` returns `Ok(())` on most
+        // platforms, but FreeBSD can surface the reset as `ConnectionReset` when
+        // the kernel processed it before `shutdown` ran. Both are valid for an
+        // already-reset connection.
+        match AsyncWriteExt::shutdown(&mut stream).await {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::ConnectionReset => {}
+            Err(e) => panic!("unexpected error after reset: {e:?}"),
+        }
     });
 
     let (stream, _) = assert_ok!(srv.accept().await);
