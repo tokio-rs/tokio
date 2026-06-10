@@ -390,6 +390,14 @@ impl Sleep {
 
     fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
         ready!(crate::trace::trace_leaf());
+        let mut this = self.project();
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _res_span = this.inner.ctx.resource_span.enter();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _ao_span = this.inner.ctx.async_op_span.enter();
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let _ao_poll_span = this.inner.ctx.async_op_poll_span.enter();
 
         // Keep track of task budget
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -401,7 +409,6 @@ impl Sleep {
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 
-        let mut this = self.project();
         let timer = match this.timer.as_mut().as_pin_mut() {
             Some(timer) => timer,
             None => {
@@ -454,14 +461,8 @@ impl Future for Sleep {
     // Both cases are extremely rare, and pretty accurately fit into
     // "logic errors", so we just panic in this case. A user couldn't
     // really do much better if we passed the error onwards.
-    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let _res_span = self.inner.ctx.resource_span.clone().entered();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let _ao_span = self.inner.ctx.async_op_span.clone().entered();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let _ao_poll_span = self.inner.ctx.async_op_poll_span.clone().entered();
-        match ready!(self.as_mut().poll_elapsed(cx)) {
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+        match ready!(self.poll_elapsed(cx)) {
             Ok(()) => Poll::Ready(()),
             Err(e) => panic!("timer error: {e}"),
         }
