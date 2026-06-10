@@ -24,6 +24,7 @@ impl LocalContext {
 pub(crate) enum TempLocalContext<'a> {
     /// The runtime is running, we can access it.
     Running {
+        elapsed: u64,
         registration_queue: &'a mut RegistrationQueue,
     },
     #[cfg(feature = "rt-multi-thread")]
@@ -34,6 +35,7 @@ pub(crate) enum TempLocalContext<'a> {
 impl<'a> TempLocalContext<'a> {
     pub(crate) fn new_running(cx: &'a mut LocalContext) -> Self {
         TempLocalContext::Running {
+            elapsed: cx.wheel.elapsed(),
             registration_queue: &mut cx.registration_queue,
         }
     }

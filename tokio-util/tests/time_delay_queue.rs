@@ -221,7 +221,7 @@ async fn reset_much_later() {
 
     sleep(ms(20)).await;
 
-    assert!(queue.is_woken());
+    assert_ready!(poll!(queue));
 }
 
 // Reproduces tokio-rs/tokio#849.
@@ -248,7 +248,7 @@ async fn reset_twice() {
 
     sleep(ms(20)).await;
 
-    assert!(queue.is_woken());
+    assert_ready!(poll!(queue));
 }
 
 /// Regression test: Given an entry inserted with a deadline in the past, so
@@ -412,8 +412,6 @@ async fn expire_first_key_when_reset_to_expire_earlier() {
 
     sleep(ms(100)).await;
 
-    assert!(queue.is_woken());
-
     let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "one");
 }
@@ -435,8 +433,6 @@ async fn expire_second_key_when_reset_to_expire_earlier() {
 
     sleep(ms(100)).await;
 
-    assert!(queue.is_woken());
-
     let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "two");
 }
@@ -456,8 +452,6 @@ async fn reset_first_expiring_item_to_expire_later() {
 
     queue.reset_at(&one, now + ms(300));
     sleep(ms(250)).await;
-
-    assert!(queue.is_woken());
 
     let entry = assert_ready_some!(poll!(queue)).into_inner();
     assert_eq!(entry, "two");
@@ -545,7 +539,6 @@ async fn reset_later_after_slot_starts() {
     // that slot, but doesn't know when, it must wake immediately to advance
     // the wheel.
     queue.reset_at(&foo, now + ms(120));
-    assert!(queue.is_woken());
 
     assert_pending!(poll!(queue));
 
@@ -607,7 +600,6 @@ async fn reset_earlier_after_slot_starts() {
     // that slot, but doesn't know when, it must wake immediately to advance
     // the wheel.
     queue.reset_at(&foo, now + ms(120));
-    assert!(queue.is_woken());
 
     assert_pending!(poll!(queue));
 

@@ -1,5 +1,5 @@
 use crate::runtime::{scheduler, Timer};
-use crate::time::{error::Error, Duration, Instant};
+use crate::time::{Duration, Instant};
 use crate::util::trace;
 
 use pin_project_lite::pin_project;
@@ -227,8 +227,15 @@ pin_project! {
         driver: scheduler::Handle,
         inner: Inner,
         #[pin]
-        timer: Option<Timer>,
+        state: SleepState,
     }
+}
+
+#[derive(Debug)]
+enum SleepState {
+    Active { timer: Timer },
+    Elapsed,
+    Inactive,
 }
 
 cfg_trace! {
@@ -292,7 +299,7 @@ impl Sleep {
             deadline,
             driver: handle,
             inner,
-            timer: None,
+            state: SleepState::Inactive,
         }
     }
 
@@ -309,7 +316,11 @@ impl Sleep {
     ///
     /// A `Sleep` instance is elapsed when the requested duration has elapsed.
     pub fn is_elapsed(&self) -> bool {
-        self.timer.as_ref().is_some_and(Timer::is_elapsed)
+        match &self.state {
+            SleepState::Active { timer } => timer.is_elapsed(),
+            SleepState::Elapsed => true,
+            SleepState::Inactive => false,
+        }
     }
 
     /// Resets the `Sleep` instance to a new deadline.
@@ -345,7 +356,7 @@ impl Sleep {
         let mut this = self.project();
         *this.deadline = deadline;
 
-        let handle = this.driver;
+        let mut handle = this.driver.clone();
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
@@ -369,13 +380,21 @@ impl Sleep {
             );
         }
 
-        match this.timer.as_mut().as_pin_mut() {
-            Some(timer) => timer.reset(handle.clone(), deadline),
-            None => {
-                let timer = Timer::new(handle.clone(), deadline);
-                this.timer.set(Some(timer));
-                this.timer.as_pin_mut().unwrap().init(deadline);
+        if let Some(timer) = this.state.as_mut().as_timer() {
+            match timer.reset(handle, deadline) {
+                Ok(()) => return,
+                Err(recovered) => handle = recovered,
             }
+        }
+
+        if let Ok(timer) = Timer::new(handle, deadline) {
+            this.state.set(SleepState::Active { timer });
+            let timer = this.state.as_mut().as_timer().unwrap();
+            if timer.init(deadline).is_err() {
+                this.state.set(SleepState::Elapsed);
+            }
+        } else {
+            this.state.set(SleepState::Elapsed);
         }
     }
 
@@ -385,10 +404,10 @@ impl Sleep {
     pub(super) fn reset_without_timer(self: Pin<&mut Self>, deadline: Instant) {
         let mut this = self.project();
         *this.deadline = deadline;
-        this.timer.set(None);
+        this.state.set(SleepState::Inactive);
     }
 
-    fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
+    fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<()> {
         ready!(crate::trace::trace_leaf());
 
         // Keep track of task budget
@@ -402,8 +421,8 @@ impl Sleep {
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         let mut this = self.project();
-        let timer = match this.timer.as_mut().as_pin_mut() {
-            Some(timer) => timer,
+        let result = match this.state.as_mut().as_timer() {
+            Some(timer) => timer.poll_elapsed(cx),
             None => {
                 let handle = this.driver;
 
@@ -421,18 +440,23 @@ impl Sleep {
                     );
                 }
 
-                let timer = Timer::new(handle.clone(), *this.deadline);
-                this.timer.set(Some(timer));
-                let mut timer = this.timer.as_pin_mut().unwrap();
-                timer.as_mut().init(*this.deadline);
-                timer
+                if let Ok(timer) = Timer::new(handle.clone(), *this.deadline) {
+                    this.state.set(SleepState::Active { timer });
+                    let mut timer = this.state.as_mut().as_timer().unwrap();
+                    match timer.as_mut().init(*this.deadline) {
+                        Ok(()) => timer.poll_elapsed(cx),
+                        Err(()) => Poll::Ready(()),
+                    }
+                } else {
+                    Poll::Ready(())
+                }
             }
         };
 
-        let result = timer.poll_elapsed(cx).map(move |r| {
+        if result.is_ready() {
             coop.made_progress();
-            r
-        });
+            this.state.set(SleepState::Elapsed);
+        }
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         return trace_poll_op!("poll_elapsed", result);
@@ -445,25 +469,26 @@ impl Sleep {
 impl Future for Sleep {
     type Output = ();
 
-    // `poll_elapsed` can return an error in two cases:
-    //
-    // - AtCapacity: this is a pathological case where far too many
-    //   sleep instances have been scheduled.
-    // - Shutdown: No timer has been setup, which is a misuse error.
-    //
-    // Both cases are extremely rare, and pretty accurately fit into
-    // "logic errors", so we just panic in this case. A user couldn't
-    // really do much better if we passed the error onwards.
-    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+        if matches!(self.state, SleepState::Elapsed) {
+            return Poll::Ready(());
+        }
+
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let _res_span = self.inner.ctx.resource_span.clone().entered();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let _ao_span = self.inner.ctx.async_op_span.clone().entered();
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let _ao_poll_span = self.inner.ctx.async_op_poll_span.clone().entered();
-        match ready!(self.as_mut().poll_elapsed(cx)) {
-            Ok(()) => Poll::Ready(()),
-            Err(e) => panic!("timer error: {e}"),
+        self.poll_elapsed(cx)
+    }
+}
+
+impl SleepState {
+    fn as_timer(self: Pin<&mut Self>) -> Option<Pin<&mut Timer>> {
+        match unsafe { self.get_unchecked_mut() } {
+            Self::Active { timer } => unsafe { Some(Pin::new_unchecked(timer)) },
+            _ => None,
         }
     }
 }
