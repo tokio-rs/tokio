@@ -120,9 +120,9 @@ pub(crate) struct Globals {
     ///
     /// Known limitation: if the process recorded here dies and a descendant
     /// that never created a runtime forks a child that is assigned the
-    /// recycled pid, the fork goes undetected. This is inherent to pid
-    /// comparison; closing it would require `pthread_atfork`, a process-wide,
-    /// unremovable hook that is deliberately avoided here.
+    /// recycled PID, the fork goes undetected. This is inherent to PID
+    /// comparison; closing it would require `pthread_atfork`, a process-wide
+    /// hook that cannot be removed again and is deliberately avoided here.
     pid: Mutex<u32>,
 }
 
@@ -165,7 +165,7 @@ impl Globals {
     /// inherited signal handler working.
     ///
     /// This runs once per runtime creation (a cold path), so a plain mutex
-    /// around the pid is plenty.
+    /// around the PID is plenty.
     pub(crate) fn reinit_after_fork_if_needed(&self) -> std::io::Result<()> {
         let mut pid = self.pid.lock().unwrap();
         let current = std::process::id();

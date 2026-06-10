@@ -44,9 +44,9 @@ pub(crate) struct OrphanQueueImpl<T> {
     queue: Mutex<Vec<T>>,
     /// `process::id()` of the process that pushed the queued orphans,
     /// stamped on every push. A forked child inherits its parent's queue
-    /// entries but not its pid, so [`OrphanQueueImpl::lock_queue`] discards
+    /// entries but not its PID, so [`OrphanQueueImpl::lock_queue`] discards
     /// them: waiting on them would fail with `ECHILD` at best, or target an
-    /// unrelated process in case of pid reuse. Dropping them is safe, since
+    /// unrelated process in case of PID reuse. Dropping them is safe, since
     /// dropping a `std::process::Child` neither kills nor waits on the
     /// process.
     ///
