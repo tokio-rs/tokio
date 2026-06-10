@@ -1,8 +1,8 @@
 cfg_rt! {
+    #[allow(unused_imports)]
     pub(crate) use crate::runtime::spawn_blocking;
 
-    cfg_fs! {
-        #[allow(unused_imports)]
+    cfg_io_blocking! {
         pub(crate) use crate::runtime::spawn_mandatory_blocking;
     }
 
@@ -15,6 +15,7 @@ cfg_not_rt! {
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
+    #[allow(dead_code)]
     pub(crate) fn spawn_blocking<F, R>(_f: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -24,7 +25,7 @@ cfg_not_rt! {
         panic!("requires the `rt` Tokio feature flag")
     }
 
-    cfg_fs! {
+    cfg_io_blocking! {
         pub(crate) fn spawn_mandatory_blocking<F, R>(_f: F) -> Option<JoinHandle<R>>
         where
             F: FnOnce() -> R + Send + 'static,
@@ -58,6 +59,7 @@ cfg_not_rt! {
         }
     }
 
+    #[allow(dead_code)]
     fn assert_send_sync<T: Send + Sync>() {
     }
 }
