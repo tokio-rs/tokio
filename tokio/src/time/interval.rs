@@ -94,7 +94,7 @@ pub fn interval(period: Duration) -> Interval {
 ///
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() {
-/// let start = Instant::now() + Duration::from_millis(50);
+/// let start = Instant::now().checked_add(Duration::from_millis(50)).unwrap();
 /// let mut interval = interval_at(start, Duration::from_millis(10));
 ///
 /// interval.tick().await; // ticks after 50ms
@@ -334,24 +334,35 @@ impl MissedTickBehavior {
     /// If a tick is missed, this method is called to determine when the next tick should happen.
     fn next_timeout(&self, timeout: Instant, now: Instant, period: Duration) -> Instant {
         match self {
-            Self::Burst => timeout + period,
-            Self::Delay => now + period,
+            Self::Burst => timeout.saturating_add(period),
+            Self::Delay => now.saturating_add(period),
             Self::Skip => {
-                now + period
-                    - Duration::from_nanos(
-                        ((now - timeout).as_nanos() % period.as_nanos())
-                            .try_into()
-                            // This operation is practically guaranteed not to
-                            // fail, as in order for it to fail, `period` would
-                            // have to be longer than `now - timeout`, and both
-                            // would have to be longer than 584 years.
-                            //
-                            // If it did fail, there's not a good way to pass
-                            // the error along to the user, so we just panic.
-                            .expect(
-                                "too much time has elapsed since the interval was supposed to tick",
-                            ),
-                    )
+                // In practice, now should be after timeout, otherwise we didn't miss a tick. So,
+                // this shouldn't _actually_ saturate.
+                let partial_period_nanos =
+                    now.saturating_duration_since(timeout).as_nanos() % period.as_nanos();
+                // Until 1.93 is MSRV, replicate Duration::from_nanos_u128
+                let partial_period_dur = Duration::new(
+                    // This operation is practically guaranteed not to
+                    // fail, as in order for it to fail, both `period`
+                    // and `now - timeout` would have to be longer than
+                    // 584 billion years. The former can happen with
+                    // `Duration::MAX`, but the latter is implausible.
+                    //
+                    // If it did fail, there's not a good way to pass
+                    // the error along to the user, so we just panic.
+                    (partial_period_nanos / 1_000_000_000).try_into().expect(
+                        "too much time has elapsed since the interval was supposed to tick",
+                    ),
+                    // truncation is safe due to mod
+                    (partial_period_nanos % 1_000_000_000) as u32,
+                );
+
+                let start_of_previous_period = now
+                    .checked_sub(partial_period_dur)
+                    .expect("Instant between timeout and now must be representable");
+
+                start_of_previous_period.saturating_add(period)
             }
         }
     }
@@ -469,13 +480,13 @@ impl Interval {
         // However, if a tick took excessively long and we are now behind,
         // schedule the next tick according to how the user specified with
         // `MissedTickBehavior`
-        let next = if now > timeout + Duration::from_millis(5) {
+        let next = if now > timeout.saturating_add(Duration::from_millis(5)) {
             self.missed_tick_behavior
                 .next_timeout(timeout, now, self.period)
         } else {
             timeout
                 .checked_add(self.period)
-                .unwrap_or_else(Instant::far_future)
+                .unwrap_or_else(Instant::max)
         };
 
         // When we arrive here, the internal delay returned `Poll::Ready`.
@@ -491,7 +502,7 @@ impl Interval {
     ///
     /// This method ignores [`MissedTickBehavior`] strategy.
     ///
-    /// This is equivalent to calling `reset_at(Instant::now() + period)`.
+    /// This is equivalent to calling `reset_at(Instant::now().saturating_add(period))`.
     ///
     /// # Examples
     ///
@@ -516,7 +527,9 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset(&mut self) {
-        self.delay.as_mut().reset(Instant::now() + self.period);
+        self.delay
+            .as_mut()
+            .reset(Instant::now().saturating_add(self.period));
     }
 
     /// Resets the interval immediately.
@@ -555,7 +568,7 @@ impl Interval {
     ///
     /// This method ignores [`MissedTickBehavior`] strategy.
     ///
-    /// This is equivalent to calling `reset_at(Instant::now() + after)`.
+    /// This is equivalent to calling `reset_at(Instant::now().saturating_add(after))`.
     ///
     /// # Examples
     ///
@@ -581,7 +594,9 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset_after(&mut self, after: Duration) {
-        self.delay.as_mut().reset(Instant::now() + after);
+        self.delay
+            .as_mut()
+            .reset(Instant::now().saturating_add(after));
     }
 
     /// Resets the interval to a [`crate::time::Instant`] deadline.
@@ -607,7 +622,7 @@ impl Interval {
     ///
     /// time::sleep(Duration::from_millis(50)).await;
     ///
-    /// let deadline = Instant::now() + Duration::from_millis(30);
+    /// let deadline = Instant::now().checked_add(Duration::from_millis(30)).unwrap();
     /// interval.reset_at(deadline);
     ///
     /// interval.tick().await;
