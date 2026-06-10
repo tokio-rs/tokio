@@ -66,13 +66,15 @@ pub async fn read(path: impl AsRef<Path>) -> io::Result<Vec<u8>> {
     {
         use crate::fs::read_uring;
 
-        let handle = crate::runtime::Handle::current();
-        let driver_handle = handle.inner.driver().io();
-        if driver_handle
-            .check_and_init(io_uring::opcode::Read::CODE)
-            .await?
-        {
-            return read_uring(&path).await;
+        if let Ok(handle) = crate::runtime::Handle::try_current() {
+            if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                if driver_handle
+                    .check_and_init(io_uring::opcode::Read::CODE)
+                    .await?
+                {
+                    return read_uring(&path).await;
+                }
+            }
         }
     }
 

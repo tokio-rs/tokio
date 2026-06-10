@@ -969,20 +969,20 @@ impl Inner {
         ))]
         {
             if let Ok(handle) = crate::runtime::Handle::try_current() {
-                let driver_handle = handle.inner.driver().io();
+                if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                    if driver_handle.is_uring_ready(io_uring::opcode::Read::CODE) {
+                        // Fast path: uring already initialized and Read supported.
+                        let fd: crate::io::uring::utils::ArcFd = std;
+                        return Ok(spawn(Self::uring_read(fd, buf, max_buf_size)));
+                    }
 
-                if driver_handle.is_uring_ready(io_uring::opcode::Read::CODE) {
-                    // Fast path: uring already initialized and Read supported.
-                    let fd: crate::io::uring::utils::ArcFd = std;
-                    return Ok(spawn(Self::uring_read(fd, buf, max_buf_size)));
+                    if !driver_handle.is_uring_probed() {
+                        // Not yet probed: lazy init inside an async task so
+                        // `File::from_std()` can still benefit from io-uring.
+                        return Ok(spawn(Self::lazy_init_read(std, buf, max_buf_size)));
+                    }
                 }
-
-                if !driver_handle.is_uring_probed() {
-                    // Not yet probed: lazy init inside an async task so
-                    // `File::from_std()` can still benefit from io-uring.
-                    return Ok(spawn(Self::lazy_init_read(std, buf, max_buf_size)));
-                }
-                // Probed but unsupported: fall through to spawn_blocking.
+                // No IO driver or probed but unsupported: fall through to spawn_blocking.
             }
         }
 
@@ -1035,23 +1035,25 @@ impl Inner {
         target_os = "linux",
     ))]
     async fn lazy_init_read(std: Arc<StdFile>, buf: Buf, max_buf_size: usize) -> (Operation, Buf) {
-        let handle = crate::runtime::Handle::current();
-        let driver_handle = handle.inner.driver().io();
-        if driver_handle
-            .check_and_init(io_uring::opcode::Read::CODE)
-            .await
-            .unwrap_or(false)
-        {
-            let fd: crate::io::uring::utils::ArcFd = std;
-            Self::uring_read(fd, buf, max_buf_size).await
-        } else {
-            match Self::spawn_blocking_read(buf, std, max_buf_size).await {
-                Ok(result) => result,
-                Err(e) => (
-                    Operation::Read(Err(io::Error::new(io::ErrorKind::Other, e))),
-                    Buf::with_capacity(0),
-                ),
+        if let Ok(handle) = crate::runtime::Handle::try_current() {
+            if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                if driver_handle
+                    .check_and_init(io_uring::opcode::Read::CODE)
+                    .await
+                    .unwrap_or(false)
+                {
+                    let fd: crate::io::uring::utils::ArcFd = std;
+                    return Self::uring_read(fd, buf, max_buf_size).await;
+                }
             }
+        }
+
+        match Self::spawn_blocking_read(buf, std, max_buf_size).await {
+            Ok(result) => result,
+            Err(e) => (
+                Operation::Read(Err(io::Error::new(io::ErrorKind::Other, e))),
+                Buf::with_capacity(0),
+            ),
         }
     }
 
