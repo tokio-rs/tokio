@@ -239,16 +239,24 @@
 //! ## Unix `fork`
 //!
 //! User code that calls `fork(2)` without immediately calling `exec` must not
-//! reuse Tokio in the child process. Tokio supports this kind of fork only in
-//! two cases:
+//! reuse in the child process any Tokio state that existed in the parent at
+//! the time of the fork. Tokio supports this kind of fork in the following
+//! cases:
 //!
 //! - The fork happens before the parent process has used Tokio in any way.
 //! - The child process does not use Tokio after the fork.
+//! - The child process creates fresh runtimes after the fork and only
+//!   interacts with those. Runtimes created before the fork, as well as
+//!   anything bound to them (spawned tasks, I/O resources, timers, runtime
+//!   handles), must not be used in the child: their worker threads do not
+//!   exist in the child process, so interacting with them may deadlock. Note
+//!   that this includes implicit uses, such as dropping a value whose
+//!   destructor interacts with a pre-fork runtime.
 //!
-//! Creating or using a Tokio runtime in a child process after the parent has
-//! used Tokio is not supported, even if the runtime in the child is newly
-//! created. Some Tokio modules, including process and signal handling, use
-//! process-global state that cannot currently be reset after `fork`.
+//! Additionally, the usual caveats of forking a multi-threaded process apply:
+//! if another thread holds a lock at the moment of the fork, that lock is
+//! never released in the child process. Forking is safest when no other
+//! thread is interacting with Tokio concurrently.
 //!
 //! [tasks]: crate::task
 //! [`Runtime`]: Runtime

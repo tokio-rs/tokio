@@ -4,6 +4,7 @@ use crate::signal::unix::{signal_with_handle, SignalKind};
 use crate::sync::watch;
 use std::io;
 use std::process::ExitStatus;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 /// An interface for waiting on a process to exit.
 pub(crate) trait Wait {
@@ -41,6 +42,10 @@ impl<T, O: OrphanQueue<T>> OrphanQueue<T> for &O {
 pub(crate) struct OrphanQueueImpl<T> {
     sigchild: Mutex<Option<watch::Receiver<()>>>,
     queue: Mutex<Vec<T>>,
+    /// `process::id()` of the process that owns the queued orphans, or zero
+    /// before first use. A forked child discards orphans inherited from its
+    /// parent, see [`OrphanQueueImpl::discard_stale_orphans_after_fork`].
+    pid: AtomicU32,
 }
 
 impl<T> OrphanQueueImpl<T> {
@@ -49,6 +54,7 @@ impl<T> OrphanQueueImpl<T> {
             Self {
                 sigchild: Mutex::new(None),
                 queue: Mutex::new(Vec::new()),
+                pid: AtomicU32::new(0),
             }
         }
     }
@@ -58,7 +64,28 @@ impl<T> OrphanQueueImpl<T> {
             Self {
                 sigchild: Mutex::const_new(None),
                 queue: Mutex::const_new(Vec::new()),
+                pid: AtomicU32::new(0),
             }
+        }
+    }
+
+    /// Discards orphans queued by a parent process before a `fork`.
+    ///
+    /// Those children belong to the parent: `wait`ing on them from this
+    /// process would fail with `ECHILD` at best, or target an unrelated
+    /// process in case of pid reuse. Dropping them is safe, since dropping a
+    /// `std::process::Child` neither kills nor waits on the process.
+    ///
+    /// Must be called with the `queue` lock held.
+    fn discard_stale_orphans_after_fork(&self, queue: &mut Vec<T>) {
+        let pid = std::process::id();
+        if self.pid.load(Ordering::Relaxed) == pid {
+            return;
+        }
+
+        let old = self.pid.swap(pid, Ordering::Relaxed);
+        if old != 0 {
+            queue.clear();
         }
     }
 
@@ -71,7 +98,9 @@ impl<T> OrphanQueueImpl<T> {
     where
         T: Wait,
     {
-        self.queue.lock().push(orphan);
+        let mut queue = self.queue.lock();
+        self.discard_stale_orphans_after_fork(&mut queue);
+        queue.push(orphan);
     }
 
     /// Attempts to reap every process in the queue, ignoring any errors and
@@ -86,14 +115,20 @@ impl<T> OrphanQueueImpl<T> {
             match &mut *sigchild_guard {
                 Some(sigchild) => {
                     if sigchild.try_has_changed().and_then(Result::ok).is_some() {
-                        drain_orphan_queue(self.queue.lock());
+                        let mut queue = self.queue.lock();
+                        self.discard_stale_orphans_after_fork(&mut queue);
+                        drain_orphan_queue(queue);
                     }
                 }
                 None => {
-                    let queue = self.queue.lock();
+                    let mut queue = self.queue.lock();
 
                     // Be lazy and only initialize the SIGCHLD listener if there
                     // are any orphaned processes in the queue.
+                    if !queue.is_empty() {
+                        self.discard_stale_orphans_after_fork(&mut queue);
+                    }
+
                     if !queue.is_empty() {
                         // An errors shouldn't really happen here, but if it does it
                         // means that the signal driver isn't running, in
@@ -249,6 +284,29 @@ pub(crate) mod test {
 
         // Safe to reap when empty
         drain_orphan_queue(orphanage.queue.lock());
+    }
+
+    #[test]
+    fn discards_orphans_inherited_across_fork() {
+        let orphanage = OrphanQueueImpl::new();
+        orphanage.push_orphan(MockWait::new(2));
+        assert_eq!(orphanage.len(), 1);
+
+        // Simulate a fork by pretending the queued orphan was pushed by a
+        // different (parent) process.
+        orphanage
+            .pid
+            .store(std::process::id().wrapping_add(1), Ordering::Relaxed);
+
+        // The next push discards the entry inherited from the "parent".
+        let orphan = MockWait::new(2);
+        let waits = orphan.total_waits.clone();
+        orphanage.push_orphan(orphan);
+        assert_eq!(orphanage.len(), 1);
+
+        // The surviving entry is the newly pushed one.
+        drain_orphan_queue(orphanage.queue.lock());
+        assert_eq!(waits.get(), 1);
     }
 
     #[test]

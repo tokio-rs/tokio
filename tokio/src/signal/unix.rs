@@ -74,6 +74,51 @@ impl Default for OsExtraData {
     }
 }
 
+impl OsExtraData {
+    /// Replaces the self-pipe with a freshly created one, redirecting the
+    /// existing file descriptor numbers at it via `dup2`.
+    ///
+    /// This is used by a forked child process, whose inherited descriptors
+    /// share the underlying pipe with the parent process. Keeping the
+    /// descriptor numbers stable means the already-installed signal handler,
+    /// which is also inherited across the fork, needs no re-registration nor
+    /// synchronization: a handler running concurrently with the swap writes
+    /// either to the old pipe (at worst a spurious wakeup for the parent) or
+    /// to the new one.
+    pub(crate) fn replace_pipe(&self) -> io::Result<()> {
+        use std::os::unix::io::AsRawFd;
+
+        let (new_receiver, new_sender) = UnixStream::pair()?;
+        replace_fd(new_sender.as_raw_fd(), self.sender.as_raw_fd())?;
+        replace_fd(new_receiver.as_raw_fd(), self.receiver.as_raw_fd())?;
+
+        // `new_sender`/`new_receiver` are dropped here, closing the temporary
+        // descriptors; the new pipe stays alive behind the original
+        // descriptor numbers.
+        Ok(())
+    }
+}
+
+/// Atomically redirects the `dst` file descriptor at the resource behind
+/// `src`, preserving `dst`'s number.
+fn replace_fd(src: std::os::unix::io::RawFd, dst: std::os::unix::io::RawFd) -> io::Result<()> {
+    // Safety: `dup2` is async-signal-safe and atomic; both descriptors are
+    // owned by `OsExtraData`, which lives for the rest of the process.
+    if unsafe { libc::dup2(src, dst) } == -1 {
+        return Err(io::Error::last_os_error());
+    }
+
+    // `O_NONBLOCK` is carried over from `src`'s open file description, but
+    // `dup2` does not carry over the close-on-exec flag, which lives on the
+    // descriptor itself; restore it.
+    // Safety: setting a flag on a descriptor we own.
+    if unsafe { libc::fcntl(dst, libc::F_SETFD, libc::FD_CLOEXEC) } == -1 {
+        return Err(io::Error::last_os_error());
+    }
+
+    Ok(())
+}
+
 /// Represents the specific kind of signal to listen for.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct SignalKind(libc::c_int);

@@ -2,8 +2,8 @@ use crate::signal::unix::{OsExtraData, OsStorage};
 use crate::sync::watch;
 
 use std::ops;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 pub(crate) type EventId = usize;
 
@@ -83,6 +83,13 @@ impl<S: Storage> Registry<S> {
         }
     }
 
+    /// Discards all recorded events without broadcasting them.
+    fn clear_pending(&self) {
+        self.storage.for_each(|event_info| {
+            event_info.pending.store(false, Ordering::SeqCst);
+        });
+    }
+
     /// Broadcasts all previously recorded events to their respective listeners.
     ///
     /// Returns `true` if an event was delivered to at least one listener.
@@ -107,6 +114,12 @@ impl<S: Storage> Registry<S> {
 pub(crate) struct Globals {
     extra: OsExtraData,
     registry: Registry<OsStorage>,
+    /// `process::id()` of the process whose self-pipe is currently installed
+    /// in `extra`. A forked child inherits its parent's pipe and must replace
+    /// it before use, see [`Globals::reinit_after_fork_if_needed`].
+    pid: AtomicU32,
+    /// Serializes post-fork re-initialization.
+    fork_lock: Mutex<()>,
 }
 
 impl ops::Deref for Globals {
@@ -140,6 +153,41 @@ impl Globals {
     pub(crate) fn storage(&self) -> &OsStorage {
         &self.registry.storage
     }
+
+    /// Re-creates process-wide signal resources if this process was forked
+    /// from the process that initialized them.
+    ///
+    /// The self-pipe inherited across a `fork` shares the underlying pipe
+    /// with the parent process: both processes would race to consume wakeups
+    /// from it, silently losing signal notifications in either process.
+    /// Replacing the pipe gives the forked child one of its own.
+    ///
+    /// The signal handler installed before the fork is inherited and keeps
+    /// working without re-registration, because the replacement preserves the
+    /// file descriptor numbers, see [`OsExtraData::replace_pipe`].
+    pub(crate) fn reinit_after_fork_if_needed(&self) -> std::io::Result<()> {
+        if self.pid.load(Ordering::Acquire) == std::process::id() {
+            return Ok(());
+        }
+
+        self.reinit_after_fork()
+    }
+
+    #[cold]
+    fn reinit_after_fork(&self) -> std::io::Result<()> {
+        let _guard = self.fork_lock.lock().unwrap();
+
+        let pid = std::process::id();
+        if self.pid.load(Ordering::Acquire) == pid {
+            return Ok(());
+        }
+
+        self.extra.replace_pipe()?;
+        // Events recorded before the fork were meant for the parent process.
+        self.registry.clear_pending();
+        self.pid.store(pid, Ordering::Release);
+        Ok(())
+    }
 }
 
 fn globals_init() -> Globals
@@ -150,6 +198,8 @@ where
     Globals {
         extra: OsExtraData::default(),
         registry: Registry::new(OsStorage::default()),
+        pid: AtomicU32::new(std::process::id()),
+        fork_lock: Mutex::new(()),
     }
 }
 
