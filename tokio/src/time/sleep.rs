@@ -1,5 +1,5 @@
 use crate::runtime::{scheduler, Timer};
-use crate::time::{error::Error, Duration, Instant};
+use crate::time::{error::Error, safe_delay, Duration, Instant};
 use crate::util::trace;
 
 use pin_project_lite::pin_project;
@@ -121,12 +121,8 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 #[cfg_attr(docsrs, doc(alias = "wait"))]
 #[track_caller]
 pub fn sleep(duration: Duration) -> Sleep {
-    let location = trace::caller_location();
-
-    match Instant::now().checked_add(duration) {
-        Some(deadline) => Sleep::new_timeout(deadline, location),
-        None => Sleep::new_timeout(Instant::far_future(), location),
-    }
+    let deadline = Instant::now() + safe_delay(duration);
+    Sleep::new_timeout(deadline, trace::caller_location())
 }
 
 pin_project! {
@@ -294,10 +290,6 @@ impl Sleep {
             inner,
             timer: None,
         }
-    }
-
-    pub(crate) fn far_future(location: Option<&'static Location<'static>>) -> Sleep {
-        Self::new_timeout(Instant::far_future(), location)
     }
 
     /// Returns the instant at which the future will complete.
