@@ -58,6 +58,49 @@ impl AsyncWrite for MaybePending {
     }
 }
 
+struct PartialThenPending {
+    inner: Vec<u8>,
+    pending: bool,
+}
+
+impl PartialThenPending {
+    fn new() -> Self {
+        Self {
+            inner: Vec::new(),
+            pending: false,
+        }
+    }
+}
+
+impl AsyncWrite for PartialThenPending {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        if self.pending {
+            cx.waker().wake_by_ref();
+            return Poll::Pending;
+        }
+
+        self.pending = true;
+        if let Some(byte) = buf.first() {
+            self.inner.push(*byte);
+            Poll::Ready(Ok(1))
+        } else {
+            Poll::Ready(Ok(0))
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+}
+
 async fn write_vectored<W>(writer: &mut W, bufs: &[IoSlice<'_>]) -> io::Result<usize>
 where
     W: AsyncWrite + Unpin,
@@ -116,6 +159,33 @@ async fn buf_writer_inner_flushes() {
     w.flush().await.unwrap();
     let w = w.into_inner();
     assert_eq!(w, [0, 1]);
+}
+
+#[tokio::test]
+async fn buf_writer_into_parts() {
+    let mut w = BufWriter::with_capacity(3, Vec::new());
+    assert_eq!(w.write(&[0, 1]).await.unwrap(), 2);
+
+    let (inner, buf) = w.into_parts();
+    assert_eq!(inner, []);
+    assert_eq!(buf, [0, 1]);
+}
+
+#[tokio::test]
+async fn buf_writer_into_parts_after_partial_flush() {
+    let mut w = BufWriter::with_capacity(4, PartialThenPending::new());
+    w.write_all(&[0, 1, 2]).await.unwrap();
+
+    future::poll_fn(|cx| match Pin::new(&mut w).poll_flush(cx) {
+        Poll::Pending => Poll::Ready(()),
+        Poll::Ready(res) => panic!("flush unexpectedly completed: {res:?}"),
+    })
+    .await;
+
+    assert_eq!(w.buffer(), [0, 1, 2]);
+    let (inner, buf) = w.into_parts();
+    assert_eq!(inner.inner, [0]);
+    assert_eq!(buf, [1, 2]);
 }
 
 #[tokio::test]
