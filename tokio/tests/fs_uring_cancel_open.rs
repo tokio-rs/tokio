@@ -12,6 +12,7 @@ use futures::future::FutureExt;
 use std::fs;
 use std::future::poll_fn;
 use std::task::Poll;
+use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio_test::assert_pending;
 
@@ -66,6 +67,9 @@ async fn file_descriptors_are_closed_when_cancelling_open_op() {
         let res = handle.await.unwrap_err();
         assert!(res.is_cancelled());
     }
+
+    // Give completions a moment to settle before counting fds.
+    tokio::time::sleep(Duration::from_millis(250)).await;
 
     let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
     let leaked = fd_count_after_cancel.saturating_sub(fd_count_before_opens);
