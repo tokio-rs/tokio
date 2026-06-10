@@ -23,27 +23,52 @@ fn new_runtime() -> Runtime {
         .unwrap()
 }
 
-/// Registers a listener for `kind`, raises the signal, and reports whether
-/// the listener observed it.
-fn receives_signal(rt: &Runtime, kind: SignalKind) -> bool {
+/// Registers a listener for `kind`, then raises the signal and awaits it
+/// `rounds` times. Reports whether the listener observed every round.
+///
+/// Multiple rounds matter when the parent process also has a runtime
+/// running: with a self-pipe incorrectly shared across a fork, each round is
+/// an independent race between the two processes' drivers for the wakeup
+/// byte, so N rounds catch a regression with probability ~(1 - p^N).
+fn receives_signal_rounds(rt: &Runtime, kind: SignalKind, rounds: u32) -> bool {
     rt.block_on(async {
         let mut sig = signal(kind).expect("failed to register signal listener");
-        // Safety: raising a signal for which a listener was just registered.
-        unsafe { libc::raise(kind.as_raw_value()) };
-        tokio::time::timeout(Duration::from_secs(15), sig.recv())
-            .await
-            .is_ok()
+        for round in 0..rounds {
+            // Safety: raising a signal for which a listener is registered.
+            unsafe { libc::raise(kind.as_raw_value()) };
+            if tokio::time::timeout(Duration::from_secs(15), sig.recv())
+                .await
+                .is_err()
+            {
+                eprintln!(
+                    "signal_fork: signal {} lost in round {round}",
+                    kind.as_raw_value()
+                );
+                return false;
+            }
+        }
+        true
     })
 }
 
+/// Single-round variant of [`receives_signal_rounds`].
+fn receives_signal(rt: &Runtime, kind: SignalKind) -> bool {
+    receives_signal_rounds(rt, kind, 1)
+}
+
 /// Spawns a short-lived child process and reports whether waiting on it
-/// succeeds. Exercises the process reaping machinery (SIGCHLD or pidfd).
+/// succeeds. Exercises the process reaping machinery. Note that on Linux
+/// this takes the pidfd path; the SIGCHLD reaper path is only covered on
+/// platforms without pidfd support, such as macOS.
 fn spawns_child_process(rt: &Runtime) -> bool {
     rt.block_on(async {
         let status = tokio::process::Command::new("true").status();
         match tokio::time::timeout(Duration::from_secs(15), status).await {
             Ok(Ok(status)) => status.success(),
-            _ => false,
+            other => {
+                eprintln!("signal_fork: waiting on a spawned process failed: {other:?}");
+                false
+            }
         }
     })
 }
@@ -89,7 +114,7 @@ fn fork_and_check(f: impl FnOnce() -> bool) -> bool {
 #[test]
 fn fork_scenarios() {
     // Scenario 1: the parent uses signals, shuts its runtime down, and forks.
-    // A fresh runtime in the child must receive signals.
+    // Fresh runtimes in the child, of both flavors, must receive signals.
     let rt = new_runtime();
     assert!(
         receives_signal(&rt, SignalKind::user_defined1()),
@@ -100,6 +125,15 @@ fn fork_scenarios() {
     assert!(
         fork_and_check(|| {
             let rt = new_runtime();
+            if !receives_signal(&rt, SignalKind::user_defined1()) {
+                return false;
+            }
+            drop(rt);
+
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
             receives_signal(&rt, SignalKind::user_defined1())
         }),
         "child created after parent runtime shutdown",
@@ -108,17 +142,20 @@ fn fork_scenarios() {
     // Scenario 2: the parent runtime stays alive across the fork. The child
     // must not touch it, but a fresh runtime in the child must receive
     // signals and reap child processes, and the parent's signal handling
-    // must keep working after the fork.
+    // must keep working after the fork. Multiple signal rounds make a
+    // wrongly shared pipe (a per-round wakeup race against the parent's
+    // driver) overwhelmingly likely to be caught.
     let rt = new_runtime();
     assert!(receives_signal(&rt, SignalKind::user_defined2()));
-    // Give the parent's worker a moment to park, reducing the chance of
-    // forking while it holds a lock.
+    // Give the parent's worker a moment to park. This only reduces the
+    // chance of forking while it holds a lock; that risk is inherent to
+    // forking a multi-threaded process.
     std::thread::sleep(Duration::from_millis(100));
 
     assert!(
         fork_and_check(|| {
             let child_rt = new_runtime();
-            receives_signal(&child_rt, SignalKind::user_defined2())
+            receives_signal_rounds(&child_rt, SignalKind::user_defined2(), 20)
                 && spawns_child_process(&child_rt)
         }),
         "child created while the parent runtime is alive",
@@ -128,10 +165,15 @@ fn fork_scenarios() {
         receives_signal(&rt, SignalKind::user_defined2()),
         "parent signal handling must survive the child's pipe replacement",
     );
+    // Shut the parent runtime down before the remaining scenarios: scenario 3
+    // requires that nothing in the parent consumes signal events between its
+    // `raise` and the fork.
+    drop(rt);
 
     // Scenario 3: a signal recorded in the parent but not yet broadcast at
     // the moment of the fork must not be delivered as a ghost signal to a
-    // listener in the child.
+    // listener in the child, while a real signal raised in the child
+    // afterwards must still be delivered.
     let rt = new_runtime();
     assert!(receives_signal(&rt, SignalKind::hangup()));
     // Drop the runtime so nothing consumes signal events anymore, then raise:
@@ -147,15 +189,44 @@ fn fork_scenarios() {
                 let mut sig =
                     signal(SignalKind::hangup()).expect("failed to register signal listener");
                 // No SIGHUP was raised in the child, so nothing must arrive.
-                tokio::time::timeout(Duration::from_millis(500), sig.recv())
+                if tokio::time::timeout(Duration::from_millis(500), sig.recv())
                     .await
-                    .is_err()
+                    .is_ok()
+                {
+                    eprintln!("signal_fork: ghost SIGHUP delivered to the child");
+                    return false;
+                }
+                // A real SIGHUP raised in the child must still arrive,
+                // proving the listener is alive and the silence above was
+                // not a broken listener.
+                // Safety: raising a signal for which a listener is registered.
+                unsafe { libc::raise(libc::SIGHUP) };
+                tokio::time::timeout(Duration::from_secs(15), sig.recv())
+                    .await
+                    .is_ok()
             })
         }),
         "child must not observe signals recorded by the parent before the fork",
     );
 
-    // Scenario 4: forking twice in a row; each generation gets its own pipe.
+    // Scenario 4: two threads in the child create runtimes concurrently,
+    // racing to re-initialize the process-global signal state.
+    assert!(
+        fork_and_check(|| {
+            let threads: Vec<_> = (0..2)
+                .map(|_| {
+                    std::thread::spawn(|| {
+                        let rt = new_runtime();
+                        receives_signal(&rt, SignalKind::user_defined1())
+                    })
+                })
+                .collect();
+            threads.into_iter().all(|t| t.join().unwrap_or_default())
+        }),
+        "concurrent runtime creation in the child",
+    );
+
+    // Scenario 5: forking twice in a row; each generation gets its own pipe.
     assert!(
         fork_and_check(|| {
             let rt = new_runtime();

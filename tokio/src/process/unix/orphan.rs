@@ -45,6 +45,10 @@ pub(crate) struct OrphanQueueImpl<T> {
     /// `process::id()` of the process that owns the queued orphans, or zero
     /// before first use. A forked child discards orphans inherited from its
     /// parent, see [`OrphanQueueImpl::discard_stale_orphans_after_fork`].
+    ///
+    /// The `std` atomic is used instead of the loom one because `new` must
+    /// be a `const fn` and loom atomics lack const constructors; this is
+    /// fine since every access happens while holding the `queue` lock.
     pid: AtomicU32,
 }
 
@@ -289,7 +293,9 @@ pub(crate) mod test {
     #[test]
     fn discards_orphans_inherited_across_fork() {
         let orphanage = OrphanQueueImpl::new();
-        orphanage.push_orphan(MockWait::new(2));
+        let stale = MockWait::new(2);
+        let stale_waits = stale.total_waits.clone();
+        orphanage.push_orphan(stale);
         assert_eq!(orphanage.len(), 1);
 
         // Simulate a fork by pretending the queued orphan was pushed by a
@@ -304,9 +310,11 @@ pub(crate) mod test {
         orphanage.push_orphan(orphan);
         assert_eq!(orphanage.len(), 1);
 
-        // The surviving entry is the newly pushed one.
+        // The surviving entry is the newly pushed one, and the discarded
+        // orphan was never waited on: it is not this process's child.
         drain_orphan_queue(orphanage.queue.lock());
         assert_eq!(waits.get(), 1);
+        assert_eq!(stale_waits.get(), 0);
     }
 
     #[test]

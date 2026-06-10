@@ -117,6 +117,12 @@ pub(crate) struct Globals {
     /// `process::id()` of the process whose self-pipe is currently installed
     /// in `extra`. A forked child inherits its parent's pipe and must replace
     /// it before use, see [`Globals::reinit_after_fork_if_needed`].
+    ///
+    /// Known limitation: if the process recorded here dies and a descendant
+    /// that never created a runtime forks a child that is assigned the
+    /// recycled pid, the fork goes undetected. This is inherent to pid
+    /// comparison; closing it would require `pthread_atfork`, a process-wide,
+    /// unremovable hook that is deliberately avoided here.
     pid: AtomicU32,
     /// Serializes post-fork re-initialization.
     fork_lock: Mutex<()>,
@@ -182,6 +188,12 @@ impl Globals {
             return Ok(());
         }
 
+        // Invariant: no signal listener can exist in this process yet —
+        // registering one requires a signal driver, and the first driver of
+        // this process is the caller, which is still being constructed. So
+        // a signal arriving while this runs is recorded with no one to
+        // observe it, and discarding it below is indistinguishable from the
+        // (unsupported) delivery of a signal before any listener exists.
         self.extra.replace_pipe()?;
         // Events recorded before the fork were meant for the parent process.
         self.registry.clear_pending();
