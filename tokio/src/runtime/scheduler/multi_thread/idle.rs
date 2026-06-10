@@ -151,7 +151,14 @@ impl Idle {
     }
 
     fn notify_should_wakeup(&self) -> bool {
-        let state = State(self.state.fetch_add(0, SeqCst));
+        // This must be a `SeqCst` load (not Acquire): it has to participate in
+        // the single total order of `SeqCst` operations so that it pairs with
+        // the `fetch_sub(1)` in `dec_num_searching`. A `SeqCst` load is
+        // sufficient — the previous `fetch_add(0)` performed a needless
+        // read-modify-write (exclusive cache-line acquisition) where a load
+        // gives the same ordering. See `worker_to_notify` for the full
+        // happens-before argument.
+        let state = State(self.state.load(SeqCst));
         state.num_searching() == 0 && state.num_unparked() < self.num_workers
     }
 }
