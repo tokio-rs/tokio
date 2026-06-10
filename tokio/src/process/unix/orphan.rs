@@ -42,9 +42,13 @@ impl<T, O: OrphanQueue<T>> OrphanQueue<T> for &O {
 pub(crate) struct OrphanQueueImpl<T> {
     sigchild: Mutex<Option<watch::Receiver<()>>>,
     queue: Mutex<Vec<T>>,
-    /// `process::id()` of the process that owns the queued orphans, or zero
-    /// before first use. A forked child discards orphans inherited from its
-    /// parent, see [`OrphanQueueImpl::discard_stale_orphans_after_fork`].
+    /// `process::id()` of the process that pushed the queued orphans,
+    /// stamped on every push. A forked child inherits its parent's queue
+    /// entries but not its pid, so [`OrphanQueueImpl::lock_queue`] discards
+    /// them: waiting on them would fail with `ECHILD` at best, or target an
+    /// unrelated process in case of pid reuse. Dropping them is safe, since
+    /// dropping a `std::process::Child` neither kills nor waits on the
+    /// process.
     ///
     /// The `std` atomic is used instead of the loom one because `new` must
     /// be a `const fn` and loom atomics lack const constructors; this is
@@ -73,24 +77,17 @@ impl<T> OrphanQueueImpl<T> {
         }
     }
 
-    /// Discards orphans queued by a parent process before a `fork`.
+    /// Locks the queue, first discarding any orphans queued by a pre-fork
+    /// parent process.
     ///
-    /// Those children belong to the parent: `wait`ing on them from this
-    /// process would fail with `ECHILD` at best, or target an unrelated
-    /// process in case of pid reuse. Dropping them is safe, since dropping a
-    /// `std::process::Child` neither kills nor waits on the process.
-    ///
-    /// Must be called with the `queue` lock held.
-    fn discard_stale_orphans_after_fork(&self, queue: &mut Vec<T>) {
-        let pid = std::process::id();
-        if self.pid.load(Ordering::Relaxed) == pid {
-            return;
-        }
-
-        let old = self.pid.swap(pid, Ordering::Relaxed);
-        if old != 0 {
+    /// The emptiness check keeps the common reaping path — an empty queue
+    /// checked on every driver park — free of the `getpid` syscall.
+    fn lock_queue(&self) -> MutexGuard<'_, Vec<T>> {
+        let mut queue = self.queue.lock();
+        if !queue.is_empty() && self.pid.load(Ordering::Relaxed) != std::process::id() {
             queue.clear();
         }
+        queue
     }
 
     #[cfg(test)]
@@ -102,8 +99,9 @@ impl<T> OrphanQueueImpl<T> {
     where
         T: Wait,
     {
-        let mut queue = self.queue.lock();
-        self.discard_stale_orphans_after_fork(&mut queue);
+        let mut queue = self.lock_queue();
+        // Stamp ownership: everything in the queue belongs to this process.
+        self.pid.store(std::process::id(), Ordering::Relaxed);
         queue.push(orphan);
     }
 
@@ -119,20 +117,14 @@ impl<T> OrphanQueueImpl<T> {
             match &mut *sigchild_guard {
                 Some(sigchild) => {
                     if sigchild.try_has_changed().and_then(Result::ok).is_some() {
-                        let mut queue = self.queue.lock();
-                        self.discard_stale_orphans_after_fork(&mut queue);
-                        drain_orphan_queue(queue);
+                        drain_orphan_queue(self.lock_queue());
                     }
                 }
                 None => {
-                    let mut queue = self.queue.lock();
+                    let queue = self.lock_queue();
 
                     // Be lazy and only initialize the SIGCHLD listener if there
                     // are any orphaned processes in the queue.
-                    if !queue.is_empty() {
-                        self.discard_stale_orphans_after_fork(&mut queue);
-                    }
-
                     if !queue.is_empty() {
                         // An errors shouldn't really happen here, but if it does it
                         // means that the signal driver isn't running, in

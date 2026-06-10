@@ -14,6 +14,7 @@ use crate::sync::watch;
 
 use mio::net::UnixStream;
 use std::io::{self, Error, ErrorKind, Write};
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
 
@@ -86,8 +87,6 @@ impl OsExtraData {
     /// either to the old pipe (at worst a spurious wakeup for the parent) or
     /// to the new one.
     pub(crate) fn replace_pipe(&self) -> io::Result<()> {
-        use std::os::unix::io::AsRawFd;
-
         let (new_receiver, new_sender) = UnixStream::pair()?;
 
         // Replace the receiver first: if replacing the sender then fails, the
@@ -109,7 +108,7 @@ impl OsExtraData {
 
 /// Atomically redirects the `dst` file descriptor at the resource behind
 /// `src`, preserving `dst`'s number.
-fn replace_fd(src: std::os::unix::io::RawFd, dst: std::os::unix::io::RawFd) -> io::Result<()> {
+fn replace_fd(src: RawFd, dst: RawFd) -> io::Result<()> {
     loop {
         // Safety: `dup2` replaces the descriptor slot atomically; both
         // descriptors are owned by `OsExtraData`, which lives for the rest

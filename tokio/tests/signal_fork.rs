@@ -10,6 +10,11 @@
 //! sibling test threads run risks inheriting locks held by those threads,
 //! which would deadlock the child. Keep this file to exactly one test.
 
+mod support {
+    pub mod signal;
+}
+use support::signal::send_signal;
+
 use std::time::{Duration, Instant};
 
 use tokio::runtime::Runtime;
@@ -34,8 +39,7 @@ fn receives_signal_rounds(rt: &Runtime, kind: SignalKind, rounds: u32) -> bool {
     rt.block_on(async {
         let mut sig = signal(kind).expect("failed to register signal listener");
         for round in 0..rounds {
-            // Safety: raising a signal for which a listener is registered.
-            unsafe { libc::raise(kind.as_raw_value()) };
+            send_signal(kind.as_raw_value());
             if tokio::time::timeout(Duration::from_secs(15), sig.recv())
                 .await
                 .is_err()
@@ -54,6 +58,12 @@ fn receives_signal_rounds(rt: &Runtime, kind: SignalKind, rounds: u32) -> bool {
 /// Single-round variant of [`receives_signal_rounds`].
 fn receives_signal(rt: &Runtime, kind: SignalKind) -> bool {
     receives_signal_rounds(rt, kind, 1)
+}
+
+/// Creates a fresh runtime and reports whether it receives `kind`.
+fn fresh_runtime_receives(kind: SignalKind) -> bool {
+    let rt = new_runtime();
+    receives_signal(&rt, kind)
 }
 
 /// Spawns a short-lived child process and reports whether waiting on it
@@ -124,11 +134,9 @@ fn fork_scenarios() {
 
     assert!(
         fork_and_check(|| {
-            let rt = new_runtime();
-            if !receives_signal(&rt, SignalKind::user_defined1()) {
+            if !fresh_runtime_receives(SignalKind::user_defined1()) {
                 return false;
             }
-            drop(rt);
 
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -142,9 +150,8 @@ fn fork_scenarios() {
     // Scenario 2: the parent runtime stays alive across the fork. The child
     // must not touch it, but a fresh runtime in the child must receive
     // signals and reap child processes, and the parent's signal handling
-    // must keep working after the fork. Multiple signal rounds make a
-    // wrongly shared pipe (a per-round wakeup race against the parent's
-    // driver) overwhelmingly likely to be caught.
+    // must keep working after the fork. Multiple rounds maximize the chance
+    // of catching a wrongly shared pipe, see `receives_signal_rounds`.
     let rt = new_runtime();
     assert!(receives_signal(&rt, SignalKind::user_defined2()));
     // Give the parent's worker a moment to park. This only reduces the
@@ -180,7 +187,7 @@ fn fork_scenarios() {
     // the process-global signal handler stays installed and records the event
     // as pending, where it remains until the fork.
     drop(rt);
-    unsafe { libc::raise(libc::SIGHUP) };
+    send_signal(libc::SIGHUP);
 
     assert!(
         fork_and_check(|| {
@@ -199,8 +206,7 @@ fn fork_scenarios() {
                 // A real SIGHUP raised in the child must still arrive,
                 // proving the listener is alive and the silence above was
                 // not a broken listener.
-                // Safety: raising a signal for which a listener is registered.
-                unsafe { libc::raise(libc::SIGHUP) };
+                send_signal(libc::SIGHUP);
                 tokio::time::timeout(Duration::from_secs(15), sig.recv())
                     .await
                     .is_ok()
@@ -214,12 +220,7 @@ fn fork_scenarios() {
     assert!(
         fork_and_check(|| {
             let threads: Vec<_> = (0..2)
-                .map(|_| {
-                    std::thread::spawn(|| {
-                        let rt = new_runtime();
-                        receives_signal(&rt, SignalKind::user_defined1())
-                    })
-                })
+                .map(|_| std::thread::spawn(|| fresh_runtime_receives(SignalKind::user_defined1())))
                 .collect();
             threads.into_iter().all(|t| t.join().unwrap_or_default())
         }),
@@ -229,16 +230,8 @@ fn fork_scenarios() {
     // Scenario 5: forking twice in a row; each generation gets its own pipe.
     assert!(
         fork_and_check(|| {
-            let rt = new_runtime();
-            if !receives_signal(&rt, SignalKind::user_defined1()) {
-                return false;
-            }
-            drop(rt);
-
-            fork_and_check(|| {
-                let rt = new_runtime();
-                receives_signal(&rt, SignalKind::user_defined1())
-            })
+            fresh_runtime_receives(SignalKind::user_defined1())
+                && fork_and_check(|| fresh_runtime_receives(SignalKind::user_defined1()))
         }),
         "grandchild runtimes must work as well",
     );

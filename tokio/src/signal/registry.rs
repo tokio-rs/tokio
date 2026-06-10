@@ -2,7 +2,7 @@ use crate::signal::unix::{OsExtraData, OsStorage};
 use crate::sync::watch;
 
 use std::ops;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 pub(crate) type EventId = usize;
@@ -123,9 +123,7 @@ pub(crate) struct Globals {
     /// recycled pid, the fork goes undetected. This is inherent to pid
     /// comparison; closing it would require `pthread_atfork`, a process-wide,
     /// unremovable hook that is deliberately avoided here.
-    pid: AtomicU32,
-    /// Serializes post-fork re-initialization.
-    fork_lock: Mutex<()>,
+    pid: Mutex<u32>,
 }
 
 impl ops::Deref for Globals {
@@ -160,31 +158,18 @@ impl Globals {
         &self.registry.storage
     }
 
-    /// Re-creates process-wide signal resources if this process was forked
-    /// from the process that initialized them.
+    /// Re-creates the process-wide self-pipe if this process was forked from
+    /// the process that initialized it, so that signal wakeups are no longer
+    /// shared with the parent process. See [`OsExtraData::replace_pipe`] for
+    /// why the pipe must be replaced and how the replacement keeps the
+    /// inherited signal handler working.
     ///
-    /// The self-pipe inherited across a `fork` shares the underlying pipe
-    /// with the parent process: both processes would race to consume wakeups
-    /// from it, silently losing signal notifications in either process.
-    /// Replacing the pipe gives the forked child one of its own.
-    ///
-    /// The signal handler installed before the fork is inherited and keeps
-    /// working without re-registration, because the replacement preserves the
-    /// file descriptor numbers, see [`OsExtraData::replace_pipe`].
+    /// This runs once per runtime creation (a cold path), so a plain mutex
+    /// around the pid is plenty.
     pub(crate) fn reinit_after_fork_if_needed(&self) -> std::io::Result<()> {
-        if self.pid.load(Ordering::Acquire) == std::process::id() {
-            return Ok(());
-        }
-
-        self.reinit_after_fork()
-    }
-
-    #[cold]
-    fn reinit_after_fork(&self) -> std::io::Result<()> {
-        let _guard = self.fork_lock.lock().unwrap();
-
-        let pid = std::process::id();
-        if self.pid.load(Ordering::Acquire) == pid {
+        let mut pid = self.pid.lock().unwrap();
+        let current = std::process::id();
+        if *pid == current {
             return Ok(());
         }
 
@@ -197,7 +182,7 @@ impl Globals {
         self.extra.replace_pipe()?;
         // Events recorded before the fork were meant for the parent process.
         self.registry.clear_pending();
-        self.pid.store(pid, Ordering::Release);
+        *pid = current;
         Ok(())
     }
 }
@@ -210,8 +195,7 @@ where
     Globals {
         extra: OsExtraData::default(),
         registry: Registry::new(OsStorage::default()),
-        pid: AtomicU32::new(std::process::id()),
-        fork_lock: Mutex::new(()),
+        pid: Mutex::new(std::process::id()),
     }
 }
 
