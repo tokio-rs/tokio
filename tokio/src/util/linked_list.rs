@@ -239,6 +239,13 @@ impl<L: Link> LinkedList<L, L::Target> {
 
         Some(L::from_raw(node))
     }
+
+    pub(crate) fn iter(&self) -> Iter<'_, L, L::Target> {
+        Iter {
+            next: self.head,
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
@@ -267,6 +274,21 @@ impl<L: Link> LinkedList<L, L::Target> {
 impl<L: Link> Default for LinkedList<L, L::Target> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+pub(crate) struct Iter<'a, L, T> {
+    next: Option<NonNull<T>>,
+    _marker: PhantomData<&'a L>,
+}
+
+impl<'a, L: Link> Iterator for Iter<'a, L, L::Target> {
+    type Item = &'a L::Target;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = self.next?;
+        self.next = unsafe { L::pointers(next).as_ref() }.get_next();
+        Some(unsafe { next.as_ref() })
     }
 }
 
@@ -391,6 +413,14 @@ feature! {
     }
 
     impl<L: Link> GuardedLinkedList<L, L::Target> {
+        pub(crate) fn is_empty(&self) -> bool {
+            self.tail().is_none()
+        }
+
+        pub(crate) fn drain(&mut self) -> Drain<'_, L, L::Target> {
+            Drain { list: self }
+        }
+
         fn tail(&self) -> Option<NonNull<L::Target>> {
             let tail_ptr = unsafe {
                 L::pointers(self.guard).as_ref().get_prev().unwrap()
@@ -408,7 +438,7 @@ feature! {
 
         /// Removes the last element from a list and returns it, or None if it is
         /// empty.
-        pub(crate) fn pop_back(&mut self) -> Option<L::Handle> {
+        fn pop_back(&mut self) -> Option<L::Handle> {
             unsafe {
                 let last = self.tail()?;
                 let before_last = L::pointers(last).as_ref().get_prev().unwrap();
@@ -421,6 +451,18 @@ feature! {
 
                 Some(L::from_raw(last))
             }
+        }
+    }
+
+    pub(crate) struct Drain<'a, L, T> {
+        list: &'a mut GuardedLinkedList<L, T>,
+    }
+
+    impl<'a, L: Link> Iterator for Drain<'a, L, L::Target> {
+        type Item = L::Handle;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.list.pop_back()
         }
     }
 }

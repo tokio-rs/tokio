@@ -939,99 +939,53 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     Receiver { shared, next }
 }
 
-/// List used in `Shared::notify_rx`. It wraps a guarded linked list
-/// and gates the access to it on the `Shared.tail` mutex. It also empties
-/// the list on drop.
-struct WaitersList<'a, T> {
-    list: GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
-    is_empty: bool,
-    shared: &'a Shared<T>,
-}
-
-impl<'a, T> Drop for WaitersList<'a, T> {
-    fn drop(&mut self) {
-        // If the list is not empty, we unlink all waiters from it.
-        // We do not wake the waiters to avoid double panics.
-        if !self.is_empty {
-            let _lock_guard = self.shared.tail.lock();
-            while self.list.pop_back().is_some() {}
-        }
-    }
-}
-
-impl<'a, T> WaitersList<'a, T> {
-    fn new(
-        unguarded_list: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
-        guard: Pin<&'a Waiter>,
-        shared: &'a Shared<T>,
-    ) -> Self {
-        let guard_ptr = NonNull::from(guard.get_ref());
-        let list = unguarded_list.into_guarded(guard_ptr);
-        WaitersList {
-            list,
-            is_empty: false,
-            shared,
-        }
-    }
-
-    /// Removes the last element from the guarded list. Modifying this list
-    /// requires an exclusive access to the main list in `Notify`.
-    fn pop_back_locked(&mut self, _tail: &mut Tail) -> Option<NonNull<Waiter>> {
-        let result = self.list.pop_back();
-        if result.is_none() {
-            // Save information about emptiness to avoid waiting for lock
-            // in the destructor.
-            self.is_empty = true;
-        }
-        result
-    }
-}
-
 impl<T> Shared<T> {
     fn notify_rx<'a, 'b: 'a>(&'b self, mut tail: MutexGuard<'a, Tail>) {
+        struct DropGuard<'a, T> {
+            list: Option<GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::Target>>,
+            shared: &'a Shared<T>,
+        }
+
+        impl<T> Drop for DropGuard<'_, T> {
+            fn drop(&mut self) {
+                // If the list is not empty, we unlink all waiters from it.
+                let Some(mut list) = self.list.take().filter(|list| !list.is_empty()) else {
+                    return;
+                };
+
+                let _lock = self.shared.tail.lock();
+                // We do not wake the waiters to avoid double panics.
+                for _ in list.drain() {}
+            }
+        }
+
         // It is critical for `GuardedLinkedList` safety that the guard node is
         // pinned in memory and is not dropped until the guarded list is dropped.
         let guard = Waiter::new();
         pin!(guard);
 
-        // We move all waiters to a secondary list. It uses a `GuardedLinkedList`
-        // underneath to allow every waiter to safely remove itself from it.
-        //
-        // * This list will be still guarded by the `waiters` lock.
-        //   `NotifyWaitersList` wrapper makes sure we hold the lock to modify it.
-        // * This wrapper will empty the list on drop. It is critical for safety
-        //   that we will not leave any list entry with a pointer to the local
-        //   guard node after this function returns / panics.
-        let mut list = WaitersList::new(std::mem::take(&mut tail.waiters), guard.as_ref(), self);
+        let mut list =
+            std::mem::take(&mut tail.waiters).into_guarded(guard.as_ref().get_ref().into());
 
-        let mut wakers = WakeList::new();
-        'outer: loop {
-            while wakers.can_push() {
-                match list.pop_back_locked(&mut tail) {
-                    Some(waiter) => {
-                        unsafe {
-                            // Safety: accessing `waker` is safe because
-                            // the tail lock is held.
-                            if let Some(waker) = (*waiter.as_ptr()).waker.take() {
-                                wakers.push(waker);
-                            }
+        loop {
+            let mut wakers = list
+                .drain()
+                .filter_map(|waiter| {
+                    // Safety: accessing `waker` is safe because the tail lock is held.
+                    let waker = unsafe { (*waiter.as_ptr()).waker.take() };
+                    // Safety: `queued` is atomic.
+                    let queued = unsafe { &(*waiter.as_ptr()).queued };
+                    // `Relaxed` suffices because the tail lock is held.
+                    assert!(queued.load(Relaxed));
+                    // `Release` is needed to synchronize with `Recv::drop`.
+                    // It is critical to set this variable **after** waker
+                    // is extracted, otherwise we may data race with `Recv::drop`.
+                    queued.store(false, Release);
+                    waker
+                })
+                .collect::<WakeList>();
 
-                            // Safety: `queued` is atomic.
-                            let queued = &(*waiter.as_ptr()).queued;
-                            // `Relaxed` suffices because the tail lock is held.
-                            assert!(queued.load(Relaxed));
-                            // `Release` is needed to synchronize with `Recv::drop`.
-                            // It is critical to set this variable **after** waker
-                            // is extracted, otherwise we may data race with `Recv::drop`.
-                            queued.store(false, Release);
-                        }
-                    }
-                    None => {
-                        break 'outer;
-                    }
-                }
-            }
-
+            let is_empty = list.is_empty();
             // Release the lock before waking.
             drop(tail);
 
@@ -1040,16 +994,19 @@ impl<T> Shared<T> {
             // may be added. This is fine since at worst we will unnecessarily
             // wake up waiters which will then queue themselves again.
 
+            let mut guard = DropGuard {
+                list: Some(list),
+                shared: self,
+            };
             wakers.wake_all();
 
+            if is_empty {
+                break;
+            }
+            list = guard.list.take().unwrap();
             // Acquire the lock again.
             tail = self.tail.lock();
         }
-
-        // Release the lock before waking.
-        drop(tail);
-
-        wakers.wake_all();
     }
 }
 
