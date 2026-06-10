@@ -322,8 +322,6 @@ pub(crate) struct TimerHandle {
     inner: NonNull<TimerShared>,
 }
 
-pub(super) type EntryList = crate::util::linked_list::LinkedList<TimerShared, TimerShared>;
-
 /// The shared state structure of a timer. This structure is shared between the
 /// frontend (`Entry`) and driver backend.
 ///

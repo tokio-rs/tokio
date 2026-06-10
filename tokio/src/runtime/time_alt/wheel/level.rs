@@ -1,4 +1,6 @@
-use super::{EntryHandle, EntryList};
+use crate::util::linked_list::LinkedList;
+
+use super::{Entry, EntryHandle};
 use std::ptr::NonNull;
 use std::{array, fmt};
 
@@ -16,7 +18,7 @@ pub(crate) struct Level {
     occupied: u64,
 
     /// Slots. We access these via the EntryInner `current_list` as well, so this needs to be an `UnsafeCell`.
-    slot: [EntryList; LEVEL_MULT],
+    slot: [LinkedList<Entry>; LEVEL_MULT],
 }
 
 /// Indicates when a slot must be processed next.
@@ -42,7 +44,7 @@ impl Level {
         Level {
             level,
             occupied: 0,
-            slot: array::from_fn(|_| EntryList::default()),
+            slot: array::from_fn(|_| LinkedList::default()),
         }
     }
 
@@ -142,7 +144,7 @@ impl Level {
         }
     }
 
-    pub(crate) fn take_slot(&mut self, slot: usize) -> EntryList {
+    pub(crate) fn take_slot(&mut self, slot: usize) -> LinkedList<Entry> {
         self.occupied &= !occupied_bit(slot);
 
         std::mem::take(&mut self.slot[slot])
