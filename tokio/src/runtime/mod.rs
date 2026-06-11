@@ -236,6 +236,20 @@
 //! guaranteed to have been terminated. See the
 //! [struct level documentation](Runtime#shutdown) for more details.
 //!
+//! ## Unix `fork`
+//!
+//! User code that calls `fork(2)` without immediately calling `exec` must not
+//! reuse Tokio in the child process. Tokio supports this kind of fork only in
+//! two cases:
+//!
+//! - The fork happens before the parent process has used Tokio in any way.
+//! - The child process does not use Tokio after the fork.
+//!
+//! Creating or using a Tokio runtime in a child process after the parent has
+//! used Tokio is not supported, even if the runtime in the child is newly
+//! created. Some Tokio modules, including process and signal handling, use
+//! process-global state that cannot currently be reset after `fork`.
+//!
 //! [tasks]: crate::task
 //! [`Runtime`]: Runtime
 //! [`tokio::spawn`]: crate::spawn
