@@ -533,7 +533,12 @@ impl Handle {
         tokio_unstable,
         feature = "taskdump",
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+        any(
+            target_arch = "aarch64",
+            target_arch = "x86",
+            target_arch = "x86_64",
+            target_arch = "s390x"
+        )
     ))]
     pub(crate) fn dump(&self) -> crate::runtime::Dump {
         use crate::runtime::dump;
