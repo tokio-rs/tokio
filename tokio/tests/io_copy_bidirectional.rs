@@ -89,6 +89,7 @@ async fn test_transfer_after_close() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore)] // Miri sometimes fails to establish the tcp connection
 async fn blocking_one_side_does_not_block_other() {
     symmetric(|handle, mut a, mut b| async move {
         block_write(&mut a).await;
