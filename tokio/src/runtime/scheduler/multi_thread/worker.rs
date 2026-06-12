@@ -112,13 +112,6 @@ struct Core {
     /// Used to schedule bookkeeping tasks every so often.
     tick: u32,
 
-    /// When a task is scheduled from a worker, it is stored in this slot. The
-    /// worker will check this slot for a task **before** checking the run
-    /// queue. This effectively results in the **last** scheduled task to be run
-    /// next (LIFO). This is an optimization for improving locality which
-    /// benefits message passing patterns and helps to reduce latency.
-    lifo_slot: Option<Notified>,
-
     /// When `true`, locally scheduled tasks go to the LIFO slot. When `false`,
     /// they go to the back of the `run_queue`.
     lifo_enabled: bool,
@@ -289,7 +282,6 @@ pub(super) fn create(
 
         cores.push(Box::new(Core {
             tick: 0,
-            lifo_slot: None,
             lifo_enabled: !config.disable_lifo_slot,
             run_queue,
             #[cfg(all(tokio_unstable, feature = "time"))]
@@ -451,7 +443,7 @@ where
         // If we heavily call `spawn_blocking`, there might be no available thread to
         // run this core. Except for the task in the lifo_slot, all tasks can be
         // stolen, so we move the task out of the lifo_slot to the run_queue.
-        if let Some(task) = core.lifo_slot.take() {
+        if let Some(task) = core.run_queue.pop_lifo() {
             core.run_queue
                 .push_back_or_overflow(task, &*cx.worker.handle, &mut core.stats);
         }
@@ -704,7 +696,7 @@ impl Context {
                 };
 
                 // Check for a task in the LIFO slot
-                let task = match core.lifo_slot.take() {
+                let task = match core.run_queue.pop_lifo() {
                     Some(task) => task,
                     None => {
                         self.reset_lifo_enabled(&mut core);
@@ -1130,7 +1122,7 @@ impl Core {
     }
 
     fn next_local_task(&mut self) -> Option<Notified> {
-        self.lifo_slot.take().or_else(|| self.run_queue.pop())
+        self.run_queue.pop_lifo().or_else(|| self.run_queue.pop())
     }
 
     /// Function responsible for stealing tasks from another worker
@@ -1143,27 +1135,46 @@ impl Core {
             return None;
         }
 
+        // How many passes over the set of worker threads shall we make before
+        // giving up? On the final pass we shall additionally attempt to steal
+        // tasks from each worker's LIFO slot should the run queue be empty.
+        //
+        // The Go runtime makes four similar work-stealing passes, and only attempts to steal from `runnext` (its name for a LIFO slot) on the final pass. See:
+        // https://github.com/golang/go/blob/release-branch.go1.26/src/runtime/proc.go#L3828-L3895
+        //
+        // Empirically, 4 seems to result in better performance on the
+        // `rt_multi_thread` benchmarks than 2 passes, so we'll do the same
+        // thing Go does, I guess.
+        const PASSES: usize = 4;
+
         let num = worker.handle.shared.remotes.len();
-        // Start from a random worker
-        let start = self.rand.fastrand_n(num as u32) as usize;
+        for i in 1..=PASSES {
+            // If we are making our final pass over the other workers, we shall
+            // also attempt to steal a task from the LIFO slot if we were not
+            // able to steal from the main queue.
+            let steal_lifo = i == PASSES;
 
-        for i in 0..num {
-            let i = (start + i) % num;
+            // Start from a random worker
+            let start = self.rand.fastrand_n(num as u32) as usize;
 
-            // Don't steal from ourself! We know we don't have work.
-            if i == worker.index {
-                continue;
-            }
+            for i in 0..num {
+                let i = (start + i) % num;
 
-            let target = &worker.handle.shared.remotes[i];
-            if let Some(task) = target
-                .steal
-                .steal_into(&mut self.run_queue, &mut self.stats)
-            {
-                return Some(task);
+                // Don't steal from ourself! We know we don't have work.
+                if i == worker.index {
+                    continue;
+                }
+
+                let target = &worker.handle.shared.remotes[i];
+                if let Some(task) =
+                    target
+                        .steal
+                        .steal_into(&mut self.run_queue, &mut self.stats, steal_lifo)
+                {
+                    return Some(task);
+                }
             }
         }
-
         // Fallback on checking the global queue
         worker.handle.next_remote_task()
     }
@@ -1186,7 +1197,7 @@ impl Core {
     }
 
     fn has_tasks(&self) -> bool {
-        self.lifo_slot.is_some() || self.run_queue.has_tasks()
+        self.run_queue.has_tasks()
     }
 
     fn should_notify_others(&self) -> bool {
@@ -1195,7 +1206,7 @@ impl Core {
         if self.is_searching {
             return false;
         }
-        self.lifo_slot.is_some() as usize + self.run_queue.len() > 1
+        self.run_queue.len() > 1
     }
 
     /// Prepares the worker state for parking.
@@ -1360,20 +1371,22 @@ impl Handle {
         let should_notify = if is_yield || !core.lifo_enabled {
             core.run_queue
                 .push_back_or_overflow(task, self, &mut core.stats);
+            // Always notify a worker, as we have pushed to the end of the
+            // queue.
             true
         } else {
             // Push to the LIFO slot
-            let prev = core.lifo_slot.take();
-            let ret = prev.is_some();
-
-            if let Some(prev) = prev {
+            if let Some(prev) = core.run_queue.push_lifo(task) {
+                // There was a previous task in the LIFO slot which needs
+                // to be pushed to the back of the run queue.
                 core.run_queue
                     .push_back_or_overflow(prev, self, &mut core.stats);
+                // Again, we have pushed the previous LIFO task to the end of
+                // the queue, so we should always notify a parked worker.
+                true
+            } else {
+                self.shared.config.wake_on_lifo_push
             }
-
-            core.lifo_slot = Some(task);
-
-            ret
         };
 
         // Only notify if not currently parked. If `park` is `None`, then the

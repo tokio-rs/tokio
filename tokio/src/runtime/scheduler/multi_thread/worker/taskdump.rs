@@ -68,7 +68,9 @@ impl Shared {
         for remote in self.remotes.iter() {
             let steal = &remote.steal;
             while !steal.is_empty() {
-                if let Some(task) = steal.steal_into(&mut local, &mut stats) {
+                // Always pass the `steal_lifo` flag here to ensure we also
+                // steal from the LIFO slot if we have drained the main queue.
+                if let Some(task) = steal.steal_into(&mut local, &mut stats, true) {
                     local.push_back([task].into_iter());
                 }
             }
