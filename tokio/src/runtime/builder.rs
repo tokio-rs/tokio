@@ -121,6 +121,17 @@ pub struct Builder {
     /// self-tuning strategy based on mean task poll times.
     pub(super) global_queue_interval: Option<u32>,
 
+    /// How equitably workers of the multi-threaded scheduler drain the global
+    /// queue, in the range `0.0..=1.0`.
+    ///
+    /// When a worker pulls a batch of tasks from the global queue it takes a
+    /// `1 / N.powf(equitability)` share of the queued tasks, where `N` is the
+    /// number of workers. A value of `1.0` (the default) gives each worker an
+    /// equal `1 / N` share. Smaller values let a worker take a larger share,
+    /// reducing how often workers contend on the global queue lock when `N` is
+    /// large, at the cost of a less even distribution of work.
+    pub(super) global_queue_equitability: f32,
+
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(super) event_interval: u32,
 
@@ -324,6 +335,7 @@ impl Builder {
             // Defaults for these values depend on the scheduler kind, so we get them
             // as parameters.
             global_queue_interval: None,
+            global_queue_equitability: 1.0,
             event_interval,
 
             seed_generator: RngSeedGenerator::new(RngSeed::new()),
@@ -1338,6 +1350,57 @@ impl Builder {
             self
         }
 
+        /// Sets how equitably the multi-threaded scheduler's workers drain the
+        /// global task queue.
+        ///
+        /// When a worker runs out of local work it pulls a batch of tasks from
+        /// the global (injection) queue rather than draining it completely, so
+        /// that other workers can also grab work. By default each worker takes a
+        /// `1 / N` share of the queued tasks, where `N` is the number of worker
+        /// threads. When `N` is large, that share becomes small, so workers must
+        /// lock the global queue more often to make progress, increasing
+        /// contention on the shared mutex.
+        ///
+        /// This option scales that share. Given a value `e` in the range
+        /// `0.0..=1.0`, a worker takes a `1 / N.powf(e)` share of the queue:
+        ///
+        /// * `1.0` (the default) keeps the original behavior: an equal `1 / N`
+        ///   share per worker, which spreads work most evenly.
+        /// * `0.0` lets a worker take the entire queue in one pull, minimizing
+        ///   global-queue locking at the cost of an uneven distribution.
+        /// * Values in between trade evenness for less contention; for example
+        ///   `0.5` makes each worker take a `1 / sqrt(N)` share.
+        ///
+        /// This setting only affects the multi-threaded scheduler.
+        ///
+        /// # Panics
+        ///
+        /// This function panics if `equitability` is not in the range
+        /// `0.0..=1.0`, or is `NaN`.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .global_queue_equitability(0.5)
+        ///     .build()
+        ///     .unwrap();
+        /// # }
+        /// ```
+        #[track_caller]
+        pub fn global_queue_equitability(&mut self, equitability: f32) -> &mut Self {
+            assert!(
+                (0.0..=1.0).contains(&equitability),
+                "global_queue_equitability must be in the range 0.0..=1.0"
+            );
+            self.global_queue_equitability = equitability;
+            self
+        }
+
         /// Specifies the random number generation seed to use within all
         /// threads associated with the runtime being built.
         ///
@@ -1699,6 +1762,7 @@ impl Builder {
                 after_poll: self.after_poll.clone(),
                 after_termination: self.after_termination.clone(),
                 global_queue_interval: self.global_queue_interval,
+                global_queue_equitability: self.global_queue_equitability,
                 event_interval: self.event_interval,
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
@@ -1885,6 +1949,7 @@ cfg_rt_multi_thread! {
                     after_poll: self.after_poll.clone(),
                     after_termination: self.after_termination.clone(),
                     global_queue_interval: self.global_queue_interval,
+                    global_queue_equitability: self.global_queue_equitability,
                     event_interval: self.event_interval,
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
