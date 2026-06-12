@@ -198,9 +198,9 @@ impl<T> Receiver<T> {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
-    /// completes first, it is guaranteed that no messages were received on this
+    /// This method is cancel safe. If `recv` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch completes first,
+    /// it is guaranteed that no messages were received on this
     /// channel.
     ///
     /// [`close`]: Self::close
@@ -268,9 +268,9 @@ impl<T> Receiver<T> {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv_many` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
-    /// completes first, it is guaranteed that no messages were received on this
+    /// This method is cancel safe. If `recv_many` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch completes first,
+    /// it is guaranteed that no messages were received on this
     /// channel.
     ///
     /// [`close`]: Self::close
@@ -775,8 +775,8 @@ impl<T> Sender<T> {
     ///
     /// # Cancel safety
     ///
-    /// If `send` is used as the event in a [`tokio::select!`](crate::select)
-    /// statement and some other branch completes first, then it is guaranteed
+    /// If `send` is used as a branch in [`tokio::select!`](crate::select) and
+    /// another branch completes first, then it is guaranteed
     /// that the message was not sent. **However, in that case, the message
     /// is dropped and will be lost.**
     ///

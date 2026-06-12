@@ -147,8 +147,8 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is cancel safe. If you use it as the event in a
-        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// This method is cancel safe. If you use it as a branch in
+        /// [`tokio::select!`](crate::select) and another branch
         /// completes first, then it is guaranteed that no data was read.
         ///
         /// # Examples
@@ -215,8 +215,8 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is cancel safe. If you use it as the event in a
-        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// This method is cancel safe. If you use it as a branch in
+        /// [`tokio::select!`](crate::select) and another branch
         /// completes first, then it is guaranteed that no data was read.
         ///
         /// # Examples
@@ -291,9 +291,9 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is not cancellation safe. If the method is used as the
-        /// event in a [`tokio::select!`](crate::select) statement and some
-        /// other branch completes first, then some data may already have been
+        /// This method is not cancel safe. If the method is used as a
+        /// branch in [`tokio::select!`](crate::select) and another
+        /// branch completes first, then some data may already have been
         /// read into `buf`.
         ///
         /// # Examples
@@ -347,8 +347,8 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is cancel safe. If this method is used as an event in a
-            /// [`tokio::select!`](crate::select) statement and some other branch
+            /// This method is cancel safe. If this method is used as a branch in
+            /// [`tokio::select!`](crate::select) and another branch
             /// completes first, it is guaranteed that no data were read.
             ///
             /// # Examples
@@ -391,8 +391,8 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is cancel safe. If this method is used as an event in a
-            /// [`tokio::select!`](crate::select) statement and some other branch
+            /// This method is cancel safe. If this method is used as a branch in
+            /// [`tokio::select!`](crate::select) and another branch
             /// completes first, it is guaranteed that no data were read.
             ///
             /// # Examples
@@ -436,9 +436,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -480,9 +480,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -524,9 +524,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -568,9 +568,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -611,9 +611,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -656,9 +656,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -699,9 +699,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -745,9 +745,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -791,9 +791,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -834,9 +834,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -879,9 +879,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -923,9 +923,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -967,9 +967,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -1011,9 +1011,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -1054,9 +1054,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -1099,9 +1099,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -1142,9 +1142,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -1188,9 +1188,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -1234,9 +1234,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
@@ -1277,9 +1277,9 @@ cfg_io_util! {
             ///
             /// # Cancel safety
             ///
-            /// This method is not cancellation safe. If the method is used as the
-            /// event in a [`tokio::select!`](crate::select) statement and some
-            /// other branch completes first, then some data may be lost.
+            /// This method is not cancel safe. If the method is used as a
+            /// branch in [`tokio::select!`](crate::select) and another
+            /// branch completes first, then some data may be lost.
             ///
             /// # Examples
             ///
