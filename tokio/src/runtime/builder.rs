@@ -121,6 +121,19 @@ pub struct Builder {
     /// self-tuning strategy based on mean task poll times.
     pub(super) global_queue_interval: Option<u32>,
 
+    /// The share of the global queue a multi-threaded scheduler worker takes
+    /// each time it pulls a batch, as a fraction in `0.0..=1.0`.
+    ///
+    /// When `Some(f)`, a worker takes `floor(len * f) + 1` of the `len` tasks
+    /// currently in the global queue per pull (at least one, and still capped
+    /// by local-queue space). `1.0` lets a worker drain the whole queue in one
+    /// lock acquisition; smaller values take less per lock, spreading work more
+    /// evenly at the cost of contending on the global queue lock more often.
+    ///
+    /// When `None` (the default), the scheduler uses its built-in behavior: a
+    /// `1 / N` share, where `N` is the number of workers.
+    pub(super) global_queue_share_per_worker: Option<f32>,
+
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(super) event_interval: u32,
 
@@ -324,6 +337,7 @@ impl Builder {
             // Defaults for these values depend on the scheduler kind, so we get them
             // as parameters.
             global_queue_interval: None,
+            global_queue_share_per_worker: None,
             event_interval,
 
             seed_generator: RngSeedGenerator::new(RngSeed::new()),
@@ -1338,6 +1352,59 @@ impl Builder {
             self
         }
 
+        /// Sets the share of the global task queue a multi-threaded scheduler
+        /// worker takes each time it pulls a batch.
+        ///
+        /// When a worker runs out of local work it pulls a batch of tasks from
+        /// the global (injection) queue rather than draining it completely, so
+        /// that other workers can also grab work. By default each worker takes a
+        /// `1 / N` share of the queued tasks, where `N` is the number of worker
+        /// threads. When `N` is large, that share becomes small, so workers must
+        /// lock the global queue more often to make progress, increasing
+        /// contention on the shared mutex.
+        ///
+        /// This option replaces that worker-count-derived share with a fixed
+        /// fraction `share` in `0.0..=1.0`. With `len` tasks in the global
+        /// queue, a worker takes `floor(len * share) + 1` of them per pull (at
+        /// least one, and still capped by available local-queue space):
+        ///
+        /// * `1.0` lets a worker drain the whole queue in one lock acquisition,
+        ///   minimizing global-queue locking at the cost of an uneven
+        ///   distribution.
+        /// * smaller values take less per lock, spreading work more evenly but
+        ///   contending on the global queue lock more often.
+        ///
+        /// If this is never called, the scheduler keeps its default `1 / N`
+        /// behavior. This setting only affects the multi-threaded scheduler.
+        ///
+        /// # Panics
+        ///
+        /// This function panics if `share` is not in the range `0.0..=1.0`,
+        /// is `0.0`, or is `NaN`.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .global_queue_share_per_worker(0.5)
+        ///     .build()
+        ///     .unwrap();
+        /// # }
+        /// ```
+        #[track_caller]
+        pub fn global_queue_share_per_worker(&mut self, share: f32) -> &mut Self {
+            assert!(
+                share > 0.0 && share <= 1.0,
+                "global_queue_share_per_worker must be in the range 0.0..=1.0 and greater than 0.0"
+            );
+            self.global_queue_share_per_worker = Some(share);
+            self
+        }
+
         /// Specifies the random number generation seed to use within all
         /// threads associated with the runtime being built.
         ///
@@ -1699,6 +1766,7 @@ impl Builder {
                 after_poll: self.after_poll.clone(),
                 after_termination: self.after_termination.clone(),
                 global_queue_interval: self.global_queue_interval,
+                global_queue_share_per_worker: self.global_queue_share_per_worker,
                 event_interval: self.event_interval,
                 #[cfg(tokio_unstable)]
                 unhandled_panic: self.unhandled_panic.clone(),
@@ -1885,6 +1953,7 @@ cfg_rt_multi_thread! {
                     after_poll: self.after_poll.clone(),
                     after_termination: self.after_termination.clone(),
                     global_queue_interval: self.global_queue_interval,
+                    global_queue_share_per_worker: self.global_queue_share_per_worker,
                     event_interval: self.event_interval,
                     #[cfg(tokio_unstable)]
                     unhandled_panic: self.unhandled_panic.clone(),
