@@ -5,6 +5,7 @@ cfg_signal_internal_and_unix! {
 cfg_io_uring! {
     mod uring;
     use uring::UringContext;
+    pub(crate) use uring::RegisterResult;
     use crate::sync::OnceCell;
 }
 
