@@ -1,19 +1,32 @@
+use crate::io::blocking;
+use crate::io::uring::utils::{ArcFd, UringFd};
 use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
-use crate::util::as_ref::OwnedBuf;
 
 use io_uring::{opcode, types};
 use std::io::{self, Error};
-use std::os::fd::{AsRawFd, OwnedFd};
+use std::os::fd::OwnedFd;
 
-#[derive(Debug)]
-pub(crate) struct Write {
-    buf: OwnedBuf,
-    fd: OwnedFd,
+pub(crate) struct Write<F: UringFd> {
+    buf: blocking::Buf,
+    fd: F,
 }
 
-impl Completable for Write {
-    type Output = (io::Result<u32>, OwnedBuf, OwnedFd);
-    fn complete(self, cqe: CqeResult) -> Self::Output {
+impl<F: UringFd> std::fmt::Debug for Write<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Write")
+            .field("buf_len", &self.buf.len())
+            .field("fd", &self.fd.as_raw_fd())
+            .finish()
+    }
+}
+
+impl<F: UringFd> Completable for Write<F> {
+    type Output = (io::Result<u32>, blocking::Buf, F);
+    fn complete(mut self, cqe: CqeResult) -> Self::Output {
+        if let Ok(n) = cqe.result.as_ref() {
+            self.buf.advance(*n as usize);
+        }
+
         (cqe.result, self.buf, self.fd)
     }
 
@@ -22,26 +35,29 @@ impl Completable for Write {
     }
 }
 
-impl Cancellable for Write {
+impl Cancellable for Write<ArcFd> {
     fn cancel(self) -> CancelData {
         CancelData::Write(self)
     }
 }
 
-impl Op<Write> {
-    /// Issue a write that starts at `buf_offset` within `buf` and writes some bytes
-    /// into `file` at `file_offset`.
-    pub(crate) fn write_at(
-        fd: OwnedFd,
-        buf: OwnedBuf,
-        buf_offset: usize,
-        file_offset: u64,
-    ) -> io::Result<Self> {
+impl Cancellable for Write<OwnedFd> {
+    fn cancel(self) -> CancelData {
+        CancelData::WriteOwned(self)
+    }
+}
+
+impl<F: UringFd> Op<Write<F>>
+where
+    Write<F>: Cancellable,
+{
+    /// Issue a write at `file_offset` from the provided `buf`. To use current file cursor, set `file_offset` to `-1` or `u64::MAX`.
+    pub(crate) fn write_at(fd: F, buf: blocking::Buf, file_offset: u64) -> Self {
         // There is a cap on how many bytes we can write in a single uring write operation.
         // ref: https://github.com/axboe/liburing/discussions/497
-        let len = u32::try_from(buf.as_ref().len() - buf_offset).unwrap_or(u32::MAX);
+        let len = u32::try_from(buf.len()).unwrap_or(u32::MAX);
 
-        let ptr = buf.as_ref()[buf_offset..buf_offset + len as usize].as_ptr();
+        let ptr = buf.bytes().as_ptr();
 
         let sqe = opcode::Write::new(types::Fd(fd.as_raw_fd()), ptr, len)
             .offset(file_offset)
@@ -49,7 +65,6 @@ impl Op<Write> {
 
         // SAFETY: parameters of the entry, such as `fd` and `buf`, are valid
         // until this operation completes.
-        let op = unsafe { Op::new(sqe, Write { buf, fd }) };
-        Ok(op)
+        unsafe { Op::new(sqe, Write { buf, fd }) }
     }
 }
