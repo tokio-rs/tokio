@@ -84,43 +84,59 @@ impl<S: 'static> OwnedTasks<S> {
         }
     }
 
-    /// Binds the provided task to this `OwnedTasks` instance. This fails if the
-    /// `OwnedTasks` has been closed.
-    pub(crate) fn bind<T>(
+    pub(crate) fn bind_with_spawn_hook<T>(
         &self,
         task: T,
         scheduler: S,
         id: super::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
+        task_hooks: &crate::runtime::TaskHooks,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        );
+        run_spawn_hook(&task, id, spawned_at, task_hooks);
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
 
-    /// Bind a task that isn't safe to transfer across thread boundaries.
-    ///
     /// # Safety
     ///
-    /// Only use this in `LocalRuntime` where the task cannot move
-    pub(crate) unsafe fn bind_local<T>(
+    /// Only use this in `LocalRuntime` where the task cannot move.
+    pub(crate) unsafe fn bind_local_with_spawn_hook<T>(
         &self,
         task: T,
         scheduler: S,
         id: super::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
+        task_hooks: &crate::runtime::TaskHooks,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        );
+        run_spawn_hook(&task, id, spawned_at, task_hooks);
         let notified = unsafe { self.bind_inner(task, notified) };
         (join, notified)
     }
@@ -234,6 +250,31 @@ impl<S: 'static> OwnedTasks<S> {
     }
 }
 
+#[cfg(tokio_unstable)]
+fn run_spawn_hook<S: 'static>(
+    task: &Task<S>,
+    _id: super::Id,
+    _spawned_at: SpawnLocation,
+    task_hooks: &crate::runtime::TaskHooks,
+) {
+    super::with_current_task_meta(|parent| {
+        // Safety: the task is freshly allocated and not published yet.
+        let mut meta = unsafe { task.task_meta() };
+        task_hooks.spawn(&mut meta, parent);
+    });
+}
+
+#[cfg(not(tokio_unstable))]
+fn run_spawn_hook<S: 'static>(
+    _task: &Task<S>,
+    id: super::Id,
+    spawned_at: SpawnLocation,
+    task_hooks: &crate::runtime::TaskHooks,
+) {
+    let mut meta = crate::runtime::TaskMeta::new(id, spawned_at);
+    task_hooks.spawn(&mut meta, None);
+}
+
 cfg_taskdump! {
     impl<S: 'static> OwnedTasks<S> {
         /// Locks the tasks, and calls `f` on an iterator over them.
@@ -264,13 +305,21 @@ impl<S: 'static> LocalOwnedTasks<S> {
         scheduler: S,
         id: super::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> (JoinHandle<T::Output>, Option<Notified<S>>)
     where
         S: Schedule,
         T: Future + 'static,
         T::Output: 'static,
     {
-        let (task, notified, join) = super::new_task(task, scheduler, id, spawned_at);
+        let (task, notified, join) = super::new_task(
+            task,
+            scheduler,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        );
 
         unsafe {
             // safety: We just created the task, so we have exclusive access

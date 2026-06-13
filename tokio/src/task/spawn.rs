@@ -178,14 +178,28 @@ cfg_rt! {
     {
         let fut_size = std::mem::size_of::<F>();
         if fut_size > BOX_FUTURE_THRESHOLD {
-            spawn_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+            spawn_inner(
+                Box::pin(future),
+                SpawnMeta::new_unnamed(fut_size),
+                #[cfg(tokio_unstable)]
+                None,
+            )
         } else {
-            spawn_inner(future, SpawnMeta::new_unnamed(fut_size))
+            spawn_inner(
+                future,
+                SpawnMeta::new_unnamed(fut_size),
+                #[cfg(tokio_unstable)]
+                None,
+            )
         }
     }
 
     #[track_caller]
-    pub(super) fn spawn_inner<T>(future: T, meta: SpawnMeta<'_>) -> JoinHandle<T::Output>
+    pub(super) fn spawn_inner<T>(
+        future: T,
+        meta: SpawnMeta<'_>,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
+    ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
@@ -208,7 +222,15 @@ cfg_rt! {
         let id = task::Id::next();
         let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
-        match context::with_current(|handle| handle.spawn(task, id, meta.spawned_at)) {
+        match context::with_current(|handle| {
+            handle.spawn(
+                task,
+                id,
+                meta.spawned_at,
+                #[cfg(tokio_unstable)]
+                user_data,
+            )
+        }) {
             Ok(join_handle) => join_handle,
             Err(e) => panic!("{}", e),
         }

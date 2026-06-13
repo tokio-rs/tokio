@@ -8,8 +8,8 @@ cfg_rt! {
     pub(crate) mod inject;
     pub(crate) use inject::Inject;
 
+    #[cfg(tokio_unstable)]
     use crate::runtime::TaskHooks;
-
     use crate::runtime::WorkerMetrics;
 }
 
@@ -149,16 +149,36 @@ cfg_rt! {
             }
         }
 
-        pub(crate) fn spawn<F>(&self, future: F, id: Id, spawned_at: SpawnLocation) -> JoinHandle<F::Output>
+        pub(crate) fn spawn<F>(
+            &self,
+            future: F,
+            id: Id,
+            spawned_at: SpawnLocation,
+            #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
+        ) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
             match self {
-                Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id, spawned_at),
+                Handle::CurrentThread(h) => current_thread::Handle::spawn(
+                    h,
+                    future,
+                    id,
+                    spawned_at,
+                    #[cfg(tokio_unstable)]
+                    user_data,
+                ),
 
                 #[cfg(feature = "rt-multi-thread")]
-                Handle::MultiThread(h) => multi_thread::Handle::spawn(h, future, id, spawned_at),
+                Handle::MultiThread(h) => multi_thread::Handle::spawn(
+                    h,
+                    future,
+                    id,
+                    spawned_at,
+                    #[cfg(tokio_unstable)]
+                    user_data,
+                ),
             }
         }
 
@@ -170,14 +190,29 @@ cfg_rt! {
         /// by the current thread.
         #[allow(irrefutable_let_patterns)]
         #[track_caller]
-        pub(crate) unsafe fn spawn_local<F>(&self, future: F, id: Id, spawned_at: SpawnLocation) -> JoinHandle<F::Output>
+        pub(crate) unsafe fn spawn_local<F>(
+            &self,
+            future: F,
+            id: Id,
+            spawned_at: SpawnLocation,
+            #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
+        ) -> JoinHandle<F::Output>
         where
             F: Future + 'static,
             F::Output: 'static,
         {
             if let Handle::CurrentThread(h) = self {
                 // Safety: caller guarantees that this is a `LocalRuntime`.
-                unsafe { current_thread::Handle::spawn_local(h, future, id, spawned_at) }
+                unsafe {
+                    current_thread::Handle::spawn_local(
+                        h,
+                        future,
+                        id,
+                        spawned_at,
+                        #[cfg(tokio_unstable)]
+                        user_data,
+                    )
+                }
             } else {
                 panic!("Only current_thread and LocalSet have spawn_local internals implemented")
             }
@@ -204,6 +239,7 @@ cfg_rt! {
             }
         }
 
+        #[cfg(tokio_unstable)]
         pub(crate) fn hooks(&self) -> &TaskHooks {
             match self {
                 Handle::CurrentThread(h) => &h.task_hooks,

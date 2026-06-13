@@ -2,7 +2,8 @@
 
 use crate::runtime::handle::Handle;
 use crate::runtime::{
-    blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback, TimerFlavor,
+    blocking, driver, Callback, HistogramBuilder, Runtime, TaskCallback, TaskSpawnCallback,
+    TimerFlavor,
 };
 #[cfg(tokio_unstable)]
 use crate::runtime::{metrics::HistogramConfiguration, TaskMeta};
@@ -96,7 +97,7 @@ pub struct Builder {
     pub(super) after_unpark: Option<Callback>,
 
     /// To run before each task is spawned.
-    pub(super) before_spawn: Option<TaskCallback>,
+    pub(super) before_spawn: Option<TaskSpawnCallback>,
 
     /// To run before each poll
     #[cfg(tokio_unstable)]
@@ -873,7 +874,7 @@ impl Builder {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_current_thread()
-    ///     .on_task_spawn(|_| {
+    ///     .on_task_spawn(|_, _| {
     ///         println!("spawning task");
     ///     })
     ///     .build()
@@ -892,7 +893,7 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_task_spawn<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
+        F: Fn(&mut TaskMeta<'_>, Option<crate::runtime::TaskMetaRef<'_>>) + Send + Sync + 'static,
     {
         self.before_spawn = Some(std::sync::Arc::new(f));
         self
@@ -939,7 +940,7 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_before_task_poll<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
+        F: Fn(&mut TaskMeta<'_>) + Send + Sync + 'static,
     {
         self.before_poll = Some(std::sync::Arc::new(f));
         self
@@ -986,7 +987,7 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_after_task_poll<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
+        F: Fn(&mut TaskMeta<'_>) + Send + Sync + 'static,
     {
         self.after_poll = Some(std::sync::Arc::new(f));
         self
@@ -1035,7 +1036,7 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn on_task_terminate<F>(&mut self, f: F) -> &mut Self
     where
-        F: Fn(&TaskMeta<'_>) + Send + Sync + 'static,
+        F: Fn(&mut TaskMeta<'_>) + Send + Sync + 'static,
     {
         self.after_termination = Some(std::sync::Arc::new(f));
         self

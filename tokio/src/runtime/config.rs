@@ -2,7 +2,7 @@
     any(not(all(tokio_unstable, feature = "full")), target_family = "wasm"),
     allow(dead_code)
 )]
-use crate::runtime::{Callback, TaskCallback};
+use crate::runtime::{Callback, TaskCallback, TaskSpawnCallback};
 use crate::util::RngSeedGenerator;
 
 pub(crate) struct Config {
@@ -19,7 +19,7 @@ pub(crate) struct Config {
     pub(crate) after_unpark: Option<Callback>,
 
     /// To run before each task is spawned.
-    pub(crate) before_spawn: Option<TaskCallback>,
+    pub(crate) before_spawn: Option<TaskSpawnCallback>,
 
     /// To run after each task is terminated.
     pub(crate) after_termination: Option<TaskCallback>,

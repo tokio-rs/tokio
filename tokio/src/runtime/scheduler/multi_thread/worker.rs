@@ -475,7 +475,7 @@ where
         // Once the blocking task is done executing, we will attempt to
         // steal the core back.
         let worker = cx.worker.clone();
-        runtime::spawn_blocking(move || run(worker));
+        runtime::spawn_blocking_skip_hooks(move || run(worker));
         Ok(())
     });
 
@@ -500,7 +500,7 @@ where
 impl Launch {
     pub(crate) fn launch(mut self) {
         for worker in self.0.drain(..) {
-            runtime::spawn_blocking(move || run(worker));
+            runtime::spawn_blocking_skip_hooks(move || run(worker));
         }
     }
 }
@@ -628,9 +628,6 @@ impl Context {
     }
 
     fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
-        #[cfg(tokio_unstable)]
-        let task_meta = task.task_meta();
-
         let task = self.worker.handle.shared.owned.assert_owner(task);
 
         // Make sure the worker is not in the **searching** state. This enables
@@ -673,18 +670,7 @@ impl Context {
 
         // Run the task
         coop::budget(|| {
-            // Unlike the poll time above, poll start callback is attached to the task id,
-            // so it is tightly associated with the actual poll invocation.
-            #[cfg(tokio_unstable)]
-            self.worker
-                .handle
-                .task_hooks
-                .poll_start_callback(&task_meta);
-
             task.run();
-
-            #[cfg(tokio_unstable)]
-            self.worker.handle.task_hooks.poll_stop_callback(&task_meta);
 
             let mut lifo_polls = 0;
 
@@ -749,19 +735,7 @@ impl Context {
                 *self.core.borrow_mut() = Some(core);
                 let task = self.worker.handle.shared.owned.assert_owner(task);
 
-                #[cfg(tokio_unstable)]
-                let task_meta = task.task_meta();
-
-                #[cfg(tokio_unstable)]
-                self.worker
-                    .handle
-                    .task_hooks
-                    .poll_start_callback(&task_meta);
-
                 task.run();
-
-                #[cfg(tokio_unstable)]
-                self.worker.handle.task_hooks.poll_stop_callback(&task_meta);
             }
         })
     }

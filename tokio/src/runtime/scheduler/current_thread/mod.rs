@@ -2,11 +2,11 @@ use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
-use crate::runtime::task::{
-    self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task, TaskHarnessScheduleHooks,
-};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task};
+#[cfg(tokio_unstable)]
+use crate::runtime::TaskMeta;
 use crate::runtime::{
-    blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
+    blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, WorkerMetrics,
 };
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
@@ -470,18 +470,21 @@ impl Handle {
         future: F,
         id: crate::runtime::task::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
-
-        me.task_hooks.spawn(&TaskMeta {
+        let (handle, notified) = me.shared.owned.bind_with_spawn_hook(
+            future,
+            me.clone(),
             id,
             spawned_at,
-            _phantom: Default::default(),
-        });
+            #[cfg(tokio_unstable)]
+            user_data,
+            &me.task_hooks,
+        );
 
         if let Some(notified) = notified {
             me.schedule(notified);
@@ -503,6 +506,7 @@ impl Handle {
         future: F,
         id: crate::runtime::task::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + 'static,
@@ -510,16 +514,16 @@ impl Handle {
     {
         // Safety: the caller guarantees that this is only called on a `LocalRuntime`.
         let (handle, notified) = unsafe {
-            me.shared
-                .owned
-                .bind_local(future, me.clone(), id, spawned_at)
+            me.shared.owned.bind_local_with_spawn_hook(
+                future,
+                me.clone(),
+                id,
+                spawned_at,
+                #[cfg(tokio_unstable)]
+                user_data,
+                &me.task_hooks,
+            )
         };
-
-        me.task_hooks.spawn(&TaskMeta {
-            id,
-            spawned_at,
-            _phantom: Default::default(),
-        });
 
         if let Some(notified) = notified {
             me.schedule(notified);
@@ -692,13 +696,27 @@ impl Schedule for Arc<Handle> {
         });
     }
 
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
-        }
-    }
-
     cfg_unstable! {
+        fn task_terminate_callback(&self, meta: &mut TaskMeta<'_>) {
+            self.task_hooks.task_terminate_callback(meta);
+        }
+
+        fn has_task_poll_start_callback(&self) -> bool {
+            self.task_hooks.has_poll_start_callback()
+        }
+
+        fn task_poll_start_callback(&self, meta: &mut TaskMeta<'_>) {
+            self.task_hooks.poll_start_callback(meta);
+        }
+
+        fn has_task_poll_stop_callback(&self) -> bool {
+            self.task_hooks.has_poll_stop_callback()
+        }
+
+        fn task_poll_stop_callback(&self, meta: &mut TaskMeta<'_>) {
+            self.task_hooks.poll_stop_callback(meta);
+        }
+
         fn unhandled_panic(&self) {
             use crate::runtime::UnhandledPanic;
 
@@ -820,17 +838,8 @@ impl CoreGuard<'_> {
 
                     let task = context.handle.shared.owned.assert_owner(task);
 
-                    #[cfg(tokio_unstable)]
-                    let task_meta = task.task_meta();
-
                     let (c, ()) = context.run_task(core, || {
-                        #[cfg(tokio_unstable)]
-                        context.handle.task_hooks.poll_start_callback(&task_meta);
-
                         task.run();
-
-                        #[cfg(tokio_unstable)]
-                        context.handle.task_hooks.poll_stop_callback(&task_meta);
                     });
 
                     core = c;

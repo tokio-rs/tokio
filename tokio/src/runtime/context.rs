@@ -20,7 +20,11 @@ cfg_rt! {
     use scoped::Scoped;
 
     use crate::runtime::{scheduler, task::Id};
+    #[cfg(tokio_unstable)]
+    use crate::runtime::task::Header;
 
+    #[cfg(tokio_unstable)]
+    use std::ptr::NonNull;
     use std::task::Waker;
 
     cfg_taskdump! {
@@ -48,6 +52,9 @@ struct Context {
 
     #[cfg(feature = "rt")]
     current_task_id: Cell<Option<Id>>,
+
+    #[cfg(all(feature = "rt", tokio_unstable))]
+    current_task: Cell<Option<NonNull<Header>>>,
 
     /// Tracks if the current thread is currently driving a runtime.
     /// Note, that if this is set to "entered", the current scheduler
@@ -96,6 +103,9 @@ tokio_thread_local! {
 
             #[cfg(feature = "rt")]
             current_task_id: Cell::new(None),
+
+            #[cfg(all(feature = "rt", tokio_unstable))]
+            current_task: Cell::new(None),
 
             // Tracks if the current thread is currently driving a runtime.
             // Note, that if this is set to "entered", the current scheduler
@@ -163,6 +173,34 @@ cfg_rt! {
 
     pub(crate) fn current_task_id() -> Option<Id> {
         CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or(None)
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn set_current_task(task: Option<NonNull<Header>>) -> Option<NonNull<Header>> {
+        CONTEXT
+            .try_with(|ctx| ctx.current_task.replace(task))
+            .unwrap_or(None)
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn set_current_task_id_and_task(
+        id: Option<Id>,
+        task: Option<NonNull<Header>>,
+    ) -> (Option<Id>, Option<NonNull<Header>>) {
+        CONTEXT
+            .try_with(|ctx| {
+                let parent_task_id = ctx.current_task_id.replace(id);
+                let parent_task = ctx.current_task.replace(task);
+                (parent_task_id, parent_task)
+            })
+            .unwrap_or((None, None))
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn current_task() -> Option<NonNull<Header>> {
+        CONTEXT
+            .try_with(|ctx| ctx.current_task.get())
+            .unwrap_or(None)
     }
 
     #[cfg(tokio_unstable)]
