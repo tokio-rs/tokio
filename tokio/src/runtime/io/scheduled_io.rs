@@ -292,7 +292,7 @@ impl ScheduledIo {
 
         ReadyEvent {
             tick: TICK.unpack(curr) as u8,
-            ready: interest.mask() & Ready::from_usize(READINESS.unpack(curr)),
+            ready: Ready::from_interest(interest) & Ready::from_usize(READINESS.unpack(curr)),
             is_shutdown: SHUTDOWN.unpack(curr) != 0,
         }
     }
