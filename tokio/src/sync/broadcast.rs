@@ -120,7 +120,8 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
 use crate::task::coop::cooperative;
-use crate::util::linked_list::{self, GuardedLinkedList, LinkedList};
+use crate::util::linked_list;
+use crate::util::sharded_list::{ShardedList, ShardedListItem};
 use crate::util::WakeList;
 
 use std::fmt;
@@ -345,8 +346,25 @@ struct Shared<T> {
     /// Mask a position -> index.
     mask: usize,
 
-    /// Tail of the queue. Includes the rx wait list.
+    /// Tail of the queue. Tracks the next write position and receiver count.
     tail: Mutex<Tail>,
+
+    /// True once the channel is closed.
+    ///
+    /// Stored as an atomic (rather than inside `Tail`) so that a parking
+    /// receiver can check it without taking the `tail` lock. Writes are still
+    /// performed under the `tail` lock so they stay ordered with `rx_cnt`.
+    closed: AtomicBool,
+
+    /// Receivers waiting for a value, sharded to reduce contention between
+    /// parking (`recv_ref`), cancelling (`Recv::drop`), and waking
+    /// (`notify_rx`).
+    waiters: ShardedList<Waiter, Waiter>,
+
+    /// Round-robin counter used to assign waiters to shards under loom, where
+    /// node addresses are not stable across executions. Unused outside of loom.
+    #[cfg(loom)]
+    next_shard: std::sync::atomic::AtomicUsize,
 
     /// Number of outstanding Sender handles.
     num_tx: AtomicUsize,
@@ -365,12 +383,6 @@ struct Tail {
 
     /// Number of active receivers.
     rx_cnt: usize,
-
-    /// True if the channel is closed.
-    closed: bool,
-
-    /// Receivers waiting for a value.
-    waiters: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
 }
 
 /// Slot in the buffer.
@@ -404,19 +416,18 @@ struct Waiter {
     /// Intrusive linked-list pointers.
     pointers: linked_list::Pointers<Waiter>,
 
+    /// Shard this waiter is assigned to.
+    ///
+    /// Under loom, pointer addresses are not stable across executions, so we
+    /// cannot derive the shard from the node address (it would make the model
+    /// non-deterministic). Instead the shard is assigned from a per-channel
+    /// counter when the waiter is created and stored here. Outside of loom the
+    /// shard is derived from the (stable) node address, so this field is unused.
+    #[cfg(loom)]
+    shard: usize,
+
     /// Should not be `Unpin`.
     _p: PhantomPinned,
-}
-
-impl Waiter {
-    fn new() -> Self {
-        Self {
-            queued: AtomicBool::new(false),
-            waker: None,
-            pointers: linked_list::Pointers::new(),
-            _p: PhantomPinned,
-        }
-    }
 }
 
 generate_addr_of_methods! {
@@ -436,7 +447,7 @@ struct Recv<'a, T> {
     /// Receiver being waited on.
     receiver: &'a mut Receiver<T>,
 
-    /// Entry in the waiter `LinkedList`.
+    /// Entry in the sharded waiter list.
     waiter: WaiterCell,
 }
 
@@ -449,6 +460,15 @@ unsafe impl Sync for WaiterCell {}
 
 /// Max number of receivers. Reserve space to lock.
 const MAX_RECEIVERS: usize = usize::MAX >> 2;
+
+/// Number of shards the waiter list is split into. A small power of two keeps
+/// the per-`send` cost of visiting every shard low while spreading the lock that
+/// parking and cancelling receivers contend on. Under loom the shard count is
+/// reduced to keep the explored state space small.
+#[cfg(not(loom))]
+const WAITER_SHARDS: usize = 8;
+#[cfg(loom)]
+const WAITER_SHARDS: usize = 2;
 
 /// Create a bounded, multi-producer, multi-consumer channel where each sent
 /// value is broadcasted to all active receivers.
@@ -564,9 +584,11 @@ impl<T> Sender<T> {
             tail: Mutex::new(Tail {
                 pos: 0,
                 rx_cnt: receiver_count,
-                closed: receiver_count == 0,
-                waiters: LinkedList::new(),
             }),
+            closed: AtomicBool::new(receiver_count == 0),
+            waiters: ShardedList::new(WAITER_SHARDS),
+            #[cfg(loom)]
+            next_shard: std::sync::atomic::AtomicUsize::new(0),
             num_tx: AtomicUsize::new(1),
             num_weak_tx: AtomicUsize::new(0),
             notify_last_rx_drop: Notify::new(),
@@ -656,10 +678,21 @@ impl<T> Sender<T> {
         // Release the slot lock before notifying the receivers.
         drop(slot);
 
-        // Notify and release the mutex. This must happen after the slot lock is
-        // released, otherwise the writer lock bit could be cleared while another
-        // thread is in the critical section.
-        self.shared.notify_rx(tail);
+        // Fast path: if no receiver is parked, there is nothing to wake, so skip
+        // locking every shard. A single relaxed load suffices: a receiver waiting
+        // for the value we just wrote enqueued itself before observing the old
+        // (empty) slot, so — having written the slot above — its increment of the
+        // waiter count is ordered before this load through the slot lock. (Once
+        // there is any parked receiver this load is non-zero and we take the slow
+        // path; only the genuinely-empty case is skipped.)
+        if self.shared.waiters.is_empty() {
+            drop(tail);
+        } else {
+            // Notify and release the mutex. This must happen after the slot lock
+            // is released, otherwise the writer lock bit could be cleared while
+            // another thread is in the critical section.
+            self.shared.notify_rx(tail);
+        }
 
         Ok(rem)
     }
@@ -889,9 +922,11 @@ impl<T> Sender<T> {
             let notified = self.shared.notify_last_rx_drop.notified();
 
             {
-                // Ensure the lock drops if the channel isn't closed
-                let tail = self.shared.tail.lock();
-                if tail.closed {
+                // Hold the tail lock while checking `closed` so this stays
+                // ordered with `Receiver::drop`, which sets `closed` and notifies
+                // `notify_last_rx_drop` under the same lock.
+                let _tail = self.shared.tail.lock();
+                if self.shared.closed.load(Acquire) {
                     return;
                 }
             }
@@ -901,8 +936,11 @@ impl<T> Sender<T> {
     }
 
     fn close_channel(&self) {
-        let mut tail = self.shared.tail.lock();
-        tail.closed = true;
+        let tail = self.shared.tail.lock();
+        // Set `closed` (under the tail lock, so it stays ordered with reopen in
+        // `new_receiver`) before draining, so a receiver that re-checks `closed`
+        // after enqueueing observes it.
+        self.shared.closed.store(true, Release);
 
         self.shared.notify_rx(tail);
     }
@@ -928,7 +966,7 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
         // Potentially need to re-open the channel, if a new receiver has been added between calls
         // to poll(). Note that we use rx_cnt == 0 instead of is_closed since is_closed also
         // applies if the sender has been dropped
-        tail.closed = false;
+        shared.closed.store(false, Release);
     }
 
     tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
@@ -939,117 +977,72 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     Receiver { shared, next }
 }
 
-/// List used in `Shared::notify_rx`. It wraps a guarded linked list
-/// and gates the access to it on the `Shared.tail` mutex. It also empties
-/// the list on drop.
-struct WaitersList<'a, T> {
-    list: GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
-    is_empty: bool,
-    shared: &'a Shared<T>,
-}
-
-impl<'a, T> Drop for WaitersList<'a, T> {
-    fn drop(&mut self) {
-        // If the list is not empty, we unlink all waiters from it.
-        // We do not wake the waiters to avoid double panics.
-        if !self.is_empty {
-            let _lock_guard = self.shared.tail.lock();
-            while self.list.pop_back().is_some() {}
-        }
-    }
-}
-
-impl<'a, T> WaitersList<'a, T> {
-    fn new(
-        unguarded_list: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
-        guard: Pin<&'a Waiter>,
-        shared: &'a Shared<T>,
-    ) -> Self {
-        let guard_ptr = NonNull::from(guard.get_ref());
-        let list = unguarded_list.into_guarded(guard_ptr);
-        WaitersList {
-            list,
-            is_empty: false,
-            shared,
-        }
-    }
-
-    /// Removes the last element from the guarded list. Modifying this list
-    /// requires an exclusive access to the main list in `Notify`.
-    fn pop_back_locked(&mut self, _tail: &mut Tail) -> Option<NonNull<Waiter>> {
-        let result = self.list.pop_back();
-        if result.is_none() {
-            // Save information about emptiness to avoid waiting for lock
-            // in the destructor.
-            self.is_empty = true;
-        }
-        result
-    }
-}
-
 impl<T> Shared<T> {
-    fn notify_rx<'a, 'b: 'a>(&'b self, mut tail: MutexGuard<'a, Tail>) {
-        // It is critical for `GuardedLinkedList` safety that the guard node is
-        // pinned in memory and is not dropped until the guarded list is dropped.
-        let guard = Waiter::new();
-        pin!(guard);
-
-        // We move all waiters to a secondary list. It uses a `GuardedLinkedList`
-        // underneath to allow every waiter to safely remove itself from it.
+    fn notify_rx(&self, tail: MutexGuard<'_, Tail>) {
+        // The waiter list lives in its own sharded structure, independent of the
+        // `tail` lock. Release `tail` before waking so that senders and parking
+        // receivers do not contend on it while wakers run.
         //
-        // * This list will be still guarded by the `waiters` lock.
-        //   `NotifyWaitersList` wrapper makes sure we hold the lock to modify it.
-        // * This wrapper will empty the list on drop. It is critical for safety
-        //   that we will not leave any list entry with a pointer to the local
-        //   guard node after this function returns / panics.
-        let mut list = WaitersList::new(std::mem::take(&mut tail.waiters), guard.as_ref(), self);
-
-        let mut wakers = WakeList::new();
-        'outer: loop {
-            while wakers.can_push() {
-                match list.pop_back_locked(&mut tail) {
-                    Some(waiter) => {
-                        unsafe {
-                            // Safety: accessing `waker` is safe because
-                            // the tail lock is held.
-                            if let Some(waker) = (*waiter.as_ptr()).waker.take() {
-                                wakers.push(waker);
-                            }
-
-                            // Safety: `queued` is atomic.
-                            let queued = &(*waiter.as_ptr()).queued;
-                            // `Relaxed` suffices because the tail lock is held.
-                            assert!(queued.load(Relaxed));
-                            // `Release` is needed to synchronize with `Recv::drop`.
-                            // It is critical to set this variable **after** waker
-                            // is extracted, otherwise we may data race with `Recv::drop`.
-                            queued.store(false, Release);
-                        }
-                    }
-                    None => {
-                        break 'outer;
-                    }
-                }
-            }
-
-            // Release the lock before waking.
-            drop(tail);
-
-            // Before we acquire the lock again all sorts of things can happen:
-            // some waiters may remove themselves from the list and new waiters
-            // may be added. This is fine since at worst we will unnecessarily
-            // wake up waiters which will then queue themselves again.
-
-            wakers.wake_all();
-
-            // Acquire the lock again.
-            tail = self.tail.lock();
-        }
-
-        // Release the lock before waking.
+        // This drains every shard unconditionally. `send` skips the call entirely
+        // when there are no waiters (a relaxed `is_empty` it can make safely,
+        // because it has just written the slot); `close_channel` cannot make that
+        // check safely — a receiver may enqueue and re-check `closed` without any
+        // happens-before to a count load here — so it must always drain.
         drop(tail);
 
-        wakers.wake_all();
+        let mut wakers = WakeList::new();
+        for shard_id in 0..self.waiters.shard_size() {
+            'shard: loop {
+                // Drain a batch of waiters from this shard under a single lock
+                // acquisition (the lock is held for the whole `while` below), so
+                // we don't re-lock the shard per waiter. The waker is taken and
+                // `queued` is cleared while the shard lock is held, so we cannot
+                // race a concurrent `Recv::drop` removing the same node.
+                {
+                    let mut shard = self.waiters.lock_shard_by_id(shard_id);
+                    while wakers.can_push() {
+                        match shard.pop_back() {
+                            Some(waiter) => {
+                                let ptr = waiter.as_ptr();
+                                // Safety: the node was just popped under the shard
+                                // lock and is a valid, pinned `Waiter`;
+                                // `Recv::drop` cannot reclaim it while the shard
+                                // lock is held.
+                                unsafe {
+                                    if let Some(waker) = (*ptr).waker.take() {
+                                        wakers.push(waker);
+                                    }
+
+                                    // Safety: `queued` is atomic.
+                                    let queued = &(*ptr).queued;
+                                    // The node was in the list, so it must be
+                                    // queued.
+                                    debug_assert!(queued.load(Relaxed));
+                                    // `Release` synchronizes with the `Acquire`
+                                    // load in `Recv::drop`. It is critical to set
+                                    // this **after** the waker is extracted,
+                                    // otherwise we may data race with `Recv::drop`.
+                                    queued.store(false, Release);
+                                }
+                            }
+                            // This shard is drained; release the lock and wake the
+                            // last batch before moving on to the next shard.
+                            None => {
+                                drop(shard);
+                                wakers.wake_all();
+                                break 'shard;
+                            }
+                        }
+                    }
+                    // The `WakeList` filled up; the shard lock is released at the
+                    // end of this block.
+                }
+
+                // Wake outside of the shard lock (waking may run arbitrary code),
+                // then keep draining this shard.
+                wakers.wake_all();
+            }
+        }
     }
 }
 
@@ -1224,105 +1217,127 @@ impl<T> Receiver<T> {
     ) -> Result<RecvGuard<'_, T>, TryRecvError> {
         let idx = (self.next & self.shared.mask as u64) as usize;
 
-        // The slot holding the next value to read
-        let mut slot = self.shared.buffer[idx].lock();
+        // Set to `true` once this receiver has enqueued its waiter, so the loop
+        // re-checks the slot after enqueueing instead of enqueueing again.
+        let mut enqueued = false;
 
-        if slot.pos != self.next {
-            // Release the `slot` lock before attempting to acquire the `tail`
-            // lock. This is required because `send2` acquires the tail lock
-            // first followed by the slot lock. Acquiring the locks in reverse
-            // order here would result in a potential deadlock: `recv_ref`
-            // acquires the `slot` lock and attempts to acquire the `tail` lock
-            // while `send2` acquired the `tail` lock and attempts to acquire
-            // the slot lock.
-            drop(slot);
+        loop {
+            // The slot holding the next value to read.
+            let slot = self.shared.buffer[idx].lock();
 
-            let mut old_waker = None;
+            if slot.pos == self.next {
+                // The value is available.
+                self.next = self.next.wrapping_add(1);
+                return Ok(RecvGuard { slot });
+            }
 
-            let mut tail = self.shared.tail.lock();
+            let next_pos = slot.pos.wrapping_add(self.shared.buffer.len() as u64);
 
-            // Acquire slot lock again
-            slot = self.shared.buffer[idx].lock();
+            if next_pos == self.next {
+                // The channel is empty for *this* receiver: it is waiting for the
+                // next value to be written to this slot.
+                //
+                // `closed` is read with an atomic load instead of under the
+                // `tail` lock, so that parking does not contend on `tail`.
+                if self.shared.closed.load(Acquire) {
+                    return Err(TryRecvError::Closed);
+                }
 
-            // Make sure the position did not change. This could happen in the
-            // unlikely event that the buffer is wrapped between dropping the
-            // read lock and acquiring the tail lock.
-            if slot.pos != self.next {
-                let next_pos = slot.pos.wrapping_add(self.shared.buffer.len() as u64);
+                let (waiter, waker) = match waiter {
+                    Some(waiter) => waiter,
+                    // `try_recv` (and the drain in `Receiver::drop`) cannot park.
+                    None => return Err(TryRecvError::Empty),
+                };
 
-                if next_pos == self.next {
-                    // At this point the channel is empty for *this* receiver. If
-                    // it's been closed, then that's what we return, otherwise we
-                    // set a waker and return empty.
-                    if tail.closed {
-                        return Err(TryRecvError::Closed);
-                    }
-
-                    // Store the waker
-                    if let Some((waiter, waker)) = waiter {
-                        // Safety: called while locked.
-                        unsafe {
-                            // Only queue if not already queued
-                            waiter.with_mut(|ptr| {
-                                // If there is no waker **or** if the currently
-                                // stored waker references a **different** task,
-                                // track the tasks' waker to be notified on
-                                // receipt of a new value.
-                                match (*ptr).waker {
-                                    Some(ref w) if w.will_wake(waker) => {}
-                                    _ => {
-                                        old_waker = (*ptr).waker.replace(waker.clone());
-                                    }
-                                }
-
-                                // If the waiter is not already queued, enqueue it.
-                                // `Relaxed` order suffices: we have synchronized with
-                                // all writers through the tail lock that we hold.
-                                if !(*ptr).queued.load(Relaxed) {
-                                    // `Relaxed` order suffices: all the readers will
-                                    // synchronize with this write through the tail lock.
-                                    (*ptr).queued.store(true, Relaxed);
-                                    tail.waiters.push_front(NonNull::new_unchecked(&mut *ptr));
-                                }
-                            });
-                        }
-                    }
-
-                    // Drop the old waker after releasing the locks.
-                    drop(slot);
-                    drop(tail);
-                    drop(old_waker);
-
+                if enqueued {
+                    // Second pass: the waiter is enqueued and the slot is still
+                    // empty, so we are genuinely parked. If a sender writes our
+                    // value after our enqueue, its drain wakes us (the enqueue is
+                    // ordered before the drain); if it already popped us, that pop
+                    // also woke us, so we will be polled again. Either way no
+                    // wakeup is lost.
                     return Err(TryRecvError::Empty);
                 }
 
-                // At this point, the receiver has lagged behind the sender by
-                // more than the channel capacity. The receiver will attempt to
-                // catch up by skipping dropped messages and setting the
-                // internal cursor to the **oldest** message stored by the
-                // channel.
-                let next = tail.pos.wrapping_sub(self.shared.buffer.len() as u64);
+                // First pass: enqueue the waiter without holding `tail`, then loop
+                // to re-check the slot. Releasing the slot lock before enqueueing
+                // lets a concurrent `send` write the slot; the re-check then
+                // observes the value (and returns it), and if it does not, our
+                // enqueue happened-before that send's drain, so we are woken.
+                drop(slot);
 
-                let missed = next.wrapping_sub(self.next);
+                let mut old_waker = None;
+                // Safety: the shard lock taken below is the synchronization edge
+                // for `waker`/`queued` shared with `notify_rx` and `Recv::drop`.
+                unsafe {
+                    waiter.with_mut(|ptr| {
+                        let node = NonNull::new_unchecked(ptr);
+                        let shard = self.shared.waiters.lock_shard(&node);
 
-                drop(tail);
+                        // If there is no waker, or the stored waker is for a
+                        // different task, store the current task's waker.
+                        match (*ptr).waker {
+                            Some(ref w) if w.will_wake(waker) => {}
+                            _ => {
+                                old_waker = (*ptr).waker.replace(waker.clone());
+                            }
+                        }
 
-                // The receiver is slow but no values have been missed
-                if missed == 0 {
-                    self.next = self.next.wrapping_add(1);
-
-                    return Ok(RecvGuard { slot });
+                        // Enqueue into this waiter's shard if not already queued.
+                        // `Relaxed` suffices: the shard lock is the
+                        // synchronization edge with `notify_rx`/`Recv::drop`.
+                        if !(*ptr).queued.load(Relaxed) {
+                            (*ptr).queued.store(true, Relaxed);
+                            shard.push(node);
+                        } else {
+                            drop(shard);
+                        }
+                    });
                 }
+                // Drop the previous waker now that the shard lock is released.
+                drop(old_waker);
 
-                self.next = next;
-
-                return Err(TryRecvError::Lagged(missed));
+                enqueued = true;
+                continue;
             }
+
+            // The receiver has lagged behind the sender by more than the channel
+            // capacity. This is the slow path: take the `tail` lock to read the
+            // write position and catch up to the oldest retained message.
+            drop(slot);
+            let tail = self.shared.tail.lock();
+
+            // Re-acquire the slot lock and re-check: the buffer may have wrapped
+            // between dropping and re-acquiring the slot lock.
+            let slot = self.shared.buffer[idx].lock();
+            if slot.pos == self.next {
+                drop(tail);
+                self.next = self.next.wrapping_add(1);
+                return Ok(RecvGuard { slot });
+            }
+
+            let next_pos = slot.pos.wrapping_add(self.shared.buffer.len() as u64);
+            if next_pos == self.next {
+                // It became empty under `tail` (a wrap-around). Release both locks
+                // and retry the lock-free empty path at the top of the loop.
+                drop(slot);
+                drop(tail);
+                continue;
+            }
+
+            let next = tail.pos.wrapping_sub(self.shared.buffer.len() as u64);
+            let missed = next.wrapping_sub(self.next);
+            drop(tail);
+
+            // The receiver is slow but no values have actually been missed.
+            if missed == 0 {
+                self.next = self.next.wrapping_add(1);
+                return Ok(RecvGuard { slot });
+            }
+
+            self.next = next;
+            return Err(TryRecvError::Lagged(missed));
         }
-
-        self.next = self.next.wrapping_add(1);
-
-        Ok(RecvGuard { slot })
     }
 
     /// Returns the number of [`Sender`] handles.
@@ -1553,7 +1568,7 @@ impl<T> Drop for Receiver<T> {
 
         if remaining_rx == 0 {
             self.shared.notify_last_rx_drop.notify_waiters();
-            tail.closed = true;
+            self.shared.closed.store(true, Release);
         }
 
         drop(tail);
@@ -1574,12 +1589,25 @@ impl<T> Drop for Receiver<T> {
 
 impl<'a, T> Recv<'a, T> {
     fn new(receiver: &'a mut Receiver<T>) -> Recv<'a, T> {
+        // Under loom, assign the shard up front from a per-channel counter (node
+        // addresses are not stable across loom executions). The value is fixed
+        // for the life of the waiter, so it stays consistent between the push in
+        // `recv_ref` and the removal in `Recv::drop`.
+        #[cfg(loom)]
+        let shard = receiver
+            .shared
+            .next_shard
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            % WAITER_SHARDS;
+
         Recv {
             receiver,
             waiter: WaiterCell(UnsafeCell::new(Waiter {
                 queued: AtomicBool::new(false),
                 waker: None,
                 pointers: linked_list::Pointers::new(),
+                #[cfg(loom)]
+                shard,
                 _p: PhantomPinned,
             })),
         }
@@ -1630,32 +1658,20 @@ impl<'a, T> Drop for Recv<'a, T> {
             .0
             .with(|ptr| unsafe { (*ptr).queued.load(Acquire) });
 
-        // If the waiter is queued, we need to unlink it from the waiters list.
-        // If not, no further synchronization is required, since the waiter
-        // is not in the list and, as such, is not shared with any other threads.
+        // If the waiter is queued, we need to unlink it from its shard. If not,
+        // no further synchronization is required, since the waiter is not in any
+        // list and, as such, is not shared with any other threads.
         if queued {
-            // Acquire the tail lock. This is required for safety before accessing
-            // the waiter node.
-            let mut tail = self.receiver.shared.tail.lock();
-
-            // Safety: tail lock is held.
-            // `Relaxed` order suffices because we hold the tail lock.
-            let queued = self
-                .waiter
-                .0
-                .with_mut(|ptr| unsafe { (*ptr).queued.load(Relaxed) });
-
-            if queued {
-                // Remove the node
-                //
-                // safety: tail lock is held and the wait node is verified to be in
-                // the list.
-                unsafe {
-                    self.waiter.0.with_mut(|ptr| {
-                        tail.waiters.remove((&mut *ptr).into());
-                    });
-                }
-            }
+            self.waiter.0.with_mut(|ptr| {
+                // Safety: `queued` was observed to be `true`, so the node is (or
+                // recently was) in its shard. `remove` locks that shard and
+                // unlinks the node if it is still present; if `notify_rx` already
+                // removed it concurrently, `remove` returns `None` and does
+                // nothing. The node's shard id is stable, so it cannot be in any
+                // other shard.
+                let node = unsafe { NonNull::new_unchecked(ptr) };
+                let _ = unsafe { self.receiver.shared.waiters.remove(node) };
+            });
         }
     }
 }
@@ -1677,6 +1693,37 @@ unsafe impl linked_list::Link for Waiter {
 
     unsafe fn pointers(target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
         unsafe { Waiter::addr_of_pointers(target) }
+    }
+}
+
+/// # Safety
+///
+/// A `Waiter` is pinned for as long as it is queued, so its address — and
+/// therefore the shard id derived from it — does not change between being pushed
+/// and being removed.
+unsafe impl ShardedListItem for Waiter {
+    unsafe fn get_shard_id(target: NonNull<Self::Target>) -> usize {
+        // Under loom, pointer addresses are not stable across executions, so the
+        // shard is assigned from a per-channel counter when the waiter is created
+        // and read back here. This keeps the chosen shard deterministic for a
+        // given execution, which loom requires.
+        #[cfg(loom)]
+        {
+            // Safety: the caller guarantees `target` points at a valid waiter,
+            // and `shard` is set at construction and never mutated afterwards.
+            unsafe { (*target.as_ptr()).shard }
+        }
+        // Outside of loom, mix the node address with Fibonacci hashing so that
+        // adjacently allocated (and thus aligned) waiters are spread across
+        // shards instead of all landing in the same one. The high bits of the
+        // product are the well-mixed ones; `ShardedList` masks the low bits, so
+        // shift the high bits down. The arithmetic is done in `u64` so it is
+        // correct on 32-bit targets too.
+        #[cfg(not(loom))]
+        {
+            let addr = target.as_ptr() as usize as u64;
+            (addr.wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 32) as usize
+        }
     }
 }
 
