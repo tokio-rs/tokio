@@ -197,6 +197,14 @@ pub(crate) struct Shared {
     /// Scheduler configuration options
     config: Config,
 
+    /// Pre-computed divisor applied to the global queue length when a worker
+    /// pulls a batch of tasks from it. Derived once from the worker count `N`
+    /// and `config.global_queue_equitability` (`e`) as `N.powf(e)`, clamped to
+    /// `1..=N`. `e == 1` yields `N` (each worker takes a `1 / N` share); smaller
+    /// values shrink the divisor so a worker takes a larger share per pull,
+    /// reducing contention on the global queue lock.
+    global_queue_share_divisor: usize,
+
     /// Collects metrics from the runtime.
     pub(super) scheduler_metrics: SchedulerMetrics,
 
@@ -312,6 +320,15 @@ pub(super) fn create(
     let (idle, idle_synced) = Idle::new(size);
     let (inject, inject_synced) = inject::Shared::new();
 
+    // Pre-compute the divisor used when a worker pulls a batch from the global
+    // queue. `global_queue_equitability` (`e`) scales the per-pull share from
+    // `1 / N` (`e == 1`, fully equitable) up to the whole queue (`e == 0`). The
+    // divisor `N.powf(e)` interpolates between `N` and `1`; we clamp to `1..=N`
+    // to guard against rounding nudging the result outside that range.
+    let global_queue_share_divisor =
+        (size as f32).powf(config.global_queue_equitability).round() as usize;
+    let global_queue_share_divisor = global_queue_share_divisor.clamp(1, size.max(1));
+
     let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
         name,
@@ -330,6 +347,7 @@ pub(super) fn create(
             shutdown_cores: Mutex::new(vec![]),
             trace_status: TraceStatus::new(remotes_len),
             config,
+            global_queue_share_divisor,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
             _counters: Counters,
@@ -1104,10 +1122,12 @@ impl Core {
             );
 
             // The worker is currently idle, pull a batch of work from the
-            // injection queue. We don't want to pull *all* the work so other
-            // workers can also get some.
+            // injection queue. By default we don't pull *all* the work so other
+            // workers can also get some; the share is scaled by
+            // `global_queue_share_divisor` (derived from the configured
+            // `global_queue_equitability`).
             let n = usize::min(
-                worker.inject().len() / worker.handle.shared.remotes.len() + 1,
+                worker.inject().len() / worker.handle.shared.global_queue_share_divisor + 1,
                 cap,
             );
 

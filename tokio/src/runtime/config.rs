@@ -9,6 +9,13 @@ pub(crate) struct Config {
     /// How many ticks before pulling a task from the global/remote queue?
     pub(crate) global_queue_interval: Option<u32>,
 
+    /// How equitably multi-threaded scheduler workers drain the global queue,
+    /// in `0.0..=1.0`. A worker takes a `1 / N.powf(equitability)` share of the
+    /// queued tasks, where `N` is the number of workers. `1.0` gives each worker
+    /// an equal `1 / N` share; smaller values let a worker take more per pull,
+    /// reducing global-queue lock contention when `N` is large.
+    pub(crate) global_queue_equitability: f32,
+
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(crate) event_interval: u32,
 

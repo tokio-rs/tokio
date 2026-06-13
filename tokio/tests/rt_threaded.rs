@@ -951,4 +951,66 @@ mod unstable {
 
         assert_ne!(rt1.handle().id(), rt2.handle().id());
     }
+
+    /// `global_queue_equitability` scales the per-pull share of the global
+    /// queue across the full `0.0..=1.0` range. Across that range and a spread
+    /// of worker counts, every spawned task must still complete (the global
+    /// queue is always fully drained, regardless of the share each worker
+    /// takes).
+    #[test]
+    fn global_queue_equitability_drains_all_tasks() {
+        const TASKS: usize = 1_000;
+
+        for worker_threads in [1, 2, 4, 16] {
+            for equitability in [0.0, 0.25, 0.5, 0.75, 1.0] {
+                let rt = runtime::Builder::new_multi_thread()
+                    .worker_threads(worker_threads)
+                    .global_queue_equitability(equitability)
+                    .build()
+                    .unwrap();
+
+                let cnt = Arc::new(AtomicUsize::new(0));
+                rt.block_on(async {
+                    let mut set = tokio::task::JoinSet::new();
+                    for _ in 0..TASKS {
+                        let cnt = cnt.clone();
+                        set.spawn(async move { cnt.fetch_add(1, Ordering::Relaxed) });
+                    }
+                    while let Some(res) = set.join_next().await {
+                        res.unwrap();
+                    }
+                });
+
+                assert_eq!(
+                    cnt.load(Relaxed),
+                    TASKS,
+                    "worker_threads={worker_threads}, equitability={equitability}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "global_queue_equitability must be in the range 0.0..=1.0")]
+    fn global_queue_equitability_rejects_out_of_range() {
+        let _ = runtime::Builder::new_multi_thread().global_queue_equitability(1.5);
+    }
+
+    #[test]
+    #[should_panic(expected = "global_queue_equitability must be in the range 0.0..=1.0")]
+    fn global_queue_equitability_rejects_nan() {
+        let _ = runtime::Builder::new_multi_thread().global_queue_equitability(f32::NAN);
+    }
+
+    #[test]
+    #[should_panic(expected = "global_queue_equitability must be in the range 0.0..=1.0")]
+    fn global_queue_equitability_rejects_infinity() {
+        let _ = runtime::Builder::new_multi_thread().global_queue_equitability(f32::INFINITY);
+    }
+
+    #[test]
+    #[should_panic(expected = "global_queue_equitability must be in the range 0.0..=1.0")]
+    fn global_queue_equitability_rejects_neg_infinity() {
+        let _ = runtime::Builder::new_multi_thread().global_queue_equitability(f32::NEG_INFINITY);
+    }
 }
