@@ -140,7 +140,7 @@ impl UdpSocket {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// #   if cfg!(miri) { return Ok(()); } // No UDP sockets in miri.
     ///     let sock = UdpSocket::bind("0.0.0.0:8080").await?;
     ///     // use `sock`
     /// #   let _ = sock;
@@ -308,7 +308,7 @@ impl UdpSocket {
     /// # use std::{io, net::SocketAddr};
     /// # #[tokio::main]
     /// # async fn main() -> io::Result<()> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No UDP sockets in miri.
     /// let addr = "0.0.0.0:8080".parse::<SocketAddr>().unwrap();
     /// let peer = "127.0.0.1:11100".parse::<SocketAddr>().unwrap();
     /// let sock = UdpSocket::bind(addr).await?;
@@ -2288,7 +2288,7 @@ impl UdpSocket {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// #   if cfg!(miri) { return Ok(()); } // No UDP sockets in miri.
     ///     // Create a socket
     ///     let socket = UdpSocket::bind("0.0.0.0:8080").await?;
     ///

@@ -517,7 +517,8 @@ macro_rules! cfg_taskdump {
                 any(
                     target_arch = "aarch64",
                     target_arch = "x86",
-                    target_arch = "x86_64"
+                    target_arch = "x86_64",
+                    target_arch = "s390x"
                 )
             ))]
             #[cfg_attr(
@@ -530,7 +531,8 @@ macro_rules! cfg_taskdump {
                     any(
                         target_arch = "aarch64",
                         target_arch = "x86",
-                        target_arch = "x86_64"
+                        target_arch = "x86_64",
+                        target_arch = "s390x"
                     )
                 )))
             )]
@@ -550,7 +552,8 @@ macro_rules! cfg_not_taskdump {
                 any(
                     target_arch = "aarch64",
                     target_arch = "x86",
-                    target_arch = "x86_64"
+                    target_arch = "x86_64",
+                    target_arch = "s390x"
                 )
             )))]
             $item

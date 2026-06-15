@@ -4,10 +4,12 @@ Pull Requests are the way concrete changes are made to the code, documentation,
 and dependencies in the Tokio repository.
 
 Even tiny pull requests (e.g., one-character pull request fixing a typo in API
-documentation) are greatly appreciated. Before making a large change, it is
-usually a good idea to first open an issue describing the change to solicit
-feedback and guidance. This will increase the likelihood of the PR getting
-merged.
+documentation) are greatly appreciated.
+
+> [!NOTE]
+> Before making a large change, it is usually a good idea to first open an
+> issue describing the change to solicit feedback and guidance.
+> This will increase the likelihood of the PR getting merged.
 
 ### Cargo Commands
 
@@ -23,8 +25,10 @@ cargo check --all-features
 cargo test --all-features
 ```
 
-**NOTE**: there are some features that are not supported in every system, so you might
-need to specify which features you want to pass to cargo (e.g., `cargo check --features=full,io-uring`)
+> [!NOTE]
+> There are some features that are not available in some systems (e.g., `io-uring`
+> which is Linux only). In that case you cannot use the `--all-features` and you
+> should specify only the features that are supported (e.g., `--features=full`).
 
 Ideally, you should use the same version of clippy as the one used in CI
 (defined by `env.rust_clippy` in [ci.yml][ci.yml]), because newer versions
@@ -99,7 +103,7 @@ MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-strict-provenance" \
     cargo +nightly miri test --features full --lib --tests
 ```
 
-### Performing spellcheck on tokio codebase
+### Performing spellcheck on Tokio codebase
 
 You can perform a spell-check on the Tokio codebase. For details of how to use the spellcheck tool, feel free to visit
 https://github.com/drahnr/cargo-spellcheck

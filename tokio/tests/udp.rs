@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 // WASIp1 doesn't support bind
-// No `socket` on miri.
+// No UDP sockets on miri.
 #![cfg(all(
     feature = "net",
     feature = "macros",
