@@ -1,3 +1,11 @@
+# Unreleased
+
+### Added
+
+- task: add `Spawn::poll_to_block` ([#8209])
+
+[#8209]: https://github.com/tokio-rs/tokio/issues/8209
+
 # 0.4.5 (January 4th, 2026)
 
 ### Added

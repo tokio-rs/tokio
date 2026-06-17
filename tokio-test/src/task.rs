@@ -123,6 +123,30 @@ impl<T: Future> Spawn<T> {
         let fut = self.future.as_mut();
         self.task.enter(|cx| fut.poll(cx))
     }
+
+    /// Polls the future until it either completes or is no longer woken.
+    ///
+    /// Unlike [`poll`](Self::poll), this method keeps polling while the future
+    /// returns [`Poll::Pending`] but has received a wake notification, advancing
+    /// the future as far as possible without waiting for external events.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use tokio_test::task;
+    ///
+    /// let mut task = task::spawn(async { 42 });
+    ///
+    /// assert!(task.poll_to_block().is_ready());
+    /// ```
+    pub fn poll_to_block(&mut self) -> Poll<T::Output> {
+        loop {
+            let result = self.poll();
+            if result.is_ready() || !self.is_woken() {
+                return result;
+            }
+        }
+    }
 }
 
 impl<T: Stream> Spawn<T> {
