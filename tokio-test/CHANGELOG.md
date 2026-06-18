@@ -2,9 +2,9 @@
 
 ### Added
 
-- task: add `Spawn::poll_to_block` ([#8209])
+- task: add `Spawn::poll_to_block` ([#8213])
 
-[#8209]: https://github.com/tokio-rs/tokio/issues/8209
+[#8213]: https://github.com/tokio-rs/tokio/pulls/8213
 
 # 0.4.5 (January 4th, 2026)
 
