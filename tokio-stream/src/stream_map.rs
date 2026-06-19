@@ -632,6 +632,10 @@ where
                         should_loop = true;
 
                         idx = idx.wrapping_add(1) % self.entries.len();
+
+                        if added == limit {
+                            break;
+                        }
                     }
                     Poll::Ready(None) => {
                         // Remove the entry
