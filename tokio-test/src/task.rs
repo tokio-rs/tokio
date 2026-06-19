@@ -70,6 +70,9 @@ const IDLE: usize = 0;
 const WAKE: usize = 1;
 const SLEEP: usize = 2;
 
+/// Default maximum number of poll iterations in [`Spawn::poll_to_block`].
+const POLL_TO_BLOCK_MAX_ITERATIONS: usize = 128;
+
 impl<T> Spawn<T> {
     /// Consumes `self` returning the inner value
     pub fn into_inner(self) -> T
@@ -130,6 +133,13 @@ impl<T: Future> Spawn<T> {
     /// returns [`Poll::Pending`] but has received a wake notification, advancing
     /// the future as far as possible without waiting for external events.
     ///
+    /// Polling is bounded to avoid infinite loops when a future wakes without
+    /// making progress.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the iteration limit is exceeded.
+    ///
     /// # Example
     ///
     /// ```
@@ -140,12 +150,15 @@ impl<T: Future> Spawn<T> {
     /// assert!(task.poll_to_block().is_ready());
     /// ```
     pub fn poll_to_block(&mut self) -> Poll<T::Output> {
-        loop {
+        for _ in 0..POLL_TO_BLOCK_MAX_ITERATIONS {
             let result = self.poll();
             if result.is_ready() || !self.is_woken() {
                 return result;
             }
         }
+        panic!(
+            "poll_to_block exceeded {POLL_TO_BLOCK_MAX_ITERATIONS} iterations; future may be waking without making progress"
+        );
     }
 }
 
