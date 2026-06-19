@@ -20,7 +20,7 @@ pub(super) struct Synced {
     is_shutdown: bool,
 
     // List of all registrations tracked by the set
-    registrations: LinkedList<Arc<ScheduledIo>, ScheduledIo>,
+    registrations: LinkedList<Arc<ScheduledIo>>,
 
     // Registrations that are pending drop. When a `Registration` is dropped, it
     // stores its `ScheduledIo` in this list. The I/O driver is responsible for
