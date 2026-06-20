@@ -12,7 +12,7 @@ async fn test_iter_coop_budget() {
 
     for i in 0..limit {
         let res = stream.poll_next();
-        assert!(res.is_ready(), "Should be ready at index {}", i);
+        assert!(res.is_ready(), "Should be ready at index {i}");
     }
 
     // Next poll should be pending
