@@ -97,7 +97,7 @@ impl Future for WakeForever {
 }
 
 #[test]
-#[should_panic(expected = "poll_to_block exceeded 128 iterations")]
+#[should_panic(expected = "poll_to_block exceeded 150 iterations")]
 fn poll_to_block_panics_on_infinite_wake() {
     let mut task = task::spawn(WakeForever);
     let _ = task.poll_to_block();

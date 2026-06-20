@@ -71,7 +71,7 @@ const WAKE: usize = 1;
 const SLEEP: usize = 2;
 
 /// Default maximum number of poll iterations in [`Spawn::poll_to_block`].
-const POLL_TO_BLOCK_MAX_ITERATIONS: usize = 128;
+const POLL_TO_BLOCK_MAX_ITERATIONS: usize = 150;
 
 impl<T> Spawn<T> {
     /// Consumes `self` returning the inner value
