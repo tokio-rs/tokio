@@ -12,8 +12,8 @@ use super::linked_list::{Link, LinkedList};
 /// responsibility to ensure the list is empty before dropping it.
 ///
 /// Note: Due to its inner sharded design, the order of nodes cannot be guaranteed.
-pub(crate) struct ShardedList<L, T> {
-    lists: Box<[Mutex<LinkedList<L, T>>]>,
+pub(crate) struct ShardedList<L: ShardedListItem> {
+    lists: Box<[Mutex<LinkedList<L>>]>,
     added: MetricAtomicU64,
     count: MetricAtomicUsize,
     shard_mask: usize,
@@ -32,7 +32,15 @@ pub(crate) unsafe trait ShardedListItem: Link {
     unsafe fn get_shard_id(target: NonNull<Self::Target>) -> usize;
 }
 
-impl<L, T> ShardedList<L, T> {
+/// Used to get the lock of shard.
+pub(crate) struct ShardGuard<'a, L: Link> {
+    lock: MutexGuard<'a, LinkedList<L>>,
+    added: &'a MetricAtomicU64,
+    count: &'a MetricAtomicUsize,
+    id: usize,
+}
+
+impl<L: ShardedListItem> ShardedList<L> {
     /// Creates a new and empty sharded linked list with the specified size.
     pub(crate) fn new(sharded_size: usize) -> Self {
         assert!(sharded_size.is_power_of_two());
@@ -46,17 +54,7 @@ impl<L, T> ShardedList<L, T> {
             shard_mask,
         }
     }
-}
 
-/// Used to get the lock of shard.
-pub(crate) struct ShardGuard<'a, L, T> {
-    lock: MutexGuard<'a, LinkedList<L, T>>,
-    added: &'a MetricAtomicU64,
-    count: &'a MetricAtomicUsize,
-    id: usize,
-}
-
-impl<L: ShardedListItem> ShardedList<L, L::Target> {
     /// Removes the last element from a list specified by `shard_id` and returns it, or None if it is
     /// empty.
     pub(crate) fn pop_back(&self, shard_id: usize) -> Option<L::Handle> {
@@ -89,7 +87,7 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
     }
 
     /// Gets the lock of `ShardedList`, makes us have the write permission.
-    pub(crate) fn lock_shard(&self, val: &L::Handle) -> ShardGuard<'_, L, L::Target> {
+    pub(crate) fn lock_shard(&self, val: &L::Handle) -> ShardGuard<'_, L> {
         let id = unsafe { L::get_shard_id(L::as_raw(val)) };
         ShardGuard {
             lock: self.shard_inner(id),
@@ -126,13 +124,13 @@ impl<L: ShardedListItem> ShardedList<L, L::Target> {
     }
 
     #[inline]
-    fn shard_inner(&self, id: usize) -> MutexGuard<'_, LinkedList<L, <L as Link>::Target>> {
+    fn shard_inner(&self, id: usize) -> MutexGuard<'_, LinkedList<L>> {
         // Safety: This modulo operation ensures that the index is not out of bounds.
         unsafe { self.lists.get_unchecked(id & self.shard_mask).lock() }
     }
 }
 
-impl<'a, L: ShardedListItem> ShardGuard<'a, L, L::Target> {
+impl<'a, L: ShardedListItem> ShardGuard<'a, L> {
     /// Push a value to this shard.
     pub(crate) fn push(mut self, val: L::Handle) {
         let id = unsafe { L::get_shard_id(L::as_raw(&val)) };
@@ -144,7 +142,7 @@ impl<'a, L: ShardedListItem> ShardGuard<'a, L, L::Target> {
 }
 
 cfg_taskdump! {
-    impl<L: ShardedListItem> ShardedList<L, L::Target> {
+    impl<L: ShardedListItem> ShardedList<L> {
         pub(crate) fn for_each<F>(&self, mut f: F)
         where
             F: FnMut(&L::Handle),

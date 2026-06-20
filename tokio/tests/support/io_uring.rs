@@ -10,7 +10,7 @@ use io_uring::IoUring;
 
 // Currently, we are running some of the tests on Kernels where io_uring is not supported
 // to check if the fallback mechanism works, this comes with the limitation that we are not
-// able to run some checks (e.g., asserting a poll returns pending). This utiliy function
+// able to run some checks (e.g., asserting a poll returns pending). This utility function
 // is useful when we want to run a test only in Linux targets where io_uring is supported.
 pub fn io_uring_supported() -> bool {
     match IoUring::new(256) {

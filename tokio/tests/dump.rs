@@ -2,7 +2,12 @@
     tokio_unstable,
     feature = "taskdump",
     target_os = "linux",
-    any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+    any(
+        target_arch = "aarch64",
+        target_arch = "x86",
+        target_arch = "x86_64",
+        target_arch = "s390x"
+    )
 ))]
 
 use std::hint::black_box;
