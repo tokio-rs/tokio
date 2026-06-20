@@ -27,13 +27,23 @@ impl Drop for Timer {
 
 impl Timer {
     #[track_caller]
-    pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
+    pub(crate) fn new(
+        handle: scheduler::Handle,
+        deadline: Instant,
+    ) -> Result<Self, scheduler::Handle> {
         let tick = deadline_to_tick(&handle, deadline);
-        let entry = with_current_temp_local_context(&handle, |ctx| match ctx {
-            Some(TempLocalContext::Running { registration_queue }) => {
+        with_current_temp_local_context(handle, |handle, ctx| match ctx {
+            Some(TempLocalContext::Running {
+                elapsed,
+                registration_queue: _,
+            }) if tick <= elapsed => Err(handle),
+            Some(TempLocalContext::Running {
+                elapsed: _,
+                registration_queue,
+            }) => {
                 let entry = EntryHandle::new(tick);
                 unsafe { registration_queue.push_front(entry.clone()) }
-                entry
+                Ok(Timer { entry })
             }
             #[cfg(feature = "rt-multi-thread")]
             Some(TempLocalContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
@@ -41,11 +51,9 @@ impl Timer {
             _ => {
                 let entry = EntryHandle::new(tick);
                 push_from_remote(&handle, entry.clone());
-                entry
+                Ok(Timer { entry })
             }
-        });
-
-        Timer { entry }
+        })
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
@@ -57,9 +65,9 @@ impl Timer {
     }
 }
 
-fn with_current_temp_local_context<F, R>(sched_hdl: &scheduler::Handle, f: F) -> R
+fn with_current_temp_local_context<F, R>(sched_hdl: scheduler::Handle, f: F) -> R
 where
-    F: FnOnce(Option<TempLocalContext<'_>>) -> R,
+    F: FnOnce(scheduler::Handle, Option<TempLocalContext<'_>>) -> R,
 {
     #[cfg(not(feature = "rt"))]
     {
@@ -78,7 +86,7 @@ where
         let is_same_rt = context::with_current(|cur_sched_hdl| {
             use crate::runtime::scheduler::Handle;
 
-            match (sched_hdl, cur_sched_hdl) {
+            match (&sched_hdl, cur_sched_hdl) {
                 (Handle::CurrentThread(_), _) => {
                     // this case is impossible as `tokio::runtime::Builder::enable_alt_timer`
                     // is not supported in the current-thread runtime, but we'd better handle it
@@ -97,14 +105,16 @@ where
             // The timer is being registered from a runtime
             // that is different from the runtime that the timer is created in,
             // so we cannot access `TempLocalContext` of the original runtime.
-            return f(None);
+            return f(sched_hdl, None);
         }
 
         // The timer is being registered from the same runtime that the timer is created in,
         // so we can access `TempLocalContext`.
         context::with_scheduler(|maybe_cx| match maybe_cx {
-            Some(cx) => cx.expect_multi_thread().with_time_temp_local_context(f),
-            None => f(None),
+            Some(cx) => cx
+                .expect_multi_thread()
+                .with_time_temp_local_context(|ctx| f(sched_hdl, ctx)),
+            None => f(sched_hdl, None),
         })
     }
 }
