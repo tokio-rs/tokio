@@ -27,6 +27,9 @@ cfg_not_has_atomic_u64! {
 
 /// Producer handle. May only be used from a single thread.
 pub(crate) struct Local<T: 'static> {
+    // If this is `false`, we DEFINITELY don't have a task in the LIFO slot,
+    // allowing us to avoid an atomic swap to try and pop from it.
+    might_have_lifo: bool,
     inner: Arc<Inner<T>>,
 }
 
@@ -51,6 +54,13 @@ pub(crate) struct Inner<T: 'static> {
 
     /// Only updated by producer thread but read by many threads.
     tail: AtomicUnsignedShort,
+
+    /// When a task is scheduled from a worker, it is stored in this slot. The
+    /// worker will check this slot for a task **before** checking the run
+    /// queue. This effectively results in the **last** scheduled task to be run
+    /// next (LIFO). This is an optimization for improving locality which
+    /// benefits message passing patterns and helps to reduce latency.
+    lifo: task::AtomicNotified<T>,
 
     /// Elements
     buffer: Box<[UnsafeCell<MaybeUninit<task::Notified<T>>>; LOCAL_QUEUE_CAPACITY]>,
@@ -89,9 +99,11 @@ pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
         head: AtomicUnsignedLong::new(0),
         tail: AtomicUnsignedShort::new(0),
         buffer: make_fixed_size(buffer.take(LOCAL_QUEUE_CAPACITY).collect()),
+        lifo: task::AtomicNotified::empty(),
     });
 
     let local = Local {
+        might_have_lifo: false,
         inner: inner.clone(),
     };
 
@@ -104,9 +116,10 @@ impl<T> Local<T> {
     /// Returns the number of entries in the queue
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.inner.head.load(Acquire));
+        let lifo = (self.might_have_lifo && self.inner.lifo.is_some()) as usize;
         // safety: this is the **only** thread that updates this cell.
         let tail = unsafe { self.inner.tail.unsync_load() };
-        len(head, tail)
+        len(head, tail) + lifo
     }
 
     /// How many tasks can be pushed into the queue
@@ -397,6 +410,26 @@ impl<T> Local<T> {
 
         Some(self.inner.buffer[idx].with(|ptr| unsafe { ptr::read(ptr).assume_init() }))
     }
+
+    /// Pushes a task to the LIFO slot, returning the task previously in the
+    /// LIFO slot (if there was one).
+    pub(crate) fn push_lifo(&mut self, task: task::Notified<T>) -> Option<task::Notified<T>> {
+        self.might_have_lifo = true;
+        self.inner.lifo.swap(Some(task))
+    }
+
+    /// Pops the task currently held in the LIFO slot, if there is one;
+    /// otherwise, returns `None`.
+    pub(crate) fn pop_lifo(&mut self) -> Option<task::Notified<T>> {
+        if !self.might_have_lifo {
+            return None;
+        }
+
+        self.might_have_lifo = false;
+
+        // LIFO-suction!
+        self.inner.lifo.take()
+    }
 }
 
 impl<T> Steal<T> {
@@ -404,7 +437,8 @@ impl<T> Steal<T> {
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.0.head.load(Acquire));
         let tail = self.0.tail.load(Acquire);
-        len(head, tail)
+        let lifo = self.0.lifo.is_some() as usize;
+        len(head, tail) + lifo
     }
 
     /// Return true if the queue is empty,
@@ -414,10 +448,15 @@ impl<T> Steal<T> {
     }
 
     /// Steals half the tasks from self and place them into `dst`.
+    ///
+    /// If `steal_lifo` is set, this method will attempt to steal from the LIFO
+    /// slot if this worker's run queue is empty. Otherwise, it will only steal
+    /// from the main queue.
     pub(crate) fn steal_into(
         &self,
         dst: &mut Local<T>,
         dst_stats: &mut Stats,
+        steal_lifo: bool,
     ) -> Option<task::Notified<T>> {
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
@@ -439,8 +478,18 @@ impl<T> Steal<T> {
         let mut n = self.steal_into2(dst, dst_tail);
 
         if n == 0 {
-            // No tasks were stolen
-            return None;
+            if steal_lifo {
+                // If no tasks were stolen, let's see if there's one in the
+                // LIFO slot.
+                let lifo = self.0.lifo.take();
+                if lifo.is_some() {
+                    dst_stats.incr_steal_count(1);
+                    dst_stats.incr_steal_operations();
+                }
+                return lifo;
+            } else {
+                return None;
+            }
         }
 
         dst_stats.incr_steal_count(n as u16);
@@ -572,6 +621,7 @@ impl<T> Drop for Local<T> {
     fn drop(&mut self) {
         if !std::thread::panicking() {
             assert!(self.pop().is_none(), "queue not empty");
+            assert!(self.pop_lifo().is_none(), "LIFO slot not empty");
         }
     }
 }

@@ -125,7 +125,7 @@ fn steal_batch() {
         local1.push_back_or_overflow(task, &inject, &mut stats);
     }
 
-    assert!(steal1.steal_into(&mut local2, &mut stats).is_some());
+    assert!(steal1.steal_into(&mut local2, &mut stats, false).is_some());
 
     cfg_unstable_metrics! {
         assert_metrics!(stats, steal_count == 2);
@@ -172,7 +172,7 @@ fn stress1() {
             let mut n = 0;
 
             for _ in 0..NUM_STEAL {
-                if steal.steal_into(&mut local, &mut stats).is_some() {
+                if steal.steal_into(&mut local, &mut stats, false).is_some() {
                     n += 1;
                 }
 
@@ -233,7 +233,7 @@ fn stress2() {
             let mut n = 0;
 
             for _ in 0..NUM_STEAL {
-                if steal.steal_into(&mut local, &mut stats).is_some() {
+                if steal.steal_into(&mut local, &mut stats, false).is_some() {
                     n += 1;
                 }
 
