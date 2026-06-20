@@ -289,6 +289,54 @@ impl Handle {
         Ok(scheduled_io)
     }
 
+    /// Registers an I/O resource with the reactor, bypassing Mio entirely and using raw epoll_ctl.
+    ///
+    /// This is more or less the copy-pasted from the Mio code, and exists so that we can use flags
+    /// other than the base set of epoll ones we normally use and those representing interests.
+    ///
+    /// This is important for supporting things like `EPOLLEXCLUSIVE`, which is very useful for
+    /// shared-nothing runtimes.
+    ///
+    /// The registries token is returned.
+    #[cfg(all(target_os = "linux", tokio_unstable))]
+    pub(super) fn add_source_raw(
+        &self,
+        source: &mut impl std::os::unix::io::AsRawFd,
+        flags: u32,
+    ) -> io::Result<Arc<ScheduledIo>> {
+        use libc::EPOLLET;
+        use std::os::unix::io::AsRawFd;
+
+        let events = EPOLLET as u32 | flags;
+
+        let scheduled_io = self.registrations.allocate(&mut self.synced.lock())?;
+        let token = scheduled_io.token();
+
+        let mut event = libc::epoll_event {
+            events,
+            u64: usize::from(token) as u64,
+        };
+
+        // TODO: if this returns an err, the `ScheduledIo` leaks...
+        let res = unsafe {
+            libc::epoll_ctl(
+                self.registry.as_raw_fd(),
+                libc::EPOLL_CTL_ADD,
+                source.as_raw_fd(),
+                &mut event,
+            )
+        };
+
+        if res == -1 {
+            return Err(std::io::Error::last_os_error());
+        }
+
+        // TODO: move this logic to `RegistrationSet` and use a `CountedLinkedList`
+        self.metrics.incr_fd_count();
+
+        Ok(scheduled_io)
+    }
+
     /// Deregisters an I/O resource from the reactor.
     pub(super) fn deregister_source(
         &self,

@@ -80,6 +80,31 @@ impl Registration {
         Ok(Registration { handle, shared })
     }
 
+    /// Registers the I/O resource with the reactor for the provided handle, for
+    /// a specific `Interest`, *with a set of raw additional epoll flags*. This does not add `hup`
+    /// or `error` so if you are interested in those states, you will need to add them to the
+    /// readiness state passed to this function.
+    ///
+    /// # Return
+    ///
+    /// - `Ok` if the registration happened successfully
+    /// - `Err` if an error was encountered during registration
+    #[cfg(all(target_os = "linux", tokio_unstable))]
+    pub(crate) fn new_with_flags_and_handle(
+        io: &mut impl std::os::unix::io::AsRawFd,
+        flags: u32,
+        handle: scheduler::Handle,
+    ) -> io::Result<Registration> {
+        debug_assert!(
+            (flags & libc::EPOLLONESHOT as u32) == 0,
+            "Tokio does not support using EPOLLONESHOT in user-specified epoll flags"
+        );
+
+        let shared = handle.driver().io().add_source_raw(io, flags)?;
+
+        Ok(Registration { handle, shared })
+    }
+
     /// Deregisters the I/O resource from the reactor it is associated with.
     ///
     /// This function must be called before the I/O resource associated with the
