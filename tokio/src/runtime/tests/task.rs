@@ -1,8 +1,8 @@
 use crate::runtime::task::{
     self, unowned, Id, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task,
-    TaskHarnessScheduleHooks,
 };
 use crate::runtime::tests::NoopSchedule;
+use crate::runtime::TaskHooks;
 
 use std::collections::VecDeque;
 use std::future::Future;
@@ -61,6 +61,8 @@ fn create_drop1() {
         NoopSchedule,
         Id::next(),
         SpawnLocation::capture(),
+        #[cfg(tokio_unstable)]
+        None,
     );
     drop(notified);
     handle.assert_not_dropped();
@@ -79,6 +81,8 @@ fn create_drop2() {
         NoopSchedule,
         Id::next(),
         SpawnLocation::capture(),
+        #[cfg(tokio_unstable)]
+        None,
     );
     drop(join);
     handle.assert_not_dropped();
@@ -97,6 +101,8 @@ fn drop_abort_handle1() {
         NoopSchedule,
         Id::next(),
         SpawnLocation::capture(),
+        #[cfg(tokio_unstable)]
+        None,
     );
     let abort = join.abort_handle();
     drop(join);
@@ -118,6 +124,8 @@ fn drop_abort_handle2() {
         NoopSchedule,
         Id::next(),
         SpawnLocation::capture(),
+        #[cfg(tokio_unstable)]
+        None,
     );
     let abort = join.abort_handle();
     drop(notified);
@@ -139,6 +147,8 @@ fn drop_abort_handle_clone() {
         NoopSchedule,
         Id::next(),
         SpawnLocation::capture(),
+        #[cfg(tokio_unstable)]
+        None,
     );
     let abort = join.abort_handle();
     let abort_clone = abort.clone();
@@ -164,6 +174,8 @@ fn create_shutdown1() {
         NoopSchedule,
         Id::next(),
         SpawnLocation::capture(),
+        #[cfg(tokio_unstable)]
+        None,
     );
     drop(join);
     handle.assert_not_dropped();
@@ -182,6 +194,8 @@ fn create_shutdown2() {
         NoopSchedule,
         Id::next(),
         SpawnLocation::capture(),
+        #[cfg(tokio_unstable)]
+        None,
     );
     handle.assert_not_dropped();
     notified.shutdown();
@@ -191,7 +205,14 @@ fn create_shutdown2() {
 
 #[test]
 fn unowned_poll() {
-    let (task, _) = unowned(async {}, NoopSchedule, Id::next(), SpawnLocation::capture());
+    let (task, _) = unowned(
+        async {},
+        NoopSchedule,
+        Id::next(),
+        SpawnLocation::capture(),
+        #[cfg(tokio_unstable)]
+        None,
+    );
     task.run();
 }
 
@@ -401,10 +422,23 @@ impl Runtime {
         T: 'static + Send + Future,
         T::Output: 'static + Send,
     {
-        let (handle, notified) =
-            self.0
-                .owned
-                .bind(future, self.clone(), Id::next(), SpawnLocation::capture());
+        let task_hooks = TaskHooks {
+            task_spawn_callback: None,
+            task_terminate_callback: None,
+            #[cfg(tokio_unstable)]
+            before_poll_callback: None,
+            #[cfg(tokio_unstable)]
+            after_poll_callback: None,
+        };
+        let (handle, notified) = self.0.owned.bind_with_spawn_hook(
+            future,
+            self.clone(),
+            Id::next(),
+            SpawnLocation::capture(),
+            #[cfg(tokio_unstable)]
+            None,
+            &task_hooks,
+        );
 
         if let Some(notified) = notified {
             self.schedule(notified);
@@ -459,11 +493,5 @@ impl Schedule for Runtime {
 
     fn schedule(&self, task: task::Notified<Self>) {
         self.0.core.try_lock().unwrap().queue.push_back(task);
-    }
-
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: None,
-        }
     }
 }

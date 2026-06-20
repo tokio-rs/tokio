@@ -544,6 +544,8 @@ cfg_rt! {
     mod blocking;
     #[cfg_attr(target_os = "wasi", allow(unused_imports))]
     pub(crate) use blocking::spawn_blocking;
+    #[cfg(feature = "rt-multi-thread")]
+    pub(crate) use blocking::spawn_blocking_skip_hooks;
 
     cfg_trace! {
         pub(crate) use blocking::Mandatory;
@@ -603,9 +605,11 @@ cfg_rt! {
     }
 
     mod task_hooks;
-    pub(crate) use task_hooks::{TaskHooks, TaskCallback};
+    pub(crate) use task_hooks::{TaskCallback, TaskHooks, TaskSpawnCallback};
+    #[cfg(tokio_unstable)]
+    pub(crate) use task_hooks::TaskData;
     cfg_unstable! {
-        pub use task_hooks::TaskMeta;
+        pub use task_hooks::{TaskMeta, TaskMetaRef};
     }
     #[cfg(not(tokio_unstable))]
     pub(crate) use task_hooks::TaskMeta;

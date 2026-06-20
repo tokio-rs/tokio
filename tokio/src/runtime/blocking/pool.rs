@@ -185,6 +185,22 @@ where
     rt.spawn_blocking(func)
 }
 
+/// Runs an internal runtime worker on the blocking pool without invoking task
+/// lifecycle hooks.
+#[track_caller]
+#[cfg(feature = "rt-multi-thread")]
+#[cfg_attr(target_os = "wasi", allow(dead_code))]
+pub(crate) fn spawn_blocking_skip_hooks<F, R>(func: F) -> JoinHandle<R>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    let rt = Handle::current();
+    rt.inner
+        .blocking_spawner()
+        .spawn_blocking_skip_hooks(&rt, func)
+}
+
 cfg_fs! {
     #[cfg_attr(any(
         all(loom, not(test)), // the function is covered by loom tests
@@ -300,6 +316,40 @@ impl Spawner {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        self.spawn_blocking_impl(
+            rt,
+            func,
+            #[cfg(tokio_unstable)]
+            true,
+        )
+    }
+
+    #[track_caller]
+    #[cfg(feature = "rt-multi-thread")]
+    pub(crate) fn spawn_blocking_skip_hooks<F, R>(&self, rt: &Handle, func: F) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        self.spawn_blocking_impl(
+            rt,
+            func,
+            #[cfg(tokio_unstable)]
+            false,
+        )
+    }
+
+    #[track_caller]
+    fn spawn_blocking_impl<F, R>(
+        &self,
+        rt: &Handle,
+        func: F,
+        #[cfg(tokio_unstable)] run_task_hooks: bool,
+    ) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
         let fn_size = std::mem::size_of::<F>();
         let (join_handle, spawn_result) = if fn_size > BOX_FUTURE_THRESHOLD {
             self.spawn_blocking_inner(
@@ -307,6 +357,10 @@ impl Spawner {
                 Mandatory::NonMandatory,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
+                #[cfg(tokio_unstable)]
+                None,
+                #[cfg(tokio_unstable)]
+                run_task_hooks,
             )
         } else {
             self.spawn_blocking_inner(
@@ -314,6 +368,10 @@ impl Spawner {
                 Mandatory::NonMandatory,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
+                #[cfg(tokio_unstable)]
+                None,
+                #[cfg(tokio_unstable)]
+                run_task_hooks,
             )
         };
 
@@ -345,6 +403,10 @@ impl Spawner {
                     Mandatory::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,
+                    #[cfg(tokio_unstable)]
+                    None,
+                    #[cfg(tokio_unstable)]
+                    true,
                 )
             } else {
                 self.spawn_blocking_inner(
@@ -352,6 +414,10 @@ impl Spawner {
                     Mandatory::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,
+                    #[cfg(tokio_unstable)]
+                    None,
+                    #[cfg(tokio_unstable)]
+                    true,
                 )
             };
 
@@ -370,6 +436,8 @@ impl Spawner {
         is_mandatory: Mandatory,
         spawn_meta: SpawnMeta<'_>,
         rt: &Handle,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
+        #[cfg(tokio_unstable)] run_task_hooks: bool,
     ) -> (JoinHandle<R>, Result<(), SpawnError>)
     where
         F: FnOnce() -> R + Send + 'static,
@@ -381,10 +449,26 @@ impl Spawner {
 
         let (task, handle) = task::unowned(
             fut,
-            BlockingSchedule::new(rt),
+            BlockingSchedule::new(
+                rt,
+                #[cfg(tokio_unstable)]
+                run_task_hooks,
+            ),
             id,
             task::SpawnLocation::capture(),
+            #[cfg(tokio_unstable)]
+            user_data,
         );
+
+        #[cfg(tokio_unstable)]
+        if run_task_hooks {
+            task::with_current_task_meta(|parent| {
+                // Safety: the task is freshly allocated and has not been published
+                // to the blocking queue yet.
+                let mut meta = unsafe { task.task_meta() };
+                rt.inner.hooks().spawn(&mut meta, parent);
+            });
+        }
 
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
         (handle, spawned)
@@ -397,6 +481,10 @@ impl Spawner {
             // Shutdown the task: it's fine to shutdown this task (even if
             // mandatory) because it was scheduled after the shutdown of the
             // runtime began.
+            //
+            // Dropping the task can run lifecycle hooks, and those hooks are
+            // allowed to re-enter the blocking pool.
+            drop(shared);
             task.task.shutdown();
 
             // no need to even push this task; it would never get picked up

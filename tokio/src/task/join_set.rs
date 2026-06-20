@@ -705,6 +705,15 @@ impl<'a, T: 'static> Builder<'a, T> {
         Self { builder, ..self }
     }
 
+    /// Sets task data visible to runtime task hooks.
+    pub fn data<D>(self, data: D) -> Self
+    where
+        D: std::any::Any + Send + Sync + 'static,
+    {
+        let builder = self.builder.data(data);
+        Self { builder, ..self }
+    }
+
     /// Spawn the provided task with this builder's settings and store it in the
     /// [`JoinSet`], returning an [`AbortHandle`] that can be used to remotely
     /// cancel the task.

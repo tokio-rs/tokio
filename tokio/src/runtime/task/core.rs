@@ -23,7 +23,9 @@ use crate::loom::cell::UnsafeCell;
 use crate::runtime::context;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
-use crate::runtime::task::{Id, Schedule, TaskHarnessScheduleHooks};
+use crate::runtime::task::{Id, Schedule};
+#[cfg(tokio_unstable)]
+use crate::runtime::TaskData;
 use crate::util::linked_list;
 
 use std::num::NonZeroU64;
@@ -203,9 +205,8 @@ pub(super) struct Trailer {
     pub(super) owned: linked_list::Pointers<Header>,
     /// Consumer task waiting on completion of this task.
     pub(super) waker: UnsafeCell<Option<Waker>>,
-    /// Optional hooks needed in the harness.
-    #[cfg_attr(not(tokio_unstable), allow(dead_code))] //TODO: remove when hooks are stabilized
-    pub(super) hooks: TaskHarnessScheduleHooks,
+    #[cfg(tokio_unstable)]
+    pub(super) user_data: UnsafeCell<Option<TaskData>>,
 }
 
 generate_addr_of_methods! {
@@ -233,6 +234,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         state: State,
         task_id: Id,
         #[cfg(tokio_unstable)] spawned_at: &'static Location<'static>,
+        #[cfg(tokio_unstable)] user_data: Option<TaskData>,
     ) -> Box<Cell<T, S>> {
         // Separated into a non-generic function to reduce LLVM codegen
         fn new_header(
@@ -254,7 +256,10 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         let tracing_id = future.id();
         let vtable = raw::vtable::<T, S>();
         let result = Box::new(Cell {
-            trailer: Trailer::new(scheduler.hooks()),
+            trailer: Trailer::new(
+                #[cfg(tokio_unstable)]
+                user_data,
+            ),
             header: new_header(
                 state,
                 vtable,
@@ -345,6 +350,70 @@ impl Drop for TaskIdGuard {
     }
 }
 
+struct TaskContextGuard {
+    parent_task_id: Option<Id>,
+    #[cfg(tokio_unstable)]
+    parent_task: Option<NonNull<Header>>,
+}
+
+impl TaskContextGuard {
+    fn enter(id: Id, header: NonNull<Header>) -> Self {
+        #[cfg(tokio_unstable)]
+        {
+            let (parent_task_id, parent_task) =
+                context::set_current_task_id_and_task(Some(id), Some(header));
+
+            TaskContextGuard {
+                parent_task_id,
+                parent_task,
+            }
+        }
+
+        #[cfg(not(tokio_unstable))]
+        {
+            let _ = header;
+            TaskContextGuard {
+                parent_task_id: context::set_current_task_id(Some(id)),
+            }
+        }
+    }
+}
+
+impl Drop for TaskContextGuard {
+    fn drop(&mut self) {
+        #[cfg(tokio_unstable)]
+        {
+            context::set_current_task_id_and_task(self.parent_task_id, self.parent_task);
+        }
+
+        #[cfg(not(tokio_unstable))]
+        {
+            context::set_current_task_id(self.parent_task_id);
+        }
+    }
+}
+
+#[cfg(tokio_unstable)]
+struct CurrentTaskGuard {
+    parent_task: Option<NonNull<Header>>,
+}
+
+#[cfg(tokio_unstable)]
+impl CurrentTaskGuard {
+    fn enter(header: NonNull<Header>) -> Self {
+        CurrentTaskGuard {
+            parent_task: context::set_current_task(Some(header)),
+        }
+    }
+}
+
+#[cfg(tokio_unstable)]
+impl Drop for CurrentTaskGuard {
+    fn drop(&mut self) {
+        context::set_current_task(self.parent_task);
+    }
+}
+
 impl<T: Future, S: Schedule> Core<T, S> {
     /// Polls the future.
     ///
@@ -359,7 +428,14 @@ impl<T: Future, S: Schedule> Core<T, S> {
     ///
     /// `self` must also be pinned. This is handled by storing the task on the
     /// heap.
-    pub(super) fn poll(&self, mut cx: Context<'_>) -> Poll<T::Output> {
+    ///
+    /// `header` must point to the header for this exact task allocation, and
+    /// the allocation must remain live until this function returns.
+    pub(super) unsafe fn poll(
+        &self,
+        header: NonNull<Header>,
+        mut cx: Context<'_>,
+    ) -> Poll<T::Output> {
         let res = {
             self.stage.stage.with_mut(|ptr| {
                 // Safety: The caller ensures mutual exclusion to the field.
@@ -371,13 +447,13 @@ impl<T: Future, S: Schedule> Core<T, S> {
                 // Safety: The caller ensures the future is pinned.
                 let future = unsafe { Pin::new_unchecked(future) };
 
-                let _guard = TaskIdGuard::enter(self.task_id);
+                let _guard = TaskContextGuard::enter(self.task_id, header);
                 future.poll(&mut cx)
             })
         };
 
         if res.is_ready() {
-            self.drop_future_or_output();
+            self.drop_future_or_output(header);
         }
 
         res
@@ -388,7 +464,24 @@ impl<T: Future, S: Schedule> Core<T, S> {
     /// # Safety
     ///
     /// The caller must ensure it is safe to mutate the `stage` field.
-    pub(super) fn drop_future_or_output(&self) {
+    pub(super) fn drop_future_or_output(&self, header: NonNull<Header>) {
+        #[cfg(not(tokio_unstable))]
+        let _ = header;
+
+        #[cfg(tokio_unstable)]
+        let _current_task = {
+            let dropping_future = self.stage.stage.with(|ptr| {
+                // Safety: the caller ensures mutual exclusion to the field.
+                matches!(unsafe { &*ptr }, Stage::Running(_))
+            });
+
+            if dropping_future {
+                Some(CurrentTaskGuard::enter(header))
+            } else {
+                None
+            }
+        };
+
         // Safety: the caller ensures mutual exclusion to the field.
         unsafe {
             self.set_stage(Stage::Consumed);
@@ -537,12 +630,19 @@ impl Header {
 }
 
 impl Trailer {
-    fn new(hooks: TaskHarnessScheduleHooks) -> Self {
+    fn new(#[cfg(tokio_unstable)] user_data: Option<TaskData>) -> Self {
         Trailer {
             waker: UnsafeCell::new(None),
             owned: linked_list::Pointers::new(),
-            hooks,
+            #[cfg(tokio_unstable)]
+            user_data: UnsafeCell::new(user_data),
         }
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(super) fn user_data_ptr(&self) -> NonNull<Option<TaskData>> {
+        self.user_data
+            .with_mut(|ptr| unsafe { NonNull::new_unchecked(ptr) })
     }
 
     pub(super) unsafe fn set_waker(&self, waker: Option<Waker>) {

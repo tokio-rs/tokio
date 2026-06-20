@@ -11,6 +11,8 @@ use crate::future::Future;
 use crate::runtime::task::core::{Core, Trailer};
 use crate::runtime::task::{Cell, Harness, Header, Id, Schedule, State};
 #[cfg(tokio_unstable)]
+use crate::runtime::TaskData;
+#[cfg(tokio_unstable)]
 use std::panic::Location;
 use std::ptr::NonNull;
 use std::task::{Poll, Waker};
@@ -213,6 +215,7 @@ impl RawTask {
         scheduler: S,
         id: Id,
         _spawned_at: super::SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<TaskData>,
     ) -> RawTask
     where
         T: Future,
@@ -225,6 +228,8 @@ impl RawTask {
             id,
             #[cfg(tokio_unstable)]
             _spawned_at.0,
+            #[cfg(tokio_unstable)]
+            user_data,
         ));
         let ptr = unsafe { NonNull::new_unchecked(ptr.cast()) };
 
@@ -260,6 +265,40 @@ impl RawTask {
     /// Returns a reference to the task's trailer.
     pub(super) fn trailer(&self) -> &Trailer {
         unsafe { &*self.trailer_ptr().as_ptr() }
+    }
+
+    /// # Safety
+    ///
+    /// The task allocation must be live, and the returned metadata must have
+    /// exclusive access to hook data for as long as it can expose mutable references.
+    #[cfg(tokio_unstable)]
+    pub(crate) unsafe fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
+        // Safety: the caller guarantees that the task allocation is live and that
+        // the returned metadata has exclusive access to hook data.
+        unsafe {
+            crate::runtime::TaskMeta::new(
+                Header::get_id(self.ptr),
+                Header::get_spawn_location(self.ptr).into(),
+                Some(self.trailer().user_data_ptr()),
+            )
+        }
+    }
+
+    /// # Safety
+    ///
+    /// The task allocation must be live, and hook data must not be mutated while
+    /// references exposed through the returned metadata are live.
+    #[cfg(tokio_unstable)]
+    pub(crate) unsafe fn task_meta_ref<'meta>(&self) -> crate::runtime::TaskMetaRef<'meta> {
+        // Safety: the caller guarantees that the task allocation is live and that
+        // hook data is not mutated while exposed references are live.
+        unsafe {
+            crate::runtime::TaskMetaRef::new(
+                Header::get_id(self.ptr),
+                Header::get_spawn_location(self.ptr).into(),
+                Some(self.trailer().user_data_ptr()),
+            )
+        }
     }
 
     /// Returns a reference to the task's state.

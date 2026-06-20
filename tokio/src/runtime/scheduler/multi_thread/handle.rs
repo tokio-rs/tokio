@@ -1,11 +1,13 @@
 use crate::future::Future;
 use crate::loom::sync::Arc;
 use crate::runtime::scheduler::multi_thread::worker;
-use crate::runtime::task::{Notified, Task, TaskHarnessScheduleHooks};
+use crate::runtime::task::{Notified, Task};
+#[cfg(tokio_unstable)]
+use crate::runtime::TaskMeta;
 use crate::runtime::{
     blocking, driver,
     task::{self, JoinHandle, SpawnLocation},
-    TaskHooks, TaskMeta, TimerFlavor,
+    TaskHooks, TimerFlavor,
 };
 use crate::util::RngSeedGenerator;
 
@@ -57,12 +59,20 @@ impl Handle {
         future: F,
         id: task::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        Self::bind_new_task(me, future, id, spawned_at)
+        Self::bind_new_task(
+            me,
+            future,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            user_data,
+        )
     }
 
     #[cfg(all(tokio_unstable, feature = "time"))]
@@ -83,18 +93,21 @@ impl Handle {
         future: T,
         id: task::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
-
-        me.task_hooks.spawn(&TaskMeta {
+        let (handle, notified) = me.shared.owned.bind_with_spawn_hook(
+            future,
+            me.clone(),
             id,
             spawned_at,
-            _phantom: Default::default(),
-        });
+            #[cfg(tokio_unstable)]
+            user_data,
+            &me.task_hooks,
+        );
 
         me.schedule_option_task_without_yield(notified);
 
@@ -111,14 +124,33 @@ impl task::Schedule for Arc<Handle> {
         self.schedule_task(task, false);
     }
 
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
-        }
-    }
-
     fn yield_now(&self, task: Notified<Self>) {
         self.schedule_task(task, true);
+    }
+
+    #[cfg(tokio_unstable)]
+    fn task_terminate_callback(&self, meta: &mut TaskMeta<'_>) {
+        self.task_hooks.task_terminate_callback(meta);
+    }
+
+    #[cfg(tokio_unstable)]
+    fn has_task_poll_start_callback(&self) -> bool {
+        self.task_hooks.has_poll_start_callback()
+    }
+
+    #[cfg(tokio_unstable)]
+    fn task_poll_start_callback(&self, meta: &mut TaskMeta<'_>) {
+        self.task_hooks.poll_start_callback(meta);
+    }
+
+    #[cfg(tokio_unstable)]
+    fn has_task_poll_stop_callback(&self) -> bool {
+        self.task_hooks.has_poll_stop_callback()
+    }
+
+    #[cfg(tokio_unstable)]
+    fn task_poll_stop_callback(&self, meta: &mut TaskMeta<'_>) {
+        self.task_hooks.poll_stop_callback(meta);
     }
 }
 
