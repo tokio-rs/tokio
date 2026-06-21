@@ -7,7 +7,7 @@
 //! similar.
 
 use std::marker::PhantomPinned;
-use std::mem::ManuallyDrop;
+use std::mem::{self, ManuallyDrop};
 use std::ptr::NonNull;
 use std::task::{Context, Waker};
 
@@ -230,21 +230,6 @@ impl<T> IdleNotifiedSet<T> {
 
     /// Call a function on every element in this list.
     pub(crate) fn for_each<F: FnMut(&mut T)>(&mut self, mut func: F) {
-        fn get_ptrs<T>(list: &mut LinkedList<ListEntry<T>>, ptrs: &mut Vec<*mut T>) {
-            let mut node = list.last();
-
-            while let Some(entry) = node {
-                ptrs.push(entry.value.with_mut(|ptr| {
-                    let ptr: *mut ManuallyDrop<T> = ptr;
-                    let ptr: *mut T = ptr.cast();
-                    ptr
-                }));
-
-                let prev = entry.pointers.get_prev();
-                node = prev.map(|prev| unsafe { &*prev.as_ptr() });
-            }
-        }
-
         // Atomically get a raw pointer to the value of every entry.
         //
         // Since this only locks the mutex once, it is not possible for a value
@@ -253,10 +238,14 @@ impl<T> IdleNotifiedSet<T> {
         // twice.
         let mut ptrs = Vec::with_capacity(self.len());
         {
-            let mut lock = self.lists.lock();
+            let lock = self.lists.lock();
 
-            get_ptrs(&mut lock.idle, &mut ptrs);
-            get_ptrs(&mut lock.notified, &mut ptrs);
+            ptrs.extend(
+                lock.idle
+                    .iter_back()
+                    .chain(lock.notified.iter_back())
+                    .map(|entry| entry.value.with_mut(|ptr| ptr.cast())),
+            );
         }
         debug_assert_eq!(ptrs.len(), ptrs.capacity());
 
@@ -293,68 +282,45 @@ impl<T> IdleNotifiedSet<T> {
         }
 
         impl<T, F: FnMut(T)> AllEntries<T, F> {
-            fn pop_next(&mut self) -> bool {
-                if let Some(entry) = self.all_entries.pop_back() {
+            fn iter(&mut self) {
+                for entry in self.all_entries.drain_back() {
                     // Safety: We just took this value from the list, so we can
                     // destroy the value in the entry.
                     entry
                         .value
                         .with_mut(|ptr| unsafe { (self.func)(ManuallyDrop::take(&mut *ptr)) });
-                    true
-                } else {
-                    false
                 }
             }
         }
 
         impl<T, F: FnMut(T)> Drop for AllEntries<T, F> {
             fn drop(&mut self) {
-                while self.pop_next() {}
+                self.iter()
             }
         }
 
-        let mut all_entries = AllEntries {
-            all_entries: LinkedList::new(),
-            func,
+        // Atomically take all entries.
+        let all_entries = {
+            let mut lock = self.lists.lock();
+            mem::take(&mut lock.idle)
+                .drain_back()
+                .chain(mem::take(&mut lock.notified).drain_back())
+                .inspect(|entry| {
+                    // Safety: pointer is accessed while holding the mutex.
+                    entry
+                        .my_list
+                        .with_mut(|ptr| unsafe { *ptr = List::Neither });
+                })
+                .collect::<LinkedList<_>>()
         };
 
-        // Atomically move all entries to the new linked list in the AllEntries
-        // object.
-        {
-            let mut lock = self.lists.lock();
-            unsafe {
-                // Safety: We are holding the lock and `all_entries` is a new
-                // LinkedList.
-                move_to_new_list(&mut lock.idle, &mut all_entries.all_entries);
-                move_to_new_list(&mut lock.notified, &mut all_entries.all_entries);
-            }
-        }
-
+        let mut all_entries = AllEntries { all_entries, func };
         // Keep destroying entries in the list until it is empty.
         //
         // If the closure panics, then the destructor of the `AllEntries` bomb
         // ensures that we keep running the destructor on the remaining values.
         // A second panic will abort the program.
-        while all_entries.pop_next() {}
-    }
-}
-
-/// # Safety
-///
-/// The mutex for the entries must be held, and the target list must be such
-/// that setting `my_list` to `Neither` is ok.
-unsafe fn move_to_new_list<T>(
-    from: &mut LinkedList<ListEntry<T>>,
-    to: &mut LinkedList<ListEntry<T>>,
-) {
-    while let Some(entry) = from.pop_back() {
-        entry.my_list.with_mut(|ptr| {
-            // Safety: pointer is accessed while holding the mutex.
-            unsafe {
-                *ptr = List::Neither;
-            }
-        });
-        to.push_front(entry);
+        all_entries.iter();
     }
 }
 

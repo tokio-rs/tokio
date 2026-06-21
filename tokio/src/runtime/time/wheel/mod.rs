@@ -225,9 +225,7 @@ impl Wheel {
         // they actually need to be dropped down a level. We then reinsert them
         // back into the same position; we must make sure we don't then process
         // those entries again or we'll end up in an infinite loop.
-        let mut entries = self.take_entries(expiration);
-
-        while let Some(item) = entries.pop_back() {
+        for item in self.take_entries(expiration).drain_back() {
             if expiration.level == 0 {
                 debug_assert_eq!(unsafe { item.registered_when() }, expiration.deadline);
             }
