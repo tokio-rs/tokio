@@ -1,12 +1,10 @@
-use super::{CancellationQueueEntry, Entry, EntryHandle};
+use super::{CancellationQueueEntry, EntryHandle};
 use crate::loom::sync::{Arc, Mutex};
-use crate::util::linked_list;
-
-type EntryList = linked_list::LinkedList<CancellationQueueEntry, Entry>;
+use crate::util::linked_list::LinkedList;
 
 #[derive(Debug, Default)]
 struct Inner {
-    list: EntryList,
+    list: LinkedList<CancellationQueueEntry>,
 }
 
 impl Drop for Inner {
@@ -21,7 +19,7 @@ impl Drop for Inner {
 impl Inner {
     fn new() -> Self {
         Self {
-            list: EntryList::new(),
+            list: LinkedList::new(),
         }
     }
 

@@ -41,7 +41,7 @@ pub(crate) struct Semaphore {
 }
 
 struct Waitlist {
-    queue: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+    queue: LinkedList<Waiter>,
     closed: bool,
 }
 
