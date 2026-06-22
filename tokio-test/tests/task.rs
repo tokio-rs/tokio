@@ -26,15 +26,15 @@ fn test_spawn_stream_size_hint() {
 }
 
 #[test]
-fn poll_to_block_ready() {
+fn poll_until_idle_ready() {
     let mut task = task::spawn(async { 42 });
-    assert_eq!(task.poll_to_block(), Poll::Ready(42));
+    assert_eq!(task.poll_until_idle(), Poll::Ready(42));
 }
 
 #[test]
-fn poll_to_block_pending_not_woken() {
+fn poll_until_idle_pending_not_woken() {
     let mut task = task::spawn(pending::<()>());
-    assert!(task.poll_to_block().is_pending());
+    assert!(task.poll_until_idle().is_pending());
 }
 
 struct WakeThenReady {
@@ -57,9 +57,9 @@ impl Future for WakeThenReady {
 }
 
 #[test]
-fn poll_to_block_advances_on_wake() {
+fn poll_until_idle_advances_on_wake() {
     let mut task = task::spawn(WakeThenReady { step: 0 });
-    assert!(task.poll_to_block().is_ready());
+    assert!(task.poll_until_idle().is_ready());
 }
 
 struct WakeNTimes {
@@ -80,9 +80,9 @@ impl Future for WakeNTimes {
 }
 
 #[test]
-fn poll_to_block_multiple_wakes() {
+fn poll_until_idle_multiple_wakes() {
     let mut task = task::spawn(WakeNTimes { remaining: 3 });
-    assert_eq!(task.poll_to_block(), Poll::Ready(0));
+    assert_eq!(task.poll_until_idle(), Poll::Ready(0));
 }
 
 struct WakeForever;
@@ -97,8 +97,8 @@ impl Future for WakeForever {
 }
 
 #[test]
-#[should_panic(expected = "poll_to_block exceeded 150 iterations")]
-fn poll_to_block_panics_on_infinite_wake() {
+#[should_panic(expected = "poll_until_idle exceeded 150 iterations")]
+fn poll_until_idle_panics_on_infinite_wake() {
     let mut task = task::spawn(WakeForever);
-    let _ = task.poll_to_block();
+    let _ = task.poll_until_idle();
 }

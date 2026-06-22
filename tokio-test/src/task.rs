@@ -70,8 +70,8 @@ const IDLE: usize = 0;
 const WAKE: usize = 1;
 const SLEEP: usize = 2;
 
-/// Default maximum number of poll iterations in [`Spawn::poll_to_block`].
-const POLL_TO_BLOCK_MAX_ITERATIONS: usize = 150;
+/// Default maximum number of poll iterations in [`Spawn::poll_until_idle`].
+const POLL_UNTIL_IDLE_MAX_ITERATIONS: usize = 150;
 
 impl<T> Spawn<T> {
     /// Consumes `self` returning the inner value
@@ -127,7 +127,10 @@ impl<T: Future> Spawn<T> {
         self.task.enter(|cx| fut.poll(cx))
     }
 
-    /// Polls the future until it either completes or is no longer woken.
+    /// Polls the future until it is idle.
+    ///
+    /// A future is considered idle when it either completes, or returns
+    /// [`Poll::Pending`] without a pending wake notification.
     ///
     /// Unlike [`poll`](Self::poll), this method keeps polling while the future
     /// returns [`Poll::Pending`] but has received a wake notification, advancing
@@ -147,17 +150,17 @@ impl<T: Future> Spawn<T> {
     ///
     /// let mut task = task::spawn(async { 42 });
     ///
-    /// assert!(task.poll_to_block().is_ready());
+    /// assert!(task.poll_until_idle().is_ready());
     /// ```
-    pub fn poll_to_block(&mut self) -> Poll<T::Output> {
-        for _ in 0..POLL_TO_BLOCK_MAX_ITERATIONS {
+    pub fn poll_until_idle(&mut self) -> Poll<T::Output> {
+        for _ in 0..POLL_UNTIL_IDLE_MAX_ITERATIONS {
             let result = self.poll();
             if result.is_ready() || !self.is_woken() {
                 return result;
             }
         }
         panic!(
-            "poll_to_block exceeded {POLL_TO_BLOCK_MAX_ITERATIONS} iterations; future may be waking without making progress"
+            "poll_until_idle exceeded {POLL_UNTIL_IDLE_MAX_ITERATIONS} iterations; future may be waking without making progress"
         );
     }
 }
