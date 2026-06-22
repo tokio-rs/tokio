@@ -6,8 +6,6 @@ use std::marker::PhantomPinned;
 use std::ptr::NonNull;
 use std::task::{Context, Poll, Waker};
 
-pub(super) type EntryList = linked_list::LinkedList<Entry, Entry>;
-
 #[derive(Debug, Default)]
 struct State {
     cancelled: bool,

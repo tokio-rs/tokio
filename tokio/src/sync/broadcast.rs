@@ -370,7 +370,7 @@ struct Tail {
     closed: bool,
 
     /// Receivers waiting for a value.
-    waiters: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+    waiters: LinkedList<Waiter>,
 }
 
 /// Slot in the buffer.
@@ -943,7 +943,7 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
 /// and gates the access to it on the `Shared.tail` mutex. It also empties
 /// the list on drop.
 struct WaitersList<'a, T> {
-    list: GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+    list: GuardedLinkedList<Waiter>,
     is_empty: bool,
     shared: &'a Shared<T>,
 }
@@ -961,7 +961,7 @@ impl<'a, T> Drop for WaitersList<'a, T> {
 
 impl<'a, T> WaitersList<'a, T> {
     fn new(
-        unguarded_list: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+        unguarded_list: LinkedList<Waiter>,
         guard: Pin<&'a Waiter>,
         shared: &'a Shared<T>,
     ) -> Self {
