@@ -72,6 +72,8 @@ use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
+use std::convert::Infallible;
+use std::ops::ControlFlow;
 use std::task::Waker;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -254,11 +256,6 @@ pub(crate) struct Context {
 
 /// Starts the workers
 pub(crate) struct Launch(Vec<Arc<Worker>>);
-
-/// Running a task may consume the core. If the core is still available when
-/// running the task completes, it is returned. Otherwise, the worker will need
-/// to stop processing.
-type RunResult = Result<Box<Core>, ()>;
 
 /// A notified task handle
 type Notified = task::Notified<Arc<Handle>>;
@@ -556,9 +553,7 @@ fn run(worker: Arc<Worker>) {
         context::set_scheduler(&cx, || {
             let cx = cx.expect_multi_thread();
 
-            // This should always be an error. It only returns a `Result` to support
-            // using `?` to short circuit.
-            assert!(cx.run(core).is_err());
+            _ = cx.run(core);
 
             // Check if there are any deferred tasks to notify. This can happen when
             // the worker core is lost due to `block_in_place()` being called from
@@ -569,7 +564,7 @@ fn run(worker: Arc<Worker>) {
 }
 
 impl Context {
-    fn run(&self, mut core: Box<Core>) -> RunResult {
+    fn run(&self, mut core: Box<Core>) -> ControlFlow<(), Infallible> {
         // Reset `lifo_enabled` here in case the core was previously stolen from
         // a task that had the LIFO slot disabled.
         self.reset_lifo_enabled(&mut core);
@@ -635,10 +630,13 @@ impl Context {
         core.pre_shutdown(&self.worker);
         // Signal shutdown
         self.worker.handle.shutdown_core(core);
-        Err(())
+        ControlFlow::Break(())
     }
 
-    fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
+    /// Running a task may consume the core. If the core is still available when
+    /// running the task completes, it is returned. Otherwise, the worker will need
+    /// to stop processing.
+    fn run_task(&self, task: Notified, mut core: Box<Core>) -> ControlFlow<(), Box<Core>> {
         #[cfg(tokio_unstable)]
         let task_meta = task.task_meta();
 
@@ -713,7 +711,7 @@ impl Context {
                         // In this case, we cannot call `reset_lifo_enabled()`
                         // because the core was stolen. The stealer will handle
                         // that at the top of `Context::run`
-                        return Err(());
+                        return ControlFlow::Break(());
                     }
                 };
 
@@ -723,7 +721,7 @@ impl Context {
                     None => {
                         self.reset_lifo_enabled(&mut core);
                         core.stats.end_poll();
-                        return Ok(core);
+                        return ControlFlow::Continue(core);
                     }
                 };
 
@@ -740,7 +738,7 @@ impl Context {
                     // If we hit this point, the LIFO slot should be enabled.
                     // There is no need to reset it.
                     debug_assert!(core.lifo_enabled);
-                    return Ok(core);
+                    return ControlFlow::Continue(core);
                 }
 
                 // Track that we are about to run a task from the LIFO slot.
