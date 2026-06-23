@@ -39,8 +39,8 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// If the method is used as the event in a
-        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// If used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch
         /// completes first, then some data may have been partially read. Any
         /// partially read bytes are appended to `buf`, and the method can be
         /// called again to continue reading until `byte`.
@@ -129,9 +129,9 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is not cancellation safe. If the method is used as the
-        /// event in a [`tokio::select!`](crate::select) statement and some
-        /// other branch completes first, then some data may have been partially
+        /// This method is not cancel safe. If the method is used as a
+        /// branch in [`tokio::select!`](crate::select) and another
+        /// branch completes first, then some data may have been partially
         /// read, and this data is lost. There are no guarantees regarding the
         /// contents of `buf` when the call is cancelled. The current
         /// implementation replaces `buf` with the empty string, but this may
@@ -269,8 +269,8 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is cancel safe. If you use it as the event in a
-        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// This method is cancel safe. If used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch
         /// completes first, then it is guaranteed that no data was read.
         ///
         /// [`consume`]: crate::io::AsyncBufReadExt::consume
