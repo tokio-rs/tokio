@@ -276,9 +276,7 @@ impl<L: Link> Default for LinkedList<L> {
 
 impl<L: Link> Extend<L::Handle> for LinkedList<L> {
     fn extend<T: IntoIterator<Item = L::Handle>>(&mut self, iter: T) {
-        for handle in iter.into_iter() {
-            self.push_front(handle);
-        }
+        iter.into_iter().for_each(|handle| self.push_front(handle));
     }
 }
 
