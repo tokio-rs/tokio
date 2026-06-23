@@ -38,3 +38,13 @@ cfg_not_unstable_metrics! {
     mod mock;
     pub(crate) use mock::{SchedulerMetrics, HistogramBuilder};
 }
+
+cfg_schedule_latency! {
+    mod schedule_latency;
+    pub(crate) use schedule_latency::{ScheduleLatencyInstant, ScheduleLatencyContext};
+}
+
+cfg_not_schedule_latency! {
+    mod schedule_latency_mock;
+    pub(crate) use schedule_latency_mock::{ScheduleLatencyInstant, ScheduleLatencyContext};
+}

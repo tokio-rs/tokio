@@ -701,8 +701,9 @@ jobs:
       # https://github.com/tokio-rs/tokio/pull/5356
       # https://github.com/tokio-rs/tokio/issues/5373
       - name: Check
-        # We use `--skip io-uring` since io-uring crate doesn't provide a binding for the i686 target.
-        run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --skip io-uring --depth 2 --keep-going
+        # We use `--skip io-uring,schedule-latency` since io-uring crate doesn't provide a binding for the i686 target
+        # and schedule latency tracking is only supported on 64-bit targets.
+        run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --skip io-uring,schedule-latency --depth 2 --keep-going
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
@@ -715,11 +716,11 @@ jobs:
         include:
           - name: ""
             rustflags: ""
-            exclude_features: "io-uring,taskdump"
+            exclude_features: "io-uring,taskdump,schedule-latency"
           - name: "--unstable"
             rustflags: "--cfg tokio_unstable -Dwarnings"
-            exclude_features: "io-uring,taskdump"
-          - name: "--unstable io-uring,taskdump"
+            exclude_features: "io-uring,taskdump,schedule-latency"
+          - name: "--unstable io-uring,taskdump,schedule-latency"
             rustflags: "--cfg tokio_unstable -Dwarnings"
             exclude_features: ""
     steps:
