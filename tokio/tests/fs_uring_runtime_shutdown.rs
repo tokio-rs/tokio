@@ -12,6 +12,7 @@ use futures::FutureExt;
 use std::fs;
 use std::future::poll_fn;
 use std::task::Poll;
+use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio::runtime::Builder;
 use tokio_test::assert_pending;
@@ -73,7 +74,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
     });
 
     // Shutdown the runtime and wait for fds to be closed
-    drop(rt);
+    rt.shutdown_timeout(Duration::from_millis(250));
 
     let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
     let leaked = fd_count_after_cancel.saturating_sub(fd_count_before_opens);
