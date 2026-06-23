@@ -9,7 +9,7 @@ async fn coop() {
 
     for _ in 0..10_000 {
         if stream.poll_next().is_pending() {
-            #[cfg(not(feature = "rt"))]
+            tokio::task::yield_now().await;
             assert!(stream.is_woken());
             return;
         }

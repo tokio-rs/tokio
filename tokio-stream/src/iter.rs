@@ -56,9 +56,7 @@ where
             let coop = std::task::ready!(coop::poll_proceed(cx));
             let item = self.iter.next();
 
-            if item.is_some() {
-                coop.made_progress();
-            }
+            coop.made_progress();
 
             Poll::Ready(item)
         }
@@ -74,9 +72,7 @@ where
             } else {
                 let item = self.iter.next();
 
-                if item.is_some() {
-                    self.yield_amt += 1;
-                }
+                self.yield_amt += 1;
 
                 Poll::Ready(item)
             }
