@@ -73,7 +73,6 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
         }
     });
 
-    // Shutdown the runtime and wait for fds to be closed
     rt.shutdown_timeout(Duration::from_millis(250));
 
     let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
