@@ -96,9 +96,9 @@ macro_rules! doc {
         /// exhaustive.
         ///
         /// Cancellation safety describes what happens when a future is dropped
-        /// before it completes. The future can come from an async method, an
-        /// async expression, or another future-producing operation. It is not a
-        /// property of types themselves.
+        /// before it completes. Whether something is cancellation safe depends on
+        /// the behavior of the future passed to `select!`, which may come from an
+        /// async method, an async expression, or another future-producing operation.
         ///
         /// The following methods are cancellation safe:
         ///
