@@ -74,7 +74,7 @@ impl ReadDir {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancellation safe.
+    /// This method is cancel safe.
     pub async fn next_entry(&mut self) -> io::Result<Option<DirEntry>> {
         use std::future::poll_fn;
         poll_fn(|cx| self.poll_next_entry(cx)).await
