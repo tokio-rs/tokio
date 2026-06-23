@@ -12,7 +12,7 @@ use futures::future::FutureExt;
 use std::fs;
 use std::future::poll_fn;
 use std::task::Poll;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
 use tokio_test::assert_pending;
 
@@ -68,17 +68,24 @@ async fn file_descriptors_are_closed_when_cancelling_open_op() {
         assert!(res.is_cancelled());
     }
 
-    // Give completions a moment to settle before counting fds.
-    tokio::time::sleep(Duration::from_millis(250)).await;
+    let fd_check_start = Instant::now();
 
-    let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
-    let leaked = fd_count_after_cancel.saturating_sub(fd_count_before_opens);
+    while fd_check_start.elapsed() < Duration::from_secs(1) {
+        tokio::task::yield_now().await;
 
-    // Since we are opening 128 files, we expect that the related fds
-    // related to this operation will be closed. Since some other fds
-    // can be opened in the meantime, we expect this number to be higher
-    // than the counter before opening the files. This number could be
-    // lower, but to avoid test flakiness we check that this is at most
-    // half the number of the file we opened to check if there's a leak.
-    assert!(leaked <= 64);
+        let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
+        let leaked = fd_count_after_cancel.saturating_sub(fd_count_before_opens);
+
+        // Since we are opening 128 files, we expect that the related fds
+        // related to this operation will be closed. Since some other fds
+        // can be opened in the meantime, we expect this number to be higher
+        // than the counter before opening the files. This number could be
+        // lower, but to avoid test flakiness we check that this is at most
+        // half the number of the file we opened to check if there's a leak.
+        if leaked <= 64 {
+            // test success
+            return;
+        }
+    }
+    panic!("Number of FDs is staying above 64. There is probably an FD leak.");
 }
