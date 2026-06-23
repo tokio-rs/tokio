@@ -7,6 +7,7 @@
 
 use std::time::Duration;
 
+use tokio_test::task;
 use tracing_mock::{expect, subscriber};
 
 #[tokio::test]
@@ -64,17 +65,17 @@ async fn test_sleep_creates_span() {
         .event(state_update)
         .event(poll_op())
         .exit(async_op_poll_span.clone())
-        .drop_span(async_op_poll_span)
         .exit(async_op_span.clone())
-        .drop_span(async_op_span)
         .exit(sleep_span.clone())
+        .drop_span(async_op_span)
+        .drop_span(async_op_poll_span)
         .drop_span(sleep_span)
         .run_with_handle();
 
     {
         let _guard = tracing::subscriber::set_default(subscriber);
 
-        tokio::time::sleep(Duration::from_millis(7)).await;
+        _ = task::spawn(tokio::time::sleep(Duration::from_millis(7))).poll();
     }
 
     handle.assert_finished();
