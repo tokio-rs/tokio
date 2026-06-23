@@ -107,12 +107,10 @@ pub(crate) struct ScheduledIo {
     waiters: Mutex<Waiters>,
 }
 
-type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
-
 #[derive(Debug, Default)]
 struct Waiters {
     /// List of all current waiters.
-    list: WaitList,
+    list: LinkedList<Waiter>,
 
     /// Waker used for `AsyncRead`.
     reader: Option<Waker>,

@@ -21,7 +21,7 @@ use std::task::{self, Poll};
 /// value is returned. Otherwise, an error is returned and the future is
 /// canceled.
 ///
-/// Note that the timeout is checked before polling the future, so if the future
+/// Note that the future is polled before the timeout is checked, so if the future
 /// does not yield during execution then it is possible for the future to complete
 /// and exceed the timeout _without_ returning an error.
 ///

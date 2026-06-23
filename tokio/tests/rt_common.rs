@@ -1155,6 +1155,7 @@ rt_test! {
 
     #[cfg(not(target_os = "wasi"))] // Wasi does not support bind
     #[test]
+    #[cfg_attr(miri, ignore)] // Miri sometimes fails to establish the tcp connection
     fn local_set_client_server_block_on() {
         let rt = rt();
         let (tx, rx) = mpsc::channel();
