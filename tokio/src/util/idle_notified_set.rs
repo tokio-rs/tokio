@@ -7,7 +7,7 @@
 //! similar.
 
 use std::marker::PhantomPinned;
-use std::mem::{self, ManuallyDrop};
+use std::mem::ManuallyDrop;
 use std::ptr::NonNull;
 use std::task::{Context, Waker};
 
@@ -297,28 +297,27 @@ impl<T> IdleNotifiedSet<T> {
             }
         }
 
-        // Atomically take all entries.
-        let all_entries = {
-            let mut lock = self.lists.lock();
-            mem::take(&mut lock.idle)
-                .drain_back()
-                .chain(mem::take(&mut lock.notified).drain_back())
-                .inspect(|entry| {
-                    // Safety: pointer is accessed while holding the mutex.
-                    entry
-                        .my_list
-                        .with_mut(|ptr| unsafe { *ptr = List::Neither });
-                })
-                .collect::<LinkedList<_>>()
-        };
+        let mut all_entries = LinkedList::new();
 
-        let mut all_entries = AllEntries { all_entries, func };
+        // Atomically move all entries to the new linked list.
+        {
+            let f = |entry: &Arc<ListEntry<T>>| {
+                // Safety: pointer is accessed while holding the mutex.
+                entry
+                    .my_list
+                    .with_mut(|ptr| unsafe { *ptr = List::Neither });
+            };
+            let mut lock = self.lists.lock();
+            all_entries.extend(lock.idle.drain_back().inspect(f));
+            all_entries.extend(lock.notified.drain_back().inspect(f));
+        }
+
         // Keep destroying entries in the list until it is empty.
         //
         // If the closure panics, then the destructor of the `AllEntries` bomb
         // ensures that we keep running the destructor on the remaining values.
         // A second panic will abort the program.
-        all_entries.drain();
+        AllEntries { all_entries, func }.drain();
     }
 }
 
