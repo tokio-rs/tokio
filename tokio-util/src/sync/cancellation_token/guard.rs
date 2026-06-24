@@ -11,7 +11,7 @@ pub struct DropGuard {
 
 impl DropGuard {
     /// Returns a reference to the cancellation token wrapped by this guard.
-    pub fn cancellation_token(&self) -> &CancellationToken {
+    pub fn token(&self) -> &CancellationToken {
         self.inner
             .as_ref()
             .expect("`inner` can only be None in a destructor")
