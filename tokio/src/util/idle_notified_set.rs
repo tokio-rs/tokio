@@ -230,13 +230,6 @@ impl<T> IdleNotifiedSet<T> {
 
     /// Call a function on every element in this list.
     pub(crate) fn for_each<F: FnMut(&mut T)>(&mut self, mut func: F) {
-        fn get_ptrs<T>(list: &mut LinkedList<ListEntry<T>>, ptrs: &mut Vec<*mut T>) {
-            ptrs.extend(
-                list.iter_back()
-                    .map(|entry| entry.value.with_mut(|ptr| ptr.cast())),
-            );
-        }
-
         // Atomically get a raw pointer to the value of every entry.
         //
         // Since this only locks the mutex once, it is not possible for a value
@@ -245,10 +238,12 @@ impl<T> IdleNotifiedSet<T> {
         // twice.
         let mut ptrs = Vec::with_capacity(self.len());
         {
-            let mut lock = self.lists.lock();
+            let lock = self.lists.lock();
 
-            get_ptrs(&mut lock.idle, &mut ptrs);
-            get_ptrs(&mut lock.notified, &mut ptrs);
+            let f = |entry: &ListEntry<T>| entry.value.with_mut(|ptr| ptr.cast());
+            // Iterator::chain results in worse codegen.
+            ptrs.extend(lock.idle.iter_back().map(f));
+            ptrs.extend(lock.notified.iter_back().map(f));
         }
         debug_assert_eq!(ptrs.len(), ptrs.capacity());
 
