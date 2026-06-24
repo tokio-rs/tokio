@@ -16,7 +16,7 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tempfile::NamedTempFile;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
@@ -128,18 +128,25 @@ fn uring_completed_then_dropped() {
             completed_then_dropped_before_repoll(path.clone()).await;
         }
 
-        // Give completions a moment to settle before counting fds.
-        tokio::time::sleep(Duration::from_millis(250)).await;
+        let fd_check_start = Instant::now();
 
-        let after = fd_count();
-        let leaked = after.saturating_sub(before);
+        while fd_check_start.elapsed() < Duration::from_secs(1) {
+            tokio::task::yield_now().await;
 
-        // Since we are opening 128 files, we expect that the related fds
-        // related to this operation will be closed. Since some other fds
-        // can be opened in the meantime, we expect this number to be higher
-        // than the counter before opening the files. This number could be
-        // lower, but to avoid test flakiness we check that this is at most
-        // half the number of the file we opened to check if there's a leak.
-        assert!(leaked <= 64);
+            let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
+            let leaked = fd_count_after_cancel.saturating_sub(before);
+
+            // Since we are opening 128 files, we expect that the related fds
+            // related to this operation will be closed. Since some other fds
+            // can be opened in the meantime, we expect this number to be higher
+            // than the counter before opening the files. This number could be
+            // lower, but to avoid test flakiness we check that this is at most
+            // half the number of the file we opened to check if there's a leak.
+            if leaked <= 64 {
+                // test success
+                return;
+            }
+        }
+        panic!("Number of FDs is staying above 64. There is probably an FD leak.");
     });
 }
