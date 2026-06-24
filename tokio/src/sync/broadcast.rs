@@ -127,7 +127,6 @@ use std::fmt;
 use std::future::Future;
 use std::marker::PhantomPinned;
 use std::mem;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release, SeqCst};
@@ -966,7 +965,7 @@ impl<T> Shared<T> {
         let guard = Waiter::new();
         pin!(guard);
 
-        let mut list = mem::take(&mut tail.waiters).into_guarded(guard.deref().into());
+        let mut list = mem::take(&mut tail.waiters).into_guarded((&*guard).into());
 
         let mut wakers = WakeList::new();
         loop {
