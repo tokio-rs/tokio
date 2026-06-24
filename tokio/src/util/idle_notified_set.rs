@@ -301,13 +301,14 @@ impl<T> IdleNotifiedSet<T> {
 
         // Atomically move all entries to the new linked list.
         {
+            let mut lock = self.lists.lock();
+
             let f = |entry: &Arc<ListEntry<T>>| {
                 // Safety: pointer is accessed while holding the mutex.
                 entry
                     .my_list
                     .with_mut(|ptr| unsafe { *ptr = List::Neither });
             };
-            let mut lock = self.lists.lock();
             all_entries.extend(lock.idle.drain_back().inspect(f));
             all_entries.extend(lock.notified.drain_back().inspect(f));
         }
