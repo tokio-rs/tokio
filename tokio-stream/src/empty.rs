@@ -40,16 +40,14 @@ pub const fn empty<T>() -> Empty<T> {
 impl<T> Stream for Empty<T> {
     type Item = T;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+    fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<T>> {
         #[cfg(feature = "rt")]
         {
             use tokio::task::coop;
 
-            let coop = std::task::ready!(coop::poll_proceed(cx));
+            let coop = std::task::ready!(coop::poll_proceed(_cx));
             coop.made_progress();
         }
-        #[cfg(not(feature = "rt"))]
-        let _ = cx;
 
         Poll::Ready(None)
     }
