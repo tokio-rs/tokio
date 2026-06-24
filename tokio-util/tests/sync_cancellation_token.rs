@@ -613,3 +613,27 @@ fn different_cancellation_tokens_have_different_hash() {
     token2.hash(&mut state2);
     assert_ne!(state1.finish(), state2.finish());
 }
+
+#[test]
+fn drop_guard_cancellation_token_can_be_cloned_without_disarming() {
+    let token = CancellationToken::new();
+    let guard = token.clone().drop_guard();
+
+    let cloned = guard.cancellation_token().clone();
+    assert!(!cloned.is_cancelled());
+
+    drop(guard);
+    assert!(cloned.is_cancelled());
+}
+
+#[test]
+fn drop_guard_ref_cancellation_token_can_be_cloned_without_disarming() {
+    let token = CancellationToken::new();
+    let guard = token.drop_guard_ref();
+
+    let cloned = guard.cancellation_token().clone();
+    assert!(!cloned.is_cancelled());
+
+    drop(guard);
+    assert!(cloned.is_cancelled());
+}

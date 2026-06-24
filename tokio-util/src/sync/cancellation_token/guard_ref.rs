@@ -21,6 +21,13 @@ impl<'a> DropGuardRef<'a> {
             .take()
             .expect("`inner` can be only None in a destructor")
     }
+
+    /// Returns a reference to the wrapped cancellation token, without
+    /// disarming this guard.
+    pub fn cancellation_token(&self) -> &CancellationToken {
+        self.inner
+            .expect("`inner` can be only None in a destructor")
+    }
 }
 
 impl Drop for DropGuardRef<'_> {
