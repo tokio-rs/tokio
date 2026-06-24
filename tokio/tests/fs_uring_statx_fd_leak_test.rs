@@ -16,7 +16,7 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use tempfile::NamedTempFile;
 use tokio::fs::read;
@@ -24,7 +24,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::timeout;
 use tokio_test::assert_pending;
 
-use crate::support::io_uring::io_uring_supported;
+use crate::support::io_uring::{assert_fd_are_not_leaking, io_uring_supported};
 
 /// Count currently-open fds in this process.
 fn fd_count() -> usize {
@@ -139,30 +139,12 @@ fn uring_completed_then_dropped() {
         let before = fd_count();
         let tmp = NamedTempFile::new().unwrap();
         let path = tmp.path().to_path_buf();
+        let file_number = 128;
 
-        for _ in 0..128 {
+        for _ in 0..file_number {
             completed_then_dropped_before_repoll(path.clone()).await;
         }
 
-        let fd_check_start = Instant::now();
-
-        while fd_check_start.elapsed() < Duration::from_secs(1) {
-            tokio::task::yield_now().await;
-
-            let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
-            let leaked = fd_count_after_cancel.saturating_sub(before);
-
-            // Since we are opening 128 files, we expect that the related fds
-            // related to this operation will be closed. Since some other fds
-            // can be opened in the meantime, we expect this number to be higher
-            // than the counter before opening the files. This number could be
-            // lower, but to avoid test flakiness we check that this is at most
-            // half the number of the file we opened to check if there's a leak.
-            if leaked <= 64 {
-                // test success
-                return;
-            }
-        }
-        panic!("Number of FDs is staying above 64. There is probably an FD leak.");
+        assert_fd_are_not_leaking(before, file_number, 1).await
     });
 }
