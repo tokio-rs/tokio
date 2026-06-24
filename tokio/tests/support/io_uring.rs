@@ -28,6 +28,7 @@ pub fn io_uring_supported() -> bool {
     }
 }
 
+#[allow(dead_code)]
 pub async fn assert_fds_are_not_leaking(count_before: usize, opened_files: usize, timeout: u64) {
     let fd_check_start = Instant::now();
 

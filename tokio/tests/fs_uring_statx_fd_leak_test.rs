@@ -24,7 +24,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::timeout;
 use tokio_test::assert_pending;
 
-use crate::support::io_uring::{assert_fd_are_not_leaking, io_uring_supported};
+use crate::support::io_uring::{assert_fds_are_not_leaking, io_uring_supported};
 
 /// Count currently-open fds in this process.
 fn fd_count() -> usize {
@@ -145,6 +145,6 @@ fn uring_completed_then_dropped() {
             completed_then_dropped_before_repoll(path.clone()).await;
         }
 
-        assert_fd_are_not_leaking(before, file_number, 1).await
+        assert_fds_are_not_leaking(before, file_number, 1).await
     });
 }
