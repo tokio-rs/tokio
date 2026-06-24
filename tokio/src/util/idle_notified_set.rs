@@ -280,7 +280,7 @@ impl<T> IdleNotifiedSet<T> {
         }
 
         impl<T, F: FnMut(T)> AllEntries<T, F> {
-            fn drain(&mut self) {
+            fn consume(&mut self) {
                 for entry in self.all_entries.drain_back() {
                     // Safety: We just took this value from the list, so we can
                     // destroy the value in the entry.
@@ -293,7 +293,7 @@ impl<T> IdleNotifiedSet<T> {
 
         impl<T, F: FnMut(T)> Drop for AllEntries<T, F> {
             fn drop(&mut self) {
-                self.drain()
+                self.consume()
             }
         }
 
@@ -317,7 +317,7 @@ impl<T> IdleNotifiedSet<T> {
         // If the closure panics, then the destructor of the `AllEntries` bomb
         // ensures that we keep running the destructor on the remaining values.
         // A second panic will abort the program.
-        AllEntries { all_entries, func }.drain();
+        AllEntries { all_entries, func }.consume();
     }
 }
 
