@@ -1,4 +1,5 @@
 use std::io;
+use std::io::Error;
 use std::sync::OnceLock;
 
 use crate::signal::RxFuture;
@@ -10,28 +11,30 @@ use windows_sys::Win32::System::Console as console;
 type EventInfo = watch::Sender<()>;
 
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
-    new(&registry().ctrl_break)
+    new(console::CTRL_BREAK_EVENT)
 }
 
 pub(super) fn ctrl_close() -> io::Result<RxFuture> {
-    new(&registry().ctrl_close)
+    new(console::CTRL_CLOSE_EVENT)
 }
 
 pub(super) fn ctrl_c() -> io::Result<RxFuture> {
-    new(&registry().ctrl_c)
+    new(console::CTRL_C_EVENT)
 }
 
 pub(super) fn ctrl_logoff() -> io::Result<RxFuture> {
-    new(&registry().ctrl_logoff)
+    new(console::CTRL_LOGOFF_EVENT)
 }
 
 pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
-    new(&registry().ctrl_shutdown)
+    new(console::CTRL_SHUTDOWN_EVENT)
 }
 
-fn new(event_info: &EventInfo) -> io::Result<RxFuture> {
-    global_init()?;
-    let rx = event_info.subscribe();
+fn new(signum: u32) -> io::Result<RxFuture> {
+    let rx = match REGISTRY.get_or_init(init).as_ref() {
+        Ok(registry) => registry.event_info(signum).expect("valid").subscribe(),
+        Err(&code) => return Err(Error::from_raw_os_error(code)),
+    };
     Ok(RxFuture::new(rx))
 }
 
@@ -70,34 +73,21 @@ impl Registry {
     }
 }
 
-fn registry() -> &'static Registry {
-    static REGISTRY: OnceLock<Registry> = OnceLock::new();
+static REGISTRY: OnceLock<Result<Registry, i32>> = OnceLock::new();
 
-    REGISTRY.get_or_init(Default::default)
-}
-
-fn global_init() -> io::Result<()> {
-    static INIT: OnceLock<Result<(), Option<i32>>> = OnceLock::new();
-
-    INIT.get_or_init(|| {
-        let rc = unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) };
-        if rc == 0 {
-            Err(io::Error::last_os_error().raw_os_error())
-        } else {
-            Ok(())
-        }
-    })
-    .map_err(|e| {
-        e.map_or_else(
-            || io::Error::new(io::ErrorKind::Other, "registering signal handler failed"),
-            io::Error::from_raw_os_error,
-        )
-    })
+fn init() -> Result<Registry, i32> {
+    match unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) } {
+        0 => Err(Error::last_os_error().raw_os_error().expect("unreachable")),
+        _ => Ok(Registry::default()),
+    }
 }
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
+    // SAFETY: this function is only invoked if `REGISTRY` was successfully initialized.
+    let registry = unsafe { REGISTRY.get().unwrap_unchecked().unwrap_unchecked() };
+
     // Ignore unknown control signal types.
-    let Some(event_info) = registry().event_info(ty) else {
+    let Some(event_info) = registry.event_info(ty) else {
         return 0;
     };
 
