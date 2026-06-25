@@ -327,8 +327,8 @@ impl fmt::Debug for Handle {
 impl Direction {
     pub(super) fn mask(self) -> Ready {
         match self {
-            Direction::Read => Ready::READABLE | Ready::READ_CLOSED,
-            Direction::Write => Ready::WRITABLE | Ready::WRITE_CLOSED,
+            Direction::Read => Ready::READABLE | Ready::READ_CLOSED | Ready::ERROR,
+            Direction::Write => Ready::WRITABLE | Ready::WRITE_CLOSED | Ready::ERROR,
         }
     }
 }
