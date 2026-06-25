@@ -24,7 +24,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::timeout;
 use tokio_test::assert_pending;
 
-use crate::support::io_uring::io_uring_supported;
+use crate::support::io_uring::{assert_fds_are_not_leaking, io_uring_supported};
 
 /// Count currently-open fds in this process.
 fn fd_count() -> usize {
@@ -139,23 +139,12 @@ fn uring_completed_then_dropped() {
         let before = fd_count();
         let tmp = NamedTempFile::new().unwrap();
         let path = tmp.path().to_path_buf();
+        let file_number = 128;
 
-        for _ in 0..128 {
+        for _ in 0..file_number {
             completed_then_dropped_before_repoll(path.clone()).await;
         }
 
-        // Give completions a moment to settle before counting fds.
-        tokio::time::sleep(Duration::from_millis(250)).await;
-
-        let after = fd_count();
-        let leaked = after.saturating_sub(before);
-
-        // Since we are opening 128 files, we expect that the related fds
-        // related to this operation will be closed. Since some other fds
-        // can be opened in the meantime, we expect this number to be higher
-        // than the counter before opening the files. This number could be
-        // lower, but to avoid test flakiness we check that this is at most
-        // half the number of the file we opened to check if there's a leak.
-        assert!(leaked <= 64);
+        assert_fds_are_not_leaking(before, file_number, 1).await
     });
 }
