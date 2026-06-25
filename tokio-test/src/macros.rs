@@ -286,7 +286,11 @@ macro_rules! assert_elapsed {
 
         // Handles ms rounding
         assert!(
-            elapsed >= lower && elapsed <= lower + std::time::Duration::from_millis(1),
+            elapsed >= lower
+                && elapsed
+                    <= lower
+                        .checked_add(std::time::Duration::from_millis(1))
+                        .unwrap(),
             "actual = {:?}, expected = {:?}",
             elapsed,
             lower

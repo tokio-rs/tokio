@@ -52,7 +52,7 @@ async fn delayed_sleep_level_0() {
         let now = Instant::now();
         let dur = ms(i);
 
-        time::sleep_until(now + dur).await;
+        time::sleep_until(now.checked_add(dur).unwrap()).await;
 
         assert_elapsed!(now, dur);
     }
@@ -64,7 +64,7 @@ async fn sub_ms_delayed_sleep() {
 
     for _ in 0..5 {
         let now = Instant::now();
-        let deadline = now + ms(1) + Duration::new(0, 1);
+        let deadline = now.checked_add(ms(1) + Duration::new(0, 1)).unwrap();
 
         time::sleep_until(deadline).await;
 
@@ -79,7 +79,7 @@ async fn delayed_sleep_wrapping_level_0() {
     time::sleep(ms(5)).await;
 
     let now = Instant::now();
-    time::sleep_until(now + ms(60)).await;
+    time::sleep_until(now.checked_add(ms(60)).unwrap()).await;
 
     assert_elapsed!(now, ms(60));
 }
@@ -90,12 +90,16 @@ async fn reset_future_sleep_before_fire() {
 
     let now = Instant::now();
 
-    let mut sleep = task::spawn(Box::pin(time::sleep_until(now + ms(100))));
+    let mut sleep = task::spawn(Box::pin(time::sleep_until(
+        now.checked_add(ms(100)).unwrap(),
+    )));
     assert_pending!(sleep.poll());
 
     let mut sleep = sleep.into_inner();
 
-    sleep.as_mut().reset(Instant::now() + ms(200));
+    sleep
+        .as_mut()
+        .reset(Instant::now().checked_add(ms(200)).unwrap());
     sleep.await;
 
     assert_elapsed!(now, ms(200));
@@ -107,12 +111,14 @@ async fn reset_past_sleep_before_turn() {
 
     let now = Instant::now();
 
-    let mut sleep = task::spawn(Box::pin(time::sleep_until(now + ms(100))));
+    let mut sleep = task::spawn(Box::pin(time::sleep_until(
+        now.checked_add(ms(100)).unwrap(),
+    )));
     assert_pending!(sleep.poll());
 
     let mut sleep = sleep.into_inner();
 
-    sleep.as_mut().reset(now + ms(80));
+    sleep.as_mut().reset(now.checked_add(ms(80)).unwrap());
     sleep.await;
 
     assert_elapsed!(now, ms(80));
@@ -124,14 +130,16 @@ async fn reset_past_sleep_before_fire() {
 
     let now = Instant::now();
 
-    let mut sleep = task::spawn(Box::pin(time::sleep_until(now + ms(100))));
+    let mut sleep = task::spawn(Box::pin(time::sleep_until(
+        now.checked_add(ms(100)).unwrap(),
+    )));
     assert_pending!(sleep.poll());
 
     let mut sleep = sleep.into_inner();
 
     time::sleep(ms(10)).await;
 
-    sleep.as_mut().reset(now + ms(80));
+    sleep.as_mut().reset(now.checked_add(ms(80)).unwrap());
     sleep.await;
 
     assert_elapsed!(now, ms(80));
@@ -142,12 +150,12 @@ async fn reset_future_sleep_after_fire() {
     time::pause();
 
     let now = Instant::now();
-    let mut sleep = Box::pin(time::sleep_until(now + ms(100)));
+    let mut sleep = Box::pin(time::sleep_until(now.checked_add(ms(100)).unwrap()));
 
     sleep.as_mut().await;
     assert_elapsed!(now, ms(100));
 
-    sleep.as_mut().reset(now + ms(110));
+    sleep.as_mut().reset(now.checked_add(ms(110)).unwrap());
     sleep.await;
     assert_elapsed!(now, ms(110));
 }
@@ -158,14 +166,16 @@ async fn reset_sleep_to_past() {
 
     let now = Instant::now();
 
-    let mut sleep = task::spawn(Box::pin(time::sleep_until(now + ms(100))));
+    let mut sleep = task::spawn(Box::pin(time::sleep_until(
+        now.checked_add(ms(100)).unwrap(),
+    )));
     assert_pending!(sleep.poll());
 
     time::sleep(ms(50)).await;
 
     assert!(!sleep.is_woken());
 
-    sleep.as_mut().reset(now + ms(40));
+    sleep.as_mut().reset(now.checked_add(ms(40)).unwrap());
 
     // TODO: is this required?
     //assert!(sleep.is_woken());
@@ -181,7 +191,7 @@ fn creating_sleep_outside_of_context() {
 
     // This creates a delay outside of the context of a mock timer. This tests
     // that it will panic.
-    let _fut = time::sleep_until(now + ms(500));
+    let _fut = time::sleep_until(now.checked_add(ms(500)).unwrap());
 }
 
 #[tokio::test]
@@ -189,7 +199,7 @@ async fn greater_than_max() {
     const YR_5: u64 = 5 * 365 * 24 * 60 * 60 * 1000;
 
     time::pause();
-    time::sleep_until(Instant::now() + ms(YR_5)).await;
+    time::sleep_until(Instant::now().checked_add(ms(YR_5)).unwrap()).await;
 }
 
 #[tokio::test]
@@ -212,10 +222,11 @@ async fn multi_long_sleeps() {
     }
 
     let deadline = tokio::time::Instant::now()
-        + Duration::from_secs(
+        .checked_add(Duration::from_secs(
             // about 10 years
             10 * 365 * 24 * 3600,
-        );
+        ))
+        .unwrap();
 
     tokio::time::sleep_until(deadline).await;
 
@@ -227,15 +238,16 @@ async fn long_sleeps() {
     tokio::time::pause();
 
     let deadline = tokio::time::Instant::now()
-        + Duration::from_secs(
+        .checked_add(Duration::from_secs(
             // about 10 years
             10 * 365 * 24 * 3600,
-        );
+        ))
+        .unwrap();
 
     tokio::time::sleep_until(deadline).await;
 
     assert!(tokio::time::Instant::now() >= deadline);
-    assert!(tokio::time::Instant::now() <= deadline + Duration::from_millis(1));
+    assert!(tokio::time::Instant::now() <= deadline.checked_add(Duration::from_millis(1)).unwrap());
 }
 
 #[tokio::test]
@@ -249,9 +261,11 @@ async fn reset_after_firing() {
     assert_ready!(timer
         .as_mut()
         .poll(&mut Context::from_waker(noop_waker_ref())));
-    timer
-        .as_mut()
-        .reset(tokio::time::Instant::now() + std::time::Duration::from_secs(600));
+    timer.as_mut().reset(
+        tokio::time::Instant::now()
+            .checked_add(std::time::Duration::from_secs(600))
+            .unwrap(),
+    );
 
     assert_ne!(deadline, timer.deadline());
 
@@ -265,6 +279,7 @@ async fn reset_after_firing() {
 
 #[tokio::test]
 async fn exactly_max() {
+    panic!("TODO: this sleeps forever...");
     time::pause();
     time::sleep(Duration::MAX).await;
 }
@@ -285,6 +300,7 @@ async fn issue_5183() {
 
 #[tokio::test]
 async fn no_out_of_bounds_close_to_max() {
+    panic!("TODO: this sleeps forever...");
     time::pause();
     time::sleep(Duration::MAX - Duration::from_millis(1)).await;
 }
@@ -309,7 +325,8 @@ async fn drop_after_reschedule_at_new_scheduled_time() {
     let _ = poll!(&mut b);
     let _ = poll!(&mut c);
 
-    b.as_mut().reset(start + Duration::from_millis(10));
+    b.as_mut()
+        .reset(start.checked_add(Duration::from_millis(10)).unwrap());
     a.await;
 
     drop(b);

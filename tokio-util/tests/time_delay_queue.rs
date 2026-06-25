@@ -72,7 +72,7 @@ async fn single_short_delay() {
     time::pause();
 
     let mut queue = task::spawn(DelayQueue::new());
-    let _key = queue.insert_at("foo", Instant::now() + ms(5));
+    let _key = queue.insert_at("foo", Instant::now().checked_add(ms(5)).unwrap());
 
     assert_pending!(poll!(queue));
 
@@ -103,7 +103,7 @@ async fn multi_delay_at_start() {
 
     // Setup the delays
     for &i in delays {
-        let _key = queue.insert_at(i, Instant::now() + ms(i));
+        let _key = queue.insert_at(i, Instant::now().checked_add(ms(i)).unwrap());
     }
 
     assert_pending!(poll!(queue));
@@ -113,7 +113,7 @@ async fn multi_delay_at_start() {
     for elapsed in 0..1200 {
         println!("elapsed: {elapsed:?}");
         let elapsed = elapsed + 1;
-        tokio::time::sleep_until(start + ms(elapsed)).await;
+        tokio::time::sleep_until(start.checked_add(ms(elapsed)).unwrap()).await;
 
         if delays.contains(&elapsed) {
             assert!(queue.is_woken());
@@ -125,7 +125,7 @@ async fn multi_delay_at_start() {
                 cascade.contains(&elapsed),
                 "elapsed={} dt={:?}",
                 elapsed,
-                Instant::now() - start
+                Instant::now().checked_duration_since(start).unwrap()
             );
 
             assert_pending!(poll!(queue));
@@ -156,7 +156,7 @@ async fn remove_entry() {
 
     let mut queue = task::spawn(DelayQueue::new());
 
-    let key = queue.insert_at("foo", Instant::now() + ms(5));
+    let key = queue.insert_at("foo", Instant::now().checked_add(ms(5)).unwrap());
 
     assert_pending!(poll!(queue));
 
@@ -176,12 +176,12 @@ async fn reset_entry() {
     let mut queue = task::spawn(DelayQueue::new());
 
     let now = Instant::now();
-    let key = queue.insert_at("foo", now + ms(5));
+    let key = queue.insert_at("foo", now.checked_add(ms(5)).unwrap());
 
     assert_pending!(poll!(queue));
     sleep(ms(1)).await;
 
-    queue.reset_at(&key, now + ms(10));
+    queue.reset_at(&key, now.checked_add(ms(10)).unwrap());
 
     assert_pending!(poll!(queue));
 
@@ -212,12 +212,12 @@ async fn reset_much_later() {
     let now = Instant::now();
     sleep(ms(1)).await;
 
-    let key = queue.insert_at("foo", now + ms(200));
+    let key = queue.insert_at("foo", now.checked_add(ms(200)).unwrap());
     assert_pending!(poll!(queue));
 
     sleep(ms(3)).await;
 
-    queue.reset_at(&key, now + ms(10));
+    queue.reset_at(&key, now.checked_add(ms(10)).unwrap());
 
     sleep(ms(20)).await;
 
@@ -234,17 +234,17 @@ async fn reset_twice() {
 
     sleep(ms(1)).await;
 
-    let key = queue.insert_at("foo", now + ms(200));
+    let key = queue.insert_at("foo", now.checked_add(ms(200)).unwrap());
 
     assert_pending!(poll!(queue));
 
     sleep(ms(3)).await;
 
-    queue.reset_at(&key, now + ms(50));
+    queue.reset_at(&key, now.checked_add(ms(50)).unwrap());
 
     sleep(ms(20)).await;
 
-    queue.reset_at(&key, now + ms(40));
+    queue.reset_at(&key, now.checked_add(ms(40)).unwrap());
 
     sleep(ms(20)).await;
 
@@ -266,14 +266,14 @@ async fn repeatedly_reset_entry_inserted_as_expired() {
     let mut queue = task::spawn(DelayQueue::new());
     let now = Instant::now();
 
-    let key = queue.insert_at("foo", now - ms(100));
+    let key = queue.insert_at("foo", now.checked_sub(ms(100)).unwrap());
 
-    queue.reset_at(&key, now + ms(100));
-    queue.reset_at(&key, now + ms(50));
+    queue.reset_at(&key, now.checked_add(ms(100)).unwrap());
+    queue.reset_at(&key, now.checked_add(ms(50)).unwrap());
 
     assert_pending!(poll!(queue));
 
-    time::sleep_until(now + ms(60)).await;
+    time::sleep_until(now.checked_add(ms(60)).unwrap()).await;
 
     assert!(queue.is_woken());
 
@@ -312,8 +312,8 @@ async fn remove_at_timer_wheel_threshold() {
 
     let now = Instant::now();
 
-    let key1 = queue.insert_at("foo", now + ms(64));
-    let key2 = queue.insert_at("bar", now + ms(64));
+    let key1 = queue.insert_at("foo", now.checked_add(ms(64)).unwrap());
+    let key2 = queue.insert_at("bar", now.checked_add(ms(64)).unwrap());
 
     sleep(ms(80)).await;
 
@@ -340,13 +340,13 @@ async fn expires_before_last_insert() {
 
     let now = Instant::now();
 
-    queue.insert_at("foo", now + ms(10_000));
+    queue.insert_at("foo", now.checked_add(ms(10_000)).unwrap());
 
     // Delay should be set to 8.192s here.
     assert_pending!(poll!(queue));
 
     // Delay should be set to the delay of the new item here
-    queue.insert_at("bar", now + ms(600));
+    queue.insert_at("bar", now.checked_add(ms(600)).unwrap());
 
     assert_pending!(poll!(queue));
 
@@ -366,14 +366,14 @@ async fn multi_reset() {
 
     let now = Instant::now();
 
-    let one = queue.insert_at("one", now + ms(200));
-    let two = queue.insert_at("two", now + ms(250));
+    let one = queue.insert_at("one", now.checked_add(ms(200)).unwrap());
+    let two = queue.insert_at("two", now.checked_add(ms(250)).unwrap());
 
     assert_pending!(poll!(queue));
 
-    queue.reset_at(&one, now + ms(300));
-    queue.reset_at(&two, now + ms(350));
-    queue.reset_at(&one, now + ms(400));
+    queue.reset_at(&one, now.checked_add(ms(300)).unwrap());
+    queue.reset_at(&two, now.checked_add(ms(350)).unwrap());
+    queue.reset_at(&one, now.checked_add(ms(400)).unwrap());
 
     sleep(ms(310)).await;
 
@@ -403,12 +403,12 @@ async fn expire_first_key_when_reset_to_expire_earlier() {
 
     let now = Instant::now();
 
-    let one = queue.insert_at("one", now + ms(200));
-    queue.insert_at("two", now + ms(250));
+    let one = queue.insert_at("one", now.checked_add(ms(200)).unwrap());
+    queue.insert_at("two", now.checked_add(ms(250)).unwrap());
 
     assert_pending!(poll!(queue));
 
-    queue.reset_at(&one, now + ms(100));
+    queue.reset_at(&one, now.checked_add(ms(100)).unwrap());
 
     sleep(ms(100)).await;
 
@@ -426,12 +426,12 @@ async fn expire_second_key_when_reset_to_expire_earlier() {
 
     let now = Instant::now();
 
-    queue.insert_at("one", now + ms(200));
-    let two = queue.insert_at("two", now + ms(250));
+    queue.insert_at("one", now.checked_add(ms(200)).unwrap());
+    let two = queue.insert_at("two", now.checked_add(ms(250)).unwrap());
 
     assert_pending!(poll!(queue));
 
-    queue.reset_at(&two, now + ms(100));
+    queue.reset_at(&two, now.checked_add(ms(100)).unwrap());
 
     sleep(ms(100)).await;
 
@@ -449,12 +449,12 @@ async fn reset_first_expiring_item_to_expire_later() {
 
     let now = Instant::now();
 
-    let one = queue.insert_at("one", now + ms(200));
-    let _two = queue.insert_at("two", now + ms(250));
+    let one = queue.insert_at("one", now.checked_add(ms(200)).unwrap());
+    let _two = queue.insert_at("two", now.checked_add(ms(250)).unwrap());
 
     assert_pending!(poll!(queue));
 
-    queue.reset_at(&one, now + ms(300));
+    queue.reset_at(&one, now.checked_add(ms(300)).unwrap());
     sleep(ms(250)).await;
 
     assert!(queue.is_woken());
@@ -471,11 +471,11 @@ async fn insert_before_first_after_poll() {
 
     let now = Instant::now();
 
-    let _one = queue.insert_at("one", now + ms(200));
+    let _one = queue.insert_at("one", now.checked_add(ms(200)).unwrap());
 
     assert_pending!(poll!(queue));
 
-    let _two = queue.insert_at("two", now + ms(100));
+    let _two = queue.insert_at("two", now.checked_add(ms(100)).unwrap());
 
     sleep(ms(99)).await;
 
@@ -497,9 +497,9 @@ async fn insert_after_ready_poll() {
 
     let now = Instant::now();
 
-    queue.insert_at("1", now + ms(100));
-    queue.insert_at("2", now + ms(100));
-    queue.insert_at("3", now + ms(100));
+    queue.insert_at("1", now.checked_add(ms(100)).unwrap());
+    queue.insert_at("2", now.checked_add(ms(100)).unwrap());
+    queue.insert_at("3", now.checked_add(ms(100)).unwrap());
 
     assert_pending!(poll!(queue));
 
@@ -512,7 +512,7 @@ async fn insert_after_ready_poll() {
     while res.len() < 3 {
         let entry = assert_ready_some!(poll!(queue));
         res.push(entry.into_inner());
-        queue.insert_at("foo", now + ms(500));
+        queue.insert_at("foo", now.checked_add(ms(500)).unwrap());
     }
 
     res.sort_unstable();
@@ -530,11 +530,11 @@ async fn reset_later_after_slot_starts() {
 
     let now = Instant::now();
 
-    let foo = queue.insert_at("foo", now + ms(100));
+    let foo = queue.insert_at("foo", now.checked_add(ms(100)).unwrap());
 
     assert_pending!(poll!(queue));
 
-    sleep_until(now + Duration::from_millis(80)).await;
+    sleep_until(now.checked_add(Duration::from_millis(80)).unwrap()).await;
 
     assert!(!queue.is_woken());
 
@@ -544,12 +544,12 @@ async fn reset_later_after_slot_starts() {
     // the [64-128) slot.  As the queue knows that the first entry is within
     // that slot, but doesn't know when, it must wake immediately to advance
     // the wheel.
-    queue.reset_at(&foo, now + ms(120));
+    queue.reset_at(&foo, now.checked_add(ms(120)).unwrap());
     assert!(queue.is_woken());
 
     assert_pending!(poll!(queue));
 
-    sleep_until(now + Duration::from_millis(119)).await;
+    sleep_until(now.checked_add(Duration::from_millis(119)).unwrap()).await;
     assert!(!queue.is_woken());
 
     sleep(ms(1)).await;
@@ -569,10 +569,10 @@ async fn reset_inserted_expired() {
     let mut queue = task::spawn(DelayQueue::new());
     let now = Instant::now();
 
-    let key = queue.insert_at("foo", now - ms(100));
+    let key = queue.insert_at("foo", now.checked_sub(ms(100)).unwrap());
 
     // this causes the panic described in #2473
-    queue.reset_at(&key, now + ms(100));
+    queue.reset_at(&key, now.checked_add(ms(100)).unwrap());
 
     assert_eq!(1, queue.len());
 
@@ -592,11 +592,11 @@ async fn reset_earlier_after_slot_starts() {
 
     let now = Instant::now();
 
-    let foo = queue.insert_at("foo", now + ms(200));
+    let foo = queue.insert_at("foo", now.checked_add(ms(200)).unwrap());
 
     assert_pending!(poll!(queue));
 
-    sleep_until(now + Duration::from_millis(80)).await;
+    sleep_until(now.checked_add(Duration::from_millis(80)).unwrap()).await;
 
     assert!(!queue.is_woken());
 
@@ -606,12 +606,12 @@ async fn reset_earlier_after_slot_starts() {
     // the [64-128) slot.  As the queue knows that the first entry is within
     // that slot, but doesn't know when, it must wake immediately to advance
     // the wheel.
-    queue.reset_at(&foo, now + ms(120));
+    queue.reset_at(&foo, now.checked_add(ms(120)).unwrap());
     assert!(queue.is_woken());
 
     assert_pending!(poll!(queue));
 
-    sleep_until(now + Duration::from_millis(119)).await;
+    sleep_until(now.checked_add(Duration::from_millis(119)).unwrap()).await;
     assert!(!queue.is_woken());
 
     sleep(ms(1)).await;
@@ -629,14 +629,14 @@ async fn insert_in_past_after_poll_fires_immediately() {
 
     let now = Instant::now();
 
-    queue.insert_at("foo", now + ms(200));
+    queue.insert_at("foo", now.checked_add(ms(200)).unwrap());
 
     assert_pending!(poll!(queue));
 
     sleep(ms(80)).await;
 
     assert!(!queue.is_woken());
-    queue.insert_at("bar", now + ms(40));
+    queue.insert_at("bar", now.checked_add(ms(40)).unwrap());
 
     assert!(queue.is_woken());
 
@@ -660,8 +660,8 @@ async fn compact_expire_empty() {
 
     let now = Instant::now();
 
-    queue.insert_at("foo1", now + ms(10));
-    queue.insert_at("foo2", now + ms(10));
+    queue.insert_at("foo1", now.checked_add(ms(10)).unwrap());
+    queue.insert_at("foo2", now.checked_add(ms(10)).unwrap());
 
     sleep(ms(10)).await;
 
@@ -683,8 +683,8 @@ async fn compact_remove_empty() {
 
     let now = Instant::now();
 
-    let key1 = queue.insert_at("foo1", now + ms(10));
-    let key2 = queue.insert_at("foo2", now + ms(10));
+    let key1 = queue.insert_at("foo1", now.checked_add(ms(10)).unwrap());
+    let key2 = queue.insert_at("foo2", now.checked_add(ms(10)).unwrap());
 
     queue.remove(&key1);
     queue.remove(&key2);
@@ -703,12 +703,12 @@ async fn compact_remove_remapped_keys() {
 
     let now = Instant::now();
 
-    queue.insert_at("foo1", now + ms(10));
-    queue.insert_at("foo2", now + ms(10));
+    queue.insert_at("foo1", now.checked_add(ms(10)).unwrap());
+    queue.insert_at("foo2", now.checked_add(ms(10)).unwrap());
 
     // should be assigned indices 3 and 4
-    let key3 = queue.insert_at("foo3", now + ms(20));
-    let key4 = queue.insert_at("foo4", now + ms(20));
+    let key3 = queue.insert_at("foo3", now.checked_add(ms(20)).unwrap());
+    let key4 = queue.insert_at("foo4", now.checked_add(ms(20)).unwrap());
 
     sleep(ms(10)).await;
 
@@ -722,7 +722,7 @@ async fn compact_remove_remapped_keys() {
     // new indices here
     queue.compact();
 
-    queue.insert_at("foo5", now + ms(10));
+    queue.insert_at("foo5", now.checked_add(ms(10)).unwrap());
 
     // test removal of re-mapped keys
     let expired3 = queue.remove(&key3);
@@ -742,12 +742,12 @@ async fn compact_change_deadline() {
 
     let mut now = Instant::now();
 
-    queue.insert_at("foo1", now + ms(10));
-    queue.insert_at("foo2", now + ms(10));
+    queue.insert_at("foo1", now.checked_add(ms(10)).unwrap());
+    queue.insert_at("foo2", now.checked_add(ms(10)).unwrap());
 
     // should be assigned indices 3 and 4
-    queue.insert_at("foo3", now + ms(20));
-    let key4 = queue.insert_at("foo4", now + ms(20));
+    queue.insert_at("foo3", now.checked_add(ms(20)).unwrap());
+    let key4 = queue.insert_at("foo4", now.checked_add(ms(20)).unwrap());
 
     sleep(ms(10)).await;
 
@@ -763,11 +763,11 @@ async fn compact_change_deadline() {
 
     now = Instant::now();
 
-    queue.insert_at("foo5", now + ms(10));
-    let key6 = queue.insert_at("foo6", now + ms(10));
+    queue.insert_at("foo5", now.checked_add(ms(10)).unwrap());
+    let key6 = queue.insert_at("foo6", now.checked_add(ms(10)).unwrap());
 
-    queue.reset_at(&key4, now + ms(20));
-    queue.reset_at(&key6, now + ms(20));
+    queue.reset_at(&key4, now.checked_add(ms(20)).unwrap());
+    queue.reset_at(&key6, now.checked_add(ms(20)).unwrap());
 
     // foo3 and foo5 will expire
     sleep(ms(10)).await;
@@ -811,8 +811,8 @@ async fn remove_after_compact() {
     let now = Instant::now();
     let mut queue = DelayQueue::new();
 
-    let foo_key = queue.insert_at("foo", now + ms(10));
-    queue.insert_at("bar", now + ms(20));
+    let foo_key = queue.insert_at("foo", now.checked_add(ms(10)).unwrap());
+    queue.insert_at("bar", now.checked_add(ms(20)).unwrap());
     queue.remove(&foo_key);
     queue.compact();
 
@@ -829,8 +829,8 @@ async fn remove_after_compact_poll() {
     let now = Instant::now();
     let mut queue = task::spawn(DelayQueue::new());
 
-    let foo_key = queue.insert_at("foo", now + ms(10));
-    queue.insert_at("bar", now + ms(20));
+    let foo_key = queue.insert_at("foo", now.checked_add(ms(10)).unwrap());
+    queue.insert_at("bar", now.checked_add(ms(20)).unwrap());
 
     sleep(ms(10)).await;
     assert_eq!(assert_ready_some!(poll!(queue)).key(), foo_key);
@@ -849,9 +849,9 @@ async fn peek() {
 
     let now = Instant::now();
 
-    let key = queue.insert_at("foo", now + ms(5));
+    let key = queue.insert_at("foo", now.checked_add(ms(5)).unwrap());
     let key2 = queue.insert_at("bar", now);
-    let key3 = queue.insert_at("baz", now + ms(10));
+    let key3 = queue.insert_at("baz", now.checked_add(ms(10)).unwrap());
 
     assert_eq!(queue.peek(), Some(key2));
 
