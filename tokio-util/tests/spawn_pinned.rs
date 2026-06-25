@@ -50,6 +50,44 @@ fn cannot_create_zero_sized_pool() {
     let _pool = task::LocalPoolHandle::new(0);
 }
 
+#[tokio::test]
+async fn builder_uses_default_thread_name() {
+    let pool = task::LocalPoolBuilder::new(1).build().unwrap();
+
+    let thread_name = pool
+        .spawn_pinned(|| async {
+            std::thread::current()
+                .name()
+                .expect("thread should be named")
+                .to_string()
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(thread_name, "tokio-local-pool-worker");
+}
+
+#[tokio::test]
+async fn builder_configures_threads() {
+    let pool = task::LocalPoolBuilder::new(1)
+        .thread_name("spawn-pinned-test")
+        .thread_stack_size(3 * 1024 * 1024)
+        .build()
+        .unwrap();
+
+    let thread_name = pool
+        .spawn_pinned(|| async {
+            std::thread::current()
+                .name()
+                .expect("thread should be named")
+                .to_string()
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(thread_name, "spawn-pinned-test");
+}
+
 /// We should be able to spawn multiple futures onto the pool at the same time.
 #[tokio::test]
 async fn can_spawn_multiple_futures() {
