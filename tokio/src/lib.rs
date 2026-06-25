@@ -354,6 +354,7 @@
 //! Some feature flags are only available when specifying the `tokio_unstable` flag:
 //!
 //! - `tracing`: Enables tracing events.
+//! - `schedule-latency`: Allows measurement of task scheduling latencies.
 //! - `io-uring`: Enables `io-uring` (Linux only).
 //! - `taskdump`: Enables `taskdump` (Linux only).
 //!
@@ -500,6 +501,15 @@ compile_error!(
     "The `taskdump` feature is only currently supported on \
 linux, on `aarch64`, `x86`, `x86_64` and `s390x`."
 );
+
+#[cfg(all(not(tokio_unstable), feature = "schedule-latency"))]
+compile_error!("The `schedule-latency` feature requires `--cfg tokio_unstable`.");
+
+#[cfg(all(
+    feature = "schedule-latency",
+    not(all(target_pointer_width = "64", target_has_atomic = "64"))
+))]
+compile_error!("The `schedule-latency` feature is only currently supported on 64-bit targets.");
 
 // Includes re-exports used by macros.
 //
