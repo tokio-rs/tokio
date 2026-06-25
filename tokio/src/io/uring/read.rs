@@ -61,7 +61,9 @@ impl<B: fmt::Debug, F> fmt::Debug for Read<B, F> {
 }
 
 impl<B: ReadBuffer, F: UringFd> Completable for Read<B, F> {
-    type Output = (io::Result<u32>, F, B);
+    // The fd and buffer are `None` only when the op was cancelled and they were
+    // kept in the driver; otherwise they are returned to the caller.
+    type Output = (io::Result<u32>, Option<F>, Option<B>);
 
     fn complete(self, cqe: CqeResult) -> Self::Output {
         let mut buf = self.buf;
@@ -69,11 +71,15 @@ impl<B: ReadBuffer, F: UringFd> Completable for Read<B, F> {
             // SAFETY: kernel wrote exactly `len` bytes into the prepared buffer.
             unsafe { buf.uring_read_complete(len) };
         }
-        (cqe.result, self.fd, buf)
+        (cqe.result, Some(self.fd), Some(buf))
     }
 
     fn complete_with_error(self, err: Error) -> Self::Output {
-        (Err(err), self.fd, self.buf)
+        (Err(err), Some(self.fd), Some(self.buf))
+    }
+
+    fn complete_after_cancel(err: Error) -> Self::Output {
+        (Err(err), None, None)
     }
 }
 
