@@ -4,9 +4,11 @@
 use futures::future::FutureExt;
 use std::io::prelude::*;
 use std::io::IoSlice;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tempfile::NamedTempFile;
 use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt, SeekFrom};
 use tokio_test::task;
 
 const HELLO: &[u8] = b"hello world...";
@@ -83,6 +85,60 @@ async fn write_vectored_and_shutdown() {
 
     let file = std::fs::read(tempfile.path()).unwrap();
     assert_eq!(file, [HELLO, HELLO].concat());
+}
+
+#[test]
+fn poll_write_after_runtime_shutdown_returns_errors() {
+    let tempfile = tempfile();
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .unwrap();
+    let handle = rt.handle().clone();
+    let mut file = rt.block_on(async { File::create(tempfile.path()).await.unwrap() });
+
+    rt.shutdown_background();
+    let _guard = handle.enter();
+    let waker = futures::task::noop_waker();
+    let mut cx = Context::from_waker(&waker);
+
+    assert!(matches!(
+        Pin::new(&mut file).poll_write(&mut cx, b"first write"),
+        Poll::Ready(Err(_))
+    ));
+    assert!(matches!(
+        Pin::new(&mut file).poll_write(&mut cx, b"second write"),
+        Poll::Ready(Err(_))
+    ));
+}
+
+#[test]
+fn poll_write_vectored_after_runtime_shutdown_returns_errors() {
+    let tempfile = tempfile();
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .unwrap();
+    let handle = rt.handle().clone();
+    let mut file = rt.block_on(async { File::create(tempfile.path()).await.unwrap() });
+
+    rt.shutdown_background();
+    let _guard = handle.enter();
+    let waker = futures::task::noop_waker();
+    let mut cx = Context::from_waker(&waker);
+    let first = [IoSlice::new(b"first write")];
+    let second = [IoSlice::new(b"second write")];
+
+    assert!(matches!(
+        Pin::new(&mut file).poll_write_vectored(&mut cx, &first),
+        Poll::Ready(Err(_))
+    ));
+    assert!(matches!(
+        Pin::new(&mut file).poll_write_vectored(&mut cx, &second),
+        Poll::Ready(Err(_))
+    ));
 }
 
 #[tokio::test]
