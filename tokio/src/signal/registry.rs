@@ -3,7 +3,7 @@ use crate::sync::watch;
 
 use std::ops;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 pub(crate) type EventId = usize;
 
@@ -83,6 +83,13 @@ impl<S: Storage> Registry<S> {
         }
     }
 
+    /// Discards all recorded events without broadcasting them.
+    fn clear_pending(&self) {
+        self.storage.for_each(|event_info| {
+            event_info.pending.store(false, Ordering::SeqCst);
+        });
+    }
+
     /// Broadcasts all previously recorded events to their respective listeners.
     ///
     /// Returns `true` if an event was delivered to at least one listener.
@@ -107,6 +114,16 @@ impl<S: Storage> Registry<S> {
 pub(crate) struct Globals {
     extra: OsExtraData,
     registry: Registry<OsStorage>,
+    /// `process::id()` of the process whose self-pipe is currently installed
+    /// in `extra`. A forked child inherits its parent's pipe and must replace
+    /// it before use, see [`Globals::reinit_after_fork_if_needed`].
+    ///
+    /// Known limitation: if the process recorded here dies and a descendant
+    /// that never created a runtime forks a child that is assigned the
+    /// recycled PID, the fork goes undetected. This is inherent to PID
+    /// comparison; closing it would require `pthread_atfork`, a process-wide
+    /// hook that cannot be removed again and is deliberately avoided here.
+    pid: Mutex<u32>,
 }
 
 impl ops::Deref for Globals {
@@ -140,6 +157,34 @@ impl Globals {
     pub(crate) fn storage(&self) -> &OsStorage {
         &self.registry.storage
     }
+
+    /// Re-creates the process-wide self-pipe if this process was forked from
+    /// the process that initialized it, so that signal wakeups are no longer
+    /// shared with the parent process. See [`OsExtraData::replace_pipe`] for
+    /// why the pipe must be replaced and how the replacement keeps the
+    /// inherited signal handler working.
+    ///
+    /// This runs once per runtime creation (a cold path), so a plain mutex
+    /// around the PID is plenty.
+    pub(crate) fn reinit_after_fork_if_needed(&self) -> std::io::Result<()> {
+        let mut pid = self.pid.lock().unwrap();
+        let current = std::process::id();
+        if *pid == current {
+            return Ok(());
+        }
+
+        // Invariant: no signal listener can exist in this process yet —
+        // registering one requires a signal driver, and the first driver of
+        // this process is the caller, which is still being constructed. So
+        // a signal arriving while this runs is recorded with no one to
+        // observe it, and discarding it below is indistinguishable from the
+        // (unsupported) delivery of a signal before any listener exists.
+        self.extra.replace_pipe()?;
+        // Events recorded before the fork were meant for the parent process.
+        self.registry.clear_pending();
+        *pid = current;
+        Ok(())
+    }
 }
 
 fn globals_init() -> Globals
@@ -150,6 +195,7 @@ where
     Globals {
         extra: OsExtraData::default(),
         registry: Registry::new(OsStorage::default()),
+        pid: Mutex::new(std::process::id()),
     }
 }
 
