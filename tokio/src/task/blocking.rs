@@ -65,6 +65,21 @@ cfg_rt_multi_thread! {
     /// # }
     /// ```
     ///
+    /// <div class="warning">
+    ///
+    /// If a future comprises different branches that attempt to acquire the same async [`Mutex`]
+    /// (e.g. [`select`] branches), then calling `lock` via `block_in_place` and `block_on` in one
+    /// branch can **deadlock** if another branch had previously yielded while waiting for the same
+    /// mutex. This happens because the yielded branch holds a position in the mutex's (FIFO) wait
+    /// queue that cannot be fulfilled. Hence the future fails to make progress.
+    ///
+    /// See [#7892](https://github.com/tokio-rs/tokio/issues/7892) for more information.
+    ///
+    /// [`Mutex`]: struct@crate::sync::Mutex
+    /// [`select`]: macro@crate::select
+    ///
+    /// </div>
+    ///
     /// # Panics
     ///
     /// This function panics if called from a [`current_thread`] runtime.
