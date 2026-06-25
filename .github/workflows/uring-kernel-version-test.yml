@@ -25,7 +25,7 @@ jobs:
 
       - name: Cache Linux source
         id: cache-kernel
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: linux-${{ env.KERNEL_VERSION }}
           key: kernel-${{ env.KERNEL_VERSION }}
