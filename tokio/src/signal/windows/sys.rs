@@ -11,28 +11,29 @@ use windows_sys::Win32::System::Console as console;
 type EventInfo = watch::Sender<()>;
 
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
-    new(console::CTRL_BREAK_EVENT)
+    unsafe { new(console::CTRL_BREAK_EVENT) }
 }
 
 pub(super) fn ctrl_close() -> io::Result<RxFuture> {
-    new(console::CTRL_CLOSE_EVENT)
+    unsafe { new(console::CTRL_CLOSE_EVENT) }
 }
 
 pub(super) fn ctrl_c() -> io::Result<RxFuture> {
-    new(console::CTRL_C_EVENT)
+    unsafe { new(console::CTRL_C_EVENT) }
 }
 
 pub(super) fn ctrl_logoff() -> io::Result<RxFuture> {
-    new(console::CTRL_LOGOFF_EVENT)
+    unsafe { new(console::CTRL_LOGOFF_EVENT) }
 }
 
 pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
-    new(console::CTRL_SHUTDOWN_EVENT)
+    unsafe { new(console::CTRL_SHUTDOWN_EVENT) }
 }
 
-fn new(signum: u32) -> io::Result<RxFuture> {
+unsafe fn new(signum: u32) -> io::Result<RxFuture> {
     let rx = match REGISTRY.get_or_init(init).as_ref() {
-        Ok(registry) => registry.event_info(signum).expect("valid").subscribe(),
+        // SAFETY: signum is valid (the compiler is unable to determine this)
+        Ok(registry) => unsafe { registry.event_info(signum).unwrap_unchecked() }.subscribe(),
         Err(&code) => return Err(Error::from_raw_os_error(code)),
     };
     Ok(RxFuture::new(rx))
