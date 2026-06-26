@@ -116,7 +116,7 @@ impl<F> TokioContext<F> {
     /// rt2.block_on(fut);
     /// # }
     /// ```
-    pub fn new(future: F, handle: Handle) -> TokioContext<F> {
+    pub const fn new(future: F, handle: Handle) -> TokioContext<F> {
         TokioContext {
             inner: future,
             handle,
@@ -124,7 +124,7 @@ impl<F> TokioContext<F> {
     }
 
     /// Obtain a reference to the handle inside this `TokioContext`.
-    pub fn handle(&self) -> &Handle {
+    pub const fn handle(&self) -> &Handle {
         &self.handle
     }
 
