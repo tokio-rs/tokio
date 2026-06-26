@@ -23,6 +23,8 @@ use super::time_alt;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Mutex;
+#[cfg(feature = "rt")]
+use crate::runtime::context;
 use crate::runtime::driver::{self, IoHandle, IoStack};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
@@ -443,9 +445,14 @@ impl Handle {
         };
 
         // The timer was fired synchronously as a result of the reregistration.
-        // Wake the waker; this is needed because we might reset _after_ a poll,
-        // and otherwise the task won't be awoken to poll again.
+        // Defer the wakeup so that the timer driver gets a chance to run before
+        // the task is re-polled (issue #7883). Calling wake() directly here
+        // would cause eager combinators to re-poll Sleep without ever yielding
+        // to the runtime, preventing the timer driver from advancing.
         if let Some(waker) = waker {
+            #[cfg(feature = "rt")]
+            context::defer(&waker);
+            #[cfg(not(feature = "rt"))]
             waker.wake();
         }
     }
