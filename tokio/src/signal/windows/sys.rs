@@ -31,12 +31,14 @@ pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
 }
 
 unsafe fn new(signum: u32) -> io::Result<RxFuture> {
-    let rx = match REGISTRY.get_or_init(init).as_ref() {
-        // SAFETY: signum is valid (the compiler is unable to determine this)
-        Ok(registry) => unsafe { registry.event_info(signum).unwrap_unchecked() }.subscribe(),
-        Err(&code) => return Err(Error::from_raw_os_error(code)),
-    };
-    Ok(RxFuture::new(rx))
+    let registry = REGISTRY
+        .get_or_init(init)
+        .as_ref()
+        .map_err(|&code| Error::from_raw_os_error(code))?;
+
+    // SAFETY: signum is valid (the compiler is unable to infer this).
+    let event_info = unsafe { registry.event_info(signum).unwrap_unchecked() };
+    Ok(RxFuture::new(event_info.subscribe()))
 }
 
 fn event_requires_infinite_sleep_in_handler(signum: u32) -> bool {
@@ -84,7 +86,7 @@ fn init() -> Result<Registry, i32> {
 }
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
-    // SAFETY: this function is only invoked if `REGISTRY` was successfully initialized.
+    // SAFETY: `handler` is only invoked if `REGISTRY` was successfully initialized.
     let registry = unsafe {
         REGISTRY
             .get()
