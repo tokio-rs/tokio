@@ -1,4 +1,4 @@
-use crate::signal::os::{OsExtraData, OsStorage};
+use crate::signal::unix::{OsExtraData, OsStorage};
 use crate::sync::watch;
 
 use std::ops;

@@ -166,11 +166,12 @@ impl Handle {
     ///
     /// The provided future will start running in the background immediately
     /// when `spawn` is called, even if you don't await the returned
-    /// `JoinHandle`.
+    /// `JoinHandle` (assuming that the runtime [is running][running-runtime]).
     ///
     /// See [module level][mod] documentation for more details.
     ///
     /// [mod]: index.html
+    /// [running-runtime]: index.html#driving-the-runtime
     ///
     /// # Examples
     ///
@@ -354,7 +355,12 @@ impl Handle {
             feature = "taskdump",
             feature = "rt",
             target_os = "linux",
-            any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+            any(
+                target_arch = "aarch64",
+                target_arch = "x86",
+                target_arch = "x86_64",
+                target_arch = "s390x"
+            )
         ))]
         let future = super::task::trace::Trace::root(future);
 
@@ -381,7 +387,12 @@ impl Handle {
             feature = "taskdump",
             feature = "rt",
             target_os = "linux",
-            any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+            any(
+                target_arch = "aarch64",
+                target_arch = "x86",
+                target_arch = "x86_64",
+                target_arch = "s390x"
+            )
         ))]
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -410,7 +421,12 @@ impl Handle {
             feature = "taskdump",
             feature = "rt",
             target_os = "linux",
-            any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+            any(
+                target_arch = "aarch64",
+                target_arch = "x86",
+                target_arch = "x86_64",
+                target_arch = "s390x"
+            )
         ))]
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -471,6 +487,27 @@ impl Handle {
             scheduler::Handle::MultiThread(handle) => handle.owned_id(),
         };
         runtime::Id::new(owned_id)
+    }
+
+    /// Returns the name of the current `Runtime`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Handle;
+    ///
+    /// #[tokio::main(flavor = "current_thread", name = "my-runtime")]
+    /// async fn main() {
+    ///   println!("Current runtime name: {}", Handle::current().name().unwrap());
+    /// }
+    /// ```
+    ///
+    pub fn name(&self) -> Option<&str> {
+        match &self.inner {
+            scheduler::Handle::CurrentThread(handle) => handle.name(),
+            #[cfg(feature = "rt-multi-thread")]
+            scheduler::Handle::MultiThread(handle) => handle.name(),
+        }
     }
 
     /// Returns a view that lets you get information about how the runtime
@@ -560,7 +597,7 @@ cfg_taskdump! {
         /// You can do this by setting the `RUSTFLAGS` environment variable
         /// before invoking `cargo`; e.g.:
         /// ```bash
-        /// RUSTFLAGS="--cfg tokio_unstable cargo run --example dump
+        /// RUSTFLAGS="--cfg tokio_unstable" cargo run --example dump
         /// ```
         ///
         /// Or by [configuring][cargo-config] `rustflags` in
@@ -575,7 +612,7 @@ cfg_taskdump! {
         ///
         /// ## Platform Requirements
         ///
-        /// Task dumps are supported on Linux atop `aarch64`, `x86` and `x86_64`.
+        /// Task dumps are supported on Linux atop `aarch64`, `x86`, `x86_64` and `s390x`.
         ///
         /// ## Current Thread Runtime Requirements
         ///

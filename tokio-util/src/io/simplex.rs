@@ -88,13 +88,15 @@ impl Inner {
 /// # Cancellation safety
 ///
 /// The `Receiver` is cancel safe. If it is used as the event in a
-/// [`tokio::select!`](macro@tokio::select) statement and some other branch
-/// completes first, it is guaranteed that no bytes were received on this
+/// [`tokio::select!`] statement and some other branch completes
+/// first, it is guaranteed that no bytes were received on this
 /// channel.
 ///
 /// You can still read the remaining data from the buffer
 /// even if the write half has been dropped.
 /// See [`Sender::poll_shutdown`] and [`Sender::drop`] for more details.
+///
+/// [`tokio::select!`]: https://docs.rs/tokio/latest/tokio/macro.select.html
 #[derive(Debug)]
 pub struct Receiver {
     inner: Arc<Mutex<Inner>>,
@@ -163,13 +165,14 @@ impl AsyncRead for Receiver {
 /// # Cancellation safety
 ///
 /// The `Sender` is cancel safe. If it is used as the event in a
-/// [`tokio::select!`](macro@tokio::select) statement and some other branch
-/// completes first, it is guaranteed that no bytes were sent on this
-/// channel.
+/// [`tokio::select!`] statement and some other branch completes
+/// first, it is guaranteed that no bytes were sent on this channel.
 ///
 /// # Shutdown
 ///
 /// See [`Sender::poll_shutdown`].
+///
+/// [`tokio::select!`]: https://docs.rs/tokio/latest/tokio/macro.select.html
 #[derive(Debug)]
 pub struct Sender {
     inner: Arc<Mutex<Inner>>,

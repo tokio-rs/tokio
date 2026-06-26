@@ -189,7 +189,6 @@ mod harness;
 use self::harness::Harness;
 
 mod id;
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub, unused_imports))]
 pub use id::{id, try_id, Id};
 
 #[cfg(feature = "rt")]
@@ -222,6 +221,7 @@ use crate::future::Future;
 use crate::util::linked_list;
 use crate::util::sharded_list;
 
+use crate::runtime::metrics::ScheduleLatencyInstant;
 use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
 use std::panic::Location;
@@ -248,6 +248,15 @@ impl<S> Notified<S> {
     pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
         self.0.task_meta()
     }
+
+    pub(crate) fn set_scheduled_at(&self, scheduled_at: ScheduleLatencyInstant) {
+        // SAFETY: There are no concurrent writes because there is only ever one `Notified`
+        // reference per task. There are no concurrent reads because this field is only read
+        // when polling the task, which can only happen after it's scheduled.
+        unsafe {
+            self.0.header().set_scheduled_at(scheduled_at);
+        }
+    }
 }
 
 // safety: This type cannot be used to touch the task without first verifying
@@ -268,6 +277,10 @@ impl<S> LocalNotified<S> {
     #[inline]
     pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
         self.task.task_meta()
+    }
+
+    pub(crate) fn get_scheduled_at(&self) -> ScheduleLatencyInstant {
+        self.task.header().get_scheduled_at()
     }
 }
 
@@ -401,15 +414,10 @@ impl<S: 'static> Task<S> {
         unsafe { Task::new(RawTask::from_raw(ptr)) }
     }
 
-    #[cfg(all(
-        tokio_unstable,
-        feature = "taskdump",
-        feature = "rt",
-        target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
-    ))]
-    pub(super) fn as_raw(&self) -> RawTask {
-        self.raw
+    cfg_taskdump! {
+        pub(super) fn as_raw(&self) -> RawTask {
+            self.raw
+        }
     }
 
     fn header(&self) -> &Header {
@@ -509,6 +517,15 @@ impl<S: Schedule> LocalNotified<S> {
         let raw = self.task.raw;
         mem::forget(self);
         raw.poll();
+    }
+
+    cfg_taskdump! {
+        /// Returns a `WakerRef` borrowing from this task.
+        ///
+        /// `WakerRef` derefs to `Waker` without bumping the task's refcount.
+        pub(crate) fn waker_ref(&self) -> waker::WakerRef<'_, S> {
+            waker::waker_ref::<S>(self.task.raw.header_ptr_ref())
+        }
     }
 }
 

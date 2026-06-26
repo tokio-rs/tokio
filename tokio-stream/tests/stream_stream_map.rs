@@ -226,6 +226,30 @@ fn size_hint_without_upper() {
 }
 
 #[test]
+fn size_hint_overflow() {
+    struct Monster;
+
+    impl Stream for Monster {
+        type Item = ();
+
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<Option<()>> {
+            panic!()
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            (usize::MAX, Some(usize::MAX))
+        }
+    }
+
+    let mut map = StreamMap::new();
+
+    map.insert("a", Monster);
+    map.insert("b", Monster);
+
+    assert_eq!(map.size_hint(), (usize::MAX, None));
+}
+
+#[test]
 fn new_capacity_zero() {
     let map = StreamMap::<&str, stream::Pending<()>>::new();
     assert_eq!(0, map.capacity());

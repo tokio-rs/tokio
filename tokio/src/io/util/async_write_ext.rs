@@ -103,9 +103,9 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is cancellation safe in the sense that if it is used as
-        /// the event in a [`tokio::select!`](crate::select) statement and some
-        /// other branch completes first, then it is guaranteed that no data was
+        /// This method is cancel safe. If it is used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch completes
+        /// first, then it is guaranteed that no data was
         /// written to this `AsyncWrite`.
         ///
         /// # Examples
@@ -146,9 +146,9 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is cancellation safe in the sense that if it is used as
-        /// the event in a [`tokio::select!`](crate::select) statement and some
-        /// other branch completes first, then it is guaranteed that no data was
+        /// This method is cancel safe. If it is used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch completes
+        /// first, then it is guaranteed that no data was
         /// written to this `AsyncWrite`.
         ///
         /// # Examples
@@ -223,9 +223,9 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is cancellation safe in the sense that if it is used as
-        /// the event in a [`tokio::select!`](crate::select) statement and some
-        /// other branch completes first, then it is guaranteed that no data was
+        /// This method is cancel safe. If it is used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch completes
+        /// first, then it is guaranteed that no data was
         /// written to this `AsyncWrite`.
         ///
         /// # Examples
@@ -294,8 +294,8 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// If `write_all_buf` is used as the event in a
-        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// If `write_all_buf` is used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch
         /// completes first, then the data in the provided buffer may have been
         /// partially written. However, it is guaranteed that the provided
         /// buffer has been [advanced] by the amount of bytes that have been
@@ -354,9 +354,9 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is not cancellation safe. If it is used as the event
-        /// in a [`tokio::select!`](crate::select) statement and some other
-        /// branch completes first, then the provided buffer may have been
+        /// This method is not cancel safe. If it is used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch completes
+        /// first, then the provided buffer may have been
         /// partially written, but future calls to `write_all` will start over
         /// from the beginning of the buffer.
         ///
@@ -1253,9 +1253,9 @@ cfg_io_util! {
         ///
         /// This method is cancel safe.
         ///
-        /// If `flush` is used as the event in a [`tokio::select!`](crate::select)
-        /// statement and some other branch completes first, then the data in the
-        /// buffered data in this `AsyncWrite` may have been partially flushed.
+        /// If `flush` is used as a branch in [`tokio::select!`](crate::select)
+        /// and another branch completes first, then the buffered data in this
+        /// `AsyncWrite` may have been partially flushed.
         /// However, it is guaranteed that the buffer is advanced by the amount of
         /// bytes that have been partially flushed.
         ///
@@ -1294,8 +1294,8 @@ cfg_io_util! {
         /// async fn shutdown(&mut self) -> io::Result<()>;
         /// ```
         ///
-        /// Similar to [`flush`], all intermediately buffered is written to the
-        /// underlying stream. Once the operation completes, the caller should
+        /// Similar to [`flush`], all intermediately buffered content is written to
+        /// the underlying stream. Once the operation completes, the caller should
         /// no longer attempt to write to the stream. For example, the
         /// `TcpStream` implementation will issue a `shutdown(Write)` sys call.
         ///

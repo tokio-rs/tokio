@@ -59,7 +59,10 @@ pub async fn connect(
     let socket = UdpSocket::bind(&bind_addr).await?;
     socket.connect(addr).await?;
 
-    tokio::try_join!(send(stdin, &socket), recv(stdout, &socket))?;
+    tokio::select! {
+        r = send(stdin, &socket) => r?,
+        r = recv(stdout, &socket) => r?,
+    }
 
     Ok(())
 }

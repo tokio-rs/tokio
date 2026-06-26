@@ -20,9 +20,6 @@ use std::sync::atomic::Ordering::{self, Acquire, Relaxed, Release, SeqCst};
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
-type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
-type GuardedWaitList = GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
-
 /// Notifies a single task to wake up.
 ///
 /// `Notify` provides a basic mechanism to notify a single task of an event.
@@ -211,7 +208,7 @@ pub struct Notify {
     // - number of times `notify_waiters` was called can
     //   be modified only if `waiters` lock is held
     state: AtomicUsize,
-    waiters: Mutex<WaitList>,
+    waiters: Mutex<LinkedList<Waiter>>,
 }
 
 #[derive(Debug)]
@@ -327,14 +324,14 @@ enum Notification {
 /// and gates the access to it on `notify.waiters` mutex. It also empties
 /// the list on drop.
 struct NotifyWaitersList<'a> {
-    list: GuardedWaitList,
+    list: GuardedLinkedList<Waiter>,
     is_empty: bool,
     notify: &'a Notify,
 }
 
 impl<'a> NotifyWaitersList<'a> {
     fn new(
-        unguarded_list: WaitList,
+        unguarded_list: LinkedList<Waiter>,
         guard: Pin<&'a Waiter>,
         notify: &'a Notify,
     ) -> NotifyWaitersList<'a> {
@@ -349,7 +346,7 @@ impl<'a> NotifyWaitersList<'a> {
 
     /// Removes the last element from the guarded list. Modifying this list
     /// requires an exclusive access to the main list in `Notify`.
-    fn pop_back_locked(&mut self, _waiters: &mut WaitList) -> Option<NonNull<Waiter>> {
+    fn pop_back_locked(&mut self, _waiters: &mut LinkedList<Waiter>) -> Option<NonNull<Waiter>> {
         let result = self.list.pop_back();
         if result.is_none() {
             // Save information about emptiness to avoid waiting for lock
@@ -747,7 +744,7 @@ impl Notify {
     fn inner_notify_waiters<'a>(
         &'a self,
         curr: usize,
-        mut waiters: crate::loom::sync::MutexGuard<'a, LinkedList<Waiter, Waiter>>,
+        mut waiters: crate::loom::sync::MutexGuard<'a, LinkedList<Waiter>>,
     ) {
         if matches!(get_state(curr), EMPTY | NOTIFIED) {
             // There are no waiting tasks. All we need to do is increment the
@@ -842,7 +839,7 @@ impl UnwindSafe for Notify {}
 impl RefUnwindSafe for Notify {}
 
 fn notify_locked(
-    waiters: &mut WaitList,
+    waiters: &mut LinkedList<Waiter>,
     state: &AtomicUsize,
     curr: usize,
     strategy: NotifyOneStrategy,
@@ -1118,6 +1115,14 @@ impl NotifiedProject<'_> {
                 State::Init => {
                     let curr = notify.state.load(SeqCst);
 
+                    // Check if `notify_waiters` was called before attempting to acquire
+                    // the `NOTIFIED` state. If a broadcast occurred, we will be woken by it,
+                    // leaving the `notify_one` permit for other waiters.
+                    if get_num_notify_waiters_calls(curr) != *notify_waiters_calls {
+                        *state = State::Done;
+                        continue 'outer_loop;
+                    }
+
                     // Optimistically try acquiring a pending notification
                     let res = notify.state.compare_exchange(
                         set_state(curr, NOTIFIED),
@@ -1219,9 +1224,8 @@ impl NotifiedProject<'_> {
                 }
                 State::Waiting => {
                     #[cfg(feature = "taskdump")]
-                    if let Some(waker) = waker {
-                        let mut ctx = Context::from_waker(waker);
-                        std::task::ready!(crate::trace::trace_leaf(&mut ctx));
+                    if let Some(_waker) = waker {
+                        std::task::ready!(crate::trace::trace_leaf());
                     }
 
                     if waiter.notification.load(Acquire).is_some() {
@@ -1313,9 +1317,8 @@ impl NotifiedProject<'_> {
                 }
                 State::Done => {
                     #[cfg(feature = "taskdump")]
-                    if let Some(waker) = waker {
-                        let mut ctx = Context::from_waker(waker);
-                        std::task::ready!(crate::trace::trace_leaf(&mut ctx));
+                    if let Some(_waker) = waker {
+                        std::task::ready!(crate::trace::trace_leaf());
                     }
                     return Poll::Ready(());
                 }
@@ -1397,7 +1400,7 @@ fn is_unpin<T: Unpin>() {}
 /// While this guard is held, the `Notify` instance's waiter list is locked.
 pub(crate) struct NotifyGuard<'a> {
     guarded_notify: &'a Notify,
-    guarded_waiters: crate::loom::sync::MutexGuard<'a, WaitList>,
+    guarded_waiters: crate::loom::sync::MutexGuard<'a, LinkedList<Waiter>>,
     current_state: usize,
 }
 

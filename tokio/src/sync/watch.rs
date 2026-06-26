@@ -111,7 +111,7 @@
 //! ```
 //! use tokio::sync::watch;
 //!
-//! #[tokio::main(flavor = "current_thread")]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() {
 //! let (tx, mut rx) = watch::channel("hello");
 //! tx.send("goodbye").unwrap();
@@ -788,8 +788,8 @@ impl<T> Receiver<T> {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If you use it as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If you use it as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, then it is guaranteed that no values have been marked
     /// seen by this call to `changed`.
     ///
@@ -857,8 +857,8 @@ impl<T> Receiver<T> {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If you use it as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If you use it as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, then it is guaranteed that the last seen value `val`
     /// (if any) satisfies `f(val) == false`.
     ///

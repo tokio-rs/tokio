@@ -579,9 +579,11 @@ where
     /// # Cancel safety
     ///
     /// This method is cancel safe. If `next_many` is used as the event in a
-    /// [`tokio::select!`](tokio::select) statement and some other branch
-    /// completes first, it is guaranteed that no items were received on any of
-    /// the underlying streams.
+    /// [`tokio::select!`] statement and some other branch completes first,
+    /// it is guaranteed that no items were received on any of the underlying
+    /// streams.
+    ///
+    /// [`tokio::select!`]: https://docs.rs/tokio/latest/tokio/macro.select.html
     pub async fn next_many(&mut self, buffer: &mut Vec<(K, V::Item)>, limit: usize) -> usize {
         poll_fn(|cx| self.poll_next_many(cx, buffer, limit)).await
     }
@@ -683,15 +685,15 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let mut ret = (0, Some(0));
+        let mut ret: (usize, Option<usize>) = (0, Some(0));
 
         for (_, stream) in &self.entries {
             let hint = stream.size_hint();
 
-            ret.0 += hint.0;
+            ret.0 = ret.0.saturating_add(hint.0);
 
             match (ret.1, hint.1) {
-                (Some(a), Some(b)) => ret.1 = Some(a + b),
+                (Some(a), Some(b)) => ret.1 = a.checked_add(b),
                 (Some(_), None) => ret.1 = None,
                 _ => {}
             }

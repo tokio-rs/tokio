@@ -1,6 +1,12 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support bind
-                                                                   // No `socket` on miri.
+// WASIp1 doesn't support bind
+#![cfg(all(
+    feature = "net",
+    feature = "macros",
+    feature = "rt",
+    feature = "io-util",
+    not(all(target_os = "wasi", target_env = "p1")),
+))]
 
 use std::time::Duration;
 use tokio::net::TcpSocket;
@@ -43,6 +49,7 @@ async fn basic_usage_v6() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore = "Miri doesn't support binding before connecting")]
 async fn bind_before_connect() {
     // Create server
     let any_addr = assert_ok!("127.0.0.1:0".parse());
@@ -61,8 +68,9 @@ async fn bind_before_connect() {
     let _ = assert_ok!(srv.accept().await);
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support `SO_LINGER`")]
 #[tokio::test]
-#[expect(deprecated)] // set_linger is deprecated
+#[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
 async fn basic_linger() {
     // Create server
     let addr = assert_ok!("127.0.0.1:0".parse());
@@ -71,7 +79,7 @@ async fn basic_linger() {
 
     assert!(srv.linger().unwrap().is_none());
 
-    srv.set_linger(Some(Duration::new(0, 0))).unwrap();
+    srv.set_zero_linger().unwrap();
     assert_eq!(srv.linger().unwrap(), Some(Duration::new(0, 0)));
 }
 
@@ -124,15 +132,29 @@ const SET_BUF_SIZE: u32 = 4096;
 // Linux doubles the buffer size for kernel usage, and exposes that when
 // retrieving the buffer size.
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
 const GET_BUF_SIZE: u32 = SET_BUF_SIZE;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 const GET_BUF_SIZE: u32 = 2 * SET_BUF_SIZE;
 
-test!(keepalive, set_keepalive(true));
+test!(
+    #[cfg_attr(
+        miri,
+        ignore = "Miri doesn't support setting the keepalive socket option"
+    )]
+    keepalive,
+    set_keepalive(true)
+);
 
-test!(reuseaddr, set_reuseaddr(true));
+test!(
+    #[cfg_attr(
+        miri,
+        ignore = "Miri doesn't support reading the reuseaddr socket option"
+    )]
+    reuseaddr,
+    set_reuseaddr(true)
+);
 
 #[cfg(all(
     unix,
@@ -140,27 +162,48 @@ test!(reuseaddr, set_reuseaddr(true));
     not(target_os = "illumos"),
     not(target_os = "cygwin"),
 ))]
-test!(reuseport, set_reuseport(true));
+test!(
+    #[cfg_attr(
+        miri,
+        ignore = "Miri doesn't support setting the reuseport socket option"
+    )]
+    reuseport,
+    set_reuseport(true)
+);
 
 test!(
+    #[cfg_attr(
+        miri,
+        ignore = "Miri doesn't support setting the send buffer size socket option"
+    )]
     send_buffer_size,
     set_send_buffer_size(SET_BUF_SIZE),
     GET_BUF_SIZE
 );
 
 test!(
+    #[cfg_attr(
+        miri,
+        ignore = "Miri doesn't support setting the receive buffer size socket option"
+    )]
     recv_buffer_size,
     set_recv_buffer_size(SET_BUF_SIZE),
     GET_BUF_SIZE
 );
 
 test!(
+    #[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support `SO_LINGER`")]
+    #[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
     #[expect(deprecated, reason = "set_linger is deprecated")]
     linger,
     set_linger(Some(Duration::from_secs(10)))
 );
 
-test!(nodelay, set_nodelay(true));
+test!(
+    #[cfg_attr(miri, ignore = "Miri only supports `TCP_NODELAY` on connected sockets")]
+    nodelay,
+    set_nodelay(true)
+);
 
 #[cfg(any(
     target_os = "android",
@@ -173,13 +216,19 @@ test!(nodelay, set_nodelay(true));
     target_os = "openbsd",
     target_os = "cygwin",
 ))]
-test!(IPv6 tclass_v6, set_tclass_v6(96));
+#[cfg(not(miri))] // Miri doesn't support TClass.
+test!(
+    IPv6 tclass_v6,
+    set_tclass_v6(96)
+);
 
 #[cfg(not(any(
     target_os = "fuchsia",
     target_os = "redox",
     target_os = "solaris",
     target_os = "illumos",
-    target_os = "haiku"
+    target_os = "haiku",
+    target_os = "wasi",
+    miri // Miri doesn't support TOS.
 )))]
 test!(IPv4 tos_v4, set_tos_v4(96));

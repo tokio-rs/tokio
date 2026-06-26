@@ -120,18 +120,6 @@ cfg_rt! {
         }
 
         #[cfg(all(tokio_unstable, feature = "rt-multi-thread", feature = "time"))]
-        /// Returns true if both handles belong to the same runtime instance.
-        pub(crate) fn is_same_runtime(&self, other: &Handle) -> bool {
-            match (self, other) {
-                (Handle::CurrentThread(a), Handle::CurrentThread(b)) => Arc::ptr_eq(a, b),
-                #[cfg(feature = "rt-multi-thread")]
-                (Handle::MultiThread(a), Handle::MultiThread(b)) => Arc::ptr_eq(a, b),
-                #[cfg(feature = "rt-multi-thread")]
-                _ => false, // different runtime types
-            }
-        }
-
-        #[cfg(all(tokio_unstable, feature = "rt-multi-thread", feature = "time"))]
         /// Returns true if the runtime is shutting down.
         pub(crate) fn is_shutdown(&self) -> bool {
             match self {
@@ -293,14 +281,12 @@ cfg_rt! {
             match_flavor!(self, Context(context) => context.defer(waker));
         }
 
-        #[cfg(all(tokio_unstable, feature = "time", feature = "rt-multi-thread"))]
-        pub(crate) fn with_time_temp_local_context<F, R>(&self, f: F) -> R
-        where
-            F: FnOnce(Option<crate::runtime::time_alt::TempLocalContext<'_>>) -> R,
-        {
+        #[cfg(tokio_unstable)]
+        pub(crate) fn worker_index(&self) -> Option<usize> {
             match self {
-                Context::CurrentThread(_) => panic!("the alternative timer implementation is not supported on CurrentThread runtime"),
-                Context::MultiThread(context) => context.with_time_temp_local_context(f),
+                Context::CurrentThread(_) => Some(0),
+                #[cfg(feature = "rt-multi-thread")]
+                Context::MultiThread(context) => Some(context.worker_index()),
             }
         }
 

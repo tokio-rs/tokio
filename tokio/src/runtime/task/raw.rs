@@ -242,6 +242,12 @@ impl RawTask {
         self.ptr
     }
 
+    cfg_taskdump! {
+        pub(super) fn header_ptr_ref(&self) -> &NonNull<Header> {
+            &self.ptr
+        }
+    }
+
     pub(super) fn trailer_ptr(&self) -> NonNull<Trailer> {
         unsafe { Header::get_trailer(self.ptr) }
     }

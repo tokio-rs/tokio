@@ -13,11 +13,8 @@ use std::task::{Context, Waker};
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex};
-use crate::util::linked_list::{self, Link};
+use crate::util::linked_list::{self, Link, LinkedList};
 use crate::util::{waker_ref, Wake};
-
-type LinkedList<T> =
-    linked_list::LinkedList<ListEntry<T>, <ListEntry<T> as linked_list::Link>::Target>;
 
 /// This is the main handle to the collection.
 pub(crate) struct IdleNotifiedSet<T> {
@@ -47,8 +44,8 @@ type Lists<T> = Mutex<ListsInner<T>>;
 /// the destructor of the `IdleNotifiedSet` will clear the two lists, so once
 /// that object is destroyed, no ref-cycles will remain.
 struct ListsInner<T> {
-    notified: LinkedList<T>,
-    idle: LinkedList<T>,
+    notified: LinkedList<ListEntry<T>>,
+    idle: LinkedList<ListEntry<T>>,
     /// Whenever an element in the `notified` list is woken, this waker will be
     /// notified and consumed, if it exists.
     waker: Option<Waker>,
@@ -233,7 +230,7 @@ impl<T> IdleNotifiedSet<T> {
 
     /// Call a function on every element in this list.
     pub(crate) fn for_each<F: FnMut(&mut T)>(&mut self, mut func: F) {
-        fn get_ptrs<T>(list: &mut LinkedList<T>, ptrs: &mut Vec<*mut T>) {
+        fn get_ptrs<T>(list: &mut LinkedList<ListEntry<T>>, ptrs: &mut Vec<*mut T>) {
             let mut node = list.last();
 
             while let Some(entry) = node {
@@ -291,7 +288,7 @@ impl<T> IdleNotifiedSet<T> {
         // has `my_list` set to `Neither` and that the value has not yet been
         // dropped.
         struct AllEntries<T, F: FnMut(T)> {
-            all_entries: LinkedList<T>,
+            all_entries: LinkedList<ListEntry<T>>,
             func: F,
         }
 
@@ -346,7 +343,10 @@ impl<T> IdleNotifiedSet<T> {
 ///
 /// The mutex for the entries must be held, and the target list must be such
 /// that setting `my_list` to `Neither` is ok.
-unsafe fn move_to_new_list<T>(from: &mut LinkedList<T>, to: &mut LinkedList<T>) {
+unsafe fn move_to_new_list<T>(
+    from: &mut LinkedList<ListEntry<T>>,
+    to: &mut LinkedList<ListEntry<T>>,
+) {
     while let Some(entry) = from.pop_back() {
         entry.my_list.with_mut(|ptr| {
             // Safety: pointer is accessed while holding the mutex.

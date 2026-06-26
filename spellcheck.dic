@@ -1,4 +1,4 @@
-312
+324
 &
 +
 <
@@ -89,6 +89,7 @@ decrementing
 demangled
 dequeued
 dereferenced
+derefs
 deregister
 deregistered
 deregistering
@@ -138,6 +139,7 @@ hashmaps
 HashMaps
 hashsets
 HdrHistogram
+ICMP
 ie
 Illumos
 impl
@@ -188,14 +190,17 @@ mutex
 Mutex
 Nagle
 namespace
+NetBSD
 nonblocking
 nondecreasing
 noop
 ntasks
+NTO
 NUMA
 ok
 oneshot
 opcode
+OpenBSD
 ORed
 os
 parker
@@ -209,8 +214,10 @@ POSIX
 proxied
 qos
 RAII
+RCU
 reallocations
 recv's
+Redox
 refactors
 refcount
 refcounting
@@ -240,6 +247,7 @@ spawner
 Splitter
 spmc
 spsc
+SQE
 src
 stabilised
 startup
@@ -276,6 +284,7 @@ tokio's
 Tokio's
 tuple
 Tuple
+tvOS
 tx
 udp
 UDP
@@ -303,11 +312,14 @@ vec
 versa
 versioned
 versioning
+visionOS
 vtable
 waker
 wakers
 Wakers
 wakeup
 wakeups
+WASI
+watchOS
 workstealing
 ZST

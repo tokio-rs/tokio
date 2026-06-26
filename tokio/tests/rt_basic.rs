@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::runtime::Runtime;
+use tokio::runtime::{self, Runtime};
 use tokio::sync::oneshot;
 use tokio::time::{timeout, Duration};
 use tokio_test::{assert_err, assert_ok};
@@ -299,6 +299,27 @@ fn timeout_panics_when_no_time_handle() {
         let dur = Duration::from_millis(20);
         let _ = timeout(dur, rx).await;
     });
+}
+
+#[test]
+fn default_runtime_name_should_be_none() {
+    let rt1 = runtime::Builder::new_current_thread().build().unwrap();
+
+    assert!(rt1.handle().name().is_none());
+}
+
+#[test]
+fn different_runtime_names() {
+    let rt1 = runtime::Builder::new_current_thread()
+        .name("test-runtime-1")
+        .build()
+        .unwrap();
+    let rt2 = runtime::Builder::new_current_thread()
+        .name("test-runtime-2")
+        .build()
+        .unwrap();
+
+    assert_ne!(rt1.handle().name().unwrap(), rt2.handle().name().unwrap());
 }
 
 #[cfg(tokio_unstable)]

@@ -3,6 +3,7 @@ use crate::Stream;
 use core::fmt;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -54,5 +55,15 @@ where
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, self.stream.size_hint().1) // can't know a lower bound, due to the predicate
+    }
+}
+
+impl<St, F, T> FusedStream for FilterMap<St, F>
+where
+    St: FusedStream,
+    F: FnMut(St::Item) -> Option<T>,
+{
+    fn is_terminated(&self) -> bool {
+        self.stream.is_terminated()
     }
 }

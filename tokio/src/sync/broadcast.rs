@@ -370,7 +370,7 @@ struct Tail {
     closed: bool,
 
     /// Receivers waiting for a value.
-    waiters: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+    waiters: LinkedList<Waiter>,
 }
 
 /// Slot in the buffer.
@@ -550,18 +550,16 @@ impl<T> Sender<T> {
         // Round to a power of two
         capacity = capacity.next_power_of_two();
 
-        let mut buffer = Vec::with_capacity(capacity);
-
-        for i in 0..capacity {
-            buffer.push(Mutex::new(Slot {
+        let buffer = (0..capacity).map(|i| {
+            Mutex::new(Slot {
                 rem: AtomicUsize::new(0),
                 pos: (i as u64).wrapping_sub(capacity as u64),
                 val: None,
-            }));
-        }
+            })
+        });
 
         let shared = Arc::new(Shared {
-            buffer: buffer.into_boxed_slice(),
+            buffer: buffer.collect(),
             mask: capacity - 1,
             tail: Mutex::new(Tail {
                 pos: 0,
@@ -945,7 +943,7 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
 /// and gates the access to it on the `Shared.tail` mutex. It also empties
 /// the list on drop.
 struct WaitersList<'a, T> {
-    list: GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+    list: GuardedLinkedList<Waiter>,
     is_empty: bool,
     shared: &'a Shared<T>,
 }
@@ -963,7 +961,7 @@ impl<'a, T> Drop for WaitersList<'a, T> {
 
 impl<'a, T> WaitersList<'a, T> {
     fn new(
-        unguarded_list: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+        unguarded_list: LinkedList<Waiter>,
         guard: Pin<&'a Waiter>,
         shared: &'a Shared<T>,
     ) -> Self {
@@ -1409,8 +1407,8 @@ impl<T: Clone> Receiver<T> {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If `recv` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, it is guaranteed that no messages were received on this
     /// channel.
     ///
@@ -1607,7 +1605,7 @@ where
     type Output = Result<T, RecvError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         let (receiver, waiter) = self.project();
 

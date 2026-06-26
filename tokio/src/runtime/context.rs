@@ -69,7 +69,12 @@ struct Context {
         feature = "taskdump",
         feature = "rt",
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+        any(
+            target_arch = "aarch64",
+            target_arch = "x86",
+            target_arch = "x86_64",
+            target_arch = "s390x"
+        )
     ))]
     trace: trace::Context,
 }
@@ -113,7 +118,8 @@ tokio_thread_local! {
                 any(
                     target_arch = "aarch64",
                     target_arch = "x86",
-                    target_arch = "x86_64"
+                    target_arch = "x86_64",
+                    target_arch = "s390x"
                 )
             ))]
             trace: trace::Context::new(),
@@ -157,6 +163,11 @@ cfg_rt! {
 
     pub(crate) fn current_task_id() -> Option<Id> {
         CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or(None)
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn worker_index() -> Option<usize> {
+        with_scheduler(|ctx| ctx.and_then(|c| c.worker_index()))
     }
 
     #[track_caller]

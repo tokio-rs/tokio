@@ -15,7 +15,7 @@
 
 use core::cell::UnsafeCell;
 use core::fmt;
-use core::marker::{PhantomData, PhantomPinned};
+use core::marker::PhantomPinned;
 use core::mem::ManuallyDrop;
 use core::ptr::{self, NonNull};
 
@@ -23,19 +23,16 @@ use core::ptr::{self, NonNull};
 ///
 /// Currently, the list is not emptied on drop. It is the caller's
 /// responsibility to ensure the list is empty before dropping it.
-pub(crate) struct LinkedList<L, T> {
+pub(crate) struct LinkedList<L: Link> {
     /// Linked list head
-    head: Option<NonNull<T>>,
+    head: Option<NonNull<L::Target>>,
 
     /// Linked list tail
-    tail: Option<NonNull<T>>,
-
-    /// Node type marker.
-    _marker: PhantomData<*const L>,
+    tail: Option<NonNull<L::Target>>,
 }
 
-unsafe impl<L: Link> Send for LinkedList<L, L::Target> where L::Target: Send {}
-unsafe impl<L: Link> Sync for LinkedList<L, L::Target> where L::Target: Sync {}
+unsafe impl<L: Link> Send for LinkedList<L> where L::Target: Send {}
+unsafe impl<L: Link> Sync for LinkedList<L> where L::Target: Sync {}
 
 /// Defines how a type is tracked within a linked list.
 ///
@@ -57,7 +54,6 @@ pub(crate) unsafe trait Link {
     type Target;
 
     /// Convert the handle to a raw pointer without consuming the handle.
-    #[allow(clippy::wrong_self_convention)]
     fn as_raw(handle: &Self::Handle) -> NonNull<Self::Target>;
 
     /// Convert the raw pointer to a handle
@@ -112,18 +108,15 @@ unsafe impl<T: Sync> Sync for Pointers<T> {}
 
 // ===== impl LinkedList =====
 
-impl<L, T> LinkedList<L, T> {
+impl<L: Link> LinkedList<L> {
     /// Creates an empty linked list.
-    pub(crate) const fn new() -> LinkedList<L, T> {
+    pub(crate) const fn new() -> LinkedList<L> {
         LinkedList {
             head: None,
             tail: None,
-            _marker: PhantomData,
         }
     }
-}
 
-impl<L: Link> LinkedList<L, L::Target> {
     /// Adds an element first in the list.
     pub(crate) fn push_front(&mut self, val: L::Handle) {
         // The value should not be dropped, it is being inserted into the list
@@ -241,7 +234,7 @@ impl<L: Link> LinkedList<L, L::Target> {
     }
 }
 
-impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
+impl<L: Link> fmt::Debug for LinkedList<L> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("LinkedList")
             .field("head", &self.head)
@@ -257,14 +250,14 @@ impl<L: Link> fmt::Debug for LinkedList<L, L::Target> {
     feature = "signal",
     feature = "sync",
 ))]
-impl<L: Link> LinkedList<L, L::Target> {
+impl<L: Link> LinkedList<L> {
     pub(crate) fn last(&self) -> Option<&L::Target> {
         let tail = self.tail.as_ref()?;
         unsafe { Some(&*tail.as_ptr()) }
     }
 }
 
-impl<L: Link> Default for LinkedList<L, L::Target> {
+impl<L: Link> Default for LinkedList<L> {
     fn default() -> Self {
         Self::new()
     }
@@ -273,16 +266,16 @@ impl<L: Link> Default for LinkedList<L, L::Target> {
 // ===== impl DrainFilter =====
 
 cfg_io_driver_impl! {
-    pub(crate) struct DrainFilter<'a, T: Link, F> {
-        list: &'a mut LinkedList<T, T::Target>,
+    pub(crate) struct DrainFilter<'a, L: Link, F> {
+        list: &'a mut LinkedList<L>,
         filter: F,
-        curr: Option<NonNull<T::Target>>,
+        curr: Option<NonNull<L::Target>>,
     }
 
-    impl<T: Link> LinkedList<T, T::Target> {
-        pub(crate) fn drain_filter<F>(&mut self, filter: F) -> DrainFilter<'_, T, F>
+    impl<L: Link> LinkedList<L> {
+        pub(crate) fn drain_filter<F>(&mut self, filter: F) -> DrainFilter<'_, L, F>
         where
-            F: FnMut(&T::Target) -> bool,
+            F: FnMut(&L::Target) -> bool,
         {
             let curr = self.head;
             DrainFilter {
@@ -293,17 +286,16 @@ cfg_io_driver_impl! {
         }
     }
 
-    impl<'a, T, F> Iterator for DrainFilter<'a, T, F>
+    impl<'a, L: Link, F> Iterator for DrainFilter<'a, L, F>
     where
-        T: Link,
-        F: FnMut(&T::Target) -> bool,
+        F: FnMut(&L::Target) -> bool,
     {
-        type Item = T::Handle;
+        type Item = L::Handle;
 
         fn next(&mut self) -> Option<Self::Item> {
             while let Some(curr) = self.curr {
                 // safety: the pointer references data contained by the list
-                self.curr = unsafe { T::pointers(curr).as_ref() }.get_next();
+                self.curr = unsafe { L::pointers(curr).as_ref() }.get_next();
 
                 // safety: the value is still owned by the linked list.
                 if (self.filter)(unsafe { &mut *curr.as_ptr() }) {
@@ -317,18 +309,18 @@ cfg_io_driver_impl! {
 }
 
 cfg_taskdump! {
-    impl<T: Link> LinkedList<T, T::Target> {
+    impl<L: Link> LinkedList<L> {
         pub(crate) fn for_each<F>(&mut self, mut f: F)
         where
-            F: FnMut(&T::Handle),
+            F: FnMut(&L::Handle),
         {
             let mut next = self.head;
 
             while let Some(curr) = next {
                 unsafe {
-                    let handle = ManuallyDrop::new(T::from_raw(curr));
+                    let handle = ManuallyDrop::new(L::from_raw(curr));
                     f(&handle);
-                    next = T::pointers(curr).as_ref().get_next();
+                    next = L::pointers(curr).as_ref().get_next();
                 }
             }
         }
@@ -352,19 +344,16 @@ feature! {
     ///
     /// If a list is empty, then both pointers of the guard node are pointing
     /// at the guard node itself.
-    pub(crate) struct GuardedLinkedList<L, T> {
+    pub(crate) struct GuardedLinkedList<L: Link> {
         /// Pointer to the guard node.
-        guard: NonNull<T>,
-
-        /// Node type marker.
-        _marker: PhantomData<*const L>,
+        guard: NonNull<L::Target>,
     }
 
-    impl<L: Link> LinkedList<L, L::Target> {
+    impl<L: Link> LinkedList<L> {
         /// Turns a linked list into the guarded version by linking the guard node
         /// with the head and tail nodes. Like with other nodes, you should guarantee
         /// that the guard node is pinned in memory.
-        pub(crate) fn into_guarded(self, guard_handle: L::Handle) -> GuardedLinkedList<L, L::Target> {
+        pub(crate) fn into_guarded(self, guard_handle: L::Handle) -> GuardedLinkedList<L> {
             // `guard_handle` is a NonNull pointer, we don't have to care about dropping it.
             let guard = L::as_raw(&guard_handle);
 
@@ -386,11 +375,11 @@ feature! {
                 }
             }
 
-            GuardedLinkedList { guard, _marker: PhantomData }
+            GuardedLinkedList { guard }
         }
     }
 
-    impl<L: Link> GuardedLinkedList<L, L::Target> {
+    impl<L: Link> GuardedLinkedList<L> {
         fn tail(&self) -> Option<NonNull<L::Target>> {
             let tail_ptr = unsafe {
                 L::pointers(self.guard).as_ref().get_prev().unwrap()
@@ -515,7 +504,7 @@ pub(crate) mod tests {
         r.as_ref().get_ref().into()
     }
 
-    fn collect_list(list: &mut LinkedList<&'_ Entry, <&'_ Entry as Link>::Target>) -> Vec<i32> {
+    fn collect_list(list: &mut LinkedList<&'_ Entry>) -> Vec<i32> {
         let mut ret = vec![];
 
         while let Some(entry) = list.pop_back() {
@@ -525,10 +514,7 @@ pub(crate) mod tests {
         ret
     }
 
-    fn push_all<'a>(
-        list: &mut LinkedList<&'a Entry, <&'_ Entry as Link>::Target>,
-        entries: &[Pin<&'a Entry>],
-    ) {
+    fn push_all<'a>(list: &mut LinkedList<&'a Entry>, entries: &[Pin<&'a Entry>]) {
         for entry in entries.iter() {
             list.push_front(*entry);
         }
@@ -552,7 +538,7 @@ pub(crate) mod tests {
 
     #[test]
     fn const_new() {
-        const _: LinkedList<&Entry, <&Entry as Link>::Target> = LinkedList::new();
+        const _: LinkedList<&Entry> = LinkedList::new();
     }
 
     #[test]
@@ -580,7 +566,7 @@ pub(crate) mod tests {
         let a = entry(5);
         let b = entry(7);
 
-        let mut list = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
+        let mut list = LinkedList::<&Entry>::new();
 
         list.push_front(a.as_ref());
 
@@ -737,7 +723,7 @@ pub(crate) mod tests {
 
         unsafe {
             // Remove missing
-            let mut list = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
+            let mut list = LinkedList::<&Entry>::new();
 
             list.push_front(b.as_ref());
             list.push_front(a.as_ref());
@@ -766,7 +752,7 @@ pub(crate) mod tests {
             })
             .collect::<Vec<_>>();
 
-        let mut ll = LinkedList::<&Entry, <&Entry as Link>::Target>::new();
+        let mut ll = LinkedList::<&Entry>::new();
         let mut reference = VecDeque::new();
 
         let entries: Vec<_> = (0..ops.len()).map(|i| entry(i as i32)).collect();

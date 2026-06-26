@@ -122,6 +122,26 @@ impl Clone for CancellationToken {
     }
 }
 
+impl PartialEq for CancellationToken {
+    /// Checks if two tokens are equal in terms of their cancellation operation.
+    ///
+    /// Two tokens are considered equal if cancelling one will always also cancel the other and vice
+    /// versa. This is only true for cloned tokens and not for tokens in a parent-child
+    /// relationship.
+    fn eq(&self, other: &CancellationToken) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl Eq for CancellationToken {}
+
+impl core::hash::Hash for CancellationToken {
+    #[inline]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.inner).hash(state);
+    }
+}
+
 impl Drop for CancellationToken {
     fn drop(&mut self) {
         tree_node::decrease_handle_refcount(&self.inner);

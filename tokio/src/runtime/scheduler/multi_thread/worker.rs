@@ -59,7 +59,7 @@
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
-    idle, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
+    idle, park, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
 use crate::runtime::scheduler::{inject, Defer, Lock};
 use crate::runtime::task::OwnedTasks;
@@ -74,7 +74,7 @@ use crate::util::rand::{FastRand, RngSeedGenerator};
 use std::cell::RefCell;
 use std::task::Waker;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 mod metrics;
 
@@ -92,6 +92,7 @@ use crate::loom::sync::atomic::AtomicBool;
 #[cfg(all(tokio_unstable, feature = "time"))]
 use crate::runtime::time_alt;
 
+use crate::runtime::metrics::ScheduleLatencyInstant;
 #[cfg(all(tokio_unstable, feature = "time"))]
 use crate::runtime::scheduler::util;
 
@@ -138,6 +139,15 @@ struct Core {
 
     /// True if the scheduler is being traced
     is_traced: bool,
+
+    /// Whether or not the worker has just returned from a park in which we
+    /// parked on the I/O driver.
+    had_driver: park::HadDriver,
+
+    /// If `true`, the worker should eagerly notify another worker when polling
+    /// the first task after returning from a park in which it parked on the I/O
+    /// or time driver.
+    enable_eager_driver_handoff: bool,
 
     /// Parker
     ///
@@ -192,6 +202,11 @@ pub(crate) struct Shared {
     pub(super) scheduler_metrics: SchedulerMetrics,
 
     pub(super) worker_metrics: Box<[WorkerMetrics]>,
+
+    /// Startup time of this scheduler.
+    ///
+    /// This instant is used as the basis of task `scheduled_at` measurements.
+    started_at: Option<Instant>,
 
     /// Only held to trigger some code on drop. This is used to get internal
     /// runtime metrics that can be useful when doing performance
@@ -254,6 +269,7 @@ type Notified = task::Notified<Arc<Handle>>;
 /// improvements.
 const MAX_LIFO_POLLS_PER_TICK: usize = 3;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn create(
     size: usize,
     park: Parker,
@@ -262,6 +278,7 @@ pub(super) fn create(
     seed_generator: RngSeedGenerator,
     config: Config,
     timer_flavor: TimerFlavor,
+    name: Option<String>,
 ) -> (Arc<Handle>, Launch) {
     let mut cores = Vec::with_capacity(size);
     let mut remotes = Vec::with_capacity(size);
@@ -286,6 +303,8 @@ pub(super) fn create(
             is_searching: false,
             is_shutdown: false,
             is_traced: false,
+            enable_eager_driver_handoff: config.enable_eager_driver_handoff,
+            had_driver: park::HadDriver::No,
             park: Some(park),
             global_queue_interval: stats.tuned_global_queue_interval(&config),
             stats,
@@ -298,9 +317,14 @@ pub(super) fn create(
 
     let (idle, idle_synced) = Idle::new(size);
     let (inject, inject_synced) = inject::Shared::new();
+    let started_at = config
+        .metrics_schedule_latency_histogram
+        .as_ref()
+        .map(|_| Instant::now());
 
     let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
+        name,
         task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
@@ -318,6 +342,7 @@ pub(super) fn create(
             config,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
+            started_at,
             _counters: Counters,
         },
         driver: driver_handle,
@@ -423,6 +448,10 @@ where
         }
 
         let cx = maybe_cx.expect("no .is_some() == false cases above should lead here");
+
+        // Since deferred tasks don't stay on `core`, make sure to wake them
+        // before blocking.
+        cx.defer.wake();
 
         // Get the worker core. If none is set, then blocking is fine!
         let mut core = match cx.core.borrow_mut().take() {
@@ -617,7 +646,30 @@ impl Context {
 
         // Make sure the worker is not in the **searching** state. This enables
         // another idle worker to try to steal work.
-        core.transition_from_searching(&self.worker);
+        let notified_parked_worker = core.transition_from_searching(&self.worker);
+
+        // If the setting to wake eagerly when releasing the I/O driver is
+        // enabled, and this worker had the driver, wake a parked worker to come
+        // grab it from us.
+        //
+        // Note that this is only done when we are *actually* about to poll a
+        // task, rather than whenever the worker has unparked. When the worker
+        // has been unparked, it may not actually have any tasks to poll, and if
+        // it's still holding the I/O driver, it should just go back to polling
+        // the driver again, rather than trying to wake someone else spuriously.
+        //
+        // Note that this explicitly checks `cfg!(tokio_unstable)` in addition,
+        // as that should result in this whole expression being eliminated at
+        // compile-time when unstable features are disabled.
+        if cfg!(tokio_unstable)
+            && core.enable_eager_driver_handoff
+            && core.had_driver == park::HadDriver::Yes
+            && !notified_parked_worker
+        // don't do it a second time
+        {
+            core.had_driver = park::HadDriver::No;
+            self.worker.handle.notify_parked_local();
+        }
 
         self.assert_lifo_enabled_is_correct(&core);
 
@@ -625,7 +677,10 @@ impl Context {
         // tasks under this measurement. In this case, the tasks came from the
         // LIFO slot and are considered part of the current task for scheduling
         // purposes. These tasks inherent the "parent"'s limits.
-        core.stats.start_poll();
+        core.stats.start_poll(
+            task.get_scheduled_at()
+                .prepare(self.worker.handle.shared.started_at),
+        );
 
         // Make the core available to the runtime context
         *self.core.borrow_mut() = Some(core);
@@ -826,11 +881,11 @@ impl Context {
         };
 
         // Park thread
-        if let Some(timeout) = duration {
-            park.park_timeout(&self.worker.handle.driver, timeout);
+        let had_driver = if let Some(timeout) = duration {
+            park.park_timeout(&self.worker.handle.driver, timeout)
         } else {
-            park.park(&self.worker.handle.driver);
-        }
+            park.park(&self.worker.handle.driver)
+        };
 
         self.defer.wake();
 
@@ -855,6 +910,8 @@ impl Context {
 
         // Place `park` back in `core`
         core.park = Some(park);
+        core.had_driver = had_driver;
+
         if core.should_notify_others() {
             self.worker.handle.notify_parked_local();
         }
@@ -1002,6 +1059,11 @@ impl Context {
             None => f(None),
         })
     }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn worker_index(&self) -> usize {
+        self.worker.index
+    }
 }
 
 impl Core {
@@ -1031,12 +1093,27 @@ impl Core {
                 return None;
             }
 
-            // Other threads can only **remove** tasks from the current worker's
-            // `run_queue`. So, we can be confident that by the time we call
-            // `run_queue.push_back` below, there will be *at least* `cap`
-            // available slots in the queue.
             let cap = usize::min(
+                // Other threads can only **remove** tasks from the current
+                // worker's `run_queue`. So, we can be confident that by the
+                // time we call `run_queue.push_back` below, there will be *at
+                // least* `cap` available slots in the queue.
+                //
+                // Note that even though `next_local_task()` just returned
+                // `None`, this may be different from `max_capacity()` if
+                // another worker is currently stealing tasks from us.
                 self.run_queue.remaining_slots(),
+                // We want to make sure that all of the tasks we take end up in
+                // the first half of the local queue. This ensures that the
+                // tasks do not get pushed to the inject queue again if overflow
+                // occurs, as overflow only affects tasks in the second half of
+                // the local queue.
+                //
+                // Note that even if there are concurrent stealers, we do not
+                // need to consider the value of `remaining_slots()` because a
+                // future call to `push_overflow()` can only succeed once that
+                // concurrent stealer has finished stealing, so at that point
+                // the tasks we are adding now will be in the first half.
                 self.run_queue.max_capacity() / 2,
             );
 
@@ -1113,13 +1190,13 @@ impl Core {
         self.is_searching
     }
 
-    fn transition_from_searching(&mut self, worker: &Worker) {
+    fn transition_from_searching(&mut self, worker: &Worker) -> bool {
         if !self.is_searching {
-            return;
+            return false;
         }
 
         self.is_searching = false;
-        worker.handle.transition_worker_from_searching();
+        worker.handle.transition_worker_from_searching()
     }
 
     fn has_tasks(&self) -> bool {
@@ -1262,6 +1339,15 @@ impl Worker {
 
 impl Handle {
     pub(super) fn schedule_task(&self, task: Notified, is_yield: bool) {
+        if self
+            .shared
+            .config
+            .metrics_schedule_latency_histogram
+            .is_some()
+        {
+            task.set_scheduled_at(ScheduleLatencyInstant::new(self.shared.started_at));
+        }
+
         with_current(|maybe_cx| {
             if let Some(cx) = maybe_cx {
                 // Make sure the task is part of the **current** scheduler.
@@ -1280,6 +1366,7 @@ impl Handle {
         });
     }
 
+    // Separated case to reduce LLVM codegen in `Handle::bind_new_task`.
     pub(super) fn schedule_option_task_without_yield(&self, task: Option<Notified>) {
         if let Some(task) = task {
             self.schedule_task(task, false);
@@ -1371,12 +1458,18 @@ impl Handle {
         }
     }
 
-    fn notify_parked_local(&self) {
+    /// Notify a parked worker.
+    ///
+    /// Returns `true` if a worker was notified, `false` otherwise.
+    fn notify_parked_local(&self) -> bool {
         super::counters::inc_num_inc_notify_local();
 
         if let Some(index) = self.shared.idle.worker_to_notify(&self.shared) {
             super::counters::inc_num_unparks_local();
             self.shared.remotes[index].unpark.unpark(&self.driver);
+            true
+        } else {
+            false
         }
     }
 
@@ -1405,11 +1498,14 @@ impl Handle {
         }
     }
 
-    fn transition_worker_from_searching(&self) {
+    /// Returns `true` if another parked worker was notified, `false` otherwise.
+    fn transition_worker_from_searching(&self) -> bool {
         if self.shared.idle.transition_worker_from_searching() {
             // We are the final searching worker. Because work was found, we
             // need to notify another worker.
-            self.notify_parked_local();
+            self.notify_parked_local()
+        } else {
+            false
         }
     }
 

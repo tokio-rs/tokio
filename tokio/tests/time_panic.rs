@@ -6,7 +6,7 @@ use futures::future;
 use std::error::Error;
 use std::time::Duration;
 use tokio::runtime::{Builder, Runtime};
-use tokio::time::{self, interval, interval_at, timeout, Instant};
+use tokio::time::{self, interval, interval_at, timeout, timeout_at, Instant};
 
 mod support {
     pub mod panic;
@@ -122,6 +122,22 @@ fn timeout_panic_caller() -> Result<(), Box<dyn Error>> {
         let rt = Builder::new_current_thread().build().unwrap();
         rt.block_on(async {
             let _timeout = timeout(Duration::from_millis(5), future::pending::<()>());
+        });
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn timeout_at_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        // Runtime without `enable_time` so it has no current timer set.
+        let rt = Builder::new_current_thread().build().unwrap();
+        rt.block_on(async {
+            let _timeout = timeout_at(Instant::now(), future::pending::<()>());
         });
     });
 

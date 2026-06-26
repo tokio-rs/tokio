@@ -29,10 +29,11 @@ use proc_macro::TokenStream;
 /// powerful interface.
 ///
 /// Note: This macro can be used on any function and not just the `main`
-/// function. Using it on a non-main function makes the function behave as if it
-/// was synchronous by starting a new runtime each time it is called. If the
-/// function is called often, it is preferable to create the runtime using the
-/// runtime builder so the runtime can be reused across calls.
+/// function. Although the function is written with `async fn`, this macro
+/// expands it to a synchronous function that starts a runtime each time it is
+/// called. If the function is called often, it is preferable to create the
+/// runtime using the runtime builder so the runtime can be reused across calls.
+/// For details on the expansion, see [Bridging with sync code][bridging].
 ///
 /// # Non-worker async function
 ///
@@ -73,16 +74,11 @@ use proc_macro::TokenStream;
 ///
 /// ## Local
 ///
-/// [Unstable API][unstable] only.
-///
 /// To use the [local runtime], the macro can be configured using
 ///
 /// ```rust
-/// # #[cfg(tokio_unstable)]
 /// #[tokio::main(flavor = "local")]
 /// # async fn main() {}
-/// # #[cfg(not(tokio_unstable))]
-/// # fn main() {}
 /// ```
 ///
 /// # Function arguments
@@ -90,6 +86,30 @@ use proc_macro::TokenStream;
 /// Arguments are allowed for any functions, aside from `main` which is special.
 ///
 /// # Usage
+///
+/// ## Set the name of the runtime
+///
+/// ```rust
+/// #[tokio::main(name = "my-runtime")]
+/// async fn main() {
+///     println!("Hello world");
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::main]`
+///
+/// ```rust
+/// fn main() {
+///     tokio::runtime::Builder::new_multi_thread()
+///         .enable_all()
+///         .name("my-runtime")
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             println!("Hello world");
+///         })
+/// }
+/// ```
 ///
 /// ## Using the multi-threaded runtime
 ///
@@ -141,25 +161,19 @@ use proc_macro::TokenStream;
 ///
 /// ## Using the local runtime
 ///
-/// Available in the [unstable API][unstable] only.
-///
 /// The [local runtime] is similar to the current-thread runtime but
 /// supports [`task::spawn_local`](../tokio/task/fn.spawn_local.html).
 ///
 /// ```rust
-/// # #[cfg(tokio_unstable)]
 /// #[tokio::main(flavor = "local")]
 /// async fn main() {
 ///     println!("Hello world");
 /// }
-/// # #[cfg(not(tokio_unstable))]
-/// # fn main() {}
 /// ```
 ///
 /// Equivalent code not using `#[tokio::main]`
 ///
 /// ```rust
-/// # #[cfg(tokio_unstable)]
 /// fn main() {
 ///     tokio::runtime::Builder::new_current_thread()
 ///         .enable_all()
@@ -169,8 +183,6 @@ use proc_macro::TokenStream;
 ///             println!("Hello world");
 ///         })
 /// }
-/// # #[cfg(not(tokio_unstable))]
-/// # fn main() {}
 /// ```
 ///
 ///
@@ -297,6 +309,7 @@ use proc_macro::TokenStream;
 /// [`Builder::unhandled_panic`]: ../tokio/runtime/struct.Builder.html#method.unhandled_panic
 /// [unstable]: ../tokio/index.html#unstable-features
 /// [local runtime]: ../tokio/runtime/struct.LocalRuntime.html
+/// [bridging]: https://tokio.rs/tokio/topics/bridging#what-tokiomain-expands-to
 #[proc_macro_attribute]
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args.into(), item.into(), true).into()
@@ -407,6 +420,31 @@ pub fn main_rt(args: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// ## Usage
+///
+/// ### Set the name of the runtime
+///
+/// ```no_run
+/// #[tokio::test(name = "my-test-runtime")]
+/// async fn my_test() {
+///     assert!(true);
+/// }
+/// ```
+///
+/// Equivalent code not using `#[tokio::test]`
+///
+/// ```no_run
+/// #[test]
+/// fn my_test() {
+///     tokio::runtime::Builder::new_current_thread()
+///         .enable_all()
+///         .name("my-test-runtime")
+///         .build()
+///         .unwrap()
+///         .block_on(async {
+///             assert!(true);
+///         })
+/// }
+/// ```
 ///
 /// ### Using the multi-thread runtime
 ///

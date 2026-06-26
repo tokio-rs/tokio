@@ -54,24 +54,41 @@ use std::{io, path::Path};
 /// }
 /// ```
 pub async fn read(path: impl AsRef<Path>) -> io::Result<Vec<u8>> {
-    let path = path.as_ref().to_owned();
+    let path = path.as_ref();
 
     #[cfg(all(
         tokio_unstable,
         feature = "io-uring",
         feature = "rt",
         feature = "fs",
-        target_os = "linux"
+        // libc::statx is only supported on these platforms
+        // FIXME: Add musl target env when our minimum supported
+        // rust version is 1.93. To clarify, statx support is
+        // introduced to musl in 1.25 as mentioned officially here:
+        // https://musl.libc.org/releases.html.
+        // However, rustup target_env building for *-linux-musl
+        // uses 1.25 musl on all *-linux-musl platforms starting
+        // in 1.93 stable rust version.
+        // https://blog.rust-lang.org/2025/12/05/Updating-musl-1.2.5/
+        any(target_env = "gnu", target_os = "android")
     ))]
     {
         use crate::fs::read_uring;
 
         let handle = crate::runtime::Handle::current();
         let driver_handle = handle.inner.driver().io();
-        if driver_handle.check_and_init(io_uring::opcode::Read::CODE)? {
-            return read_uring(&path).await;
+        if driver_handle
+            .check_and_init(io_uring::opcode::Read::CODE)
+            .await?
+        {
+            return read_uring(path).await;
         }
     }
 
+    read_spawn_blocking(path).await
+}
+
+async fn read_spawn_blocking(path: &Path) -> io::Result<Vec<u8>> {
+    let path = path.to_owned();
     asyncify(move || std::fs::read(path)).await
 }

@@ -1,8 +1,6 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support bind
-                                                                   // No `socket` on miri.
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support mulithreading
 
-use std::time::Duration;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot::channel;
@@ -33,7 +31,7 @@ async fn shutdown() {
 }
 
 #[tokio::test]
-#[expect(deprecated)] // set_linger is deprecated
+#[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
 async fn shutdown_after_tcp_reset() {
     let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
     let addr = assert_ok!(srv.local_addr());
@@ -46,12 +44,21 @@ async fn shutdown_after_tcp_reset() {
         connected_tx.send(()).unwrap();
 
         dropped_rx.await.unwrap();
-        assert_ok!(AsyncWriteExt::shutdown(&mut stream).await);
+
+        // After the peer's RST (linger = 0), `shutdown` returns `Ok(())` on most
+        // platforms, but FreeBSD can surface the reset as `ConnectionReset` when
+        // the kernel processed it before `shutdown` ran. Both are valid for an
+        // already-reset connection.
+        match AsyncWriteExt::shutdown(&mut stream).await {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::ConnectionReset => {}
+            Err(e) => panic!("unexpected error after reset: {e:?}"),
+        }
     });
 
     let (stream, _) = assert_ok!(srv.accept().await);
     // By setting linger to 0 we will trigger a TCP reset
-    stream.set_linger(Some(Duration::new(0, 0))).unwrap();
+    stream.set_zero_linger().unwrap();
     connected_rx.await.unwrap();
 
     drop(stream);
