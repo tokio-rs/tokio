@@ -245,7 +245,7 @@ cfg_not_trace! {
 }
 
 impl Sleep {
-    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
+    #[cfg_attr(not(all(feature = "tracing")), allow(unused_variables))]
     #[track_caller]
     pub(crate) fn new_timeout(
         deadline: Instant,
@@ -254,7 +254,7 @@ impl Sleep {
         let handle = scheduler::Handle::current();
         // Panic if the time driver is not enabled (backwards compat)
         _ = handle.driver().time();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let inner = {
             let location = location.expect("should have location if tracing");
             let resource_span = tracing::trace_span!(
@@ -285,7 +285,7 @@ impl Sleep {
             Inner { ctx }
         };
 
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        #[cfg(not(all(feature = "tracing")))]
         let inner = Inner {};
 
         Sleep {
@@ -347,7 +347,7 @@ impl Sleep {
 
         let handle = this.driver;
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         {
             let _resource_enter = this.inner.ctx.resource_span.enter();
             this.inner.ctx.async_op_span =
@@ -392,21 +392,21 @@ impl Sleep {
         ready!(crate::trace::trace_leaf());
         let mut this = self.project();
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let _res_span = this.inner.ctx.resource_span.enter();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let _ao_span = this.inner.ctx.async_op_span.enter();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let _ao_poll_span = this.inner.ctx.async_op_poll_span.enter();
 
         // Keep track of task budget
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let coop = ready!(trace_poll_op!(
             "poll_elapsed",
             crate::task::coop::poll_proceed(cx),
         ));
 
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        #[cfg(not(feature = "tracing"))]
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         let timer = match this.timer.as_mut().as_pin_mut() {
@@ -414,7 +414,7 @@ impl Sleep {
             None => {
                 let handle = this.driver;
 
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(feature = "tracing")]
                 {
                     let clock = handle.driver().clock();
                     let time_source = handle.driver().time().time_source();
@@ -441,10 +441,10 @@ impl Sleep {
             r
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         return trace_poll_op!("poll_elapsed", result);
 
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        #[cfg(not(feature = "tracing"))]
         return result;
     }
 }

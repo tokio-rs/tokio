@@ -110,13 +110,13 @@ pub fn interval_at(start: Instant, period: Duration) -> Interval {
     internal_interval_at(start, period, trace::caller_location())
 }
 
-#[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_variables))]
+#[cfg_attr(not(all(feature = "tracing")), allow(unused_variables))]
 fn internal_interval_at(
     start: Instant,
     period: Duration,
     location: Option<&'static Location<'static>>,
 ) -> Interval {
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg(feature = "tracing")]
     let resource_span = {
         let location = location.expect("should have location if tracing");
 
@@ -135,7 +135,7 @@ fn internal_interval_at(
         delay: Box::pin(sleep_until(start)),
         period,
         missed_tick_behavior: MissedTickBehavior::default(),
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         resource_span,
     }
 }
@@ -393,7 +393,7 @@ pub struct Interval {
     /// The strategy `Interval` should use when a tick is missed.
     missed_tick_behavior: MissedTickBehavior,
 
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg(feature = "tracing")]
     resource_span: tracing::Span,
 }
 
@@ -426,9 +426,9 @@ impl Interval {
     /// # }
     /// ```
     pub async fn tick(&mut self) -> Instant {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let resource_span = self.resource_span.clone();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let instant = trace::async_op(
             || poll_fn(|cx| self.poll_tick(cx)),
             resource_span,
@@ -436,7 +436,7 @@ impl Interval {
             "poll_tick",
             false,
         );
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        #[cfg(not(all(feature = "tracing")))]
         let instant = poll_fn(|cx| self.poll_tick(cx));
 
         instant.await

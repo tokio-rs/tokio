@@ -190,7 +190,7 @@ pub(crate) struct Header {
     pub(super) owner_id: UnsafeCell<Option<NonZeroU64>>,
 
     /// The tracing ID for this instrumented task.
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg(feature = "tracing")]
     pub(super) tracing_id: Option<tracing::Id>,
 
     /// The last time this task was scheduled. Used to measure schedule latency.
@@ -242,20 +242,20 @@ impl<T: Future, S: Schedule> Cell<T, S> {
         fn new_header(
             state: State,
             vtable: &'static Vtable,
-            #[cfg(all(tokio_unstable, feature = "tracing"))] tracing_id: Option<tracing::Id>,
+            #[cfg(feature = "tracing")] tracing_id: Option<tracing::Id>,
         ) -> Header {
             Header {
                 state,
                 queue_next: UnsafeCell::new(None),
                 vtable,
                 owner_id: UnsafeCell::new(None),
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(feature = "tracing")]
                 tracing_id,
                 scheduled_at: UnsafeCell::new(ScheduleLatencyInstant::new(None)),
             }
         }
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let tracing_id = future.id();
         let vtable = raw::vtable::<T, S>();
         let result = Box::new(Cell {
@@ -263,7 +263,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
             header: new_header(
                 state,
                 vtable,
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(feature = "tracing")]
                 tracing_id,
             ),
             core: Core {
@@ -535,7 +535,7 @@ impl Header {
     /// # Safety
     ///
     /// The provided raw pointer must point at the header of a task.
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg(feature = "tracing")]
     pub(super) unsafe fn get_tracing_id(me: &NonNull<Header>) -> Option<&tracing::Id> {
         me.as_ref().tracing_id.as_ref()
     }

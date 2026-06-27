@@ -1,3 +1,9 @@
+# Unreleased
+
+## Changed
+
+- tracing: stabilize the `tracing` feature flag, removing the requirement for `tokio_unstable`
+
 # 1.52.3 (May 8th, 2026)
 
 ### Fixed

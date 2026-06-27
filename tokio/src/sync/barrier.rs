@@ -1,6 +1,6 @@
 use crate::loom::sync::Mutex;
 use crate::sync::watch;
-#[cfg(all(tokio_unstable, feature = "tracing"))]
+#[cfg(feature = "tracing")]
 use crate::util::trace;
 
 /// A barrier enables multiple tasks to synchronize the beginning of some computation.
@@ -43,7 +43,7 @@ pub struct Barrier {
     state: Mutex<BarrierState>,
     wait: watch::Receiver<usize>,
     n: usize,
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg(feature = "tracing")]
     resource_span: tracing::Span,
 }
 
@@ -70,7 +70,7 @@ impl Barrier {
             n = 1;
         }
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let resource_span = {
             let location = std::panic::Location::caller();
             let resource_span = tracing::trace_span!(
@@ -105,7 +105,7 @@ impl Barrier {
             }),
             n,
             wait,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span,
         }
     }
@@ -123,7 +123,7 @@ impl Barrier {
     ///
     /// This method is not cancel safe.
     pub async fn wait(&self) -> BarrierWaitResult {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         return trace::async_op(
             || self.wait_internal(),
             self.resource_span.clone(),
@@ -133,7 +133,7 @@ impl Barrier {
         )
         .await;
 
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        #[cfg(not(feature = "tracing"))]
         return self.wait_internal().await;
     }
     async fn wait_internal(&self) -> BarrierWaitResult {
@@ -150,19 +150,19 @@ impl Barrier {
             let mut state = self.state.lock();
             let generation = state.generation;
             state.arrived += 1;
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             tracing::trace!(
                 target: "runtime::resource::state_update",
                 arrived = 1,
                 arrived.op = "add",
             );
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             tracing::trace!(
                 target: "runtime::resource::async_op::state_update",
                 arrived = true,
             );
             if state.arrived == self.n {
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(feature = "tracing")]
                 tracing::trace!(
                     target: "runtime::resource::async_op::state_update",
                     is_leader = true,

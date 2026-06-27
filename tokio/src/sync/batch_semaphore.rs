@@ -19,7 +19,7 @@ use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Mutex, MutexGuard};
 use crate::util::linked_list::{self, LinkedList};
-#[cfg(all(tokio_unstable, feature = "tracing"))]
+#[cfg(feature = "tracing")]
 use crate::util::trace;
 use crate::util::WakeList;
 
@@ -36,7 +36,7 @@ pub(crate) struct Semaphore {
     waiters: Mutex<Waitlist>,
     /// The current number of available permits in the semaphore.
     permits: AtomicUsize,
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg(feature = "tracing")]
     resource_span: tracing::Span,
 }
 
@@ -104,7 +104,7 @@ struct Waiter {
     /// use `UnsafeCell` internally.
     pointers: linked_list::Pointers<Waiter>,
 
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg(feature = "tracing")]
     ctx: trace::AsyncOpTracingCtx,
 
     /// Should not be `Unpin`.
@@ -144,7 +144,7 @@ impl Semaphore {
             Self::MAX_PERMITS
         );
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let resource_span = {
             let resource_span = tracing::trace_span!(
                 parent: None,
@@ -170,7 +170,7 @@ impl Semaphore {
                 queue: LinkedList::new(),
                 closed: false,
             }),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span,
         }
     }
@@ -188,7 +188,7 @@ impl Semaphore {
                 queue: LinkedList::new(),
                 closed: false,
             }),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: tracing::Span::none(),
         }
     }
@@ -201,7 +201,7 @@ impl Semaphore {
                 queue: LinkedList::new(),
                 closed: true,
             }),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: tracing::Span::none(),
         }
     }
@@ -215,7 +215,7 @@ impl Semaphore {
                 queue: LinkedList::new(),
                 closed: true,
             }),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: tracing::Span::none(),
         }
     }
@@ -349,7 +349,7 @@ impl Semaphore {
                 );
 
                 // add remaining permits back
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(feature = "tracing")]
                 self.resource_span.in_scope(|| {
                     tracing::trace!(
                     target: "runtime::resource::state_update",
@@ -447,7 +447,7 @@ impl Semaphore {
                     acquired += acq;
                     if remaining == 0 {
                         if !queued {
-                            #[cfg(all(tokio_unstable, feature = "tracing"))]
+                            #[cfg(feature = "tracing")]
                             self.resource_span.in_scope(|| {
                                 tracing::trace!(
                                     target: "runtime::resource::state_update",
@@ -476,7 +476,7 @@ impl Semaphore {
             return Poll::Ready(Err(AcquireError::closed()));
         }
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         self.resource_span.in_scope(|| {
             tracing::trace!(
                 target: "runtime::resource::state_update",
@@ -531,15 +531,12 @@ impl fmt::Debug for Semaphore {
 }
 
 impl Waiter {
-    fn new(
-        num_permits: usize,
-        #[cfg(all(tokio_unstable, feature = "tracing"))] ctx: trace::AsyncOpTracingCtx,
-    ) -> Self {
+    fn new(num_permits: usize, #[cfg(feature = "tracing")] ctx: trace::AsyncOpTracingCtx) -> Self {
         Waiter {
             waker: UnsafeCell::new(None),
             state: AtomicUsize::new(num_permits),
             pointers: linked_list::Pointers::new(),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             ctx,
             _p: PhantomPinned,
         }
@@ -556,7 +553,7 @@ impl Waiter {
             match self.state.compare_exchange(curr, next, AcqRel, Acquire) {
                 Ok(_) => {
                     *n -= assign;
-                    #[cfg(all(tokio_unstable, feature = "tracing"))]
+                    #[cfg(feature = "tracing")]
                     self.ctx.async_op_span.in_scope(|| {
                         tracing::trace!(
                             target: "runtime::resource::async_op::state_update",
@@ -578,23 +575,23 @@ impl Future for Acquire<'_> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         ready!(crate::trace::trace_leaf());
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let _resource_span = self.node.ctx.resource_span.clone().entered();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let _async_op_span = self.node.ctx.async_op_span.clone().entered();
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let _async_op_poll_span = self.node.ctx.async_op_poll_span.clone().entered();
 
         let (node, semaphore, needed, queued) = self.project();
 
         // First, ensure the current task has enough budget to proceed.
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let coop = ready!(trace_poll_op!(
             "poll_acquire",
             crate::task::coop::poll_proceed(cx),
         ));
 
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        #[cfg(not(all(feature = "tracing")))]
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 
         let result = match semaphore.poll_acquire(cx, needed, node, *queued) {
@@ -610,17 +607,17 @@ impl Future for Acquire<'_> {
             }
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         return trace_poll_op!("poll_acquire", result);
 
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+        #[cfg(not(all(feature = "tracing")))]
         return result;
     }
 }
 
 impl<'a> Acquire<'a> {
     fn new(semaphore: &'a Semaphore, num_permits: usize) -> Self {
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        #[cfg(not(feature = "tracing"))]
         return Self {
             node: Waiter::new(num_permits),
             semaphore,
@@ -628,7 +625,7 @@ impl<'a> Acquire<'a> {
             queued: false,
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         return semaphore.resource_span.in_scope(|| {
             let async_op_span =
                 tracing::trace_span!("runtime.resource.async_op", source = "Acquire::new");

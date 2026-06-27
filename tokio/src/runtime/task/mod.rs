@@ -637,9 +637,9 @@ unsafe impl<S> sharded_list::ShardedListItem for Task<S> {
     }
 }
 
-/// Wrapper around [`std::panic::Location`] that's conditionally compiled out
-/// when `tokio_unstable` is not enabled.
-#[cfg(tokio_unstable)]
+/// Wrapper around [`std::panic::Location`] that stores the caller location when
+/// the `tracing` feature or `tokio_unstable` is enabled, and is zero-sized otherwise.
+#[cfg(any(feature = "tracing", tokio_unstable))]
 mod spawn_location {
 
     use std::panic::Location;
@@ -654,7 +654,7 @@ mod spawn_location {
     }
 }
 
-#[cfg(not(tokio_unstable))]
+#[cfg(not(any(feature = "tracing", tokio_unstable)))]
 mod spawn_location {
     use std::panic::Location;
 
