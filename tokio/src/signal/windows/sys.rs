@@ -1,5 +1,6 @@
 use std::io;
 use std::io::Error;
+use std::ops::Index;
 use std::sync::OnceLock;
 
 use crate::signal::RxFuture;
@@ -10,30 +11,36 @@ use windows_sys::Win32::System::Console as console;
 
 type EventInfo = watch::Sender<()>;
 
+#[repr(u32)]
+enum SignalType {
+    CtrlC = console::CTRL_C_EVENT,
+    CtrlBreak = console::CTRL_BREAK_EVENT,
+    CtrlClose = console::CTRL_CLOSE_EVENT,
+    CtrlLogoff = console::CTRL_LOGOFF_EVENT,
+    CtrlShutdown = console::CTRL_SHUTDOWN_EVENT,
+}
+
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
-    unsafe { new(console::CTRL_BREAK_EVENT) }
+    new(SignalType::CtrlBreak)
 }
 
 pub(super) fn ctrl_close() -> io::Result<RxFuture> {
-    unsafe { new(console::CTRL_CLOSE_EVENT) }
+    new(SignalType::CtrlClose)
 }
 
 pub(super) fn ctrl_c() -> io::Result<RxFuture> {
-    unsafe { new(console::CTRL_C_EVENT) }
+    new(SignalType::CtrlC)
 }
 
 pub(super) fn ctrl_logoff() -> io::Result<RxFuture> {
-    unsafe { new(console::CTRL_LOGOFF_EVENT) }
+    new(SignalType::CtrlLogoff)
 }
 
 pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
-    unsafe { new(console::CTRL_SHUTDOWN_EVENT) }
+    new(SignalType::CtrlShutdown)
 }
 
-/// # Safety
-///
-/// `signum` must be valid.
-unsafe fn new(signum: u32) -> io::Result<RxFuture> {
+fn new(signal: SignalType) -> io::Result<RxFuture> {
     let registry = REGISTRY
         .get_or_init(
             || match unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) } {
@@ -44,9 +51,8 @@ unsafe fn new(signum: u32) -> io::Result<RxFuture> {
         .as_ref()
         .map_err(|&code| Error::from_raw_os_error(code))?;
 
-    // SAFETY: signum is valid.
-    let event_info = unsafe { registry.event_info(signum).unwrap_unchecked() };
-    Ok(RxFuture::new(event_info.subscribe()))
+    let rx = registry[signal].subscribe();
+    Ok(RxFuture::new(rx))
 }
 
 fn event_requires_infinite_sleep_in_handler(signum: u32) -> bool {
@@ -71,15 +77,16 @@ struct Registry {
     ctrl_shutdown: EventInfo,
 }
 
-impl Registry {
-    fn event_info(&self, signum: u32) -> Option<&EventInfo> {
-        match signum {
-            console::CTRL_BREAK_EVENT => Some(&self.ctrl_break),
-            console::CTRL_CLOSE_EVENT => Some(&self.ctrl_close),
-            console::CTRL_C_EVENT => Some(&self.ctrl_c),
-            console::CTRL_LOGOFF_EVENT => Some(&self.ctrl_logoff),
-            console::CTRL_SHUTDOWN_EVENT => Some(&self.ctrl_shutdown),
-            _ => None,
+impl Index<SignalType> for Registry {
+    type Output = EventInfo;
+
+    fn index(&self, index: SignalType) -> &Self::Output {
+        match index {
+            SignalType::CtrlC => &self.ctrl_c,
+            SignalType::CtrlBreak => &self.ctrl_break,
+            SignalType::CtrlClose => &self.ctrl_close,
+            SignalType::CtrlLogoff => &self.ctrl_logoff,
+            SignalType::CtrlShutdown => &self.ctrl_shutdown,
         }
     }
 }
@@ -87,21 +94,26 @@ impl Registry {
 static REGISTRY: OnceLock<Result<Registry, i32>> = OnceLock::new();
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
+    let signal = match ty {
+        console::CTRL_C_EVENT => SignalType::CtrlC,
+        console::CTRL_BREAK_EVENT => SignalType::CtrlBreak,
+        console::CTRL_CLOSE_EVENT => SignalType::CtrlClose,
+        console::CTRL_LOGOFF_EVENT => SignalType::CtrlLogoff,
+        console::CTRL_SHUTDOWN_EVENT => SignalType::CtrlShutdown,
+        // Ignore unknown signals.
+        _ => return 0,
+    };
+
     // Note that `OnceLock::get` does not handle the small window between invoking
     // `SetConsoleCtrlHandler` and `REGISTRY` being initialized.
     // SAFETY: `handler` is only invoked if `SetConsoleCtrlHandler` succeded.
     let registry = unsafe { REGISTRY.wait().as_ref().unwrap_unchecked() };
 
-    // Ignore unknown control signal types.
-    let Some(event_info) = registry.event_info(ty) else {
-        return 0;
-    };
-
     // According to https://learn.microsoft.com/en-us/windows/console/handlerroutine
     // the handler routine is always invoked in a new thread, thus we don't
     // have the same restrictions as in Unix signal handlers, meaning we can
     // go ahead and perform the broadcast here.
-    match event_info.send(()) {
+    match registry[signal].send(()) {
         Ok(_) if event_requires_infinite_sleep_in_handler(ty) => loop {
             std::thread::park();
         },
