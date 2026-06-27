@@ -32,7 +32,12 @@ pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
 
 unsafe fn new(signum: u32) -> io::Result<RxFuture> {
     let registry = REGISTRY
-        .get_or_init(init)
+        .get_or_init(
+            || match unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) } {
+                0 => Err(Error::last_os_error().raw_os_error().expect("unreachable")),
+                _ => Ok(Registry::default()),
+            },
+        )
         .as_ref()
         .map_err(|&code| Error::from_raw_os_error(code))?;
 
@@ -77,13 +82,6 @@ impl Registry {
 }
 
 static REGISTRY: OnceLock<Result<Registry, i32>> = OnceLock::new();
-
-fn init() -> Result<Registry, i32> {
-    match unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) } {
-        0 => Err(Error::last_os_error().raw_os_error().expect("unreachable")),
-        _ => Ok(Registry::default()),
-    }
-}
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
     // SAFETY: `handler` is only invoked if `REGISTRY` was successfully initialized.
