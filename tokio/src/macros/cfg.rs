@@ -596,8 +596,8 @@ macro_rules! cfg_not_time {
 macro_rules! cfg_trace {
     ($($item:item)*) => {
         $(
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
-            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+            #[cfg(feature = "tracing")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
             $item
         )*
     };
@@ -616,7 +616,7 @@ macro_rules! cfg_unstable {
 macro_rules! cfg_not_trace {
     ($($item:item)*) => {
         $(
-            #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+            #[cfg(not(feature = "tracing"))]
             $item
         )*
     }

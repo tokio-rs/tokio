@@ -3,7 +3,7 @@
 //! These tests ensure that the instrumentation for task spawning and task
 //! lifecycles is correct.
 #![warn(rust_2018_idioms)]
-#![cfg(all(tokio_unstable, feature = "tracing", target_has_atomic = "64"))]
+#![cfg(all(feature = "tracing", target_has_atomic = "64"))]
 
 use std::{mem, time::Duration};
 

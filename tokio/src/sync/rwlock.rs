@@ -1,6 +1,6 @@
 use crate::sync::batch_semaphore::{Semaphore, TryAcquireError};
 use crate::sync::mutex::TryLockError;
-#[cfg(all(tokio_unstable, feature = "tracing"))]
+#[cfg(feature = "tracing")]
 use crate::util::trace;
 use std::cell::UnsafeCell;
 use std::marker;
@@ -85,7 +85,7 @@ const MAX_READS: u32 = 10;
 /// [`Send`]: trait@std::marker::Send
 /// [_write-preferring_]: https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock#Priority_policies
 pub struct RwLock<T: ?Sized> {
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg(feature = "tracing")]
     resource_span: tracing::Span,
 
     // maximum number of concurrent readers
@@ -204,7 +204,7 @@ impl<T: ?Sized> RwLock<T> {
     where
         T: Sized,
     {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let resource_span = {
             let location = std::panic::Location::caller();
             let resource_span = tracing::trace_span!(
@@ -237,17 +237,17 @@ impl<T: ?Sized> RwLock<T> {
             resource_span
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let s = resource_span.in_scope(|| Semaphore::new(MAX_READS as usize));
 
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        #[cfg(not(feature = "tracing"))]
         let s = Semaphore::new(MAX_READS as usize);
 
         RwLock {
             mr: MAX_READS,
             c: UnsafeCell::new(value),
             s,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span,
         }
     }
@@ -277,7 +277,7 @@ impl<T: ?Sized> RwLock<T> {
             "a RwLock may not be created with more than {MAX_READS} readers"
         );
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let resource_span = {
             let location = std::panic::Location::caller();
 
@@ -311,17 +311,17 @@ impl<T: ?Sized> RwLock<T> {
             resource_span
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let s = resource_span.in_scope(|| Semaphore::new(max_reads as usize));
 
-        #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
+        #[cfg(not(feature = "tracing"))]
         let s = Semaphore::new(max_reads as usize);
 
         RwLock {
             mr: max_reads,
             c: UnsafeCell::new(value),
             s,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span,
         }
     }
@@ -352,7 +352,7 @@ impl<T: ?Sized> RwLock<T> {
             mr: MAX_READS,
             c: UnsafeCell::new(value),
             s: Semaphore::const_new(MAX_READS as usize),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: tracing::Span::none(),
         }
     }
@@ -383,7 +383,7 @@ impl<T: ?Sized> RwLock<T> {
             mr: max_reads,
             c: UnsafeCell::new(value),
             s: Semaphore::const_new(max_reads as usize),
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: tracing::Span::none(),
         }
     }
@@ -445,12 +445,12 @@ impl<T: ?Sized> RwLock<T> {
                 s: &self.s,
                 data: self.c.get(),
                 marker: PhantomData,
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(feature = "tracing")]
                 resource_span: self.resource_span.clone(),
             }
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let acquire_fut = trace::async_op(
             move || acquire_fut,
             self.resource_span.clone(),
@@ -462,7 +462,7 @@ impl<T: ?Sized> RwLock<T> {
         #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
         let guard = acquire_fut.await;
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         self.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -582,7 +582,7 @@ impl<T: ?Sized> RwLock<T> {
     ///}
     /// ```
     pub async fn read_owned(self: Arc<Self>) -> OwnedRwLockReadGuard<T> {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let resource_span = self.resource_span.clone();
 
         let acquire_fut = async {
@@ -593,7 +593,7 @@ impl<T: ?Sized> RwLock<T> {
             });
 
             OwnedRwLockReadGuard {
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(feature = "tracing")]
                 resource_span: self.resource_span.clone(),
                 data: self.c.get(),
                 lock: self,
@@ -601,7 +601,7 @@ impl<T: ?Sized> RwLock<T> {
             }
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let acquire_fut = trace::async_op(
             move || acquire_fut,
             resource_span,
@@ -613,7 +613,7 @@ impl<T: ?Sized> RwLock<T> {
         #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
         let guard = acquire_fut.await;
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -668,11 +668,11 @@ impl<T: ?Sized> RwLock<T> {
             s: &self.s,
             data: self.c.get(),
             marker: marker::PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: self.resource_span.clone(),
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         self.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -730,14 +730,14 @@ impl<T: ?Sized> RwLock<T> {
         }
 
         let guard = OwnedRwLockReadGuard {
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: self.resource_span.clone(),
             data: self.c.get(),
             lock: self,
             _p: PhantomData,
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -791,12 +791,12 @@ impl<T: ?Sized> RwLock<T> {
                 s: &self.s,
                 data: self.c.get(),
                 marker: marker::PhantomData,
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(feature = "tracing")]
                 resource_span: self.resource_span.clone(),
             }
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let acquire_fut = trace::async_op(
             move || acquire_fut,
             self.resource_span.clone(),
@@ -808,7 +808,7 @@ impl<T: ?Sized> RwLock<T> {
         #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
         let guard = acquire_fut.await;
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         self.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -914,7 +914,7 @@ impl<T: ?Sized> RwLock<T> {
     ///}
     /// ```
     pub async fn write_owned(self: Arc<Self>) -> OwnedRwLockWriteGuard<T> {
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let resource_span = self.resource_span.clone();
 
         let acquire_fut = async {
@@ -926,7 +926,7 @@ impl<T: ?Sized> RwLock<T> {
             });
 
             OwnedRwLockWriteGuard {
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(feature = "tracing")]
                 resource_span: self.resource_span.clone(),
                 permits_acquired: self.mr,
                 data: self.c.get(),
@@ -935,7 +935,7 @@ impl<T: ?Sized> RwLock<T> {
             }
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let acquire_fut = trace::async_op(
             move || acquire_fut,
             resource_span,
@@ -947,7 +947,7 @@ impl<T: ?Sized> RwLock<T> {
         #[allow(clippy::let_and_return)] // this lint triggers when disabling tracing
         let guard = acquire_fut.await;
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -995,11 +995,11 @@ impl<T: ?Sized> RwLock<T> {
             s: &self.s,
             data: self.c.get(),
             marker: marker::PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: self.resource_span.clone(),
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         self.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -1050,7 +1050,7 @@ impl<T: ?Sized> RwLock<T> {
         }
 
         let guard = OwnedRwLockWriteGuard {
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: self.resource_span.clone(),
             permits_acquired: self.mr,
             data: self.c.get(),
@@ -1058,7 +1058,7 @@ impl<T: ?Sized> RwLock<T> {
             _p: PhantomData,
         };
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",

@@ -59,7 +59,7 @@ use std::{future::Future, io, mem};
 /// [`spawn`]: Builder::spawn
 /// [`spawn_blocking`]: Builder::spawn_blocking
 #[derive(Default, Debug)]
-#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
 pub struct Builder<'a> {
     name: Option<&'a str>,
 }

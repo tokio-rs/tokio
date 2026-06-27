@@ -243,7 +243,7 @@ impl LocalRuntime {
         ))]
         let future = crate::runtime::task::trace::Trace::root(future);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         let future = crate::util::trace::task(
             future,
             "block_on",

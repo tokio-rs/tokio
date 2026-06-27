@@ -17,7 +17,7 @@ use std::{fmt, mem, ops, ptr};
 pub struct OwnedRwLockWriteGuard<T: ?Sized> {
     // When changing the fields in this struct, make sure to update the
     // `skip_drop` method.
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg(feature = "tracing")]
     pub(super) resource_span: tracing::Span,
     pub(super) permits_acquired: u32,
     pub(super) lock: Arc<RwLock<T>>,
@@ -27,7 +27,7 @@ pub struct OwnedRwLockWriteGuard<T: ?Sized> {
 
 #[allow(dead_code)] // Unused fields are still used in Drop.
 struct Inner<T: ?Sized> {
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg(feature = "tracing")]
     resource_span: tracing::Span,
     permits_acquired: u32,
     lock: Arc<RwLock<T>>,
@@ -41,7 +41,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
         // forgets the originals, so in the end no value is duplicated.
         unsafe {
             Inner {
-                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                #[cfg(feature = "tracing")]
                 resource_span: ptr::read(&me.resource_span),
                 permits_acquired: me.permits_acquired,
                 lock: ptr::read(&me.lock),
@@ -95,7 +95,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
             lock: this.lock,
             data,
             _p: PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: this.resource_span,
         }
     }
@@ -142,7 +142,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
             lock: this.lock,
             data,
             _p: PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: this.resource_span,
         };
 
@@ -150,7 +150,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
         let to_release = (this.permits_acquired - 1) as usize;
         guard.lock.s.release(to_release);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -159,7 +159,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -225,7 +225,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
             lock: this.lock,
             data,
             _p: PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: this.resource_span,
         })
     }
@@ -282,7 +282,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
             lock: this.lock,
             data,
             _p: PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: this.resource_span,
         };
 
@@ -290,7 +290,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
         let to_release = (this.permits_acquired - 1) as usize;
         guard.lock.s.release(to_release);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -299,7 +299,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -362,7 +362,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
             lock: this.lock,
             data: this.data,
             _p: PhantomData,
-            #[cfg(all(tokio_unstable, feature = "tracing"))]
+            #[cfg(feature = "tracing")]
             resource_span: this.resource_span,
         };
 
@@ -370,7 +370,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
         let to_release = (this.permits_acquired - 1) as usize;
         guard.lock.s.release(to_release);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -379,7 +379,7 @@ impl<T: ?Sized> OwnedRwLockWriteGuard<T> {
             )
         });
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         guard.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",
@@ -448,7 +448,7 @@ impl<T: ?Sized> Drop for OwnedRwLockWriteGuard<T> {
     fn drop(&mut self) {
         self.lock.s.release(self.permits_acquired as usize);
 
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(feature = "tracing")]
         self.resource_span.in_scope(|| {
             tracing::trace!(
             target: "runtime::resource::state_update",

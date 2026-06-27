@@ -1,4 +1,4 @@
-#![cfg(all(tokio_unstable, feature = "tracing"))]
+#![cfg(feature = "tracing")]
 
 use std::rc::Rc;
 use tokio::task::{Builder, LocalSet};

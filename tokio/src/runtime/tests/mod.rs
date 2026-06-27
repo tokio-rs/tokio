@@ -32,7 +32,7 @@ mod unowned_wrapper {
     use crate::runtime::task::{Id, JoinHandle, Notified, SpawnLocation};
     use crate::runtime::tests::NoopSchedule;
 
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    #[cfg(feature = "tracing")]
     #[track_caller]
     pub(crate) fn unowned<T>(task: T) -> (Notified<NoopSchedule>, JoinHandle<T::Output>)
     where
@@ -47,7 +47,7 @@ mod unowned_wrapper {
         (task.into_notified(), handle)
     }
 
-    #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+    #[cfg(not(all(feature = "tracing")))]
     #[track_caller]
     pub(crate) fn unowned<T>(task: T) -> (Notified<NoopSchedule>, JoinHandle<T::Output>)
     where

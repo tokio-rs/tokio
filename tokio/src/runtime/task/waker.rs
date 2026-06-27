@@ -70,7 +70,7 @@ cfg_not_trace! {
 unsafe fn clone_waker(ptr: *const ()) -> RawWaker {
     // Safety: `ptr` was created from a `Header` pointer in function `waker_ref`.
     let header = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
-    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_unsafe))]
+    #[cfg_attr(not(feature = "tracing"), allow(unused_unsafe))]
     unsafe {
         trace!(header, "waker.clone");
     }
@@ -82,7 +82,7 @@ unsafe fn drop_waker(ptr: *const ()) {
     // Safety: `ptr` was created from a `Header` pointer in function `waker_ref`.
     let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
     // TODO; replace to #[expect(unused_unsafe)] after bumping MSRV to 1.81.0.
-    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_unsafe))]
+    #[cfg_attr(not(feature = "tracing"), allow(unused_unsafe))]
     unsafe {
         trace!(ptr, "waker.drop");
     }
@@ -94,7 +94,7 @@ unsafe fn wake_by_val(ptr: *const ()) {
     // Safety: `ptr` was created from a `Header` pointer in function `waker_ref`.
     let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
     // TODO; replace to #[expect(unused_unsafe)] after bumping MSRV to 1.81.0.
-    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_unsafe))]
+    #[cfg_attr(not(feature = "tracing"), allow(unused_unsafe))]
     unsafe {
         trace!(ptr, "waker.wake");
     }
@@ -107,7 +107,7 @@ unsafe fn wake_by_ref(ptr: *const ()) {
     // Safety: `ptr` was created from a `Header` pointer in function `waker_ref`.
     let ptr = unsafe { NonNull::new_unchecked(ptr as *mut Header) };
     // TODO; replace to #[expect(unused_unsafe)] after bumping MSRV to 1.81.0.
-    #[cfg_attr(not(all(tokio_unstable, feature = "tracing")), allow(unused_unsafe))]
+    #[cfg_attr(not(feature = "tracing"), allow(unused_unsafe))]
     unsafe {
         trace!(ptr, "waker.wake_by_ref");
     }
