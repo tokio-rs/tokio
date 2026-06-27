@@ -1,4 +1,5 @@
 use std::io;
+use std::io::Error;
 use std::sync::OnceLock;
 
 use crate::signal::RxFuture;
@@ -10,29 +11,42 @@ use windows_sys::Win32::System::Console as console;
 type EventInfo = watch::Sender<()>;
 
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
-    new(&registry().ctrl_break)
+    unsafe { new(console::CTRL_BREAK_EVENT) }
 }
 
 pub(super) fn ctrl_close() -> io::Result<RxFuture> {
-    new(&registry().ctrl_close)
+    unsafe { new(console::CTRL_CLOSE_EVENT) }
 }
 
 pub(super) fn ctrl_c() -> io::Result<RxFuture> {
-    new(&registry().ctrl_c)
+    unsafe { new(console::CTRL_C_EVENT) }
 }
 
 pub(super) fn ctrl_logoff() -> io::Result<RxFuture> {
-    new(&registry().ctrl_logoff)
+    unsafe { new(console::CTRL_LOGOFF_EVENT) }
 }
 
 pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
-    new(&registry().ctrl_shutdown)
+    unsafe { new(console::CTRL_SHUTDOWN_EVENT) }
 }
 
-fn new(event_info: &EventInfo) -> io::Result<RxFuture> {
-    global_init()?;
-    let rx = event_info.subscribe();
-    Ok(RxFuture::new(rx))
+/// # Safety
+///
+/// `signum` must be valid.
+unsafe fn new(signum: u32) -> io::Result<RxFuture> {
+    let registry = REGISTRY
+        .get_or_init(
+            || match unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) } {
+                0 => Err(Error::last_os_error().raw_os_error().expect("unreachable")),
+                _ => Ok(Registry::default()),
+            },
+        )
+        .as_ref()
+        .map_err(|&code| Error::from_raw_os_error(code))?;
+
+    // SAFETY: signum is valid.
+    let event_info = unsafe { registry.event_info(signum).unwrap_unchecked() };
+    Ok(RxFuture::new(event_info.subscribe()))
 }
 
 fn event_requires_infinite_sleep_in_handler(signum: u32) -> bool {
@@ -70,34 +84,16 @@ impl Registry {
     }
 }
 
-fn registry() -> &'static Registry {
-    static REGISTRY: OnceLock<Registry> = OnceLock::new();
-
-    REGISTRY.get_or_init(Default::default)
-}
-
-fn global_init() -> io::Result<()> {
-    static INIT: OnceLock<Result<(), Option<i32>>> = OnceLock::new();
-
-    INIT.get_or_init(|| {
-        let rc = unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) };
-        if rc == 0 {
-            Err(io::Error::last_os_error().raw_os_error())
-        } else {
-            Ok(())
-        }
-    })
-    .map_err(|e| {
-        e.map_or_else(
-            || io::Error::new(io::ErrorKind::Other, "registering signal handler failed"),
-            io::Error::from_raw_os_error,
-        )
-    })
-}
+static REGISTRY: OnceLock<Result<Registry, i32>> = OnceLock::new();
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
+    // Note that `OnceLock::get` does not handle the small window between invoking
+    // `SetConsoleCtrlHandler` and `REGISTRY` being initialized.
+    // SAFETY: `handler` is only invoked if `SetConsoleCtrlHandler` succeded.
+    let registry = unsafe { REGISTRY.wait().as_ref().unwrap_unchecked() };
+
     // Ignore unknown control signal types.
-    let Some(event_info) = registry().event_info(ty) else {
+    let Some(event_info) = registry.event_info(ty) else {
         return 0;
     };
 
