@@ -87,14 +87,10 @@ impl Registry {
 static REGISTRY: OnceLock<Result<Registry, i32>> = OnceLock::new();
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
-    // SAFETY: `handler` is only invoked if `REGISTRY` was successfully initialized.
-    let registry = unsafe {
-        REGISTRY
-            .get()
-            .unwrap_unchecked()
-            .as_ref()
-            .unwrap_unchecked()
-    };
+    // Note that `OnceLock::get` does not handle the small window between invoking
+    // `SetConsoleCtrlHandler` and `REGISTRY` being initialized.
+    // SAFETY: `handler` is only invoked if `SetConsoleCtrlHandler` succeded.
+    let registry = unsafe { REGISTRY.wait().as_ref().unwrap_unchecked() };
 
     // Ignore unknown control signal types.
     let Some(event_info) = registry.event_info(ty) else {
