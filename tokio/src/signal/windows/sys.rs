@@ -13,7 +13,7 @@ type EventInfo = watch::Sender<()>;
 
 #[derive(Clone, Copy)]
 #[repr(u32)]
-enum SignalType {
+enum SignalKind {
     CtrlC = console::CTRL_C_EVENT,
     CtrlBreak = console::CTRL_BREAK_EVENT,
     CtrlClose = console::CTRL_CLOSE_EVENT,
@@ -21,7 +21,7 @@ enum SignalType {
     CtrlShutdown = console::CTRL_SHUTDOWN_EVENT,
 }
 
-impl SignalType {
+impl SignalKind {
     const fn terminates(&self) -> bool {
         // Returning from the handler function of those events immediately terminates the process.
         // So for async systems, the easiest solution is to simply never return from
@@ -37,26 +37,26 @@ impl SignalType {
 }
 
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
-    new(SignalType::CtrlBreak)
+    new(SignalKind::CtrlBreak)
 }
 
 pub(super) fn ctrl_close() -> io::Result<RxFuture> {
-    new(SignalType::CtrlClose)
+    new(SignalKind::CtrlClose)
 }
 
 pub(super) fn ctrl_c() -> io::Result<RxFuture> {
-    new(SignalType::CtrlC)
+    new(SignalKind::CtrlC)
 }
 
 pub(super) fn ctrl_logoff() -> io::Result<RxFuture> {
-    new(SignalType::CtrlLogoff)
+    new(SignalKind::CtrlLogoff)
 }
 
 pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
-    new(SignalType::CtrlShutdown)
+    new(SignalKind::CtrlShutdown)
 }
 
-fn new(signal: SignalType) -> io::Result<RxFuture> {
+fn new(signal: SignalKind) -> io::Result<RxFuture> {
     let registry = REGISTRY
         .get_or_init(
             || match unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) } {
@@ -80,16 +80,16 @@ struct Registry {
     ctrl_shutdown: EventInfo,
 }
 
-impl Index<SignalType> for Registry {
+impl Index<SignalKind> for Registry {
     type Output = EventInfo;
 
-    fn index(&self, index: SignalType) -> &Self::Output {
-        match index {
-            SignalType::CtrlC => &self.ctrl_c,
-            SignalType::CtrlBreak => &self.ctrl_break,
-            SignalType::CtrlClose => &self.ctrl_close,
-            SignalType::CtrlLogoff => &self.ctrl_logoff,
-            SignalType::CtrlShutdown => &self.ctrl_shutdown,
+    fn index(&self, signal: SignalKind) -> &Self::Output {
+        match signal {
+            SignalKind::CtrlC => &self.ctrl_c,
+            SignalKind::CtrlBreak => &self.ctrl_break,
+            SignalKind::CtrlClose => &self.ctrl_close,
+            SignalKind::CtrlLogoff => &self.ctrl_logoff,
+            SignalKind::CtrlShutdown => &self.ctrl_shutdown,
         }
     }
 }
@@ -98,11 +98,11 @@ static REGISTRY: OnceLock<Result<Registry, i32>> = OnceLock::new();
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
     let signal = match ty {
-        console::CTRL_C_EVENT => SignalType::CtrlC,
-        console::CTRL_BREAK_EVENT => SignalType::CtrlBreak,
-        console::CTRL_CLOSE_EVENT => SignalType::CtrlClose,
-        console::CTRL_LOGOFF_EVENT => SignalType::CtrlLogoff,
-        console::CTRL_SHUTDOWN_EVENT => SignalType::CtrlShutdown,
+        console::CTRL_C_EVENT => SignalKind::CtrlC,
+        console::CTRL_BREAK_EVENT => SignalKind::CtrlBreak,
+        console::CTRL_CLOSE_EVENT => SignalKind::CtrlClose,
+        console::CTRL_LOGOFF_EVENT => SignalKind::CtrlLogoff,
+        console::CTRL_SHUTDOWN_EVENT => SignalKind::CtrlShutdown,
         // Ignore unknown signals.
         _ => return 0,
     };
@@ -134,7 +134,7 @@ mod tests {
 
     use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 
-    unsafe fn raise_event(signal: SignalType) {
+    unsafe fn raise_event(signal: SignalKind) {
         if signal.terminates() {
             // Those events will enter an infinite loop in `handler`, so
             // we need to run them on a separate thread
@@ -157,7 +157,7 @@ mod tests {
         // like sending signals on Unix, so we'll stub out the actual OS
         // integration and test that our handling works.
         unsafe {
-            raise_event(SignalType::CtrlC);
+            raise_event(SignalKind::CtrlC);
         }
 
         assert_ready_ok!(ctrl_c.poll());
@@ -174,7 +174,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                raise_event(SignalType::CtrlBreak);
+                raise_event(SignalKind::CtrlBreak);
             }
 
             ctrl_break.recv().await.unwrap();
@@ -192,7 +192,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                raise_event(SignalType::CtrlClose);
+                raise_event(SignalKind::CtrlClose);
             }
 
             ctrl_close.recv().await.unwrap();
@@ -210,7 +210,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                raise_event(SignalType::CtrlShutdown);
+                raise_event(SignalKind::CtrlShutdown);
             }
 
             ctrl_shutdown.recv().await.unwrap();
@@ -228,7 +228,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                raise_event(SignalType::CtrlLogoff);
+                raise_event(SignalKind::CtrlLogoff);
             }
 
             ctrl_logoff.recv().await.unwrap();
