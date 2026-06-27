@@ -11,6 +11,7 @@ use windows_sys::Win32::System::Console as console;
 
 type EventInfo = watch::Sender<()>;
 
+#[derive(Clone, Copy)]
 #[repr(u32)]
 enum SignalType {
     CtrlC = console::CTRL_C_EVENT,
@@ -18,6 +19,21 @@ enum SignalType {
     CtrlClose = console::CTRL_CLOSE_EVENT,
     CtrlLogoff = console::CTRL_LOGOFF_EVENT,
     CtrlShutdown = console::CTRL_SHUTDOWN_EVENT,
+}
+
+impl SignalType {
+    const fn terminates(&self) -> bool {
+        // Returning from the handler function of those events immediately terminates the process.
+        // So for async systems, the easiest solution is to simply never return from
+        // the handler function.
+        //
+        // For more information, see:
+        // https://learn.microsoft.com/en-us/windows/console/handlerroutine#remarks
+        matches!(
+            self,
+            Self::CtrlClose | Self::CtrlLogoff | Self::CtrlShutdown
+        )
+    }
 }
 
 pub(super) fn ctrl_break() -> io::Result<RxFuture> {
@@ -53,19 +69,6 @@ fn new(signal: SignalType) -> io::Result<RxFuture> {
 
     let rx = registry[signal].subscribe();
     Ok(RxFuture::new(rx))
-}
-
-fn event_requires_infinite_sleep_in_handler(signum: u32) -> bool {
-    // Returning from the handler function of those events immediately terminates the process.
-    // So for async systems, the easiest solution is to simply never return from
-    // the handler function.
-    //
-    // For more information, see:
-    // https://learn.microsoft.com/en-us/windows/console/handlerroutine#remarks
-    matches!(
-        signum,
-        console::CTRL_CLOSE_EVENT | console::CTRL_LOGOFF_EVENT | console::CTRL_SHUTDOWN_EVENT
-    )
 }
 
 #[derive(Debug, Default)]
@@ -114,7 +117,7 @@ unsafe extern "system" fn handler(ty: u32) -> BOOL {
     // have the same restrictions as in Unix signal handlers, meaning we can
     // go ahead and perform the broadcast here.
     match registry[signal].send(()) {
-        Ok(_) if event_requires_infinite_sleep_in_handler(ty) => loop {
+        Ok(_) if signal.terminates() => loop {
             std::thread::park();
         },
         Ok(_) => 1,
@@ -131,13 +134,13 @@ mod tests {
 
     use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 
-    unsafe fn raise_event(signum: u32) {
-        if event_requires_infinite_sleep_in_handler(signum) {
+    unsafe fn raise_event(signal: SignalType) {
+        if signal.terminates() {
             // Those events will enter an infinite loop in `handler`, so
             // we need to run them on a separate thread
-            std::thread::spawn(move || unsafe { super::handler(signum) });
+            std::thread::spawn(move || unsafe { super::handler(signal as u32) });
         } else {
-            unsafe { super::handler(signum) };
+            unsafe { super::handler(signal as u32) };
         }
     }
 
@@ -154,7 +157,7 @@ mod tests {
         // like sending signals on Unix, so we'll stub out the actual OS
         // integration and test that our handling works.
         unsafe {
-            raise_event(console::CTRL_C_EVENT);
+            raise_event(SignalType::CtrlC);
         }
 
         assert_ready_ok!(ctrl_c.poll());
@@ -171,7 +174,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                raise_event(console::CTRL_BREAK_EVENT);
+                raise_event(SignalType::CtrlBreak);
             }
 
             ctrl_break.recv().await.unwrap();
@@ -189,7 +192,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                raise_event(console::CTRL_CLOSE_EVENT);
+                raise_event(SignalType::CtrlClose);
             }
 
             ctrl_close.recv().await.unwrap();
@@ -207,7 +210,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                raise_event(console::CTRL_SHUTDOWN_EVENT);
+                raise_event(SignalType::CtrlShutdown);
             }
 
             ctrl_shutdown.recv().await.unwrap();
@@ -225,7 +228,7 @@ mod tests {
             // like sending signals on Unix, so we'll stub out the actual OS
             // integration and test that our handling works.
             unsafe {
-                raise_event(console::CTRL_LOGOFF_EVENT);
+                raise_event(SignalType::CtrlLogoff);
             }
 
             ctrl_logoff.recv().await.unwrap();
