@@ -129,6 +129,27 @@ async fn take_while_terminated_after_predicate_fails() {
     assert!(stream.is_terminated());
 }
 
+// ── map_while ─────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn map_while_not_terminated_before_closure_returns_none() {
+    let stream =
+        tokio_stream::iter(vec![1, 2, 3]).map_while(|x| if x < 10 { Some(x) } else { None });
+    assert!(!stream.is_terminated());
+}
+
+#[tokio::test]
+async fn map_while_terminated_after_closure_returns_none() {
+    let mut stream =
+        tokio_stream::iter(vec![1, 5, 2]).map_while(|x| if x < 3 { Some(x) } else { None });
+    assert_eq!(stream.next().await, Some(1));
+    assert!(!stream.is_terminated());
+    // closure returns `None` on 5 → done flag set; the trailing 2 must not be yielded
+    assert_eq!(stream.next().await, None);
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
 // ── then ─────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
