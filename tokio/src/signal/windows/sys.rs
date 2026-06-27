@@ -30,6 +30,9 @@ pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
     unsafe { new(console::CTRL_SHUTDOWN_EVENT) }
 }
 
+/// # Safety
+///
+/// `signum` must be valid.
 unsafe fn new(signum: u32) -> io::Result<RxFuture> {
     let registry = REGISTRY
         .get_or_init(
@@ -41,7 +44,7 @@ unsafe fn new(signum: u32) -> io::Result<RxFuture> {
         .as_ref()
         .map_err(|&code| Error::from_raw_os_error(code))?;
 
-    // SAFETY: signum is valid (the compiler is unable to infer this).
+    // SAFETY: signum is valid.
     let event_info = unsafe { registry.event_info(signum).unwrap_unchecked() };
     Ok(RxFuture::new(event_info.subscribe()))
 }
