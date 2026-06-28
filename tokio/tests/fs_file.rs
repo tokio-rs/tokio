@@ -2,7 +2,6 @@
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
 
 use futures::future::FutureExt;
-use std::io::prelude::*;
 use std::io::IoSlice;
 use tempfile::NamedTempFile;
 use tokio::fs::File;
@@ -286,12 +285,21 @@ async fn read_at_reads_correct_bytes_at_offset() {
 
     let file = File::open(temp_file.path()).await.unwrap();
 
-    let offset = 1;
-    let mut buf = [0u8; 4];
-    let n = file.read_at(&mut buf, offset).await.unwrap();
+    let offset = 1u64;
+    let want = &HELLO[offset as usize..offset as usize + 4];
+    let mut buf = vec![0u8; want.len()];
+    let mut filled = 0;
 
-    assert_eq!(n, buf.len());
-    assert_eq!(&buf[..n], &HELLO[offset as usize..offset as usize + n]);
+    while filled < buf.len() {
+        let n = file
+            .read_at(&mut buf[filled..], offset + filled as u64)
+            .await
+            .unwrap();
+        assert!(n > 0, "unexpected EOF before buffer was filled");
+        filled += n;
+    }
+
+    assert_eq!(&buf[..], want);
 }
 
 #[tokio::test]
@@ -320,10 +328,27 @@ async fn read_at_short_read_at_eof() {
     let len = HELLO.len();
 
     let mut buf = vec![0u8; len + 10]; // buffer larger than remaining data
-    let n = file.read_at(&mut buf, 0).await.unwrap();
+    let mut filled = 0;
 
-    assert_eq!(n, len, "short read at EOF must return Ok(n) with n < buf.len(), not an error");
-    assert_eq!(&buf[..n], HELLO);
+    while filled < buf.len() {
+        let n = file
+            .read_at(&mut buf[filled..], filled as u64)
+            .await
+            .unwrap();
+
+        // it's expected a short read here.
+        if n == 0 {
+            break;
+        }
+
+        filled += n;
+    }
+
+    assert_eq!(
+        filled, len,
+        "short read at EOF must return Ok(n) with n < buf.len(), not an error"
+    );
+    assert_eq!(&buf[..filled], HELLO);
 }
 
 #[tokio::test]
@@ -379,16 +404,224 @@ async fn read_at_calls_can_run_concurrently() {
 
     let mut buf_a = vec![0u8; mid];
     let mut buf_b = vec![0u8; HELLO.len() - mid];
+    let mut filled_a = 0;
+    let mut filled_b = 0;
 
-    let (ra, rb) = tokio::join!(
-        file.read_at(&mut buf_a, 0),
-        file.read_at(&mut buf_b, mid as u64),
-    );
+    while filled_a < buf_a.len() || filled_b < buf_b.len() {
+        let fut_a = async {
+            if filled_a < buf_a.len() {
+                Some(file.read_at(&mut buf_a[filled_a..], filled_a as u64).await)
+            } else {
+                None
+            }
+        };
 
-    assert_eq!(ra.unwrap(), mid);
-    assert_eq!(rb.unwrap(), HELLO.len() - mid);
+        let fut_b = async {
+            if filled_b < buf_b.len() {
+                Some(
+                    file.read_at(&mut buf_b[filled_b..], mid as u64 + filled_b as u64)
+                        .await,
+                )
+            } else {
+                None
+            }
+        };
+
+        let (ra, rb) = tokio::join!(fut_a, fut_b,);
+
+        if let Some(a) = ra {
+            let a = a.unwrap();
+            assert!(a > 0, "unexpected EOF before buffer was filled");
+            filled_a += a;
+        }
+
+        if let Some(b) = rb {
+            let b = b.unwrap();
+            assert!(b > 0, "unexpected EOF before buffer was filled");
+            filled_b += b;
+        }
+    }
+
+    assert_eq!(filled_a, mid);
+    assert_eq!(filled_b, HELLO.len() - mid);
     assert_eq!(buf_a, &HELLO[..mid]);
     assert_eq!(buf_b, &HELLO[mid..]);
+}
+
+use std::io::Write;
+#[cfg(unix)]
+use tokio::fs::OpenOptions;
+
+#[tokio::test]
+#[cfg(unix)]
+async fn write_at_overwrites_in_place_without_truncating() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let file = OpenOptions::new()
+        .write(true)
+        .open(temp_file.path())
+        .await
+        .unwrap();
+
+    let patch: &[u8] = &[0xAA, 0xBB, 0xCC];
+    let offset = 1usize;
+    assert!(
+        offset + patch.len() < HELLO.len(),
+        "test setup: patch must leave trailing bytes untouched"
+    );
+
+    let mut written = 0;
+
+    while written < patch.len() {
+        let n = file
+            .write_at(&patch[written..], offset as u64 + written as u64)
+            .await
+            .unwrap();
+        assert!(n > 0, "unexpected zero write before buffer was flushed");
+        written += n;
+    }
+
+    assert_eq!(written, patch.len());
+    let on_disk = std::fs::read(temp_file.path()).unwrap();
+    assert_eq!(
+        on_disk.len(),
+        HELLO.len(),
+        "write_at must not change file length when writing inside existing bounds"
+    );
+
+    assert_eq!(&on_disk[..offset], &HELLO[..offset]);
+    assert_eq!(&on_disk[offset..offset + patch.len()], patch);
+    assert_eq!(
+        &on_disk[offset + patch.len()..],
+        &HELLO[offset + patch.len()..]
+    );
+
+    let n = file.write_at(patch, offset as u64).await.unwrap();
+    assert_eq!(n, patch.len());
+
+    let on_disk = std::fs::read(temp_file.path()).unwrap();
+    assert_eq!(
+        on_disk.len(),
+        HELLO.len(),
+        "write_at must not change file length when writing inside existing bounds"
+    );
+    assert_eq!(&on_disk[..offset], &HELLO[..offset]);
+    assert_eq!(&on_disk[offset..offset + patch.len()], patch);
+    assert_eq!(
+        &on_disk[offset + patch.len()..],
+        &HELLO[offset + patch.len()..]
+    );
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn write_at_does_not_move_cursor() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .open(temp_file.path())
+        .await
+        .unwrap();
+
+    file.seek(SeekFrom::Start(4)).await.unwrap();
+
+    file.write_at(&[9, 9, 9], 0).await.unwrap();
+
+    let pos = file.seek(SeekFrom::Current(0)).await.unwrap();
+    assert_eq!(pos, 4, "write_at must not affect the file's cursor");
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn write_at_extends_file_and_zero_fills_gap() {
+    let temp_file = tempfile();
+
+    let file = OpenOptions::new()
+        .write(true)
+        .open(temp_file.path())
+        .await
+        .unwrap();
+
+    let data = b"end";
+    let offset = 5u64;
+    let mut written = 0;
+
+    while written < data.len() {
+        let n = file
+            .write_at(&data[written..], offset + written as u64)
+            .await
+            .unwrap();
+        assert!(n > 0, "unexpected zero write before buffer was flushed");
+        written += n;
+    }
+
+    assert_eq!(written, data.len());
+    let on_disk = std::fs::read(temp_file.path()).unwrap();
+    assert_eq!(on_disk.len(), offset as usize + data.len());
+    assert_eq!(&on_disk[..offset as usize], &[0u8; 5]);
+    assert_eq!(&on_disk[offset as usize..], data);
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn write_at_with_empty_buffer_returns_zero() {
+    let temp_file = tempfile();
+
+    let file = OpenOptions::new()
+        .write(true)
+        .open(temp_file.path())
+        .await
+        .unwrap();
+
+    let n = file.write_at(&[], 0).await.unwrap();
+    assert_eq!(n, 0);
+
+    let on_disk = std::fs::read(temp_file.path()).unwrap();
+    assert!(
+        on_disk.is_empty(),
+        "writing an empty buffer must not extend the file"
+    );
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn write_at_calls_can_run_concurrently() {
+    let temp_file = tempfile();
+
+    let file = OpenOptions::new()
+        .write(true)
+        .open(temp_file.path())
+        .await
+        .unwrap();
+
+    let expect_bytes = 4;
+    let mut filled_a = 0;
+    let mut filled_b = 0;
+
+    while filled_a < expect_bytes || filled_b < expect_bytes {
+        let buffer_a = b"AAAA";
+        let buffer_b = b"BBBB";
+
+        let (ra, rb) = tokio::join!(
+            file.write_at(&buffer_a[filled_a..], filled_a as u64),
+            file.write_at(&buffer_b[filled_b..], 4 + filled_b as u64)
+        );
+        let ra = ra.unwrap();
+        let rb = rb.unwrap();
+
+        filled_a += ra;
+        filled_b += rb;
+    }
+
+    assert_eq!(filled_a, expect_bytes);
+    assert_eq!(filled_b, expect_bytes);
+
+    let on_disk = std::fs::read(temp_file.path()).unwrap();
+    assert_eq!(&on_disk[..4], b"AAAA");
+    assert_eq!(&on_disk[4..8], b"BBBB");
 }
 
 #[tokio::test]
