@@ -107,10 +107,13 @@ unsafe extern "system" fn handler(ty: u32) -> BOOL {
         _ => return 0,
     };
 
-    // Note that `OnceLock::get` does not handle the small window between invoking
+    // Note that `OnceLock::get` does not handle the small window between calling
     // `SetConsoleCtrlHandler` and `REGISTRY` being initialized.
-    // SAFETY: `handler` is only invoked if `SetConsoleCtrlHandler` succeded.
-    let registry = unsafe { REGISTRY.wait().as_ref().unwrap_unchecked() };
+    let Ok(registry) = REGISTRY.wait().as_ref() else {
+        // Technically unreachable since `handler` is only called if
+        // `SetConsoleCtrlHandler` succeded.
+        return 0;
+    };
 
     // According to https://learn.microsoft.com/en-us/windows/console/handlerroutine
     // the handler routine is always invoked in a new thread, thus we don't
