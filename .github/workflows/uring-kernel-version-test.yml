@@ -82,7 +82,8 @@ jobs:
           mkdir -p /tmp && mount -t tmpfs -o mode=1777 tmpfs /tmp
           for f in /bin/tests/*; do RUST_BACKTRACE=1 "$f" ; done
           EOF
-          chmod +x initramfs/init
+          ch
+          +x initramfs/init
 
           # Pack into a CPIO archive
           (cd initramfs && find . -print0 \
