@@ -647,6 +647,57 @@ impl File {
         
         Ok(n)
     }
+
+    /// Writes a number of bytes starting from a given offset.
+    ///
+    /// Returns the number of bytes written.
+    ///
+    /// The offset is independent from the current cursor. The current
+    /// file cursor is not affected by this function.
+    ///
+    /// When writing beyond the end of the file, the file is appropriately
+    /// extended and the intermediate bytes are initialized with the value 0.
+    ///
+    /// This corresponds to the [`write_at`] method on
+    /// [`std::os::unix::fs::FileExt`].
+    ///
+    /// [`write_at`]: std::os::unix::fs::FileExt::write_at
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if called from outside of the
+    /// Tokio runtime or if the underlying `pwrite` call results in an error.
+    ///
+    /// # Bugs
+    ///
+    /// On some systems, `write_at` uses `pwrite64`, which has a bug where
+    /// files opened with `.append(true)` ignore the given offset and always
+    /// write at the end of the file.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::create("foo.txt").await?;
+    ///
+    /// let n = file.write_at(b"some bytes", 0).await?;
+    ///
+    /// println!("wrote {} bytes", n);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    pub async fn write_at(&self, buf: &[u8], offset: u64) -> Result<usize, io::Error> {
+        use std::os::unix::fs::FileExt;
+        
+        let file = Arc::clone(&self.std);
+        let buf = buf.to_vec();
+        
+        asyncify(move || file.write_at(&buf, offset)).await
+    }
 }
 
 impl AsyncRead for File {

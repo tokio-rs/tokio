@@ -391,6 +391,140 @@ async fn read_at_calls_can_run_concurrently() {
     assert_eq!(buf_b, &HELLO[mid..]);
 }
 
+use std::io::Write;
+use tokio::fs::OpenOptions;
+
+#[tokio::test]
+#[cfg(unix)]
+async fn write_at_overwrites_in_place_without_truncating() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let file = OpenOptions::new()
+        .write(true)
+        .open(temp_file.path())
+        .await
+        .unwrap();
+
+    let patch: &[u8] = &[0xAA, 0xBB, 0xCC];
+    let offset = 1usize;
+    assert!(
+        offset + patch.len() < HELLO.len(),
+        "test setup: patch must leave trailing bytes untouched"
+    );
+
+    let n = file.write_at(patch, offset as u64).await.unwrap();
+    assert_eq!(n, patch.len());
+
+    let on_disk = std::fs::read(temp_file.path()).unwrap();
+    assert_eq!(on_disk.len(), HELLO.len(), "write_at must not change file length when writing inside existing bounds");
+    assert_eq!(&on_disk[..offset], &HELLO[..offset]);
+    assert_eq!(&on_disk[offset..offset + patch.len()], patch);
+    assert_eq!(&on_disk[offset + patch.len()..], &HELLO[offset + patch.len()..]);
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn write_at_does_not_move_cursor() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .open(temp_file.path())
+        .await
+        .unwrap();
+
+    file.seek(SeekFrom::Start(4)).await.unwrap();
+
+    file.write_at(&[9, 9, 9], 0).await.unwrap();
+
+    let pos = file.seek(SeekFrom::Current(0)).await.unwrap();
+    assert_eq!(pos, 4, "write_at must not affect the file's cursor");
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn write_at_extends_file_and_zero_fills_gap() {
+    let temp_file = tempfile(); // empty file, no prior content
+
+    let file = OpenOptions::new()
+        .write(true)
+        .open(temp_file.path())
+        .await
+        .unwrap();
+
+    let data = b"end";
+    let offset = 5u64;
+    let n = file.write_at(data, offset).await.unwrap();
+    assert_eq!(n, data.len());
+
+    let on_disk = std::fs::read(temp_file.path()).unwrap();
+    assert_eq!(on_disk.len(), offset as usize + data.len());
+    assert_eq!(&on_disk[..offset as usize], &[0u8; 5]);
+    assert_eq!(&on_disk[offset as usize..], data);
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn write_at_with_empty_buffer_returns_zero() {
+    let temp_file = tempfile();
+
+    let file = OpenOptions::new()
+        .write(true)
+        .open(temp_file.path())
+        .await
+        .unwrap();
+
+    let n = file.write_at(&[], 0).await.unwrap();
+    assert_eq!(n, 0);
+
+    let on_disk = std::fs::read(temp_file.path()).unwrap();
+    assert!(on_disk.is_empty(), "writing an empty buffer must not extend the file");
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn write_at_calls_can_run_concurrently() {
+    let temp_file = tempfile();
+
+    let file = OpenOptions::new()
+        .write(true)
+        .open(temp_file.path())
+        .await
+        .unwrap();
+
+    let (ra, rb) = tokio::join!(
+        file.write_at(b"AAAA", 0),
+        file.write_at(b"BBBB", 4),
+    );
+
+    assert_eq!(ra.unwrap(), 4);
+    assert_eq!(rb.unwrap(), 4);
+
+    let on_disk = std::fs::read(temp_file.path()).unwrap();
+    assert_eq!(&on_disk[..4], b"AAAA");
+    assert_eq!(&on_disk[4..8], b"BBBB");
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn write_at_with_append_mode_ignores_offset() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let file = OpenOptions::new()
+        .append(true)
+        .open(temp_file.path())
+        .await
+        .unwrap();
+
+    file.write_at(b"X", 0).await.unwrap();
+
+    let on_disk = std::fs::read(temp_file.path()).unwrap();
+    assert_eq!(&on_disk[HELLO.len()..], b"X");
+}
+
 #[tokio::test]
 #[cfg(windows)]
 async fn windows_handle() {
