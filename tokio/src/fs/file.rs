@@ -7,7 +7,7 @@ use crate::io::blocking::{Buf, DEFAULT_MAX_BUF_SIZE};
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
 
-use std::cmp;
+use std::{cmp, vec};
 use std::fmt;
 use std::fs::{Metadata, Permissions};
 use std::future::Future;
@@ -590,6 +590,62 @@ impl File {
     /// Get the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.
     pub fn max_buf_size(&self) -> usize {
         self.max_buf_size
+    }
+
+    /// Reads a number of bytes starting from a given offset.
+    ///
+    /// Returns the number of bytes read.
+    ///
+    /// The offset is independent from the current cursor. The current
+    /// file cursor is not affected by this function.
+    ///
+    /// This corresponds to the [`read_at`] method on
+    /// [`std::os::unix::fs::FileExt`].
+    ///
+    /// Note that similar to [`File::read`], it is not an error to return with
+    /// a short read.
+    ///
+    /// [`read_at`]: std::os::unix::fs::FileExt::read_at
+    /// [`File::read`]: fn@crate::io::AsyncReadExt::read
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if called from outside of the
+    /// Tokio runtime or if the underlying `pread` call results in an error.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.txt").await?;
+    ///
+    /// let mut buf = [0; 10];
+    /// let n = file.read_at(&mut buf, 0).await?;
+    ///
+    /// println!("The bytes: {:?}", &buf[..n]);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    pub async fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize, io::Error> {
+        use std::os::unix::fs::FileExt;
+        
+        let file = Arc::clone(&self.std);
+        let buf_len = buf.len();
+        
+        let (n, tmp) = asyncify(move || {
+            let mut tmp: Vec<u8> = vec![0; buf_len];
+            let n = file.read_at(&mut tmp, offset)?;
+            
+             Ok::<_, io::Error>((n, tmp))
+        }).await?;
+
+        buf[..n].copy_from_slice(&tmp[..n]);
+        
+        Ok(n)
     }
 }
 

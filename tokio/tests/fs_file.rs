@@ -279,6 +279,119 @@ async fn read_file_from_unix_fd() {
 }
 
 #[tokio::test]
+#[cfg(unix)]
+async fn read_at_reads_correct_bytes_at_offset() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let file = File::open(temp_file.path()).await.unwrap();
+
+    let offset = 1;
+    let mut buf = [0u8; 4];
+    let n = file.read_at(&mut buf, offset).await.unwrap();
+
+    assert_eq!(n, buf.len());
+    assert_eq!(&buf[..n], &HELLO[offset as usize..offset as usize + n]);
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn read_at_does_not_move_the_cursor() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let mut file = File::open(temp_file.path()).await.unwrap();
+    file.seek(SeekFrom::Start(3)).await.unwrap();
+
+    let mut buf = [0u8; 2];
+    file.read_at(&mut buf, 0).await.unwrap();
+
+    let pos = file.seek(SeekFrom::Current(0)).await.unwrap();
+    assert_eq!(pos, 3, "read_at must not affect the file's cursor");
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn read_at_short_read_at_eof() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let file = File::open(temp_file.path()).await.unwrap();
+    let len = HELLO.len();
+
+    let mut buf = vec![0u8; len + 10]; // buffer larger than remaining data
+    let n = file.read_at(&mut buf, 0).await.unwrap();
+
+    assert_eq!(n, len, "short read at EOF must return Ok(n) with n < buf.len(), not an error");
+    assert_eq!(&buf[..n], HELLO);
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn read_at_offset_at_eof_returns_zero() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let file = File::open(temp_file.path()).await.unwrap();
+    let mut buf = [0u8; 4];
+    let n = file.read_at(&mut buf, HELLO.len() as u64).await.unwrap();
+
+    assert_eq!(n, 0);
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn read_at_offset_past_eof_returns_zero() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let file = File::open(temp_file.path()).await.unwrap();
+    let mut buf = [0u8; 4];
+    let n = file
+        .read_at(&mut buf, HELLO.len() as u64 + 100)
+        .await
+        .unwrap();
+
+    assert_eq!(n, 0, "pread(2) past EOF returns 0, not an error");
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn read_at_with_empty_buffer_returns_zero() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let file = File::open(temp_file.path()).await.unwrap();
+    let mut buf: [u8; 0] = [];
+    let n = file.read_at(&mut buf, 0).await.unwrap();
+
+    assert_eq!(n, 0);
+}
+
+#[tokio::test]
+#[cfg(unix)]
+async fn read_at_calls_can_run_concurrently() {
+    let mut temp_file = tempfile();
+    temp_file.write_all(HELLO).unwrap();
+
+    let file = File::open(temp_file.path()).await.unwrap();
+    let mid = HELLO.len() / 2;
+
+    let mut buf_a = vec![0u8; mid];
+    let mut buf_b = vec![0u8; HELLO.len() - mid];
+
+    let (ra, rb) = tokio::join!(
+        file.read_at(&mut buf_a, 0),
+        file.read_at(&mut buf_b, mid as u64),
+    );
+
+    assert_eq!(ra.unwrap(), mid);
+    assert_eq!(rb.unwrap(), HELLO.len() - mid);
+    assert_eq!(buf_a, &HELLO[..mid]);
+    assert_eq!(buf_b, &HELLO[mid..]);
+}
+
+#[tokio::test]
 #[cfg(windows)]
 async fn windows_handle() {
     use std::os::windows::io::AsRawHandle;
