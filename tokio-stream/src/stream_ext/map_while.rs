@@ -73,10 +73,9 @@ where
     }
 }
 
-impl<St, F, T> FusedStream for MapWhile<St, F>
+impl<St, F> FusedStream for MapWhile<St, F>
 where
-    St: Stream,
-    F: FnMut(St::Item) -> Option<T>,
+    Self: Stream,
 {
     fn is_terminated(&self) -> bool {
         self.done
