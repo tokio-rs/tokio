@@ -2,7 +2,6 @@
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
 
 use futures::future::FutureExt;
-use std::io::prelude::*;
 use std::io::IoSlice;
 use tempfile::NamedTempFile;
 use tokio::fs::File;
@@ -322,7 +321,10 @@ async fn read_at_short_read_at_eof() {
     let mut buf = vec![0u8; len + 10]; // buffer larger than remaining data
     let n = file.read_at(&mut buf, 0).await.unwrap();
 
-    assert_eq!(n, len, "short read at EOF must return Ok(n) with n < buf.len(), not an error");
+    assert_eq!(
+        n, len,
+        "short read at EOF must return Ok(n) with n < buf.len(), not an error"
+    );
     assert_eq!(&buf[..n], HELLO);
 }
 
@@ -417,10 +419,17 @@ async fn write_at_overwrites_in_place_without_truncating() {
     assert_eq!(n, patch.len());
 
     let on_disk = std::fs::read(temp_file.path()).unwrap();
-    assert_eq!(on_disk.len(), HELLO.len(), "write_at must not change file length when writing inside existing bounds");
+    assert_eq!(
+        on_disk.len(),
+        HELLO.len(),
+        "write_at must not change file length when writing inside existing bounds"
+    );
     assert_eq!(&on_disk[..offset], &HELLO[..offset]);
     assert_eq!(&on_disk[offset..offset + patch.len()], patch);
-    assert_eq!(&on_disk[offset + patch.len()..], &HELLO[offset + patch.len()..]);
+    assert_eq!(
+        &on_disk[offset + patch.len()..],
+        &HELLO[offset + patch.len()..]
+    );
 }
 
 #[tokio::test]
@@ -480,7 +489,10 @@ async fn write_at_with_empty_buffer_returns_zero() {
     assert_eq!(n, 0);
 
     let on_disk = std::fs::read(temp_file.path()).unwrap();
-    assert!(on_disk.is_empty(), "writing an empty buffer must not extend the file");
+    assert!(
+        on_disk.is_empty(),
+        "writing an empty buffer must not extend the file"
+    );
 }
 
 #[tokio::test]
@@ -494,10 +506,7 @@ async fn write_at_calls_can_run_concurrently() {
         .await
         .unwrap();
 
-    let (ra, rb) = tokio::join!(
-        file.write_at(b"AAAA", 0),
-        file.write_at(b"BBBB", 4),
-    );
+    let (ra, rb) = tokio::join!(file.write_at(b"AAAA", 0), file.write_at(b"BBBB", 4),);
 
     assert_eq!(ra.unwrap(), 4);
     assert_eq!(rb.unwrap(), 4);

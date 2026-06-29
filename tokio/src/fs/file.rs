@@ -7,7 +7,6 @@ use crate::io::blocking::{Buf, DEFAULT_MAX_BUF_SIZE};
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
 
-use std::{cmp, vec};
 use std::fmt;
 use std::fs::{Metadata, Permissions};
 use std::future::Future;
@@ -16,6 +15,7 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{ready, Context, Poll};
+use std::{cmp, vec};
 
 #[cfg(test)]
 use super::mocks::JoinHandle;
@@ -632,19 +632,20 @@ impl File {
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub async fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize, io::Error> {
         use std::os::unix::fs::FileExt;
-        
+
         let file = Arc::clone(&self.std);
         let buf_len = buf.len();
-        
+
         let (n, tmp) = asyncify(move || {
             let mut tmp: Vec<u8> = vec![0; buf_len];
             let n = file.read_at(&mut tmp, offset)?;
-            
-             Ok::<_, io::Error>((n, tmp))
-        }).await?;
+
+            Ok::<_, io::Error>((n, tmp))
+        })
+        .await?;
 
         buf[..n].copy_from_slice(&tmp[..n]);
-        
+
         Ok(n)
     }
 
@@ -692,10 +693,10 @@ impl File {
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub async fn write_at(&self, buf: &[u8], offset: u64) -> Result<usize, io::Error> {
         use std::os::unix::fs::FileExt;
-        
+
         let file = Arc::clone(&self.std);
         let buf = buf.to_vec();
-        
+
         asyncify(move || file.write_at(&buf, offset)).await
     }
 }
