@@ -332,7 +332,7 @@ async fn read_at_short_read_at_eof() {
 
     while filled < buf.len() {
         let n = file
-            .read_at(&mut buf[filled..], 0 + filled as u64)
+            .read_at(&mut buf[filled..], filled as u64)
             .await
             .unwrap();
 
@@ -409,7 +409,7 @@ async fn read_at_calls_can_run_concurrently() {
 
     while filled_a < buf_a.len() || filled_b < buf_b.len() {
         let (ra, rb) = tokio::join!(
-            file.read_at(&mut buf_a[filled_a..], 0 + filled_a as u64),
+            file.read_at(&mut buf_a[filled_a..], filled_a as u64),
             file.read_at(&mut buf_b[filled_b..], mid as u64),
         );
 
@@ -552,7 +552,7 @@ async fn write_at_calls_can_run_concurrently() {
         let buffer_b = b"BBBB";
 
         let (ra, rb) = tokio::join!(
-            file.write_at(&buffer_a[filled_a..], 0 + filled_a as u64),
+            file.write_at(&buffer_a[filled_a..], filled_a as u64),
             file.write_at(&buffer_b[filled_b..], 4 + filled_b as u64)
         );
         let ra = ra.unwrap();
