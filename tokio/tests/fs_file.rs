@@ -285,12 +285,21 @@ async fn read_at_reads_correct_bytes_at_offset() {
 
     let file = File::open(temp_file.path()).await.unwrap();
 
-    let offset = 1;
-    let mut buf = [0u8; 4];
-    let n = file.read_at(&mut buf, offset).await.unwrap();
+    let offset = 1u64;
+    let want = &HELLO[offset as usize..offset as usize + 4];
+    let mut buf = vec![0u8; want.len()];
+    let mut filled = 0;
 
-    assert_eq!(n, buf.len());
-    assert_eq!(&buf[..n], &HELLO[offset as usize..offset as usize + n]);
+    while filled < buf.len() {
+        let n = file
+            .read_at(&mut buf[filled..], offset + filled as u64)
+            .await
+            .unwrap();
+        assert!(n > 0, "unexpected EOF before buffer was filled");
+        filled += n;
+    }
+
+    assert_eq!(&buf[..], want);
 }
 
 #[tokio::test]
@@ -319,13 +328,27 @@ async fn read_at_short_read_at_eof() {
     let len = HELLO.len();
 
     let mut buf = vec![0u8; len + 10]; // buffer larger than remaining data
-    let n = file.read_at(&mut buf, 0).await.unwrap();
+    let mut filled = 0;
+
+    while filled < buf.len() {
+        let n = file
+            .read_at(&mut buf[filled..], 0 + filled as u64)
+            .await
+            .unwrap();
+
+        // it's expected a short read here.
+        if n == 0 {
+            break;
+        }
+
+        filled += n;
+    }
 
     assert_eq!(
-        n, len,
+        filled, len,
         "short read at EOF must return Ok(n) with n < buf.len(), not an error"
     );
-    assert_eq!(&buf[..n], HELLO);
+    assert_eq!(&buf[..filled], HELLO);
 }
 
 #[tokio::test]
@@ -381,14 +404,27 @@ async fn read_at_calls_can_run_concurrently() {
 
     let mut buf_a = vec![0u8; mid];
     let mut buf_b = vec![0u8; HELLO.len() - mid];
+    let mut filled_a = 0;
+    let mut filled_b = 0;
 
-    let (ra, rb) = tokio::join!(
-        file.read_at(&mut buf_a, 0),
-        file.read_at(&mut buf_b, mid as u64),
-    );
+    while filled_a < buf_a.len() || filled_b < buf_b.len() {
+        let (ra, rb) = tokio::join!(
+            file.read_at(&mut buf_a[filled_a..], 0 + filled_a as u64),
+            file.read_at(&mut buf_b[filled_b..], mid as u64),
+        );
 
-    assert_eq!(ra.unwrap(), mid);
-    assert_eq!(rb.unwrap(), HELLO.len() - mid);
+        let ra = ra.unwrap();
+        let rb = rb.unwrap();
+
+        assert!(ra > 0, "unexpected EOF before buffer was filled");
+        assert!(rb > 0, "unexpected EOF before buffer was filled");
+
+        filled_a += ra;
+        filled_b += rb;
+    }
+
+    assert_eq!(filled_a, mid);
+    assert_eq!(filled_b, HELLO.len() - mid);
     assert_eq!(buf_a, &HELLO[..mid]);
     assert_eq!(buf_b, &HELLO[mid..]);
 }
@@ -507,10 +543,27 @@ async fn write_at_calls_can_run_concurrently() {
         .await
         .unwrap();
 
-    let (ra, rb) = tokio::join!(file.write_at(b"AAAA", 0), file.write_at(b"BBBB", 4),);
+    let expect_bytes = 4;
+    let mut filled_a = 0;
+    let mut filled_b = 0;
 
-    assert_eq!(ra.unwrap(), 4);
-    assert_eq!(rb.unwrap(), 4);
+    while filled_a < expect_bytes || filled_b < expect_bytes {
+        let buffer_a = b"AAAA";
+        let buffer_b = b"BBBB";
+
+        let (ra, rb) = tokio::join!(
+            file.write_at(&buffer_a[filled_a..], 0 + filled_a as u64),
+            file.write_at(&buffer_b[filled_b..], 4 + filled_b as u64)
+        );
+        let ra = ra.unwrap();
+        let rb = rb.unwrap();
+
+        filled_a += ra;
+        filled_b += rb;
+    }
+
+    assert_eq!(filled_a, expect_bytes);
+    assert_eq!(filled_b, expect_bytes);
 
     let on_disk = std::fs::read(temp_file.path()).unwrap();
     assert_eq!(&on_disk[..4], b"AAAA");
