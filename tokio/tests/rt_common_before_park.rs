@@ -114,27 +114,25 @@ fn before_park_does_not_stall_spawned_timer() {
     rt.spawn({
         let task_done = task_done.clone();
         async move {
-            tokio::time::sleep(Duration::from_millis(50)).await;
+            tokio::time::sleep(Duration::from_millis(1)).await;
             task_done.store(true, Ordering::SeqCst);
         }
     });
 
-    // Let the spawned task register its timer before we start driving.
-    std::thread::sleep(Duration::from_millis(10));
+    // A current-thread runtime only runs tasks while inside `block_on`, so drive it
+    // once to let the spawned task register its timer.
+    rt.block_on(tokio::task::yield_now());
 
-    // Drive the runtime in short bursts, the way an external event loop would.
-    for _ in 0..60 {
+    // Drive the runtime in short bursts, the way an external event loop would. Each
+    // burst parks via `on_thread_park` (which wakes the `block_on` future); the fix
+    // keeps polling the driver so the spawned timer still fires. A regression stalls
+    // the timer, failing the assert below instead of hanging.
+    for _ in 0..100 {
         if task_done.load(Ordering::SeqCst) {
             break;
         }
-        rt.block_on(async {
-            let notify = notify.clone();
-            tokio::select! {
-                _ = notify.notified() => {}
-                _ = tokio::time::sleep(Duration::from_millis(500)) => {}
-            }
-        });
-        std::thread::sleep(Duration::from_millis(10));
+        rt.block_on(notify.notified());
+        std::thread::sleep(Duration::from_millis(1));
     }
 
     assert!(
