@@ -394,6 +394,7 @@ async fn read_at_calls_can_run_concurrently() {
 }
 
 use std::io::Write;
+#[cfg(unix)]
 use tokio::fs::OpenOptions;
 
 #[tokio::test]

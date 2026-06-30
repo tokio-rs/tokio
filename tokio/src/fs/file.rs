@@ -7,6 +7,7 @@ use crate::io::blocking::{Buf, DEFAULT_MAX_BUF_SIZE};
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
 
+use std::cmp;
 use std::fmt;
 use std::fs::{Metadata, Permissions};
 use std::future::Future;
@@ -15,7 +16,8 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{ready, Context, Poll};
-use std::{cmp, vec};
+#[cfg(unix)]
+use std::vec;
 
 #[cfg(test)]
 use super::mocks::JoinHandle;
