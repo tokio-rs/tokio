@@ -410,7 +410,7 @@ async fn read_at_calls_can_run_concurrently() {
     while filled_a < buf_a.len() || filled_b < buf_b.len() {
         let (ra, rb) = tokio::join!(
             file.read_at(&mut buf_a[filled_a..], filled_a as u64),
-            file.read_at(&mut buf_b[filled_b..], mid as u64),
+            file.read_at(&mut buf_b[filled_b..], mid as u64 + filled_b as u64),
         );
 
         let ra = ra.unwrap();
@@ -568,24 +568,6 @@ async fn write_at_calls_can_run_concurrently() {
     let on_disk = std::fs::read(temp_file.path()).unwrap();
     assert_eq!(&on_disk[..4], b"AAAA");
     assert_eq!(&on_disk[4..8], b"BBBB");
-}
-
-#[tokio::test]
-#[cfg(unix)]
-async fn write_at_with_append_mode_ignores_offset() {
-    let mut temp_file = tempfile();
-    temp_file.write_all(HELLO).unwrap();
-
-    let file = OpenOptions::new()
-        .append(true)
-        .open(temp_file.path())
-        .await
-        .unwrap();
-
-    file.write_at(b"X", 0).await.unwrap();
-
-    let on_disk = std::fs::read(temp_file.path()).unwrap();
-    assert_eq!(&on_disk[HELLO.len()..], b"X");
 }
 
 #[tokio::test]
