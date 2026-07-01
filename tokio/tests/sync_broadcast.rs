@@ -720,3 +720,240 @@ async fn broadcast_sender_new_must_be_closed() {
     let mut task2 = task::spawn(tx.closed());
     assert_pending!(task2.poll());
 }
+
+// --- Lagging semantics -------------------------------------------------------
+//
+// Capacity is rounded up to the next power of two. That buffer length is the
+// maximum number of messages retained; exceeding it overwrites the oldest
+// message and causes RecvError::Lagged / TryRecvError::Lagged on the slow
+// receiver. After Lagged, the cursor points at the oldest retained message.
+
+/// A slow receiver that stays within the ring buffer receives every message
+/// in order; lagging only begins once the buffer wraps past the receiver.
+#[test]
+fn slow_receiver_within_capacity_does_not_lag() {
+    // capacity 2 → buffer length 2
+    let (tx, mut slow) = broadcast::channel(2);
+    let mut fast = tx.subscribe();
+
+    assert_ok!(tx.send(1));
+    assert_ok!(tx.send(2));
+
+    // Fast keeps up; slow has not read yet but both messages are still retained.
+    assert_eq!(assert_recv!(fast), 1);
+    assert_eq!(assert_recv!(fast), 2);
+    assert_empty!(fast);
+
+    assert_eq!(assert_recv!(slow), 1);
+    assert_eq!(assert_recv!(slow), 2);
+    assert_empty!(slow);
+}
+
+/// When sends overwrite the oldest retained values, the slow receiver sees
+/// Lagged(n) with the correct miss count, then resumes from the oldest
+/// retained message in send order.
+#[test]
+fn capacity_overflow_reports_lagged_then_oldest_retained() {
+    // capacity 2 → buffer length 2; third send overwrites the first.
+    let (tx, mut rx) = broadcast::channel(2);
+
+    assert_ok!(tx.send(10));
+    assert_ok!(tx.send(20));
+    assert_ok!(tx.send(30));
+
+    assert_lagged!(rx.try_recv(), 1);
+    // After Lagged, cursor is at oldest retained (20).
+    assert_eq!(assert_recv!(rx), 20);
+    assert_eq!(assert_recv!(rx), 30);
+    assert_empty!(rx);
+}
+
+/// Lagged(n) counts every overwritten message since the receiver's previous
+/// cursor, not merely "at least one".
+#[test]
+fn lagged_count_matches_number_of_overwritten_messages() {
+    // capacity 4 → buffer length 4
+    let (tx, mut rx) = broadcast::channel(4);
+
+    for i in 1..=4 {
+        assert_ok!(tx.send(i));
+    }
+    // Still within capacity: no lag.
+    assert_eq!(assert_recv!(rx), 1);
+
+    // Send four more without reading: overwrites 2, 3, 4, and then the slot
+    // that held 1 (already consumed). Receiver still owed 2,3,4 — all gone —
+    // so it missed 3 messages; oldest retained is 5.
+    for i in 5..=8 {
+        assert_ok!(tx.send(i));
+    }
+
+    assert_lagged!(rx.try_recv(), 3);
+    assert_eq!(assert_recv!(rx), 5);
+    assert_eq!(assert_recv!(rx), 6);
+    assert_eq!(assert_recv!(rx), 7);
+    assert_eq!(assert_recv!(rx), 8);
+    assert_empty!(rx);
+}
+
+/// Non-power-of-two capacity is rounded up; lag detection uses the rounded
+/// buffer length (e.g. capacity 3 → buffer 4).
+#[test]
+fn lag_uses_power_of_two_buffer_length() {
+    // capacity 3 → buffer length 4
+    let (tx, mut rx) = broadcast::channel(3);
+
+    for i in 1..=4 {
+        assert_ok!(tx.send(i));
+    }
+    // Four messages fit in the rounded buffer; no lag yet.
+    assert_eq!(rx.len(), 4);
+    assert_eq!(assert_recv!(rx), 1);
+
+    // After reading 1, next points at 2. Buffer holds 2,3,4,5 — still no lag.
+    assert_ok!(tx.send(5));
+    assert_eq!(rx.len(), 4);
+
+    // Overwrites 2; receiver still wants 2 → Lagged(1), resume at 3.
+    assert_ok!(tx.send(6));
+    assert_eq!(rx.len(), 5);
+    assert_lagged!(rx.try_recv(), 1);
+    assert_eq!(assert_recv!(rx), 3);
+    assert_eq!(assert_recv!(rx), 4);
+    assert_eq!(assert_recv!(rx), 5);
+    assert_eq!(assert_recv!(rx), 6);
+    assert_empty!(rx);
+}
+
+/// Async `recv` reports the same Lagged semantics as `try_recv`.
+#[tokio::test]
+async fn async_recv_lagged_then_resumes_from_oldest_retained() {
+    use broadcast::error::RecvError;
+
+    let (tx, mut rx) = broadcast::channel(2);
+
+    assert_ok!(tx.send(10));
+    assert_ok!(tx.send(20));
+    assert_ok!(tx.send(30));
+
+    assert!(matches!(rx.recv().await, Err(RecvError::Lagged(1))));
+    assert_eq!(rx.recv().await.unwrap(), 20);
+    assert_eq!(rx.recv().await.unwrap(), 30);
+}
+
+/// A receiver that lags, catches up, then lags again reports a fresh miss
+/// count based on the new gap only.
+#[test]
+fn lag_catch_up_then_lag_again() {
+    let (tx, mut rx) = broadcast::channel(2);
+
+    assert_ok!(tx.send(1));
+    assert_ok!(tx.send(2));
+    assert_ok!(tx.send(3));
+
+    assert_lagged!(rx.try_recv(), 1);
+    assert_eq!(assert_recv!(rx), 2);
+    assert_eq!(assert_recv!(rx), 3);
+    assert_empty!(rx);
+
+    // Fully caught up; another overflow lags again from a clean cursor.
+    assert_ok!(tx.send(4));
+    assert_ok!(tx.send(5));
+    assert_ok!(tx.send(6));
+
+    assert_lagged!(rx.try_recv(), 1);
+    assert_eq!(assert_recv!(rx), 5);
+    assert_eq!(assert_recv!(rx), 6);
+    assert_empty!(rx);
+}
+
+/// Only the slow receiver lags; a caught-up receiver is unaffected.
+#[test]
+fn lag_is_per_receiver() {
+    let (tx, mut slow) = broadcast::channel(2);
+    let mut fast = tx.subscribe();
+
+    assert_ok!(tx.send(1));
+    assert_ok!(tx.send(2));
+
+    assert_eq!(assert_recv!(fast), 1);
+    assert_eq!(assert_recv!(fast), 2);
+
+    assert_ok!(tx.send(3));
+    assert_ok!(tx.send(4));
+    // Fast has read through 2; buffer holds 3,4 — no lag.
+    assert_eq!(assert_recv!(fast), 3);
+    assert_eq!(assert_recv!(fast), 4);
+
+    // Slow never read; 1 and 2 were overwritten → Lagged(2), oldest is 3.
+    assert_lagged!(slow.try_recv(), 2);
+    assert_eq!(assert_recv!(slow), 3);
+    assert_eq!(assert_recv!(slow), 4);
+    assert_empty!(slow);
+    assert_empty!(fast);
+}
+
+/// If the receiver lags and more messages are sent before it reads the
+/// Lagged error's "resume" position, a second Lagged reflects the additional
+/// overwrites since the cursor was advanced.
+#[test]
+fn lag_again_before_reading_retained_messages() {
+    let (tx, mut rx) = broadcast::channel(2);
+
+    assert_ok!(tx.send(1));
+    assert_ok!(tx.send(2));
+    assert_ok!(tx.send(3));
+
+    // First lag: miss 1, cursor advances to oldest retained (value 2).
+    assert_lagged!(rx.try_recv(), 1);
+
+    // Before reading 2/3, send enough to overwrite them (and one more).
+    assert_ok!(tx.send(4));
+    assert_ok!(tx.send(5));
+    assert_ok!(tx.send(6));
+
+    // Cursor was at value 2; values 2, 3, and 4 are gone; oldest retained is 5.
+    assert_lagged!(rx.try_recv(), 3);
+    assert_eq!(assert_recv!(rx), 5);
+    assert_eq!(assert_recv!(rx), 6);
+    assert_empty!(rx);
+}
+
+/// With capacity 1 (buffer length 1), every send after the first unread one
+/// causes a lag of exactly one when the receiver finally reads.
+#[test]
+fn single_slot_capacity_lag_semantics() {
+    let (tx, mut rx) = broadcast::channel(1);
+
+    assert_ok!(tx.send(1));
+    assert_eq!(assert_recv!(rx), 1);
+
+    assert_ok!(tx.send(2));
+    assert_ok!(tx.send(3));
+
+    assert_lagged!(rx.try_recv(), 1);
+    assert_eq!(assert_recv!(rx), 3);
+    assert_empty!(rx);
+}
+
+/// `len` after lagging still counts from the old cursor until Lagged is
+/// observed and the cursor advances; then `len` reflects retained messages.
+#[test]
+fn receiver_len_after_lag_error_advances_cursor() {
+    let (tx, mut rx) = broadcast::channel(2);
+
+    assert_ok!(tx.send(1));
+    assert_ok!(tx.send(2));
+    assert_ok!(tx.send(3));
+    assert_ok!(tx.send(4));
+
+    // Missed 1 and 2; buffer holds 3,4. len counts from old cursor.
+    assert_eq!(rx.len(), 4);
+    assert_lagged!(rx.try_recv(), 2);
+    // Cursor now at oldest retained (3); two messages remain.
+    assert_eq!(rx.len(), 2);
+    assert_eq!(assert_recv!(rx), 3);
+    assert_eq!(rx.len(), 1);
+    assert_eq!(assert_recv!(rx), 4);
+    assert_eq!(rx.len(), 0);
+}
