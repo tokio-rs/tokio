@@ -100,6 +100,22 @@ impl Encoder<&[u8]> for ByteCodec {
     }
 }
 
+struct ErrorOnBadDatagramCodec;
+
+impl Decoder for ErrorOnBadDatagramCodec {
+    type Item = Vec<u8>;
+    type Error = io::Error;
+
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Vec<u8>>, io::Error> {
+        if buf == b"bad".as_slice() {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "bad datagram"));
+        }
+
+        let len = buf.len();
+        Ok(Some(buf.split_to(len).to_vec()))
+    }
+}
+
 #[tokio::test]
 async fn send_framed_lines_codec() -> std::io::Result<()> {
     let a_soc = UdpSocket::bind("127.0.0.1:0").await?;
@@ -117,6 +133,29 @@ async fn send_framed_lines_codec() -> std::io::Result<()> {
     assert_eq!(b.next().await.unwrap().unwrap(), ("1".to_string(), a_addr));
     assert_eq!(b.next().await.unwrap().unwrap(), ("2".to_string(), a_addr));
     assert_eq!(b.next().await.unwrap().unwrap(), ("3".to_string(), a_addr));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn recovers_after_decode_error() -> std::io::Result<()> {
+    let a_soc = UdpSocket::bind("127.0.0.1:0").await?;
+    let b_soc = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let a_addr = a_soc.local_addr()?;
+    let b_addr = b_soc.local_addr()?;
+
+    let mut a = UdpFramed::new(a_soc, ByteCodec);
+    let mut b = UdpFramed::new(b_soc, ErrorOnBadDatagramCodec);
+
+    a.send((b"bad".as_slice(), b_addr)).await?;
+
+    let err = b.next().await.unwrap().unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+
+    a.send((b"good".as_slice(), b_addr)).await?;
+
+    assert_eq!(b.next().await.unwrap().unwrap(), (b"good".to_vec(), a_addr));
 
     Ok(())
 }

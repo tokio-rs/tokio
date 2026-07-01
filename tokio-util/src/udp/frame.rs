@@ -66,12 +66,21 @@ where
         loop {
             // Are there still bytes left in the read buffer to decode?
             if pin.is_readable {
-                if let Some(frame) = pin.codec.decode_eof(&mut pin.rd)? {
-                    let current_addr = pin
-                        .current_addr
-                        .expect("will always be set before this line is called");
+                match pin.codec.decode_eof(&mut pin.rd) {
+                    Ok(Some(frame)) => {
+                        let current_addr = pin
+                            .current_addr
+                            .expect("will always be set before this line is called");
 
-                    return Poll::Ready(Some(Ok((frame, current_addr))));
+                        return Poll::Ready(Some(Ok((frame, current_addr))));
+                    }
+                    Ok(None) => {}
+                    Err(err) => {
+                        pin.is_readable = false;
+                        pin.rd.clear();
+                        pin.current_addr = None;
+                        return Poll::Ready(Some(Err(err)));
+                    }
                 }
 
                 // if this line has been reached then decode has returned `None`.
