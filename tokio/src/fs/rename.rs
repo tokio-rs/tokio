@@ -29,7 +29,7 @@ pub async fn rename(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<
 
         type RenameOp = Op<Rename>;
 
-        if driver_handle.check_and_init(RenameOp::CODE)? {
+        if driver_handle.check_and_init(RenameOp::CODE).await? {
             return RenameOp::rename(from, to)?.await;
         }
     }

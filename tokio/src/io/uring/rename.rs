@@ -11,10 +11,8 @@ use std::path::Path;
 pub(crate) struct Rename {
     /// This field will be read by the kernel during the operation, so we
     /// need to ensure it is valid for the entire duration of the operation.
-    #[allow(dead_code)]
-    from: CString,
-    #[allow(dead_code)]
-    to: CString,
+    _from: CString,
+    _to: CString,
 }
 
 impl Completable for Rename {
@@ -51,6 +49,14 @@ impl Op<Rename> {
         .build();
 
         // SAFETY: Parameters are valid for the entire duration of the operation
-        Ok(unsafe { Op::new(rename_op, Rename { from, to }) })
+        Ok(unsafe {
+            Op::new(
+                rename_op,
+                Rename {
+                    _from: from,
+                    _to: to,
+                },
+            )
+        })
     }
 }

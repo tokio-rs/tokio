@@ -36,7 +36,6 @@ use std::task::{Context, Poll, Waker};
 pub(crate) enum CancelData {
     Open(Open),
     Write(Write),
-    Read(Read),
     Rename(Rename),
     ReadVec(Read<Vec<u8>, OwnedFd>),
     ReadBuf(Read<Buf, ArcFd>),
