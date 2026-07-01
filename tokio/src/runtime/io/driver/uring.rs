@@ -14,6 +14,19 @@ use std::{io, mem, task::Waker};
 
 const DEFAULT_RING_SIZE: u32 = 256;
 
+/// Outcome of registering an op with the io_uring.
+pub(crate) enum RegisterResult {
+    /// In-flight at this slab index.
+    Submitted(usize),
+
+    /// Submit failed before reaching the kernel; the slot was removed.
+    NotPushed(io::Error),
+
+    /// Submit failed after reaching the kernel; the slot is kept and the caller
+    /// must cancel it to keep its resources alive until completion.
+    Pushed { index: usize, error: io::Error },
+}
+
 pub(crate) struct UringContext {
     pub(crate) uring: Option<io_uring::IoUring>,
     pub(crate) ops: slab::Slab<Lifecycle>,
@@ -259,7 +272,7 @@ impl Handle {
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> io::Result<usize> {
+    pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> RegisterResult {
         assert!(self.uring_probe.initialized());
 
         // Uring is initialized.
@@ -269,9 +282,10 @@ impl Handle {
         let index = ctx.ops.insert(Lifecycle::Waiting(waker));
         let entry = entry.user_data(index as u64);
 
-        let submit_or_remove = |ctx: &mut UringContext| -> io::Result<()> {
+        // `entry` has not been pushed yet, so a submit error here means it never
+        // reached the kernel and we can drop the slot before returning.
+        let submit_before_push = |ctx: &mut UringContext| -> io::Result<()> {
             if let Err(e) = ctx.submit() {
-                // Submission failed, remove the entry from the slab and return the error
                 ctx.remove_op(index);
                 return Err(e);
             }
@@ -280,8 +294,10 @@ impl Handle {
 
         // SAFETY: entry is valid for the entire duration of the operation
         while unsafe { ctx.ring_mut().submission().push(&entry).is_err() } {
-            // If the submission queue is full, flush it to the kernel
-            submit_or_remove(ctx)?;
+            // If the submission queue is full, flush it to the kernel and retry.
+            if let Err(e) = submit_before_push(ctx) {
+                return RegisterResult::NotPushed(e);
+            }
         }
 
         // Ensure that the completion queue is not full before submitting the entry.
@@ -290,9 +306,15 @@ impl Handle {
         }
 
         // Note: For now, we submit the entry immediately without utilizing batching.
-        submit_or_remove(ctx)?;
+        //
+        // `entry` is now pushed, so the kernel may already own the buffer it
+        // points at. Keep the slot on a submit error: dropping it would let the
+        // `Op` free the buffer while it is still in use.
+        if let Err(e) = ctx.submit() {
+            return RegisterResult::Pushed { index, error: e };
+        }
 
-        Ok(index)
+        RegisterResult::Submitted(index)
     }
 
     pub(crate) fn cancel_op<T: Cancellable>(&self, index: usize, data: Option<T>) {

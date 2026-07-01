@@ -1011,14 +1011,21 @@ impl Inner {
             let (res, r_fd, r_buf) =
                 // u64::MAX to use and advance the file position
                 Op::read_at(fd, buf, max_buf_size, u64::MAX).await;
-            match res {
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => {
+            match (res, r_fd, r_buf) {
+                // Retry an interrupted read with the resources the op handed back.
+                (Err(e), Some(r_fd), Some(r_buf)) if e.kind() == io::ErrorKind::Interrupted => {
                     buf = r_buf;
                     fd = r_fd;
                     continue;
                 }
-                Err(e) => break (Operation::Read(Err(e)), r_buf),
-                Ok(n) => break (Operation::Read(Ok(n as usize)), r_buf),
+                // A cancelled op keeps its buffer in the driver, so the idle slot
+                // gets a fresh empty `Buf` instead.
+                (Err(e), _, r_buf) => {
+                    let buf = r_buf.unwrap_or_else(|| Buf::with_capacity(0));
+                    break (Operation::Read(Err(e)), buf);
+                }
+                (Ok(n), _, Some(r_buf)) => break (Operation::Read(Ok(n as usize)), r_buf),
+                (Ok(_), ..) => unreachable!("a successful read returns its buffer"),
             }
         }
     }

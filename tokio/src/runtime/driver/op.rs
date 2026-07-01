@@ -4,6 +4,7 @@ use crate::io::uring::read::Read;
 use crate::io::uring::utils::ArcFd;
 use crate::io::uring::write::Write;
 
+use crate::runtime::io::RegisterResult;
 use crate::runtime::Handle;
 
 #[cfg(
@@ -150,6 +151,10 @@ pub(crate) trait Completable {
     // The `Op` type that implements this trait can return the passed error
     // upstream by embedding it in the `Output`.
     fn complete_with_error(self, error: Error) -> Self::Output;
+
+    // Like `complete_with_error`, but for an op cancelled after the SQE reached
+    // the kernel: its resources stay with the driver and are not returned.
+    fn complete_after_cancel(error: Error) -> Self::Output;
 }
 
 /// Extracts the `CancelData` needed to safely cancel an in-flight io_uring operation.
@@ -164,18 +169,22 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
-        let handle = &mut this.handle;
-        let driver = handle.inner.driver().io();
 
         match &mut this.state {
             State::Initialize(entry_opt) => {
                 let entry = entry_opt.take().expect("Entry must be present");
                 let waker = cx.waker().clone();
 
+                let driver = this.handle.inner.driver().io();
                 // SAFETY: entry is valid for the entire duration of the operation
-                match unsafe { driver.register_op(entry, waker) } {
-                    Ok(idx) => this.state = State::Polled(idx),
-                    Err(err) => {
+                let result = unsafe { driver.register_op(entry, waker) };
+
+                match result {
+                    RegisterResult::Submitted(idx) => this.state = State::Polled(idx),
+
+                    // The kernel never saw the entry, so the resources go back to
+                    // the caller with the error.
+                    RegisterResult::NotPushed(err) => {
                         let data = this
                             .take_data()
                             .expect("Data must be present on Initialization");
@@ -184,12 +193,27 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
 
                         return Poll::Ready(data.complete_with_error(err));
                     }
+
+                    // The kernel may have seen the entry, so cancel to keep the
+                    // resources alive until completion instead of returning them.
+                    RegisterResult::Pushed { index, error } => {
+                        let data = this
+                            .take_data()
+                            .expect("Data must be present on Initialization");
+
+                        this.handle.inner.driver().io().cancel_op(index, Some(data));
+
+                        this.state = State::Complete;
+
+                        return Poll::Ready(T::complete_after_cancel(error));
+                    }
                 };
 
                 Poll::Pending
             }
 
             State::Polled(idx) => {
+                let driver = this.handle.inner.driver().io();
                 let mut ctx = driver.get_uring().lock();
                 let lifecycle = ctx.ops.get_mut(*idx).expect("Lifecycle must be present");
 
