@@ -5,7 +5,7 @@
 
 cfg_rt! {
     mod spawn_pinned;
-    pub use spawn_pinned::LocalPoolHandle;
+    pub use spawn_pinned::{LocalPoolBuilder, LocalPoolHandle};
 
     pub mod task_tracker;
     #[doc(inline)]
