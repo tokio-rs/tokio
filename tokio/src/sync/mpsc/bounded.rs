@@ -2,6 +2,9 @@ use crate::loom::sync::Arc;
 use crate::sync::batch_semaphore::{self as semaphore, TryAcquireError};
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{SendError, TryRecvError, TrySendError};
+use crate::sync::mpsc::list;
+#[cfg(tokio_unstable)]
+use crate::sync::mpsc::{array, BLOCK_CAP};
 
 cfg_time! {
     use crate::sync::mpsc::error::SendTimeoutError;
@@ -20,7 +23,7 @@ use std::task::{Context, Poll};
 ///
 /// [`PollSender`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSender.html
 pub struct Sender<T> {
-    chan: chan::Tx<T, Semaphore>,
+    chan: TxFlavor<T>,
 }
 
 /// A sender that does not prevent the channel from being closed.
@@ -54,7 +57,7 @@ pub struct Sender<T> {
 /// # }
 /// ```
 pub struct WeakSender<T> {
-    chan: Arc<chan::Chan<T, Semaphore>>,
+    chan: WeakTxFlavor<T>,
 }
 
 /// Permits to send one value into the channel.
@@ -65,7 +68,7 @@ pub struct WeakSender<T> {
 /// [`Sender::reserve()`]: Sender::reserve
 /// [`Sender::try_reserve()`]: Sender::try_reserve
 pub struct Permit<'a, T> {
-    chan: &'a chan::Tx<T, Semaphore>,
+    chan: &'a TxFlavor<T>,
 }
 
 /// An [`Iterator`] of [`Permit`] that can be used to hold `n` slots in the channel.
@@ -76,7 +79,7 @@ pub struct Permit<'a, T> {
 /// [`Sender::reserve_many()`]: Sender::reserve_many
 /// [`Sender::try_reserve_many()`]: Sender::try_reserve_many
 pub struct PermitIterator<'a, T> {
-    chan: &'a chan::Tx<T, Semaphore>,
+    chan: &'a TxFlavor<T>,
     n: usize,
 }
 
@@ -93,7 +96,7 @@ pub struct PermitIterator<'a, T> {
 /// [`Sender::reserve_owned()`]: Sender::reserve_owned
 /// [`Sender::try_reserve_owned()`]: Sender::try_reserve_owned
 pub struct OwnedPermit<T> {
-    chan: Option<chan::Tx<T, Semaphore>>,
+    chan: Option<TxFlavor<T>>,
 }
 
 /// Receives values from the associated `Sender`.
@@ -105,7 +108,35 @@ pub struct OwnedPermit<T> {
 /// [`ReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.ReceiverStream.html
 pub struct Receiver<T> {
     /// The channel receiver.
-    chan: chan::Rx<T, Semaphore>,
+    chan: RxFlavor<T>,
+}
+
+type ListTx<T> = chan::Tx<T, Semaphore, list::Queue>;
+type ListRx<T> = chan::Rx<T, Semaphore, list::Queue>;
+type ListChan<T> = chan::Chan<T, Semaphore, list::Queue>;
+#[cfg(tokio_unstable)]
+type ArrayTx<T> = chan::Tx<T, Semaphore, array::Queue>;
+#[cfg(tokio_unstable)]
+type ArrayRx<T> = chan::Rx<T, Semaphore, array::Queue>;
+#[cfg(tokio_unstable)]
+type ArrayChan<T> = chan::Chan<T, Semaphore, array::Queue>;
+
+enum TxFlavor<T> {
+    List(ListTx<T>),
+    #[cfg(tokio_unstable)]
+    Array(ArrayTx<T>),
+}
+
+enum WeakTxFlavor<T> {
+    List(Arc<ListChan<T>>),
+    #[cfg(tokio_unstable)]
+    Array(Arc<ArrayChan<T>>),
+}
+
+enum RxFlavor<T> {
+    List(ListRx<T>),
+    #[cfg(tokio_unstable)]
+    Array(ArrayRx<T>),
 }
 
 /// Creates a bounded mpsc channel for communicating between asynchronous tasks
@@ -162,10 +193,22 @@ pub fn channel<T>(buffer: usize) -> (Sender<T>, Receiver<T>) {
         semaphore: semaphore::Semaphore::new(buffer),
         bound: buffer,
     };
-    let (tx, rx) = chan::channel(semaphore);
+    #[cfg(tokio_unstable)]
+    let (tx, rx) = {
+        if buffer <= BLOCK_CAP {
+            let (tx, rx) = chan::channel::<T, _, array::Queue>(semaphore, buffer);
+            (Sender::from_array(tx), Receiver::from_array(rx))
+        } else {
+            let (tx, rx) = chan::channel::<T, _, list::Queue>(semaphore, buffer);
+            (Sender::from_list(tx), Receiver::from_list(rx))
+        }
+    };
 
-    let tx = Sender::new(tx);
-    let rx = Receiver::new(rx);
+    #[cfg(not(tokio_unstable))]
+    let (tx, rx) = {
+        let (tx, rx) = chan::channel::<T, _, list::Queue>(semaphore, buffer);
+        (Sender::from_list(tx), Receiver::from_list(rx))
+    };
 
     (tx, rx)
 }
@@ -178,9 +221,263 @@ pub(crate) struct Semaphore {
     pub(crate) bound: usize,
 }
 
+impl<T> TxFlavor<T> {
+    fn send(&self, value: T) {
+        match self {
+            Self::List(chan) => chan.send(value),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.send(value),
+        }
+    }
+
+    async fn closed(&self) {
+        match self {
+            Self::List(chan) => chan.closed().await,
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.closed().await,
+        }
+    }
+
+    fn semaphore(&self) -> &Semaphore {
+        match self {
+            Self::List(chan) => chan.semaphore(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.semaphore(),
+        }
+    }
+
+    fn wake_rx(&self) {
+        match self {
+            Self::List(chan) => chan.wake_rx(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.wake_rx(),
+        }
+    }
+
+    fn is_closed(&self) -> bool {
+        match self {
+            Self::List(chan) => chan.is_closed(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.is_closed(),
+        }
+    }
+
+    fn same_channel(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::List(a), Self::List(b)) => a.same_channel(b),
+            #[cfg(tokio_unstable)]
+            (Self::Array(a), Self::Array(b)) => a.same_channel(b),
+            #[cfg(tokio_unstable)]
+            _ => false,
+        }
+    }
+
+    fn downgrade(&self) -> WeakTxFlavor<T> {
+        match self {
+            Self::List(chan) => WeakTxFlavor::List(chan.downgrade()),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => WeakTxFlavor::Array(chan.downgrade()),
+        }
+    }
+
+    fn strong_count(&self) -> usize {
+        match self {
+            Self::List(chan) => chan.strong_count(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.strong_count(),
+        }
+    }
+
+    fn weak_count(&self) -> usize {
+        match self {
+            Self::List(chan) => chan.weak_count(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.weak_count(),
+        }
+    }
+}
+
+impl<T> Clone for TxFlavor<T> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::List(chan) => Self::List(chan.clone()),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => Self::Array(chan.clone()),
+        }
+    }
+}
+
+impl<T> fmt::Debug for TxFlavor<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::List(chan) => fmt::Debug::fmt(chan, fmt),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => fmt::Debug::fmt(chan, fmt),
+        }
+    }
+}
+
+impl<T> WeakTxFlavor<T> {
+    fn increment_weak_count(&self) {
+        match self {
+            Self::List(chan) => chan.increment_weak_count(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.increment_weak_count(),
+        }
+    }
+
+    fn decrement_weak_count(&self) {
+        match self {
+            Self::List(chan) => chan.decrement_weak_count(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.decrement_weak_count(),
+        }
+    }
+
+    fn upgrade(&self) -> Option<Sender<T>> {
+        match self {
+            Self::List(chan) => chan::Tx::upgrade(chan.clone()).map(Sender::from_list),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan::Tx::upgrade(chan.clone()).map(Sender::from_array),
+        }
+    }
+
+    fn strong_count(&self) -> usize {
+        match self {
+            Self::List(chan) => chan.strong_count(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.strong_count(),
+        }
+    }
+
+    fn weak_count(&self) -> usize {
+        match self {
+            Self::List(chan) => chan.weak_count(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.weak_count(),
+        }
+    }
+}
+
+impl<T> fmt::Debug for WeakTxFlavor<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::List(chan) => fmt::Debug::fmt(chan, fmt),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => fmt::Debug::fmt(chan, fmt),
+        }
+    }
+}
+
+impl<T> RxFlavor<T> {
+    fn close(&mut self) {
+        match self {
+            Self::List(chan) => chan.close(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.close(),
+        }
+    }
+
+    fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        match self {
+            Self::List(chan) => chan.recv(cx),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.recv(cx),
+        }
+    }
+
+    fn recv_many(
+        &mut self,
+        cx: &mut Context<'_>,
+        buffer: &mut Vec<T>,
+        limit: usize,
+    ) -> Poll<usize> {
+        match self {
+            Self::List(chan) => chan.recv_many(cx, buffer, limit),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.recv_many(cx, buffer, limit),
+        }
+    }
+
+    fn try_recv(&mut self) -> Result<T, TryRecvError> {
+        match self {
+            Self::List(chan) => chan.try_recv(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.try_recv(),
+        }
+    }
+
+    fn is_closed(&self) -> bool {
+        match self {
+            Self::List(chan) => chan.is_closed(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.is_closed(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::List(chan) => chan.is_empty(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.is_empty(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::List(chan) => chan.len(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.len(),
+        }
+    }
+
+    fn semaphore(&self) -> &Semaphore {
+        match self {
+            Self::List(chan) => chan.semaphore(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.semaphore(),
+        }
+    }
+
+    fn sender_strong_count(&self) -> usize {
+        match self {
+            Self::List(chan) => chan.sender_strong_count(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.sender_strong_count(),
+        }
+    }
+
+    fn sender_weak_count(&self) -> usize {
+        match self {
+            Self::List(chan) => chan.sender_weak_count(),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => chan.sender_weak_count(),
+        }
+    }
+}
+
+impl<T> fmt::Debug for RxFlavor<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::List(chan) => fmt::Debug::fmt(chan, fmt),
+            #[cfg(tokio_unstable)]
+            Self::Array(chan) => fmt::Debug::fmt(chan, fmt),
+        }
+    }
+}
+
 impl<T> Receiver<T> {
-    pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> Receiver<T> {
-        Receiver { chan }
+    pub(crate) fn from_list(chan: ListRx<T>) -> Receiver<T> {
+        Receiver {
+            chan: RxFlavor::List(chan),
+        }
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn from_array(chan: ArrayRx<T>) -> Receiver<T> {
+        Receiver {
+            chan: RxFlavor::Array(chan),
+        }
     }
 
     /// Receives the next value for this receiver.
@@ -750,8 +1047,17 @@ impl<T> fmt::Debug for Receiver<T> {
 impl<T> Unpin for Receiver<T> {}
 
 impl<T> Sender<T> {
-    pub(crate) fn new(chan: chan::Tx<T, Semaphore>) -> Sender<T> {
-        Sender { chan }
+    pub(crate) fn from_list(chan: ListTx<T>) -> Sender<T> {
+        Sender {
+            chan: TxFlavor::List(chan),
+        }
+    }
+
+    #[cfg(tokio_unstable)]
+    pub(crate) fn from_array(chan: ArrayTx<T>) -> Sender<T> {
+        Sender {
+            chan: TxFlavor::Array(chan),
+        }
     }
 
     /// Sends a value, waiting until there is capacity.
@@ -1618,7 +1924,11 @@ impl<T> Clone for WeakSender<T> {
         self.chan.increment_weak_count();
 
         WeakSender {
-            chan: self.chan.clone(),
+            chan: match &self.chan {
+                WeakTxFlavor::List(chan) => WeakTxFlavor::List(chan.clone()),
+                #[cfg(tokio_unstable)]
+                WeakTxFlavor::Array(chan) => WeakTxFlavor::Array(chan.clone()),
+            },
         }
     }
 }
@@ -1634,7 +1944,7 @@ impl<T> WeakSender<T> {
     /// if there are other `Sender` instances alive and the channel wasn't
     /// previously dropped, otherwise `None` is returned.
     pub fn upgrade(&self) -> Option<Sender<T>> {
-        chan::Tx::upgrade(self.chan.clone()).map(Sender::new)
+        self.chan.upgrade()
     }
 
     /// Returns the number of [`Sender`] handles.
