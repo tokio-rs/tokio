@@ -303,36 +303,22 @@ impl Semaphore {
     ///
     /// If `rem` exceeds the number of permits needed by the wait list, the
     /// remainder are assigned back to the semaphore.
-    fn add_permits_locked(&self, mut rem: usize, waiters: MutexGuard<'_, Waitlist>) {
+    fn add_permits_locked<'a>(&'a self, mut rem: usize, mut waiters: MutexGuard<'a, Waitlist>) {
         let mut wakers = WakeList::new();
-        let mut lock = Some(waiters);
-        let mut is_empty = false;
-        while rem > 0 {
-            let mut waiters = lock.take().unwrap_or_else(|| self.waiters.lock());
-            'inner: while wakers.can_push() {
-                // Was the waiter assigned enough permits to wake it?
-                match waiters.queue.last() {
-                    Some(waiter) => {
-                        if !waiter.assign_permits(&mut rem) {
-                            break 'inner;
-                        }
-                    }
-                    None => {
-                        is_empty = true;
-                        // If we assigned permits to all the waiters in the queue, and there are
-                        // still permits left over, assign them back to the semaphore.
-                        break 'inner;
-                    }
-                };
-                let mut waiter = waiters.queue.pop_back().unwrap();
-                if let Some(waker) =
-                    unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) }
-                {
+        loop {
+            while wakers.can_push()
+                && waiters
+                    .queue
+                    .last()
+                    .is_some_and(|waiter| waiter.assign_permits(&mut rem))
+            {
+                let waiter = unsafe { waiters.queue.pop_back().unwrap().as_mut() };
+                if let Some(waker) = waiter.waker.with_mut(|waker| unsafe { &mut *waker }.take()) {
                     wakers.push(waker);
                 }
             }
 
-            if rem > 0 && is_empty {
+            if rem > 0 && waiters.queue.is_empty() {
                 let permits = rem;
                 assert!(
                     permits <= Self::MAX_PERMITS,
@@ -361,12 +347,15 @@ impl Semaphore {
                 rem = 0;
             }
 
-            drop(waiters); // release the lock
+            // Prevent deadlock.
+            drop(waiters);
 
             wakers.wake_all();
+            if rem == 0 {
+                break;
+            }
+            waiters = self.waiters.lock();
         }
-
-        assert_eq!(rem, 0);
     }
 
     /// Decrease a semaphore's permits by a maximum of `n`.
