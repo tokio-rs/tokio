@@ -1,6 +1,7 @@
 use crate::io::blocking::Buf;
 use crate::io::uring::open::Open;
 use crate::io::uring::read::Read;
+use crate::io::uring::unlink::Unlink;
 use crate::io::uring::utils::ArcFd;
 use crate::io::uring::write::Write;
 
@@ -34,6 +35,7 @@ use std::task::{Context, Poll, Waker};
 #[derive(Debug)]
 pub(crate) enum CancelData {
     Open(Open),
+    Unlink(Unlink),
     Write(Write),
     ReadVec(Read<Vec<u8>, OwnedFd>),
     ReadBuf(Read<Buf, ArcFd>),

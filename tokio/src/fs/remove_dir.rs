@@ -25,7 +25,7 @@ pub async fn remove_dir(path: impl AsRef<Path>) -> io::Result<()> {
 
         type OpUnlink = Op<Unlink>;
 
-        if driver_handle.check_and_init(OpUnlink::CODE)? {
+        if driver_handle.check_and_init(OpUnlink::CODE).await? {
             return OpUnlink::remove_dir(path)?.await;
         }
     }

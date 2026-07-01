@@ -28,7 +28,7 @@ pub async fn remove_file(path: impl AsRef<Path>) -> io::Result<()> {
         let driver_handle = handle.inner.driver().io();
         type OpUnlink = Op<Unlink>;
 
-        if driver_handle.check_and_init(OpUnlink::CODE)? {
+        if driver_handle.check_and_init(OpUnlink::CODE).await? {
             return OpUnlink::remove_file(path)?.await;
         }
     }

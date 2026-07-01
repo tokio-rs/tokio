@@ -10,8 +10,7 @@ use std::path::Path;
 pub(crate) struct Unlink {
     /// This field will be read by the kernel during the operation, so we
     /// need to ensure it is valid for the entire duration of the operation.
-    #[allow(dead_code)]
-    path: CString,
+    _path: CString,
 }
 
 impl Completable for Unlink {
@@ -36,24 +35,22 @@ impl Op<Unlink> {
     pub(crate) const CODE: u8 = opcode::UnlinkAt::CODE;
 
     /// Submit a request to unlink a file or directory.
-    fn unlink(path: &Path, directory: bool) -> io::Result<Op<Unlink>> {
+    fn unlink(path: &Path, flags: libc::c_int) -> io::Result<Op<Unlink>> {
         let path = cstr(path)?;
-
-        let flags = if directory { libc::AT_REMOVEDIR } else { 0 };
 
         let unlink_op = opcode::UnlinkAt::new(types::Fd(libc::AT_FDCWD), path.as_ptr())
             .flags(flags)
             .build();
 
         // SAFETY: Parameters are valid for the entire duration of the operation
-        Ok(unsafe { Op::new(unlink_op, Unlink { path }) })
+        Ok(unsafe { Op::new(unlink_op, Unlink { _path: path }) })
     }
 
     pub(crate) fn remove_file(path: &Path) -> io::Result<Op<Unlink>> {
-        Self::unlink(path, false)
+        Self::unlink(path, 0)
     }
 
     pub(crate) fn remove_dir(path: &Path) -> io::Result<Op<Unlink>> {
-        Self::unlink(path, true)
+        Self::unlink(path, libc::AT_REMOVEDIR)
     }
 }
