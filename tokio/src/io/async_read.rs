@@ -94,6 +94,7 @@ where
 }
 
 impl AsyncRead for &[u8] {
+    #[inline]
     fn poll_read(
         mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
@@ -108,6 +109,7 @@ impl AsyncRead for &[u8] {
 }
 
 impl<T: AsRef<[u8]> + Unpin> AsyncRead for io::Cursor<T> {
+    #[inline]
     fn poll_read(
         mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
