@@ -1,6 +1,7 @@
 use crate::io::blocking::Buf;
 use crate::io::uring::open::Open;
 use crate::io::uring::read::Read;
+use crate::io::uring::rename::Rename;
 use crate::io::uring::utils::ArcFd;
 use crate::io::uring::write::Write;
 
@@ -22,7 +23,7 @@ use crate::io::uring::statx::Statx;
 use io_uring::cqueue;
 use io_uring::squeue::Entry;
 use std::future::Future;
-use std::io::{self, Error};
+use std::io;
 use std::mem;
 use std::os::fd::OwnedFd;
 use std::pin::Pin;
@@ -35,6 +36,7 @@ use std::task::{Context, Poll, Waker};
 pub(crate) enum CancelData {
     Open(Open),
     Write(Write),
+    Rename(Rename),
     ReadVec(Read<Vec<u8>, OwnedFd>),
     ReadBuf(Read<Buf, ArcFd>),
     #[cfg(
@@ -69,7 +71,7 @@ pub(crate) enum Lifecycle {
     ),
 
     /// The operation has completed with a single cqe result
-    Completed(io_uring::cqueue::Entry),
+    Completed(cqueue::Entry),
 }
 
 pub(crate) enum State {
@@ -149,7 +151,7 @@ pub(crate) trait Completable {
     //
     // The `Op` type that implements this trait can return the passed error
     // upstream by embedding it in the `Output`.
-    fn complete_with_error(self, error: Error) -> Self::Output;
+    fn complete_with_error(self, error: io::Error) -> Self::Output;
 }
 
 /// Extracts the `CancelData` needed to safely cancel an in-flight io_uring operation.
