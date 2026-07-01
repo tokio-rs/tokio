@@ -198,6 +198,12 @@ pub(crate) struct Shared {
     /// Scheduler configuration options
     config: Config,
 
+    /// Fraction of the global queue a worker takes per batch pull, resolved
+    /// once at build time: `config.global_queue_share_per_worker` when set, or
+    /// `1 / N` (the default) otherwise. Pre-computed so the hot path that sizes
+    /// a batch has no per-pull branch on the configuration.
+    global_queue_share: f32,
+
     /// Collects metrics from the runtime.
     pub(super) scheduler_metrics: SchedulerMetrics,
 
@@ -322,6 +328,13 @@ pub(super) fn create(
         .as_ref()
         .map(|_| Instant::now());
 
+    // Resolve the per-pull global-queue share once, so the batch-sizing hot
+    // path does not branch on the configuration. Unset keeps the default
+    // `1 / N` share.
+    let global_queue_share = config
+        .global_queue_share_per_worker
+        .unwrap_or(1.0 / size as f32);
+
     let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
         name,
@@ -340,6 +353,7 @@ pub(super) fn create(
             shutdown_cores: Mutex::new(vec![]),
             trace_status: TraceStatus::new(remotes_len),
             config,
+            global_queue_share,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
             started_at,
@@ -1118,16 +1132,17 @@ impl Core {
             );
 
             // The worker is currently idle, pull a batch of work from the
-            // injection queue. We don't want to pull *all* the work so other
-            // workers can also get some.
-            let n = usize::min(
-                worker.inject().len() / worker.handle.shared.remotes.len() + 1,
-                cap,
-            );
-
-            // Take at least one task since the first task is returned directly
-            // and not pushed onto the local queue.
-            let n = usize::max(1, n);
+            // injection queue. We don't pull *all* the work so other workers can
+            // also get some. Take a `global_queue_share` fraction of the queued
+            // tasks, plus one. The `+ 1` guarantees we always take at least one
+            // task (the first is returned directly, not pushed to the local
+            // queue) even when the share rounds down to zero; `cap` is at least
+            // `max_capacity() / 2 > 0` here, so the batch stays >= 1 without a
+            // separate clamp. The share is resolved once at build time (the
+            // configured value, or `1 / N` by default), so there is no branch.
+            let len = worker.inject().len();
+            let n = (len as f32 * worker.handle.shared.global_queue_share) as usize + 1;
+            let n = usize::min(n, cap);
 
             let mut synced = worker.handle.shared.synced.lock();
             // safety: passing in the correct `inject::Synced`.
