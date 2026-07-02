@@ -34,8 +34,6 @@ impl Cancellable for Rename {
 }
 
 impl Op<Rename> {
-    pub(crate) const CODE: u8 = opcode::RenameAt::CODE;
-
     pub(crate) fn rename(from: &Path, to: &Path) -> io::Result<Op<Rename>> {
         let from = cstr(from)?;
         let to = cstr(to)?;
