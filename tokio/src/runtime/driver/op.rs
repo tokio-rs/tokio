@@ -74,7 +74,7 @@ pub(crate) enum Lifecycle {
 
 pub(crate) enum State {
     Initialize(Option<Entry>),
-    Polled(usize),
+    Polled { ring: usize, index: usize },
     Complete,
 }
 
@@ -111,10 +111,10 @@ impl<T: Cancellable> Drop for Op<T> {
             // We've already dropped this Op.
             State::Complete => (),
             // We will cancel this Op.
-            State::Polled(index) => {
+            State::Polled { ring, index } => {
                 let data = self.take_data();
                 let handle = &mut self.handle;
-                handle.inner.driver().io().cancel_op(index, data);
+                handle.inner.driver().io().cancel_op(ring, index, data);
             }
             // This Op has not been polled yet.
             // We don't need to do anything here.
@@ -174,7 +174,7 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
 
                 // SAFETY: entry is valid for the entire duration of the operation
                 match unsafe { driver.register_op(entry, waker) } {
-                    Ok(idx) => this.state = State::Polled(idx),
+                    Ok((ring, index)) => this.state = State::Polled { ring, index },
                     Err(err) => {
                         let data = this
                             .take_data()
@@ -189,9 +189,9 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                 Poll::Pending
             }
 
-            State::Polled(idx) => {
-                let mut ctx = driver.get_uring().lock();
-                let lifecycle = ctx.ops.get_mut(*idx).expect("Lifecycle must be present");
+            State::Polled { ring, index } => {
+                let mut ctx = driver.uring_context(*ring).lock();
+                let lifecycle = ctx.ops.get_mut(*index).expect("Lifecycle must be present");
 
                 match mem::replace(lifecycle, Lifecycle::Submitted) {
                     // Only replace the stored waker if it wouldn't wake the new one
@@ -208,7 +208,7 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
 
                     Lifecycle::Completed(cqe) => {
                         // Clean up and complete the future
-                        ctx.remove_op(*idx);
+                        ctx.remove_op(*index);
 
                         this.state = State::Complete;
 
