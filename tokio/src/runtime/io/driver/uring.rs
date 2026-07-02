@@ -261,7 +261,11 @@ impl Handle {
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> io::Result<(usize, usize)> {
+    pub(crate) unsafe fn register_op(
+        &self,
+        entry: Entry,
+        waker: Waker,
+    ) -> io::Result<(usize, usize)> {
         // The kernel probe is always initialized before ops are registered; see
         // `check_and_init`, which every fs entry point awaits first.
         assert!(self.uring_probe.initialized());

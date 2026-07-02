@@ -1123,7 +1123,9 @@ impl Builder {
             workers: match self.kind {
                 Kind::CurrentThread => 1,
                 #[cfg(feature = "rt-multi-thread")]
-                Kind::MultiThread => self.worker_threads.unwrap_or_else(crate::loom::sys::num_cpus),
+                Kind::MultiThread => self
+                    .worker_threads
+                    .unwrap_or_else(crate::loom::sys::num_cpus),
             },
             timer_flavor: self.timer_flavor,
         }
