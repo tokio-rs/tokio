@@ -7,6 +7,7 @@ license = "MIT"
 
 [features]
 test-util = ["tokio/test-util"]
+io-uring = ["tokio/io-uring"]
 
 [dependencies]
 tokio = { version = "1.5.0", path = "../tokio", features = ["full"] }
@@ -104,6 +105,11 @@ harness = false
 [[bench]]
 name = "remote_spawn"
 path = "remote_spawn.rs"
+harness = false
+
+[[bench]]
+name = "fs_read_concurrent"
+path = "fs_read_concurrent.rs"
 harness = false
 
 [lints]
