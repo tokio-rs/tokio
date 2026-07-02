@@ -752,20 +752,9 @@ impl AsyncWrite for File {
                     let n = buf.copy_from(src, me.max_buf_size);
                     let std = me.std.clone();
 
-                    let blocking_task_join_handle = spawn_mandatory_blocking(move || {
-                        let res = if let Some(seek) = seek {
-                            (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
-                        } else {
-                            buf.write_to(&mut &*std)
-                        };
+                    let task_join_handle = Inner::poll_write_inner(std, buf, seek)?;
 
-                        (Operation::Write(res), buf)
-                    })
-                    .ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::Other, "background task failed")
-                    })?;
-
-                    inner.state = State::Busy(blocking_task_join_handle);
+                    inner.state = State::Busy(task_join_handle);
 
                     return Poll::Ready(Ok(n));
                 }
@@ -823,20 +812,9 @@ impl AsyncWrite for File {
                     let n = buf.copy_from_bufs(bufs, me.max_buf_size);
                     let std = me.std.clone();
 
-                    let blocking_task_join_handle = spawn_mandatory_blocking(move || {
-                        let res = if let Some(seek) = seek {
-                            (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
-                        } else {
-                            buf.write_to(&mut &*std)
-                        };
+                    let task_join_handle = Inner::poll_write_inner(std, buf, seek)?;
 
-                        (Operation::Write(res), buf)
-                    })
-                    .ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::Other, "background task failed")
-                    })?;
-
-                    inner.state = State::Busy(blocking_task_join_handle);
+                    inner.state = State::Busy(task_join_handle);
 
                     return Poll::Ready(Ok(n));
                 }
@@ -1106,6 +1084,139 @@ impl Inner {
             Operation::Write(res) => Poll::Ready(res),
             Operation::Seek(_) => Poll::Ready(Ok(())),
         }
+    }
+
+    fn poll_write_inner(
+        std: Arc<StdFile>,
+        buf: Buf,
+        seek: Option<SeekFrom>,
+    ) -> io::Result<JoinHandle<(Operation, Buf)>> {
+        // Unit tests use `MockFile` and the mock blocking infrastructure,
+        // which cannot execute real io_uring operations.
+        #[cfg(all(
+            not(test),
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        {
+            if let Ok(handle) = crate::runtime::Handle::try_current() {
+                let driver_handle = handle.inner.driver().io();
+
+                if driver_handle.is_uring_ready(io_uring::opcode::Write::CODE) {
+                    return Ok(spawn(Self::uring_write(std, buf, seek)));
+                }
+
+                if !driver_handle.is_uring_probed() {
+                    return Ok(spawn(Self::lazy_init_write(std, buf, seek)));
+                }
+            }
+        }
+
+        Self::spawn_blocking_write(buf, std, seek)
+    }
+
+    /// Perform an io-uring write with interrupt retry.
+    #[cfg(all(
+        not(test),
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    async fn uring_write(
+        std: Arc<StdFile>,
+        mut buf: Buf,
+        seek: Option<SeekFrom>,
+    ) -> (Operation, Buf) {
+        use crate::{io::uring::utils::ArcFd, runtime::driver::op::Op};
+
+        if let Some(seek) = seek {
+            if let Err(e) = (&*std).seek(seek) {
+                return (
+                    Operation::Write(Err(io::Error::new(
+                        e.kind(),
+                        format!("failed to seek before write: {e}"),
+                    ))),
+                    buf,
+                );
+            }
+        }
+
+        let mut fd: ArcFd = std;
+        loop {
+            let op = Op::write_at(fd, buf, u64::MAX);
+            let (r, _buf, _fd) = op.await;
+            buf = _buf;
+            fd = _fd;
+
+            match r {
+                Ok(_) if buf.is_empty() => break (Operation::Write(Ok(())), buf),
+                Ok(0) => break (Operation::Write(Err(io::ErrorKind::WriteZero.into())), buf),
+                Ok(_) => continue, // more to write
+                Err(e) => break (Operation::Write(Err(e)), buf),
+            }
+        }
+    }
+
+    /// Attempt lazy io-uring initialization for write, then use uring or
+    /// fall back to blocking write.
+    #[cfg(all(
+        not(test),
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    async fn lazy_init_write(
+        std: Arc<StdFile>,
+        buf: Buf,
+        seek: Option<SeekFrom>,
+    ) -> (Operation, Buf) {
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+        if driver_handle
+            .check_and_init(io_uring::opcode::Write::CODE)
+            .await
+            .unwrap_or(false)
+        {
+            Self::uring_write(std, buf, seek).await
+        } else {
+            match Self::spawn_blocking_write(buf, std, seek) {
+                Ok(join_handle) => match join_handle.await {
+                    Ok(result) => result,
+                    Err(e) => (
+                        Operation::Write(Err(io::Error::new(io::ErrorKind::Other, e))),
+                        Buf::with_capacity(0),
+                    ),
+                },
+                Err(e) => (Operation::Write(Err(e)), Buf::with_capacity(0)),
+            }
+        }
+    }
+
+    fn spawn_blocking_write(
+        buf: Buf,
+        std: Arc<StdFile>,
+        seek: Option<SeekFrom>,
+    ) -> io::Result<JoinHandle<(Operation, Buf)>> {
+        let handle = spawn_mandatory_blocking(move || {
+            let mut buf = buf;
+            let res = if let Some(seek) = seek {
+                (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
+            } else {
+                buf.write_to(&mut &*std)
+            };
+
+            (Operation::Write(res), buf)
+        })
+        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "background task failed"))?;
+
+        Ok(handle)
     }
 }
 
