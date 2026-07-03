@@ -501,6 +501,12 @@ impl Runtime {
 
 impl Drop for Runtime {
     fn drop(&mut self) {
+        // On a panic, shut down the blocking pool immediately instead of waiting
+        // since a clean showdown isn't necessary once its unwinding.
+        if std::thread::panicking() {
+            self.blocking_pool.shutdown(Some(Duration::from_nanos(0)));
+        }
+
         match &mut self.scheduler {
             Scheduler::CurrentThread(current_thread) => {
                 // This ensures that tasks spawned on the current-thread

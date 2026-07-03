@@ -238,6 +238,30 @@ rt_test! {
         }));
     }
 
+    #[test]
+    fn drop_on_panic_is_immediate() {
+        use std::sync::mpsc;
+        use std::thread;
+
+        let (tx, rx) = mpsc::channel();
+
+        thread::spawn(move || {
+            let rt = rt();
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                rt.block_on(async {
+                    tokio::task::spawn_blocking(|| {
+                        thread::sleep(Duration::from_secs(5));
+                    });
+                    panic!("trigger unwind");
+                });
+            }));
+            let _ = tx.send(());
+        });
+        // If main thread receives message from rx within 2 seconds
+        // the spawned thread had been dropped immediately, as expected
+        assert!(rx.recv_timeout(Duration::from_secs(2)).is_ok());
+    }
+
     // ==== net ======
 
     #[test]
