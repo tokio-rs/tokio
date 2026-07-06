@@ -15,11 +15,7 @@ pub(crate) mod cell {
     pub(crate) use super::unsafe_cell::UnsafeCell;
 }
 
-#[cfg(any(
-    feature = "net",
-    feature = "process",
-    feature = "signal",
-))]
+#[cfg(any(feature = "net", feature = "process", feature = "signal",))]
 pub(crate) mod future {
     pub(crate) use crate::sync::AtomicWaker;
 }
