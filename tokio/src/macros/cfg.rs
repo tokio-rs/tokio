@@ -102,10 +102,7 @@ macro_rules! cfg_atomic_waker_impl {
     ($($item:item)*) => {
         $(
             #[cfg(any(
-                feature = "net",
-                feature = "process",
                 feature = "rt",
-                feature = "signal",
                 feature = "time",
             ))]
             #[cfg(not(loom))]

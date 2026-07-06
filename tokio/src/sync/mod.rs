@@ -485,8 +485,10 @@ cfg_sync! {
     pub use rwlock::write_guard::RwLockWriteGuard;
     pub use rwlock::write_guard_mapped::RwLockMappedWriteGuard;
 
-    mod task;
-    pub(crate) use task::AtomicWaker;
+    cfg_atomic_waker_impl! {
+        mod task;
+        pub(crate) use task::AtomicWaker;
+    }
 
     mod once_cell;
     pub use self::once_cell::{OnceCell, SetError};
