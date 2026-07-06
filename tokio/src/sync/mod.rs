@@ -485,11 +485,6 @@ cfg_sync! {
     pub use rwlock::write_guard::RwLockWriteGuard;
     pub use rwlock::write_guard_mapped::RwLockMappedWriteGuard;
 
-    cfg_atomic_waker_impl! {
-        mod task;
-        pub(crate) use task::AtomicWaker;
-    }
-
     mod once_cell;
     pub use self::once_cell::{OnceCell, SetError};
 
@@ -512,14 +507,14 @@ cfg_not_sync! {
     #[cfg(any(feature = "rt", all(windows, feature = "process")))]
     pub(crate) mod oneshot;
 
-    cfg_atomic_waker_impl! {
-        mod task;
-        pub(crate) use task::AtomicWaker;
-    }
-
     #[cfg(any(feature = "signal", all(unix, feature = "process")))]
     pub(crate) mod watch;
 }
+
+#[cfg(any(feature = "rt", feature = "time"))]
+mod task;
+#[cfg(any(feature = "rt", feature = "time"))]
+pub(crate) use task::AtomicWaker;
 
 /// Unit tests
 #[cfg(test)]

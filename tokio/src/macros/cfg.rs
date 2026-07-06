@@ -105,7 +105,6 @@ macro_rules! cfg_atomic_waker_impl {
                 feature = "rt",
                 feature = "time",
             ))]
-            #[cfg(not(loom))]
             $item
         )*
     }
