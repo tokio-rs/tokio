@@ -16,16 +16,16 @@ fn noop_waker() -> Waker {
         |_| (),
         |_| (),
     );
-    unsafe { Waker::new(std::ptr::null(), NOOP_VTABLE) }
+    unsafe { Waker::from_raw(RawWaker::new(std::ptr::null(), NOOP_VTABLE)) }
 }
 
 /// An atomic waker with relaxed synchronization.
 ///
 /// `SpmcWaker` relies on an external synchronization which must ensure that a previous `register`
-/// is visible in `wake`. This is achieved using RMWs for the wake condition access with 
+/// is visible in `wake`. This is achieved using RMWs for the wake condition access with
 /// appropriate orderings.
-/// 
-/// `SpmcWaker` keep the latest registered waker in cache to save most of the reference counting 
+///
+/// `SpmcWaker` keep the latest registered waker in cache to save most of the reference counting
 /// operations.
 ///
 /// Algorithm adapted from [`SpmcWaker<Unsynchronized>`](https://crates.io/crates/spmc-waker).
@@ -115,19 +115,19 @@ impl SpmcWaker {
                 .compare_exchange(REGISTERED, EMPTY, Relaxed, Relaxed)
                 .is_ok()
     }
-    
+
     /// Unregister a previously registered waker if any, and remove it from the cache.
-    /// 
-    /// This function is best-effort, it may fail silently if there is a concurrent `wake`. 
-    /// 
+    ///
+    /// This function is best-effort, it may fail silently if there is a concurrent `wake`.
+    ///
     /// # Safety
-    /// 
+    ///
     /// This function calls `try_register` and assumes the same safety contract.
     pub(crate) unsafe fn reset(&self) {
         // SAFETY: as per function safety contract
-        unsafe {self.try_register(&noop_waker())};
+        unsafe { self.try_register(&noop_waker()) };
     }
-    
+
     /// Wake the registered waker.
     pub(crate) fn wake(&self) {
         // `SpmcWaker` relies on external synchronization to ensure Relaxed ordering

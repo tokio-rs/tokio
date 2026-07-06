@@ -155,10 +155,10 @@ impl<T> Block<T> {
         // If a waker is registered, `read` must synchronize with `is_ready`
         // so the registered waker becomes visible for the waking thread.
         // Synchronization is done with an AcqRel RMW.
-        let ready_bits =if waker_registered {
+        let ready_bits = if waker_registered {
             self.header.ready_slots.fetch_add(0, AcqRel)
         } else {
-             self.header.ready_slots.load(Acquire)
+            self.header.ready_slots.load(Acquire)
         };
 
         if !is_ready(ready_bits, offset) {
@@ -272,7 +272,7 @@ impl<T> Block<T> {
     /// Mark a slot as ready
     fn set_ready(&self, slot: usize) {
         let mask = 1 << slot;
-        // When a waker is registered, `read` must synchronize with `set_ready` 
+        // When a waker is registered, `read` must synchronize with `set_ready`
         // and uses an RMW with Release (actually AcqRel) ordering, so we must
         // use AcqRel here instead of Release to make the synchronization happen.
         // This synchronization allows `SpmcWaker::wake` to see the registered
