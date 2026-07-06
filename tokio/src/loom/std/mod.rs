@@ -15,7 +15,6 @@ pub(crate) mod cell {
     pub(crate) use super::unsafe_cell::UnsafeCell;
 }
 
-
 pub(crate) mod hint {
     pub(crate) use std::hint::spin_loop;
 }
