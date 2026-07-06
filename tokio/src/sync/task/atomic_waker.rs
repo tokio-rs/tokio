@@ -300,6 +300,7 @@ impl AtomicWaker {
     /// Wakes the task that last called `register`.
     ///
     /// If `register` has not been called yet, then this does nothing.
+    #[cfg(feature = "rt")]
     pub(crate) fn wake(&self) {
         if let Some(waker) = self.take_waker() {
             // If wake panics, we've consumed the waker which is a legitimate
