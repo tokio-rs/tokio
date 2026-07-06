@@ -104,7 +104,7 @@ impl SpmcWaker {
         true
     }
 
-    /// Unregister a previously registered waker.
+    /// Unregisters a previously registered waker.
     ///
     /// # Safety
     ///
@@ -116,7 +116,7 @@ impl SpmcWaker {
                 .is_ok()
     }
 
-    /// Unregister a previously registered waker if any, and remove it from the cache.
+    /// Unregisters a previously registered waker if any, and remove it from the cache.
     ///
     /// This function is best-effort, it may fail silently if there is a concurrent `wake`.
     ///

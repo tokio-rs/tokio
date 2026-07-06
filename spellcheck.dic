@@ -181,6 +181,7 @@ mock's
 monomorphization
 mpmc
 mpsc
+MSRV
 multi
 Multi
 multicast
@@ -229,6 +230,7 @@ reregistering
 resize
 resized
 RMW
+RMWs
 runtime
 runtime's
 runtimes
@@ -299,6 +301,7 @@ unparking
 unparks
 Unparks
 unreceived
+Unregister
 unsafety
 unsets
 Unsets
