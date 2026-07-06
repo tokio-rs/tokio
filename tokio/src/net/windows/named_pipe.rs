@@ -24,7 +24,7 @@ mod doc {
     pub(super) mod windows_sys {
         pub(crate) use windows_sys::{
             Win32::Foundation::*, Win32::Storage::FileSystem::*, Win32::System::Pipes::*,
-            Win32::System::SystemServices::*,
+            Win32::System::SystemServices::*, Win32::System::IO::CancelIoEx,
         };
     }
     pub(super) use mio::windows as mio_windows;
@@ -104,6 +104,18 @@ use self::doc::*;
 #[derive(Debug)]
 pub struct NamedPipeServer {
     io: PollEvented<mio_windows::NamedPipe>,
+}
+
+impl Drop for NamedPipeServer {
+    fn drop(&mut self) {
+        unsafe {
+            // Cancel all pending overlapped I/O on this handle.
+            // We pass null for the lpOverlapped parameter to cancel all requests.
+            // We ignore the return value because failure during drop is expected
+            // if no I/O was pending.
+            windows_sys::CancelIoEx(self.as_raw_handle() as _, ptr::null_mut());
+        }
+    }
 }
 
 impl NamedPipeServer {

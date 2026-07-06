@@ -397,3 +397,28 @@ async fn test_named_pipe_access() -> io::Result<()> {
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn test_named_pipe_server_drop_cancels_io() -> std::io::Result<()> {
+    use tokio::net::windows::named_pipe::ServerOptions;
+    let pipe_name = r"\\.\pipe\tokio-named-pipe-server-drop-cancel-test";
+
+    let server = ServerOptions::new().create(pipe_name)?;
+
+    {
+        // Start an asynchronous connect that will go pending because there is no client.
+        let connect_future = server.connect();
+        tokio::pin!(connect_future);
+
+        // Poll it once to ensure the overlapped I/O request is submitted to the kernel.
+        let _ = futures::poll!(&mut connect_future);
+
+        // The future is dropped at the end of this block (cancelling the Rust-side await).
+        // If CancelIoEx is not called in the Drop trait, the pending ConnectNamedPipe
+        // will leak in the Windows kernel and could cause a use-after-free.
+    }
+
+    drop(server);
+
+    Ok(())
+}
