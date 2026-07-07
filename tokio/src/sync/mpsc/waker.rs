@@ -48,6 +48,7 @@ impl SpmcWaker {
     /// # Safety
     ///
     /// `try_register` and `register` must not be called concurrently from multiple threads
+    #[inline]
     pub(crate) unsafe fn try_register(&self, waker: &Waker) -> bool {
         // Acquire is not needed to load the state. In fact, if the waker is already cached,
         // the cell is not touched. And if the previous operation was a register, it must have
@@ -108,6 +109,7 @@ impl SpmcWaker {
     /// # Safety
     ///
     /// `try_register` and `register` must not be called concurrently from multiple threads
+    #[inline]
     pub(crate) unsafe fn unregister(&self) -> bool {
         self.state.load(Relaxed) == REGISTERED
             && (self.state)
@@ -122,12 +124,14 @@ impl SpmcWaker {
     /// # Safety
     ///
     /// This function calls `try_register` and assumes the same safety contract.
+    #[inline]
     pub(crate) unsafe fn reset(&self) {
         // SAFETY: as per function safety contract
         unsafe { self.try_register(&noop_waker()) };
     }
 
     /// Wake the registered waker.
+    #[inline]
     pub(crate) fn wake(&self) {
         // `SpmcWaker` relies on external synchronization to ensure Relaxed ordering
         // can be used here and still see the waker previously registered.
