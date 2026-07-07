@@ -83,9 +83,9 @@ impl SpmcWaker {
                 return true;
             }
             // Otherwise, the waker must be unregistered before replacing it.
-            // Updating the waker cell requires Acquire ordering to synchronize with
-            // the release store of a previous `wake`.
-            if let Err(s) = self.state.compare_exchange(REGISTERED, 0, Acquire, Relaxed) {
+            // In case of concurrent `wake`, the CAS would fail and the waker cell
+            // would not be modified, so Acquire ordering is not needed.
+            if let Err(s) = (self.state).compare_exchange(REGISTERED, EMPTY, Relaxed, Relaxed) {
                 // A concurrent `wake` happened, return as above.
                 debug_assert!(s == WAKING || s == EMPTY);
                 return false;
