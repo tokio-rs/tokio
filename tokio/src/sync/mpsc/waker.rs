@@ -1,5 +1,6 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{fence, AtomicUsize};
+use std::mem;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
@@ -94,12 +95,23 @@ impl SpmcWaker {
             // Updating the waker cell requires an Acquire fence to synchronize with
             // the release store of a previous `wake`.
             fence(Acquire);
-        }
+        };
         // Replaces the waker and update the state using Release ordering, so the waker
         // can be accessed after an Acquire CAS in `wake`.
+        // If `Waker::clone` panics after a waker was unregistered, the waker is restored.
+        struct RestoreWaker<'a>(Option<&'a SpmcWaker>);
+        impl Drop for RestoreWaker<'_> {
+            fn drop(&mut self) {
+                if let Some(this) = &self.0 {
+                    this.state.store(REGISTERED, Release);
+                }
+            }
+        }
+        let guard = RestoreWaker((state == REGISTERED).then_some(self));
         // SAFETY: The state is EMPTY, so a concurrent `wake` cannot access to the cell as
         // its CAS would fail
         let _cached_waker = self.waker.with_mut(|w| unsafe { w.replace(waker.clone()) });
+        mem::forget(guard);
         self.state.store(REGISTERED, Release);
         true
     }
@@ -157,14 +169,14 @@ impl SpmcWaker {
             // to ensure the waker reference stays alive during the call.
             // However, if `wake_by_ref` panics, the state should also be
             // reset, so we use a Drop guard for this purpose.
-            struct ResetState<'a>(&'a SpmcWaker);
-            impl Drop for ResetState<'_> {
+            struct ConsumeWaker<'a>(&'a SpmcWaker);
+            impl Drop for ConsumeWaker<'_> {
                 fn drop(&mut self) {
                     self.0.state.store(EMPTY, Release);
                 }
             }
             //
-            let _guard = ResetState(self);
+            let _guard = ConsumeWaker(self);
             // SAFETY: the waker cell cannot be modified while the state is WAKING,
             // so it safe to access it by const reference.
             self.waker.with(|w| unsafe { (*w).wake_by_ref() })
