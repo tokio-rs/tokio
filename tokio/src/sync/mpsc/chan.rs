@@ -302,8 +302,8 @@ impl<T, S: Semaphore> Rx<T, S> {
                     match rx_fields.list.pop(&self.inner.tx, $registered) {
                         Some(Read::Value(value)) => {
                             if $registered {
-                                // SAFETY: every `unregister` call requires
-                                // a mutable reference on Rx
+                                // SAFETY: mutable reference on Rx ensures
+                                // no concurrent (un)registration.
                                 unsafe { self.inner.rx_waker.unregister() };
                             }
                             self.inner.semaphore.add_permit();
@@ -326,7 +326,7 @@ impl<T, S: Semaphore> Rx<T, S> {
 
             try_recv!(false);
 
-            // SAFETY: every `try_register` call requires a mutable reference on Rx
+            // SAFETY: mutable reference on Rx ensures no concurrent (un)registration.
             let registered = unsafe { self.inner.rx_waker.try_register(cx.waker()) };
 
             // It is possible that a value was pushed between attempting to read
@@ -385,8 +385,8 @@ impl<T, S: Semaphore> Rx<T, S> {
                             Some(Read::Value(value)) => {
                                 if registered {
                                     if $registered {
-                                        // SAFETY: every `unregister` call requires
-                                        // a mutable reference on Rx
+                                        // SAFETY: mutable reference on Rx ensures
+                                        // no concurrent (un)registration.
                                         unsafe { self.inner.rx_waker.unregister() };
                                     }
                                     registered = false;
@@ -425,7 +425,7 @@ impl<T, S: Semaphore> Rx<T, S> {
 
             try_recv!(false);
 
-            // SAFETY: every `try_register` call requires a mutable reference on Rx
+            // SAFETY: mutable reference on Rx ensures no concurrent (un)registration.
             let registered = unsafe { self.inner.rx_waker.try_register(cx.waker()) };
 
             // It is possible that a value was pushed between attempting to read
@@ -462,8 +462,8 @@ impl<T, S: Semaphore> Rx<T, S> {
                     match rx_fields.list.try_pop(&self.inner.tx, $registered) {
                         TryPopResult::Ok(value) => {
                             if $registered {
-                                // SAFETY: every `unregister` call requires
-                                // a mutable reference on Rx
+                                // SAFETY: mutable reference on Rx ensures
+                                // no concurrent (un)registration.
                                 unsafe { self.inner.rx_waker.unregister() };
                             }
                             self.inner.semaphore.add_permit();
@@ -488,7 +488,7 @@ impl<T, S: Semaphore> Rx<T, S> {
             let mut park = CachedParkThread::new();
             let waker = park.waker().unwrap();
             loop {
-                // SAFETY: every `try_register` call requires a mutable reference on Rx
+                // SAFETY: mutable reference on Rx ensures no concurrent (un)registration.
                 let registered = unsafe { self.inner.rx_waker.try_register(&waker) };
                 // It is possible that the problematic send has now completed,
                 // so we have to check for messages again.
@@ -553,8 +553,8 @@ impl<T, S: Semaphore> Drop for Rx<T, S> {
             // When Rx is dropped, there is nothing for a task to poll anymore.
             // This means we can drop our waker to potentially free up resources.
             // Do so before draining the channel where panics may occur.
-            // SAFETY: every `try_register` call requires a mutable reference on Rx
-            unsafe { self.inner.rx_waker.reset() };
+            // SAFETY: mutable reference on Rx ensures no concurrent (un)registration.
+            unsafe { self.inner.rx_waker.unregister() };
 
             guard.drain();
         });
