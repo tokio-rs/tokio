@@ -1,6 +1,5 @@
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::AtomicUsize;
-use std::sync::atomic::fence;
+use crate::loom::sync::atomic::{fence, AtomicUsize};
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
