@@ -224,7 +224,8 @@ impl<T> Block<T> {
 
     /// Signal to the receiver that the sender half of the list is closed.
     pub(crate) unsafe fn tx_close(&self) {
-        self.header.ready_slots.fetch_or(TX_CLOSED, Release);
+        // Use AcqRel ordering for the same reason as `set_ready`.
+        self.header.ready_slots.fetch_or(TX_CLOSED, AcqRel);
     }
 
     /// Resets the block to a blank state. This enables reusing blocks in the
