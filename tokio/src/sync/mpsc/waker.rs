@@ -49,9 +49,9 @@ impl SpmcWaker {
         }
         // Replaces the waker and update the state using Release ordering, so the waker
         // can be accessed after an Acquire CAS in `wake`.
-        // SAFETY: The state is EMPTY, so a concurrent `wake` cannot access to the cell as
-        // its CAS would fail
-        (self.waker).with_mut(|w| unsafe { w.cast::<Waker>().write(waker.clone()) });
+        // SAFETY: state is EMPTY, so `wake` cannot access the cell (and `try_register`
+        // safety contract prevents other concurrent accesses)
+        (self.waker).with_mut(|w| unsafe { (*w).write(waker.clone()) });
         self.state.store(REGISTERED, Release);
         true
     }
@@ -87,8 +87,8 @@ impl SpmcWaker {
         let mut _old_waker = None; // declared before RegisterGuard so drop is executed after
         let _register_guard = RegisterGuard(self);
         _old_waker = self.waker.with_mut(|old_waker| {
-            // SAFETY: state is EMPTY, so `wake` cannot access the cell (and `try_register`)
-            // safety contract prevent other concurrent access
+            // SAFETY: state is EMPTY, so `wake` cannot access the cell (and `try_register`
+            // safety contract prevents other concurrent accesses)
             // SAFETY: the previously registered waker is still stored in the cell
             let old_waker = unsafe { (*old_waker).assume_init_mut() };
             // Replace the waker only if it is different from the one already stored.
@@ -160,4 +160,9 @@ impl Drop for SpmcWaker {
             self.waker.with_mut(|w| unsafe { (*w).assume_init_drop() })
         }
     }
+}
+
+#[unsafe(no_mangle)]
+fn plop(a: &SpmcWaker, b: &Waker) -> bool {
+    unsafe { a.try_register(b) }
 }
