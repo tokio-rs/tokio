@@ -66,12 +66,6 @@ impl SpmcWaker {
             return false;
         }
         debug_assert_eq!(state, REGISTERED);
-        // If the waker is already registered, there is nothing else to do.
-        // SAFETY: as per function safety contract, there can't be concurrent
-        // mutable access to the cell, and a waker is registered
-        if (self.waker).with(|w| unsafe { (*w).assume_init_ref().will_wake(waker) }) {
-            return true;
-        }
         // Otherwise, the waker must be unregistered before replacing it.
         // In case of concurrent `wake`, the CAS would fail and the waker cell
         // would not be modified, so Acquire ordering is not needed.
@@ -89,11 +83,19 @@ impl SpmcWaker {
                 self.0.state.store(REGISTERED, Release);
             }
         }
-        let _guard = RegisterWaker(self);
-        let waker = waker.clone();
-        // SAFETY: The state is EMPTY, so a concurrent `wake` cannot access to the cell as
-        // its CAS would fail
-        let _cached_waker = (self.waker).with_mut(|w| unsafe { w.cast::<Waker>().replace(waker) });
+        // SAFETY: - as per function safety contract, there can't be concurrent
+        //           mutable access to the cell, and `wake` cannot access it either because
+        //           the state is EMPTY
+        //         - the previously registered waker is still stored in the cell
+        (self.waker).with_mut(move |prev_waker| unsafe {
+            let mut _waker_to_drop = None; // declared before RegisterWaker so drop is executed after
+            let _guard = RegisterWaker(self);
+            // If the waker is already registered, there is no need to replace it.
+            // Otherwise,
+            if !(*prev_waker).assume_init_ref().will_wake(waker) {
+                _waker_to_drop = Some(prev_waker.cast::<Waker>().replace(waker.clone()))
+            }
+        });
         true
     }
 
@@ -159,5 +161,12 @@ impl Drop for SpmcWaker {
             // SAFETY: a waker is registered
             self.waker.with_mut(|w| unsafe { (*w).assume_init_drop() })
         }
+    }
+}
+
+#[unsafe(no_mangle)]
+fn plop(a: &SpmcWaker, w: &Waker) {
+    unsafe {
+        a.try_register(w);
     }
 }
