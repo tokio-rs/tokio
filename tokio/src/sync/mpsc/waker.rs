@@ -1,5 +1,6 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::AtomicUsize;
+use std::mem;
 use std::mem::MaybeUninit;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 use std::task::Waker;
@@ -50,8 +51,7 @@ impl SpmcWaker {
         // can be accessed after an Acquire CAS in `wake`.
         // SAFETY: The state is EMPTY, so a concurrent `wake` cannot access to the cell as
         // its CAS would fail
-        self.waker
-            .with_mut(|w| unsafe { w.cast::<Waker>().write(waker.clone()) });
+        (self.waker).with_mut(|w| unsafe { w.cast::<Waker>().write(waker.clone()) });
         self.state.store(REGISTERED, Release);
         true
     }
@@ -66,7 +66,7 @@ impl SpmcWaker {
             return false;
         }
         debug_assert_eq!(state, REGISTERED);
-        // Otherwise, the waker must be unregistered before replacing it.
+        // A waker is registered, it must be unregistered before replacing it.
         // In case of concurrent `wake`, the CAS would fail and the waker cell
         // would not be modified, so Acquire ordering is not needed.
         if let Err(s) = (self.state).compare_exchange(REGISTERED, EMPTY, Relaxed, Relaxed) {
@@ -74,27 +74,25 @@ impl SpmcWaker {
             debug_assert!(s == WAKING || s == EMPTY);
             return false;
         }
-        // Replaces the waker and update the state using Release ordering, so the waker
+        // Set back the state to REGISTERED using Release ordering, so the waker
         // can be accessed after an Acquire CAS in `wake`.
-        // If `Waker::clone` panics after a waker was unregistered, the waker is restored.
-        struct RegisterWaker<'a>(&'a SpmcWaker);
-        impl Drop for RegisterWaker<'_> {
+        // If `Waker::clone` panics, the guard will still set the state, which
+        // is correct as the previous waker is still stored.
+        struct RegisterGuard<'a>(&'a SpmcWaker);
+        impl Drop for RegisterGuard<'_> {
             fn drop(&mut self) {
                 self.0.state.store(REGISTERED, Release);
             }
         }
-        // SAFETY: - as per function safety contract, there can't be concurrent
-        //           mutable access to the cell, and `wake` cannot access it either because
-        //           the state is EMPTY
-        //         - the previously registered waker is still stored in the cell
-        (self.waker).with_mut(move |prev_waker| unsafe {
-            let mut _waker_to_drop = None; // declared before RegisterWaker so drop is executed after
-            let _guard = RegisterWaker(self);
-            // If the waker is already registered, there is no need to replace it.
-            // Otherwise,
-            if !(*prev_waker).assume_init_ref().will_wake(waker) {
-                _waker_to_drop = Some(prev_waker.cast::<Waker>().replace(waker.clone()))
-            }
+        let mut _old_waker = None; // declared before RegisterGuard so drop is executed after
+        let _register_guard = RegisterGuard(self);
+        _old_waker = self.waker.with_mut(|old_waker| {
+            // SAFETY: state is EMPTY, so `wake` cannot access the cell (and `try_register`)
+            // safety contract prevent other concurrent access
+            // SAFETY: the previously registered waker is still stored in the cell
+            let old_waker = unsafe { (*old_waker).assume_init_mut() };
+            // Replace the waker only if it is different from the one already stored.
+            (!old_waker.will_wake(waker)).then(|| mem::replace(old_waker, waker.clone()))
         });
         true
     }
