@@ -39,6 +39,7 @@ impl SpmcWaker {
     /// # Safety
     ///
     /// `try_register` and `unregister` must not be called concurrently from multiple threads
+    #[inline]
     pub(crate) unsafe fn try_register(&self, waker: &Waker) -> bool {
         // Load the state with Acquire ordering to synchronize the cell access
         // with the Release store in `wake`.
