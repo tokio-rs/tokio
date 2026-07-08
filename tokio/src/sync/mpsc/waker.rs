@@ -161,8 +161,3 @@ impl Drop for SpmcWaker {
         }
     }
 }
-
-#[unsafe(no_mangle)]
-fn plop(a: &SpmcWaker, b: &Waker) -> bool {
-    unsafe { a.try_register(b) }
-}
