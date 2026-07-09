@@ -156,16 +156,46 @@ fn trace_leaf_for_test(meta: &TraceMeta, log: &mut Vec<Vec<String>>) {
 }
 
 /// Strip the trailing `::h<hex>` hash that rustc appends to symbol names.
-fn strip_symbol_hash(s: &str) -> &str {
+/// Also strip bracketed disambiguators (e.g. `[ad0502bdaf4feaf5]`).
+fn strip_symbol_hash(s: &str) -> String {
     // Symbols end with "::h" followed by hex digits. Find the last "::h".
+    let mut s = s;
     if let Some(pos) = s.rfind("::h") {
         let suffix = &s[pos + 3..];
         if !suffix.is_empty() && suffix.chars().all(|c| c.is_ascii_hexdigit()) {
-            return &s[..pos];
+            s = &s[..pos];
         }
     }
-    s
+    // Also strip [disambiguator]
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '[' {
+            let mut temp = String::new();
+            let mut found_close = false;
+            for next_c in &mut chars {
+                if next_c == ']' {
+                    found_close = true;
+                    break;
+                }
+                temp.push(next_c);
+            }
+            if found_close && temp.chars().all(|ch| ch.is_ascii_hexdigit()) && !temp.is_empty() {
+                continue;
+            } else {
+                result.push('[');
+                result.push_str(&temp);
+                if found_close {
+                    result.push(']');
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
 }
+
 
 pin_project_lite::pin_project! {
     /// A future wrapper that uses `trace_with` to capture a backtrace on every

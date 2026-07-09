@@ -66,10 +66,11 @@ impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(name) = self.symbol.name() {
             let name = name.to_string();
-            let name = if let Some((name, _)) = name.rsplit_once("::") {
+            let stripped = strip_disambiguators(&name);
+            let name = if let Some((name, _)) = stripped.rsplit_once("::") {
                 name
             } else {
-                &name
+                &stripped
             };
             fmt::Display::fmt(&name, f)?;
         }
@@ -90,3 +91,34 @@ impl fmt::Display for Symbol {
         Ok(())
     }
 }
+
+fn strip_disambiguators(name: &str) -> String {
+    let mut result = String::with_capacity(name.len());
+    let mut chars = name.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '[' {
+            let mut temp = String::new();
+            let mut found_close = false;
+            for next_c in &mut chars {
+                if next_c == ']' {
+                    found_close = true;
+                    break;
+                }
+                temp.push(next_c);
+            }
+            if found_close && temp.chars().all(|ch| ch.is_ascii_hexdigit()) && !temp.is_empty() {
+                continue;
+            } else {
+                result.push('[');
+                result.push_str(&temp);
+                if found_close {
+                    result.push(']');
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
