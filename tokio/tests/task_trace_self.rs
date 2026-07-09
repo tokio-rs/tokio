@@ -196,7 +196,6 @@ fn strip_symbol_hash(s: &str) -> String {
     result
 }
 
-
 pin_project_lite::pin_project! {
     /// A future wrapper that uses `trace_with` to capture a backtrace on every
     /// poll.
