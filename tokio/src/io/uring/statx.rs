@@ -44,12 +44,22 @@ impl Debug for Metadata {
     }
 }
 
-#[derive(Debug)]
 pub(crate) struct Statx {
     /// This field will be read by the kernel during the operation, so we
     /// need to ensure it is valid for the entire duration of the operation.
     _path: CString,
     buffer: Box<MaybeUninit<statx>>,
+    _fd: Option<crate::io::uring::utils::ArcFd>,
+}
+
+impl Debug for Statx {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Statx")
+            .field("_path", &self._path)
+            .field("buffer", &self.buffer)
+            .field("_fd", &self._fd.as_ref().map(|fd| fd.as_raw_fd()))
+            .finish()
+    }
 }
 
 impl Completable for Statx {
@@ -99,6 +109,7 @@ impl Op<Statx> {
                 Statx {
                     _path: path,
                     buffer,
+                    _fd: None,
                 },
             )
         })
@@ -132,6 +143,8 @@ impl Op<Statx> {
         .mask(libc::STATX_BASIC_STATS | libc::STATX_BTIME)
         .build();
 
+        let fd: crate::io::uring::utils::ArcFd = file.std.clone();
+
         // SAFETY: Parameters are valid for the entire duration of the operation
         Ok(unsafe {
             Op::new(
@@ -139,6 +152,7 @@ impl Op<Statx> {
                 Statx {
                     _path: empty_path.into(),
                     buffer,
+                    _fd: Some(fd),
                 },
             )
         })

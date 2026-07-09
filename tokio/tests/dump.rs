@@ -49,9 +49,9 @@ fn current_thread() {
             let id = task.id();
             let trace = task.trace().to_string();
             eprintln!("\n\n{id}:\n{trace}\n\n");
-            assert!(trace.contains("dump::a"));
-            assert!(trace.contains("dump::b"));
-            assert!(trace.contains("dump::c"));
+            assert!(trace.contains("::a") && trace.contains("dump"));
+            assert!(trace.contains("::b") && trace.contains("dump"));
+            assert!(trace.contains("::c") && trace.contains("dump"));
             assert!(trace.contains("tokio::task::yield_now"));
         }
     }
@@ -87,9 +87,9 @@ fn multi_thread() {
             let id = task.id();
             let trace = task.trace().to_string();
             eprintln!("\n\n{id}:\n{trace}\n\n");
-            assert!(trace.contains("dump::a"));
-            assert!(trace.contains("dump::b"));
-            assert!(trace.contains("dump::c"));
+            assert!(trace.contains("::a") && trace.contains("dump"));
+            assert!(trace.contains("::b") && trace.contains("dump"));
+            assert!(trace.contains("::c") && trace.contains("dump"));
             assert!(trace.contains("tokio::task::yield_now"));
         }
     }

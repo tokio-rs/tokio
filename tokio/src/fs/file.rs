@@ -93,7 +93,7 @@ cfg_io_uring! {
 /// # }
 /// ```
 pub struct File {
-    std: Arc<StdFile>,
+    pub(crate) std: Arc<StdFile>,
     inner: Mutex<Inner>,
     max_buf_size: usize,
 }

@@ -114,7 +114,10 @@ impl UringContext {
                 }
 
                 // If the submission queue is full, we dispatch completions and try again.
-                Err(ref e) if e.raw_os_error() == Some(libc::EBUSY) => {
+                Err(ref e)
+                    if e.raw_os_error() == Some(libc::EBUSY)
+                        || e.raw_os_error() == Some(libc::EAGAIN) =>
+                {
                     self.dispatch_completions();
                 }
                 // For other errors, we currently return the error as is.
@@ -269,20 +272,21 @@ impl Handle {
         let index = ctx.ops.insert(Lifecycle::Waiting(waker));
         let entry = entry.user_data(index as u64);
 
-        let submit_or_remove = |ctx: &mut UringContext| -> io::Result<()> {
-            if let Err(e) = ctx.submit() {
-                // Submission failed, remove the entry from the slab and return the error
-                ctx.remove_op(index);
-                return Err(e);
-            }
-            Ok(())
-        };
+        let mut queued = false;
 
         // SAFETY: entry is valid for the entire duration of the operation
         while unsafe { ctx.ring_mut().submission().push(&entry).is_err() } {
             // If the submission queue is full, flush it to the kernel
-            submit_or_remove(ctx)?;
+            if let Err(e) = ctx.submit() {
+                if queued {
+                    return Ok(index);
+                } else {
+                    ctx.remove_op(index);
+                    return Err(e);
+                }
+            }
         }
+        queued = true;
 
         // Ensure that the completion queue is not full before submitting the entry.
         while ctx.ring_mut().completion().is_full() {
@@ -290,7 +294,14 @@ impl Handle {
         }
 
         // Note: For now, we submit the entry immediately without utilizing batching.
-        submit_or_remove(ctx)?;
+        if let Err(e) = ctx.submit() {
+            if queued {
+                return Ok(index);
+            } else {
+                ctx.remove_op(index);
+                return Err(e);
+            }
+        }
 
         Ok(index)
     }
