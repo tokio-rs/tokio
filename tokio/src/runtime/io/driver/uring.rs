@@ -62,16 +62,18 @@ impl UringContext {
         Ok(true)
     }
 
-    pub(crate) fn dispatch_completions(&mut self) {
+    pub(crate) fn dispatch_completions(&mut self) -> usize {
         let ops = &mut self.ops;
         let Some(mut uring) = self.uring.take() else {
             // Uring is not initialized yet.
-            return;
+            return 0;
         };
 
         let cq = uring.completion();
+        let mut count = 0;
 
         for cqe in cq {
+            count += 1;
             let idx = cqe.user_data() as usize;
 
             match ops.get_mut(idx) {
@@ -101,8 +103,7 @@ impl UringContext {
         }
 
         self.uring.replace(uring);
-
-        // `cq`'s drop gets called here, updating the latest head pointer
+        count
     }
 
     pub(crate) fn submit(&mut self) -> io::Result<()> {
@@ -118,7 +119,12 @@ impl UringContext {
                     if e.raw_os_error() == Some(libc::EBUSY)
                         || e.raw_os_error() == Some(libc::EAGAIN) =>
                 {
-                    self.dispatch_completions();
+                    let reaped = self.dispatch_completions();
+                    if reaped == 0 {
+                        // If we reaped 0 completions, we must wait for at least one
+                        // to free up resources/slots.
+                        let _ = self.ring_mut().submit_and_wait(1);
+                    }
                 }
                 // For other errors, we currently return the error as is.
                 Err(e) => {
