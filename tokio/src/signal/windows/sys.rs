@@ -111,7 +111,7 @@ unsafe extern "system" fn handler(ty: u32) -> BOOL {
     // `SetConsoleCtrlHandler` and `REGISTRY` being initialized.
     let Ok(registry) = REGISTRY.wait().as_ref() else {
         // Technically unreachable since `handler` is only called if
-        // `SetConsoleCtrlHandler` succeded.
+        // `SetConsoleCtrlHandler` succeeded.
         return 0;
     };
 
