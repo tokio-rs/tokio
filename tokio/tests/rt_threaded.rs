@@ -700,7 +700,7 @@ fn wake_deferred_tasks_before_block_in_place() {
     let (tx2, rx2) = oneshot::channel::<()>();
 
     let deferred_task = tokio_test::task::spawn(tokio::task::yield_now());
-    let deffered_task = Arc::new(Mutex::new(deferred_task));
+    let deferred_task = Arc::new(Mutex::new(deferred_task));
 
     let rt = runtime::Builder::new_multi_thread()
         .worker_threads(1)
@@ -708,7 +708,7 @@ fn wake_deferred_tasks_before_block_in_place() {
         .unwrap();
 
     let jh = {
-        let deferred_task = Arc::clone(&deffered_task);
+        let deferred_task = Arc::clone(&deferred_task);
         rt.spawn(async move {
             {
                 let mut lock = deferred_task.lock().unwrap();
@@ -728,7 +728,7 @@ fn wake_deferred_tasks_before_block_in_place() {
 
     // check that the deferred task was woken before the `block_in_place` ends
     let is_woken = {
-        let lock = deffered_task.lock().unwrap();
+        let lock = deferred_task.lock().unwrap();
         lock.is_woken()
     };
 
