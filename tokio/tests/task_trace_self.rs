@@ -138,7 +138,7 @@ fn trace_leaf_for_test(meta: &TraceMeta, log: &mut Vec<Vec<String>>) {
     for frame in bt.frames() {
         for symbol in frame.symbols() {
             if let Some(name) = symbol.name() {
-                names.push(strip_symbol_hash(&format!("{name}")).to_owned());
+                names.push(strip_symbol_hash(&format!("{name:#}")).to_owned());
             }
         }
     }
