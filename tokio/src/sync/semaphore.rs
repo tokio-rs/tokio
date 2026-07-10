@@ -722,6 +722,91 @@ impl Semaphore {
         }
     }
 
+    /// Acquires a permit from the semaphore, blocking the current thread until
+    /// one is available.
+    ///
+    /// If the semaphore has been closed, this returns an [`AcquireError`].
+    /// Otherwise, this returns a [`SemaphorePermit`] representing the
+    /// acquired permit.
+    ///
+    /// This method is intended for use in synchronous code, such as inside
+    /// [`spawn_blocking`] or when the semaphore is shared between asynchronous
+    /// and synchronous code. It is the blocking equivalent of [`acquire`].
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called within an asynchronous execution
+    /// context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let semaphore = Arc::new(Semaphore::new(2));
+    ///
+    ///     let semaphore2 = semaphore.clone();
+    ///     let blocking_task = tokio::task::spawn_blocking(move || {
+    ///         // Inside a blocking context we cannot use `.await`, so we use
+    ///         // `blocking_acquire` instead.
+    ///         let _permit = semaphore2.blocking_acquire().unwrap();
+    ///
+    ///         // ... perform blocking work while holding the permit ...
+    ///     });
+    ///
+    ///     blocking_task.await.unwrap();
+    /// }
+    /// ```
+    ///
+    /// [`AcquireError`]: crate::sync::AcquireError
+    /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
+    /// [`spawn_blocking`]: crate::task::spawn_blocking
+    /// [`acquire`]: Semaphore::acquire
+    #[track_caller]
+    #[cfg(feature = "sync")]
+    pub fn blocking_acquire(&self) -> Result<SemaphorePermit<'_>, AcquireError> {
+        crate::future::block_on(self.acquire())
+    }
+
+    /// Acquires `n` permits from the semaphore, blocking the current thread
+    /// until they are available.
+    ///
+    /// If the semaphore has been closed, this returns an [`AcquireError`].
+    /// Otherwise, this returns a [`SemaphorePermit`] representing the
+    /// acquired permits.
+    ///
+    /// This method is the blocking equivalent of [`acquire_many`].
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called within an asynchronous execution
+    /// context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::Semaphore;
+    ///
+    /// fn main() {
+    ///     let semaphore = Semaphore::new(5);
+    ///
+    ///     let permit = semaphore.blocking_acquire_many(3).unwrap();
+    ///     assert_eq!(semaphore.available_permits(), 2);
+    /// }
+    /// ```
+    ///
+    /// [`AcquireError`]: crate::sync::AcquireError
+    /// [`SemaphorePermit`]: crate::sync::SemaphorePermit
+    /// [`acquire_many`]: Semaphore::acquire_many
+    #[track_caller]
+    #[cfg(feature = "sync")]
+    pub fn blocking_acquire_many(&self, n: u32) -> Result<SemaphorePermit<'_>, AcquireError> {
+        crate::future::block_on(self.acquire_many(n))
+    }
+
     /// Acquires a permit from the semaphore.
     ///
     /// The semaphore must be wrapped in an [`Arc`] to call this method.
@@ -929,6 +1014,87 @@ impl Semaphore {
             }),
             Err(e) => Err(e),
         }
+    }
+
+    /// Acquires a permit from the semaphore, blocking the current thread until
+    /// one is available.
+    ///
+    /// The semaphore must be wrapped in an [`Arc`] to call this method.
+    /// If the semaphore has been closed, this returns an [`AcquireError`].
+    /// Otherwise, this returns a [`OwnedSemaphorePermit`] representing the
+    /// acquired permit.
+    ///
+    /// This method is the blocking equivalent of [`acquire_owned`].
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called within an asynchronous execution
+    /// context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// fn main() {
+    ///     let semaphore = Arc::new(Semaphore::new(2));
+    ///
+    ///     let permit = semaphore.clone().blocking_acquire_owned().unwrap();
+    ///     assert_eq!(semaphore.available_permits(), 1);
+    /// }
+    /// ```
+    ///
+    /// [`Arc`]: std::sync::Arc
+    /// [`AcquireError`]: crate::sync::AcquireError
+    /// [`OwnedSemaphorePermit`]: crate::sync::OwnedSemaphorePermit
+    /// [`acquire_owned`]: Semaphore::acquire_owned
+    #[track_caller]
+    #[cfg(feature = "sync")]
+    pub fn blocking_acquire_owned(self: Arc<Self>) -> Result<OwnedSemaphorePermit, AcquireError> {
+        crate::future::block_on(self.acquire_owned())
+    }
+
+    /// Acquires `n` permits from the semaphore, blocking the current thread
+    /// until they are available.
+    ///
+    /// The semaphore must be wrapped in an [`Arc`] to call this method.
+    /// If the semaphore has been closed, this returns an [`AcquireError`].
+    /// Otherwise, this returns a [`OwnedSemaphorePermit`] representing the
+    /// acquired permits.
+    ///
+    /// This method is the blocking equivalent of [`acquire_many_owned`].
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called within an asynchronous execution
+    /// context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use tokio::sync::Semaphore;
+    ///
+    /// fn main() {
+    ///     let semaphore = Arc::new(Semaphore::new(5));
+    ///
+    ///     let permit = semaphore.clone().blocking_acquire_many_owned(3).unwrap();
+    ///     assert_eq!(semaphore.available_permits(), 2);
+    /// }
+    /// ```
+    ///
+    /// [`Arc`]: std::sync::Arc
+    /// [`AcquireError`]: crate::sync::AcquireError
+    /// [`OwnedSemaphorePermit`]: crate::sync::OwnedSemaphorePermit
+    /// [`acquire_many_owned`]: Semaphore::acquire_many_owned
+    #[track_caller]
+    #[cfg(feature = "sync")]
+    pub fn blocking_acquire_many_owned(
+        self: Arc<Self>,
+        n: u32,
+    ) -> Result<OwnedSemaphorePermit, AcquireError> {
+        crate::future::block_on(self.acquire_many_owned(n))
     }
 
     /// Closes the semaphore.
