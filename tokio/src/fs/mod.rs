@@ -11,6 +11,13 @@
 //! behind the scenes. This is done using the [`spawn_blocking`] threadpool to
 //! run them in the background.
 //!
+//! # Cancellation
+//!
+//! Cancelling a future from this module will stop waiting for the result, but
+//! the underlying blocking operation will continue to run on the thread pool.
+//! For example, cancelling a [`write()`] future after it has been
+//! polled will still result in the data being written to disk.
+//!
 //! The `tokio::fs` module should only be used for ordinary files. Trying to use
 //! it with e.g., a named pipe on Linux can result in surprising behavior,
 //! such as hangs during runtime shutdown. For special files, you should use a
