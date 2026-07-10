@@ -12,7 +12,7 @@
 //! The following example demonstrates how to use a codec such as [`LinesCodec`] to
 //! write framed data. [`FramedWrite`] can be used to achieve this. Data sent to
 //! [`FramedWrite`] are first framed according to a specific codec, and then sent to
-//! an implementor of [`AsyncWrite`].
+//! an implementer of [`AsyncWrite`].
 //!
 //! ```
 //! use futures::sink::SinkExt;
@@ -43,7 +43,7 @@
 //! # Example decoding using `LinesCodec`
 //! The following example demonstrates how to use a codec such as [`LinesCodec`] to
 //! read a stream of framed data. [`FramedRead`] can be used to achieve this. [`FramedRead`]
-//! will keep reading from an [`AsyncRead`] implementor until a whole frame, according to a codec,
+//! will keep reading from an [`AsyncRead`] implementer until a whole frame, according to a codec,
 //! can be parsed.
 //!
 //!```

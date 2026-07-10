@@ -90,7 +90,23 @@ impl UnixListener {
         #[cfg(not(any(target_os = "linux", target_os = "android")))]
         let addr = StdSocketAddr::from_pathname(path)?;
 
-        let listener = mio::net::UnixListener::bind_addr(&addr)?;
+        let addr = SocketAddr::from(addr);
+        UnixListener::bind_addr(&addr)
+    }
+
+    /// Creates a new `UnixListener` bound to the specified address.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    #[track_caller]
+    pub fn bind_addr(socket_addr: &SocketAddr) -> io::Result<UnixListener> {
+        let listener = mio::net::UnixListener::bind_addr(&socket_addr.0)?;
         let io = PollEvented::new(listener)?;
         Ok(UnixListener { io })
     }
@@ -186,8 +202,8 @@ impl UnixListener {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If the method is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If the method is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, then it is guaranteed that no new connections were
     /// accepted by this method.
     pub async fn accept(&self) -> io::Result<(UnixStream, SocketAddr)> {

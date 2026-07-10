@@ -140,7 +140,7 @@ impl UdpSocket {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// #   if cfg!(miri) { return Ok(()); } // No UDP sockets in miri.
     ///     let sock = UdpSocket::bind("0.0.0.0:8080").await?;
     ///     // use `sock`
     /// #   let _ = sock;
@@ -308,7 +308,7 @@ impl UdpSocket {
     /// # use std::{io, net::SocketAddr};
     /// # #[tokio::main]
     /// # async fn main() -> io::Result<()> {
-    /// # if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// # if cfg!(miri) { return Ok(()); } // No UDP sockets in miri.
     /// let addr = "0.0.0.0:8080".parse::<SocketAddr>().unwrap();
     /// let peer = "127.0.0.1:11100".parse::<SocketAddr>().unwrap();
     /// let sock = UdpSocket::bind(addr).await?;
@@ -545,8 +545,8 @@ impl UdpSocket {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `send` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If `send` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, then it is guaranteed that the message was not sent.
     ///
     /// # Examples
@@ -762,8 +762,8 @@ impl UdpSocket {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If `recv` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, it is guaranteed that no messages were received on this
     /// socket.
     ///
@@ -1149,7 +1149,7 @@ impl UdpSocket {
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///
-    /// Address type can be any implementor of [`ToSocketAddrs`] trait. See its
+    /// Address type can be any implementer of [`ToSocketAddrs`] trait. See its
     /// documentation for concrete examples.
     ///
     /// It is possible for `addr` to yield multiple addresses, but `send_to`
@@ -1162,8 +1162,8 @@ impl UdpSocket {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `send_to` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If `send_to` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, then it is guaranteed that the message was not sent.
     ///
     /// # Example
@@ -1291,8 +1291,8 @@ impl UdpSocket {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv_from` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If `recv_from` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, it is guaranteed that no messages were received on this
     /// socket.
     ///
@@ -2288,7 +2288,7 @@ impl UdpSocket {
     ///
     /// #[tokio::main]
     /// async fn main() -> io::Result<()> {
-    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// #   if cfg!(miri) { return Ok(()); } // No UDP sockets in miri.
     ///     // Create a socket
     ///     let socket = UdpSocket::bind("0.0.0.0:8080").await?;
     ///

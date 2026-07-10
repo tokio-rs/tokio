@@ -74,7 +74,7 @@ use crate::util::rand::{FastRand, RngSeedGenerator};
 use std::cell::RefCell;
 use std::task::Waker;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 mod metrics;
 
@@ -92,6 +92,7 @@ use crate::loom::sync::atomic::AtomicBool;
 #[cfg(all(tokio_unstable, feature = "time"))]
 use crate::runtime::time_alt;
 
+use crate::runtime::metrics::ScheduleLatencyInstant;
 #[cfg(all(tokio_unstable, feature = "time"))]
 use crate::runtime::scheduler::util;
 
@@ -111,6 +112,13 @@ pub(super) struct Worker {
 struct Core {
     /// Used to schedule bookkeeping tasks every so often.
     tick: u32,
+
+    /// When a task is scheduled from a worker, it is stored in this slot. The
+    /// worker will check this slot for a task **before** checking the run
+    /// queue. This effectively results in the **last** scheduled task to be run
+    /// next (LIFO). This is an optimization for improving locality which
+    /// benefits message passing patterns and helps to reduce latency.
+    lifo_slot: Option<Notified>,
 
     /// When `true`, locally scheduled tasks go to the LIFO slot. When `false`,
     /// they go to the back of the `run_queue`.
@@ -194,6 +202,11 @@ pub(crate) struct Shared {
     pub(super) scheduler_metrics: SchedulerMetrics,
 
     pub(super) worker_metrics: Box<[WorkerMetrics]>,
+
+    /// Startup time of this scheduler.
+    ///
+    /// This instant is used as the basis of task `scheduled_at` measurements.
+    started_at: Option<Instant>,
 
     /// Only held to trigger some code on drop. This is used to get internal
     /// runtime metrics that can be useful when doing performance
@@ -282,6 +295,7 @@ pub(super) fn create(
 
         cores.push(Box::new(Core {
             tick: 0,
+            lifo_slot: None,
             lifo_enabled: !config.disable_lifo_slot,
             run_queue,
             #[cfg(all(tokio_unstable, feature = "time"))]
@@ -303,6 +317,10 @@ pub(super) fn create(
 
     let (idle, idle_synced) = Idle::new(size);
     let (inject, inject_synced) = inject::Shared::new();
+    let started_at = config
+        .metrics_schedule_latency_histogram
+        .as_ref()
+        .map(|_| Instant::now());
 
     let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
@@ -324,6 +342,7 @@ pub(super) fn create(
             config,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
+            started_at,
             _counters: Counters,
         },
         driver: driver_handle,
@@ -443,7 +462,7 @@ where
         // If we heavily call `spawn_blocking`, there might be no available thread to
         // run this core. Except for the task in the lifo_slot, all tasks can be
         // stolen, so we move the task out of the lifo_slot to the run_queue.
-        if let Some(task) = core.run_queue.pop_lifo() {
+        if let Some(task) = core.lifo_slot.take() {
             core.run_queue
                 .push_back_or_overflow(task, &*cx.worker.handle, &mut core.stats);
         }
@@ -658,7 +677,10 @@ impl Context {
         // tasks under this measurement. In this case, the tasks came from the
         // LIFO slot and are considered part of the current task for scheduling
         // purposes. These tasks inherent the "parent"'s limits.
-        core.stats.start_poll();
+        core.stats.start_poll(
+            task.get_scheduled_at()
+                .prepare(self.worker.handle.shared.started_at),
+        );
 
         // Make the core available to the runtime context
         *self.core.borrow_mut() = Some(core);
@@ -696,7 +718,7 @@ impl Context {
                 };
 
                 // Check for a task in the LIFO slot
-                let task = match core.run_queue.pop_lifo() {
+                let task = match core.lifo_slot.take() {
                     Some(task) => task,
                     None => {
                         self.reset_lifo_enabled(&mut core);
@@ -1122,7 +1144,7 @@ impl Core {
     }
 
     fn next_local_task(&mut self) -> Option<Notified> {
-        self.run_queue.pop_lifo().or_else(|| self.run_queue.pop())
+        self.lifo_slot.take().or_else(|| self.run_queue.pop())
     }
 
     /// Function responsible for stealing tasks from another worker
@@ -1178,7 +1200,7 @@ impl Core {
     }
 
     fn has_tasks(&self) -> bool {
-        self.run_queue.has_tasks()
+        self.lifo_slot.is_some() || self.run_queue.has_tasks()
     }
 
     fn should_notify_others(&self) -> bool {
@@ -1187,7 +1209,7 @@ impl Core {
         if self.is_searching {
             return false;
         }
-        self.run_queue.len() > 1
+        self.lifo_slot.is_some() as usize + self.run_queue.len() > 1
     }
 
     /// Prepares the worker state for parking.
@@ -1317,6 +1339,15 @@ impl Worker {
 
 impl Handle {
     pub(super) fn schedule_task(&self, task: Notified, is_yield: bool) {
+        if self
+            .shared
+            .config
+            .metrics_schedule_latency_histogram
+            .is_some()
+        {
+            task.set_scheduled_at(ScheduleLatencyInstant::new(self.shared.started_at));
+        }
+
         with_current(|maybe_cx| {
             if let Some(cx) = maybe_cx {
                 // Make sure the task is part of the **current** scheduler.
@@ -1349,23 +1380,29 @@ impl Handle {
         // task must always be pushed to the back of the queue, enabling other
         // tasks to be executed. If **not** a yield, then there is more
         // flexibility and the task may go to the front of the queue.
-        if is_yield || !core.lifo_enabled {
+        let should_notify = if is_yield || !core.lifo_enabled {
             core.run_queue
                 .push_back_or_overflow(task, self, &mut core.stats);
+            true
         } else {
             // Push to the LIFO slot
-            if let Some(prev) = core.run_queue.push_lifo(task) {
-                // There was a previous task in the LIFO slot which needs
-                // to be pushed to the back of the run queue.
+            let prev = core.lifo_slot.take();
+            let ret = prev.is_some();
+
+            if let Some(prev) = prev {
                 core.run_queue
                     .push_back_or_overflow(prev, self, &mut core.stats);
             }
+
+            core.lifo_slot = Some(task);
+
+            ret
         };
 
         // Only notify if not currently parked. If `park` is `None`, then the
         // scheduling is from a resource driver. As notifications often come in
         // batches, the notification is delayed until the park is complete.
-        if core.park.is_some() {
+        if should_notify && core.park.is_some() {
             self.notify_parked_local();
         }
     }

@@ -41,7 +41,7 @@ pub(crate) struct Semaphore {
 }
 
 struct Waitlist {
-    queue: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+    queue: LinkedList<Waiter>,
     closed: bool,
 }
 
@@ -576,7 +576,7 @@ impl Future for Acquire<'_> {
     type Output = Result<(), AcquireError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let _resource_span = self.node.ctx.resource_span.clone().entered();

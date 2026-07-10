@@ -788,6 +788,91 @@ async fn drop_permit_iterator_releases_permits() {
     }
 }
 
+#[test]
+fn dropping_last_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permit);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn dropping_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permit);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn dropping_last_permit_iterator_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permits = tx.try_reserve_many(1).unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permits);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn sending_last_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    permit.send(());
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn sending_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    permit.send(());
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn releasing_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    let inert_sender = permit.release();
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+    drop(inert_sender);
+}
+
 #[maybe_tokio_test]
 async fn dropping_rx_closes_channel() {
     let (tx, rx) = mpsc::channel(100);
@@ -996,6 +1081,19 @@ fn try_recv_after_receiver_close() {
 
     assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
     rx.close();
+    assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+}
+
+#[test]
+fn try_recv_after_receiver_close_with_permit() {
+    let (tx, mut rx) = mpsc::channel::<()>(5);
+
+    let permit = tx.try_reserve().unwrap();
+
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    rx.close();
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    drop(permit);
     assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
 }
 
@@ -1531,6 +1629,40 @@ fn drop_all_elements_during_panic() {
 
     drop(tx);
     // `mpsc::Chan`'s drop is called, freeing the `Block` memory allocation.
+}
+
+/// A task's wakers keep its memory allocation alive. This test ensures
+/// `mpsc::channel` releases the rx waker immediately upon drop to potentially
+/// free up resources.
+#[test]
+fn release_waker_on_rx_drop() {
+    use std::task::{Context, Wake, Waker};
+
+    struct DummyWaker;
+    impl Wake for DummyWaker {
+        fn wake(self: Arc<Self>) {}
+    }
+
+    // Create a dummy Arc<impl Wake> to count waker references
+    let dummy = Arc::new(DummyWaker);
+    let waker = Waker::from(dummy.clone());
+    let mut cx = Context::from_waker(&waker);
+
+    // Baseline: 2 references (`dummy` and `waker`)
+    assert_eq!(Arc::strong_count(&dummy), 2);
+
+    // Register `waker` in rx
+    let (_tx, mut rx) = mpsc::channel::<()>(1);
+    assert_pending!(rx.poll_recv(&mut cx));
+    assert_eq!(Arc::strong_count(&dummy), 3);
+
+    // Drop rx, releasing the stored waker
+    drop(rx);
+    assert_eq!(
+        Arc::strong_count(&dummy),
+        2,
+        "dropping rx did not drop its waker",
+    );
 }
 
 fn is_debug<T: fmt::Debug>(_: &T) {}

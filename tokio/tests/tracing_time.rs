@@ -7,6 +7,7 @@
 
 use std::time::Duration;
 
+use tokio_test::task;
 use tracing_mock::{expect, subscriber};
 
 #[tokio::test]
@@ -16,6 +17,12 @@ async fn test_sleep_creates_span() {
         .with_id(sleep_span_id.clone())
         .named("runtime.resource")
         .with_target("tokio::time::sleep");
+
+    let poll_op = || {
+        expect::event()
+            .with_target("runtime::resource::poll_op")
+            .with_fields(expect::field("op_name").with_value(&"poll_elapsed"))
+    };
 
     let state_update = expect::event()
         .with_target("runtime::resource::state_update")
@@ -40,22 +47,26 @@ async fn test_sleep_creates_span() {
 
     let (subscriber, handle) = subscriber::mock()
         .new_span(sleep_span.clone().with_ancestry(expect::is_explicit_root()))
-        .enter(sleep_span.clone())
-        .event(state_update)
         .new_span(
             async_op_span
                 .clone()
-                .with_ancestry(expect::has_contextual_parent(&sleep_span_id))
+                .with_ancestry(expect::has_explicit_parent(&sleep_span_id))
                 .with_fields(expect::field("source").with_value(&"Sleep::new_timeout")),
         )
-        .exit(sleep_span.clone())
-        .enter(async_op_span.clone())
         .new_span(
             async_op_poll_span
                 .clone()
-                .with_ancestry(expect::has_contextual_parent(&async_op_span_id)),
+                .with_ancestry(expect::has_explicit_parent(&async_op_span_id)),
         )
+        .enter(sleep_span.clone())
+        .enter(async_op_span.clone())
+        .enter(async_op_poll_span.clone())
+        .event(poll_op())
+        .event(state_update)
+        .event(poll_op())
+        .exit(async_op_poll_span.clone())
         .exit(async_op_span.clone())
+        .exit(sleep_span.clone())
         .drop_span(async_op_span)
         .drop_span(async_op_poll_span)
         .drop_span(sleep_span)
@@ -64,7 +75,7 @@ async fn test_sleep_creates_span() {
     {
         let _guard = tracing::subscriber::set_default(subscriber);
 
-        _ = tokio::time::sleep(Duration::from_millis(7));
+        _ = task::spawn(tokio::time::sleep(Duration::from_millis(7))).poll();
     }
 
     handle.assert_finished();

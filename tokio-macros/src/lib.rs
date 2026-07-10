@@ -29,10 +29,11 @@ use proc_macro::TokenStream;
 /// powerful interface.
 ///
 /// Note: This macro can be used on any function and not just the `main`
-/// function. Using it on a non-main function makes the function behave as if it
-/// was synchronous by starting a new runtime each time it is called. If the
-/// function is called often, it is preferable to create the runtime using the
-/// runtime builder so the runtime can be reused across calls.
+/// function. Although the function is written with `async fn`, this macro
+/// expands it to a synchronous function that starts a runtime each time it is
+/// called. If the function is called often, it is preferable to create the
+/// runtime using the runtime builder so the runtime can be reused across calls.
+/// For details on the expansion, see [Bridging with sync code][bridging].
 ///
 /// # Non-worker async function
 ///
@@ -308,6 +309,7 @@ use proc_macro::TokenStream;
 /// [`Builder::unhandled_panic`]: ../tokio/runtime/struct.Builder.html#method.unhandled_panic
 /// [unstable]: ../tokio/index.html#unstable-features
 /// [local runtime]: ../tokio/runtime/struct.LocalRuntime.html
+/// [bridging]: https://tokio.rs/tokio/topics/bridging#what-tokiomain-expands-to
 #[proc_macro_attribute]
 pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     entry::main(args.into(), item.into(), true).into()

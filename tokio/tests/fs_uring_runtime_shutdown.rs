@@ -12,12 +12,24 @@ use futures::FutureExt;
 use std::fs;
 use std::future::poll_fn;
 use std::task::Poll;
+use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
 use tokio::runtime::Builder;
+use tokio_test::assert_pending;
+
+use crate::support::io_uring::io_uring_supported;
+
+mod support {
+    pub(crate) mod io_uring;
+}
 
 // see: https://github.com/tokio-rs/tokio/issues/7979
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
+    if !io_uring_supported() {
+        return;
+    }
+
     let tmp = NamedTempFile::new().unwrap();
     let path = tmp.path().to_path_buf();
 
@@ -41,10 +53,8 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
                     let fut = opt.open(&path);
 
                     // If io_uring is enabled (and not falling back to the thread pool),
-                    // the first poll should return Pending. We don't check if the result
-                    // is actually a pending because we run some CI checks based on old
-                    // kernels that don't support uring.
-                    let _pending = Box::pin(fut).poll_unpin(cx);
+                    // the first poll should return Pending.
+                    assert_pending!(Box::pin(fut).poll_unpin(cx));
 
                     tx.send(()).unwrap();
 
@@ -65,14 +75,22 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
 
     rt.shutdown_background();
 
-    let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
-    let leaked = fd_count_after_cancel.saturating_sub(fd_count_before_opens);
+    let fd_check_start = Instant::now();
 
-    // Since we are opening 128 files, we expect that the related fds
-    // related to this operation will be closed. Since some other fds
-    // can be opened in the meantime, we expect this number to be higher
-    // than the counter before opening the files. This number could be
-    // lower, but to avoid test flakiness we check that this is at most
-    // half the number of the file we opened to check if there's a leak.
-    assert!(leaked <= 64);
+    while fd_check_start.elapsed() < Duration::from_secs(1) {
+        let fd_count_after_cancel = fs::read_dir("/proc/self/fd").unwrap().count();
+        let leaked = fd_count_after_cancel.saturating_sub(fd_count_before_opens);
+
+        // Since we are opening 128 files, we expect that the related fds
+        // related to this operation will be closed. Since some other fds
+        // can be opened in the meantime, we expect this number to be higher
+        // than the counter before opening the files. This number could be
+        // lower, but to avoid test flakiness we check that this is at most
+        // half the number of the file we opened to check if there's a leak.
+        if leaked <= 64 {
+            // test success
+            return;
+        }
+    }
+    panic!("Number of FDs is staying above 64. There is probably an FD leak.");
 }

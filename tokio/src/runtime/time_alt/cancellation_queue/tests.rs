@@ -1,7 +1,5 @@
 use super::*;
 
-use futures::task::noop_waker;
-
 #[cfg(loom)]
 const NUM_ITEMS: usize = 16;
 
@@ -9,7 +7,7 @@ const NUM_ITEMS: usize = 16;
 const NUM_ITEMS: usize = 64;
 
 fn new_handle() -> EntryHandle {
-    EntryHandle::new(0, noop_waker())
+    EntryHandle::new(0)
 }
 
 fn model<F: Fn() + Send + Sync + 'static>(f: F) {

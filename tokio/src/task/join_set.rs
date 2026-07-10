@@ -288,11 +288,11 @@ impl<T: 'static> JoinSet<T> {
     ///
     /// Returns `None` if the set is empty.
     ///
-    /// # Cancel Safety
+    /// # Cancel safety
     ///
-    /// This method is cancel safe. If `join_next` is used as the event in a `tokio::select!`
-    /// statement and some other branch completes first, it is guaranteed that no tasks were
-    /// removed from this `JoinSet`.
+    /// This method is cancel safe. If `join_next` is used as a branch in
+    /// `tokio::select!` and another branch completes first, it is guaranteed
+    /// that no tasks were removed from this `JoinSet`.
     pub async fn join_next(&mut self) -> Option<Result<T, JoinError>> {
         std::future::poll_fn(|cx| self.poll_join_next(cx)).await
     }
@@ -305,11 +305,11 @@ impl<T: 'static> JoinSet<T> {
     /// When this method returns an error, then the id of the task that failed can be accessed
     /// using the [`JoinError::id`] method.
     ///
-    /// # Cancel Safety
+    /// # Cancel safety
     ///
-    /// This method is cancel safe. If `join_next_with_id` is used as the event in a `tokio::select!`
-    /// statement and some other branch completes first, it is guaranteed that no tasks were
-    /// removed from this `JoinSet`.
+    /// This method is cancel safe. If `join_next_with_id` is used as a branch
+    /// in `tokio::select!` and another branch completes first, it is
+    /// guaranteed that no tasks were removed from this `JoinSet`.
     ///
     /// [task ID]: crate::task::Id
     /// [`JoinError::id`]: fn@crate::task::JoinError::id

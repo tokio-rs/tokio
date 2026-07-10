@@ -115,9 +115,7 @@ impl Decoder for LinesCodec {
             // there's no max_length set, we'll read to the end of the buffer.
             let read_to = cmp::min(self.max_length.saturating_add(1), buf.len());
 
-            let newline_offset = buf[self.next_index..read_to]
-                .iter()
-                .position(|b| *b == b'\n');
+            let newline_offset = crate::util::memchr::memchr(b'\n', &buf[self.next_index..read_to]);
 
             match (self.is_discarding, newline_offset) {
                 (true, Some(offset)) => {

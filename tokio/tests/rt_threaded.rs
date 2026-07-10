@@ -1,6 +1,5 @@
 #![warn(rust_2018_idioms)]
-// Too slow on miri.
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))]
+#![cfg(all(feature = "full", not(target_os = "wasi")))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -35,6 +34,7 @@ fn single_thread() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Too slow on miri.
 fn many_oneshot_futures() {
     // used for notifying the main thread
     const NUM: usize = 1_000;
@@ -98,6 +98,7 @@ fn spawn_two() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Too slow on miri
 fn many_multishot_futures() {
     const CHAIN: usize = 200;
     const CYCLES: usize = 5;
@@ -188,7 +189,6 @@ fn lifo_slot_budget() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // No `socket` in miri.
 fn spawn_shutdown() {
     let rt = rt();
     let (tx, rx) = mpsc::channel();
@@ -232,6 +232,7 @@ async fn client_server(tx: mpsc::Sender<()>) {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Too slow on miri
 fn drop_threadpool_drops_futures() {
     for _ in 0..1_000 {
         let num_inc = Arc::new(AtomicUsize::new(0));
@@ -322,8 +323,7 @@ fn start_stop_callbacks_called() {
 }
 
 #[test]
-// too slow on miri
-#[cfg_attr(miri, ignore)]
+#[cfg_attr(miri, ignore)] // Too slow on miri
 fn blocking() {
     // used for notifying the main thread
     const NUM: usize = 1_000;
@@ -692,99 +692,6 @@ fn mutex_in_block_in_place() {
     })
 }
 
-// Tests that when a task is notified by another task and is placed in the LIFO
-// slot, and then the notifying task blocks the runtime, the notified task will
-// be stolen by another worker thread.
-//
-// Integration test for: https://github.com/tokio-rs/tokio/issues/4941
-#[test]
-fn lifo_stealable() {
-    use std::time::Duration;
-
-    // This test constructs a scenario where a task (the "blocker task")
-    // notifies another task (the "victim task") and then blocks that worker
-    // thread indefinitely. The victim task is placed in the worker's LIFO
-    // slot, and will only run to completion if another worker steals it from
-    // the LIFO slot, as the current worker remains blocked running the blocker
-    // task.
-    //
-    // To make the blocker task block its worker thread without yielding, we use
-    // a `std::sync` blocking channel, so that we can eventually unblock it when
-    // the test completes.
-    let (block_thread_tx, block_thread_rx) = mpsc::channel::<()>();
-    // We use this channel to wait until the victim task has started running. If
-    // we just spawned the victim task and then immediately blocked the worker
-    // thread, it would be in the global inject queue, rather than in the
-    // worker's LIFO slot.
-    let (task_started_tx, task_started_rx) = tokio::sync::oneshot::channel();
-    // Finally, this channel is used by the blocker task to wake up the victim
-    // task, so that it is placed in the worker's LIFO slot.
-    let (notify_tx, notify_rx) = tokio::sync::oneshot::channel();
-    let rt = runtime::Builder::new_multi_thread()
-        // Make sure there are enough workers that one can be parked running the
-        // I/O driver and another can be parked running the timer wheel and
-        // there's still at least one worker free to steal the blocked task.
-        .worker_threads(4)
-        .enable_time()
-        .build()
-        .unwrap();
-
-    rt.block_on(async {
-        let victim_task_joined = tokio::spawn(async move {
-            println!("[victim] task started");
-            task_started_tx.send(()).unwrap();
-            println!("[victim] task waiting for wakeup...");
-            notify_rx.await.unwrap();
-            println!("[victim] task running after wakeup");
-        });
-
-        // Wait for the victim task to have been polled once and have yielded
-        // before we spawn the task that will notify it. This ensures that it
-        // will be placed in the LIFO slot of the same worker thread as the
-        // blocker task, rather than on the global injector queue.
-        task_started_rx.await.unwrap();
-        println!("[main] victim slot task start acked!");
-
-        // Now, spawn a task that will notify the victim task before going
-        // blocking forever.
-        tokio::spawn(async move {
-            println!("[blocker] sending wakeup");
-            notify_tx.send(()).unwrap();
-
-            println!("[blocker] blocking the worker thread...");
-            // Block the worker thread indefinitely by waiting for a message on
-            // a blocking channel. Since we just notified the victim task, it
-            // went into the current worker thread's LIFO slot, and will only
-            // be able to complete if another worker thread successfully steals
-            // it from the LIFO slot.
-            //
-            // Using a channel rather than e.g. `loop {}` allows us to terminate
-            // the task cleanly when the test finishes.
-            let _ = block_thread_rx.recv();
-            println!("[blocker] done");
-        });
-
-        println!("[main] blocker task spawned");
-
-        // Wait for the victim task to join. If it does, then it has been stolen
-        // by another worker thread successfully.
-        //
-        // The 30-second timeout is chosen arbitrarily: its purpose is to ensure
-        // that the failure mode for this test is a panic, rather than hanging
-        // indefinitely. 30 seconds should be plenty of time for the task to be
-        // stolen, if it's going to work.
-        let result = tokio::time::timeout(Duration::from_secs(30), victim_task_joined).await;
-        println!("[main] result: {result:?}");
-
-        // Before possibly panicking, make sure that we wake up the blocker task
-        // so that it doesn't stop the runtime from shutting down.
-        block_thread_tx.send(()).unwrap();
-        result
-            .expect("task in LIFO slot should complete within 30 seconds")
-            .expect("task in LIFO slot should not panic");
-    })
-}
-
 #[test]
 /// Deferred tasks should be woken before starting the [`tokio::task::block_in_place`]
 // https://github.com/tokio-rs/tokio/issues/7877
@@ -793,7 +700,7 @@ fn wake_deferred_tasks_before_block_in_place() {
     let (tx2, rx2) = oneshot::channel::<()>();
 
     let deferred_task = tokio_test::task::spawn(tokio::task::yield_now());
-    let deffered_task = Arc::new(Mutex::new(deferred_task));
+    let deferred_task = Arc::new(Mutex::new(deferred_task));
 
     let rt = runtime::Builder::new_multi_thread()
         .worker_threads(1)
@@ -801,7 +708,7 @@ fn wake_deferred_tasks_before_block_in_place() {
         .unwrap();
 
     let jh = {
-        let deferred_task = Arc::clone(&deffered_task);
+        let deferred_task = Arc::clone(&deferred_task);
         rt.spawn(async move {
             {
                 let mut lock = deferred_task.lock().unwrap();
@@ -821,7 +728,7 @@ fn wake_deferred_tasks_before_block_in_place() {
 
     // check that the deferred task was woken before the `block_in_place` ends
     let is_woken = {
-        let lock = deffered_task.lock().unwrap();
+        let lock = deferred_task.lock().unwrap();
         lock.is_woken()
     };
 
@@ -840,6 +747,7 @@ fn wake_deferred_tasks_before_block_in_place() {
 // could add limits, but that would be likely to fail on CI.
 #[test]
 #[cfg(not(tokio_no_tuning_tests))]
+#[cfg_attr(miri, ignore)] // Too slow on miri
 fn test_tuning() {
     use std::sync::atomic::AtomicBool;
     use std::time::Duration;

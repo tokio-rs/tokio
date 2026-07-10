@@ -38,6 +38,10 @@ mock! {
         pub fn try_clone(&self) -> io::Result<Self>;
     }
     #[cfg(windows)]
+    impl From<std::os::windows::io::OwnedHandle> for File {
+        fn from(handle: std::os::windows::io::OwnedHandle) -> Self;
+    }
+    #[cfg(windows)]
     impl std::os::windows::io::AsRawHandle for File {
         fn as_raw_handle(&self) -> std::os::windows::io::RawHandle;
     }
@@ -103,6 +107,15 @@ impl From<MockFile> for OwnedFd {
     #[inline]
     fn from(file: MockFile) -> OwnedFd {
         unsafe { OwnedFd::from_raw_fd(file.as_raw_fd()) }
+    }
+}
+
+#[cfg(all(test, unix))]
+impl From<OwnedFd> for MockFile {
+    #[inline]
+    fn from(file: OwnedFd) -> MockFile {
+        use std::os::fd::IntoRawFd;
+        unsafe { MockFile::from_raw_fd(IntoRawFd::into_raw_fd(file)) }
     }
 }
 
