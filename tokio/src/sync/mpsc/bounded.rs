@@ -1664,6 +1664,12 @@ impl<T> Permit<'_, T> {
     /// even if the receiver half has been closed. See [`Receiver::close`] for
     /// more details on performing a clean shutdown.
     ///
+    /// If the receiver half has been *dropped* (rather than closed), the value
+    /// is still sent into the channel, but it will never be received. It is
+    /// dropped only when every handle to the channel (senders, weak senders,
+    /// and outstanding permits) has been dropped. Do not rely on the value
+    /// being dropped promptly, e.g. when its destructor has side effects.
+    ///
     /// [`Receiver::close`]: Receiver::close
     ///
     /// # Examples
@@ -1785,6 +1791,12 @@ impl<T> OwnedPermit<T> {
     /// to the receiver and the permit is consumed. The operation will succeed
     /// even if the receiver half has been closed. See [`Receiver::close`] for
     /// more details on performing a clean shutdown.
+    ///
+    /// If the receiver half has been *dropped* (rather than closed), the value
+    /// is still sent into the channel, but it will never be received. It is
+    /// dropped only when every handle to the channel (senders, weak senders,
+    /// and outstanding permits) has been dropped. Do not rely on the value
+    /// being dropped promptly, e.g. when its destructor has side effects.
     ///
     /// Unlike [`Permit::send`], this method returns the [`Sender`] from which
     /// the `OwnedPermit` was reserved.

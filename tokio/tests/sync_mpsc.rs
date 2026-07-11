@@ -519,6 +519,51 @@ async fn recv_close_gets_none_reserved() {
     assert!(rx.recv().await.is_none());
 }
 
+// Pins the behavior documented on `Permit::send`: a value sent through a
+// previously reserved permit after the receiver is *dropped* is neither
+// received nor dropped immediately; it is dropped only when every handle to
+// the channel has been dropped.
+#[maybe_tokio_test]
+async fn permit_send_after_rx_drop_defers_value_drop() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct SetOnDrop(Arc<AtomicBool>);
+    impl Drop for SetOnDrop {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    let dropped = Arc::new(AtomicBool::new(false));
+    let (tx, rx) = mpsc::channel(1);
+
+    let permit = assert_ok!(tx.reserve().await);
+    drop(rx);
+
+    // The send succeeds even though the receiver is gone, and the value is
+    // not dropped while the sender is still alive.
+    permit.send(SetOnDrop(dropped.clone()));
+    assert!(!dropped.load(Ordering::SeqCst));
+
+    // The value is dropped together with the last channel handle.
+    drop(tx);
+    assert!(dropped.load(Ordering::SeqCst));
+}
+
+// Contrast case: after `Receiver::close`, a value sent through a previously
+// reserved permit is still received (clean-shutdown contract).
+#[maybe_tokio_test]
+async fn permit_send_after_rx_close_is_received() {
+    let (tx, mut rx) = mpsc::channel(1);
+
+    let permit = assert_ok!(tx.reserve().await);
+    rx.close();
+
+    permit.send(123);
+    assert_eq!(rx.recv().await, Some(123));
+    assert!(rx.recv().await.is_none());
+}
+
 #[maybe_tokio_test]
 async fn tx_close_gets_none() {
     let (_, mut rx) = mpsc::channel::<i32>(10);

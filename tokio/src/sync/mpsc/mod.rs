@@ -35,8 +35,11 @@
 //!
 //! If the [`Receiver`] handle is dropped, then messages can no longer
 //! be read out of the channel. In this case, all further attempts to send will
-//! result in an error. Additionally, all unread messages will be drained from the
-//! channel and dropped.
+//! result in an error, and all unread messages are drained from the channel and
+//! dropped. However, a value sent through a previously reserved [`Permit`] or
+//! [`OwnedPermit`] does not result in an error, and is not dropped until every
+//! handle to the channel (senders, weak senders, and outstanding permits) has
+//! been dropped.
 //!
 //! # Clean Shutdown
 //!
@@ -102,6 +105,8 @@
 //!
 //! [`Sender`]: crate::sync::mpsc::Sender
 //! [`Receiver`]: crate::sync::mpsc::Receiver
+//! [`Permit`]: crate::sync::mpsc::Permit
+//! [`OwnedPermit`]: crate::sync::mpsc::OwnedPermit
 //! [bounded-send]: crate::sync::mpsc::Sender::send()
 //! [bounded-recv]: crate::sync::mpsc::Receiver::recv()
 //! [blocking-send]: crate::sync::mpsc::Sender::blocking_send()
