@@ -234,7 +234,7 @@ impl Driver {
             let ctx = &mut *guard;
             ctx.dispatch_completions();
 
-            // There might be some cases when the CQ overflows, so we need to flush
+            // There might be some cases where the CQ overflows, so we need to flush
             // the remaining buffered CQEs.
             while ctx
                 .uring
