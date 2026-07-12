@@ -233,6 +233,18 @@ impl Driver {
             let mut guard = handle.get_uring().lock();
             let ctx = &mut *guard;
             ctx.dispatch_completions();
+
+            // There might be some cases when the CQ overflows, so we need to flush
+            // the remaining buffered CQEs.
+            while ctx
+                .uring
+                .as_mut()
+                .is_some_and(|uring| uring.submission().cq_overflow())
+            {
+                ctx.submit()
+                    .expect("failed to flush io_uring completion queue overflow");
+                ctx.dispatch_completions();
+            }
         }
 
         handle.metrics.incr_ready_count_by(ready_count);
