@@ -99,11 +99,8 @@ jobs:
             -initrd initramfs.cpio.gz \
             -append "console=ttyS0 rootfstype=ramfs panic=1" \
             -nographic -no-reboot -m 1024 -action panic=exit-failure 2>&1 | tee qemu-output.log
-          statuses=("${PIPESTATUS[@]}")
+          qemu_status=${PIPESTATUS[0]} tee_status=${PIPESTATUS[1]}
           set -e
-
-          qemu_status=${statuses[0]}
-          tee_status=${statuses[1]}
 
           if [ "$qemu_status" -ne 0 ]; then
             echo "QEMU exited with status $qemu_status"
