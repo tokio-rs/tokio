@@ -295,7 +295,7 @@ pub(crate) mod test {
     #[cfg_attr(miri, ignore)] // No `sigaction` on Miri
     #[test]
     fn does_not_register_signal_if_queue_empty() {
-        let (io_driver, io_handle) = IoDriver::new(1024).unwrap();
+        let (io_driver, io_handle) = IoDriver::new(1024, 1).unwrap();
         let signal_driver = SignalDriver::new(io_driver, &io_handle).unwrap();
         let handle = signal_driver.handle();
 

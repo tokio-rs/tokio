@@ -7,7 +7,7 @@ use crate::runtime::driver::op::CqeResult;
 use crate::runtime::driver::op::{Cancellable, Lifecycle};
 use crate::{io::Interest, loom::sync::Mutex};
 
-use super::{Handle, TOKEN_WAKEUP};
+use super::{Handle, URING_TOKEN_FLAG};
 
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::{io, mem, task::Waker};
@@ -35,31 +35,15 @@ impl UringContext {
         self.uring.as_mut().expect("io_uring not initialized")
     }
 
-    /// Perform `io_uring_setup` system call, and Returns true if this
-    /// actually initialized the io_uring.
+    /// Create this worker's `io_uring` instance via the `io_uring_setup` system
+    /// call. Called lazily on the first operation that binds to this ring.
     ///
-    /// If the machine doesn't support io_uring, then this will return an
-    /// `ENOSYS` error.
-    pub(crate) fn try_init(&mut self, probe: &mut Probe) -> io::Result<bool> {
-        if self.uring.is_some() {
-            // Already initialized.
-            return Ok(false);
-        }
-
-        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
-
-        match uring.submitter().register_probe(probe) {
-            Ok(_) => {}
-            Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {
-                // The kernel does not support IORING_REGISTER_PROBE.
-                return Err(io::Error::from_raw_os_error(libc::ENOSYS));
-            }
-            Err(e) => return Err(e),
-        }
-
-        self.uring.replace(uring);
-
-        Ok(true)
+    /// Kernel support and the set of available opcodes are probed once for the
+    /// whole runtime in [`Handle::check_and_init`], so this does not probe again.
+    fn init(&mut self) -> io::Result<()> {
+        debug_assert!(self.uring.is_none());
+        self.uring = Some(IoUring::new(DEFAULT_RING_SIZE)?);
+        Ok(())
     }
 
     pub(crate) fn dispatch_completions(&mut self) {
@@ -173,14 +157,22 @@ impl Drop for UringContext {
 }
 
 impl Handle {
-    fn add_uring_source(&self, uringfd: RawFd) -> io::Result<()> {
+    fn add_uring_source(&self, index: usize, uringfd: RawFd) -> io::Result<()> {
         let mut source = SourceFd(&uringfd);
+        let token = mio::Token(URING_TOKEN_FLAG | index);
         self.registry
-            .register(&mut source, TOKEN_WAKEUP, Interest::READABLE.to_mio())
+            .register(&mut source, token, Interest::READABLE.to_mio())
     }
 
-    pub(crate) fn get_uring(&self) -> &Mutex<UringContext> {
-        &self.uring_context
+    pub(crate) fn uring_context(&self, index: usize) -> &Mutex<UringContext> {
+        &self.uring_contexts[index]
+    }
+
+    /// Index of the `io_uring` ring owned by the worker currently executing.
+    fn current_uring_index(&self) -> usize {
+        crate::runtime::context::worker_index()
+            .unwrap_or(0)
+            .min(self.uring_contexts.len() - 1)
     }
 
     /// Returns `true` if io_uring has already been initialized and the given
@@ -203,14 +195,16 @@ impl Handle {
         self.uring_probe.get().is_some()
     }
 
-    /// Check if the io_uring context is initialized. If not, it will try to initialize it.
-    /// Then, check if the provided opcode is supported.
+    /// Probe the kernel for io_uring support and check whether `opcode` is
+    /// available. The probe is performed once for the whole runtime and cached,
+    /// since the set of supported opcodes is a kernel property shared by every
+    /// ring. The per-worker rings themselves are created lazily in
+    /// [`Handle::register_op`].
     ///
-    /// If both the context initialization succeeds and the opcode is supported,
-    /// this returns `Ok(true)`.
-    /// If either io_uring is unsupported or the opcode is unsupported,
-    /// this returns `Ok(false)`.
-    /// An error is returned if an io_uring syscall returns an unexpected error value.
+    /// Returns `Ok(true)` if io_uring is supported and offers `opcode`, and
+    /// `Ok(false)` if io_uring is unavailable or `opcode` is unsupported (the
+    /// caller then falls back to `spawn_blocking`). An error is returned only if
+    /// an io_uring syscall fails unexpectedly.
     ///
     /// TODO: This would like to be a synchronous function,
     /// but we require `OnceLock::get_or_try_init`.
@@ -220,7 +214,7 @@ impl Handle {
             .uring_probe
             .get_or_try_init(|| async {
                 let mut probe = Probe::new();
-                match self.try_init(&mut probe) {
+                match Self::probe_kernel(&mut probe) {
                     Ok(()) => Ok(Some(probe)),
                     // If the system doesn't support io_uring, we set the probe to `None`.
                     Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => Ok(None),
@@ -239,33 +233,62 @@ impl Handle {
             .is_some_and(|probe| probe.is_supported(opcode)))
     }
 
-    /// Initialize the io_uring context if it hasn't been initialized yet.
-    fn try_init(&self, probe: &mut Probe) -> io::Result<()> {
-        let mut guard = self.get_uring().lock();
-        if guard.try_init(probe)? {
-            self.add_uring_source(guard.ring().as_raw_fd())?;
+    /// Register a `Probe` describing the kernel's io_uring support against a
+    /// throwaway ring. The ring is dropped afterwards; only the probe is kept,
+    /// as its result applies to every per-worker ring.
+    fn probe_kernel(probe: &mut Probe) -> io::Result<()> {
+        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
+        match uring.submitter().register_probe(probe) {
+            Ok(_) => Ok(()),
+            // The kernel does not support IORING_REGISTER_PROBE.
+            Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {
+                Err(io::Error::from_raw_os_error(libc::ENOSYS))
+            }
+            Err(e) => Err(e),
         }
-
-        Ok(())
     }
 
-    /// Register an operation with the io_uring.
+    /// Register an operation with the current worker's io_uring, submitting it
+    /// to the kernel.
     ///
-    /// If this is the first io_uring operation, it will also initialize the io_uring context.
-    /// If io_uring isn't supported, this function returns an `ENOSYS` error, so the caller can
-    /// perform custom handling, such as falling back to an alternative mechanism.
+    /// The operation binds to the ring of the worker executing this call; that
+    /// ring is created lazily if this is its first operation. Returns the
+    /// `(ring, index)` pair identifying the operation, which the caller stores so
+    /// that later polls and cancellation reach the same ring even if the task is
+    /// stolen to another worker.
     ///
     /// # Safety
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> io::Result<usize> {
+    pub(crate) unsafe fn register_op(
+        &self,
+        entry: Entry,
+        waker: Waker,
+    ) -> io::Result<(usize, usize)> {
+        // The kernel probe is always initialized before ops are registered; see
+        // `check_and_init`, which every fs entry point awaits first.
         assert!(self.uring_probe.initialized());
 
-        // Uring is initialized.
-
-        let mut guard = self.get_uring().lock();
+        let ring = self.current_uring_index();
+        let mut guard = self.uring_contexts[ring].lock();
         let ctx = &mut *guard;
+
+        // Create this worker's ring on first use, and register its fd with mio so
+        // the driver wakes up when its completions arrive.
+        if ctx.uring.is_none() {
+            ctx.init()?;
+            let fd = ctx.ring().as_raw_fd();
+            if let Err(e) = self.add_uring_source(ring, fd) {
+                // Registration failed after the ring was created, leaving it with
+                // an fd mio isn't watching. Drop the ring so a later operation
+                // retries a clean init rather than submitting to a ring whose
+                // completions would never be dispatched.
+                ctx.uring = None;
+                return Err(e);
+            }
+        }
+
         let index = ctx.ops.insert(Lifecycle::Waiting(waker));
         let entry = entry.user_data(index as u64);
 
@@ -292,11 +315,11 @@ impl Handle {
         // Note: For now, we submit the entry immediately without utilizing batching.
         submit_or_remove(ctx)?;
 
-        Ok(index)
+        Ok((ring, index))
     }
 
-    pub(crate) fn cancel_op<T: Cancellable>(&self, index: usize, data: Option<T>) {
-        let mut guard = self.get_uring().lock();
+    pub(crate) fn cancel_op<T: Cancellable>(&self, ring: usize, index: usize, data: Option<T>) {
+        let mut guard = self.uring_contexts[ring].lock();
         let ctx = &mut *guard;
         let ops = &mut ctx.ops;
         let Some(lifecycle) = ops.get_mut(index) else {

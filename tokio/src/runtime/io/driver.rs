@@ -51,6 +51,10 @@ pub(crate) struct Handle {
 
     pub(crate) metrics: IoDriverMetrics,
 
+    /// One `io_uring` ring per scheduler worker. An operation binds to the ring
+    /// of the worker that first submits it, so each ring's queues and slab are
+    /// only mutated under that ring's lock, avoiding contention on a single
+    /// global ring while the scheduler keeps stealing tasks across workers.
     #[cfg(all(
         tokio_unstable,
         feature = "io-uring",
@@ -58,8 +62,10 @@ pub(crate) struct Handle {
         feature = "fs",
         target_os = "linux",
     ))]
-    pub(crate) uring_context: Mutex<UringContext>,
+    pub(crate) uring_contexts: Box<[Mutex<UringContext>]>,
 
+    /// Kernel io_uring support probe. The set of supported opcodes is a kernel
+    /// property shared by every ring, so it is probed once for the whole runtime.
     #[cfg(all(
         tokio_unstable,
         feature = "io-uring",
@@ -103,6 +109,19 @@ pub(super) enum Tick {
 const TOKEN_WAKEUP: mio::Token = mio::Token(0);
 const TOKEN_SIGNAL: mio::Token = mio::Token(1);
 
+/// A worker registers its `io_uring` CQ fd with mio using a token that has highest bit set.
+/// Completion readiness for ring `i` arrives as `mio::Token(URING_TOKEN_FLAG | i)`.
+/// The bit distinguishes rings from `TOKEN_WAKEUP` (0), `TOKEN_SIGNAL` (1),
+/// and the `ScheduledIo` pointers (userspace addresses never have the top bit set).
+#[cfg(all(
+    tokio_unstable,
+    feature = "io-uring",
+    feature = "rt",
+    feature = "fs",
+    target_os = "linux",
+))]
+pub(crate) const URING_TOKEN_FLAG: usize = 1 << (usize::BITS - 1);
+
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
 
@@ -114,7 +133,24 @@ fn _assert_kinds() {
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub(crate) fn new(nevents: usize) -> io::Result<(Driver, Handle)> {
+    ///
+    /// `workers` is the number of scheduler worker threads; the io driver
+    /// allocates one `io_uring` ring per worker (the rings themselves are
+    /// created lazily on first use).
+    pub(crate) fn new(
+        nevents: usize,
+        #[cfg_attr(
+            not(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            )),
+            allow(unused_variables)
+        )]
+        workers: usize,
+    ) -> io::Result<(Driver, Handle)> {
         let poll = mio::Poll::new()?;
         #[cfg(not(target_os = "wasi"))]
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
@@ -142,7 +178,10 @@ impl Driver {
                 feature = "fs",
                 target_os = "linux",
             ))]
-            uring_context: Mutex::new(UringContext::new()),
+            uring_contexts: (0..workers)
+                .map(|_| Mutex::new(UringContext::new()))
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             #[cfg(all(
                 tokio_unstable,
                 feature = "io-uring",
@@ -206,6 +245,21 @@ impl Driver {
             } else if token == TOKEN_SIGNAL {
                 self.signal_ready = true;
             } else {
+                // Completion-queue readiness for a per-worker io_uring ring:
+                // drain just that ring rather than scanning every ring.
+                #[cfg(all(
+                    tokio_unstable,
+                    feature = "io-uring",
+                    feature = "rt",
+                    feature = "fs",
+                    target_os = "linux",
+                ))]
+                if token.0 & URING_TOKEN_FLAG != 0 {
+                    let ring = token.0 & !URING_TOKEN_FLAG;
+                    handle.uring_context(ring).lock().dispatch_completions();
+                    continue;
+                }
+
                 let ready = Ready::from_mio(event);
                 let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
 
@@ -220,19 +274,6 @@ impl Driver {
 
                 ready_count += 1;
             }
-        }
-
-        #[cfg(all(
-            tokio_unstable,
-            feature = "io-uring",
-            feature = "rt",
-            feature = "fs",
-            target_os = "linux",
-        ))]
-        {
-            let mut guard = handle.get_uring().lock();
-            let ctx = &mut *guard;
-            ctx.dispatch_completions();
         }
 
         handle.metrics.incr_ready_count_by(ready_count);
