@@ -398,7 +398,7 @@ macro_rules! cfg_process {
             #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
             #[cfg(not(loom))]
             #[cfg(not(target_os = "wasi"))]
-            // emscripten has no `fork`/`exec`, so the `process` module is a
+            // Emscripten has no `fork`/`exec`, so the `process` module is a
             // throwing stub there (see `process/emscripten.rs`); it still
             // compiles so dependents that name the types build. The orphan
             // reaper / signal driver it would otherwise need stays off via
@@ -413,7 +413,7 @@ macro_rules! cfg_process_driver {
         #[cfg(unix)]
         #[cfg(not(loom))]
         // The driver (orphan reaper backed by the signal handler) doesn't exist
-        // on emscripten; the process module there is a throwing stub.
+        // on Emscripten; the process module there is a throwing stub.
         #[cfg(not(target_os = "emscripten"))]
         cfg_process! { $($item)* }
     }
@@ -438,7 +438,7 @@ macro_rules! cfg_signal {
             #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
             #[cfg(not(loom))]
             #[cfg(not(target_os = "wasi"))]
-            // No kernel signal delivery on emscripten; inert there.
+            // No kernel signal delivery on Emscripten; inert there.
             #[cfg(not(target_os = "emscripten"))]
             $item
         )*
@@ -783,7 +783,7 @@ macro_rules! cfg_not_schedule_latency {
     }
 }
 
-/// Enables emscripten-specific code.
+/// Enables Emscripten-specific code.
 macro_rules! cfg_emscripten {
     ($($item:item)*) => {
         $(
@@ -794,7 +794,7 @@ macro_rules! cfg_emscripten {
     }
 }
 
-/// Enables code for non-emscripten targets.
+/// Enables code for non-Emscripten targets.
 macro_rules! cfg_not_emscripten {
     ($($item:item)*) => {
         $(
@@ -804,7 +804,7 @@ macro_rules! cfg_not_emscripten {
     }
 }
 
-/// Enables code requiring both the `rt` feature and the emscripten target.
+/// Enables code requiring both the `rt` feature and the Emscripten target.
 macro_rules! cfg_rt_emscripten {
     ($($item:item)*) => {
         $(
