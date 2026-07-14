@@ -101,7 +101,7 @@ bytes = { version = "1.2.1", optional = true }
 mio = { version = "1.2.0", optional = true, default-features = false }
 parking_lot = { version = "0.12.0", optional = true }
 
-[target.'cfg(any(not(target_family = "wasm"), all(target_os = "wasi", not(target_env = "p1"))))'.dependencies]
+[target.'cfg(any(not(target_family = "wasm"), target_os = "emscripten", all(target_os = "wasi", not(target_env = "p1"))))'.dependencies]
 socket2 = { version = "0.6.3", optional = true, features = ["all"] }
 
 # Currently unstable. The API exposed by these features may be broken at any time.
@@ -130,6 +130,8 @@ libc = { version = "0.2.168", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = { version = "0.2.168" }
+
+[target.'cfg(all(unix, not(target_os = "emscripten")))'.dev-dependencies]
 nix = { version = "0.31.0", default-features = false, features = ["aio", "fs", "socket"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
@@ -146,22 +148,26 @@ features = [
 [dev-dependencies]
 tokio-test = "0.4.0"
 tokio-stream = "0.1"
-tokio-util = { version = "0.7", features = ["rt"] }
 futures = { version = "0.3.0", features = ["async-await"] }
 futures-test = "0.3.31"
 mockall = "0.13.0"
 async-stream = "0.3"
 futures-concurrency = "7.6.3"
 
+[target.'cfg(not(target_os = "emscripten"))'.dev-dependencies]
+tokio-util = { version = "0.7", features = ["rt"] }
+
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 socket2 = "0.6.0"
-tempfile = "3.1.0"
 proptest = "1"
+
+[target.'cfg(any(not(target_family = "wasm"), target_os = "emscripten"))'.dev-dependencies]
+tempfile = "3.1.0"
 
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dev-dependencies]
 rand = "0.9"
 
-[target.'cfg(all(target_family = "wasm", not(target_os = "wasi")))'.dev-dependencies]
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dev-dependencies]
 wasm-bindgen-test = "0.3.0"
 
 [target.'cfg(target_os = "freebsd")'.dev-dependencies]

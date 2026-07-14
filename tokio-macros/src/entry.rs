@@ -506,7 +506,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
 
     let body_ident = quote! { body };
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
-    let last_block = quote_spanned! {last_stmt_end_span=>
+    let native_last_block = quote_spanned! {last_stmt_end_span=>
 
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return, clippy::unwrap_in_result)]
         {
@@ -519,6 +519,24 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
                 .block_on(#body_ident);
         }
 
+    };
+
+    // Emscripten runs the native expansion; only the `multi_thread` flavor
+    // diverges — it has no native threads there, so it's rejected with a
+    // targeted error rather than the opaque failure of the native
+    // multi-thread `block_on`.
+    let last_block = match config.flavor {
+        RuntimeFlavor::Threaded => quote! {
+            #[cfg(not(target_os = "emscripten"))]
+            #native_last_block
+            #[cfg(target_os = "emscripten")]
+            ::core::compile_error!(
+                "the `multi_thread` runtime flavor is not available on \
+                 wasm32-unknown-emscripten (no native threads); use \
+                 `flavor = \"current_thread\"`"
+            );
+        },
+        _ => native_last_block,
     };
 
     let body = input.body();
