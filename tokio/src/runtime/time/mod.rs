@@ -295,7 +295,7 @@ impl Handle {
     }
 
     /// Returns the absolute deadline in ticks for the soonest unexpired
-    /// timer, or `None` if no timers are registered. Used by the emscripten
+    /// timer, or `None` if no timers are registered. Used by the Emscripten
     /// schedule loop to compute its `setTimeout` delay; ticks here are the
     /// time wheel's monotonic tick basis (`time_source.now()`).
     #[cfg(target_os = "emscripten")]

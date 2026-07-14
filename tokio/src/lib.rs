@@ -447,15 +447,14 @@
 //! ### Emscripten support
 //!
 //! The `wasm32-unknown-emscripten` target is supported at parity with the
-//! other wasm targets. A host-event-loop execution model with a parking
+//! other Wasm targets. A host-event-loop execution model with a parking
 //! `block_on` is a planned follow-up; until it lands, a `block_on` whose
 //! future cannot resolve synchronously behaves as on other single-threaded
-//! wasm targets.
+//! Wasm targets.
 //!
 //! Supported features: `rt`, `time`, `sync`, `macros`, `fs`, `io-util`,
-//! `io-std`, and `test-util`. `fs` and the stdio types run their `std::*`
-//! calls inline, since emscripten's filesystem syscalls complete
-//! synchronously. The `net` reactor (epoll-backed, over emscripten's socket
+//! `io-std`, and `test-util` — the same surface as the other single-threaded
+//! Wasm targets. The `net` reactor (epoll-backed, over Emscripten's socket
 //! support) is planned as a follow-up; until then the `net` feature fails to
 //! build for this target (rejected by `mio`).
 //!
@@ -463,11 +462,10 @@
 //! compile time: `process`/`signal` have no underlying primitives (`fork`/`exec`,
 //! kernel signal delivery) and `rt-multi-thread` has no native threads.
 //!
-//! `spawn_blocking` has no threadpool to dispatch to, so the closure runs as a
-//! canonical spawned task on the single thread and returns the usual
-//! `JoinHandle`. `tokio::fs::*` and `tokio::io::{stdin, stdout, stderr}`
-//! likewise run their `std::*` calls inline, because emscripten's libc
-//! syscalls complete synchronously and don't block the cooperative scheduler.
+//! `spawn_blocking` dispatches to the blocking thread pool and so behaves as on
+//! the other single-threaded Wasm targets. Running `spawn_blocking` closures
+//! and `fs`/stdio `std::*` calls inline over Emscripten's synchronous syscalls
+//! is part of the planned host-event-loop follow-up.
 //!
 //! Panics behave as on native: `wasm32-unknown-emscripten` defaults to
 //! `panic = "unwind"`, so panic recovery works, a panicking task yields
@@ -479,7 +477,7 @@
 //! `flavor = "current_thread"`.
 //!
 //!
-//! #### Linking and running on emscripten
+//! #### Linking and running on Emscripten
 //!
 //! No js-library or other custom file is required, and plain `node` runs the
 //! test binaries directly:
@@ -526,7 +524,7 @@ compile_error! {
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
-// On emscripten, `process`, `signal`, and `rt-multi-thread` compile but are
+// On Emscripten, `process`, `signal`, and `rt-multi-thread` compile but are
 // inert, so `full` (and any dependency that enables these features) still
 // builds. `process` and `signal` have no `fork`/`exec` or kernel signal
 // delivery, so their modules are compiled out (see `cfg_process!` /
