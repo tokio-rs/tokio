@@ -392,6 +392,31 @@ use std::sync::Arc;
 /// # }
 /// ```
 ///
+/// # Memory ordering
+///
+/// `Semaphore` provides synchronization guarantees equivalent to operations on
+/// a single atomic value with the following orderings:
+///
+/// * Successfully acquiring a permit behaves like an [`AcqRel`] operation.
+/// * Adding permits (via [`add_permits`]) behaves like an [`AcqRel`] operation.
+/// * Forgetting permits behaves like an [`AcqRel`] operation.
+/// * Closing the semaphore (via [`close`]) behaves like an [`AcqRel`] operation.
+/// * Failure to acquire a permit because the semaphore is empty behaves like an
+///   [`Acquire`] load.
+/// * Failure to acquire a permit because the semaphore is closed behaves like an
+///   [`Acquire`] load.
+/// * [`available_permits`] and [`is_closed`] behave like [`Acquire`] loads.
+///
+/// Calling `wake` on wakers happens after changing the semaphore state in a
+/// non-atomic manner.
+///
+/// [`AcqRel`]: std::sync::atomic::Ordering::AcqRel
+/// [`Acquire`]: std::sync::atomic::Ordering::Acquire
+/// [`add_permits`]: Semaphore::add_permits
+/// [`close`]: Semaphore::close
+/// [`available_permits`]: Semaphore::available_permits
+/// [`is_closed`]: Semaphore::is_closed
+///
 /// [`PollSemaphore`]: https://docs.rs/tokio-util/latest/tokio_util/sync/struct.PollSemaphore.html
 /// [`Semaphore::acquire_owned`]: crate::sync::Semaphore::acquire_owned
 #[derive(Debug)]
