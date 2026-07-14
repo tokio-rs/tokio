@@ -73,7 +73,7 @@ impl SlowHddWriter {
     fn write_bytes(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-        writeable: usize,
+        writable: usize,
     ) -> std::task::Poll<Result<usize, std::io::Error>> {
         let service_res = self.as_mut().service_write(cx);
 
@@ -86,7 +86,7 @@ impl SlowHddWriter {
             assert!(service_res.is_pending());
             Poll::Pending
         } else {
-            let written = available.min(writeable);
+            let written = available.min(writable);
             self.buffer_used += written;
             Poll::Ready(Ok(written))
         }
@@ -123,8 +123,8 @@ impl AsyncWrite for SlowHddWriter {
         cx: &mut std::task::Context<'_>,
         bufs: &[std::io::IoSlice<'_>],
     ) -> std::task::Poll<Result<usize, std::io::Error>> {
-        let writeable = bufs.iter().fold(0, |acc, buf| acc + buf.len());
-        self.write_bytes(cx, writeable)
+        let writable = bufs.iter().fold(0, |acc, buf| acc + buf.len());
+        self.write_bytes(cx, writable)
     }
 
     fn is_write_vectored(&self) -> bool {

@@ -1275,8 +1275,37 @@ impl<T> Sender<T> {
         if n > self.max_capacity() {
             return Err(SendError(()));
         }
-        match self.chan.semaphore().semaphore.acquire(n).await {
-            Ok(()) => Ok(()),
+
+        // If the reservation fails or is cancelled while it holds some but not
+        // all of the permits it asked for, the inner `Acquire` returns those
+        // permits to the semaphore on drop, without the receiver notification
+        // that `Permit` and `PermitIterator` do on release. Wake the receiver in
+        // that case so a `recv()` blocked on the channel becoming idle can
+        // observe a close. On success the caller receives the permits and takes
+        // over that job, so the guard is forgotten below.
+        struct WakeReceiverOnDrop<'a, T> {
+            chan: &'a chan::Tx<T, Semaphore>,
+        }
+
+        impl<T> Drop for WakeReceiverOnDrop<'_, T> {
+            fn drop(&mut self) {
+                use chan::Semaphore;
+
+                let semaphore = self.chan.semaphore();
+                if semaphore.is_closed() && semaphore.is_idle() {
+                    self.chan.wake_rx();
+                }
+            }
+        }
+
+        let guard = WakeReceiverOnDrop { chan: &self.chan };
+        let result = self.chan.semaphore().semaphore.acquire(n).await;
+
+        match result {
+            Ok(()) => {
+                std::mem::forget(guard);
+                Ok(())
+            }
             Err(_) => Err(SendError(())),
         }
     }
