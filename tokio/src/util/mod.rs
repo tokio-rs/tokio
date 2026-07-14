@@ -5,14 +5,15 @@ cfg_io_driver! {
 #[cfg(feature = "fs")]
 pub(crate) mod as_ref;
 
-#[cfg(feature = "rt")]
-pub(crate) mod atomic_cell;
+cfg_rt! {
+    pub(crate) mod atomic_cell;
+}
 
-#[cfg(feature = "net")]
-mod blocking_check;
-#[cfg(feature = "net")]
-#[allow(unused_imports)]
-pub(crate) use blocking_check::check_socket_for_blocking;
+cfg_net! {
+    mod blocking_check;
+    #[allow(unused_imports)]
+    pub(crate) use blocking_check::check_socket_for_blocking;
+}
 
 pub(crate) mod metric_atomics;
 
@@ -40,6 +41,9 @@ mod wake_list;
     feature = "signal",
     feature = "time",
 ))]
+// Some WakeList consumers are cfg'd out on emscripten, so the re-export may be
+// unused there.
+#[cfg_attr(target_os = "emscripten", allow(unused_imports))]
 pub(crate) use wake_list::WakeList;
 
 #[cfg(any(

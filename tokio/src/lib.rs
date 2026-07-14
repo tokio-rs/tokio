@@ -444,6 +444,53 @@
 //! immediately instead of blocking forever. On platforms that don't support
 //! time, this means that the runtime can never be idle in any way.
 //!
+//! ### Emscripten support
+//!
+//! The `wasm32-unknown-emscripten` target is supported at parity with the
+//! other wasm targets. A host-event-loop execution model with a parking
+//! `block_on` is a planned follow-up; until it lands, a `block_on` whose
+//! future cannot resolve synchronously behaves as on other single-threaded
+//! wasm targets.
+//!
+//! Supported features: `rt`, `time`, `sync`, `macros`, `fs`, `io-util`,
+//! `io-std`, and `test-util`. `fs` and the stdio types run their `std::*`
+//! calls inline, since emscripten's filesystem syscalls complete
+//! synchronously. The `net` reactor (epoll-backed, over emscripten's socket
+//! support) is planned as a follow-up; until then the `net` feature fails to
+//! build for this target (rejected by `mio`).
+//!
+//! The `process`, `signal`, and `rt-multi-thread` features are rejected at
+//! compile time: `process`/`signal` have no underlying primitives (`fork`/`exec`,
+//! kernel signal delivery) and `rt-multi-thread` has no native threads.
+//!
+//! `spawn_blocking` has no threadpool to dispatch to, so the closure runs as a
+//! canonical spawned task on the single thread and returns the usual
+//! `JoinHandle`. `tokio::fs::*` and `tokio::io::{stdin, stdout, stderr}`
+//! likewise run their `std::*` calls inline, because emscripten's libc
+//! syscalls complete synchronously and don't block the cooperative scheduler.
+//!
+//! Panics behave as on native: `wasm32-unknown-emscripten` defaults to
+//! `panic = "unwind"`, so panic recovery works, a panicking task yields
+//! `Err(JoinError)`, and `JoinError::is_panic` / `JoinError::into_panic`
+//! report the payload.
+//!
+//! `#[tokio::test]` / `#[tokio::main]` use the native macro expansion; the
+//! `multi_thread` flavor is rejected (no native threads) — use
+//! `flavor = "current_thread"`.
+//!
+//!
+//! #### Linking and running on emscripten
+//!
+//! No js-library or other custom file is required, and plain `node` runs the
+//! test binaries directly:
+//!
+//! ```text
+//! CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER="node"
+//! RUSTFLAGS="-C link-args=-sALLOW_MEMORY_GROWTH=1 \
+//!            -C link-args=-sEXIT_RUNTIME=1 \
+//!            -C link-args=-sSTACK_SIZE=1048576"
+//! ```
+//!
 //! ## Unstable `WASM` support
 //!
 //! Tokio also has unstable support for some additional `WASM` features. This
@@ -467,6 +514,7 @@ compile_error! {
 #[cfg(all(
     not(tokio_unstable),
     target_family = "wasm",
+    not(target_os = "emscripten"),
     any(
         feature = "fs",
         feature = "io-std",
@@ -477,6 +525,13 @@ compile_error! {
     )
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
+
+// On emscripten, `process`, `signal`, and `rt-multi-thread` compile but are
+// inert, so `full` (and any dependency that enables these features) still
+// builds. `process` and `signal` have no `fork`/`exec` or kernel signal
+// delivery, so their modules are compiled out (see `cfg_process!` /
+// `cfg_signal!`). The multi-threaded runtime compiles but only runs under a
+// `PROXY_TO_PTHREAD` build; `#[tokio::main]` steers to `current_thread`.
 
 #[cfg(all(not(tokio_unstable), feature = "io-uring"))]
 compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");

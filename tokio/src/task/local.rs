@@ -1279,7 +1279,7 @@ impl LocalState {
 // ensure they are on the same thread that owns the `LocalSet`.
 unsafe impl Send for LocalState {}
 
-#[cfg(all(test, not(loom)))]
+#[cfg(all(test, not(loom), not(target_os = "emscripten")))]
 mod tests {
     use super::*;
 

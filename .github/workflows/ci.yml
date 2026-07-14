@@ -1163,6 +1163,47 @@ jobs:
           RUSTFLAGS: --cfg tokio_unstable
           CARGO_TARGET_WASM32_WASIP2_RUNNER: wasmtime run -Sinherit-network
 
+  wasm32-unknown-emscripten:
+    name: test tokio for wasm32-unknown-emscripten
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_stable }}
+          targets: wasm32-unknown-emscripten
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 'latest'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+
+      - name: Check tokio feature matrix for emscripten
+        run: cargo hack check -p tokio --each-feature --exclude-features full,net,process,signal,rt-multi-thread,io-uring,taskdump,schedule-latency --target wasm32-unknown-emscripten
+        working-directory: tokio
+        env:
+          RUSTFLAGS: ""
+
+      - name: Test tokio for emscripten
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,io-util,test-util" --tests
+        working-directory: tokio
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
+          RUSTFLAGS: "-C link-args=-sALLOW_MEMORY_GROWTH=1 -C link-args=-sEXIT_RUNTIME=1 -C link-args=-sSTACK_SIZE=1048576"
+
   check-external-types:
     name: check-external-types (${{ matrix.os }})
     needs: basics

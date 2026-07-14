@@ -287,10 +287,20 @@ impl Driver {
 }
 
 impl Handle {
-    pub(self) fn process(&self, clock: &Clock) {
+    #[cfg_attr(not(target_os = "emscripten"), allow(dead_code))]
+    pub(crate) fn process(&self, clock: &Clock) {
         let now = self.time_source().now(clock);
 
         self.process_at_time(now);
+    }
+
+    /// Returns the absolute deadline in ticks for the soonest unexpired
+    /// timer, or `None` if no timers are registered. Used by the emscripten
+    /// schedule loop to compute its `setTimeout` delay; ticks here are the
+    /// time wheel's monotonic tick basis (`time_source.now()`).
+    #[cfg(target_os = "emscripten")]
+    pub(crate) fn next_expiration_tick(&self) -> Option<u64> {
+        self.inner.lock().wheel.next_expiration_time()
     }
 
     pub(self) fn process_at_time(&self, mut now: u64) {
