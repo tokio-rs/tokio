@@ -849,6 +849,57 @@ fn schedule_latency_counts() {
     }
 }
 
+#[cfg(feature = "schedule-latency")]
+#[test]
+fn schedule_latency_lifo_polls_are_recorded_individually() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_metrics_schedule_latency_histogram()
+        .enable_metrics_poll_time_histogram()
+        .metrics_schedule_latency_histogram_configuration(HistogramConfiguration::linear(
+            Duration::from_millis(10),
+            3,
+        ))
+        .build()
+        .unwrap();
+    let metrics = rt.metrics();
+
+    rt.block_on(async {
+        tokio::spawn(async {
+            drop(tokio::spawn(async {}));
+            wait_for_elapsed(Duration::from_millis(50));
+        })
+        .await
+        .unwrap();
+    });
+    drop(rt);
+
+    let bucket_counts = (0..metrics.schedule_latency_histogram_num_buckets())
+        .map(|bucket| metrics.schedule_latency_histogram_bucket_count(0, bucket))
+        .collect::<Vec<_>>();
+
+    assert_eq!(bucket_counts.iter().sum::<u64>(), 2);
+    assert!(bucket_counts.last().is_some_and(|count| *count >= 1));
+
+    assert_eq!(metrics.worker_poll_count(0), 1);
+    let poll_time_samples = (0..metrics.poll_time_histogram_num_buckets())
+        .map(|bucket| metrics.poll_time_histogram_bucket_count(0, bucket))
+        .sum::<u64>();
+    assert_eq!(poll_time_samples, 1);
+}
+
+#[cfg(feature = "schedule-latency")]
+fn wait_for_elapsed(duration: Duration) {
+    let start = std::time::Instant::now();
+    loop {
+        let elapsed = start.elapsed();
+        if elapsed >= duration {
+            return;
+        }
+        std::thread::sleep(duration - elapsed);
+    }
+}
+
 async fn try_spawn_stealable_task() -> Result<(), mpsc::RecvTimeoutError> {
     // We use a blocking channel to synchronize the tasks.
     let (tx, rx) = mpsc::channel();

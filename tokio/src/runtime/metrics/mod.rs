@@ -41,10 +41,10 @@ cfg_not_unstable_metrics! {
 
 cfg_schedule_latency! {
     mod schedule_latency;
-    pub(crate) use schedule_latency::{ScheduleLatencyInstant, ScheduleLatencyContext};
+    pub(crate) use schedule_latency::{ScheduleLatencyContext, ScheduleLatencyInstant};
 }
 
 cfg_not_schedule_latency! {
     mod schedule_latency_mock;
-    pub(crate) use schedule_latency_mock::{ScheduleLatencyInstant, ScheduleLatencyContext};
+    pub(crate) use schedule_latency_mock::{ScheduleLatencyContext, ScheduleLatencyInstant};
 }
