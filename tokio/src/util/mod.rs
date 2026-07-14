@@ -41,7 +41,7 @@ mod wake_list;
     feature = "signal",
     feature = "time",
 ))]
-// Some WakeList consumers are cfg'd out on emscripten, so the re-export may be
+// Some WakeList consumers are cfg'd out on Emscripten, so the re-export may be
 // unused there.
 #[cfg_attr(target_os = "emscripten", allow(unused_imports))]
 pub(crate) use wake_list::WakeList;

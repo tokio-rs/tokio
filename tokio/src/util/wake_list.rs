@@ -1,4 +1,4 @@
-// On emscripten, `WakeList` is reachable via the feature gates that pull
+// On Emscripten, `WakeList` is reachable via the feature gates that pull
 // it into `util::mod`, but the actual consumers (time::clock, sync::notify,
 // etc.) may be cfg'd out — leaving the type used only through a re-export.
 #![cfg_attr(target_os = "emscripten", allow(dead_code))]

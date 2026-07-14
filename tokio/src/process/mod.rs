@@ -230,7 +230,7 @@
 #[cfg(all(unix, not(target_os = "emscripten")))]
 mod imp;
 
-// emscripten has no `fork`/`exec`: a throwing stub keeps the API present.
+// Emscripten has no `fork`/`exec`: a throwing stub keeps the API present.
 #[path = "emscripten.rs"]
 #[cfg(target_os = "emscripten")]
 mod imp;
