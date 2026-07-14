@@ -65,7 +65,8 @@ impl Eq for Symbol {}
 impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(name) = self.symbol.name() {
-            let name = name.to_string();
+            // Printing this using :# formatting omits crate disambiguators.
+            let name = format!("{name:#}");
             let name = if let Some((name, _)) = name.rsplit_once("::") {
                 name
             } else {

@@ -38,6 +38,10 @@ mock! {
         pub fn try_clone(&self) -> io::Result<Self>;
     }
     #[cfg(windows)]
+    impl From<std::os::windows::io::OwnedHandle> for File {
+        fn from(handle: std::os::windows::io::OwnedHandle) -> Self;
+    }
+    #[cfg(windows)]
     impl std::os::windows::io::AsRawHandle for File {
         fn as_raw_handle(&self) -> std::os::windows::io::RawHandle;
     }
