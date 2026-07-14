@@ -744,7 +744,7 @@ impl Semaphore {
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
-    /// #[tokio::main]
+    /// #[tokio::main(flavor = "current_thread")]
     /// async fn main() {
     ///     let semaphore = Arc::new(Semaphore::new(2));
     ///
