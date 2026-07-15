@@ -28,23 +28,22 @@ use std::sync::Arc;
 ///
 /// # Memory ordering
 ///
-/// Successfully acquiring a permit (via [`acquire`], [`acquire_many`],
-/// [`try_acquire`], [`try_acquire_many`], or their `_owned` variants) performs
-/// an `AcqRel` operation on the semaphore's internal state. Similarly,
-/// releasing permits (by dropping a [`SemaphorePermit`] or
-/// [`OwnedSemaphorePermit`], or by calling [`add_permits`] or
-/// [`forget_permits`]) and closing the semaphore (via [`close`]) are also
-/// `AcqRel` operations.
+/// If a task writes some data and then releases a permit, any task that later
+/// acquires a permit is guaranteed to see that data. This makes it safe to use
+/// a semaphore to hand data off between tasks through shared state.
+///
+/// Stated more precisely in terms of atomic memory orderings: acquiring a
+/// permit (via [`acquire`], [`acquire_many`], [`try_acquire`],
+/// [`try_acquire_many`], or their `_owned` variants), releasing permits (by
+/// dropping a [`SemaphorePermit`] or [`OwnedSemaphorePermit`], or by calling
+/// [`add_permits`] or [`forget_permits`]), and closing the semaphore (via
+/// [`close`]) are all `AcqRel` operations. They are totally ordered, and each
+/// one synchronizes-with all such operations that precede it, giving the same
+/// guarantees as `AcqRel` operations on a single atomic.
 ///
 /// A failed acquisition attempt (including [`TryAcquireError::NoPermits`] and
-/// [`TryAcquireError::Closed`]) behaves like an `Acquire` load.
-///
-/// The methods [`available_permits`] and [`is_closed`] also behave like an
-/// `Acquire` load.
-///
-/// In practical terms, this means that any memory writes performed before
-/// releasing a permit are guaranteed to be visible to the task that
-/// subsequently acquires that permit.
+/// [`TryAcquireError::Closed`]), along with the [`available_permits`] and
+/// [`is_closed`] methods, behave like an `Acquire` load.
 ///
 /// [`acquire`]: Semaphore::acquire
 /// [`acquire_many`]: Semaphore::acquire_many
