@@ -185,7 +185,7 @@ impl Drop for DuplexStream {
 /// Creates unidirectional buffer that acts like in memory pipe.
 ///
 /// The `max_buf_size` argument is the maximum amount of bytes that can be
-/// written to a buffer before the it returns `Poll::Pending`.
+/// written to a buffer before it returns `Poll::Pending`.
 ///
 /// # Unify reader and writer
 ///
@@ -217,7 +217,7 @@ impl SimplexStream {
     /// version with separate reader and writer you can use [`simplex`] function.
     ///
     /// The `max_buf_size` argument is the maximum amount of bytes that can be
-    /// written to a buffer before the it returns `Poll::Pending`.
+    /// written to a buffer before it returns `Poll::Pending`.
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub fn new_unsplit(max_buf_size: usize) -> SimplexStream {
         SimplexStream {
