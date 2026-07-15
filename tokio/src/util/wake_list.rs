@@ -1,8 +1,3 @@
-// On Emscripten, `WakeList` is reachable via the feature gates that pull
-// it into `util::mod`, but the actual consumers (time::clock, sync::notify,
-// etc.) may be cfg'd out — leaving the type used only through a re-export.
-#![cfg_attr(target_os = "emscripten", allow(dead_code))]
-
 use core::mem::MaybeUninit;
 use core::ptr;
 use std::task::Waker;
