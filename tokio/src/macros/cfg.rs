@@ -782,35 +782,3 @@ macro_rules! cfg_not_schedule_latency {
         )*
     }
 }
-
-/// Enables Emscripten-specific code.
-macro_rules! cfg_emscripten {
-    ($($item:item)*) => {
-        $(
-            #[cfg(target_os = "emscripten")]
-            #[cfg_attr(docsrs, doc(cfg(target_os = "emscripten")))]
-            $item
-        )*
-    }
-}
-
-/// Enables code for non-Emscripten targets.
-macro_rules! cfg_not_emscripten {
-    ($($item:item)*) => {
-        $(
-            #[cfg(not(target_os = "emscripten"))]
-            $item
-        )*
-    }
-}
-
-/// Enables code requiring both the `rt` feature and the Emscripten target.
-macro_rules! cfg_rt_emscripten {
-    ($($item:item)*) => {
-        $(
-            #[cfg(all(feature = "rt", target_os = "emscripten"))]
-            #[cfg_attr(docsrs, doc(cfg(all(feature = "rt", target_os = "emscripten"))))]
-            $item
-        )*
-    }
-}
