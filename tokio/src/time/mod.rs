@@ -19,9 +19,6 @@
 //!
 //! These types must be used from within the context of the [`Runtime`](crate::runtime::Runtime).
 //!
-//! On `wasm32-unknown-emscripten` these timers are driven by JavaScript's
-//! event loop via `setTimeout`.
-//!
 //! # Examples
 //!
 //! Wait 100ms and print "100 ms have elapsed"
@@ -89,6 +86,11 @@
 
 mod clock;
 pub(crate) use self::clock::Clock;
+cfg_test_util! {
+    pub use clock::{advance, pause, resume};
+}
+
+pub mod error;
 
 mod instant;
 pub use self::instant::Instant;
@@ -102,12 +104,6 @@ pub use sleep::{sleep, sleep_until, Sleep};
 mod timeout;
 #[doc(inline)]
 pub use timeout::{timeout, timeout_at, Timeout};
-
-cfg_test_util! {
-    pub use clock::{advance, pause, resume};
-}
-
-pub mod error;
 
 // Re-export for convenience
 #[doc(no_inline)]
