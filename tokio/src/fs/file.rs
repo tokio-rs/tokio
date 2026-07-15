@@ -599,7 +599,7 @@ impl AsyncRead for File {
         cx: &mut Context<'_>,
         dst: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         let me = self.get_mut();
         let inner = me.inner.get_mut();
@@ -694,7 +694,7 @@ impl AsyncSeek for File {
     }
 
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         let inner = self.inner.get_mut();
 
         loop {
@@ -730,7 +730,7 @@ impl AsyncWrite for File {
         cx: &mut Context<'_>,
         src: &[u8],
     ) -> Poll<io::Result<usize>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
@@ -801,7 +801,7 @@ impl AsyncWrite for File {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<Result<usize, io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
@@ -872,13 +872,13 @@ impl AsyncWrite for File {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         let inner = self.inner.get_mut();
         inner.poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         self.poll_flush(cx)
     }
 }
@@ -894,6 +894,13 @@ impl fmt::Debug for File {
         fmt.debug_struct("tokio::fs::File")
             .field("std", &self.std)
             .finish()
+    }
+}
+
+#[cfg(unix)]
+impl From<std::os::fd::OwnedFd> for File {
+    fn from(fd: std::os::fd::OwnedFd) -> Self {
+        Self::from_std(StdFile::from(fd))
     }
 }
 
@@ -923,7 +930,13 @@ impl std::os::unix::io::FromRawFd for File {
 }
 
 cfg_windows! {
-    use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, AsHandle, BorrowedHandle};
+    use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, AsHandle, BorrowedHandle, OwnedHandle};
+
+    impl From<OwnedHandle> for File {
+        fn from(handle: OwnedHandle) -> Self {
+            Self::from_std(StdFile::from(handle))
+        }
+    }
 
     impl AsRawHandle for File {
         fn as_raw_handle(&self) -> RawHandle {
@@ -1077,7 +1090,7 @@ impl Inner {
     }
 
     fn poll_complete_inflight(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         match self.poll_flush(cx) {
             Poll::Ready(Err(e)) => {
                 self.last_write_err = Some(e.kind());

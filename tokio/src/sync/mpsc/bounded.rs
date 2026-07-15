@@ -198,9 +198,9 @@ impl<T> Receiver<T> {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
-    /// completes first, it is guaranteed that no messages were received on this
+    /// This method is cancel safe. If `recv` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch completes first,
+    /// it is guaranteed that no messages were received on this
     /// channel.
     ///
     /// [`close`]: Self::close
@@ -268,9 +268,9 @@ impl<T> Receiver<T> {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv_many` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
-    /// completes first, it is guaranteed that no messages were received on this
+    /// This method is cancel safe. If `recv_many` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch completes first,
+    /// it is guaranteed that no messages were received on this
     /// channel.
     ///
     /// [`close`]: Self::close
@@ -775,8 +775,8 @@ impl<T> Sender<T> {
     ///
     /// # Cancel safety
     ///
-    /// If `send` is used as the event in a [`tokio::select!`](crate::select)
-    /// statement and some other branch completes first, then it is guaranteed
+    /// If `send` is used as a branch in [`tokio::select!`](crate::select) and
+    /// another branch completes first, then it is guaranteed
     /// that the message was not sent. **However, in that case, the message
     /// is dropped and will be lost.**
     ///
@@ -1275,8 +1275,37 @@ impl<T> Sender<T> {
         if n > self.max_capacity() {
             return Err(SendError(()));
         }
-        match self.chan.semaphore().semaphore.acquire(n).await {
-            Ok(()) => Ok(()),
+
+        // If the reservation fails or is cancelled while it holds some but not
+        // all of the permits it asked for, the inner `Acquire` returns those
+        // permits to the semaphore on drop, without the receiver notification
+        // that `Permit` and `PermitIterator` do on release. Wake the receiver in
+        // that case so a `recv()` blocked on the channel becoming idle can
+        // observe a close. On success the caller receives the permits and takes
+        // over that job, so the guard is forgotten below.
+        struct WakeReceiverOnDrop<'a, T> {
+            chan: &'a chan::Tx<T, Semaphore>,
+        }
+
+        impl<T> Drop for WakeReceiverOnDrop<'_, T> {
+            fn drop(&mut self) {
+                use chan::Semaphore;
+
+                let semaphore = self.chan.semaphore();
+                if semaphore.is_closed() && semaphore.is_idle() {
+                    self.chan.wake_rx();
+                }
+            }
+        }
+
+        let guard = WakeReceiverOnDrop { chan: &self.chan };
+        let result = self.chan.semaphore().semaphore.acquire(n).await;
+
+        match result {
+            Ok(()) => {
+                std::mem::forget(guard);
+                Ok(())
+            }
             Err(_) => Err(SendError(())),
         }
     }
@@ -1853,14 +1882,12 @@ impl<T> OwnedPermit<T> {
     ///
     /// [`Sender`]: Sender
     pub fn release(mut self) -> Sender<T> {
-        use chan::Semaphore;
-
         let chan = self.chan.take().unwrap_or_else(|| {
             unreachable!("OwnedPermit channel is only taken when the permit is moved")
         });
 
         // Add the permit back to the semaphore
-        chan.semaphore().add_permit();
+        drop(Permit { chan: &chan });
         Sender { chan }
     }
 
@@ -1919,21 +1946,10 @@ impl<T> OwnedPermit<T> {
 
 impl<T> Drop for OwnedPermit<T> {
     fn drop(&mut self) {
-        use chan::Semaphore;
-
         // Are we still holding onto the sender?
         if let Some(chan) = self.chan.take() {
-            let semaphore = chan.semaphore();
-
-            // Add the permit back to the semaphore
-            semaphore.add_permit();
-
-            // If this `OwnedPermit` is holding the last sender for this
-            // channel, wake the receiver so that it can be notified that the
-            // channel is closed.
-            if semaphore.is_closed() && semaphore.is_idle() {
-                chan.wake_rx();
-            }
+            // Reuse Drop impl of non-owned Permit.
+            drop(Permit { chan: &chan });
         }
 
         // Otherwise, do nothing.

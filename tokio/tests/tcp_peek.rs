@@ -1,6 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support peeking
-                                                                   // No `socket` on miri.
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support peeking
 
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
