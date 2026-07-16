@@ -1,3 +1,11 @@
+# 1.51.4 (July 16th, 2026)
+
+### Fixed
+
+- runtime: don't skip the driver when `before_park` schedules work ([#8222])
+
+[#8222]: https://github.com/tokio-rs/tokio/pull/8222
+
 # 1.51.3 (May 8th, 2026)
 
 ### Fixed
