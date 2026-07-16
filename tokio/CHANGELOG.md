@@ -1,3 +1,15 @@
+# 1.52.4 (July 16th, 2026)
+
+### Fixed
+
+- runtime: don't skip the driver when `before_park` schedules work ([#8222])
+
+### Fixed (unstable)
+
+- taskdump: remove crate disambiguators from output ([#8264])
+
+[#8264]: https://github.com/tokio-rs/tokio/pull/8264
+
 # 1.52.3 (May 8th, 2026)
 
 ### Fixed
