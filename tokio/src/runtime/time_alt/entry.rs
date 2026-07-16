@@ -210,17 +210,7 @@ impl Handle {
         }
     }
 
-    /// Registers `cancel_tx` so that a subsequent [`Handle::cancel`] call can
-    /// find its way back into the wheel it is about to be (or already is)
-    /// inserted into.
-    ///
-    /// Returns `false` — without registering anything — if the entry was
-    /// already cancelled or already woken up by the time this is called.
-    /// Callers must not insert an entry into the wheel when this returns
-    /// `false`: without a registered `cancel_tx`, nothing could ever
-    /// remove it again, and it would sit in the wheel until it naturally
-    /// expires or the runtime shuts down.
-    #[must_use]
+    /// Returns `false` if the `self` has already been cancelled or woken up.
     pub(crate) fn register_cancel_tx(&self, cancel_tx: Sender) -> bool {
         let mut lock = self.entry.state.lock();
         if !lock.cancelled && !lock.woken_up {

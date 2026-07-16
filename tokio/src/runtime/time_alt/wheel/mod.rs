@@ -54,12 +54,7 @@ impl Wheel {
         self.elapsed
     }
 
-    /// Inserts an entry into the timing wheel, unless it has already been
-    /// cancelled or woken up (e.g. a racing `Handle::cancel` from another
-    /// thread beat us here). In that case, the entry is dropped instead:
-    /// there is nothing to insert into the wheel for, and — crucially — no
-    /// `cancel_tx` was registered on it, so it must not be added, or it
-    /// would sit in the wheel forever with no way to be removed again.
+    /// Inserts an entry into the timing wheel
     ///
     /// # Arguments
     ///
@@ -75,14 +70,8 @@ impl Wheel {
 
         assert!(deadline > self.elapsed);
 
-        // This is the single point of truth for whether the entry is safe to
-        // insert: `register_cancel_tx` re-checks the cancelled/woken state
-        // under the entry's own lock and atomically stores `cancel_tx` only
-        // if it is still live. If it returns `false`, some racing
-        // `Handle::cancel`/wake already ran (or ran with no `cancel_tx` to
-        // find), so there is no way to ever remove `hdl` from the wheel
-        // again and it must not be added.
         if !hdl.register_cancel_tx(cancel_tx) {
+            // `hdl` has been cancelled or woken up concurrently
             return;
         }
 
