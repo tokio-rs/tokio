@@ -47,4 +47,12 @@ impl<T: Stream> Stream for Peekable<T> {
             this.stream.poll_next(cx)
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let peek_len = if self.peek.is_some() { 1 } else { 0 };
+        let (lo, hi) = self.stream.size_hint();
+        let lo = lo.saturating_add(peek_len);
+        let hi = hi.and_then(|x| x.checked_add(peek_len));
+        (lo, hi)
+    }
 }
