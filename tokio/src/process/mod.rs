@@ -227,12 +227,7 @@
 //! [`Child`]: crate::process::Child
 
 #[path = "unix/mod.rs"]
-#[cfg(all(unix, not(target_os = "emscripten")))]
-mod imp;
-
-// Emscripten has no `fork`/`exec`: a throwing stub keeps the API present.
-#[path = "emscripten.rs"]
-#[cfg(target_os = "emscripten")]
+#[cfg(unix)]
 mod imp;
 
 #[cfg(unix)]

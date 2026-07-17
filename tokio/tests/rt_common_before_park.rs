@@ -1,6 +1,9 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+                                 // Not widened to emscripten: every test here exercises the `on_thread_park`
+                                 // Builder hook, which never fires on emscripten (the kernel suspends to the
+                                 // JS event loop instead of parking), plus a cross-thread wake.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
