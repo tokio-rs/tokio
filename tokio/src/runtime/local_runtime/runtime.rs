@@ -86,6 +86,11 @@ impl LocalRuntime {
     /// // Use the runtime...
     /// ```
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the I/O driver or other OS resources required by the
+    /// runtime cannot be initialized.
+    ///
     /// [mod]: crate::runtime
     /// [runtime builder]: crate::runtime::Builder
     pub fn new() -> std::io::Result<LocalRuntime> {
