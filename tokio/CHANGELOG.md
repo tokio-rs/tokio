@@ -1,3 +1,89 @@
+# 1.53.0 (July 17th, 2026)
+
+### Added
+
+- fs: implement `From<OwnedFd>` and `From<OwnedHandle>` for `File` ([#8266])
+- metrics: add task schedule latency metric ([#7986])
+- net: add `SocketAddr` methods to Unix sockets ([#8144])
+
+### Changed
+
+- io: add `#[inline]` to IO trait impls for in-memory types ([#8242])
+- net: implement UCred::pid on FreeBSD ([#8086])
+- net: support Nuttx target os ([#8259])
+- signal: refactor global variables on Windows ([#8231])
+- sync: `mpsc::{Receiver,UnboundedReceiver}` now drops waker on drop, even if there are still senders ([#8095])
+- taskdump: support taskdumps on s390x ([#8192])
+- time: add `#[track_caller]` to `timeout_at()` ([#8077])
+- time: consolidate mutex locks on spurious poll ([#8124])
+- time: defer waker clone on spurious poll ([#8107])
+- time: move lazy-registration state into `Sleep` ([#8132])
+- tracing: remove unnecessary span clone ([#8126])
+
+### Fixed
+
+- io: do not treat zero-length reads as EOF in `Chain` ([#8251])
+- net: use getpeereid for QNX peer credentials ([#8270])
+- runtime: avoid illegal state in `FastRand` ([#8078])
+- sync: wake mpsc receiver when a queued `reserve[_many]` returns permits ([#8260])
+- taskdump: skip double wake on `Trace::capture`/`Trace::trace_with` ([#8043])
+- time: avoid stack overflow in runtime constructor ([#8093])
+- time (alt timer): ensure timers stay in the same runtime after `.reset()` ([#8169])
+
+### IO uring (unstable)
+
+- fs: use io-uring for `fs::try_exists` ([#8080])
+- fs: use io-uring for renaming files ([#7800])
+- rt: flush io-uring CQE in case of CQE overflow ([#8277])
+
+### Documented
+
+- docs: clarify cancel safety wording ([#8181])
+- fs: clarify `create_dir_all` succeeds if path exists ([#8149])
+- io: add warning about stdout reordering with multiple handles ([#8276])
+- net: document pipe `try_read*`/`try_write*` readiness behavior ([#8032])
+- runtime: document interaction with fork() ([#8202])
+- sync: clarify broadcast lagging semantics ([#8239])
+- sync: document memory ordering guarantees for Semaphore ([#8119])
+- task: explain why `yield_now` defers its waker ([#8254])
+- time: add panic docs to `timeout_at()` ([#8077])
+- time: fix reversed poll order in timeout doc ([#8214])
+
+[#7800]: https://github.com/tokio-rs/tokio/pull/7800
+[#7986]: https://github.com/tokio-rs/tokio/pull/7986
+[#8032]: https://github.com/tokio-rs/tokio/pull/8032
+[#8043]: https://github.com/tokio-rs/tokio/pull/8043
+[#8077]: https://github.com/tokio-rs/tokio/pull/8077
+[#8078]: https://github.com/tokio-rs/tokio/pull/8078
+[#8080]: https://github.com/tokio-rs/tokio/pull/8080
+[#8086]: https://github.com/tokio-rs/tokio/pull/8086
+[#8093]: https://github.com/tokio-rs/tokio/pull/8093
+[#8095]: https://github.com/tokio-rs/tokio/pull/8095
+[#8107]: https://github.com/tokio-rs/tokio/pull/8107
+[#8119]: https://github.com/tokio-rs/tokio/pull/8119
+[#8124]: https://github.com/tokio-rs/tokio/pull/8124
+[#8126]: https://github.com/tokio-rs/tokio/pull/8126
+[#8132]: https://github.com/tokio-rs/tokio/pull/8132
+[#8144]: https://github.com/tokio-rs/tokio/pull/8144
+[#8149]: https://github.com/tokio-rs/tokio/pull/8149
+[#8169]: https://github.com/tokio-rs/tokio/pull/8169
+[#8181]: https://github.com/tokio-rs/tokio/pull/8181
+[#8192]: https://github.com/tokio-rs/tokio/pull/8192
+[#8193]: https://github.com/tokio-rs/tokio/pull/8193
+[#8202]: https://github.com/tokio-rs/tokio/pull/8202
+[#8214]: https://github.com/tokio-rs/tokio/pull/8214
+[#8231]: https://github.com/tokio-rs/tokio/pull/8231
+[#8239]: https://github.com/tokio-rs/tokio/pull/8239
+[#8242]: https://github.com/tokio-rs/tokio/pull/8242
+[#8251]: https://github.com/tokio-rs/tokio/pull/8251
+[#8254]: https://github.com/tokio-rs/tokio/pull/8254
+[#8259]: https://github.com/tokio-rs/tokio/pull/8259
+[#8260]: https://github.com/tokio-rs/tokio/pull/8260
+[#8266]: https://github.com/tokio-rs/tokio/pull/8266
+[#8270]: https://github.com/tokio-rs/tokio/pull/8270
+[#8276]: https://github.com/tokio-rs/tokio/pull/8276
+[#8277]: https://github.com/tokio-rs/tokio/pull/8277
+
 # 1.52.4 (July 16th, 2026)
 
 ### Fixed
