@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", tokio_unstable))]
+#![cfg(feature = "full")]
 
 use std::panic;
 use tokio::runtime::LocalOptions;
