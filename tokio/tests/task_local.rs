@@ -1,6 +1,13 @@
 #![cfg(any(
     feature = "full",
-    all(target_os = "emscripten", feature = "rt", feature = "macros")
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
 ))]
 
 use std::future::Future;

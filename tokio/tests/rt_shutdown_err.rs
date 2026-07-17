@@ -1,5 +1,15 @@
 #![warn(rust_2018_idioms)]
-#![cfg(any(feature = "full", all(target_os = "emscripten", feature = "rt")))]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 #![cfg(not(miri))] // No socket in miri.
 
 use std::io;

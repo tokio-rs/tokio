@@ -1,7 +1,14 @@
 #![warn(rust_2018_idioms)]
 #![cfg(any(
-    all(feature = "full", not(target_os = "wasi")), // Wasi doesn't support panic recovery
-    all(target_os = "emscripten", feature = "rt", feature = "macros", feature = "time")
+    all(feature = "full", not(target_os = "wasi")),
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
 ))]
 #![cfg(panic = "unwind")]
 

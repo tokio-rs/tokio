@@ -453,6 +453,11 @@
 //! `-sPROXY_TO_PTHREAD` so the main thread may block). The `net`, `process`,
 //! and `signal` features are not supported.
 //!
+//! With [JSPI], `#[tokio::test]` can suspend on the host event loop while
+//! waiting for timers. Without JSPI, a wait that cannot progress panics.
+//!
+//! [JSPI]: https://github.com/WebAssembly/js-promise-integration
+//!
 //! ## Unstable `WASM` support
 //!
 //! Tokio also has unstable support for some additional `WASM` features. This

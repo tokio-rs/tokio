@@ -1,7 +1,14 @@
 #![warn(rust_2018_idioms)]
 #![cfg(any(
     feature = "full",
-    all(target_os = "emscripten", feature = "rt", feature = "macros")
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
 ))]
 
 use tokio::runtime::{self, Runtime};

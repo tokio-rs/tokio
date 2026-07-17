@@ -3,6 +3,8 @@
     all(
         target_os = "emscripten",
         feature = "rt",
+        feature = "time",
+        feature = "sync",
         feature = "macros",
         feature = "test-util"
     )

@@ -1,7 +1,14 @@
 #![warn(rust_2018_idioms)]
 #![cfg(any(
-    all(feature = "full", not(target_os = "wasi")), // Wasi does not support panic recovery
-    all(target_os = "emscripten", feature = "rt", feature = "sync")
+    all(feature = "full", not(target_os = "wasi")),
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
 ))]
 
 use std::panic::{RefUnwindSafe, UnwindSafe};
