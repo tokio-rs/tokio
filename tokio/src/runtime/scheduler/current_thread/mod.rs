@@ -415,8 +415,6 @@ impl Context {
             core = c;
         }
 
-        // If `before_park` spawns a task (or otherwise schedules work for us), then we should not
-        // park the thread.
         if !self.has_pending_work(&core) {
             // Park until the thread is signaled
             core.metrics.about_to_park();
@@ -426,6 +424,15 @@ impl Context {
 
             core.metrics.unparked();
             core.submit_metrics(handle);
+        } else {
+            // `before_park` scheduled work (e.g. an `on_thread_park` hook that woke the
+            // `block_on` future), so we don't block. We must still poll the driver once
+            // without blocking, or timer and I/O events would stall under a runtime driven
+            // by repeated short `block_on` calls. See
+            // <https://github.com/tokio-rs/tokio/issues/8212>.
+            core.submit_metrics(handle);
+
+            core = self.park_internal(core, handle, &mut driver, Some(Duration::from_millis(0)));
         }
 
         if let Some(f) = &handle.shared.config.after_unpark {
