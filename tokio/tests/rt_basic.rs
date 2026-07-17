@@ -1,5 +1,15 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 
 use tokio::runtime::{self, Runtime};
 use tokio::sync::oneshot;
@@ -249,7 +259,10 @@ fn spawn_two() {
     }
 }
 
-#[cfg_attr(target_os = "wasi", ignore = "WASI: std::thread::spawn not supported")]
+#[cfg_attr(
+    target_family = "wasm",
+    ignore = "wasm targets do not support std::thread::spawn"
+)]
 #[test]
 fn spawn_remote() {
     let rt = rt();
@@ -346,7 +359,10 @@ mod unstable {
     }
 
     #[test]
-    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
+    #[cfg_attr(
+        target_family = "wasm",
+        ignore = "wasm targets do not support std::thread::spawn"
+    )]
     fn spawns_do_nothing() {
         use std::sync::Arc;
 
@@ -375,7 +391,10 @@ mod unstable {
     }
 
     #[test]
-    #[cfg_attr(target_os = "wasi", ignore = "Wasi does not support panic recovery")]
+    #[cfg_attr(
+        target_family = "wasm",
+        ignore = "wasm targets do not support std::thread::spawn"
+    )]
     fn shutdown_all_concurrent_block_on() {
         const N: usize = 2;
         use std::sync::{mpsc, Arc};
@@ -479,6 +498,10 @@ fn rt() -> Runtime {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "on_thread_park never fires on emscripten (kernel suspends to the JS event loop instead of parking)"
+)]
 fn before_park_yields() {
     use futures::task::ArcWake;
     use std::sync::Arc;

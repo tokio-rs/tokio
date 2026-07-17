@@ -451,6 +451,11 @@
 //! `test-util` features. The `net`, `process`, `signal`, and `rt-multi-thread`
 //! features are not supported.
 //!
+//! With [JSPI], `#[tokio::test]` can suspend on the host event loop while
+//! waiting for timers. Without JSPI, a wait that cannot progress panics.
+//!
+//! [JSPI]: https://github.com/WebAssembly/js-promise-integration
+//!
 //! ## Unstable `WASM` support
 //!
 //! Tokio also has unstable support for some additional `WASM` features. This
@@ -488,6 +493,16 @@ compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.
 
 #[cfg(all(target_os = "emscripten", feature = "process"))]
 compile_error!("The `process` feature is not supported on wasm32-unknown-emscripten.");
+
+// We currently only support the single-threaded Emscripten runtime, with
+// support for JSPI.
+// A `-pthread` (atomics) build breaks its assumptions, until the kernel is made
+// thread-aware.
+#[cfg(all(target_os = "emscripten", feature = "rt", target_feature = "atomics"))]
+compile_error!(
+    "Tokio's `wasm32-unknown-emscripten` runtime is single-threaded and does \
+ not support `-pthread` (atomics) builds."
+);
 
 #[cfg(all(not(tokio_unstable), feature = "io-uring"))]
 compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");
