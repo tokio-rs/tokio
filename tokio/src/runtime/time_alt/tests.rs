@@ -97,86 +97,63 @@ fn cancel_in_the_same_thread() {
 
 #[test]
 fn insert_of_already_cancelled_entry_does_not_enter_wheel() {
-    model(|| {
-        let (cancel_tx, mut cancel_rx) = cancellation_queue::new();
-        let mut wheel = Wheel::new();
+    let (cancel_tx, mut cancel_rx) = cancellation_queue::new();
+    let mut wheel = Wheel::new();
 
-        // Use a deadline far in the future so it can't accidentally be
-        // treated as already-expired.
-        let far_future = 10_000_000;
-        let (hdl, count) = new_handle_with_deadline(far_future);
+    // do not expire during the test
+    let far_future = 10_000_000;
+    let (hdl, awoken_count) = new_handle_with_deadline(far_future);
 
-        // The timer is cancelled *before* it is ever inserted into a wheel,
-        // i.e. before it has a `cancel_tx` to remove itself through.
-        hdl.cancel();
-        assert!(hdl.is_cancelled());
+    // cancel the timer before inserting it into the wheel
+    hdl.cancel();
+    assert!(hdl.is_cancelled());
 
-        // The driver now processes it, exactly as
-        // `scheduler::util::time_alt::process_registration_queue` /
-        // `insert_inject_timers` do for entries that haven't hit their
-        // deadline yet.
-        unsafe {
-            wheel.insert(hdl, cancel_tx);
-        }
+    // try to insert the cancelled entry into the wheel
+    unsafe {
+        wheel.insert(hdl, cancel_tx);
+    }
 
-        // The cancelled entry must NOT be occupying a slot in the wheel:
-        // there is no live `Sleep`/`Timer` left that could ever remove it,
-        // so if it went into the wheel it is stuck there until it naturally
-        // expires or the runtime shuts down.
-        assert!(
-            wheel.next_expiration_time().is_none(),
-            "an already-cancelled entry leaked into the wheel on insert"
-        );
+    // a cancelled entry should not be inserted into the wheel
+    assert!(
+        wheel.next_expiration_time().is_none(),
+        "an already-cancelled entry leaked into the wheel on insert"
+    );
 
-        // It also must not have been queued for cancellation removal, since
-        // it was never actually placed in the wheel for `remove` to find.
-        assert_eq!(cancel_rx.recv_all().count(), 0);
-        assert_eq!(count.get(), 0);
+    // It also must not have been queued for cancellation removal, since
+    // it was never actually placed in the wheel for `remove` to find.
+    assert_eq!(cancel_rx.recv_all().count(), 0);
+    assert_eq!(awoken_count.get(), 0);
 
-        // `Wheel` has no `Drop` impl of its own (unlike the other queues) --
-        // it relies on the driver always fully draining it via
-        // `take_expired`/`shutdown_alt` before it goes away. Do the same
-        // here so a leaked entry (i.e. this test failing) is reported via
-        // the assertion above and not obscured by an unrelated
-        // "Arc leaked" panic from loom's own leak checker.
-        let mut wake_queue = WakeQueue::new();
-        wheel.take_expired(u64::MAX, &mut wake_queue);
-        wake_queue.wake_all();
-    });
+    // drain the wheel unconditionally, otherwise loom will complain
+    // about the leaked entry, which confuses developers in case
+    // this test fails for some other reason.
+    let mut wake_queue = WakeQueue::new();
+    wheel.take_expired(u64::MAX, &mut wake_queue);
+    wake_queue.wake_all();
 }
 
 #[test]
-/// The concurrent counterpart of the test above: this races a real
-/// `Handle::cancel()` call against `Wheel::insert()` for the *same* entry
-/// on two different (loom-modelled) threads, which is exactly what happens
-/// when a `Sleep` created on one worker is dropped from a different thread
-/// (e.g. the task got migrated) at the same moment the original worker is
-/// draining its registration queue into the wheel.
-///
-/// This is the interleaving that a naive fix -- checking
-/// `hdl.is_cancelled()` once up front before calling `Wheel::insert` --
-/// would still miss: the check-then-insert would not be atomic, so a
-/// `cancel()` landing in the gap could still slip an entry into the wheel
-/// with no `cancel_tx` registered. The real fix makes `Wheel::insert` act
-/// on the same lock-guarded answer that `register_cancel_tx` computes,
-/// so there is no gap to race into.
 fn cancel_races_with_insert() {
     model(|| {
         let (cancel_tx, mut cancel_rx) = cancellation_queue::new();
         let mut wheel = Wheel::new();
 
+        // do not expire during the test
         let far_future = 10_000_000;
         let (hdl, count) = new_handle_with_deadline(far_future);
 
         let hdl2 = hdl.clone();
         let jh = thread::spawn(move || {
+            // cancel the timer concurrently with insertion into the wheel
             hdl2.cancel();
         });
 
+        // try to insert the entry into the wheel concurrently with cancellation
         unsafe {
             wheel.insert(hdl, cancel_tx);
         }
 
+        // ensure the cancellation thread has exited
         jh.join().unwrap();
 
         // Whichever way the race went, the entry must end up in exactly one
@@ -200,10 +177,9 @@ fn cancel_races_with_insert() {
         );
         assert_eq!(count.get(), 0, "a cancelled entry must never be woken");
 
-        // Drain the wheel unconditionally so this test doesn't trip loom's
-        // leak checker on the (bug-exhibiting) path where the entry ended
-        // up stuck in the wheel -- see the comment in
-        // `insert_of_already_cancelled_entry_does_not_enter_wheel`.
+        // drain the wheel unconditionally, otherwise loom will complain
+        // about the leaked entry, which confuses developers in case
+        // this test fails for some other reason.
         let mut wake_queue = WakeQueue::new();
         wheel.take_expired(u64::MAX, &mut wake_queue);
         wake_queue.wake_all();
