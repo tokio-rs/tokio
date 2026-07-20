@@ -24,7 +24,7 @@ proc-macro = true
 [dependencies]
 proc-macro2 = "1.0.60"
 quote = "1"
-syn = { version = "2.0", features = ["full"] }
+syn = { version = "3.0", features = ["full"] }
 
 [dev-dependencies]
 tokio = { version = "1.0.0", features = ["full", "test-util"] }

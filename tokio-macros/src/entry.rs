@@ -326,7 +326,7 @@ fn contains_impl_trait(ty: &syn::Type) -> bool {
                     _ => false,
                 }),
                 syn::PathArguments::Parenthesized(args) => {
-                    args.inputs.iter().any(contains_impl_trait)
+                    args.inputs.iter().any(|arg| contains_impl_trait(&arg.ty))
                         || matches!(&args.output, syn::ReturnType::Type(_, t) if contains_impl_trait(t))
                 }
                 syn::PathArguments::None => false,
