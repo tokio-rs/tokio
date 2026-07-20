@@ -97,39 +97,41 @@ fn cancel_in_the_same_thread() {
 
 #[test]
 fn insert_of_already_cancelled_entry_does_not_enter_wheel() {
-    let (cancel_tx, mut cancel_rx) = cancellation_queue::new();
-    let mut wheel = Wheel::new();
+    model(|| {
+        let (cancel_tx, mut cancel_rx) = cancellation_queue::new();
+        let mut wheel = Wheel::new();
 
-    // do not expire during the test
-    let far_future = 10_000_000;
-    let (hdl, awoken_count) = new_handle_with_deadline(far_future);
+        // do not expire during the test
+        let far_future = 10_000_000;
+        let (hdl, awoken_count) = new_handle_with_deadline(far_future);
 
-    // cancel the timer before inserting it into the wheel
-    hdl.cancel();
-    assert!(hdl.is_cancelled());
+        // cancel the timer before inserting it into the wheel
+        hdl.cancel();
+        assert!(hdl.is_cancelled());
 
-    // try to insert the cancelled entry into the wheel
-    unsafe {
-        wheel.insert(hdl, cancel_tx);
-    }
+        // try to insert the cancelled entry into the wheel
+        unsafe {
+            wheel.insert(hdl, cancel_tx);
+        }
 
-    // a cancelled entry should not be inserted into the wheel
-    assert!(
-        wheel.next_expiration_time().is_none(),
-        "an already-cancelled entry leaked into the wheel on insert"
-    );
+        // a cancelled entry should not be inserted into the wheel
+        assert!(
+            wheel.next_expiration_time().is_none(),
+            "an already-cancelled entry leaked into the wheel on insert"
+        );
 
-    // It also must not have been queued for cancellation removal, since
-    // it was never actually placed in the wheel for `remove` to find.
-    assert_eq!(cancel_rx.recv_all().count(), 0);
-    assert_eq!(awoken_count.get(), 0);
+        // It also must not have been queued for cancellation removal, since
+        // it was never actually placed in the wheel for `remove` to find.
+        assert_eq!(cancel_rx.recv_all().count(), 0);
+        assert_eq!(awoken_count.get(), 0);
 
-    // drain the wheel unconditionally, otherwise loom will complain
-    // about the leaked entry, which confuses developers in case
-    // this test fails for some other reason.
-    let mut wake_queue = WakeQueue::new();
-    wheel.take_expired(u64::MAX, &mut wake_queue);
-    wake_queue.wake_all();
+        // drain the wheel unconditionally, otherwise loom will complain
+        // about the leaked entry, which confuses developers in case
+        // this test fails for some other reason.
+        let mut wake_queue = WakeQueue::new();
+        wheel.take_expired(u64::MAX, &mut wake_queue);
+        wake_queue.wake_all();
+    });
 }
 
 #[test]
