@@ -60,9 +60,7 @@ fn new(signal: SignalKind) -> io::Result<RxFuture> {
     // Initialize the registry BEFORE registering the OS handler: the
     // handler thread can then always observe an initialized `REGISTRY`
     // (`SetConsoleCtrlHandler` happens-after the initialization below),
-    // so it needs no blocking wait. Registration itself still happens
-    // exactly once, and a failure is cached so every subsequent call
-    // reports the same error, matching the previous behavior.
+    // so it needs no blocking wait.
     let registry = REGISTRY.get_or_init(Registry::default);
 
     HANDLER_RESULT
