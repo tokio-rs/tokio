@@ -96,21 +96,6 @@ fn cancel_in_the_same_thread() {
 }
 
 #[test]
-/// Reproduces the scenario where a timer is cancelled (e.g. its `Sleep` is
-/// dropped) *before* `Wheel::insert` is called for it, which is the normal
-/// case for a timer that is dropped while it's still sitting in the
-/// per-worker `RegistrationQueue` and has not yet been handed a `cancel_tx`
-/// (e.g. `tokio::select!` where the sleep branch loses and its future is
-/// dropped, or a `timeout()` whose inner future resolves first, all without
-/// the worker parking in between).
-///
-/// Before this fix, `Wheel::insert` called `register_cancel_tx` but ignored
-/// whether it actually succeeded, and unconditionally added the entry to a
-/// wheel slot regardless. A `register_cancel_tx` failure means the entry is
-/// cancelled/woken with no `cancel_tx` stored, so nothing could ever find it
-/// in the wheel to remove it again -- it would sit there, occupying a slot,
-/// until it naturally expired (up to ~2 years later, see
-/// `wheel::MAX_DURATION`) or the runtime shut down.
 fn insert_of_already_cancelled_entry_does_not_enter_wheel() {
     model(|| {
         let (cancel_tx, mut cancel_rx) = cancellation_queue::new();
