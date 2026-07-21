@@ -4,7 +4,7 @@
 //! suspension for its whole promising activation with a [`SuspendGuard`],
 //! and [`sleep`] — the one suspending import the runtime issues — parks
 //! that activation on a host timer. With never more than one suspension in
-//! flight, no spill-stack save/restore is needed: any wasm re-entered
+//! flight, no spill-stack save/restore is needed: any Wasm re-entered
 //! while the activation is parked completes before the resume, leaving the
 //! spill stack above the suspended frame untouched.
 
@@ -67,7 +67,7 @@ static __em_js____asyncjs__tokio_jspi_sleep: [u8; TOKIO_JSPI_SLEEP.len() + 1] =
     em_js(TOKIO_JSPI_SLEEP);
 
 unsafe extern "C" {
-    /// Reports the ASYNCIFY build mode: 0 = none, 1 = asyncify, 2 = JSPI.
+    /// Reports the `ASYNCIFY` build mode: 0 = none, 1 = `asyncify`, 2 = JSPI.
     safe fn emscripten_has_asyncify() -> i32;
 }
 
