@@ -163,8 +163,8 @@ macro_rules! cfg_io_driver {
             ))]
             #[cfg_attr(docsrs, doc(cfg(any(
                 feature = "net",
-                all(unix, feature = "process"),
-                all(unix, feature = "signal"),
+                feature = "process",
+                feature = "signal",
                 all(
                     tokio_unstable,
                     feature = "io-uring",
