@@ -1110,8 +1110,7 @@ impl Builder {
     ///
     /// Returns an error if the I/O driver or other OS resources required by the
     /// runtime cannot be initialized.
-    #[allow(unused_variables, unreachable_patterns)]
-    pub fn build_local(&mut self, options: LocalOptions) -> io::Result<LocalRuntime> {
+    pub fn build_local(&mut self, _options: LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
             #[cfg(feature = "rt-multi-thread")]
