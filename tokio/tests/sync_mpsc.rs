@@ -536,6 +536,7 @@ async fn permit_send_after_rx_drop_defers_value_drop() {
 
     let dropped = Arc::new(AtomicBool::new(false));
     let (tx, rx) = mpsc::channel(1);
+    let weak = tx.downgrade();
 
     let permit = assert_ok!(tx.reserve().await);
     drop(rx);
@@ -545,8 +546,12 @@ async fn permit_send_after_rx_drop_defers_value_drop() {
     permit.send(SetOnDrop(dropped.clone()));
     assert!(!dropped.load(Ordering::SeqCst));
 
-    // The value is dropped together with the last channel handle.
+    // A weak sender also keeps the value alive.
     drop(tx);
+    assert!(!dropped.load(Ordering::SeqCst));
+
+    // The value is dropped together with the last channel handle.
+    drop(weak);
     assert!(dropped.load(Ordering::SeqCst));
 }
 

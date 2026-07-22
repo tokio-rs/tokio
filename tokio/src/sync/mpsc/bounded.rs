@@ -762,7 +762,12 @@ impl<T> Sender<T> {
     /// value of `Err` means that the data will never be received, but a return
     /// value of `Ok` does not mean that the data will be received. It is
     /// possible for the corresponding receiver to hang up immediately after
-    /// this function returns `Ok`.
+    /// this function returns `Ok`. Additionally, if the receiver is dropped
+    /// concurrently with a call to `send`, the call may return `Ok` even
+    /// though the value is never received, in which case the value's drop may
+    /// be deferred until every handle to the channel has been dropped. See the
+    /// [Disconnection][disconnection] section of the module documentation for
+    /// details.
     ///
     /// # Errors
     ///
@@ -772,6 +777,7 @@ impl<T> Sender<T> {
     ///
     /// [`close`]: Receiver::close
     /// [`Receiver`]: Receiver
+    /// [disconnection]: crate::sync::mpsc#disconnection
     ///
     /// # Cancel safety
     ///
@@ -870,6 +876,13 @@ impl<T> Sender<T> {
     /// with [`send`], this function has two failure cases instead of one (one for
     /// disconnection, one for a full buffer).
     ///
+    /// However, if the receiver is dropped concurrently with a call to
+    /// `try_send`, the call may return `Ok` even though the value is never
+    /// received, in which case the value's drop may be deferred until every
+    /// handle to the channel has been dropped. See the
+    /// [Disconnection][disconnection] section of the module documentation for
+    /// details.
+    ///
     /// # Errors
     ///
     /// If the channel capacity has been reached, i.e., the channel has `n`
@@ -883,6 +896,7 @@ impl<T> Sender<T> {
     /// [`send`]: Sender::send
     /// [`channel`]: channel
     /// [`close`]: Receiver::close
+    /// [disconnection]: crate::sync::mpsc#disconnection
     ///
     /// # Examples
     ///
@@ -1010,6 +1024,9 @@ impl<T> Sender<T> {
     /// synchronous code to asynchronous code, and will work even if the
     /// receiver is not using [`blocking_recv`] to receive the message.
     ///
+    /// Shares the same success and error conditions as [`send`].
+    ///
+    /// [`send`]: Sender::send
     /// [`blocking_recv`]: fn@crate::sync::mpsc::Receiver::blocking_recv
     ///
     /// # Panics
@@ -1668,7 +1685,7 @@ impl<T> Permit<'_, T> {
     /// is still sent into the channel, but it will never be received. It is
     /// dropped only when every handle to the channel (senders, weak senders,
     /// and outstanding permits) has been dropped. Do not rely on the value
-    /// being dropped promptly, e.g. when its destructor has side effects.
+    /// being dropped promptly, especially if its destructor has side effects.
     ///
     /// [`Receiver::close`]: Receiver::close
     ///
@@ -1796,7 +1813,7 @@ impl<T> OwnedPermit<T> {
     /// is still sent into the channel, but it will never be received. It is
     /// dropped only when every handle to the channel (senders, weak senders,
     /// and outstanding permits) has been dropped. Do not rely on the value
-    /// being dropped promptly, e.g. when its destructor has side effects.
+    /// being dropped promptly, especially if its destructor has side effects.
     ///
     /// Unlike [`Permit::send`], this method returns the [`Sender`] from which
     /// the `OwnedPermit` was reserved.

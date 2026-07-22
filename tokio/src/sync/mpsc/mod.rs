@@ -35,11 +35,22 @@
 //!
 //! If the [`Receiver`] handle is dropped, then messages can no longer
 //! be read out of the channel. In this case, all further attempts to send will
-//! result in an error, and all unread messages are drained from the channel and
-//! dropped. However, a value sent through a previously reserved [`Permit`] or
-//! [`OwnedPermit`] does not result in an error, and is not dropped until every
-//! handle to the channel (senders, weak senders, and outstanding permits) has
-//! been dropped.
+//! result in an error, and all unread messages will be drained from the channel
+//! and dropped. However, a send that has already reserved capacity does not
+//! fail: a value sent through a previously reserved [`Permit`] or
+//! [`OwnedPermit`] is still sent into the channel, but it is never received,
+//! and it is only dropped once every handle to the channel (senders, weak
+//! senders, and outstanding permits) has been dropped.
+//!
+//! A send that races with the receiver being dropped can behave the same way:
+//! bounded [`send`][bounded-send] (including its timeout and blocking
+//! variants) and [`try_send`][bounded-try-send], as well as unbounded
+//! [`send`][unbounded-send], may return `Ok` even though the value is never
+//! received, and its drop may likewise be deferred. Do not rely on the value
+//! being dropped promptly; for example, if the value carries a [oneshot]
+//! `Sender` for a reply, the reply receiver keeps waiting until the value is
+//! finally dropped. To shut down without stranding values, the receiver can
+//! instead use [`Receiver::close`] as described in the next section.
 //!
 //! # Clean Shutdown
 //!
@@ -105,9 +116,12 @@
 //!
 //! [`Sender`]: crate::sync::mpsc::Sender
 //! [`Receiver`]: crate::sync::mpsc::Receiver
+//! [`Receiver::close`]: crate::sync::mpsc::Receiver::close()
 //! [`Permit`]: crate::sync::mpsc::Permit
 //! [`OwnedPermit`]: crate::sync::mpsc::OwnedPermit
 //! [bounded-send]: crate::sync::mpsc::Sender::send()
+//! [bounded-try-send]: crate::sync::mpsc::Sender::try_send()
+//! [unbounded-send]: crate::sync::mpsc::UnboundedSender::send()
 //! [bounded-recv]: crate::sync::mpsc::Receiver::recv()
 //! [blocking-send]: crate::sync::mpsc::Sender::blocking_send()
 //! [blocking-recv]: crate::sync::mpsc::Receiver::blocking_recv()
