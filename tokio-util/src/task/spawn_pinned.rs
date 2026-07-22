@@ -2,9 +2,10 @@ use futures_util::future::{AbortHandle, Abortable};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
+use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use tokio::runtime::Builder;
+use tokio::runtime::Builder as RuntimeBuilder;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 use tokio::task::{spawn_local, JoinHandle, LocalSet};
@@ -18,6 +19,8 @@ use tokio::task::{spawn_local, JoinHandle, LocalSet};
 ///
 /// [`tokio::task::LocalSet`]: tokio::task::LocalSet
 /// [`tokio::task::spawn_local`]: tokio::task::spawn_local
+///
+/// Use [`LocalPoolBuilder`] to configure the worker threads spawned by the pool.
 ///
 /// # Examples
 ///
@@ -64,15 +67,15 @@ impl LocalPoolHandle {
     /// Panics if the pool size is less than one.
     #[track_caller]
     pub fn new(pool_size: usize) -> LocalPoolHandle {
-        assert!(pool_size > 0);
+        LocalPoolBuilder::new(pool_size)
+            .build()
+            .expect("Failed to start pinned worker threads")
+    }
 
-        let workers = (0..pool_size)
-            .map(|_| LocalWorkerHandle::new_worker())
-            .collect();
-
-        let pool = Arc::new(LocalPool { workers });
-
-        LocalPoolHandle { pool }
+    /// Create a builder for configuring a local pool.
+    #[track_caller]
+    pub fn builder(pool_size: usize) -> LocalPoolBuilder {
+        LocalPoolBuilder::new(pool_size)
     }
 
     /// Returns the number of threads of the Pool.
@@ -188,6 +191,161 @@ impl LocalPoolHandle {
     {
         self.pool
             .spawn_pinned(create_task, WorkerChoice::ByIdx(idx))
+    }
+}
+
+/// Builder for configuring a [`LocalPoolHandle`].
+///
+/// This follows the same style as [`tokio::runtime::Builder`] for thread
+/// customization.
+///
+/// # Examples
+///
+/// ```
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
+/// use tokio_util::task::LocalPoolBuilder;
+///
+/// # fn main() -> std::io::Result<()> {
+/// let pool = LocalPoolBuilder::new(2)
+///     .thread_name("pinned-worker")
+///     .thread_stack_size(4 * 1024 * 1024)
+///     .build()?;
+///
+/// assert_eq!(pool.num_threads(), 2);
+/// # Ok(())
+/// # }
+/// # }
+/// ```
+pub struct LocalPoolBuilder {
+    pool_size: usize,
+    thread_name: ThreadNameFn,
+    thread_stack_size: Option<usize>,
+}
+
+impl LocalPoolBuilder {
+    /// Create a new builder for a pool of threads to handle `!Send` tasks.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the pool size is less than one.
+    #[track_caller]
+    pub fn new(pool_size: usize) -> LocalPoolBuilder {
+        assert!(pool_size > 0);
+
+        LocalPoolBuilder {
+            pool_size,
+            thread_name: Arc::new(|| DEFAULT_THREAD_NAME.into()),
+            thread_stack_size: None,
+        }
+    }
+
+    /// Sets the name of threads spawned by the local pool.
+    ///
+    /// The default name is "tokio-local-pool-worker".
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio_util::task::LocalPoolBuilder;
+    ///
+    /// # fn main() -> std::io::Result<()> {
+    /// let pool = LocalPoolBuilder::new(2)
+    ///     .thread_name("pinned-worker")
+    ///     .build()?;
+    /// # Ok(())
+    /// # }
+    /// # }
+    /// ```
+    pub fn thread_name(&mut self, val: impl Into<String>) -> &mut Self {
+        let val = val.into();
+        self.thread_name = Arc::new(move || val.clone());
+        self
+    }
+
+    /// Sets a function used to generate the name of threads spawned by the
+    /// local pool.
+    ///
+    /// The default name fn is `|| "tokio-local-pool-worker".into()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use std::sync::atomic::{AtomicUsize, Ordering};
+    /// use tokio_util::task::LocalPoolBuilder;
+    ///
+    /// # fn main() -> std::io::Result<()> {
+    /// let pool = LocalPoolBuilder::new(2)
+    ///     .thread_name_fn(|| {
+    ///         static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+    ///         let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+    ///         format!("pinned-worker-{id}")
+    ///     })
+    ///     .build()?;
+    /// # Ok(())
+    /// # }
+    /// # }
+    /// ```
+    pub fn thread_name_fn<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn() -> String + Send + Sync + 'static,
+    {
+        self.thread_name = Arc::new(f);
+        self
+    }
+
+    /// Sets the stack size (in bytes) for threads spawned by the local pool.
+    ///
+    /// The actual stack size may be greater than this value if the platform
+    /// specifies a minimal stack size.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio_util::task::LocalPoolBuilder;
+    ///
+    /// # fn main() -> std::io::Result<()> {
+    /// let pool = LocalPoolBuilder::new(2)
+    ///     .thread_stack_size(4 * 1024 * 1024)
+    ///     .build()?;
+    /// # Ok(())
+    /// # }
+    /// # }
+    /// ```
+    pub fn thread_stack_size(&mut self, val: usize) -> &mut Self {
+        self.thread_stack_size = Some(val);
+        self
+    }
+
+    /// Build the configured local pool.
+    pub fn build(&mut self) -> io::Result<LocalPoolHandle> {
+        let workers = (0..self.pool_size)
+            .map(|_| LocalWorkerHandle::new_worker(self))
+            .collect::<io::Result<Vec<_>>>()?
+            .into_boxed_slice();
+
+        let pool = Arc::new(LocalPool { workers });
+
+        Ok(LocalPoolHandle { pool })
+    }
+}
+
+impl Debug for LocalPoolBuilder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LocalPoolBuilder")
+            .field("pool_size", &self.pool_size)
+            .field(
+                "thread_name",
+                &"<dyn Fn() -> String + Send + Sync + 'static>",
+            )
+            .field("thread_stack_size", &self.thread_stack_size)
+            .finish()
     }
 }
 
@@ -368,6 +526,8 @@ impl Drop for AbortGuard {
 }
 
 type PinnedFutureSpawner = Box<dyn FnOnce() + Send + 'static>;
+type ThreadNameFn = Arc<dyn Fn() -> String + Send + Sync + 'static>;
+const DEFAULT_THREAD_NAME: &str = "tokio-local-pool-worker";
 
 struct LocalWorkerHandle {
     runtime_handle: tokio::runtime::Handle,
@@ -377,23 +537,25 @@ struct LocalWorkerHandle {
 
 impl LocalWorkerHandle {
     /// Create a new worker for executing pinned tasks
-    fn new_worker() -> LocalWorkerHandle {
+    fn new_worker(builder: &LocalPoolBuilder) -> io::Result<LocalWorkerHandle> {
         let (sender, receiver) = unbounded_channel();
-        let runtime = Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("Failed to start a pinned worker thread runtime");
+        let runtime = RuntimeBuilder::new_current_thread().enable_all().build()?;
         let runtime_handle = runtime.handle().clone();
         let task_count = Arc::new(AtomicUsize::new(0));
         let task_count_clone = Arc::clone(&task_count);
+        let mut thread_builder = std::thread::Builder::new().name((builder.thread_name)());
 
-        std::thread::spawn(|| Self::run(runtime, receiver, task_count_clone));
+        if let Some(thread_stack_size) = builder.thread_stack_size {
+            thread_builder = thread_builder.stack_size(thread_stack_size);
+        }
 
-        LocalWorkerHandle {
+        let _ = thread_builder.spawn(|| Self::run(runtime, receiver, task_count_clone))?;
+
+        Ok(LocalWorkerHandle {
             runtime_handle,
             spawner: sender,
             task_count,
-        }
+        })
     }
 
     fn run(
