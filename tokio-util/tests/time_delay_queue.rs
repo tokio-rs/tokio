@@ -566,6 +566,9 @@ async fn reset_later_after_slot_starts() {
     // that slot, but doesn't know when, it must wake immediately to advance
     // the wheel.
     queue.reset_at(&foo, now + ms(120));
+    // The wake is deferred (via context::defer) so we must yield to the
+    // runtime once to flush the deferred waker list before checking.
+    tokio::task::yield_now().await;
     assert!(queue.is_woken());
 
     assert_pending!(poll!(queue));
@@ -628,6 +631,9 @@ async fn reset_earlier_after_slot_starts() {
     // that slot, but doesn't know when, it must wake immediately to advance
     // the wheel.
     queue.reset_at(&foo, now + ms(120));
+    // The wake is deferred (via context::defer) so we must yield to the
+    // runtime once to flush the deferred waker list before checking.
+    tokio::task::yield_now().await;
     assert!(queue.is_woken());
 
     assert_pending!(poll!(queue));

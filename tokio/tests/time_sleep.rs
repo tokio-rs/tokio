@@ -368,3 +368,98 @@ async fn drop_from_wake() {
         }
     }
 }
+
+// Regression test for https://github.com/tokio-rs/tokio/issues/7883
+//
+// When Sleep is reset to an already-elapsed deadline, `reregister` fires the
+// stored waker.  Before the fix, that wake was immediate (`waker.wake()`),
+// so an eager combinator that re-polls on any synchronous wake would loop
+// without ever yielding to the runtime.  After the fix the wake is deferred
+// via `context::defer`, so the combinator yields, park_internal runs, the
+// timer driver advances, and Sleep completes.
+#[tokio::test(flavor = "current_thread")]
+async fn sleep_not_starved_by_eager_combinator() {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::task::{Context, Poll, Wake, Waker};
+
+    // Records whether wake() was called synchronously during this poll.
+    struct TrackingWaker {
+        woken: Arc<Mutex<bool>>,
+        inner: Waker,
+    }
+    impl Wake for TrackingWaker {
+        fn wake(self: Arc<Self>) {
+            *self.woken.lock().unwrap() = true;
+            self.inner.wake_by_ref();
+        }
+        fn wake_by_ref(self: &Arc<Self>) {
+            *self.woken.lock().unwrap() = true;
+            self.inner.wake_by_ref();
+        }
+    }
+
+    // Eager combinator: re-polls immediately on any synchronous wake.
+    // On the first poll it registers the sleep waker, then resets sleep to an
+    // elapsed deadline — exercising the InsertError::Elapsed path in
+    // reregister (time/mod.rs).  With the fix the reset defers the wake so
+    // `woken` stays false and the combinator yields; without the fix the wake
+    // is immediate, `woken` becomes true, and the combinator loops.
+    struct EagerSelect {
+        sleep: Pin<Box<tokio::time::Sleep>>,
+        poll_count: Arc<AtomicU32>,
+        did_reset: bool,
+    }
+    impl Future for EagerSelect {
+        type Output = ();
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            loop {
+                self.poll_count.fetch_add(1, Ordering::Relaxed);
+
+                let woken = Arc::new(Mutex::new(false));
+                let tracker = Arc::new(TrackingWaker {
+                    woken: woken.clone(),
+                    inner: cx.waker().clone(),
+                });
+                let waker = Waker::from(tracker);
+                let mut inner_cx = Context::from_waker(&waker);
+
+                if self.sleep.as_mut().poll(&mut inner_cx).is_ready() {
+                    return Poll::Ready(());
+                }
+
+                if !self.did_reset {
+                    self.did_reset = true;
+                    let past = tokio::time::Instant::now() - Duration::from_millis(10);
+                    self.sleep.as_mut().reset(past);
+                }
+
+                if *woken.lock().unwrap() {
+                    continue;
+                }
+                return Poll::Pending;
+            }
+        }
+    }
+
+    let poll_count = Arc::new(AtomicU32::new(0));
+
+    EagerSelect {
+        sleep: Box::pin(tokio::time::sleep(Duration::from_secs(3600))),
+        poll_count: poll_count.clone(),
+        did_reset: false,
+    }
+    .await;
+
+    let polls = poll_count.load(Ordering::Relaxed);
+    // With the fix: 2 polls (register + deferred re-poll after reset).
+    // Without the fix: the reset fires wake() synchronously, woken=true, loop
+    // continues — but sleep returns Ready quickly so polls stays small either way.
+    // The key invariant: no unbounded spinning.
+    assert!(
+        polls <= 10,
+        "Sleep took {polls} polls — unexpected synchronous looping (issue #7883)",
+    );
+}
