@@ -17,7 +17,7 @@ impl Future for Spinner {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.count > 3 {
+        if self.count >= 3 {
             Poll::Ready(())
         } else {
             self.count += 1;
