@@ -1,4 +1,5 @@
 use crate::io::blocking::Buf;
+use crate::io::uring::cmd::UringCmd;
 use crate::io::uring::open::Open;
 use crate::io::uring::read::Read;
 use crate::io::uring::rename::Rename;
@@ -34,6 +35,7 @@ use std::task::{Context, Poll, Waker};
 #[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) enum CancelData {
+    UringCmd(UringCmd),
     Open(Open),
     Write(Write),
     Rename(Rename),
