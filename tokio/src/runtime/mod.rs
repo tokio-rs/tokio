@@ -239,16 +239,34 @@
 //! ## Unix `fork`
 //!
 //! User code that calls `fork(2)` without immediately calling `exec` must not
-//! reuse Tokio in the child process. Tokio supports this kind of fork only in
-//! two cases:
+//! reuse in the child process any Tokio state that existed in the parent at
+//! the time of the fork. Tokio supports this kind of fork in the following
+//! cases:
 //!
 //! - The fork happens before the parent process has used Tokio in any way.
 //! - The child process does not use Tokio after the fork.
+//! - The child process creates fresh runtimes after the fork and only
+//!   interacts with those. Runtimes created before the fork, as well as
+//!   anything bound to them (spawned tasks, I/O resources, timers, runtime
+//!   handles), must not be used in the child: their worker threads do not
+//!   exist in the child process, so interacting with them may deadlock. Note
+//!   that this includes implicit uses, such as dropping a value whose
+//!   destructor interacts with a pre-fork runtime.
 //!
-//! Creating or using a Tokio runtime in a child process after the parent has
-//! used Tokio is not supported, even if the runtime in the child is newly
-//! created. Some Tokio modules, including process and signal handling, use
-//! process-global state that cannot currently be reset after `fork`.
+//! For the last case, the fork must also not happen on a thread that is
+//! itself running on a Tokio runtime (inside `block_on` or a spawned task):
+//! the forking thread is the only thread that exists in the child, and it
+//! would still be marked as being inside the pre-fork runtime, so entering a
+//! new runtime on it panics. Fork from a thread outside any runtime, or
+//! create the child's runtime on a newly spawned thread.
+//!
+//! Additionally, the usual caveats of forking a multi-threaded process apply:
+//! if another thread holds a lock at the moment of the fork, that lock is
+//! never released in the child process, and any thread (including Tokio
+//! worker threads) may hold a lock at an unfortunate moment. Forking is
+//! reliable when no runtime exists or no other thread is interacting with
+//! Tokio concurrently; forking while runtimes are running works on common
+//! platforms but is subject to these inherent hazards.
 //!
 //! [tasks]: crate::task
 //! [`Runtime`]: Runtime
