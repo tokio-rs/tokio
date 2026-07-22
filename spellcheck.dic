@@ -1,4 +1,4 @@
-324
+327
 &
 +
 <
@@ -106,6 +106,8 @@ dns
 DNS
 DoS
 dwOpenMode
+Emscripten
+Emscripten's
 endian
 enqueue
 enqueued
@@ -320,6 +322,7 @@ Wakers
 wakeup
 wakeups
 WASI
+Wasm
 watchOS
 workstealing
 ZST
