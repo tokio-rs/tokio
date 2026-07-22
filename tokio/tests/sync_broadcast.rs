@@ -674,11 +674,13 @@ fn broadcast_sender_closed() {
 }
 
 #[test]
-fn broadcast_sender_closed_with_extra_subscribe() {
+fn broadcast_weak_sender_closed() {
     let (tx, rx) = broadcast::channel::<()>(1);
     let rx2 = tx.subscribe();
+    let weak = tx.downgrade();
+    drop(tx);
 
-    let mut task = task::spawn(tx.closed());
+    let mut task = task::spawn(weak.closed());
     assert_pending!(task.poll());
 
     drop(rx);
@@ -687,24 +689,56 @@ fn broadcast_sender_closed_with_extra_subscribe() {
 
     drop(rx2);
     assert!(task.is_woken());
+    assert_ready!(task.poll());
+}
+
+#[test]
+fn broadcast_sender_closed_with_extra_subscribe() {
+    let (tx, rx) = broadcast::channel::<()>(1);
+    let rx2 = tx.subscribe();
+    let weak = tx.downgrade();
+
+    let mut task = task::spawn(tx.closed());
+    let mut weak_task = task::spawn(weak.closed());
+    assert_pending!(task.poll());
+    assert_pending!(weak_task.poll());
+
+    drop(rx);
+    assert!(!task.is_woken());
+    assert!(!weak_task.is_woken());
+    assert_pending!(task.poll());
+    assert_pending!(weak_task.poll());
+
+    drop(rx2);
+    assert!(task.is_woken());
+    assert!(weak_task.is_woken());
 
     let rx3 = tx.subscribe();
     assert_pending!(task.poll());
+    assert_pending!(weak_task.poll());
 
     drop(rx3);
     assert!(task.is_woken());
+    assert!(weak_task.is_woken());
     assert_ready!(task.poll());
+    assert_ready!(weak_task.poll());
 
     let mut task2 = task::spawn(tx.closed());
     assert_ready!(task2.poll());
+    let mut weak_task2 = task::spawn(weak.closed());
+    assert_ready!(weak_task2.poll());
 
     let rx4 = tx.subscribe();
     let mut task3 = task::spawn(tx.closed());
     assert_pending!(task3.poll());
+    let mut weak_task3 = task::spawn(weak.closed());
+    assert_pending!(weak_task3.poll());
 
     drop(rx4);
     assert!(task3.is_woken());
     assert_ready!(task3.poll());
+    assert!(weak_task3.is_woken());
+    assert_ready!(weak_task3.poll());
 }
 
 #[tokio::test]
