@@ -418,7 +418,7 @@ struct Data<T> {
     /// instant.
     inner: T,
 
-    /// The instant at which the item is returned.
+    /// The offset in ms at which the item is returned.
     when: u64,
 
     /// Set to true when stored in the `expired` queue
@@ -505,10 +505,6 @@ impl<T> DelayQueue<T> {
     ///
     /// See [type] level documentation for more details.
     ///
-    /// # Panics
-    ///
-    /// This function panics if `when` is too far in the future.
-    ///
     /// # Examples
     ///
     /// Basic usage
@@ -521,7 +517,7 @@ impl<T> DelayQueue<T> {
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert_at(
-    ///     "foo", Instant::now() + Duration::from_secs(5));
+    ///     "foo", Instant::now().checked_add(Duration::from_secs(5)).unwrap());
     ///
     /// // Remove the entry
     /// let item = delay_queue.remove(&key);
@@ -565,7 +561,7 @@ impl<T> DelayQueue<T> {
                 waker.wake();
             }
 
-            let delay_time = self.start + Duration::from_millis(when);
+            let delay_time = self.start.saturating_add(Duration::from_millis(when));
             if let Some(ref mut delay) = &mut self.delay {
                 delay.as_mut().reset(delay_time);
             } else {
@@ -598,7 +594,7 @@ impl<T> DelayQueue<T> {
             Expired {
                 key,
                 data: data.inner,
-                deadline: self.start + Duration::from_millis(data.when),
+                deadline: self.start.saturating_add(Duration::from_millis(data.when)),
             }
         }))
     }
@@ -655,7 +651,7 @@ impl<T> DelayQueue<T> {
     /// [type]: #
     #[track_caller]
     pub fn insert(&mut self, value: T, timeout: Duration) -> Key {
-        self.insert_at(value, Instant::now() + timeout)
+        self.insert_at(value, Instant::now().saturating_add(timeout))
     }
 
     #[track_caller]
@@ -704,7 +700,8 @@ impl<T> DelayQueue<T> {
     /// ```
     #[track_caller]
     pub fn deadline(&self, key: &Key) -> Instant {
-        self.start + Duration::from_millis(self.slab[*key].when)
+        self.start
+            .saturating_add(Duration::from_millis(self.slab[*key].when))
     }
 
     /// Removes the key from the expired queue or the timer wheel
@@ -778,7 +775,7 @@ impl<T> DelayQueue<T> {
         Expired {
             key: Key::new(key.index),
             data: data.inner,
-            deadline: self.start + Duration::from_millis(data.when),
+            deadline: self.start.saturating_add(Duration::from_millis(data.when)),
         }
     }
 
@@ -830,8 +827,7 @@ impl<T> DelayQueue<T> {
     ///
     /// # Panics
     ///
-    /// This function panics if `when` is too far in the future or if `key` is
-    /// not contained by the queue.
+    /// This function panics if `key` is not contained by the queue.
     ///
     /// # Examples
     ///
@@ -848,7 +844,7 @@ impl<T> DelayQueue<T> {
     ///
     /// // "foo" is scheduled to be returned in 5 seconds
     ///
-    /// delay_queue.reset_at(&key, Instant::now() + Duration::from_secs(10));
+    /// delay_queue.reset_at(&key, Instant::now().checked_add(Duration::from_secs(10)).unwrap());
     ///
     /// // "foo" is now scheduled to be returned in 10 seconds
     /// # }
@@ -965,7 +961,7 @@ impl<T> DelayQueue<T> {
     fn next_deadline(&self) -> Option<Instant> {
         self.wheel
             .poll_at()
-            .map(|poll_at| self.start + Duration::from_millis(poll_at))
+            .map(|poll_at| self.start.saturating_add(Duration::from_millis(poll_at)))
     }
 
     /// Sets the delay of the item associated with `key` to expire after
@@ -980,8 +976,7 @@ impl<T> DelayQueue<T> {
     ///
     /// # Panics
     ///
-    /// This function panics if `timeout` is greater than the maximum supported
-    /// duration or if `key` is not contained by the queue.
+    /// This function panics if `key` is not contained by the queue.
     ///
     /// # Examples
     ///
@@ -1005,7 +1000,7 @@ impl<T> DelayQueue<T> {
     /// ```
     #[track_caller]
     pub fn reset(&mut self, key: &Key, timeout: Duration) {
-        self.reset_at(key, Instant::now() + timeout);
+        self.reset_at(key, Instant::now().saturating_add(timeout));
     }
 
     /// Clears the queue, removing all items.
@@ -1161,7 +1156,10 @@ impl<T> DelayQueue<T> {
                     ready!(Pin::new(&mut *delay).poll(cx));
                 }
 
-                let now = crate::time::ms(delay.deadline() - self.start, crate::time::Round::Down);
+                let now = crate::time::ms(
+                    delay.deadline().saturating_duration_since(self.start),
+                    crate::time::Round::Down,
+                );
 
                 self.wheel_now = now;
             }
@@ -1182,11 +1180,10 @@ impl<T> DelayQueue<T> {
     }
 
     fn normalize_deadline(&self, when: Instant) -> u64 {
-        let when = if when < self.start {
-            0
-        } else {
-            crate::time::ms(when - self.start, crate::time::Round::Up)
-        };
+        let when = when
+            .checked_duration_since(self.start)
+            .map(|delta| crate::time::ms(delta, crate::time::Round::Up))
+            .unwrap_or(0);
 
         cmp::max(when, self.wheel.elapsed())
     }
