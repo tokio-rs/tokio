@@ -42,10 +42,6 @@ async fn set_linger() {
 }
 
 #[tokio::test]
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
-)]
 async fn try_read_write() {
     const DATA: &[u8] = &[2u8; 4000];
 
@@ -395,10 +391,6 @@ async fn try_read_buf() {
 
 // read_closed is a best effort event, so test only for no false positives.
 #[tokio::test]
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
-)]
 async fn read_closed() {
     let (client, mut server) = create_pair().await;
 
