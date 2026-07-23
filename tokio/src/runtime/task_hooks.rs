@@ -1,5 +1,7 @@
 use super::Config;
 use std::marker::PhantomData;
+#[cfg(feature = "schedule-latency")]
+use std::time::Duration;
 
 impl TaskHooks {
     pub(crate) fn spawn(&self, meta: &TaskMeta<'_>) {
@@ -62,6 +64,9 @@ pub struct TaskMeta<'a> {
     /// The location where the task was spawned.
     #[cfg_attr(not(tokio_unstable), allow(unreachable_pub, dead_code))]
     pub(crate) spawned_at: crate::runtime::task::SpawnLocation,
+    /// The latency between scheduling the task and starting its current poll.
+    #[cfg(feature = "schedule-latency")]
+    pub(crate) schedule_latency: Option<Duration>,
     pub(crate) _phantom: PhantomData<&'a ()>,
 }
 
@@ -76,6 +81,32 @@ impl<'a> TaskMeta<'a> {
     #[cfg(tokio_unstable)]
     pub fn spawned_at(&self) -> &'static std::panic::Location<'static> {
         self.spawned_at.0
+    }
+
+    /// Returns the latency between scheduling the task and starting its
+    /// current poll.
+    ///
+    /// Task schedule latency is measured from the task's most recent transition
+    /// to the scheduled state until immediately before the
+    /// [`on_before_task_poll`] callback. Waking a task that is already scheduled
+    /// does not reset the measurement.
+    ///
+    /// This returns `Some` from [`on_before_task_poll`] and
+    /// [`on_after_task_poll`] callbacks when tracking is enabled with
+    /// [`track_task_schedule_latency`] or
+    /// [`enable_metrics_schedule_latency_histogram`]. Both callbacks receive
+    /// the same value, so time spent polling the task is not included. It
+    /// returns `None` when tracking is disabled and from task spawn and
+    /// termination callbacks.
+    ///
+    /// [`track_task_schedule_latency`]: crate::runtime::Builder::track_task_schedule_latency
+    /// [`enable_metrics_schedule_latency_histogram`]: crate::runtime::Builder::enable_metrics_schedule_latency_histogram
+    /// [`on_before_task_poll`]: crate::runtime::Builder::on_before_task_poll
+    /// [`on_after_task_poll`]: crate::runtime::Builder::on_after_task_poll
+    #[cfg(feature = "schedule-latency")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "schedule-latency")))]
+    pub fn schedule_latency(&self) -> Option<Duration> {
+        self.schedule_latency
     }
 }
 

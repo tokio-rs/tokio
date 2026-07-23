@@ -206,7 +206,7 @@ pub(crate) struct Shared {
     /// Startup time of this scheduler.
     ///
     /// This instant is used as the basis of task `scheduled_at` measurements.
-    started_at: Option<Instant>,
+    schedule_latency_start: Option<Instant>,
 
     /// Only held to trigger some code on drop. This is used to get internal
     /// runtime metrics that can be useful when doing performance
@@ -317,10 +317,7 @@ pub(super) fn create(
 
     let (idle, idle_synced) = Idle::new(size);
     let (inject, inject_synced) = inject::Shared::new();
-    let started_at = config
-        .metrics_schedule_latency_histogram
-        .as_ref()
-        .map(|_| Instant::now());
+    let schedule_latency_start = config.track_task_schedule_latency.then(Instant::now);
 
     let remotes_len = remotes.len();
     let handle = Arc::new(Handle {
@@ -342,7 +339,7 @@ pub(super) fn create(
             config,
             scheduler_metrics: SchedulerMetrics::new(),
             worker_metrics: worker_metrics.into_boxed_slice(),
-            started_at,
+            schedule_latency_start,
             _counters: Counters,
         },
         driver: driver_handle,
@@ -639,9 +636,6 @@ impl Context {
     }
 
     fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
-        #[cfg(tokio_unstable)]
-        let task_meta = task.task_meta();
-
         let task = self.worker.handle.shared.owned.assert_owner(task);
 
         // Make sure the worker is not in the **searching** state. This enables
@@ -674,13 +668,16 @@ impl Context {
         self.assert_lifo_enabled_is_correct(&core);
 
         // Measure the poll start time. Note that we may end up polling other
-        // tasks under this measurement. In this case, the tasks came from the
-        // LIFO slot and are considered part of the current task for scheduling
-        // purposes. These tasks inherent the "parent"'s limits.
-        core.stats.start_poll(
-            task.get_scheduled_at()
-                .prepare(self.worker.handle.shared.started_at),
-        );
+        // tasks under this poll-time measurement. Tasks from the LIFO slot
+        // inherit the "parent"'s limits, but their schedule latency is recorded
+        // separately when each task is polled.
+        let schedule_latency_context = task
+            .get_scheduled_at()
+            .prepare(self.worker.handle.shared.schedule_latency_start);
+        let _task_schedule_latency = core.stats.start_poll(schedule_latency_context);
+
+        #[cfg(tokio_unstable)]
+        let task_meta = task.task_meta(_task_schedule_latency);
 
         // Make the core available to the runtime context
         *self.core.borrow_mut() = Some(core);
@@ -759,12 +756,21 @@ impl Context {
                     super::counters::inc_lifo_capped();
                 }
 
-                // Run the LIFO task, then loop
-                *self.core.borrow_mut() = Some(core);
                 let task = self.worker.handle.shared.owned.assert_owner(task);
 
+                // Record the LIFO task's schedule latency independently from
+                // the outer task's poll-time sample. The returned value is the
+                // same sample that is passed to the histogram recorder.
+                let schedule_latency_context = task
+                    .get_scheduled_at()
+                    .prepare(self.worker.handle.shared.schedule_latency_start);
+                let _task_schedule_latency =
+                    core.stats.record_schedule_latency(schedule_latency_context);
+
+                *self.core.borrow_mut() = Some(core);
+
                 #[cfg(tokio_unstable)]
-                let task_meta = task.task_meta();
+                let task_meta = task.task_meta(_task_schedule_latency);
 
                 #[cfg(tokio_unstable)]
                 self.worker
@@ -1339,13 +1345,10 @@ impl Worker {
 
 impl Handle {
     pub(super) fn schedule_task(&self, task: Notified, is_yield: bool) {
-        if self
-            .shared
-            .config
-            .metrics_schedule_latency_histogram
-            .is_some()
-        {
-            task.set_scheduled_at(ScheduleLatencyInstant::new(self.shared.started_at));
+        if self.shared.schedule_latency_start.is_some() {
+            task.set_scheduled_at(ScheduleLatencyInstant::new(
+                self.shared.schedule_latency_start,
+            ));
         }
 
         with_current(|maybe_cx| {

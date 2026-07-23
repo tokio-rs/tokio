@@ -374,6 +374,8 @@ where
                 f(&TaskMeta {
                     id: self.core().task_id,
                     spawned_at: self.core().spawned_at.into(),
+                    #[cfg(feature = "schedule-latency")]
+                    schedule_latency: None,
                     _phantom: Default::default(),
                 })
             }));

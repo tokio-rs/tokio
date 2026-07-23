@@ -226,32 +226,95 @@ impl MetricsBatch {
     cfg_metrics_variant! {
         stable: {
             /// Start polling an individual task
-            pub(crate) fn start_poll(&mut self, _task_scheduled_at: Option<ScheduleLatencyContext>) {}
+            pub(crate) fn start_poll(
+                &mut self,
+                _schedule_latency_context: Option<ScheduleLatencyContext>,
+            ) -> Option<Duration> {
+                None
+            }
         },
         unstable: {
             /// Start polling an individual task
             ///
             /// # Arguments
             ///
-            /// `task_scheduled_at` is used to calculate task schedule latency.
-            /// A `ScheduleLatencyContext` can be obtained by calling `prepare` on a task's
-            /// `ScheduleLatencyInstant`.
-            pub(crate) fn start_poll(&mut self, _task_scheduled_at: Option<ScheduleLatencyContext>) {
+            /// `schedule_latency_context` is used to calculate task schedule latency.
+            pub(crate) fn start_poll(
+                &mut self,
+                schedule_latency_context: Option<ScheduleLatencyContext>,
+            ) -> Option<Duration> {
                 self.poll_count += 1;
-                if let Some(poll_timer) = &mut self.poll_timer {
-                    poll_timer.poll_started_at = Instant::now();
-                }
+                let poll_started_at = self.poll_timer.as_mut().map(|poll_timer| {
+                    let now = Instant::now();
+                    poll_timer.poll_started_at = now;
+                    now
+                });
+
                 #[cfg(feature = "schedule-latency")]
-                if let Some(task_scheduled_at) = _task_scheduled_at {
-                    if let Some(schedule_latencies) = &mut self.schedule_latencies {
-                        if let Some(now) = self.poll_timer.as_ref().map(|p| p.poll_started_at).or_else(now) {
-                            let elapsed = task_scheduled_at.elapsed_nanos(now);
-                            schedule_latencies.measure(elapsed, 1);
-                        }
-                    }
+                {
+                    self.record_schedule_latency_at(schedule_latency_context, poll_started_at)
+                }
+
+                #[cfg(not(feature = "schedule-latency"))]
+                {
+                    let _ = (poll_started_at, schedule_latency_context);
+                    None
                 }
             }
         }
+    }
+
+    cfg_metrics_variant! {
+        stable: {
+            /// Record the schedule latency of an additional task polled as part
+            /// of the current poll operation.
+            #[cfg(feature = "rt-multi-thread")]
+            pub(crate) fn record_schedule_latency(
+                &mut self,
+                _schedule_latency_context: Option<ScheduleLatencyContext>,
+            ) -> Option<Duration> {
+                None
+            }
+        },
+        unstable: {
+            /// Record the schedule latency of an additional task polled as part
+            /// of the current poll operation.
+            #[cfg(feature = "rt-multi-thread")]
+            pub(crate) fn record_schedule_latency(
+                &mut self,
+                schedule_latency_context: Option<ScheduleLatencyContext>,
+            ) -> Option<Duration> {
+                #[cfg(feature = "schedule-latency")]
+                {
+                    self.record_schedule_latency_at(schedule_latency_context, None)
+                }
+
+                #[cfg(not(feature = "schedule-latency"))]
+                {
+                    let _ = schedule_latency_context;
+                    None
+                }
+            }
+        }
+    }
+
+    #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
+    fn record_schedule_latency_at(
+        &mut self,
+        schedule_latency_context: Option<ScheduleLatencyContext>,
+        poll_started_at: Option<Instant>,
+    ) -> Option<Duration> {
+        let task_schedule_latency = schedule_latency_context.and_then(|schedule_latency_context| {
+            poll_started_at
+                .or_else(now)
+                .map(|now| Duration::from_nanos(schedule_latency_context.elapsed_nanos(now)))
+        });
+        if let (Some(task_schedule_latency), Some(schedule_latencies)) =
+            (task_schedule_latency, &mut self.schedule_latencies)
+        {
+            schedule_latencies.measure(duration_as_u64(task_schedule_latency), 1);
+        }
+        task_schedule_latency
     }
 
     cfg_metrics_variant! {

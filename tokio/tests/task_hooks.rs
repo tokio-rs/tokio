@@ -4,6 +4,8 @@
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+#[cfg(feature = "schedule-latency")]
+use std::time::{Duration, Instant};
 
 use tokio::runtime::Builder;
 
@@ -20,6 +22,8 @@ fn spawn_task_hook_fires() {
 
     let runtime = Builder::new_current_thread()
         .on_task_spawn(move |data| {
+            #[cfg(feature = "schedule-latency")]
+            assert_eq!(data.schedule_latency(), None);
             ids2.lock().unwrap().insert(data.id());
 
             count2.fetch_add(1, Ordering::SeqCst);
@@ -53,6 +57,8 @@ fn terminate_task_hook_fires() {
 
     let runtime = Builder::new_current_thread()
         .on_task_terminate(move |_data| {
+            #[cfg(feature = "schedule-latency")]
+            assert_eq!(_data.schedule_latency(), None);
             count2.fetch_add(1, Ordering::SeqCst);
         })
         .build()
@@ -172,6 +178,172 @@ fn task_hook_spawn_location_multi_thread() {
     let poll_starts = poll_starts.fetch_add(0, Ordering::SeqCst);
     assert!(poll_starts > 2);
     assert_eq!(poll_starts, poll_ends.fetch_add(0, Ordering::SeqCst));
+}
+
+#[cfg(feature = "schedule-latency")]
+#[test]
+fn task_hook_schedule_latency_non_poll_callbacks() {
+    let spawn_count = Arc::new(AtomicUsize::new(0));
+    let spawn_count2 = Arc::clone(&spawn_count);
+    let terminate_count = Arc::new(AtomicUsize::new(0));
+    let terminate_count2 = Arc::clone(&terminate_count);
+
+    let runtime = Builder::new_current_thread()
+        .track_task_schedule_latency()
+        .on_task_spawn(move |data| {
+            assert_eq!(data.schedule_latency(), None);
+            spawn_count2.fetch_add(1, Ordering::SeqCst);
+        })
+        .on_task_terminate(move |data| {
+            assert_eq!(data.schedule_latency(), None);
+            terminate_count2.fetch_add(1, Ordering::SeqCst);
+        })
+        .build()
+        .unwrap();
+
+    runtime.block_on(runtime.spawn(async {})).unwrap();
+    assert_eq!(spawn_count.load(Ordering::SeqCst), 1);
+    assert_eq!(terminate_count.load(Ordering::SeqCst), 1);
+}
+
+#[cfg(feature = "schedule-latency")]
+#[test]
+fn task_hook_schedule_latency_disabled() {
+    let runtime = Builder::new_current_thread()
+        .on_before_task_poll(|data| assert_eq!(data.schedule_latency(), None))
+        .build()
+        .unwrap();
+
+    runtime.block_on(runtime.spawn(async {})).unwrap();
+}
+
+#[cfg(feature = "schedule-latency")]
+#[test]
+fn task_hook_schedule_latency_current_thread() {
+    let target = Arc::new(Mutex::new(None));
+    let latencies = Arc::new(Mutex::new(Vec::new()));
+
+    let after_latencies = Arc::new(Mutex::new(Vec::new()));
+
+    let runtime = Builder::new_current_thread()
+        .enable_metrics_schedule_latency_histogram()
+        .on_before_task_poll(schedule_latency_hook(&target, &latencies))
+        .on_after_task_poll(schedule_latency_hook(&target, &after_latencies))
+        .build()
+        .unwrap();
+
+    let task = runtime.spawn(async {});
+    *target.lock().unwrap() = Some(task.id());
+
+    // A current-thread runtime has no background worker, so the spawned task
+    // cannot be polled until `block_on` starts driving the runtime below.
+    wait_for_elapsed(Duration::from_millis(50));
+    runtime.block_on(task).unwrap();
+
+    let latencies = latencies.lock().unwrap();
+    assert_eq!(latencies.len(), 1);
+    assert!(latencies[0] >= Duration::from_millis(25));
+    assert_eq!(*latencies, *after_latencies.lock().unwrap());
+}
+
+#[cfg(feature = "schedule-latency")]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not support multi-threaded runtime"
+)]
+#[test]
+fn task_hook_schedule_latency_multi_thread() {
+    let target = Arc::new(Mutex::new(None));
+    let latencies = Arc::new(Mutex::new(Vec::new()));
+
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(1)
+        .track_task_schedule_latency()
+        .on_before_task_poll(schedule_latency_hook(&target, &latencies))
+        .build()
+        .unwrap();
+
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let blocker = runtime.spawn(async move {
+        started_tx.send(()).unwrap();
+        release_rx.recv().unwrap();
+    });
+    started_rx.recv().unwrap();
+
+    let task = runtime.spawn(async {});
+    *target.lock().unwrap() = Some(task.id());
+
+    wait_for_elapsed(Duration::from_millis(50));
+    release_tx.send(()).unwrap();
+    runtime.block_on(async {
+        blocker.await.unwrap();
+        task.await.unwrap();
+    });
+
+    let latencies = latencies.lock().unwrap();
+    assert_eq!(latencies.len(), 1);
+    assert!(latencies[0] >= Duration::from_millis(25));
+}
+
+#[cfg(feature = "schedule-latency")]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "WASI does not support multi-threaded runtime"
+)]
+#[test]
+fn task_hook_schedule_latency_multi_thread_lifo() {
+    let target = Arc::new(Mutex::new(None));
+    let latencies = Arc::new(Mutex::new(Vec::new()));
+
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(1)
+        .track_task_schedule_latency()
+        .on_before_task_poll(schedule_latency_hook(&target, &latencies))
+        .build()
+        .unwrap();
+
+    let target2 = Arc::clone(&target);
+    let parent = runtime.spawn(async move {
+        let task = tokio::spawn(async {});
+        *target2.lock().unwrap() = Some(task.id());
+        wait_for_elapsed(Duration::from_millis(50));
+        task.await.unwrap();
+    });
+    runtime.block_on(parent).unwrap();
+
+    let latencies = latencies.lock().unwrap();
+    assert_eq!(latencies.len(), 1);
+    assert!(latencies[0] >= Duration::from_millis(25));
+}
+
+#[cfg(feature = "schedule-latency")]
+fn wait_for_elapsed(duration: Duration) {
+    let start = Instant::now();
+    loop {
+        let elapsed = start.elapsed();
+        if elapsed >= duration {
+            return;
+        }
+        std::thread::sleep(duration - elapsed);
+    }
+}
+
+#[cfg(feature = "schedule-latency")]
+fn schedule_latency_hook(
+    target: &Arc<Mutex<Option<tokio::task::Id>>>,
+    latencies: &Arc<Mutex<Vec<Duration>>>,
+) -> impl Fn(&tokio::runtime::TaskMeta<'_>) {
+    let target = Arc::clone(target);
+    let latencies = Arc::clone(latencies);
+    move |data| {
+        if Some(data.id()) == *target.lock().unwrap() {
+            latencies
+                .lock()
+                .unwrap()
+                .push(data.schedule_latency().unwrap());
+        }
+    }
 }
 
 fn mk_spawn_location_hook(
