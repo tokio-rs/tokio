@@ -700,6 +700,29 @@ fn frame_does_not_fit() {
 }
 
 #[test]
+fn runtime_max_frame_len_respects_length_field() {
+    let mut codec = LengthDelimitedCodec::builder()
+        .length_field_length(1)
+        .new_codec();
+
+    codec.set_max_frame_length(1_000);
+
+    let mut dst = BytesMut::from(&b"prefix"[..]);
+    let original = dst.clone();
+    let result = codec.encode(Bytes::from(vec![0; 256]), &mut dst);
+
+    assert!(
+        result.is_err(),
+        "encoded {} bytes despite the one-byte length field",
+        dst.len() - original.len()
+    );
+    let err = result.unwrap_err();
+    assert_eq!(codec.max_frame_length(), 255);
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    assert_eq!(dst, original);
+}
+
+#[test]
 fn neg_adjusted_frame_does_not_fit() {
     let codec = LengthDelimitedCodec::builder()
         .length_field_length(1)
