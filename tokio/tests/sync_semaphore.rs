@@ -228,3 +228,107 @@ fn no_panic_at_maxpermits() {
     let s = Semaphore::new(Semaphore::MAX_PERMITS - 1);
     s.add_permits(1);
 }
+
+#[test]
+#[cfg(not(target_family = "wasm"))] // wasm doesn't support threads
+fn blocking_acquire() {
+    let sem = Semaphore::new(1);
+    let permit = sem.blocking_acquire().unwrap();
+    assert_eq!(sem.available_permits(), 0);
+    drop(permit);
+    assert_eq!(sem.available_permits(), 1);
+}
+
+#[test]
+#[cfg(not(target_family = "wasm"))]
+fn blocking_acquire_waits_for_permit() {
+    let sem = Arc::new(Semaphore::new(0));
+
+    let sem2 = sem.clone();
+    let handle = std::thread::spawn(move || {
+        // Blocks until a permit becomes available.
+        let _permit = sem2.blocking_acquire().unwrap();
+    });
+
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    sem.add_permits(1);
+
+    handle.join().unwrap();
+}
+
+#[test]
+#[cfg(not(target_family = "wasm"))]
+fn blocking_acquire_many() {
+    let sem = Semaphore::new(5);
+    let permit = sem.blocking_acquire_many(3).unwrap();
+    assert_eq!(sem.available_permits(), 2);
+    drop(permit);
+    assert_eq!(sem.available_permits(), 5);
+}
+
+#[test]
+#[cfg(not(target_family = "wasm"))]
+fn blocking_acquire_owned() {
+    let sem = Arc::new(Semaphore::new(1));
+    let permit = sem.clone().blocking_acquire_owned().unwrap();
+    assert_eq!(sem.available_permits(), 0);
+    drop(permit);
+    assert_eq!(sem.available_permits(), 1);
+}
+
+#[test]
+#[cfg(not(target_family = "wasm"))]
+fn blocking_acquire_many_owned() {
+    let sem = Arc::new(Semaphore::new(5));
+    let permit = sem.clone().blocking_acquire_many_owned(3).unwrap();
+    assert_eq!(sem.available_permits(), 2);
+    drop(permit);
+    assert_eq!(sem.available_permits(), 5);
+}
+
+#[test]
+#[cfg(not(target_family = "wasm"))]
+fn blocking_acquire_closed() {
+    let sem = Arc::new(Semaphore::new(1));
+    sem.close();
+    assert!(sem.blocking_acquire().is_err());
+    assert!(sem.blocking_acquire_many(2).is_err());
+    assert!(sem.clone().blocking_acquire_owned().is_err());
+    assert!(sem.clone().blocking_acquire_many_owned(2).is_err());
+}
+
+#[tokio::test]
+#[cfg(all(feature = "full", not(target_family = "wasm")))] // wasm doesn't support unwinding
+#[should_panic]
+async fn blocking_acquire_in_async_context() {
+    let sem = Semaphore::new(1);
+    // Calling a blocking method from an async context must panic.
+    let _permit = sem.blocking_acquire();
+}
+
+#[tokio::test]
+#[cfg(all(feature = "full", not(target_family = "wasm")))] // wasm doesn't support unwinding
+#[should_panic]
+async fn blocking_acquire_many_in_async_context() {
+    let sem = Semaphore::new(1);
+    // Calling a blocking method from an async context must panic.
+    let _permit = sem.blocking_acquire_many(1);
+}
+
+#[tokio::test]
+#[cfg(all(feature = "full", not(target_family = "wasm")))] // wasm doesn't support unwinding
+#[should_panic]
+async fn blocking_acquire_owned_in_async_context() {
+    let sem = Arc::new(Semaphore::new(1));
+    // Calling a blocking method from an async context must panic.
+    let _permit = sem.blocking_acquire_owned();
+}
+
+#[tokio::test]
+#[cfg(all(feature = "full", not(target_family = "wasm")))] // wasm doesn't support unwinding
+#[should_panic]
+async fn blocking_acquire_many_owned_in_async_context() {
+    let sem = Arc::new(Semaphore::new(1));
+    // Calling a blocking method from an async context must panic.
+    let _permit = sem.blocking_acquire_many_owned(1);
+}
