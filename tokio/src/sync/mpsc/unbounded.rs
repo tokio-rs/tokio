@@ -542,8 +542,15 @@ impl<T> UnboundedSender<T> {
     /// being called or the [`UnboundedReceiver`] having been dropped, this
     /// function returns an error. The error includes the value passed to `send`.
     ///
+    /// However, if the receiver is dropped concurrently with a call to `send`,
+    /// the call may return `Ok` even though the value is never received, in
+    /// which case the value's drop may be deferred until every handle to the
+    /// channel has been dropped. See the [Disconnection][disconnection]
+    /// section of the module documentation for details.
+    ///
     /// [`close`]: UnboundedReceiver::close
     /// [`UnboundedReceiver`]: UnboundedReceiver
+    /// [disconnection]: crate::sync::mpsc#disconnection
     pub fn send(&self, message: T) -> Result<(), SendError<T>> {
         if !self.inc_num_messages() {
             return Err(SendError(message));
