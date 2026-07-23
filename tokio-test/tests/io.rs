@@ -3,7 +3,7 @@
 use std::io;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time::{Duration, Instant};
-use tokio_test::io::Builder;
+use tokio_test::{io::Builder, task};
 
 #[tokio::test]
 async fn read() {
@@ -59,6 +59,24 @@ async fn write_with_handle() {
 
     mock.write_all(b"hello ").await.expect("write 1");
     mock.write_all(b"world!").await.expect("write 2");
+}
+
+#[test]
+fn write_with_handle_after_pending() {
+    let (mock, mut handle) = Builder::new().build_with_handle();
+    let mut write = task::spawn(async move {
+        let mut mock = mock;
+        mock.write_all(b"hello ").await
+    });
+
+    assert!(
+        write.poll().is_pending(),
+        "write should wait for a handle action"
+    );
+
+    handle.write(b"hello ");
+
+    assert!(matches!(write.poll(), std::task::Poll::Ready(Ok(()))));
 }
 
 #[tokio::test]
