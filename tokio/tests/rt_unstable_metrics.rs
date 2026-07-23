@@ -646,54 +646,69 @@ fn worker_overflow_count() {
 
 #[test]
 fn worker_local_queue_depth() {
-    const N: usize = 100;
+    use std::sync::mpsc::RecvTimeoutError;
 
-    let rt = current_thread();
-    let metrics = rt.metrics();
-    rt.block_on(async {
-        for _ in 0..N {
-            tokio::spawn(async {});
-        }
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        const N: usize = 100;
 
-        assert_eq!(N, metrics.worker_local_queue_depth(0));
-    });
-
-    let rt = threaded();
-    let metrics = rt.metrics();
-    rt.block_on(async move {
-        // Move to the runtime
-        tokio::spawn(async move {
-            let (tx1, rx1) = std::sync::mpsc::channel();
-            let (tx2, rx2) = std::sync::mpsc::channel();
-
-            // First, we need to block the other worker until all tasks have
-            // been spawned.
-            tokio::spawn(async move {
-                tx1.send(()).unwrap();
-                rx2.recv().unwrap();
-            });
-
-            // Bump the next-run spawn
-            tokio::spawn(async {});
-
-            rx1.recv().unwrap();
-
-            // Spawn some tasks
-            for _ in 0..100 {
+        let rt = current_thread();
+        let metrics = rt.metrics();
+        rt.block_on(async {
+            for _ in 0..N {
                 tokio::spawn(async {});
             }
 
-            let n: usize = (0..metrics.num_workers())
-                .map(|i| metrics.worker_local_queue_depth(i))
-                .sum();
+            assert_eq!(N, metrics.worker_local_queue_depth(0));
+        });
 
-            assert_eq!(n, N);
+        let rt = threaded();
+        let metrics = rt.metrics();
+        rt.block_on(async move {
+            // Move to the runtime
+            tokio::spawn(async move {
+                let (tx1, rx1) = std::sync::mpsc::channel();
+                let (tx2, rx2) = std::sync::mpsc::channel();
 
-            tx2.send(()).unwrap();
-        })
-        .await
-        .unwrap();
+                // First, we need to block the other worker until all tasks have
+                // been spawned.
+                tokio::spawn(async move {
+                    tx1.send(()).unwrap();
+                    rx2.recv().unwrap();
+                });
+
+                // Bump the next-run spawn
+                tokio::spawn(async {});
+
+                rx1.recv().unwrap();
+
+                // Spawn some tasks
+                for _ in 0..100 {
+                    tokio::spawn(async {});
+                }
+
+                let n: usize = (0..metrics.num_workers())
+                    .map(|i| metrics.worker_local_queue_depth(i))
+                    .sum();
+
+                assert_eq!(n, N);
+
+                tx2.send(()).unwrap();
+            })
+            .await
+            .unwrap();
+        });
+
+        tx.send(()).unwrap();
     });
+
+    match rx.recv_timeout(Duration::from_secs(30)) {
+        Ok(_) => {}
+        Err(RecvTimeoutError::Timeout) => {
+            panic!("worker_local_queue_depth test timed out after 30 seconds")
+        }
+        Err(RecvTimeoutError::Disconnected) => panic!("worker_local_queue_depth test panicked"),
+    }
 }
 
 #[test]
