@@ -402,10 +402,32 @@ where
         }
     }
 
+    // Move the runtime to another thread. Do this in a non-generic function
+    // that doesn't depend on `F` or `R`.
+    let (had_entered, take_core) = match move_runtime() {
+        Ok(r) => r,
+        Err(panic_message) => panic!("{}", panic_message),
+    };
+
+    if had_entered {
+        // Unset the current task's budget. Blocking sections are not
+        // constrained by task budgets.
+        let _reset = Reset {
+            take_core,
+            budget: coop::stop(),
+        };
+
+        crate::runtime::context::exit_runtime(f)
+    } else {
+        f()
+    }
+}
+
+fn move_runtime() -> Result<(bool, bool), &'static str> {
     let mut had_entered = false;
     let mut take_core = false;
 
-    let setup_result = with_current(|maybe_cx| {
+    with_current(|maybe_cx| {
         match (
             crate::runtime::context::current_enter_context(),
             maybe_cx.is_some(),
@@ -488,24 +510,8 @@ where
         let worker = cx.worker.clone();
         runtime::spawn_blocking(move || run(worker));
         Ok(())
-    });
-
-    if let Err(panic_message) = setup_result {
-        panic!("{}", panic_message);
-    }
-
-    if had_entered {
-        // Unset the current task's budget. Blocking sections are not
-        // constrained by task budgets.
-        let _reset = Reset {
-            take_core,
-            budget: coop::stop(),
-        };
-
-        crate::runtime::context::exit_runtime(f)
-    } else {
-        f()
-    }
+    })?;
+    Ok((had_entered, take_core))
 }
 
 impl Launch {
