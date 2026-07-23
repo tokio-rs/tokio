@@ -43,7 +43,7 @@ impl UCred {
 ))]
 pub(crate) use self::impl_linux::get_peer_cred;
 
-#[cfg(any(target_os = "netbsd", target_os = "nto"))]
+#[cfg(target_os = "netbsd")]
 pub(crate) use self::impl_netbsd::get_peer_cred;
 
 #[cfg(target_os = "dragonfly")]
@@ -74,6 +74,9 @@ pub(crate) use self::impl_aix::get_peer_cred;
     target_os = "hurd"
 ))]
 pub(crate) use self::impl_noproc::get_peer_cred;
+
+#[cfg(target_os = "nto")]
+pub(crate) use self::impl_nto::get_peer_cred;
 
 #[cfg(any(
     target_os = "linux",
@@ -411,5 +414,36 @@ pub(crate) mod impl_noproc {
             gid: 0,
             pid: None,
         })
+    }
+}
+
+#[cfg(target_os = "nto")]
+pub(crate) mod impl_nto {
+    use crate::net::unix::{self, UnixStream};
+
+    use libc::getpeereid;
+    use std::io;
+    use std::mem::MaybeUninit;
+    use std::os::unix::io::AsRawFd;
+
+    pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
+        unsafe {
+            let raw_fd = sock.as_raw_fd();
+
+            let mut uid = MaybeUninit::uninit();
+            let mut gid = MaybeUninit::uninit();
+
+            let ret = getpeereid(raw_fd, uid.as_mut_ptr(), gid.as_mut_ptr());
+
+            if ret == 0 {
+                Ok(super::UCred {
+                    uid: uid.assume_init() as unix::uid_t,
+                    gid: gid.assume_init() as unix::gid_t,
+                    pid: None,
+                })
+            } else {
+                Err(io::Error::last_os_error())
+            }
+        }
     }
 }
