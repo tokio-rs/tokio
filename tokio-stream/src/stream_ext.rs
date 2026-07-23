@@ -37,6 +37,9 @@ pub use merge::Merge;
 mod next;
 use next::Next;
 
+mod partition;
+pub use partition::Partition;
+
 mod skip;
 pub use skip::Skip;
 
@@ -843,6 +846,54 @@ pub trait StreamExt: Stream {
         F: FnMut(B, Self::Item) -> B,
     {
         FoldFuture::new(self, init, f)
+    }
+
+    /// Partitions the stream into two streams based on the provided predicate.
+    ///
+    ///
+    ///
+    /// As values of this stream are made available, the provided predicate `f`
+    /// will be run against them. The first stream contains all elements for
+    /// which `f` returns `true`, and the second contains all elements for which
+    /// `f` returns `false`.
+    ///
+    /// Note that this function consumes the stream passed into it and returns a
+    /// wrapped versions of it, similar to [`Iterator::partition`] method in the
+    /// standard library.
+    ///
+    /// # Deadlocks
+    ///
+    /// Polling the matching stream when the next value is not a match will not
+    /// succeed until the value is consumed by polling the non-matching stream.
+    /// Similarly, polling the non-matching stream when the next value is a
+    /// match will not succeed until the value is consumed by polling the
+    /// matching stream. This can lead to a deadlock if the streams are not
+    /// consumed in a way that allows the other stream to continue (e.g. by
+    /// using a task or tokio::select! to poll the streams concurrently).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// use tokio_stream::{self as stream, StreamExt};
+    ///
+    /// let s = stream::iter(0..4);
+    /// let (even, odd) = s.partition(|x| x % 2 == 0);
+    ///
+    /// assert_eq!(even.next().await, Some(0));
+    /// assert_eq!(odd.next().await, Some(1));
+    /// assert_eq!(even.next().await, Some(2));
+    /// assert_eq!(odd.next().await, Some(3));
+    /// assert_eq!(even.next().await, None);
+    /// assert_eq!(odd.next().await, None);
+    /// # }
+    fn partition<F>(self, f: F) -> (Partition<Self, F>, Partition<Self, F>)
+    where
+        F: FnMut(&Self::Item) -> bool,
+        Self: Sized + Unpin,
+    {
+        Partition::new(self, f)
     }
 
     /// Drain stream pushing all emitted values into a collection.
