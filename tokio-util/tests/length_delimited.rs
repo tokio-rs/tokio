@@ -700,6 +700,33 @@ fn frame_does_not_fit() {
 }
 
 #[test]
+fn runtime_max_frame_len_respects_length_field() {
+    for (adjustment, max_frame_len) in [(-1, 254), (0, 255), (1, 256)] {
+        let mut codec = LengthDelimitedCodec::builder()
+            .length_field_length(1)
+            .length_adjustment(adjustment)
+            .new_codec();
+
+        codec.set_max_frame_length(1_000);
+        assert_eq!(codec.max_frame_length(), max_frame_len);
+
+        let mut dst = BytesMut::new();
+        codec
+            .encode(Bytes::from(vec![0; max_frame_len]), &mut dst)
+            .unwrap();
+        assert_eq!(dst[0], u8::MAX);
+
+        let mut dst = BytesMut::from(&b"prefix"[..]);
+        let original = dst.clone();
+        let result = codec.encode(Bytes::from(vec![0; max_frame_len + 1]), &mut dst);
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(dst, original);
+    }
+}
+
+#[test]
 fn neg_adjusted_frame_does_not_fit() {
     let codec = LengthDelimitedCodec::builder()
         .length_field_length(1)
