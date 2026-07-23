@@ -470,8 +470,25 @@ async fn stream_with_interval_poll_tick_no_waking() {
     assert_eq!(items, vec![]);
 }
 
-#[tokio::test(start_paused = true)]
+#[tokio::test]
 async fn interval_doesnt_panic_max_duration_when_polling() {
-    let mut timer = task::spawn(time::interval(Duration::MAX));
+    let mut timer = task::spawn(time::interval(Duration::from_secs(u64::MAX)));
+
+    // The `Interval::delay` is not ready yet.
+    let result = timer.enter(|cx, mut timer| timer.poll_tick(cx));
+    assert!(result.is_pending());
+
+    // Sleep 1 second to ensure we capture a missed tick.
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    // Call the poll tick again to check the duration doesn't panic.
+    // These 2 polls are equivalent to `timer.tick().await` that disarm the first interval fire.
     assert_ready!(timer.enter(|cx, mut timer| timer.poll_tick(cx)));
+
+    // Sleep again.
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    // This time we expect the timer to fire at the specified interval (ie too far in the future).
+    let result = timer.enter(|cx, mut timer| timer.poll_tick(cx));
+    assert!(result.is_pending());
 }
