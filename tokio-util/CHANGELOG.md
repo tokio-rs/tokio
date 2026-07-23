@@ -1,3 +1,39 @@
+# 0.7.19 (July 21st, 2026)
+
+### Added
+
+- io: add `write_all_vectored` ([#7768], [#8159])
+- sync: add `DropGuard::token` for cancellation tokens ([#8226])
+- sync: implement `PartialEq` and `Eq` for `CancellationToken` ([#8110])
+- task: add `AbortOnDrop` ([#7855])
+- task: add `JoinMap::try_join_next` ([#8099])
+
+### Changed
+
+- codec: use `libc::memchr` for `LinesCodec` delimiter scan ([#8141])
+
+### Fixed
+
+- codec: fix `is_readable` when buffer is not empty ([#7912])
+- task: avoid replacing the `JoinQueue` waker in `try_join_next` ([#8279])
+- time: wake `DelayQueue` after resetting to expired ([#8274])
+
+### Documented
+
+- codec: document `UdpFramed` decoder errors ([#8248])
+
+[#7768]: https://github.com/tokio-rs/tokio/pull/7768
+[#7855]: https://github.com/tokio-rs/tokio/pull/7855
+[#7912]: https://github.com/tokio-rs/tokio/pull/7912
+[#8099]: https://github.com/tokio-rs/tokio/pull/8099
+[#8110]: https://github.com/tokio-rs/tokio/pull/8110
+[#8141]: https://github.com/tokio-rs/tokio/pull/8141
+[#8159]: https://github.com/tokio-rs/tokio/pull/8159
+[#8226]: https://github.com/tokio-rs/tokio/pull/8226
+[#8248]: https://github.com/tokio-rs/tokio/pull/8248
+[#8274]: https://github.com/tokio-rs/tokio/pull/8274
+[#8279]: https://github.com/tokio-rs/tokio/pull/8279
+
 # 0.7.18 (January 4th, 2026)
 
 ### Added

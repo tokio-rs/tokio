@@ -334,8 +334,6 @@ impl Runtime {
     /// });
     /// # }
     /// ```
-    ///
-    /// [handle]: fn@Handle::block_on
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let fut_size = mem::size_of::<F>();

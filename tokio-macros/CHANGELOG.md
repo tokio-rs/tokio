@@ -1,3 +1,9 @@
+# 2.7.1 (July 17th, 2026)
+
+- macros: clarify `tokio::main` expansion ([#8193])
+
+[#8193]: https://github.com/tokio-rs/tokio/pull/8193
+
 # 2.7.0 (April 3rd, 2026)
 
 - macros: stabilize `LocalRuntime` ([#7557])

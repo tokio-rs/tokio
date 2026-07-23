@@ -1,7 +1,6 @@
 #![warn(rust_2018_idioms)]
 
 use futures::future::pending;
-#[cfg(tokio_unstable)]
 use std::rc::Rc;
 use tokio::sync::mpsc;
 use tokio::task::LocalSet;
@@ -182,7 +181,6 @@ fn notify_many() {
     }
 }
 
-#[cfg(tokio_unstable)]
 mod spawn {
     use super::*;
 
@@ -209,7 +207,6 @@ mod spawn {
     }
 }
 
-#[cfg(tokio_unstable)]
 mod spawn_local {
     use super::*;
 
@@ -278,7 +275,6 @@ mod spawn_local {
 mod spawn_local_on {
     use super::*;
 
-    #[cfg(tokio_unstable)]
     mod local_runtime {
         use super::*;
 

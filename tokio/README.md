@@ -1,7 +1,3 @@
-*[TokioConf 2026 program and tickets are now available!](https://tokioconf.com)*
-
----
-
 # Tokio
 
 A runtime for writing reliable, asynchronous, and slim applications with
@@ -60,7 +56,7 @@ Make sure you enable the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.52.4", features = ["full"] }
+tokio = { version = "1.53.1", features = ["full"] }
 ```
 Then, on your main.rs:
 
