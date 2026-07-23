@@ -630,13 +630,6 @@ impl Encoder<Bytes> for LengthDelimitedCodec {
             )
         })?;
 
-        if n as u64 > self.builder.max_length_field_value() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                LengthDelimitedCodecError { _priv: () },
-            ));
-        }
-
         // Reserve capacity in the destination buffer to fit the frame and
         // length field (plus adjustment).
         dst.reserve(self.builder.length_field_len + n);
