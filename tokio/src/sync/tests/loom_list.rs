@@ -27,7 +27,7 @@ fn smoke() {
         let mut next = vec![0; NUM_TX];
 
         loop {
-            match rx.pop(&tx) {
+            match rx.pop(&tx, false) {
                 Some(Read::Value((th, v))) => {
                     assert_eq!(v, next[th]);
                     next[th] += 1;

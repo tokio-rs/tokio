@@ -131,6 +131,7 @@ pub use self::unbounded::{
 };
 
 pub mod error;
+mod waker;
 
 /// The number of values a block can contain.
 ///
