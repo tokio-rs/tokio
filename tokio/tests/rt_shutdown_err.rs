@@ -1,8 +1,19 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 #![cfg(not(miri))] // No socket in miri.
 
 use std::io;
+#[cfg(not(target_family = "wasm"))]
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 
@@ -10,6 +21,7 @@ fn rt() -> tokio::runtime::Runtime {
     Builder::new_current_thread().enable_all().build().unwrap()
 }
 
+#[cfg(not(target_family = "wasm"))] // needs net (TcpListener)
 #[test]
 fn test_is_rt_shutdown_err() {
     let rt1 = rt();

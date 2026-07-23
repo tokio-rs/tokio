@@ -1,11 +1,23 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))]
+#![cfg(any(
+    all(feature = "full", not(target_os = "wasi")),
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 #![cfg(panic = "unwind")]
 
 use futures::future;
 use std::error::Error;
 use tokio::runtime::Builder;
-use tokio::task::{self, block_in_place};
+use tokio::task;
+#[cfg(not(target_os = "emscripten"))]
+use tokio::task::block_in_place;
 
 mod support {
     pub mod panic;
@@ -13,6 +25,7 @@ mod support {
 use support::panic::test_panic;
 
 #[test]
+#[cfg(not(target_os = "emscripten"))] // no rt-multi-thread
 fn block_in_place_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = Builder::new_current_thread().enable_all().build().unwrap();

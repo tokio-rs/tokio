@@ -398,6 +398,9 @@ macro_rules! cfg_process {
             #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
             #[cfg(not(loom))]
             #[cfg(not(target_os = "wasi"))]
+            // Emscripten has no `fork`/`exec`, so the `process` module is not
+            // available there.
+            #[cfg(not(target_os = "emscripten"))]
             $item
         )*
     }
@@ -414,7 +417,10 @@ macro_rules! cfg_process_driver {
 macro_rules! cfg_not_process_driver {
     ($($item:item)*) => {
         $(
-            #[cfg(not(all(unix, not(loom), feature = "process")))]
+            #[cfg(any(
+                not(all(unix, not(loom), feature = "process")),
+                target_os = "emscripten",
+            ))]
             $item
         )*
     }
@@ -427,6 +433,8 @@ macro_rules! cfg_signal {
             #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
             #[cfg(not(loom))]
             #[cfg(not(target_os = "wasi"))]
+            // No kernel signal delivery on Emscripten; inert there.
+            #[cfg(not(target_os = "emscripten"))]
             $item
         )*
     }
@@ -437,6 +445,7 @@ macro_rules! cfg_signal_internal {
         $(
             #[cfg(any(feature = "signal", all(unix, feature = "process")))]
             #[cfg(not(loom))]
+            #[cfg(not(target_os = "emscripten"))]
             $item
         )*
     }
@@ -452,7 +461,7 @@ macro_rules! cfg_signal_internal_and_unix {
 macro_rules! cfg_not_signal_internal {
     ($($item:item)*) => {
         $(
-            #[cfg(any(loom, not(unix), not(any(feature = "signal", all(unix, feature = "process")))))]
+            #[cfg(any(loom, not(unix), target_os = "emscripten", not(any(feature = "signal", all(unix, feature = "process")))))]
             $item
         )*
     }
@@ -715,7 +724,7 @@ macro_rules! cfg_not_wasip1 {
 macro_rules! cfg_is_wasm_not_wasi {
     ($($item:item)*) => {
         $(
-            #[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+            #[cfg(all(target_family = "wasm", target_os = "unknown"))]
             $item
         )*
     }

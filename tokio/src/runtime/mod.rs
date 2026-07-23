@@ -416,6 +416,16 @@ mod tests;
 
 pub(crate) mod context;
 
+#[cfg(all(target_os = "emscripten", feature = "rt"))]
+pub(crate) mod jspi;
+
+// Used by the `#[tokio::test]` expansion on Emscripten: the guard claims
+// JSPI suspension for the test's promising activation so the body's
+// `block_on` can suspend on the host loop. Not public API.
+#[cfg(all(target_os = "emscripten", feature = "rt", feature = "test-util"))]
+#[doc(hidden)]
+pub use jspi::{jspi_enabled, SuspendGuard};
+
 pub(crate) mod park;
 
 pub(crate) mod driver;
@@ -550,6 +560,8 @@ cfg_rt! {
     }
 
     cfg_fs! {
+        // Emscripten's `fs` uses the inline blocking shim, not the pool.
+        #[cfg_attr(target_os = "emscripten", allow(unused_imports))]
         pub(crate) use blocking::spawn_mandatory_blocking;
     }
 

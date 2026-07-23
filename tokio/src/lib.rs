@@ -444,6 +444,57 @@
 //! immediately instead of blocking forever. On platforms that don't support
 //! time, this means that the runtime can never be idle in any way.
 //!
+//! ### Emscripten support
+//!
+//! The `wasm32-unknown-emscripten` target runs Tokio's canonical
+//! single-threaded (`current_thread`) scheduler, time driver, and task system
+//! unchanged. `Runtime::block_on` drives the scheduler to a synchronous fixed
+//! point; a future that would have to suspend (await a timer or an external
+//! wake) panics with a targeted error, since the host event loop cannot run
+//! while Wasm blocks the stack.
+//!
+//! [JSPI] (-sJSPI in Emscripten) implements an exception to this behaviour:
+//! a drive that would block instead suspends the whole calling stack on a
+//! host timer — the host loop keeps running and wakes it. Emscripten
+//! auto-promising-wraps `main` under `-sJSPI`, so `#[tokio::main]` and
+//! `#[tokio::test]` suspend as-is; calling `block_on` from a host callback
+//! outside a promising activation traps at the engine. The drive is
+//! non-reentrant, like `block_on` everywhere else.
+//!
+//! [JSPI]: https://github.com/WebAssembly/js-promise-integration
+//!
+//! Supported features: `rt`, `time`, `sync`, `macros`, `io-util`, and
+//! `test-util`. The `net` reactor (epoll-backed, over Emscripten's socket
+//! support) and the inline `fs`/`io-std` shims are planned as follow-ups.
+//!
+//! The `process`, `signal`, and `rt-multi-thread` features are rejected at
+//! compile time: `process`/`signal` have no underlying primitives (`fork`/`exec`,
+//! kernel signal delivery) and `rt-multi-thread` has no native threads.
+//!
+//! `spawn_blocking` is unchanged: with no threadpool to dispatch to it fails
+//! at runtime, as on the other single-threaded Wasm targets.
+//!
+//! Panics behave as on native: `wasm32-unknown-emscripten` defaults to
+//! `panic = "unwind"`, so panic recovery works, a panicking task yields
+//! `Err(JoinError)`, and `JoinError::is_panic` / `JoinError::into_panic`
+//! report the payload.
+//!
+//! `#[tokio::main]` still defaults to the unsupported `multi_thread` flavor,
+//! `#[tokio::main(flavor = "current_thread")]` is currently required.
+//!
+//! #### Linking and running on Emscripten
+//!
+//! No js-library or custom file is required (Tokio embeds its JS glue in
+//! the objects); plain `node` runs the test binaries directly:
+//!
+//! ```text
+//! CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER="node"
+//! RUSTFLAGS="-C link-args=-sALLOW_MEMORY_GROWTH=1 \
+//!            -C link-args=-sEXIT_RUNTIME=1 \
+//!            -C link-args=-sJSPI \
+//!            -C link-args=-sSTACK_SIZE=1048576"
+//! ```
+//!
 //! ## Unstable `WASM` support
 //!
 //! Tokio also has unstable support for some additional `WASM` features. This
@@ -467,6 +518,7 @@ compile_error! {
 #[cfg(all(
     not(tokio_unstable),
     target_family = "wasm",
+    not(target_os = "emscripten"),
     any(
         feature = "fs",
         feature = "io-std",
@@ -477,6 +529,22 @@ compile_error! {
     )
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
+
+// On Emscripten, `process` and `signal` have no `fork`/`exec` or kernel signal
+// delivery, so their modules are compiled out (see `cfg_process!` /
+// `cfg_signal!`) exactly as on wasi; naming those APIs is a compile error.
+// `rt-multi-thread` compiles but only runs under a `PROXY_TO_PTHREAD` build;
+// `#[tokio::main]` steers to `current_thread`.
+
+// We currently only support the single-threaded Emscripten runtime, with
+// support for JSPI.
+// A `-pthread` (atomics) build breaks its assumptions, until the kernel is made
+// thread-aware.
+#[cfg(all(target_os = "emscripten", feature = "rt", target_feature = "atomics"))]
+compile_error!(
+    "Tokio's `wasm32-unknown-emscripten` runtime is single-threaded and does \
+not support `-pthread` (atomics) builds."
+);
 
 #[cfg(all(not(tokio_unstable), feature = "io-uring"))]
 compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");

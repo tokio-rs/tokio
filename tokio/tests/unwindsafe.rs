@@ -1,5 +1,15 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support panic recovery
+#![cfg(any(
+    all(feature = "full", not(target_os = "wasi")),
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 
 use std::panic::{RefUnwindSafe, UnwindSafe};
 
@@ -14,6 +24,7 @@ fn join_handle_is_unwind_safe() {
 }
 
 #[test]
+#[cfg(any(not(target_os = "emscripten"), feature = "net"))]
 fn net_types_are_unwind_safe() {
     is_unwind_safe::<tokio::net::TcpListener>();
     is_unwind_safe::<tokio::net::TcpSocket>();
@@ -22,8 +33,10 @@ fn net_types_are_unwind_safe() {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, any(not(target_os = "emscripten"), feature = "net")))]
 fn unix_net_types_are_unwind_safe() {
+    // No datagram `AF_UNIX` on emscripten's node backend.
+    #[cfg(not(target_os = "emscripten"))]
     is_unwind_safe::<tokio::net::UnixDatagram>();
     is_unwind_safe::<tokio::net::UnixListener>();
     is_unwind_safe::<tokio::net::UnixStream>();

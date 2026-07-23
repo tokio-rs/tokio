@@ -506,7 +506,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
 
     let body_ident = quote! { body };
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
-    let last_block = quote_spanned! {last_stmt_end_span=>
+    let native_last_block = quote_spanned! {last_stmt_end_span=>
 
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return, clippy::unwrap_in_result)]
         {
@@ -521,6 +521,69 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
 
     };
 
+    let output_type = match &input.sig.output {
+        // For functions with no return value syn doesn't print anything,
+        // but that doesn't work as `Output` for our boxed `Future`, so
+        // default to `()` (the same type as the function output).
+        syn::ReturnType::Default => quote! { () },
+        syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
+    };
+    let raw_body = input.body();
+    // On Emscripten `#[tokio::test]` claims exclusive JSPI suspension for the
+    // promising activation libtest runs it under (Emscripten auto-promising-
+    // wraps `main` under `-sJSPI`), so the body's `block_on` can suspend on
+    // the host event loop; without `-sJSPI` no guard is created (waits
+    // panic).
+    let emscripten_test_block = quote_spanned! {last_stmt_end_span=>
+        #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return, clippy::unwrap_in_result)]
+        {
+            let _suspend_guard = if #crate_path::runtime::jspi_enabled() {
+                ::core::option::Option::Some(#crate_path::runtime::SuspendGuard::new())
+            } else {
+                ::core::option::Option::None
+            };
+
+            let body = async #raw_body;
+            #crate_path::pin!(body);
+            let body: ::core::pin::Pin<&mut dyn ::core::future::Future<Output = #output_type>> = body;
+
+            // Inner block: keep the `use` from shadowing names in the
+            // user body, which shares this scope.
+            let rt = {
+                #use_builder
+
+                #rt
+                    .enable_all()
+                    .#build
+                    .expect("Failed building the Runtime")
+            };
+            return rt.block_on(body);
+        }
+    };
+
+    // The `multi_thread` flavor has no native threads on Emscripten, so it's
+    // rejected with a targeted error (pending a `PROXY_TO_PTHREAD` runtime)
+    // rather than the opaque failure of the native multi-thread `block_on`.
+    let last_block = match config.flavor {
+        RuntimeFlavor::Threaded => quote! {
+            #[cfg(not(target_os = "emscripten"))]
+            #native_last_block
+            #[cfg(target_os = "emscripten")]
+            ::core::compile_error!(
+                "the `multi_thread` runtime flavor is not available on \
+                 wasm32-unknown-emscripten (no native threads); use \
+                 `flavor = \"current_thread\"`"
+            );
+        },
+        _ if is_test => quote! {
+            #[cfg(not(target_os = "emscripten"))]
+            #native_last_block
+            #[cfg(target_os = "emscripten")]
+            #emscripten_test_block
+        },
+        _ => native_last_block,
+    };
+
     let body = input.body();
 
     // For test functions pin the body to the stack and use `Pin<&mut dyn
@@ -532,18 +595,15 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     //
     // We don't do this for the main function as it should only be used once so
     // there will be no benefit.
-    let output_type = match &input.sig.output {
-        // For functions with no return value syn doesn't print anything,
-        // but that doesn't work as `Output` for our boxed `Future`, so
-        // default to `()` (the same type as the function output).
-        syn::ReturnType::Default => quote! { () },
-        syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
-    };
-
     let body = if is_test {
+        // On Emscripten the body construction lives inside the capture-free
+        // closure (see `emscripten_test_block`).
         quote! {
+            #[cfg(not(target_os = "emscripten"))]
             let body = async #body;
+            #[cfg(not(target_os = "emscripten"))]
             #crate_path::pin!(body);
+            #[cfg(not(target_os = "emscripten"))]
             let body: ::core::pin::Pin<&mut dyn ::core::future::Future<Output = #output_type>> = body;
         }
     } else {

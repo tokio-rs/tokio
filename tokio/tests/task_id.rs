@@ -1,10 +1,21 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+#[cfg(not(target_family = "wasm"))]
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use tokio::task::{self, Id, LocalSet};
@@ -21,7 +32,7 @@ async fn task_id_spawn() {
         .unwrap();
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(any(target_os = "wasi", target_os = "emscripten")))]
 #[tokio::test(flavor = "current_thread")]
 async fn task_id_spawn_blocking() {
     task::spawn_blocking(|| println!("task id: {}", task::id()))
@@ -38,7 +49,7 @@ async fn task_id_collision_current_thread() {
     assert_ne!(id1.unwrap(), id2.unwrap());
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_family = "wasm"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn task_id_collision_multi_thread() {
     let handle1 = tokio::spawn(async { task::id() });
@@ -59,7 +70,7 @@ async fn task_ids_match_current_thread() {
     handle.await.unwrap();
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_family = "wasm"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn task_ids_match_multi_thread() {
     let (tx, rx) = oneshot::channel();
@@ -72,7 +83,8 @@ async fn task_ids_match_multi_thread() {
 }
 
 #[cfg(not(target_os = "wasi"))]
-#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "emscripten", tokio::test(flavor = "current_thread"))]
+#[cfg_attr(not(target_os = "emscripten"), tokio::test(flavor = "multi_thread"))]
 async fn task_id_future_destructor_completion() {
     struct MyFuture {
         tx: Option<oneshot::Sender<Id>>,
@@ -100,7 +112,8 @@ async fn task_id_future_destructor_completion() {
 }
 
 #[cfg(not(target_os = "wasi"))]
-#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "emscripten", tokio::test(flavor = "current_thread"))]
+#[cfg_attr(not(target_os = "emscripten"), tokio::test(flavor = "multi_thread"))]
 async fn task_id_future_destructor_abort() {
     struct MyFuture {
         tx: Option<oneshot::Sender<Id>>,
@@ -205,7 +218,7 @@ fn task_try_id_outside_task() {
     assert_eq!(None, task::try_id());
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_family = "wasm"))]
 #[test]
 fn task_try_id_inside_block_on() {
     let rt = Runtime::new().unwrap();
@@ -248,7 +261,7 @@ async fn task_id_nested_spawn_local() {
         .await;
 }
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(target_family = "wasm"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn task_id_block_in_place_block_on_spawn() {
     use tokio::runtime::Builder;
@@ -283,6 +296,7 @@ fn task_id_outside_task_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(not(target_family = "wasm"))]
 #[test]
 #[cfg_attr(not(panic = "unwind"), ignore)]
 fn task_id_inside_block_on_panic_caller() -> Result<(), Box<dyn Error>> {
