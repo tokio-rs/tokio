@@ -11,6 +11,65 @@ documentation) are greatly appreciated.
 > issue describing the change to solicit feedback and guidance.
 > This will increase the likelihood of the PR getting merged.
 
+### Step-by-Step Contribution Workflow
+
+Once you've found an issue you'd like to work on, follow these steps before opening a Pull Request. This workflow provides a chronological overview of the contribution process and points to the relevant documentation where additional detail is available.
+
+#### 1. Fork and Clone the Repository
+
+Fork the repository to your GitHub account and clone your fork locally.
+
+If you've previously cloned the repository, ensure your local copy is up to date before creating a new branch.
+
+```bash
+git checkout master
+git pull upstream master
+```
+
+---
+
+#### 2. Create a Feature Branch
+
+Never commit directly to your local `master` branch. Instead, create a descriptive feature branch for each change you work on.
+
+```bash
+git checkout -b my-feature
+```
+
+Using a dedicated branch keeps your default branch clean and makes it easier to update your Pull Request during code review.
+
+---
+
+#### 3. Implement Your Changes
+
+Make the code or documentation changes needed. Check your work with `git diff` to confirm the changes look correct before moving on.
+
+If your changes introduce new functionality or modify existing behavior, consider whether additional tests or documentation should also be added.
+
+---
+
+#### 4. Verify Your Changes
+
+Before opening a Pull Request, run the project's verification steps. Refer to the sections below for details on when each command should be used.
+
+---
+
+#### 5. Commit and Push Your Changes
+
+Commit your changes following the [project's commit message guidelines](#commit-message-guidelines).
+
+```bash
+git add .
+git commit -m "module: describe your change"
+git push origin my-feature
+```
+
+---
+
+#### 6. Open a Pull Request
+
+Open a Pull Request from your feature branch to the main repository. See [Opening the Pull Request](#opening-the-pull-request) for what to include and how the review process works.
+
 ### Cargo Commands
 
 Due to the extensive use of features in Tokio, you will often need to add extra

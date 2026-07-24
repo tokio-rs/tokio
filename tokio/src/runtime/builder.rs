@@ -1100,8 +1100,7 @@ impl Builder {
     ///     println!("Hello from the Tokio runtime");
     /// });
     /// ```
-    #[allow(unused_variables, unreachable_patterns)]
-    pub fn build_local(&mut self, options: LocalOptions) -> io::Result<LocalRuntime> {
+    pub fn build_local(&mut self, _options: LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
             #[cfg(feature = "rt-multi-thread")]

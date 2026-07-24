@@ -57,15 +57,20 @@ pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
 }
 
 fn new(signal: SignalKind) -> io::Result<RxFuture> {
-    let registry = REGISTRY
+    // Initialize the registry BEFORE registering the OS handler: the
+    // handler thread can then always observe an initialized `REGISTRY`
+    // (`SetConsoleCtrlHandler` happens-after the initialization below),
+    // so it needs no blocking wait.
+    let registry = REGISTRY.get_or_init(Registry::default);
+
+    HANDLER_RESULT
         .get_or_init(
             || match unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) } {
                 0 => Err(Error::last_os_error().raw_os_error().expect("unreachable")),
-                _ => Ok(Registry::default()),
+                _ => Ok(()),
             },
         )
-        .as_ref()
-        .map_err(|&code| Error::from_raw_os_error(code))?;
+        .map_err(Error::from_raw_os_error)?;
 
     let rx = registry[signal].subscribe();
     Ok(RxFuture::new(rx))
@@ -94,7 +99,11 @@ impl Index<SignalKind> for Registry {
     }
 }
 
-static REGISTRY: OnceLock<Result<Registry, i32>> = OnceLock::new();
+static REGISTRY: OnceLock<Registry> = OnceLock::new();
+
+/// Whether `SetConsoleCtrlHandler` succeeded, initialized (once) only
+/// after `REGISTRY` — see `new` for the ordering argument.
+static HANDLER_RESULT: OnceLock<Result<(), i32>> = OnceLock::new();
 
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
     let signal = match ty {
@@ -107,11 +116,13 @@ unsafe extern "system" fn handler(ty: u32) -> BOOL {
         _ => return 0,
     };
 
-    // Note that `OnceLock::get` does not handle the small window between calling
-    // `SetConsoleCtrlHandler` and `REGISTRY` being initialized.
-    let Ok(registry) = REGISTRY.wait().as_ref() else {
-        // Technically unreachable since `handler` is only called if
-        // `SetConsoleCtrlHandler` succeeded.
+    // `new` initializes `REGISTRY` before it registers this handler with
+    // the OS, so an invoked handler always finds it initialized —
+    // `get()` suffices and no blocking wait is needed (using `get`
+    // also keeps the crate's MSRV: `OnceLock::wait` needs Rust 1.86).
+    let Some(registry) = REGISTRY.get() else {
+        // Unreachable by the ordering above; kept as a defensive
+        // fallback that lets the OS run the next handler.
         return 0;
     };
 
