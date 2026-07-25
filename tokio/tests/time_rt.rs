@@ -188,7 +188,9 @@ fn tickspace() {
 
     let _guard = rt_past.enter();
     let mut sleep = std::pin::pin!(sleep(Duration::from_millis(1)));
-    assert_pending!(sleep.as_mut().poll(&mut Context::from_waker(noop_waker_ref())));
+    assert_pending!(sleep
+        .as_mut()
+        .poll(&mut Context::from_waker(noop_waker_ref())));
 
     let deadline = sleep.deadline();
     rt.block_on(async { sleep.as_mut().reset(deadline + Duration::from_millis(1)) });
