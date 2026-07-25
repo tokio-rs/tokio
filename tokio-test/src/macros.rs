@@ -198,10 +198,7 @@ macro_rules! assert_ready_eq {
 /// ```
 #[macro_export]
 macro_rules! assert_ok {
-    ($e:expr) => {
-        assert_ok!($e,)
-    };
-    ($e:expr,) => {{
+    ($e:expr $(,)?) => {{
         use std::result::Result::*;
         match $e {
             Ok(v) => v,
