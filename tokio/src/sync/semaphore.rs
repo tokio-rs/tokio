@@ -770,6 +770,8 @@ impl Semaphore {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::sync::Arc;
     /// use tokio::sync::Semaphore;
     ///
@@ -788,6 +790,7 @@ impl Semaphore {
     ///
     ///     blocking_task.await.unwrap();
     /// }
+    /// # }
     /// ```
     ///
     /// [`AcquireError`]: crate::sync::AcquireError
