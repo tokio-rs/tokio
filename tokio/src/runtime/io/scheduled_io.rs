@@ -161,15 +161,56 @@ enum State {
 
 // The `ScheduledIo::readiness` (`AtomicUsize`) is packed full of goodness.
 //
-// | shutdown | driver tick | readiness |
-// |----------+-------------+-----------|
-// |   1 bit  |   15 bits   |  16 bits  |
+// | shutdown | write tick | read tick | readiness |
+// |----------+------------+-----------+-----------|
+// |   1 bit  |   7 bits   |   7 bits  |  16 bits  |
+//
+// The driver maintains separate generation counters ("ticks") for the read and
+// write directions. A clear of read readiness is validated only against the
+// read tick (and write against the write tick), so a write-only notification
+// cannot invalidate a pending read-side `clear_readiness`, which previously
+// caused a livelock (see <https://github.com/tokio-rs/tokio/issues/8054>).
+//
+// Each tick is 7 bits so that both fit alongside the 16-bit readiness and the
+// shutdown bit within a `usize` on 32-bit targets (including `wasm32`). The
+// pre-#6135 design used a single 8-bit tick shared across both directions and
+// was sufficient; with the counters split, each direction counts only its own
+// (fewer) events, so 7 bits per direction leaves equal-or-greater headroom.
 
 const READINESS: bit::Pack = bit::Pack::least_significant(16);
 
-const TICK: bit::Pack = READINESS.then(15);
+const READ_TICK: bit::Pack = READINESS.then(7);
 
-const SHUTDOWN: bit::Pack = TICK.then(1);
+const WRITE_TICK: bit::Pack = READ_TICK.then(7);
+
+const SHUTDOWN: bit::Pack = WRITE_TICK.then(1);
+
+/// Packs readiness, both generation counters, and the shutdown flag into one word.
+fn pack_io_state(ready: usize, read_tick: usize, write_tick: usize, shutdown: usize) -> usize {
+    let mut x = READINESS.pack(ready, 0);
+    x = READ_TICK.pack(read_tick, x);
+    x = WRITE_TICK.pack(write_tick, x);
+    SHUTDOWN.pack(shutdown, x)
+}
+
+/// Readiness bits whose clearing is validated against [`ReadyEvent::read_tick`],
+/// and that advance the read tick when reported by the driver.
+fn read_side_tick_mask() -> Ready {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        Ready::READABLE | Ready::READ_CLOSED | Ready::ERROR | Ready::PRIORITY
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    {
+        Ready::READABLE | Ready::READ_CLOSED | Ready::ERROR
+    }
+}
+
+/// Readiness bits whose clearing is validated against [`ReadyEvent::write_tick`],
+/// and that advance the write tick when reported by the driver.
+fn write_side_tick_mask() -> Ready {
+    Ready::WRITABLE | Ready::WRITE_CLOSED
+}
 
 // ===== impl ScheduledIo =====
 
@@ -196,30 +237,72 @@ impl ScheduledIo {
         self.wake(Ready::ALL);
     }
 
-    /// Sets the readiness on this `ScheduledIo` by invoking the given closure on
-    /// the current value, returning the previous readiness value.
+    /// Merges readiness reported by the I/O driver into this `ScheduledIo`.
     ///
-    /// # Arguments
-    /// - `tick`: whether setting the tick or trying to clear readiness for a
-    ///   specific tick.
-    /// - `f`: a closure returning a new readiness value given the previous
-    ///   readiness.
-    pub(super) fn set_readiness(&self, tick_op: Tick, f: impl Fn(Ready) -> Ready) {
+    /// The read-side and write-side generation counters advance independently
+    /// based on which directions `incoming` touches, so a write-only
+    /// notification does not advance the read tick (and so cannot invalidate a
+    /// pending read-side [`clear_readiness`](Self::clear_readiness)). See
+    /// <https://github.com/tokio-rs/tokio/issues/8054>.
+    pub(super) fn merge_readiness_from_driver(&self, incoming: Ready) {
+        const MAX_READ: usize = READ_TICK.max_value() + 1;
+        const MAX_WRITE: usize = WRITE_TICK.max_value() + 1;
+
+        let bump_read = !(incoming & read_side_tick_mask()).is_empty();
+        let bump_write = !(incoming & write_side_tick_mask()).is_empty();
+
         let _ = self.readiness.fetch_update(AcqRel, Acquire, |curr| {
-            // If the io driver is shut down, then you are only allowed to clear readiness.
-            debug_assert!(SHUTDOWN.unpack(curr) == 0 || matches!(tick_op, Tick::Clear(_)));
+            // The driver only merges readiness; it never runs after shutdown.
+            debug_assert!(SHUTDOWN.unpack(curr) == 0);
 
-            const MAX_TICK: usize = TICK.max_value() + 1;
-            let tick = TICK.unpack(curr);
+            let ready = Ready::from_usize(READINESS.unpack(curr)) | incoming;
 
-            let new_tick = match tick_op {
-                // Trying to clear readiness with an old event!
-                Tick::Clear(t) if tick as u8 != t => return None,
-                Tick::Clear(t) => t as usize,
-                Tick::Set => tick.wrapping_add(1) % MAX_TICK,
-            };
+            let mut read_tick = READ_TICK.unpack(curr);
+            let mut write_tick = WRITE_TICK.unpack(curr);
+            if bump_read {
+                read_tick = read_tick.wrapping_add(1) % MAX_READ;
+            }
+            if bump_write {
+                write_tick = write_tick.wrapping_add(1) % MAX_WRITE;
+            }
+
+            Some(pack_io_state(
+                ready.as_usize(),
+                read_tick,
+                write_tick,
+                SHUTDOWN.unpack(curr),
+            ))
+        });
+    }
+
+    /// Clears readiness by invoking `f` on the current readiness, but only if
+    /// the generation counter(s) for the cleared direction(s) still match the
+    /// snapshot in `tick_op`. The ticks themselves are left unchanged.
+    pub(super) fn set_readiness(&self, tick_op: Tick, f: impl Fn(Ready) -> Ready) {
+        let Tick::Clear { read, write } = tick_op;
+
+        let _ = self.readiness.fetch_update(AcqRel, Acquire, |curr| {
+            // Validate each direction's tick independently; a mismatch means the
+            // driver set new readiness for that direction since the snapshot, so
+            // the clear is stale and must be skipped.
+            if let Some(t) = read {
+                if READ_TICK.unpack(curr) as u8 != t {
+                    return None;
+                }
+            }
+            if let Some(t) = write {
+                if WRITE_TICK.unpack(curr) as u8 != t {
+                    return None;
+                }
+            }
+
             let ready = Ready::from_usize(READINESS.unpack(curr));
-            Some(TICK.pack(new_tick, f(ready).as_usize()))
+            Some(pack_io_state(
+                f(ready).as_usize(),
+                READ_TICK.unpack(curr),
+                WRITE_TICK.unpack(curr),
+                SHUTDOWN.unpack(curr),
+            ))
         });
     }
 
@@ -289,7 +372,8 @@ impl ScheduledIo {
         let curr = self.readiness.load(Acquire);
 
         ReadyEvent {
-            tick: TICK.unpack(curr) as u8,
+            read_tick: READ_TICK.unpack(curr) as u8,
+            write_tick: WRITE_TICK.unpack(curr) as u8,
             ready: interest.mask() & Ready::from_usize(READINESS.unpack(curr)),
             is_shutdown: SHUTDOWN.unpack(curr) != 0,
         }
@@ -332,7 +416,8 @@ impl ScheduledIo {
             let is_shutdown = SHUTDOWN.unpack(curr) != 0;
             if is_shutdown {
                 Poll::Ready(ReadyEvent {
-                    tick: TICK.unpack(curr) as u8,
+                    read_tick: READ_TICK.unpack(curr) as u8,
+                    write_tick: WRITE_TICK.unpack(curr) as u8,
                     ready: direction.mask(),
                     is_shutdown,
                 })
@@ -340,14 +425,16 @@ impl ScheduledIo {
                 Poll::Pending
             } else {
                 Poll::Ready(ReadyEvent {
-                    tick: TICK.unpack(curr) as u8,
+                    read_tick: READ_TICK.unpack(curr) as u8,
+                    write_tick: WRITE_TICK.unpack(curr) as u8,
                     ready,
                     is_shutdown,
                 })
             }
         } else {
             Poll::Ready(ReadyEvent {
-                tick: TICK.unpack(curr) as u8,
+                read_tick: READ_TICK.unpack(curr) as u8,
+                write_tick: WRITE_TICK.unpack(curr) as u8,
                 ready,
                 is_shutdown,
             })
@@ -358,7 +445,24 @@ impl ScheduledIo {
         // This consumes the current readiness state **except** for closed
         // states. Closed states are excluded because they are final states.
         let mask_no_closed = event.ready - Ready::READ_CLOSED - Ready::WRITE_CLOSED;
-        self.set_readiness(Tick::Clear(event.tick), |curr| curr - mask_no_closed);
+
+        // Only validate the generation counter for the direction(s) actually
+        // being cleared. A read-only clear thus is not invalidated by a
+        // concurrent write-only driver event, and vice versa, which is what
+        // previously caused the livelock in
+        // <https://github.com/tokio-rs/tokio/issues/8054>.
+        let read = if !(mask_no_closed & read_side_tick_mask()).is_empty() {
+            Some(event.read_tick)
+        } else {
+            None
+        };
+        let write = if !(mask_no_closed & write_side_tick_mask()).is_empty() {
+            Some(event.write_tick)
+        } else {
+            None
+        };
+
+        self.set_readiness(Tick::Clear { read, write }, |curr| curr - mask_no_closed);
     }
 
     pub(crate) fn clear_wakers(&self) {
@@ -452,10 +556,10 @@ impl Future for Readiness<'_> {
 
                     if !ready.is_empty() || is_shutdown {
                         // Currently ready!
-                        let tick = TICK.unpack(curr) as u8;
                         *state = State::Done;
                         return Poll::Ready(ReadyEvent {
-                            tick,
+                            read_tick: READ_TICK.unpack(curr) as u8,
+                            write_tick: WRITE_TICK.unpack(curr) as u8,
                             ready,
                             is_shutdown,
                         });
@@ -476,10 +580,10 @@ impl Future for Readiness<'_> {
 
                     if !ready.is_empty() || is_shutdown {
                         // Currently ready!
-                        let tick = TICK.unpack(curr) as u8;
                         *state = State::Done;
                         return Poll::Ready(ReadyEvent {
-                            tick,
+                            read_tick: READ_TICK.unpack(curr) as u8,
+                            write_tick: WRITE_TICK.unpack(curr) as u8,
                             ready,
                             is_shutdown,
                         });
@@ -539,7 +643,6 @@ impl Future for Readiness<'_> {
                     // The returned tick might be newer than the event
                     // which notified our waker. This is ok because the future
                     // still didn't return `Poll::Ready`.
-                    let tick = TICK.unpack(curr) as u8;
 
                     // Safety: We don't need to acquire the lock here because
                     //   1. `State::Done`` means `waiter` is no longer shared,
@@ -553,7 +656,8 @@ impl Future for Readiness<'_> {
                     let ready = Ready::from_usize(READINESS.unpack(curr)).intersection(interest);
 
                     return Poll::Ready(ReadyEvent {
-                        tick,
+                        read_tick: READ_TICK.unpack(curr) as u8,
+                        write_tick: WRITE_TICK.unpack(curr) as u8,
                         ready,
                         is_shutdown,
                     });
@@ -578,3 +682,124 @@ impl Drop for Readiness<'_> {
 
 unsafe impl Send for Readiness<'_> {}
 unsafe impl Sync for Readiness<'_> {}
+
+#[cfg(all(test, not(loom)))]
+mod tests {
+    use super::ScheduledIo;
+    use crate::io::interest::Interest;
+    use crate::io::ready::Ready;
+
+    // A write-only driver notification must not invalidate a pending read-side
+    // `clear_readiness`. This is the livelock reported in
+    // <https://github.com/tokio-rs/tokio/issues/8054>: read readiness stays set
+    // while reads return `WouldBlock`, so `poll_read` spins instead of parking.
+    #[test]
+    fn write_event_does_not_block_read_clear() {
+        let io = ScheduledIo::default();
+
+        // Driver reports the resource is readable; snapshot it as a reader would.
+        io.merge_readiness_from_driver(Ready::READABLE);
+        let read_event = io.ready_event(Interest::READABLE);
+        assert!(read_event.ready.is_readable());
+
+        // The read returns `WouldBlock`; before the reader clears its readiness,
+        // the driver delivers a write-only event (the spurious `POLL_SEND`
+        // wakeup on Windows), advancing only the write generation counter.
+        io.merge_readiness_from_driver(Ready::WRITABLE);
+
+        // Clearing read readiness with the earlier snapshot must succeed because
+        // the read tick is unchanged.
+        io.clear_readiness(read_event);
+
+        assert!(
+            !io.ready_event(Interest::READABLE).ready.is_readable(),
+            "read readiness should have been cleared"
+        );
+        // The write readiness delivered in between must be untouched.
+        assert!(io.ready_event(Interest::WRITABLE).ready.is_writable());
+    }
+
+    // The symmetric case: a read-only event must not block a write clear.
+    #[test]
+    fn read_event_does_not_block_write_clear() {
+        let io = ScheduledIo::default();
+
+        io.merge_readiness_from_driver(Ready::WRITABLE);
+        let write_event = io.ready_event(Interest::WRITABLE);
+        assert!(write_event.ready.is_writable());
+
+        io.merge_readiness_from_driver(Ready::READABLE);
+
+        io.clear_readiness(write_event);
+
+        assert!(
+            !io.ready_event(Interest::WRITABLE).ready.is_writable(),
+            "write readiness should have been cleared"
+        );
+        assert!(io.ready_event(Interest::READABLE).ready.is_readable());
+    }
+
+    // A *same-direction* event must still invalidate a stale clear, preserving
+    // the generation-counter (ABA) protection that prevents a clear from
+    // consuming readiness the driver set after the snapshot was taken.
+    #[test]
+    fn same_direction_event_still_blocks_stale_clear() {
+        let io = ScheduledIo::default();
+
+        io.merge_readiness_from_driver(Ready::READABLE);
+        let stale = io.ready_event(Interest::READABLE);
+
+        // Another readable event arrives before the clear runs.
+        io.merge_readiness_from_driver(Ready::READABLE);
+
+        // The clear is stale (read tick advanced), so readiness is preserved.
+        io.clear_readiness(stale);
+        assert!(
+            io.ready_event(Interest::READABLE).ready.is_readable(),
+            "stale read clear must not consume newer readiness"
+        );
+    }
+}
+
+#[cfg(all(test, loom))]
+mod loom_tests {
+    use super::ScheduledIo;
+    use crate::io::interest::Interest;
+    use crate::io::ready::Ready;
+    use crate::loom::sync::Arc;
+
+    // Models the issue #8054 race directly: a "reader" snapshots read readiness
+    // and clears it (as `poll_read` does after `WouldBlock`) while the I/O
+    // driver delivers a concurrent write-only event. With separate read/write
+    // generation counters, the write event advances only the write tick, so the
+    // read clear must take effect in **every** interleaving — read readiness can
+    // never be stranded (which previously spun `poll_read` into a livelock).
+    #[test]
+    fn write_event_never_strands_read_clear() {
+        loom::model(|| {
+            let io = Arc::new(ScheduledIo::default());
+            // The driver has already reported the resource readable.
+            io.merge_readiness_from_driver(Ready::READABLE);
+
+            let driver = {
+                let io = io.clone();
+                loom::thread::spawn(move || {
+                    // A write-only notification (e.g. the spurious `POLL_SEND`
+                    // wakeup on Windows) lands concurrently with the clear.
+                    io.merge_readiness_from_driver(Ready::WRITABLE);
+                })
+            };
+
+            // Reader: observe readiness, then clear it after a `WouldBlock` read.
+            let ev = io.ready_event(Interest::READABLE);
+            io.clear_readiness(ev);
+
+            driver.join().unwrap();
+
+            assert!(
+                !io.ready_event(Interest::READABLE).ready.is_readable(),
+                "read readiness stranded by a concurrent write event (issue #8054)"
+            );
+        });
+    }
+}
