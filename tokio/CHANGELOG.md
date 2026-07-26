@@ -1,3 +1,21 @@
+# 1.53.1 (July 20th, 2026)
+
+### Fixed
+
+- signal: restore MSRV by removing `OnceLock::wait` from the Windows handler ([#8300])
+
+### Fixed (unstable)
+
+- time: fix alt timer cancellation and insertion race ([#8252])
+
+### Documented
+
+- runtime: remove dead link definition in Runtime::block_on ([#8301])
+
+[#8252]: https://github.com/tokio-rs/tokio/pull/8252
+[#8300]: https://github.com/tokio-rs/tokio/pull/8300
+[#8301]: https://github.com/tokio-rs/tokio/pull/8301
+
 # 1.53.0 (July 17th, 2026)
 
 ### Added
