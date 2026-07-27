@@ -200,7 +200,7 @@ impl ScheduledIo {
     /// the current value, returning the previous readiness value.
     ///
     /// # Arguments
-    /// - `tick`: whether setting the tick or trying to clear readiness for a
+    /// - `tick_op`: whether setting the tick or trying to clear readiness for a
     ///   specific tick.
     /// - `f`: a closure returning a new readiness value given the previous
     ///   readiness.
