@@ -230,7 +230,6 @@ fn no_panic_at_maxpermits() {
 }
 
 #[test]
-#[cfg(not(target_family = "wasm"))] // wasm doesn't support threads
 fn blocking_acquire() {
     let sem = Semaphore::new(1);
     let permit = sem.blocking_acquire().unwrap();
@@ -240,7 +239,7 @@ fn blocking_acquire() {
 }
 
 #[test]
-#[cfg(not(target_family = "wasm"))]
+#[cfg(not(target_family = "wasm"))] // spawns a thread, which wasm doesn't support
 fn blocking_acquire_waits_for_permit() {
     let sem = Arc::new(Semaphore::new(0));
 
@@ -250,14 +249,12 @@ fn blocking_acquire_waits_for_permit() {
         let _permit = sem2.blocking_acquire().unwrap();
     });
 
-    std::thread::sleep(std::time::Duration::from_millis(100));
     sem.add_permits(1);
 
     handle.join().unwrap();
 }
 
 #[test]
-#[cfg(not(target_family = "wasm"))]
 fn blocking_acquire_many() {
     let sem = Semaphore::new(5);
     let permit = sem.blocking_acquire_many(3).unwrap();
@@ -267,7 +264,6 @@ fn blocking_acquire_many() {
 }
 
 #[test]
-#[cfg(not(target_family = "wasm"))]
 fn blocking_acquire_owned() {
     let sem = Arc::new(Semaphore::new(1));
     let permit = sem.clone().blocking_acquire_owned().unwrap();
@@ -277,7 +273,6 @@ fn blocking_acquire_owned() {
 }
 
 #[test]
-#[cfg(not(target_family = "wasm"))]
 fn blocking_acquire_many_owned() {
     let sem = Arc::new(Semaphore::new(5));
     let permit = sem.clone().blocking_acquire_many_owned(3).unwrap();
@@ -287,7 +282,6 @@ fn blocking_acquire_many_owned() {
 }
 
 #[test]
-#[cfg(not(target_family = "wasm"))]
 fn blocking_acquire_closed() {
     let sem = Arc::new(Semaphore::new(1));
     sem.close();
