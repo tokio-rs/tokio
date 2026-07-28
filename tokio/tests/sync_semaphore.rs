@@ -292,8 +292,8 @@ fn blocking_acquire_closed() {
 }
 
 #[tokio::test]
-#[cfg(all(feature = "full", not(target_family = "wasm")))] // wasm doesn't support unwinding
-#[should_panic]
+#[cfg(feature = "full")]
+#[should_panic = "Cannot block the current thread from within a runtime"]
 async fn blocking_acquire_in_async_context() {
     let sem = Semaphore::new(1);
     // Calling a blocking method from an async context must panic.
@@ -301,8 +301,8 @@ async fn blocking_acquire_in_async_context() {
 }
 
 #[tokio::test]
-#[cfg(all(feature = "full", not(target_family = "wasm")))] // wasm doesn't support unwinding
-#[should_panic]
+#[cfg(feature = "full")]
+#[should_panic = "Cannot block the current thread from within a runtime"]
 async fn blocking_acquire_many_in_async_context() {
     let sem = Semaphore::new(1);
     // Calling a blocking method from an async context must panic.
@@ -310,8 +310,8 @@ async fn blocking_acquire_many_in_async_context() {
 }
 
 #[tokio::test]
-#[cfg(all(feature = "full", not(target_family = "wasm")))] // wasm doesn't support unwinding
-#[should_panic]
+#[cfg(feature = "full")]
+#[should_panic = "Cannot block the current thread from within a runtime"]
 async fn blocking_acquire_owned_in_async_context() {
     let sem = Arc::new(Semaphore::new(1));
     // Calling a blocking method from an async context must panic.
@@ -319,8 +319,8 @@ async fn blocking_acquire_owned_in_async_context() {
 }
 
 #[tokio::test]
-#[cfg(all(feature = "full", not(target_family = "wasm")))] // wasm doesn't support unwinding
-#[should_panic]
+#[cfg(feature = "full")]
+#[should_panic = "Cannot block the current thread from within a runtime"]
 async fn blocking_acquire_many_owned_in_async_context() {
     let sem = Arc::new(Semaphore::new(1));
     // Calling a blocking method from an async context must panic.
