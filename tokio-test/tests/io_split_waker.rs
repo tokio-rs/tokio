@@ -1,7 +1,8 @@
 #![warn(rust_2018_idioms)]
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::time::Instant;
 use tokio_test::io::Builder;
 
 // Regression tests for #7445.
@@ -10,15 +11,19 @@ use tokio_test::io::Builder;
 // the waker of its most recent poll. Whichever half polled it last used to
 // evict the other half's waker, leaving that half permanently unwoken.
 //
-// Both tests assert on elapsed time rather than merely on completion: wrapping
-// the stranded operation in a `timeout` masks the bug, because the timeout's
-// own timer wakes the task and lets the operation re-poll. The `timeout` calls
-// here are only guards, so that a regression fails the suite instead of
-// hanging it forever.
+// These run on a paused clock, so they assert on virtual time and never depend
+// on how fast the machine is. A healthy run observes exactly the 10ms wait; a
+// stranded half instead runs out the multi-second guard, and the clock
+// auto-advances straight to it, so either outcome is reached in ~0s of real
+// time.
+//
+// Note the assertions are on elapsed time rather than merely on completion:
+// the `timeout` guards would otherwise mask the bug, because a timeout's own
+// timer wakes the task and lets the stranded operation re-poll.
 
 /// The write half must still be woken when the read half polled the shared
 /// `Sleep` last.
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn split_wait_does_not_lose_writer_waker() {
     let socket = Builder::new()
         .wait(Duration::from_millis(10))
@@ -43,14 +48,14 @@ async fn split_wait_does_not_lose_writer_waker() {
     reader.abort();
 
     assert!(
-        elapsed < Duration::from_millis(500),
+        elapsed < Duration::from_secs(1),
         "the write half lost its waker: a 10ms wait took {elapsed:?}"
     );
 }
 
 /// The mirror case: the read half must still be woken when the write half
 /// polled the shared `Sleep` last.
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn split_wait_does_not_lose_reader_waker() {
     let socket = Builder::new()
         .wait(Duration::from_millis(10))
@@ -87,7 +92,7 @@ async fn split_wait_does_not_lose_reader_waker() {
 
     assert_eq!(byte, b'z');
     assert!(
-        elapsed < Duration::from_millis(500),
+        elapsed < Duration::from_secs(1),
         "the read half lost its waker: a 10ms wait took {elapsed:?}"
     );
 }
