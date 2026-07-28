@@ -27,7 +27,8 @@ async fn split_wait_does_not_lose_writer_waker() {
 
     let (mut recv, mut send) = tokio::io::split(socket);
 
-    // The read half polls the shared `Sleep` after the write half parks on it.
+    // The read half polls the shared `Sleep` after the write half parks on it,
+    // taking over the timer's single waker slot.
     let reader = tokio::spawn(async move {
         let _ = recv.read_u8().await;
     });
@@ -64,10 +65,16 @@ async fn split_wait_does_not_lose_reader_waker() {
     let reader = tokio::spawn(async move { recv.read_u8().await });
     tokio::task::yield_now().await;
 
-    // Then poll the write half, which drives the same `Sleep` and takes over
-    // the timer's single waker slot. This write never completes (the script
-    // has no `write` action), it only needs to poll the shared timer.
-    let _ = tokio::time::timeout(Duration::from_millis(50), send.write_u8(0)).await;
+    // Then park the write half on that same `Sleep`, which takes over the
+    // timer's single waker slot. This write never completes -- the script has
+    // no `write` action -- it only needs to poll the shared timer. It is left
+    // parked rather than polled to completion, because re-polling it after the
+    // read half drains the script would trip the mock's `unexpected write`
+    // panic.
+    let writer = tokio::spawn(async move {
+        let _ = send.write_u8(0).await;
+    });
+    tokio::task::yield_now().await;
 
     let byte = tokio::time::timeout(Duration::from_secs(5), reader)
         .await
@@ -75,6 +82,8 @@ async fn split_wait_does_not_lose_reader_waker() {
         .expect("the reader task panicked")
         .expect("read failed");
     let elapsed = start.elapsed();
+
+    writer.abort();
 
     assert_eq!(byte, b'z');
     assert!(
