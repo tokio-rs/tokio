@@ -234,7 +234,7 @@ impl Inner {
     /// To keep the shared wait usable from both halves, each half records its
     /// own waker here, and the half that observes the timer firing wakes the
     /// other one. The `Sleep` itself is still shared, so a `wait()` continues
-    /// to describe a single timeline for the whole `Mock`.
+    /// to describe a single shared deadline for the whole `Mock`.
     ///
     /// Note that `read_wait` is also the slot `maybe_wakeup_reader` uses to
     /// park a reader that currently has nothing to read. Both uses only ever
