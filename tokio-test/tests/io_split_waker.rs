@@ -20,10 +20,13 @@ use tokio_test::io::Builder;
 // Note the assertions are on elapsed time rather than merely on completion:
 // the `timeout` guards would otherwise mask the bug, because a timeout's own
 // timer wakes the task and lets the stranded operation re-poll.
+//
+// The flavor is pinned explicitly: which half ends up evicting the other's
+// waker registration depends on the single-threaded poll ordering below.
 
 /// The write half must still be woken when the read half polled the shared
 /// `Sleep` last.
-#[tokio::test(start_paused = true)]
+#[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn split_wait_does_not_lose_writer_waker() {
     let socket = Builder::new()
         .wait(Duration::from_millis(10))
@@ -55,7 +58,7 @@ async fn split_wait_does_not_lose_writer_waker() {
 
 /// The mirror case: the read half must still be woken when the write half
 /// polled the shared `Sleep` last.
-#[tokio::test(start_paused = true)]
+#[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn split_wait_does_not_lose_reader_waker() {
     let socket = Builder::new()
         .wait(Duration::from_millis(10))
@@ -70,12 +73,20 @@ async fn split_wait_does_not_lose_reader_waker() {
     let reader = tokio::spawn(async move { recv.read_u8().await });
     tokio::task::yield_now().await;
 
-    // Then park the write half on that same `Sleep`, which takes over the
-    // timer's single waker slot. This write never completes -- the script has
-    // no `write` action -- it only needs to poll the shared timer. It is left
-    // parked rather than polled to completion, because re-polling it after the
-    // read half drains the script would trip the mock's `unexpected write`
-    // panic.
+    // Then park the write half on that same `Sleep`, so it takes over the
+    // timer's single waker slot.
+    //
+    // This write is never driven to completion, and that is deliberate: a
+    // *successful* write calls `maybe_wakeup_reader`, which would wake the read
+    // half on its own and mask the bug this test is for. The script therefore
+    // has no `write` action, so once the wait elapses the write half settles in
+    // `poll_write`'s `Ok(0)` branch and stays parked.
+    //
+    // That branch returns `Poll::Pending` without registering a waker -- a
+    // separate, still-unfixed gap -- which is what keeps the write half from
+    // being polled again after the read half drains the script (which would
+    // trip the mock's `unexpected write` panic). If that gap is ever fixed,
+    // this test will need to hold the write half parked some other way.
     let writer = tokio::spawn(async move {
         let _ = send.write_u8(0).await;
     });

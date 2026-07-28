@@ -236,6 +236,15 @@ impl Inner {
     /// other one. The `Sleep` itself is still shared, so a `wait()` continues
     /// to describe a single timeline for the whole `Mock`.
     ///
+    /// Note that `read_wait` is also the slot `maybe_wakeup_reader` uses to
+    /// park a reader that currently has nothing to read. Both uses only ever
+    /// take the waker and wake it, so a wake arriving from either path is at
+    /// worst an extra poll.
+    ///
+    /// This does not help a half whose peer stops polling entirely: if the task
+    /// holding the timer's waker is dropped, nobody observes the timer firing
+    /// and the remaining half stays parked.
+    ///
     /// See <https://github.com/tokio-rs/tokio/issues/7445>.
     fn poll_sleep(&mut self, cx: &mut task::Context<'_>, half: Half) -> Poll<()> {
         if let Some(ref mut sleep) = self.sleep {
