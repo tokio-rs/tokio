@@ -33,3 +33,16 @@ async fn test_stream_reader() -> std::io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_stream_reader_does_not_poll_after_eof() -> std::io::Result<()> {
+    let stream = futures::stream::unfold((), |_| async { None::<(std::io::Result<Bytes>, ())> });
+    let read = StreamReader::new(stream);
+    tokio::pin!(read);
+    let mut buf = [0; 1];
+
+    assert_eq!(read.read(&mut buf).await?, 0);
+    assert_eq!(read.read(&mut buf).await?, 0);
+
+    Ok(())
+}
