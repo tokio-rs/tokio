@@ -190,4 +190,113 @@ mod test {
             }
         }
     }
+
+    fn level_with(level: usize, occupied: u64) -> Level {
+        let mut level = Level::new(level);
+        level.occupied = occupied;
+        level
+    }
+
+    #[test]
+    fn next_occupied_slot_on_an_empty_level() {
+        assert_eq!(Level::new(0).next_occupied_slot(0), None);
+        assert_eq!(Level::new(5).next_occupied_slot(1 << 36), None);
+    }
+
+    #[test]
+    fn next_occupied_slot_of_a_single_slot() {
+        // slot 10 of level 0, i.e. tick 10 of every 64-tick window
+        let level = level_with(0, 1 << 10);
+
+        assert_eq!(level.next_occupied_slot(0), Some(10));
+        assert_eq!(level.next_occupied_slot(9), Some(10));
+        // `now` inside the slot itself, and past it
+        assert_eq!(level.next_occupied_slot(10), Some(10));
+        assert_eq!(level.next_occupied_slot(11), Some(10));
+        // `now` past the window: the slot is taken modulo 64
+        assert_eq!(level.next_occupied_slot(64 + 3), Some(10));
+    }
+
+    #[test]
+    fn next_occupied_slot_picks_the_nearest_slot_forward() {
+        let level = level_with(0, (1 << 10) | (1 << 40));
+
+        assert_eq!(level.next_occupied_slot(0), Some(10));
+        assert_eq!(level.next_occupied_slot(20), Some(40));
+        // nothing left ahead in this window, so the scan wraps to slot 10
+        assert_eq!(level.next_occupied_slot(41), Some(10));
+    }
+
+    #[test]
+    fn next_occupied_slot_skips_the_slot_holding_now() {
+        // The occurrence of slot 0 in this rotation has already started, so it
+        // can only be processed a full `level_range` later. Slot 1 is still
+        // ahead of `now` in this rotation and therefore expires first.
+        let level = level_with(5, 0b11);
+
+        assert_eq!(level.next_occupied_slot(0), Some(1));
+        assert_eq!(level.next_occupied_slot((1 << 30) - 1), Some(1));
+
+        // The same holds for any later slot, not just the adjacent one.
+        let level = level_with(5, 1 | (1 << 40));
+
+        assert_eq!(level.next_occupied_slot(0), Some(40));
+    }
+
+    #[test]
+    fn next_occupied_slot_of_the_slot_holding_now_when_it_is_the_only_one() {
+        // Nothing is ahead of `now`, so slot 0 is the earliest expiration even
+        // though it is reached only in the next rotation.
+        let level = level_with(5, 1);
+
+        assert_eq!(level.next_occupied_slot(0), Some(0));
+        assert_eq!(level.next_occupied_slot((1 << 30) - 1), Some(0));
+    }
+
+    #[test]
+    fn next_occupied_slot_of_the_last_slot() {
+        let level = level_with(5, 1 << 63);
+
+        assert_eq!(level.next_occupied_slot(62 << 30), Some(63));
+        assert_eq!(level.next_occupied_slot(63 << 30), Some(63));
+    }
+
+    #[test]
+    fn next_expiration_reports_the_start_of_the_slot() {
+        // slot 3 of level 1: slots are 64 ticks wide, so it starts at tick 192
+        let expiration = level_with(1, 1 << 3).next_expiration(100).unwrap();
+
+        assert_eq!(expiration.level, 1);
+        assert_eq!(expiration.slot, 3);
+        assert_eq!(expiration.deadline, 192);
+    }
+
+    #[test]
+    fn next_expiration_below_the_top_level() {
+        let level = level_with(4, 1 << 1);
+
+        assert_eq!(level.next_expiration(0).unwrap().deadline, 1 << 24);
+        assert_eq!(level.next_expiration(1000).unwrap().deadline, 1 << 24);
+    }
+
+    #[test]
+    fn next_expiration_at_the_top_level() {
+        let level = level_with(5, 1 << 1);
+
+        assert_eq!(level.next_expiration(0).unwrap().deadline, 1 << 30);
+        assert_eq!(level.next_expiration(1000).unwrap().deadline, 1 << 30);
+    }
+
+    #[test]
+    fn next_expiration_wraps_a_slot_at_or_behind_now() {
+        // Slot 0 of the top level starts at tick 0, so its next occurrence is a
+        // full rotation of the level away.
+        let level = level_with(5, 1 << 0);
+
+        assert_eq!(level.next_expiration(0).unwrap().deadline, 1 << 36);
+        assert_eq!(
+            level.next_expiration((1 << 30) + 10).unwrap().deadline,
+            1 << 36
+        );
+    }
 }
