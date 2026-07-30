@@ -111,8 +111,15 @@ impl Level {
             return None;
         }
 
-        // Get the slot for now using Maths
-        let now_slot = (now / slot_range(self.level)) as usize;
+        // Add the +1 offset for the `now_slot` to ignore the slot that `now` fits in,
+        // since it's the farthest timer that could appear from `now`.
+        // This is mostly relevant for the top level because it acts as a
+        // pseudo-ring buffer: timers that would logically go past the top level are
+        // fudged into it by `level_for` and the `MAX_DURATION` cap, so the slot holding
+        // `now` can be occupied by an entry that is a whole rotation away.
+        // For the lower levels `level_for` always places an entry in a slot other
+        // than the one holding `now`, so `now_slot` is always empty there.
+        let now_slot = ((now / slot_range(self.level)) % LEVEL_MULT as u64) as usize + 1;
         let occupied = self.occupied.rotate_right(now_slot as u32);
         let zeros = occupied.trailing_zeros() as usize;
         let slot = (zeros + now_slot) % LEVEL_MULT;
