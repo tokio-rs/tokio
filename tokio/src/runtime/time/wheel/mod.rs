@@ -47,7 +47,7 @@ const NUM_LEVELS: usize = 6;
 const BITS_PER_LEVEL: usize = 6;
 
 /// The maximum duration of a `Sleep`.
-const MAX_DURATION: u64 = (1 << (BITS_PER_LEVEL * NUM_LEVELS)) - 1;
+const MAX_DURATION: u64 = 1 << (BITS_PER_LEVEL * NUM_LEVELS);
 
 impl Wheel {
     /// Creates a new timing wheel.
