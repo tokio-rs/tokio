@@ -39,7 +39,7 @@ impl LinesCodec {
     /// for information on why this could be a potential security risk.
     ///
     /// [`new_with_max_length`]: crate::codec::LinesCodec::new_with_max_length()
-    pub fn new() -> LinesCodec {
+    pub const fn new() -> LinesCodec {
         LinesCodec {
             next_index: 0,
             max_length: usize::MAX,
@@ -65,7 +65,7 @@ impl LinesCodec {
     /// without any `\n` characters, causing unbounded memory consumption.
     ///
     /// [`LinesCodecError`]: crate::codec::LinesCodecError
-    pub fn new_with_max_length(max_length: usize) -> Self {
+    pub const fn new_with_max_length(max_length: usize) -> Self {
         LinesCodec {
             max_length,
             ..LinesCodec::new()
@@ -87,7 +87,7 @@ impl LinesCodec {
     /// let codec = LinesCodec::new_with_max_length(256);
     /// assert_eq!(codec.max_length(), 256);
     /// ```
-    pub fn max_length(&self) -> usize {
+    pub const fn max_length(&self) -> usize {
         self.max_length
     }
 }

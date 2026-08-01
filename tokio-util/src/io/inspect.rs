@@ -23,7 +23,7 @@ impl<R, F> InspectReader<R, F> {
     /// The closure will only be called with an empty slice if the inner reader
     /// returns without reading data into the buffer. This happens at EOF, or if
     /// `poll_read` is called with a zero-size buffer.
-    pub fn new(reader: R, f: F) -> InspectReader<R, F>
+    pub const fn new(reader: R, f: F) -> InspectReader<R, F>
     where
         R: AsyncRead,
         F: FnMut(&[u8]),
@@ -105,7 +105,7 @@ impl<W, F> InspectWriter<W, F> {
     /// The closure `f` will never be called with an empty slice. A vectored
     /// write can result in multiple calls to `f` - at most one call to `f` per
     /// buffer supplied to `poll_write_vectored`.
-    pub fn new(writer: W, f: F) -> InspectWriter<W, F>
+    pub const fn new(writer: W, f: F) -> InspectWriter<W, F>
     where
         W: AsyncWrite,
         F: FnMut(&[u8]),
