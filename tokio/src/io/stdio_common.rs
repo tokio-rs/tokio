@@ -83,7 +83,7 @@ where
                 .rev()
                 .take(MAX_BYTES_PER_CHAR)
                 .position(|byte| *byte < 0b1000_0000 || *byte >= 0b1100_0000)
-                .unwrap_or(0)
+                .unwrap_or_default()
                 + 1;
             buf = &buf[..buf.len() - trailing_incomplete_char_size];
         }

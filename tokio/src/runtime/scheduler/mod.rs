@@ -142,7 +142,7 @@ cfg_rt! {
         /// Returns true if this is a local runtime and the runtime is owned by the current thread.
         pub(crate) fn can_spawn_local_on_local_runtime(&self) -> bool {
             match self {
-                Handle::CurrentThread(h) => h.local_tid.map(|x| std::thread::current().id() == x).unwrap_or(false),
+                Handle::CurrentThread(h) => h.local_tid.is_some_and(|x| std::thread::current().id() == x),
 
                 #[cfg(feature = "rt-multi-thread")]
                 Handle::MultiThread(_) => false,

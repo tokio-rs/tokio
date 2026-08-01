@@ -111,8 +111,7 @@ where
         debug_assert!({
             self.levels[level]
                 .next_expiration(self.elapsed)
-                .map(|e| e.deadline >= self.elapsed)
-                .unwrap_or(true)
+                .map_or(true, |e| e.deadline >= self.elapsed)
         });
 
         Ok(())
