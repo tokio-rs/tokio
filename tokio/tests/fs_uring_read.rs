@@ -16,7 +16,7 @@ use std::sync::mpsc;
 use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 use tempfile::NamedTempFile;
-use tokio::fs::read;
+use tokio::fs::{read, read_to_string};
 use tokio::runtime::{Builder, Runtime};
 use tokio_test::assert_pending;
 use tokio_util::task::TaskTracker;
@@ -129,6 +129,20 @@ async fn read_small_large_files() {
     let bytes = read(path).await.unwrap();
 
     assert_eq!(bytes, create_buf(20));
+}
+
+// `read_to_string` is just a thin wrapper around `read` that validates the
+// bytes are UTF-8, so this small test is sufficient and ther is no need for the more
+// extensive coverage that `read` gets above.
+#[tokio::test]
+async fn read_to_string_small_file() {
+    let mut tmp = NamedTempFile::new().unwrap();
+    tmp.write_all(b"hello uring").unwrap();
+    let path = tmp.path().to_path_buf();
+
+    let contents = read_to_string(path).await.unwrap();
+
+    assert_eq!(contents, "hello uring");
 }
 
 #[tokio::test]
