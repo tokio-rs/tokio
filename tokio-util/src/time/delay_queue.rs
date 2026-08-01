@@ -1036,10 +1036,18 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     pub fn clear(&mut self) {
+        let had_entries = !self.slab.is_empty();
+
         self.slab.clear();
         self.expired = Stack::default();
         self.wheel = Wheel::new();
         self.delay = None;
+
+        if had_entries {
+            if let Some(waker) = self.waker.take() {
+                waker.wake();
+            }
+        }
     }
 
     /// Returns the number of elements the queue can hold without reallocating.
