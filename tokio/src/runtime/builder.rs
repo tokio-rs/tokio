@@ -152,6 +152,9 @@ pub struct Builder {
     /// Whether or not to enable eager hand-off for the I/O and time drivers (in
     /// `tokio_unstable`).
     enable_eager_driver_handoff: bool,
+
+    /// When true, the blocking pool uses the sharded queue implementation.
+    pub(super) sharded_blocking_queue: bool,
 }
 
 cfg_unstable! {
@@ -239,6 +242,16 @@ cfg_unstable! {
 }
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
+
+/// The default for the `sharded_blocking_queue` option: enabled iff the
+/// `TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE` environment variable is set to a
+/// value other than `0`.
+fn sharded_blocking_queue_default() -> bool {
+    match std::env::var_os("TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE") {
+        Some(value) => !value.is_empty() && value != "0",
+        None => false,
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(crate) enum Kind {
@@ -351,6 +364,8 @@ impl Builder {
 
             // Eager driver handoff is disabled by default.
             enable_eager_driver_handoff: false,
+
+            sharded_blocking_queue: sharded_blocking_queue_default(),
         }
     }
 
@@ -462,6 +477,45 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
     pub fn enable_eager_driver_handoff(&mut self) -> &mut Self {
         self.enable_eager_driver_handoff = true;
+        self
+    }
+
+    /// Enables the sharded `spawn_blocking` queue, which is disabled by
+    /// default.
+    ///
+    /// By default, the blocking pool's task queue is protected by a single
+    /// mutex, which can become a point of contention when many threads spawn
+    /// blocking tasks concurrently. When this option is enabled, tasks are
+    /// instead distributed across several independently-locked queue shards.
+    ///
+    /// The sharded queue can also be enabled by setting the
+    /// `TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE` environment variable to any
+    /// value other than `0`.
+    ///
+    /// [Click here to share your experience with the sharded queue](https://github.com/tokio-rs/tokio/issues/8067)
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The sharded
+    /// `spawn_blocking` queue is an experimental feature that may be removed
+    /// or become the default behavior in 1.x releases. See
+    /// [the documentation on unstable features][unstable] for details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///   .enable_sharded_blocking_queue()
+    ///   .build()
+    ///   .unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [unstable]: crate#unstable-features
+    pub fn enable_sharded_blocking_queue(&mut self) -> &mut Self {
+        self.sharded_blocking_queue = true;
         self
     }
 
