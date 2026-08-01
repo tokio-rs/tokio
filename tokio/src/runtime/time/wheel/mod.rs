@@ -44,8 +44,10 @@ pub(crate) struct Wheel {
 /// precision of 1 millisecond.
 const NUM_LEVELS: usize = 6;
 
+const BITS_PER_LEVEL: usize = 6;
+
 /// The maximum duration of a `Sleep`.
-pub(super) const MAX_DURATION: u64 = (1 << (6 * NUM_LEVELS)) - 1;
+const MAX_DURATION: u64 = (1 << (BITS_PER_LEVEL * NUM_LEVELS)) - 1;
 
 impl Wheel {
     /// Creates a new timing wheel.
@@ -273,21 +275,18 @@ impl Wheel {
 }
 
 fn level_for(elapsed: u64, when: u64) -> usize {
-    const SLOT_MASK: u64 = (1 << 6) - 1;
+    const SLOT_MASK: u64 = (1 << BITS_PER_LEVEL) - 1;
 
     // Mask in the trailing bits ignored by the level calculation in order to cap
     // the possible leading zeros
-    let mut masked = elapsed ^ when | SLOT_MASK;
+    let masked = elapsed ^ when | SLOT_MASK;
 
     if masked >= MAX_DURATION {
         // Fudge the timer into the top level
-        masked = MAX_DURATION - 1;
+        return NUM_LEVELS - 1;
     }
 
-    let leading_zeros = masked.leading_zeros() as usize;
-    let significant = 63 - leading_zeros;
-
-    significant / NUM_LEVELS
+    masked.ilog2() as usize / BITS_PER_LEVEL
 }
 
 #[cfg(all(test, not(loom)))]
