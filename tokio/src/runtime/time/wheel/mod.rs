@@ -156,12 +156,10 @@ impl Wheel {
                     // the current list of timers.  advance to the poll's
                     // current time and do nothing else.
                     self.set_elapsed(now);
-                    break;
+                    return None;
                 }
             }
         }
-
-        self.pending.pop_back()
     }
 
     /// Returns the instant at which the next timeout expires.
