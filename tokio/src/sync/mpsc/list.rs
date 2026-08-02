@@ -71,6 +71,7 @@ pub(crate) fn channel<T>() -> (Tx<T>, Rx<T>) {
 
 impl<T> Tx<T> {
     /// Pushes a value into the list.
+    #[inline]
     pub(crate) fn push(&self, value: T) {
         // First, claim a slot for the value. `Acquire` is used here to
         // synchronize with the `fetch_add` in `reclaim_blocks`.
