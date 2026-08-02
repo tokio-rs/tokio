@@ -864,11 +864,19 @@ impl<T> DelayQueue<T> {
         self.slab[*key].expired = false;
 
         self.insert_idx(when, *key);
+        let inserted_expired = self.slab[*key].expired;
 
         let next_deadline = self.next_deadline();
-        if let (Some(ref mut delay), Some(deadline)) = (&mut self.delay, next_deadline) {
-            // This should awaken us if necessary (ie, if already expired)
-            delay.as_mut().reset(deadline);
+        match (next_deadline, &mut self.delay) {
+            (None, _) => self.delay = None,
+            (Some(deadline), Some(delay)) => delay.as_mut().reset(deadline),
+            (Some(deadline), None) => self.delay = Some(Box::pin(sleep_until(deadline))),
+        }
+
+        if inserted_expired {
+            if let Some(waker) = self.waker.take() {
+                waker.wake();
+            }
         }
     }
 

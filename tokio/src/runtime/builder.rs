@@ -1069,6 +1069,11 @@ impl Builder {
     /// });
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the I/O driver or other OS resources required by the
+    /// runtime cannot be initialized.
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_runtime(),
@@ -1100,8 +1105,12 @@ impl Builder {
     ///     println!("Hello from the Tokio runtime");
     /// });
     /// ```
-    #[allow(unused_variables, unreachable_patterns)]
-    pub fn build_local(&mut self, options: LocalOptions) -> io::Result<LocalRuntime> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the I/O driver or other OS resources required by the
+    /// runtime cannot be initialized.
+    pub fn build_local(&mut self, _options: LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
             #[cfg(feature = "rt-multi-thread")]

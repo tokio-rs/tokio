@@ -165,6 +165,11 @@ impl Runtime {
     /// // Use the runtime...
     /// ```
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the I/O driver or other OS resources required by the
+    /// runtime cannot be initialized.
+    ///
     /// [mod]: index.html
     /// [main]: ../attr.main.html
     /// [threaded scheduler]: index.html#threaded-scheduler
@@ -334,8 +339,6 @@ impl Runtime {
     /// });
     /// # }
     /// ```
-    ///
-    /// [handle]: fn@Handle::block_on
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let fut_size = mem::size_of::<F>();
