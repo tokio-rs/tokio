@@ -119,6 +119,7 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 // Alias for old name in 0.x
 #[cfg_attr(docsrs, doc(alias = "delay_for"))]
 #[cfg_attr(docsrs, doc(alias = "wait"))]
+#[inline]
 #[track_caller]
 pub fn sleep(duration: Duration) -> Sleep {
     let location = trace::caller_location();
