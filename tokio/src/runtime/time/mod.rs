@@ -21,7 +21,7 @@ mod wheel;
 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
 use super::time_alt;
 
-use crate::loom::sync::atomic::{AtomicBool, Ordering};
+use crate::loom::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use crate::loom::sync::Mutex;
 use crate::runtime::driver::{self, IoHandle, IoStack};
 use crate::time::error::Error;
@@ -97,6 +97,10 @@ enum Inner {
         // The state is split like this so `Handle` can access `is_shutdown` without locking the mutex
         state: Mutex<InnerState>,
 
+        /// Lock-free mirror of `InnerState::next_wake` (`0` when none), so
+        /// parked workers can detect an overdue deadline without locking.
+        next_wake_cached: AtomicU64,
+
         /// True if the driver is being shutdown.
         is_shutdown: AtomicBool,
 
@@ -152,6 +156,7 @@ impl Driver {
                     next_wake: None,
                     wheel: wheel::Wheel::new(),
                 }),
+                next_wake_cached: AtomicU64::new(0),
                 is_shutdown: AtomicBool::new(false),
 
                 #[cfg(feature = "test-util")]
@@ -219,6 +224,7 @@ impl Driver {
         let next_wake = lock.wheel.next_expiration_time();
         lock.next_wake =
             next_wake.map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
+        handle.inner.set_next_wake_cached(lock.next_wake);
 
         drop(lock);
 
@@ -293,6 +299,31 @@ impl Handle {
         self.process_at_time(now);
     }
 
+    /// Cached earliest pending timer expiration. Lock-free, may be stale.
+    pub(crate) fn next_wake_cached(&self) -> Option<NonZeroU64> {
+        match &self.inner {
+            Inner::Traditional {
+                next_wake_cached, ..
+            } => NonZeroU64::new(next_wake_cached.load(Ordering::SeqCst)),
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            Inner::Alternative { .. } => None,
+        }
+    }
+
+    /// Fires expired timers off the wheel without needing the resource
+    /// driver. Used by parked workers when the driver overslept.
+    pub(crate) fn rescue_overdue(&self, clock: &Clock) {
+        if self.is_shutdown() {
+            return;
+        }
+
+        match &self.inner {
+            Inner::Traditional { .. } => self.process(clock),
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            Inner::Alternative { .. } => {}
+        }
+    }
+
     pub(self) fn process_at_time(&self, mut now: u64) {
         let mut waker_list = WakeList::new();
 
@@ -330,6 +361,7 @@ impl Handle {
             .wheel
             .poll_at()
             .map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
+        self.inner.set_next_wake_cached(lock.next_wake);
 
         drop(lock);
 
@@ -423,6 +455,8 @@ impl Handle {
                 // the timer entry.
                 match unsafe { lock.wheel.insert(entry) } {
                     Ok(when) => {
+                        self.inner.lower_next_wake_cached(when);
+
                         if lock
                             .next_wake
                             .map(|next_wake| when < next_wake.get())
@@ -470,6 +504,36 @@ impl Inner {
             Inner::Traditional { state, .. } => state.lock(),
             #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
             Inner::Alternative { .. } => unreachable!("unreachable in alternative timer"),
+        }
+    }
+
+    /// Mirror update, must be called while holding the driver lock.
+    fn set_next_wake_cached(&self, next_wake: Option<NonZeroU64>) {
+        match self {
+            Inner::Traditional {
+                next_wake_cached, ..
+            } => {
+                next_wake_cached.store(next_wake.map_or(0, NonZeroU64::get), Ordering::SeqCst);
+            }
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            Inner::Alternative { .. } => {}
+        }
+    }
+
+    /// Lowers the mirror if `when` is earlier. Writers hold the driver
+    /// lock, so load + store is enough.
+    fn lower_next_wake_cached(&self, when: u64) {
+        match self {
+            Inner::Traditional {
+                next_wake_cached, ..
+            } => {
+                let curr = next_wake_cached.load(Ordering::SeqCst);
+                if curr == 0 || when < curr {
+                    next_wake_cached.store(when.max(1), Ordering::SeqCst);
+                }
+            }
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            Inner::Alternative { .. } => {}
         }
     }
 

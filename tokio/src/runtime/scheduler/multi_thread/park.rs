@@ -47,10 +47,34 @@ const PARKED_CONDVAR: usize = 1;
 const PARKED_DRIVER: usize = 2;
 const NOTIFIED: usize = 3;
 
+/// How often the rescue sentinel checks whether the driver overslept.
+#[cfg(all(feature = "time", not(loom)))]
+const RESCUE_INTERVAL: Duration = Duration::from_millis(250);
+
+/// Grace (in ms, the timer tick unit) past the promised wake-up before the
+/// driver counts as overslept, to avoid racing a wake-up already in flight.
+#[cfg(all(feature = "time", not(loom)))]
+const RESCUE_GRACE_MS: u64 = 100;
+
 /// Shared across multiple Parker handles
 struct Shared {
     /// Shared driver. Only one thread at a time can use this
     driver: TryLock<Driver>,
+
+    /// Set while one condvar-parked worker acts as the rescue sentinel.
+    #[cfg(all(feature = "time", not(loom)))]
+    sentinel: std::sync::atomic::AtomicBool,
+}
+
+#[cfg(all(feature = "time", not(loom)))]
+impl Shared {
+    fn claim_sentinel(&self) -> bool {
+        !self.sentinel.swap(true, SeqCst)
+    }
+
+    fn release_sentinel(&self) {
+        self.sentinel.store(false, SeqCst);
+    }
 }
 
 impl Parker {
@@ -62,6 +86,8 @@ impl Parker {
                 condvar: Condvar::new(),
                 shared: Arc::new(Shared {
                     driver: TryLock::new(driver),
+                    #[cfg(all(feature = "time", not(loom)))]
+                    sentinel: std::sync::atomic::AtomicBool::new(false),
                 }),
             }),
         }
@@ -90,7 +116,7 @@ impl Parker {
         if let Some(mut driver) = self.inner.shared.driver.try_lock() {
             self.inner.park_driver(&mut driver, handle, Some(duration))
         } else if !duration.is_zero() {
-            self.inner.park_condvar(Some(duration));
+            self.inner.park_condvar(Some(duration), handle);
             HadDriver::No
         } else {
             // https://github.com/tokio-rs/tokio/issues/6536
@@ -143,7 +169,7 @@ impl Inner {
         if let Some(mut driver) = self.shared.driver.try_lock() {
             self.park_driver(&mut driver, handle, None)
         } else {
-            self.park_condvar(None);
+            self.park_condvar(None, handle);
             HadDriver::No
         }
     }
@@ -155,7 +181,10 @@ impl Inner {
     /// # Panics
     ///
     /// Panics if `duration` is `Some` and the duration is zero.
-    fn park_condvar(&self, duration: Option<Duration>) {
+    fn park_condvar(&self, duration: Option<Duration>, handle: &driver::Handle) {
+        #[cfg(not(all(feature = "time", not(loom))))]
+        let _ = handle;
+
         // Otherwise we need to coordinate going to sleep
         let mut m = self.mutex.lock();
 
@@ -177,6 +206,16 @@ impl Inner {
                 return;
             }
             Err(actual) => panic!("inconsistent park state; actual = {actual}"),
+        }
+
+        // At most one condvar-parked worker acts as rescue sentinel: a
+        // bounded park so overdue timers still fire if the driver owner
+        // cannot wake up in time (tokio-rs/tokio#8342).
+        #[cfg(all(feature = "time", not(loom)))]
+        if duration.is_none() && handle.time.is_some() && self.shared.claim_sentinel() {
+            self.park_condvar_sentinel(m, handle);
+            self.shared.release_sentinel();
+            return;
         }
 
         let timeout_at = duration.map(|d| {
@@ -223,6 +262,83 @@ impl Inner {
 
             // spurious wakeup, go back to sleep
         }
+    }
+
+    /// Bounded condvar park for the rescue sentinel. Checks for overdue
+    /// timers on claim, after every wake-up and on wait expiry; expiry-only
+    /// checking could be starved since notifications restart the wait.
+    #[cfg(all(feature = "time", not(loom)))]
+    fn park_condvar_sentinel<'a>(
+        &'a self,
+        mut m: crate::loom::sync::MutexGuard<'a, ()>,
+        handle: &driver::Handle,
+    ) {
+        loop {
+            // Rescuing runs wakers, which can unpark this parker and lock
+            // `self.mutex`, so release it first. A racing unpark leaves the
+            // sticky NOTIFIED behind, re-checked before sleeping.
+            drop(m);
+
+            if self.rescue_overdue_timers(handle) {
+                // Rescued timers may have queued tasks on this worker,
+                // return to the worker loop to poll them.
+                let old = self.state.swap(EMPTY, SeqCst);
+                debug_assert!(
+                    old == PARKED_CONDVAR || old == NOTIFIED,
+                    "inconsistent sentinel park state; actual = {old}"
+                );
+                return;
+            }
+
+            m = self.mutex.lock();
+
+            if self
+                .state
+                .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+                .is_ok()
+            {
+                return;
+            }
+
+            let (m2, _) = self.condvar.wait_timeout(m, RESCUE_INTERVAL).unwrap();
+            m = m2;
+
+            if self
+                .state
+                .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+                .is_ok()
+            {
+                return;
+            }
+
+            // Timed out or woken spuriously: re-check.
+        }
+    }
+
+    /// Re-posts the driver wake-up and fires overdue timers if the driver
+    /// overslept the cached deadline. Returns `true` if it had overslept.
+    #[cfg(all(feature = "time", not(loom)))]
+    fn rescue_overdue_timers(&self, handle: &driver::Handle) -> bool {
+        let Some(time_handle) = handle.time.as_ref() else {
+            return false;
+        };
+        let Some(next_wake) = time_handle.next_wake_cached() else {
+            return false;
+        };
+
+        let now = time_handle.time_source().now(handle.clock());
+        if now <= next_wake.get().saturating_add(RESCUE_GRACE_MS) {
+            return false;
+        }
+
+        // Wake the driver in case it is sleeping out a stale relative
+        // timeout in the OS poll; harmless if already awake.
+        handle.unpark();
+
+        // Fires with the timer lock, does not need the driver lock.
+        time_handle.rescue_overdue(handle.clock());
+
+        true
     }
 
     fn park_driver(
