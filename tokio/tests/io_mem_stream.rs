@@ -1,6 +1,8 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use std::io::IoSlice;
+
 use tokio::io::{duplex, AsyncReadExt, AsyncWriteExt};
 
 #[tokio::test]
@@ -99,6 +101,22 @@ async fn max_write_size() {
 
     // drop b only after task t1 finishes writing
     drop(b);
+}
+
+#[tokio::test]
+async fn zero_length_ops_complete_when_stream_would_block() {
+    let (mut reader, _peer) = duplex(1);
+    let mut empty = [];
+    assert_eq!(reader.read(&mut empty).await.unwrap(), 0);
+
+    let (mut writer, _peer) = duplex(1);
+    writer.write_all(b"x").await.unwrap();
+    assert_eq!(writer.write(&[]).await.unwrap(), 0);
+
+    let (mut writer, _peer) = duplex(1);
+    writer.write_all(b"x").await.unwrap();
+    let bufs = [IoSlice::new(&[]), IoSlice::new(&[])];
+    assert_eq!(writer.write_vectored(&bufs).await.unwrap(), 0);
 }
 
 #[tokio::test]
