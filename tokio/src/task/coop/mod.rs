@@ -644,7 +644,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "time")]
+    #[cfg(all(not(miri), not(target_arch = "wasm32"), not(target_arch = "wasm64")))]
     fn time_budget_exhausted() {
         use std::thread;
         use tokio_test::*;
