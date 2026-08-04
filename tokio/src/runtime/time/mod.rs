@@ -300,6 +300,7 @@ impl Handle {
     }
 
     /// Cached earliest pending timer expiration. Lock-free, may be stale.
+    #[cfg(all(feature = "rt-multi-thread", not(loom)))]
     pub(crate) fn next_wake_cached(&self) -> Option<NonZeroU64> {
         match &self.inner {
             Inner::Traditional {
@@ -312,6 +313,7 @@ impl Handle {
 
     /// Fires expired timers off the wheel without needing the resource
     /// driver. Used by parked workers when the driver overslept.
+    #[cfg(all(feature = "rt-multi-thread", not(loom)))]
     pub(crate) fn rescue_overdue(&self, clock: &Clock) {
         if self.is_shutdown() {
             return;
