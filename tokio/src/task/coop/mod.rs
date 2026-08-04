@@ -644,6 +644,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "time")]
     fn time_budget_exhausted() {
         use std::thread;
         use tokio_test::*;
