@@ -134,7 +134,12 @@ impl Budget {
     /// Returns a time-based budget that is considered exhausted once
     /// `Instant::now()` reaches or exceeds the given deadline.
     fn initial_time(duration: Duration) -> Budget {
-        Budget(BudgetInner::Time(Instant::now() + duration))
+        Budget(
+            Instant::now()
+                .checked_add(duration)
+                .map(BudgetInner::Time)
+                .unwrap_or(BudgetInner::Unconstrained),
+        )
     }
 
     /// Returns an unconstrained budget. Operations will not be limited.
@@ -172,10 +177,7 @@ pub(crate) fn budget_time<R>(duration: Duration, f: impl FnOnce() -> R) -> R {
 /// time-based budget of duration `d`; otherwise, it runs with the default
 /// tick-based budget.
 #[inline(always)]
-pub(crate) fn run_with_coop_budget<R>(
-    time_budget: Option<Duration>,
-    f: impl FnOnce() -> R,
-) -> R {
+pub(crate) fn run_with_coop_budget<R>(time_budget: Option<Duration>, f: impl FnOnce() -> R) -> R {
     match time_budget {
         Some(d) => budget_time(d, f),
         None => budget(f),
