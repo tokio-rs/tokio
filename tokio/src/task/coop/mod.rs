@@ -661,7 +661,7 @@ mod test {
 
             // Now the budget should be exhausted.
             assert!(!has_budget_remaining());
-            let _ = assert_pending!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
+            assert_pending!(task::spawn(()).enter(|cx, _| poll_proceed(cx)));
         });
     }
 }
