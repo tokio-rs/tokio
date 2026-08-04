@@ -1250,57 +1250,57 @@ impl Builder {
         self
     }
 
-    /// Switch the cooperative scheduling budget to a time-based strategy.
-    ///
-    /// By default, Tokio uses a tick-based budget: each task may consume up
-    /// to a fixed number of cooperative "ticks" (yield points in
-    /// Tokio-aware leaf futures) per poll before being forced to yield back
-    /// to the scheduler. This works well as long as each tick corresponds to
-    /// a roughly similar amount of work, but it can lead to long polls when
-    /// individual ticks are expensive — for example, when CPU-bound work
-    /// sits between yield points.
-    ///
-    /// Calling this method opts the runtime into an alternative,
-    /// time-based budget: instead of counting ticks, the runtime records the
-    /// time when each task poll begins and considers the budget exhausted
-    /// once the configured wall-clock `duration` has elapsed.
-    ///
-    /// This causes Tokio to call `Instant::now()` at every cooperative yield
-    /// point, which is more expensive than decrementing a counter. Tasks
-    /// that perform many cheap yield points may therefore see throughput
-    /// regressions; the time-based mode is most appropriate when tasks
-    /// perform a significant amount of work between yield points and the
-    /// goal is to bound poll latency.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `duration` is zero.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # #[cfg(not(target_family = "wasm"))]
-    /// # {
-    /// use std::time::Duration;
-    /// use tokio::runtime;
-    ///
-    /// let rt = runtime::Builder::new_multi_thread()
-    ///     .coop_time_budget(Duration::from_micros(100))
-    ///     .build()
-    ///     .unwrap();
-    /// # }
-    /// ```
-    #[track_caller]
-    pub fn coop_time_budget(&mut self, duration: Duration) -> &mut Self {
-        assert!(
-            !duration.is_zero(),
-            "coop_time_budget must be greater than zero"
-        );
-        self.coop_time_budget = Some(duration);
-        self
-    }
-
     cfg_unstable! {
+        /// Switch the cooperative scheduling budget to a time-based strategy.
+        ///
+        /// By default, Tokio uses a tick-based budget: each task may consume up
+        /// to a fixed number of cooperative "ticks" (yield points in
+        /// Tokio-aware leaf futures) per poll before being forced to yield back
+        /// to the scheduler. This works well as long as each tick corresponds to
+        /// a roughly similar amount of work, but it can lead to long polls when
+        /// individual ticks are expensive — for example, when CPU-bound work
+        /// sits between yield points.
+        ///
+        /// Calling this method opts the runtime into an alternative,
+        /// time-based budget: instead of counting ticks, the runtime records the
+        /// time when each task poll begins and considers the budget exhausted
+        /// once the configured wall-clock `duration` has elapsed.
+        ///
+        /// This causes Tokio to call `Instant::now()` at every cooperative yield
+        /// point, which is more expensive than decrementing a counter. Tasks
+        /// that perform many cheap yield points may therefore see throughput
+        /// regressions; the time-based mode is most appropriate when tasks
+        /// perform a significant amount of work between yield points and the
+        /// goal is to bound poll latency.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `duration` is zero.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// use std::time::Duration;
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .coop_time_budget(Duration::from_micros(100))
+        ///     .build()
+        ///     .unwrap();
+        /// # }
+        /// ```
+        #[track_caller]
+        pub fn coop_time_budget(&mut self, duration: Duration) -> &mut Self {
+            assert!(
+                !duration.is_zero(),
+                "coop_time_budget must be greater than zero"
+            );
+            self.coop_time_budget = Some(duration);
+            self
+        }
+
         /// Configure how the runtime responds to an unhandled panic on a
         /// spawned task.
         ///
