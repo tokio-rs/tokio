@@ -69,7 +69,7 @@ static __em_js____asyncjs__tokio_jspi_sleep: [u8; TOKIO_JSPI_SLEEP.len() + 1] =
     em_js(TOKIO_JSPI_SLEEP);
 
 unsafe extern "C" {
-    /// Reports the `ASYNCIFY` build mode: 0 = none, 1 = legacy Asyncify,
+    /// Reports the `ASYNCIFY` build mode: 0 = none, 1 = legacy `Asyncify`,
     /// 2 = JSPI. Only mode 2 supports Tokio's JSPI import.
     safe fn emscripten_has_asyncify() -> i32;
 }
