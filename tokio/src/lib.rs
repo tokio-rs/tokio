@@ -446,48 +446,10 @@
 //!
 //! ### Emscripten support
 //!
-//! The `wasm32-unknown-emscripten` target is supported at parity with the
-//! other Wasm targets. A host-event-loop execution model with a parking
-//! `block_on` is a planned follow-up; until it lands, a `block_on` whose
-//! future cannot resolve synchronously behaves as on other single-threaded
-//! Wasm targets.
-//!
-//! Supported features: `rt`, `time`, `sync`, `macros`, `fs`, `io-util`,
-//! `io-std`, and `test-util` — the same surface as the other single-threaded
-//! Wasm targets. The `net` reactor (epoll-backed, over Emscripten's socket
-//! support) is planned as a follow-up; until then the `net` feature fails to
-//! build for this target (rejected by `mio`).
-//!
-//! The `process`, `signal`, and `rt-multi-thread` features are rejected at
-//! compile time: `process`/`signal` have no underlying primitives (`fork`/`exec`,
-//! kernel signal delivery) and `rt-multi-thread` has no native threads.
-//!
-//! `spawn_blocking` dispatches to the blocking thread pool and so behaves as on
-//! the other single-threaded Wasm targets. Running `spawn_blocking` closures
-//! and `fs`/stdio `std::*` calls inline over Emscripten's synchronous syscalls
-//! is part of the planned host-event-loop follow-up.
-//!
-//! Panics behave as on native: `wasm32-unknown-emscripten` defaults to
-//! `panic = "unwind"`, so panic recovery works, a panicking task yields
-//! `Err(JoinError)`, and `JoinError::is_panic` / `JoinError::into_panic`
-//! report the payload.
-//!
-//! `#[tokio::test]` / `#[tokio::main]` use the native macro expansion; the
-//! `multi_thread` flavor is rejected (no native threads) — use
-//! `flavor = "current_thread"`.
-//!
-//!
-//! #### Linking and running on Emscripten
-//!
-//! No js-library or other custom file is required, and plain `node` runs the
-//! test binaries directly:
-//!
-//! ```text
-//! CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER="node"
-//! RUSTFLAGS="-C link-args=-sALLOW_MEMORY_GROWTH=1 \
-//!            -C link-args=-sEXIT_RUNTIME=1 \
-//!            -C link-args=-sSTACK_SIZE=1048576"
-//! ```
+//! The `wasm32-unknown-emscripten` target supports the single-threaded runtime
+//! with the `rt`, `time`, `sync`, `macros`, `fs`, `io-util`, `io-std`, and
+//! `test-util` features. The `net`, `process`, `signal`, and `rt-multi-thread`
+//! features are not supported.
 //!
 //! ## Unstable `WASM` support
 //!
@@ -524,12 +486,8 @@ compile_error! {
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
-// On Emscripten, `process`, `signal`, and `rt-multi-thread` compile but are
-// inert, so `full` (and any dependency that enables these features) still
-// builds. `process` and `signal` have no `fork`/`exec` or kernel signal
-// delivery, so their modules are compiled out (see `cfg_process!` /
-// `cfg_signal!`). The multi-threaded runtime compiles but only runs under a
-// `PROXY_TO_PTHREAD` build; `#[tokio::main]` steers to `current_thread`.
+#[cfg(all(target_os = "emscripten", feature = "process"))]
+compile_error!("The `process` feature is not supported on wasm32-unknown-emscripten.");
 
 #[cfg(all(
     tokio_unstable,

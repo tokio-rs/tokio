@@ -398,11 +398,7 @@ macro_rules! cfg_process {
             #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
             #[cfg(not(loom))]
             #[cfg(not(target_os = "wasi"))]
-            // Emscripten has no `fork`/`exec`, so the `process` module is a
-            // throwing stub there (see `process/emscripten.rs`); it still
-            // compiles so dependents that name the types build. The orphan
-            // reaper / signal driver it would otherwise need stays off via
-            // `cfg_process_driver!`.
+            #[cfg(not(target_os = "emscripten"))]
             $item
         )*
     }
@@ -412,9 +408,6 @@ macro_rules! cfg_process_driver {
     ($($item:item)*) => {
         #[cfg(unix)]
         #[cfg(not(loom))]
-        // The driver (orphan reaper backed by the signal handler) doesn't exist
-        // on Emscripten; the process module there is a throwing stub.
-        #[cfg(not(target_os = "emscripten"))]
         cfg_process! { $($item)* }
     }
 }
@@ -423,8 +416,8 @@ macro_rules! cfg_not_process_driver {
     ($($item:item)*) => {
         $(
             #[cfg(any(
-                not(all(unix, not(loom), feature = "process")),
                 target_os = "emscripten",
+                not(all(unix, not(loom), feature = "process")),
             ))]
             $item
         )*
