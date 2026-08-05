@@ -16,8 +16,10 @@ thread_local! {
 }
 
 /// Marks the `#[tokio::test]` promising activation as suspendable for the
-/// body's extent; `Drop` clears the flag across panic unwinds. Internal to
-/// the test expansion, not a user convention.
+/// body's extent. JSPI availability is module-wide, but only an activation
+/// entered through `WebAssembly.promising` may call a suspending import; this
+/// guard records that per-activation capability. Internal to the test
+/// expansion, not a user convention.
 #[derive(Debug)]
 pub struct SuspendGuard(());
 
@@ -67,7 +69,8 @@ static __em_js____asyncjs__tokio_jspi_sleep: [u8; TOKIO_JSPI_SLEEP.len() + 1] =
     em_js(TOKIO_JSPI_SLEEP);
 
 unsafe extern "C" {
-    /// Reports the `ASYNCIFY` build mode: 0 = none, 1 = `asyncify`, 2 = JSPI.
+    /// Reports the `ASYNCIFY` build mode: 0 = none, 1 = legacy Asyncify,
+    /// 2 = JSPI. Only mode 2 supports Tokio's JSPI import.
     safe fn emscripten_has_asyncify() -> i32;
 }
 
@@ -80,7 +83,9 @@ unsafe extern "C-unwind" {
 }
 
 #[inline(never)]
-fn anchor() {
+fn ensure_jspi_sleep_linked() {
+    // `#[used]` retains the data in its object; this reference also causes
+    // the archive member containing the EM_JS body to be linked.
     std::hint::black_box(__em_js____asyncjs__tokio_jspi_sleep.as_ptr());
 }
 
@@ -91,6 +96,6 @@ pub fn jspi_enabled() -> bool {
 
 /// Suspend the owning activation for `dur` on a host timer.
 pub(crate) fn sleep(dur: Duration) {
-    anchor();
+    ensure_jspi_sleep_linked();
     tokio_jspi_sleep_import(dur.as_secs_f64() * 1000.0);
 }
