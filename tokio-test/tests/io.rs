@@ -236,3 +236,27 @@ async fn write_skips_queued_read_to_match_builder_write() {
     mock.read_exact(&mut buf).await.expect("read");
     assert_eq!(&buf, b"z");
 }
+
+#[tokio::test]
+async fn write_error_behind_queued_read() {
+    let error = io::Error::new(io::ErrorKind::Other, "no thanks!");
+    let mock = Builder::new()
+        .read(b"payload")
+        .write_error(error)
+        .build();
+    let (mut reader, mut writer) = tokio::io::split(mock);
+
+    let write = tokio::spawn(async move { writer.write_all(b"x").await });
+
+    let mut buf = vec![0; 7];
+    reader.read_exact(&mut buf).await.expect("read");
+    assert_eq!(&buf[..], b"payload");
+
+    match write.await.expect("join") {
+        Err(error) => {
+            assert_eq!(error.kind(), io::ErrorKind::Other);
+            assert_eq!(format!("{error}"), "no thanks!");
+        }
+        Ok(()) => panic!("error not received"),
+    }
+}
