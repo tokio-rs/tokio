@@ -529,11 +529,10 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
     };
     let raw_body = input.body();
-    // On Emscripten `#[tokio::test]` claims exclusive JSPI suspension for the
-    // promising activation libtest runs it under (Emscripten auto-promising-
-    // wraps `main` under `-sJSPI`), so the body's `block_on` can suspend on
-    // the host event loop; without `-sJSPI` no guard is created (waits
-    // panic).
+    // JSPI is enabled for the module, but suspending imports are valid only
+    // from a promising-wrapped activation. The guard marks libtest's known
+    // promising activation so its `block_on` may suspend; other entries fail
+    // at the park leaf instead of trapping in the engine.
     let emscripten_test_block = quote_spanned! {last_stmt_end_span=>
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return, clippy::unwrap_in_result)]
         {
