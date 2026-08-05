@@ -521,20 +521,11 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
 
     };
 
-    // Emscripten runs the native expansion; only the `multi_thread` flavor
-    // diverges — it has no native threads there, so it's rejected with a
-    // targeted error rather than the opaque failure of the native
-    // multi-thread `block_on`.
     let last_block = match config.flavor {
         RuntimeFlavor::Threaded => quote! {
-            #[cfg(not(target_os = "emscripten"))]
-            #native_last_block
-            #[cfg(target_os = "emscripten")]
-            ::core::compile_error!(
-                "the `multi_thread` runtime flavor is not available on \
-                 wasm32-unknown-emscripten (no native threads); use \
-                 `flavor = \"current_thread\"`"
-            );
+            #crate_path::__tokio_unsupported_multi_thread_on_emscripten! {
+                #native_last_block
+            }
         },
         _ => native_last_block,
     };
