@@ -134,7 +134,12 @@ impl Level {
     pub(crate) unsafe fn remove_entry(&mut self, hdl: EntryHandle) {
         let slot = slot_for(hdl.deadline(), self.level);
 
-        unsafe { self.slot[slot].remove(NonNull::from(&hdl)) };
+        unsafe {
+            assert!(
+                self.slot[slot].remove(NonNull::from(&hdl)).is_some(),
+                "Attempt to remove item not present in the timing wheel"
+            )
+        };
         if self.slot[slot].is_empty() {
             // The bit is currently set
             debug_assert!(self.occupied & occupied_bit(slot) != 0);

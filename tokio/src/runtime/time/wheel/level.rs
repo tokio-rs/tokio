@@ -131,7 +131,12 @@ impl Level {
     pub(crate) unsafe fn remove_entry(&mut self, item: NonNull<TimerShared>) {
         let slot = slot_for(unsafe { item.as_ref().registered_when() }, self.level);
 
-        unsafe { self.slot[slot].remove(item) };
+        unsafe {
+            assert!(
+                self.slot[slot].remove(item).is_some(),
+                "Attempt to remove item not present in the timing wheel"
+            )
+        };
         if self.slot[slot].is_empty() {
             // The bit is currently set
             debug_assert!(self.occupied & occupied_bit(slot) != 0);
