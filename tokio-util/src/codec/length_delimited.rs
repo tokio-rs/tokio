@@ -675,18 +675,20 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
+    /// # use tokio_stream::StreamExt;
     /// use tokio_util::codec::LengthDelimitedCodec;
     ///
-    /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// LengthDelimitedCodec::builder()
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// # let io: &[u8] = b"\x00\x0bhello world";
+    /// let mut reader = LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
     ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
-    ///     .num_skip(0)
     ///     .new_read(io);
+    /// # let frame = reader.next().await.unwrap().unwrap();
+    /// # assert_eq!(&frame[..], b"hello world");
     /// # }
-    /// # pub fn main() {}
     /// ```
     pub fn new() -> Builder {
         Builder {
@@ -949,14 +951,19 @@ impl Builder {
     /// # Examples
     ///
     /// ```
+    /// # use bytes::{Bytes, BytesMut};
     /// use tokio_util::codec::LengthDelimitedCodec;
+    /// # use tokio_util::codec::{Decoder, Encoder};
     /// # pub fn main() {
-    /// LengthDelimitedCodec::builder()
+    /// let mut codec = LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
     ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
-    ///     .num_skip(0)
     ///     .new_codec();
+    /// # let mut buf = BytesMut::new();
+    /// # codec.encode(Bytes::from_static(b"hello world"), &mut buf).unwrap();
+    /// # let frame = codec.decode(&mut buf).unwrap().unwrap();
+    /// # assert_eq!(&frame[..], b"hello world");
     /// # }
     /// ```
     pub fn new_codec(&self) -> LengthDelimitedCodec {
@@ -975,18 +982,20 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
+    /// # use tokio_stream::StreamExt;
     /// use tokio_util::codec::LengthDelimitedCodec;
     ///
-    /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// LengthDelimitedCodec::builder()
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// # let io: &[u8] = b"\x00\x0bhello world";
+    /// let mut reader = LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
     ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
-    ///     .num_skip(0)
     ///     .new_read(io);
+    /// # let frame = reader.next().await.unwrap().unwrap();
+    /// # assert_eq!(&frame[..], b"hello world");
     /// # }
-    /// # pub fn main() {}
     /// ```
     pub fn new_read<T>(&self, upstream: T) -> FramedRead<T, LengthDelimitedCodec>
     where
