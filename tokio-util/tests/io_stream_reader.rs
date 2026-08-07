@@ -36,12 +36,18 @@ async fn test_stream_reader() -> std::io::Result<()> {
 
 #[tokio::test]
 async fn test_stream_reader_does_not_poll_after_eof() -> std::io::Result<()> {
+    // the first poll of this stream will return `Poll::Ready(None)`,
+    // and the second poll will panic
     let stream = futures::stream::unfold((), |_| async { None::<(std::io::Result<Bytes>, ())> });
     let read = StreamReader::new(stream);
     tokio::pin!(read);
     let mut buf = [0; 1];
 
+    // the first poll hits the inner stream,
+    // and the inner stream returns `Poll::Ready(None)`.
     assert_eq!(read.read(&mut buf).await?, 0);
+    // the second poll doesn't hit the inner stream,
+    // so this `.read()` doesn't panic.
     assert_eq!(read.read(&mut buf).await?, 0);
 
     Ok(())
