@@ -84,6 +84,25 @@
 //! because they require access to the Tokio timer. See the documentation of
 //! each `*_timeout` method for more information on its use.
 //!
+//! # Permits and reserve ordering
+//!
+//! Bounded channel methods that wait for capacity, such as [`Sender::send`],
+//! [`Sender::reserve`], [`Sender::reserve_many`], and
+//! [`Sender::reserve_owned`], all draw from the same shared channel capacity.
+//! Calls are served in the order they were requested. A call that cannot be
+//! fully satisfied waits at the back of the queue, and released capacity is
+//! assigned to the waiter at the front of the queue first. See the method-level
+//! cancel safety documentation for details.
+//!
+//! An outstanding [`Permit`] or [`OwnedPermit`] holds one slot of capacity for
+//! its entire lifetime, until it is used to send a message or dropped. Holding
+//! a permit therefore reduces the capacity available to all other senders.
+//!
+//! For example, if a call to [`Sender::reserve_many`] is at the front of the
+//! queue, it blocks later [`Sender::send`] and reserve calls until enough
+//! capacity is available to satisfy its full request. Permits are not
+//! reassigned to arbitrary free slots.
+//!
 //! # Allocation behavior
 //!
 //! <div class="warning">The implementation details described in this section may change in future
@@ -102,6 +121,8 @@
 //!
 //! [`Sender`]: crate::sync::mpsc::Sender
 //! [`Receiver`]: crate::sync::mpsc::Receiver
+//! [`Permit`]: crate::sync::mpsc::Permit
+//! [`OwnedPermit`]: crate::sync::mpsc::OwnedPermit
 //! [bounded-send]: crate::sync::mpsc::Sender::send()
 //! [bounded-recv]: crate::sync::mpsc::Receiver::recv()
 //! [blocking-send]: crate::sync::mpsc::Sender::blocking_send()

@@ -1080,6 +1080,8 @@ impl<T> Sender<T> {
     ///
     /// Dropping [`Permit`] without sending a message releases the capacity back
     /// to the channel.
+    /// While held, a [`Permit`] occupies one slot of channel capacity; see the
+    /// [module-level documentation](crate::sync::mpsc#permits-and-reserve-ordering).
     ///
     /// [`Permit`]: Permit
     /// [`send`]: Permit::send
@@ -1134,6 +1136,9 @@ impl<T> Sender<T> {
     ///
     /// Dropping [`PermitIterator`] without consuming it entirely releases the remaining
     /// permits back to the channel.
+    /// While held, a [`PermitIterator`] occupies one slot of channel capacity
+    /// per remaining permit; see the
+    /// [module-level documentation](crate::sync::mpsc#permits-and-reserve-ordering).
     ///
     /// [`PermitIterator`]: PermitIterator
     /// [`Permit`]: Permit
@@ -1202,6 +1207,8 @@ impl<T> Sender<T> {
     ///
     /// Dropping the [`OwnedPermit`] without sending a message releases the
     /// capacity back to the channel.
+    /// While held, an [`OwnedPermit`] occupies one slot of channel capacity; see
+    /// the [module-level documentation](crate::sync::mpsc#permits-and-reserve-ordering).
     ///
     /// # Cancel safety
     ///
