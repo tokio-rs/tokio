@@ -9,11 +9,16 @@ async fn resume_lets_time_move_forward_instead_of_resetting_it() {
     time::pause();
     time::advance(Duration::from_secs(10)).await;
     let advanced_by_ten_secs = Instant::now();
-    assert!(advanced_by_ten_secs - start > Duration::from_secs(10));
-    assert!(advanced_by_ten_secs - start < Duration::from_secs(11));
+    assert!(advanced_by_ten_secs.checked_duration_since(start).unwrap() > Duration::from_secs(10));
+    assert!(advanced_by_ten_secs.checked_duration_since(start).unwrap() < Duration::from_secs(11));
     time::resume();
     assert!(advanced_by_ten_secs < Instant::now());
-    assert!(Instant::now() - advanced_by_ten_secs < Duration::from_secs(1));
+    assert!(
+        Instant::now()
+            .checked_duration_since(advanced_by_ten_secs)
+            .unwrap()
+            < Duration::from_secs(1)
+    );
 }
 
 #[tokio::test]
@@ -24,8 +29,8 @@ async fn can_pause_after_resume() {
     time::resume();
     time::pause();
     time::advance(Duration::from_secs(10)).await;
-    assert!(Instant::now() - start > Duration::from_secs(20));
-    assert!(Instant::now() - start < Duration::from_secs(21));
+    assert!(Instant::now().checked_duration_since(start).unwrap() > Duration::from_secs(20));
+    assert!(Instant::now().checked_duration_since(start).unwrap() < Duration::from_secs(21));
 }
 
 #[tokio::test]
