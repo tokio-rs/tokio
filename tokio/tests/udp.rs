@@ -14,11 +14,27 @@ use std::future::poll_fn;
 use std::io;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::{io::ReadBuf, net::UdpSocket, time};
+use tokio::{
+    io::{Interest, ReadBuf, Ready},
+    net::UdpSocket,
+    time,
+};
 use tokio_test::assert_ok;
 
 const MSG: &[u8] = b"hello";
 const MSG_LEN: usize = MSG.len();
+
+fn assert_connection_refused_or_reset(err: &io::Error) {
+    assert!(
+        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
+        matches!(
+            err.kind(),
+            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
+        ),
+        "unexpected error kind: {:?}",
+        err.kind()
+    );
+}
 
 #[tokio::test]
 async fn send_recv() -> std::io::Result<()> {
@@ -74,15 +90,40 @@ async fn send_to_recv_closed_returns_err() -> std::io::Result<()> {
         .await
         .expect("timed out instead of returning error")
         .unwrap_err();
-    let errno = err.kind();
 
-    assert!(
-        // Linux/BSD returns ECONNREFUSED, but Windows will usually return ECONNRESET instead.
-        matches!(
-            errno,
-            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
-        )
-    );
+    assert_connection_refused_or_reset(&err);
+    Ok(())
+}
+
+// Regression test for https://github.com/tokio-rs/tokio/issues/8082: the
+// `try_*` receive methods must surface socket errors (e.g. ECONNREFUSED after
+// the peer is gone) the same way the async `recv` methods do, instead of
+// swallowing them and returning `WouldBlock`.
+#[tokio::test]
+#[cfg_attr(
+    target_os = "wasi",
+    ignore = "temporarily disabled for WASI pending https://github.com/bytecodealliance/wasmtime/pull/13933"
+)]
+async fn send_to_try_recv_closed_returns_err() -> std::io::Result<()> {
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let receiver_addr = receiver.local_addr()?;
+    drop(receiver);
+    sender.connect(receiver_addr).await?;
+    sender.send(MSG).await?;
+
+    let interest = time::timeout(
+        Duration::from_secs(5),
+        sender.ready(Interest::READABLE | Interest::ERROR),
+    )
+    .await
+    .expect("timed out instead of returning error")
+    .unwrap();
+    assert_eq!(interest, Ready::ERROR);
+
+    let err = sender.try_recv(&mut [0u8; 32]).unwrap_err();
+    assert_connection_refused_or_reset(&err);
     Ok(())
 }
 
