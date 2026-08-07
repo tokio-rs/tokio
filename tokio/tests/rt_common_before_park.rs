@@ -4,6 +4,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::runtime::Builder;
 use tokio::sync::Notify;
 
@@ -89,4 +90,53 @@ fn wake_from_other_thread_block_on() {
     });
 
     th.join().unwrap();
+}
+
+// Regression test for #8212: a current-thread runtime driven by repeated short
+// `block_on` calls, where `on_thread_park` wakes the `block_on` future, must
+// still drive the time driver so a spawned timer keeps making progress. Before
+// the fix, `before_park` setting the `woken` flag caused `park` to skip the
+// driver entirely, so the timer never fired.
+#[test]
+fn before_park_does_not_stall_spawned_timer() {
+    let notify = Arc::new(Notify::new());
+    let task_done = Arc::new(AtomicBool::new(false));
+
+    let rt = Builder::new_current_thread()
+        .enable_all()
+        .on_thread_park({
+            let notify = notify.clone();
+            move || notify.notify_waiters()
+        })
+        .build()
+        .unwrap();
+
+    rt.spawn({
+        let task_done = task_done.clone();
+        async move {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+            task_done.store(true, Ordering::SeqCst);
+        }
+    });
+
+    // A current-thread runtime only runs tasks while inside `block_on`, so drive it
+    // once to let the spawned task register its timer.
+    rt.block_on(tokio::task::yield_now());
+
+    // Drive the runtime in short bursts, the way an external event loop would. Each
+    // burst parks via `on_thread_park` (which wakes the `block_on` future); the fix
+    // keeps polling the driver so the spawned timer still fires. A regression stalls
+    // the timer, failing the assert below instead of hanging.
+    for _ in 0..100 {
+        if task_done.load(Ordering::SeqCst) {
+            break;
+        }
+        rt.block_on(notify.notified());
+        std::thread::sleep(Duration::from_millis(1));
+    }
+
+    assert!(
+        task_done.load(Ordering::SeqCst),
+        "spawned task's timer never fired (issue #8212)"
+    );
 }

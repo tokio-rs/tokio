@@ -185,7 +185,7 @@ impl Drop for DuplexStream {
 /// Creates unidirectional buffer that acts like in memory pipe.
 ///
 /// The `max_buf_size` argument is the maximum amount of bytes that can be
-/// written to a buffer before the it returns `Poll::Pending`.
+/// written to a buffer before it returns `Poll::Pending`.
 ///
 /// # Unify reader and writer
 ///
@@ -217,7 +217,7 @@ impl SimplexStream {
     /// version with separate reader and writer you can use [`simplex`] function.
     ///
     /// The `max_buf_size` argument is the maximum amount of bytes that can be
-    /// written to a buffer before the it returns `Poll::Pending`.
+    /// written to a buffer before it returns `Poll::Pending`.
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub fn new_unsplit(max_buf_size: usize) -> SimplexStream {
         SimplexStream {
@@ -250,6 +250,10 @@ impl SimplexStream {
         cx: &mut task::Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
+        if buf.remaining() == 0 {
+            return Poll::Ready(Ok(()));
+        }
+
         if self.buffer.has_remaining() {
             let max = self.buffer.remaining().min(buf.remaining());
             buf.put_slice(&self.buffer[..max]);
@@ -278,6 +282,10 @@ impl SimplexStream {
         if self.is_closed {
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
+        if buf.is_empty() {
+            return Poll::Ready(Ok(0));
+        }
+
         let avail = self.max_buf_size - self.buffer.len();
         if avail == 0 {
             self.write_waker = Some(cx.waker().clone());
@@ -300,6 +308,10 @@ impl SimplexStream {
         if self.is_closed {
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
+        if bufs.iter().all(|buf| buf.is_empty()) {
+            return Poll::Ready(Ok(0));
+        }
+
         let avail = self.max_buf_size - self.buffer.len();
         if avail == 0 {
             self.write_waker = Some(cx.waker().clone());

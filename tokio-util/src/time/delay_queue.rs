@@ -580,12 +580,7 @@ impl<T> DelayQueue<T> {
     /// current task for wakeup if the value is not yet available, and returning
     /// `None` if the queue is exhausted.
     pub fn poll_expired(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Expired<T>>> {
-        if !self
-            .waker
-            .as_ref()
-            .map(|w| w.will_wake(cx.waker()))
-            .unwrap_or(false)
-        {
+        if !self.waker.as_ref().is_some_and(|w| w.will_wake(cx.waker())) {
             self.waker = Some(cx.waker().clone());
         }
 
@@ -864,11 +859,19 @@ impl<T> DelayQueue<T> {
         self.slab[*key].expired = false;
 
         self.insert_idx(when, *key);
+        let inserted_expired = self.slab[*key].expired;
 
         let next_deadline = self.next_deadline();
-        if let (Some(ref mut delay), Some(deadline)) = (&mut self.delay, next_deadline) {
-            // This should awaken us if necessary (ie, if already expired)
-            delay.as_mut().reset(deadline);
+        match (next_deadline, &mut self.delay) {
+            (None, _) => self.delay = None,
+            (Some(deadline), Some(delay)) => delay.as_mut().reset(deadline),
+            (Some(deadline), None) => self.delay = Some(Box::pin(sleep_until(deadline))),
+        }
+
+        if inserted_expired {
+            if let Some(waker) = self.waker.take() {
+                waker.wake();
+            }
         }
     }
 

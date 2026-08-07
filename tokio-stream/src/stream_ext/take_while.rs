@@ -49,13 +49,7 @@ where
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if !*self.as_mut().project().done {
             self.as_mut().project().stream.poll_next(cx).map(|ready| {
-                let ready = ready.and_then(|item| {
-                    if !(self.as_mut().project().predicate)(&item) {
-                        None
-                    } else {
-                        Some(item)
-                    }
-                });
+                let ready = ready.filter(self.as_mut().project().predicate);
 
                 if ready.is_none() {
                     *self.as_mut().project().done = true;

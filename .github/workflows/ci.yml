@@ -1092,7 +1092,10 @@ jobs:
       - name: Install cargo-hack, wasmtime
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-hack,wasmtime
+          # Wasmtime v46.0.1 is the last version to support
+          # `wasm32-wasip1-threads` (which was an experiment that was never
+          # standardized):
+          tool: cargo-hack,wasmtime@46.0.1
 
       - uses: Swatinem/rust-cache@v2
       - name: WASI test tokio full
@@ -1152,7 +1155,9 @@ jobs:
       - name: Install cargo-nextest, wasmtime
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,wasmtime-cli
+          # Wasmtime v47.0.0 or later should work, but we stick with a known,
+          # specific version to avoid surprises:
+          tool: cargo-nextest,wasmtime-cli@47.0.2
 
       - uses: Swatinem/rust-cache@v2
 

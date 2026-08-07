@@ -474,8 +474,7 @@ impl RuntimeMetrics {
                 .worker_metrics(0)
                 .poll_count_histogram
                 .as_ref()
-                .map(|histogram| histogram.num_buckets())
-                .unwrap_or_default()
+                .map_or(0, |histogram| histogram.num_buckets())
         }
 
         /// Deprecated. Use [`poll_time_histogram_num_buckets()`] instead.
@@ -528,14 +527,13 @@ impl RuntimeMetrics {
                 .worker_metrics(0)
                 .poll_count_histogram
                 .as_ref()
-                .map(|histogram| {
+                .map_or_else(Range::default, |histogram| {
                     let range = histogram.bucket_range(bucket);
                     std::ops::Range {
                         start: Duration::from_nanos(range.start),
                         end: Duration::from_nanos(range.end),
                     }
                 })
-                .unwrap_or_default()
         }
 
         /// Deprecated. Use [`poll_time_histogram_bucket_range()`] instead.
@@ -977,8 +975,7 @@ impl RuntimeMetrics {
                 .worker_metrics(worker)
                 .poll_count_histogram
                 .as_ref()
-                .map(|histogram| histogram.get(bucket))
-                .unwrap_or_default()
+                .map_or(0, |histogram| histogram.get(bucket))
         }
 
         #[doc(hidden)]
@@ -1096,8 +1093,7 @@ impl RuntimeMetrics {
                 .worker_metrics(0)
                 .schedule_latency_histogram
                 .as_ref()
-                .map(|histogram| histogram.num_buckets())
-                .unwrap_or_default()
+                .map_or(0, |histogram| histogram.num_buckets())
         }
 
         /// Returns the range of task schedule latencies tracked by the given bucket.
@@ -1140,14 +1136,13 @@ impl RuntimeMetrics {
                 .worker_metrics(0)
                 .schedule_latency_histogram
                 .as_ref()
-                .map(|histogram| {
+                .map_or_else(Range::default, |histogram| {
                     let range = histogram.bucket_range(bucket);
                     std::ops::Range {
                         start: Duration::from_nanos(range.start),
                         end: Duration::from_nanos(range.end),
                     }
                 })
-                .unwrap_or_default()
         }
 
         /// Returns the number of times the given worker polled tasks with a schedule
@@ -1212,8 +1207,7 @@ impl RuntimeMetrics {
                 .worker_metrics(worker)
                 .schedule_latency_histogram
                 .as_ref()
-                .map(|histogram| histogram.get(bucket))
-                .unwrap_or_default()
+                .map_or(0, |histogram| histogram.get(bucket))
         }
     }
 
@@ -1303,8 +1297,7 @@ impl RuntimeMetrics {
                     .driver()
                     .io
                     .as_ref()
-                    .map(|h| f(&h.metrics))
-                    .unwrap_or(0)
+                    .map_or(0, |h| f(&h.metrics))
             }
     }
 }

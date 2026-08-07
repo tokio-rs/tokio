@@ -89,16 +89,31 @@ jobs:
             | cpio --null -ov --format=newc | gzip -9 > ../initramfs.cpio.gz)
 
       - name: Run tests in QEMU
+        shell: bash
         run: |
+          set -euo pipefail
+
+          set +e
           qemu-system-x86_64 \
             -kernel linux-${{ env.KERNEL_VERSION }}/arch/x86/boot/bzImage \
             -initrd initramfs.cpio.gz \
             -append "console=ttyS0 rootfstype=ramfs panic=1" \
             -nographic -no-reboot -m 1024 -action panic=exit-failure 2>&1 | tee qemu-output.log
+          qemu_status=${PIPESTATUS[0]} tee_status=${PIPESTATUS[1]}
+          set -e
 
-          # qemu always exits with 0, so we check if the tests passed by using grep.
+          if [ "$qemu_status" -ne 0 ]; then
+            echo "QEMU exited with status $qemu_status"
+            exit "$qemu_status"
+          fi
+
+          if [ "$tee_status" -ne 0 ]; then
+            echo "tee exited with status $tee_status"
+            exit "$tee_status"
+          fi
+
           if grep -q "test result: FAILED" qemu-output.log; then
-            echo "tests failed (QEMU exited abnormally)"
+            echo "tests reported failures"
             exit 1
           else
             echo "all tests passed"

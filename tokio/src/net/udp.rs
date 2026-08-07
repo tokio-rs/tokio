@@ -1149,7 +1149,7 @@ impl UdpSocket {
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///
-    /// Address type can be any implementor of [`ToSocketAddrs`] trait. See its
+    /// Address type can be any implementer of [`ToSocketAddrs`] trait. See its
     /// documentation for concrete examples.
     ///
     /// It is possible for `addr` to yield multiple addresses, but `send_to`

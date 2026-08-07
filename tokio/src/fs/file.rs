@@ -898,6 +898,13 @@ impl fmt::Debug for File {
 }
 
 #[cfg(unix)]
+impl From<std::os::fd::OwnedFd> for File {
+    fn from(fd: std::os::fd::OwnedFd) -> Self {
+        Self::from_std(StdFile::from(fd))
+    }
+}
+
+#[cfg(unix)]
 impl std::os::unix::io::AsRawFd for File {
     fn as_raw_fd(&self) -> std::os::unix::io::RawFd {
         self.std.as_raw_fd()
@@ -923,7 +930,13 @@ impl std::os::unix::io::FromRawFd for File {
 }
 
 cfg_windows! {
-    use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, AsHandle, BorrowedHandle};
+    use crate::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, AsHandle, BorrowedHandle, OwnedHandle};
+
+    impl From<OwnedHandle> for File {
+        fn from(handle: OwnedHandle) -> Self {
+            Self::from_std(StdFile::from(handle))
+        }
+    }
 
     impl AsRawHandle for File {
         fn as_raw_handle(&self) -> RawHandle {
@@ -1040,7 +1053,7 @@ impl Inner {
                 if driver_handle
                     .check_and_init(io_uring::opcode::Read::CODE)
                     .await
-                    .unwrap_or(false)
+                    .unwrap_or_default()
                 {
                     let fd: crate::io::uring::utils::ArcFd = std;
                     return Self::uring_read(fd, buf, max_buf_size).await;
