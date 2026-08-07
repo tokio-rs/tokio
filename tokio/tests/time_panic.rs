@@ -1,5 +1,15 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support panic recovery
+#![cfg(any(
+    all(feature = "full", not(target_os = "wasi")),
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 #![cfg(panic = "unwind")]
 
 use futures::future;
@@ -22,21 +32,24 @@ fn rt_combinations() -> Vec<Runtime> {
         .unwrap();
     rts.push(rt);
 
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .enable_all()
-        .build()
-        .unwrap();
-    rts.push(rt);
+    #[cfg(not(target_os = "emscripten"))]
+    {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
+        rts.push(rt);
 
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(4)
-        .enable_all()
-        .build()
-        .unwrap();
-    rts.push(rt);
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(4)
+            .enable_all()
+            .build()
+            .unwrap();
+        rts.push(rt);
+    }
 
-    #[cfg(tokio_unstable)]
+    #[cfg(all(tokio_unstable, not(target_os = "emscripten")))]
     {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)

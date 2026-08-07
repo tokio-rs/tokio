@@ -1,11 +1,22 @@
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support threads
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::oneshot;
 
-#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(not(target_family = "wasm"), tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(target_family = "wasm", tokio::test)]
 async fn local() {
     tokio::task_local! {
         static REQ_ID: u32;
