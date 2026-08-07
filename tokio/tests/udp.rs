@@ -15,7 +15,7 @@ use std::io;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::{
-    io::{Interest, ReadBuf, Ready},
+    io::{Interest, ReadBuf},
     net::UdpSocket,
     time,
 };
@@ -120,7 +120,10 @@ async fn send_to_try_recv_closed_returns_err() -> std::io::Result<()> {
     .await
     .expect("timed out instead of returning error")
     .unwrap();
-    assert_eq!(interest, Ready::ERROR);
+    // On Linux the ICMP error surfaces as `Ready::ERROR`, but kqueue-based
+    // targets (macOS/BSD) may instead wake the read filter as `Ready::READABLE`.
+    // Either way the socket must report readiness so `try_recv` can surface the error.
+    assert!(interest.is_error() || interest.is_readable());
 
     let err = sender.try_recv(&mut [0u8; 32]).unwrap_err();
     assert_connection_refused_or_reset(&err);
