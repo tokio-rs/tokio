@@ -1,4 +1,4 @@
-324
+327
 &
 +
 <
@@ -141,6 +141,7 @@ hashsets
 HdrHistogram
 ICMP
 ie
+iff
 Illumos
 impl
 implementers
@@ -229,6 +230,7 @@ reregistering
 resize
 resized
 RMW
+RNG
 runtime
 runtime's
 runtimes
@@ -244,6 +246,7 @@ signalling
 SmallCrush
 Solaris
 spawner
+spawners
 Splitter
 spmc
 spsc
