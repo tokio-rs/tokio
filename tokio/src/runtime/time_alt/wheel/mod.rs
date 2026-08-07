@@ -235,6 +235,7 @@ fn level_for(elapsed: u64, when: u64) -> usize {
 
 #[cfg(all(test, not(loom)))]
 mod test {
+    use super::super::cancellation_queue;
     use super::*;
 
     #[test]
@@ -271,5 +272,181 @@ mod test {
                 }
             }
         }
+    }
+
+    #[must_use]
+    fn insert_entry(wheel: &mut Wheel, when: u64) -> EntryHandle {
+        let (cancel_tx, _cancel_rx) = cancellation_queue::new();
+        let hdl = EntryHandle::new(when);
+        unsafe { wheel.insert(hdl.clone(), cancel_tx) };
+        hdl
+    }
+
+    fn poll(wheel: &mut Wheel, now: u64) {
+        let mut wq = WakeQueue::new();
+        wheel.take_expired(now, &mut wq);
+    }
+
+    #[test]
+    fn test_next_expiration_to_level_4() {
+        let mut wheel = Wheel::new();
+
+        // that should occupy slot 1 of the level 4 of the wheel
+        let when = (1 << 24) + 10;
+
+        let _entry = insert_entry(&mut wheel, when);
+
+        let expiration = wheel.next_expiration_time();
+        // next expiration should be calculated as the start of the level 4 range
+        assert_eq!(expiration, Some(1 << 24));
+
+        // set the elapsed to the start of the previous expiration
+        poll(&mut wheel, 1 << 24);
+
+        let expiration = wheel.next_expiration_time();
+        // that should be equal of the LEVEL_WHEN which is 10 ms after previous expiration
+        assert_eq!(expiration, Some(when));
+
+        poll(&mut wheel, when);
+
+        assert!(wheel.next_expiration_time().is_none());
+    }
+
+    #[test]
+    fn test_next_expiration_to_level_5() {
+        let mut wheel = Wheel::new();
+
+        // that will occupy slot 1 of the level 5 of the wheel
+        let when = (1 << 30) + 10;
+        let _entry = insert_entry(&mut wheel, when);
+
+        let expiration = wheel.next_expiration_time();
+
+        assert_eq!(expiration, Some(1 << 30));
+
+        // set the elapsed to the start of the previous expiration
+        poll(&mut wheel, 1 << 30);
+
+        let expiration = wheel.next_expiration_time();
+
+        assert_eq!(expiration, Some((1 << 30) + 10));
+
+        poll(&mut wheel, when);
+
+        assert!(wheel.next_expiration_time().is_none());
+    }
+
+    #[test]
+    fn test_next_expiration_after_level_5() {
+        let mut wheel = Wheel::new();
+
+        // that will occupy slot 0 of the level 5 of the wheel
+        let when = (1 << 36) + 5;
+        let _entry = insert_entry(&mut wheel, when);
+
+        let expiration = wheel.next_expiration_time();
+
+        // that should come after the wheel
+        assert_eq!(expiration, Some(1 << 36));
+
+        // set the elapsed to the start of the previous expiration
+        poll(&mut wheel, 1 << 36);
+
+        let expiration = wheel.next_expiration_time();
+
+        assert_eq!(expiration, Some(when));
+
+        poll(&mut wheel, when);
+
+        assert!(wheel.next_expiration_time().is_none());
+    }
+
+    #[test]
+    fn test_next_expiration_after_level_5_twice() {
+        let mut wheel = Wheel::new();
+
+        // that will occupy slot 0 of the level 5 of the wheel
+        let when = (1 << 37) + 5;
+        let _entry = insert_entry(&mut wheel, when);
+
+        let expiration = wheel.next_expiration_time();
+
+        // that should come after the wheel
+        assert_eq!(expiration, Some(1 << 36));
+
+        // set the elapsed to the start of the previous expiration
+        poll(&mut wheel, 1 << 36);
+
+        let expiration = wheel.next_expiration_time();
+
+        assert_eq!(expiration, Some(1 << 37));
+
+        poll(&mut wheel, 1 << 37);
+
+        let expiration = wheel.next_expiration_time();
+
+        assert_eq!(expiration, Some(when));
+
+        poll(&mut wheel, when);
+
+        assert!(wheel.next_expiration_time().is_none());
+    }
+
+    #[test]
+    fn test_next_expiration_to_level_5_and_after_level_5() {
+        let mut wheel = Wheel::new();
+
+        // that will occupy slot 0 of the level 5 of the wheel
+        let when = (1 << 36) + 1;
+        let _entry = insert_entry(&mut wheel, when);
+
+        // that will occupy slot 1 of the level 5 of the wheel
+        let when = (1 << 30) + 10;
+        let _entry = insert_entry(&mut wheel, when);
+
+        let expiration = wheel.next_expiration_time();
+
+        // this should point to the expiration of the slot 1 entry
+        // and not the slot 0 that is higher than 2^36
+        assert_eq!(expiration, Some(1 << 30));
+
+        // set the elapsed to the start of the previous expiration
+        poll(&mut wheel, 1 << 30);
+
+        let expiration = wheel.next_expiration_time();
+
+        assert_eq!(expiration, Some((1 << 30) + 10));
+
+        poll(&mut wheel, when);
+
+        let expiration = wheel.next_expiration_time();
+
+        // The next expiration show refer the next loop of top level
+        assert_eq!(expiration, Some(1 << 36));
+    }
+
+    #[test]
+    fn test_next_expiration_at_slot_5_of_the_top_level() {
+        let mut wheel = Wheel::new();
+
+        // move the wheel into slot 5 of the top level
+        poll(&mut wheel, 5 << 30);
+
+        // that will occupy slot 5 of the level 5 of the wheel, the same slot the
+        // elapsed time sits in, so it is reachable only one rotation of the
+        // level later
+        let when = (1 << 36) + (5 << 30) + 1;
+        let _entry = insert_entry(&mut wheel, when);
+
+        // that will occupy slot 20 of the level 5 of the wheel, still ahead in
+        // the current rotation
+        let when = (20 << 30) + 10;
+        let _entry = insert_entry(&mut wheel, when);
+
+        let expiration = wheel.next_expiration_time();
+
+        // this should point to the start of the slot 20 and not to the slot 5
+        // that comes around only after the whole level rotates
+        assert_eq!(expiration, Some(20 << 30));
     }
 }
