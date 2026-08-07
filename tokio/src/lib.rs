@@ -444,6 +444,13 @@
 //! immediately instead of blocking forever. On platforms that don't support
 //! time, this means that the runtime can never be idle in any way.
 //!
+//! ### Emscripten support
+//!
+//! The `wasm32-unknown-emscripten` target supports the single-threaded runtime
+//! with the `rt`, `time`, `sync`, `macros`, `fs`, `io-util`, `io-std`, and
+//! `test-util` features. The `net`, `process`, `signal`, and `rt-multi-thread`
+//! features are not supported.
+//!
 //! ## Unstable `WASM` support
 //!
 //! Tokio also has unstable support for some additional `WASM` features. This
@@ -467,6 +474,7 @@ compile_error! {
 #[cfg(all(
     not(tokio_unstable),
     target_family = "wasm",
+    not(target_os = "emscripten"),
     any(
         feature = "fs",
         feature = "io-std",
@@ -477,6 +485,9 @@ compile_error! {
     )
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
+
+#[cfg(all(target_os = "emscripten", feature = "process"))]
+compile_error!("The `process` feature is not supported on wasm32-unknown-emscripten.");
 
 #[cfg(all(not(tokio_unstable), feature = "io-uring"))]
 compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");
