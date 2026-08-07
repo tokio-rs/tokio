@@ -1040,7 +1040,7 @@ impl Builder {
 
     fn num_head_bytes(&self) -> usize {
         let num = self.length_field_offset + self.length_field_len;
-        cmp::max(num, self.num_skip.unwrap_or(0))
+        cmp::max(num, self.num_skip.unwrap_or_default())
     }
 
     fn get_num_skip(&self) -> usize {

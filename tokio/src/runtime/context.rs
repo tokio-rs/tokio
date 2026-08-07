@@ -158,11 +158,11 @@ cfg_rt! {
     }
 
     pub(crate) fn set_current_task_id(id: Option<Id>) -> Option<Id> {
-        CONTEXT.try_with(|ctx| ctx.current_task_id.replace(id)).unwrap_or(None)
+        CONTEXT.try_with(|ctx| ctx.current_task_id.replace(id)).unwrap_or_default()
     }
 
     pub(crate) fn current_task_id() -> Option<Id> {
-        CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or(None)
+        CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or_default()
     }
 
     #[cfg(tokio_unstable)]

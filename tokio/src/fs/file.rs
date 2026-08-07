@@ -1053,7 +1053,7 @@ impl Inner {
         if driver_handle
             .check_and_init(io_uring::opcode::Read::CODE)
             .await
-            .unwrap_or(false)
+            .unwrap_or_default()
         {
             let fd: crate::io::uring::utils::ArcFd = std;
             Self::uring_read(fd, buf, max_buf_size).await
