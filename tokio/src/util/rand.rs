@@ -1,16 +1,17 @@
 cfg_rt! {
     mod rt;
     pub(crate) use rt::RngSeedGenerator;
-
-    cfg_unstable! {
-        mod rt_unstable;
-    }
 }
 
 /// A seed for random number generation.
 ///
 /// In order to make certain functions within a runtime deterministic, a seed
 /// can be specified at the time of creation.
+///
+/// The random number sequence generated from a given seed is **not**
+/// guaranteed to remain consistent across Tokio versions: The internal
+/// generator algorithm may change. A fixed seed makes a single program run
+/// reproducible but is not a stable interface across releases.
 #[allow(unreachable_pub)]
 #[derive(Clone, Debug)]
 pub struct RngSeed {
@@ -49,6 +50,32 @@ impl RngSeed {
             Self { s: 0, r: 1 }
         } else {
             Self { s, r }
+        }
+    }
+}
+
+cfg_rt! {
+    impl RngSeed {
+        /// Generates a seed from the provided byte slice.
+        ///
+        /// The bytes are hashed using [`std::hash::DefaultHasher`], whose
+        /// algorithm is unspecified and may change between Rust releases, so
+        /// the resulting seed is not guaranteed to be consistent across Rust
+        /// or Tokio version changes.
+        ///
+        /// # Example
+        ///
+        /// ```
+        /// # use tokio::runtime::RngSeed;
+        /// let seed = RngSeed::from_bytes(b"make me a seed");
+        /// ```
+        pub fn from_bytes(bytes: &[u8]) -> Self {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::Hasher;
+
+            let mut hasher = DefaultHasher::default();
+            hasher.write(bytes);
+            Self::from_u64(hasher.finish())
         }
     }
 }
