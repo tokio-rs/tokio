@@ -352,6 +352,37 @@ async fn reset_at_bigger_than_interval() {
     check_interval_poll!(i, start, 1701);
 }
 
+#[tokio::test(start_paused = true)]
+async fn interval_missed_tick_doesnt_panic_with_max_duration() {
+    // all behaviors should be able to handle Duration::MAX
+    for behavior in [
+        MissedTickBehavior::Delay,
+        MissedTickBehavior::Burst,
+        MissedTickBehavior::Skip,
+    ] {
+        for missed_tick_delay_duration in [
+            ms(300),
+            // a long time just less than `far_future` uses
+            Duration::from_secs(86400 * 365 * 29),
+            // a long time just more than `far_future` uses
+            Duration::from_secs(86400 * 365 * 31),
+        ] {
+            let mut long_interval = time::interval(Duration::MAX);
+            long_interval.set_missed_tick_behavior(behavior);
+
+            // cause a missed tick
+            time::advance(missed_tick_delay_duration).await;
+
+            tokio::select! {
+                // when the missed tick overflow bug exists, this will panic in missed tick logic
+                _ = long_interval.tick() => {}
+                // if no bug, the above branch will wait forever, but this will let the test pass
+                _ = time::sleep(Duration::from_millis(10)) => {}
+            }
+        }
+    }
+}
+
 fn poll_next(interval: &mut task::Spawn<time::Interval>) -> Poll<Instant> {
     interval.enter(|cx, mut interval| interval.poll_tick(cx))
 }
