@@ -1,9 +1,9 @@
 use crate::loom::cell::UnsafeCell;
-use crate::loom::future::AtomicWaker;
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::Arc;
 use crate::runtime::park::CachedParkThread;
 use crate::sync::mpsc::error::TryRecvError;
+use crate::sync::mpsc::waker::SpmcWaker;
 use crate::sync::mpsc::{bounded, list, unbounded};
 use crate::sync::notify::Notify;
 use crate::util::cacheline::CachePadded;
@@ -54,7 +54,7 @@ pub(super) struct Chan<T, S> {
     tx: CachePadded<list::Tx<T>>,
 
     /// Receiver waker. Notified when a value is pushed into the channel.
-    rx_waker: CachePadded<AtomicWaker>,
+    rx_waker: SpmcWaker,
 
     /// Notifies all tasks listening for the receiver being dropped.
     notify_rx_closed: Notify,
@@ -82,7 +82,7 @@ where
         fmt.debug_struct("Chan")
             .field("tx", &*self.tx)
             .field("semaphore", &self.semaphore)
-            .field("rx_waker", &*self.rx_waker)
+            .field("rx_waker", &self.rx_waker)
             .field("tx_count", &self.tx_count)
             .field("rx_fields", &"...")
             .finish()
@@ -119,7 +119,7 @@ pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
         notify_rx_closed: Notify::new(),
         tx: CachePadded::new(tx),
         semaphore,
-        rx_waker: CachePadded::new(AtomicWaker::new()),
+        rx_waker: SpmcWaker::new(),
         tx_count: AtomicUsize::new(1),
         tx_weak_count: AtomicUsize::new(0),
         rx_fields: UnsafeCell::new(RxFields {
@@ -298,9 +298,14 @@ impl<T, S: Semaphore> Rx<T, S> {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
 
             macro_rules! try_recv {
-                () => {
-                    match rx_fields.list.pop(&self.inner.tx) {
+                ($registered:expr) => {
+                    match rx_fields.list.pop(&self.inner.tx, $registered) {
                         Some(Read::Value(value)) => {
+                            if $registered {
+                                // SAFETY: mutable reference on Rx ensures
+                                // no concurrent (un)registration.
+                                unsafe { self.inner.rx_waker.unregister() };
+                            }
                             self.inner.semaphore.add_permit();
                             coop.made_progress();
                             return Ready(Some(value));
@@ -319,19 +324,27 @@ impl<T, S: Semaphore> Rx<T, S> {
                 };
             }
 
-            try_recv!();
+            try_recv!(false);
 
-            self.inner.rx_waker.register_by_ref(cx.waker());
+            // SAFETY: mutable reference on Rx ensures no concurrent (un)registration.
+            let registered = unsafe { self.inner.rx_waker.try_register(cx.waker()) };
 
             // It is possible that a value was pushed between attempting to read
             // and registering the task, so we have to check the channel a
             // second time here.
-            try_recv!();
+            try_recv!(registered);
 
             if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
                 coop.made_progress();
                 Ready(None)
             } else {
+                // Waker registration failed, the task must be rescheduled to retry.
+                if !registered {
+                    cx.waker().wake_by_ref();
+                    // This is equivalent to a spin loop, so loom need a spin hint.
+                    #[cfg(loom)]
+                    crate::loom::hint::spin_loop();
+                }
                 Pending
             }
         })
@@ -365,10 +378,19 @@ impl<T, S: Semaphore> Rx<T, S> {
         self.inner.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
             macro_rules! try_recv {
-                () => {
+                ($registered:expr) => {
+                    let mut registered = $registered;
                     while remaining > 0 {
-                        match rx_fields.list.pop(&self.inner.tx) {
+                        match rx_fields.list.pop(&self.inner.tx, registered) {
                             Some(Read::Value(value)) => {
+                                if registered {
+                                    if $registered {
+                                        // SAFETY: mutable reference on Rx ensures
+                                        // no concurrent (un)registration.
+                                        unsafe { self.inner.rx_waker.unregister() };
+                                    }
+                                    registered = false;
+                                }
                                 remaining -= 1;
                                 buffer.push(value);
                             }
@@ -401,20 +423,28 @@ impl<T, S: Semaphore> Rx<T, S> {
                 };
             }
 
-            try_recv!();
+            try_recv!(false);
 
-            self.inner.rx_waker.register_by_ref(cx.waker());
+            // SAFETY: mutable reference on Rx ensures no concurrent (un)registration.
+            let registered = unsafe { self.inner.rx_waker.try_register(cx.waker()) };
 
             // It is possible that a value was pushed between attempting to read
             // and registering the task, so we have to check the channel a
             // second time here.
-            try_recv!();
+            try_recv!(registered);
 
             if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
                 debug_assert_eq!(buffer.len(), initial_length);
                 coop.made_progress();
                 Ready(0usize)
             } else {
+                // Waker registration failed, the task must be rescheduled to retry.
+                if !registered {
+                    cx.waker().wake_by_ref();
+                    // This is equivalent to a spin loop, so loom need a spin hint.
+                    #[cfg(loom)]
+                    crate::loom::hint::spin_loop();
+                }
                 Pending
             }
         })
@@ -428,9 +458,14 @@ impl<T, S: Semaphore> Rx<T, S> {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
 
             macro_rules! try_recv {
-                () => {
-                    match rx_fields.list.try_pop(&self.inner.tx) {
+                ($registered:expr) => {
+                    match rx_fields.list.try_pop(&self.inner.tx, $registered) {
                         TryPopResult::Ok(value) => {
+                            if $registered {
+                                // SAFETY: mutable reference on Rx ensures
+                                // no concurrent (un)registration.
+                                unsafe { self.inner.rx_waker.unregister() };
+                            }
                             self.inner.semaphore.add_permit();
                             return Ok(value);
                         }
@@ -447,26 +482,22 @@ impl<T, S: Semaphore> Rx<T, S> {
                 };
             }
 
-            try_recv!();
-
-            // If a previous `poll_recv` call has set a waker, we wake it here.
-            // This allows us to put our own CachedParkThread waker in the
-            // AtomicWaker slot instead.
-            //
-            // This is not a spurious wakeup to `poll_recv` since we just got a
-            // Busy from `try_pop`, which only happens if there are messages in
-            // the queue.
-            self.inner.rx_waker.wake();
+            try_recv!(false);
 
             // Park the thread until the problematic send has completed.
             let mut park = CachedParkThread::new();
             let waker = park.waker().unwrap();
             loop {
-                self.inner.rx_waker.register_by_ref(&waker);
+                // SAFETY: mutable reference on Rx ensures no concurrent (un)registration.
+                let registered = unsafe { self.inner.rx_waker.try_register(&waker) };
                 // It is possible that the problematic send has now completed,
                 // so we have to check for messages again.
-                try_recv!();
-                park.park();
+                try_recv!(registered);
+                if registered {
+                    park.park();
+                } else {
+                    crate::loom::hint::spin_loop();
+                }
             }
         })
     }
@@ -501,7 +532,7 @@ impl<T, S: Semaphore> Drop for Rx<T, S> {
             impl<'a, T, S: Semaphore> Guard<'a, T, S> {
                 fn drain(&mut self) {
                     // call T's destructor.
-                    while let Some(Value(_)) = self.list.pop(self.tx) {
+                    while let Some(Value(_)) = self.list.pop(self.tx, false) {
                         self.sem.add_permit();
                     }
                 }
@@ -522,7 +553,8 @@ impl<T, S: Semaphore> Drop for Rx<T, S> {
             // When Rx is dropped, there is nothing for a task to poll anymore.
             // This means we can drop our waker to potentially free up resources.
             // Do so before draining the channel where panics may occur.
-            self.inner.rx_waker.take_waker();
+            // SAFETY: mutable reference on Rx ensures no concurrent (un)registration.
+            unsafe { self.inner.rx_waker.unregister() };
 
             guard.drain();
         });
@@ -566,7 +598,7 @@ impl<T, S> Drop for Chan<T, S> {
         self.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
 
-            while let Some(Value(_)) = rx_fields.list.pop(&self.tx) {}
+            while let Some(Value(_)) = rx_fields.list.pop(&self.tx, false) {}
             unsafe { rx_fields.list.free_blocks() };
         });
     }

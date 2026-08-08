@@ -317,7 +317,7 @@ impl<T> Rx<T> {
     }
 
     /// Pops the next value off the queue.
-    pub(crate) fn pop(&mut self, tx: &Tx<T>) -> Option<block::Read<T>> {
+    pub(crate) fn pop(&mut self, tx: &Tx<T>, waker_registered: bool) -> Option<block::Read<T>> {
         // Advance `head`, if needed
         if !self.try_advancing_head() {
             return None;
@@ -328,7 +328,7 @@ impl<T> Rx<T> {
         unsafe {
             let block = self.head.as_ref();
 
-            let ret = block.read(self.index);
+            let ret = block.read(self.index, waker_registered);
 
             if let Some(block::Read::Value(..)) = ret {
                 self.index = self.index.wrapping_add(1);
@@ -346,9 +346,9 @@ impl<T> Rx<T> {
     /// This can happen if the fully delivered message is behind another message
     /// that is in the middle of being written to the block, since the channel
     /// can't return the messages out of order.
-    pub(crate) fn try_pop(&mut self, tx: &Tx<T>) -> TryPopResult<T> {
+    pub(crate) fn try_pop(&mut self, tx: &Tx<T>, waker_registered: bool) -> TryPopResult<T> {
         let tail_position = tx.tail_position.load(Acquire);
-        let result = self.pop(tx);
+        let result = self.pop(tx, waker_registered);
 
         match result {
             Some(block::Read::Value(t)) => TryPopResult::Ok(t),
