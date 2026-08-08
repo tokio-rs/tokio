@@ -482,8 +482,12 @@ impl TimerEntry {
         let tick = self.driver().time_source().deadline_to_tick(deadline);
 
         unsafe {
-            self.driver()
-                .reregister(&self.driver.driver().io, tick, (&self.inner).into());
+            self.driver().reregister(
+                &self.driver.driver().io,
+                tick,
+                (&self.inner).into(),
+                self.driver.is_current_thread(),
+            );
         }
     }
 
@@ -527,8 +531,12 @@ impl TimerEntry {
         }
 
         unsafe {
-            self.driver()
-                .reregister(&self.driver.driver().io, tick, (&self.inner).into());
+            self.driver().reregister(
+                &self.driver.driver().io,
+                tick,
+                (&self.inner).into(),
+                self.driver.is_current_thread(),
+            );
         }
     }
 
