@@ -744,15 +744,22 @@ impl AsyncWrite for File {
                     let mut buf = buf_cell.take().unwrap();
 
                     let seek = if !buf.is_empty() {
-                        Some(SeekFrom::Current(buf.discard_read()))
+                        Some(SeekFrom::Current(-(buf.bytes().len() as i64)))
                     } else {
                         None
                     };
 
-                    let n = buf.copy_from(src, me.max_buf_size);
+                    let mut write_buf = Buf::with_capacity(0);
+                    if seek.is_none() {
+                        std::mem::swap(&mut buf, &mut write_buf);
+                    }
+
+                    let n = write_buf.copy_from(src, me.max_buf_size);
                     let std = me.std.clone();
 
-                    let blocking_task_join_handle = spawn_mandatory_blocking(move || {
+                    let blocking_task_join_handle = match spawn_mandatory_blocking(move || {
+                        let mut buf = write_buf;
+
                         let res = if let Some(seek) = seek {
                             (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
                         } else {
@@ -760,10 +767,16 @@ impl AsyncWrite for File {
                         };
 
                         (Operation::Write(res), buf)
-                    })
-                    .ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::Other, "background task failed")
-                    })?;
+                    }) {
+                        Some(join_handle) => join_handle,
+                        None => {
+                            inner.state = State::Idle(Some(buf));
+                            return Poll::Ready(Err(io::Error::new(
+                                io::ErrorKind::Other,
+                                "background task failed",
+                            )));
+                        }
+                    };
 
                     inner.state = State::Busy(blocking_task_join_handle);
 
@@ -815,15 +828,22 @@ impl AsyncWrite for File {
                     let mut buf = buf_cell.take().unwrap();
 
                     let seek = if !buf.is_empty() {
-                        Some(SeekFrom::Current(buf.discard_read()))
+                        Some(SeekFrom::Current(-(buf.bytes().len() as i64)))
                     } else {
                         None
                     };
 
-                    let n = buf.copy_from_bufs(bufs, me.max_buf_size);
+                    let mut write_buf = Buf::with_capacity(0);
+                    if seek.is_none() {
+                        std::mem::swap(&mut buf, &mut write_buf);
+                    }
+
+                    let n = write_buf.copy_from_bufs(bufs, me.max_buf_size);
                     let std = me.std.clone();
 
-                    let blocking_task_join_handle = spawn_mandatory_blocking(move || {
+                    let blocking_task_join_handle = match spawn_mandatory_blocking(move || {
+                        let mut buf = write_buf;
+
                         let res = if let Some(seek) = seek {
                             (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
                         } else {
@@ -831,10 +851,16 @@ impl AsyncWrite for File {
                         };
 
                         (Operation::Write(res), buf)
-                    })
-                    .ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::Other, "background task failed")
-                    })?;
+                    }) {
+                        Some(join_handle) => join_handle,
+                        None => {
+                            inner.state = State::Idle(Some(buf));
+                            return Poll::Ready(Err(io::Error::new(
+                                io::ErrorKind::Other,
+                                "background task failed",
+                            )));
+                        }
+                    };
 
                     inner.state = State::Busy(blocking_task_join_handle);
 
