@@ -627,8 +627,8 @@ impl Encoder<Bytes> for LengthDelimitedCodec {
         })?;
 
         // Reserve capacity in the destination buffer to fit the frame and
-        // length field (plus adjustment).
-        dst.reserve(self.builder.length_field_len + n);
+        // length field.
+        dst.reserve(self.builder.length_field_len + data.len());
 
         if self.builder.length_field_is_big_endian {
             dst.put_uint(n as u64, self.builder.length_field_len);
