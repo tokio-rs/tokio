@@ -45,6 +45,11 @@ use std::sync::Arc;
 /// [`TryAcquireError::Closed`]), along with the [`available_permits`] and
 /// [`is_closed`] methods, behave like an `Acquire` load.
 ///
+/// Note: Calling `wake` on wakers happens after changing the state of the
+/// semaphore in a non-atomic manner. This means that a task that is woken
+/// may observe the state change, but another concurrent task may not yet
+/// see it.
+///
 /// [`acquire`]: Semaphore::acquire
 /// [`acquire_many`]: Semaphore::acquire_many
 /// [`try_acquire`]: Semaphore::try_acquire
