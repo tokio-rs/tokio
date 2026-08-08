@@ -71,6 +71,7 @@ struct Inner {
     waiting: Option<Instant>,
     sleep: Option<Pin<Box<Sleep>>>,
     read_wait: Option<Waker>,
+    write_wait: Option<Waker>,
     rx: UnboundedReceiverStream<Action>,
     name: String,
 }
@@ -201,6 +202,7 @@ impl Inner {
             actions,
             sleep: None,
             read_wait: None,
+            write_wait: None,
             rx,
             waiting: None,
             name,
@@ -246,8 +248,9 @@ impl Inner {
     fn write(&mut self, mut src: &[u8]) -> io::Result<usize> {
         let mut ret = 0;
 
+        // Empty queue: let poll_write pull from the handle or panic if closed.
         if self.actions.is_empty() {
-            return Err(io::ErrorKind::BrokenPipe.into());
+            return Ok(0);
         }
 
         if let Some(&mut Action::Wait(..)) = self.action() {
@@ -287,6 +290,14 @@ impl Inner {
         }
 
         Ok(ret)
+    }
+
+    fn has_write_side_action(&self) -> bool {
+        self.actions.iter().any(|action| match action {
+            Action::Write(data) => !data.is_empty(),
+            Action::WriteError(Some(_)) | Action::Wait(_) => true,
+            _ => false,
+        })
     }
 
     fn remaining_wait(&mut self) -> Option<Duration> {
@@ -354,6 +365,28 @@ impl Mock {
             _ => {}
         }
     }
+
+    fn maybe_wakeup_writer(&mut self) {
+        if let Some(waker) = self.inner.write_wait.take() {
+            waker.wake();
+        }
+    }
+
+    /// Pull the next handle action when the current queue has no matching Write.
+    ///
+    /// See <https://github.com/tokio-rs/tokio/issues/8329>.
+    fn poll_next_action_for_write(&mut self, cx: &mut task::Context<'_>) -> Poll<()> {
+        match self.inner.poll_action(cx) {
+            Poll::Ready(Some(action)) => {
+                self.inner.actions.push_back(action);
+                Poll::Ready(())
+            }
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(None) => {
+                panic!("unexpected write {}", self.pmsg());
+            }
+        }
+    }
 }
 
 impl AsyncRead for Mock {
@@ -391,14 +424,19 @@ impl AsyncRead for Mock {
                                 continue;
                             }
                             None => {
+                                self.maybe_wakeup_writer();
                                 return Poll::Ready(Ok(()));
                             }
                         }
                     } else {
+                        self.maybe_wakeup_writer();
                         return Poll::Ready(Ok(()));
                     }
                 }
-                Err(e) => return Poll::Ready(Err(e)),
+                Err(e) => {
+                    self.maybe_wakeup_writer();
+                    return Poll::Ready(Err(e));
+                }
             }
         }
     }
@@ -410,6 +448,11 @@ impl AsyncWrite for Mock {
         cx: &mut task::Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
+        // Empty writes must not go through the "no matching Write" path.
+        if buf.is_empty() {
+            return Poll::Ready(Ok(0));
+        }
+
         loop {
             if let Some(ref mut sleep) = self.inner.sleep {
                 ready!(Pin::new(sleep).poll(cx));
@@ -417,20 +460,6 @@ impl AsyncWrite for Mock {
 
             // If a sleep is set, it has already fired
             self.inner.sleep = None;
-
-            if self.inner.actions.is_empty() {
-                match self.inner.poll_action(cx) {
-                    Poll::Pending => {
-                        // do not propagate pending
-                    }
-                    Poll::Ready(Some(action)) => {
-                        self.inner.actions.push_back(action);
-                    }
-                    Poll::Ready(None) => {
-                        panic!("unexpected write {}", self.pmsg());
-                    }
-                }
-            }
 
             match self.inner.write(buf) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -465,21 +494,16 @@ impl AsyncWrite for Mock {
                     }
                 }
                 Ok(0) => {
-                    // TODO: Is this correct?
-                    if !self.inner.actions.is_empty() {
+                    // A later Write/WriteError/Wait is blocked behind Read(s).
+                    // Park until a read makes progress; do not treat this as an
+                    // unexpected write.
+                    if self.inner.has_write_side_action() {
+                        self.inner.write_wait = Some(cx.waker().clone());
                         return Poll::Pending;
                     }
 
-                    // TODO: Extract
-                    match ready!(self.inner.poll_action(cx)) {
-                        Some(action) => {
-                            self.inner.actions.push_back(action);
-                            continue;
-                        }
-                        None => {
-                            panic!("unexpected write {}", self.pmsg());
-                        }
-                    }
+                    ready!(self.poll_next_action_for_write(cx));
+                    continue;
                 }
                 ret => {
                     self.maybe_wakeup_reader();
