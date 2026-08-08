@@ -255,6 +255,19 @@ impl Driver {
         handle.process(rt_handle.clock());
     }
 
+    /// Caps the actual OS sleep on Windows: relative waits do not elapse
+    /// while the system is suspended, while `Instant` deadlines do, so an
+    /// uncapped sleep can miss a deadline by up to the suspend duration.
+    /// Only applies to real sleeps, never to paused-clock auto-advance.
+    fn cap_park_duration(duration: Duration) -> Duration {
+        if cfg!(windows) {
+            const MAX_PARK_DURATION: Duration = Duration::from_secs(1);
+            std::cmp::min(duration, MAX_PARK_DURATION)
+        } else {
+            duration
+        }
+    }
+
     cfg_test_util! {
         fn park_thread_timeout(&mut self, rt_handle: &driver::Handle, duration: Duration) {
             let handle = rt_handle.time();
@@ -274,14 +287,14 @@ impl Driver {
                     }
                 }
             } else {
-                self.park.park_timeout(rt_handle, duration);
+                self.park.park_timeout(rt_handle, Self::cap_park_duration(duration));
             }
         }
     }
 
     cfg_not_test_util! {
         fn park_thread_timeout(&mut self, rt_handle: &driver::Handle, duration: Duration) {
-            self.park.park_timeout(rt_handle, duration);
+            self.park.park_timeout(rt_handle, Self::cap_park_duration(duration));
         }
     }
 }
