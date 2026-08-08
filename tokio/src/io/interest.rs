@@ -1,7 +1,5 @@
 #![cfg_attr(not(feature = "net"), allow(dead_code, unreachable_pub))]
 
-use crate::io::ready::Ready;
-
 use std::fmt;
 use std::ops;
 
@@ -241,7 +239,7 @@ impl Interest {
             // There is no error interest in mio, because error events are always reported.
             // But mio interests cannot be empty and an interest is needed just for the registration.
             //
-            // read readiness is filtered out in `Interest::mask` or `Ready::from_interest` if
+            // read readiness is filtered out in `Ready::from_interest` if
             // the read interest was not specified by the user.
             mio_add(&mut mio, mio::Interest::READABLE);
         }
@@ -253,17 +251,6 @@ impl Interest {
         //
         // in both cases, `mio` is Some already
         mio.unwrap_or(mio::Interest::READABLE)
-    }
-
-    pub(crate) fn mask(self) -> Ready {
-        match self {
-            Interest::READABLE => Ready::READABLE | Ready::READ_CLOSED,
-            Interest::WRITABLE => Ready::WRITABLE | Ready::WRITE_CLOSED,
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            Interest::PRIORITY => Ready::PRIORITY | Ready::READ_CLOSED,
-            Interest::ERROR => Ready::ERROR,
-            _ => Ready::EMPTY,
-        }
     }
 }
 
