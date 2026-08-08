@@ -420,9 +420,7 @@ impl AsyncWrite for Mock {
 
             if self.inner.actions.is_empty() {
                 match self.inner.poll_action(cx) {
-                    Poll::Pending => {
-                        // do not propagate pending
-                    }
+                    Poll::Pending => return Poll::Pending,
                     Poll::Ready(Some(action)) => {
                         self.inner.actions.push_back(action);
                     }
