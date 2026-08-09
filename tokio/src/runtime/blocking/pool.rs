@@ -3,6 +3,7 @@
 use crate::loom::sync::{Arc, Condvar, Mutex};
 use crate::loom::thread;
 use crate::runtime::blocking::schedule::BlockingSchedule;
+use crate::runtime::blocking::sharded::ShardedImpl;
 use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
@@ -34,11 +35,11 @@ pub(crate) struct SpawnerMetrics {
 }
 
 impl SpawnerMetrics {
-    fn num_threads(&self) -> usize {
+    pub(super) fn num_threads(&self) -> usize {
         self.num_threads.load(Ordering::Relaxed)
     }
 
-    fn num_idle_threads(&self) -> usize {
+    pub(super) fn num_idle_threads(&self) -> usize {
         self.num_idle_threads.load(Ordering::Relaxed)
     }
 
@@ -52,23 +53,23 @@ impl SpawnerMetrics {
         self.num_threads.increment();
     }
 
-    fn dec_num_threads(&self) {
+    pub(super) fn dec_num_threads(&self) {
         self.num_threads.decrement();
     }
 
-    fn inc_num_idle_threads(&self) {
+    pub(super) fn inc_num_idle_threads(&self) {
         self.num_idle_threads.increment();
     }
 
-    fn dec_num_idle_threads(&self) -> usize {
+    pub(super) fn dec_num_idle_threads(&self) -> usize {
         self.num_idle_threads.decrement()
     }
 
-    fn inc_queue_depth(&self) {
+    pub(super) fn inc_queue_depth(&self) {
         self.queue_depth.increment();
     }
 
-    fn dec_queue_depth(&self) {
+    pub(super) fn dec_queue_depth(&self) {
         self.queue_depth.decrement();
     }
 }
@@ -102,6 +103,7 @@ struct Inner {
 /// Per-variant queue + notification + lock topology.
 enum InnerImpl {
     Locked(LockedImpl),
+    Sharded(ShardedImpl),
 }
 
 /// Single-mutex + condvar implementation.
@@ -121,27 +123,56 @@ struct LockedInner {
 /// State handed back from `InnerImpl::begin_shutdown` to the caller so it
 /// can join the worker threads after the wait completes: an optional
 /// previously-timed-out worker, plus the map of currently-running workers.
-type ShutdownHandles = (
+pub(super) type ShutdownHandles = (
     Option<thread::JoinHandle<()>>,
     HashMap<usize, thread::JoinHandle<()>>,
 );
 
 /// Thread-management state used by every `InnerImpl` variant.
-struct ThreadManagementState {
-    shutdown: bool,
-    shutdown_tx: Option<shutdown::Sender>,
+pub(super) struct ThreadManagementState {
+    pub(super) shutdown: bool,
+    pub(super) shutdown_tx: Option<shutdown::Sender>,
     /// Prior to shutdown, we clean up `JoinHandles` by having each timed-out
     /// thread join on the previous timed-out thread. This is not strictly
     /// necessary but helps avoid Valgrind false positives, see
     /// <https://github.com/tokio-rs/tokio/commit/646fbae76535e397ef79dbcaacb945d4c829f666>
     /// for more information.
-    last_exiting_thread: Option<thread::JoinHandle<()>>,
+    pub(super) last_exiting_thread: Option<thread::JoinHandle<()>>,
     /// This holds the `JoinHandles` for all running threads; on shutdown, the thread
     /// calling shutdown handles joining on these.
-    worker_threads: HashMap<usize, thread::JoinHandle<()>>,
+    pub(super) worker_threads: HashMap<usize, thread::JoinHandle<()>>,
     /// This is a counter used to iterate `worker_threads` in a consistent order (for loom's
     /// benefit).
-    worker_thread_index: usize,
+    pub(super) worker_thread_index: usize,
+}
+
+impl ThreadManagementState {
+    /// Flag the pool as shutting down and hand back the worker `JoinHandle`s
+    /// to join. Returns `None` if shutdown has already begun. The caller is
+    /// responsible for waking all waiting workers.
+    pub(super) fn begin_shutdown(&mut self) -> Option<ShutdownHandles> {
+        if self.shutdown {
+            return None;
+        }
+        self.shutdown = true;
+        self.shutdown_tx = None;
+
+        let last_exited_thread = std::mem::take(&mut self.last_exiting_thread);
+        let workers = std::mem::take(&mut self.worker_threads);
+        Some((last_exited_thread, workers))
+    }
+
+    /// Bookkeeping for a worker exiting on its keep-alive timeout: leaves
+    /// its own handle for the next timed-out worker (or shutdown) to join,
+    /// and returns the previous timed-out thread's handle, which the caller
+    /// must join after releasing the lock.
+    pub(super) fn worker_timed_out(
+        &mut self,
+        worker_thread_id: usize,
+    ) -> Option<thread::JoinHandle<()>> {
+        let my_handle = self.worker_threads.remove(&worker_thread_id);
+        std::mem::replace(&mut self.last_exiting_thread, my_handle)
+    }
 }
 
 pub(crate) struct Task {
@@ -180,11 +211,15 @@ impl Task {
         Task { task, mandatory }
     }
 
-    fn run(self) {
+    pub(super) fn shutdown(self) {
+        self.task.shutdown();
+    }
+
+    pub(super) fn run(self) {
         self.task.run();
     }
 
-    fn shutdown_or_run_if_mandatory(self) {
+    pub(super) fn shutdown_or_run_if_mandatory(self) {
         match self.mandatory {
             Mandatory::NonMandatory => self.task.shutdown(),
             Mandatory::Mandatory => self.task.run(),
@@ -234,23 +269,24 @@ impl BlockingPool {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
         let keep_alive = builder.keep_alive.unwrap_or(KEEP_ALIVE);
 
+        let thread_mgmt_state = ThreadManagementState {
+            shutdown: false,
+            shutdown_tx: Some(shutdown_tx),
+            last_exiting_thread: None,
+            worker_threads: HashMap::new(),
+            worker_thread_index: 0,
+        };
+
+        let inner_impl = if builder.sharded_blocking_queue {
+            InnerImpl::Sharded(ShardedImpl::new(thread_mgmt_state))
+        } else {
+            InnerImpl::Locked(LockedImpl::new(thread_mgmt_state))
+        };
+
         BlockingPool {
             spawner: Spawner {
                 inner: Arc::new(Inner {
-                    inner_impl: InnerImpl::Locked(LockedImpl {
-                        mutex: Mutex::new(LockedInner {
-                            queue: VecDeque::new(),
-                            num_notify: 0,
-                            thread_mgmt_state: ThreadManagementState {
-                                shutdown: false,
-                                shutdown_tx: Some(shutdown_tx),
-                                last_exiting_thread: None,
-                                worker_threads: HashMap::new(),
-                                worker_thread_index: 0,
-                            },
-                        }),
-                        condvar: Condvar::new(),
-                    }),
+                    inner_impl,
                     thread_name: builder.thread_name.clone(),
                     stack_size: builder.thread_stack_size,
                     after_start: builder.after_start.clone(),
@@ -272,7 +308,8 @@ impl BlockingPool {
         // The function can be called multiple times. First, by explicitly
         // calling `shutdown` then by the drop handler calling `shutdown`. This
         // prevents shutting down twice.
-        let (last_exited_thread, workers) = match self.spawner.inner.inner_impl.begin_shutdown() {
+        let inner = &self.spawner.inner;
+        let (last_exited_thread, workers) = match inner.inner_impl.begin_shutdown(&inner.metrics) {
             Some(x) => x,
             None => return,
         };
@@ -509,6 +546,7 @@ impl InnerImpl {
     {
         match self {
             InnerImpl::Locked(l) => l.spawn_task(task, metrics, on_no_idle),
+            InnerImpl::Sharded(s) => s.spawn_task(task, metrics, on_no_idle),
         }
     }
 
@@ -520,12 +558,14 @@ impl InnerImpl {
     ) -> Option<thread::JoinHandle<()>> {
         match self {
             InnerImpl::Locked(l) => l.run_worker(metrics, keep_alive, worker_thread_id),
+            InnerImpl::Sharded(s) => s.run_worker(metrics, keep_alive, worker_thread_id),
         }
     }
 
-    fn begin_shutdown(&self) -> Option<ShutdownHandles> {
+    fn begin_shutdown(&self, metrics: &SpawnerMetrics) -> Option<ShutdownHandles> {
         match self {
             InnerImpl::Locked(l) => l.begin_shutdown(),
+            InnerImpl::Sharded(s) => s.begin_shutdown(metrics),
         }
     }
 }
@@ -535,6 +575,17 @@ impl InnerImpl {
 // code was refactored to enable adding a sharded queue implementation, this
 // was self-evidently behaviorally identical to the original implementation.
 impl LockedImpl {
+    fn new(thread_mgmt_state: ThreadManagementState) -> LockedImpl {
+        LockedImpl {
+            mutex: Mutex::new(LockedInner {
+                queue: VecDeque::new(),
+                num_notify: 0,
+                thread_mgmt_state,
+            }),
+            condvar: Condvar::new(),
+        }
+    }
+
     /// Push a task and either notify an idle worker or invoke
     /// `on_no_idle` (which is responsible for spawning a new worker if
     /// possible).
@@ -625,19 +676,7 @@ impl LockedImpl {
                 // entering the shutdown phase, we want to perform
                 // the cleanup logic.
                 if !locked.thread_mgmt_state.shutdown && timeout_result.timed_out() {
-                    // We'll join the prior timed-out thread's
-                    // JoinHandle after dropping the lock. This
-                    // isn't done when shutting down, because the
-                    // thread calling shutdown will handle joining
-                    // everything.
-                    let my_handle = locked
-                        .thread_mgmt_state
-                        .worker_threads
-                        .remove(&worker_thread_id);
-                    join_on_thread = std::mem::replace(
-                        &mut locked.thread_mgmt_state.last_exiting_thread,
-                        my_handle,
-                    );
+                    join_on_thread = locked.thread_mgmt_state.worker_timed_out(worker_thread_id);
 
                     break 'main;
                 }
@@ -689,16 +728,9 @@ impl LockedImpl {
     /// `JoinHandle`s for the caller to join.
     fn begin_shutdown(&self) -> Option<ShutdownHandles> {
         let mut locked = self.mutex.lock();
-        if locked.thread_mgmt_state.shutdown {
-            return None;
-        }
-        locked.thread_mgmt_state.shutdown = true;
-        locked.thread_mgmt_state.shutdown_tx = None;
+        let handles = locked.thread_mgmt_state.begin_shutdown()?;
         self.condvar.notify_all();
-
-        let last_exited_thread = std::mem::take(&mut locked.thread_mgmt_state.last_exiting_thread);
-        let workers = std::mem::take(&mut locked.thread_mgmt_state.worker_threads);
-        Some((last_exited_thread, workers))
+        Some(handles)
     }
 }
 
