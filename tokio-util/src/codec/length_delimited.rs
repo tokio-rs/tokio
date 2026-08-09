@@ -493,8 +493,12 @@ impl LengthDelimitedCodec {
     /// words, if a frame is currently in process of being decoded with a frame
     /// size greater than `val` but less than the max frame length in effect
     /// before calling this function, then the frame will be allowed.
+    ///
+    /// If `val` is larger than what the length field can represent, it is
+    /// clipped to the maximum representable value.
     pub fn set_max_frame_length(&mut self, val: usize) {
         self.builder.max_frame_length(val);
+        self.builder.adjust_max_frame_len();
     }
 
     fn decode_head(&mut self, src: &mut BytesMut) -> io::Result<Option<usize>> {
@@ -1049,16 +1053,25 @@ impl Builder {
     }
 
     fn adjust_max_frame_len(&mut self) {
-        // Calculate the maximum number that can be represented using `length_field_len` bytes.
-        let max_number = match 1u64.checked_shl((8 * self.length_field_len) as u32) {
+        let max_allowed_len = self.max_allowed_frame_len();
+
+        if self.max_frame_len > max_allowed_len {
+            self.max_frame_len = max_allowed_len;
+        }
+    }
+
+    fn max_allowed_frame_len(&self) -> usize {
+        let max_allowed_len = self
+            .max_length_field_value()
+            .saturating_add_signed(self.length_adjustment as i64);
+
+        usize::try_from(max_allowed_len).unwrap_or(usize::MAX)
+    }
+
+    fn max_length_field_value(&self) -> u64 {
+        match 1u64.checked_shl((8 * self.length_field_len) as u32) {
             Some(shl) => shl - 1,
             None => u64::MAX,
-        };
-
-        let max_allowed_len = max_number.saturating_add_signed(self.length_adjustment as i64);
-
-        if self.max_frame_len as u64 > max_allowed_len {
-            self.max_frame_len = usize::try_from(max_allowed_len).unwrap_or(usize::MAX);
         }
     }
 }
