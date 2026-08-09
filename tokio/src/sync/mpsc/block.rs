@@ -149,10 +149,17 @@ impl<T> Block<T> {
     /// To maintain safety, the caller must ensure:
     ///
     /// * No concurrent access to the slot.
-    pub(crate) unsafe fn read(&self, slot_index: usize) -> Option<Read<T>> {
+    pub(crate) unsafe fn read(&self, slot_index: usize, waker_registered: bool) -> Option<Read<T>> {
         let offset = offset(slot_index);
 
-        let ready_bits = self.header.ready_slots.load(Acquire);
+        // If a waker is registered, `read` must synchronize with `is_ready`
+        // so the registered waker becomes visible for the waking thread.
+        // Synchronization is done with an AcqRel RMW.
+        let ready_bits = if waker_registered {
+            self.header.ready_slots.fetch_add(0, AcqRel)
+        } else {
+            self.header.ready_slots.load(Acquire)
+        };
 
         if !is_ready(ready_bits, offset) {
             if is_tx_closed(ready_bits) {
@@ -217,7 +224,8 @@ impl<T> Block<T> {
 
     /// Signal to the receiver that the sender half of the list is closed.
     pub(crate) unsafe fn tx_close(&self) {
-        self.header.ready_slots.fetch_or(TX_CLOSED, Release);
+        // Use AcqRel ordering for the same reason as `set_ready`.
+        self.header.ready_slots.fetch_or(TX_CLOSED, AcqRel);
     }
 
     /// Resets the block to a blank state. This enables reusing blocks in the
@@ -265,7 +273,12 @@ impl<T> Block<T> {
     /// Mark a slot as ready
     fn set_ready(&self, slot: usize) {
         let mask = 1 << slot;
-        self.header.ready_slots.fetch_or(mask, Release);
+        // When a waker is registered, `read` must synchronize with `set_ready`
+        // and uses an RMW with Release (actually AcqRel) ordering, so we must
+        // use AcqRel here instead of Release to make the synchronization happen.
+        // This synchronization allows `SpmcWaker::wake` to see the registered
+        // waker.
+        self.header.ready_slots.fetch_or(mask, AcqRel);
     }
 
     /// Returns `true` when all slots have their `ready` bits set.
