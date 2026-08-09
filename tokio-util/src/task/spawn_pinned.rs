@@ -415,6 +415,7 @@ impl LocalWorkerHandle {
         handle_sender
             .send(Ok(runtime_handle))
             .expect("Failed to send local runtime handle");
+        drop(handle_sender);
 
         runtime.block_on(async {
             while let Some(spawn_task) = task_receiver.recv().await {
