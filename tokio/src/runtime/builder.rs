@@ -514,6 +514,8 @@ impl Builder {
     /// ```
     ///
     /// [unstable]: crate#unstable-features
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn enable_sharded_blocking_queue(&mut self) -> &mut Self {
         self.sharded_blocking_queue = true;
         self
