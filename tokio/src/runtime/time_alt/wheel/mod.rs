@@ -54,7 +54,7 @@ impl Wheel {
         self.elapsed
     }
 
-    /// Inserts an entry into the timing wheel.
+    /// Inserts an entry into the timing wheel
     ///
     /// # Arguments
     ///
@@ -70,7 +70,10 @@ impl Wheel {
 
         assert!(deadline > self.elapsed);
 
-        hdl.register_cancel_tx(cancel_tx);
+        if !hdl.register_cancel_tx(cancel_tx) {
+            // `hdl` has been cancelled or woken up concurrently
+            return;
+        }
 
         // Get the level at which the entry should be stored
         let level = self.level_for(deadline);
@@ -81,8 +84,7 @@ impl Wheel {
         debug_assert!({
             self.levels[level]
                 .next_expiration(self.elapsed)
-                .map(|e| e.deadline >= self.elapsed)
-                .unwrap_or(true)
+                .map_or(true, |e| e.deadline >= self.elapsed)
         });
     }
 

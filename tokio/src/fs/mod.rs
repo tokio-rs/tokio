@@ -16,9 +16,17 @@
 //! such as hangs during runtime shutdown. For special files, you should use a
 //! dedicated type such as [`tokio::net::unix::pipe`] or [`AsyncFd`] instead.
 //!
-//! Currently, Tokio will always use [`spawn_blocking`] on all platforms, but it
-//! may be changed to use asynchronous file system APIs such as io_uring in the
-//! future.
+//! Tokio currently uses [`spawn_blocking`] on all platforms, but also uses
+//! io_uring for file operations on Linux when compiled with `tokio_unstable`.
+//! Operations that cannot be cancelled with [`spawn_blocking`] may possibly
+//! be cancelled with io_uring.
+//!
+//! # Cancellation
+//!
+//! Cancelling a future from this module will stop waiting for the result, but
+//! the underlying blocking operation will continue to run on the thread pool.
+//! For example, cancelling a [`write()`] future after it has been
+//! polled will still result in the data being written to disk.
 //!
 //! # Usage
 //!

@@ -390,7 +390,6 @@ cfg_rt! {
     /// [`LocalSet`]: struct@crate::task::LocalSet
     /// [`LocalRuntime`]: struct@crate::runtime::LocalRuntime
     /// [`tokio::spawn`]: fn@crate::task::spawn
-    /// [unstable]: ../../tokio/index.html#unstable-features
     #[track_caller]
     pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
     where
@@ -1267,9 +1266,7 @@ impl LocalState {
             // if we couldn't get the thread ID because we're dropping the local
             // data, skip the assertion --- the `Drop` impl is not going to be
             // called from another thread, because `LocalSet` is `!Send`
-            context::thread_id()
-                .map(|id| id == self.owner)
-                .unwrap_or(true),
+            context::thread_id().map_or(true, |id| id == self.owner),
             "`LocalSet`'s local run queue must not be accessed by another thread!"
         );
     }

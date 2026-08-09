@@ -580,12 +580,7 @@ impl<T> DelayQueue<T> {
     /// current task for wakeup if the value is not yet available, and returning
     /// `None` if the queue is exhausted.
     pub fn poll_expired(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Expired<T>>> {
-        if !self
-            .waker
-            .as_ref()
-            .map(|w| w.will_wake(cx.waker()))
-            .unwrap_or(false)
-        {
+        if !self.waker.as_ref().is_some_and(|w| w.will_wake(cx.waker())) {
             self.waker = Some(cx.waker().clone());
         }
 

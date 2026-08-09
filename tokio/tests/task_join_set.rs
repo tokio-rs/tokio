@@ -442,7 +442,6 @@ mod spawn_local {
         set.spawn_local(async {});
     }
 
-    #[cfg(tokio_unstable)]
     mod local_runtime {
         use super::*;
 
@@ -556,7 +555,6 @@ mod spawn_local {
 mod spawn_local_on {
     use super::*;
 
-    #[cfg(tokio_unstable)]
     mod local_runtime {
         use super::*;
 
