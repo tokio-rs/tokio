@@ -289,7 +289,7 @@ impl<T, S: Semaphore> Rx<T, S> {
     pub(crate) fn recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
         use super::block::Read;
 
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
@@ -349,7 +349,7 @@ impl<T, S: Semaphore> Rx<T, S> {
     ) -> Poll<usize> {
         use super::block::Read;
 
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
@@ -436,7 +436,9 @@ impl<T, S: Semaphore> Rx<T, S> {
                         }
                         TryPopResult::Closed => return Err(TryRecvError::Disconnected),
                         // If close() was called, an empty queue should report Disconnected.
-                        TryPopResult::Empty if rx_fields.rx_closed => {
+                        TryPopResult::Empty
+                            if rx_fields.rx_closed && self.inner.semaphore.is_idle() =>
+                        {
                             return Err(TryRecvError::Disconnected)
                         }
                         TryPopResult::Empty => return Err(TryRecvError::Empty),
@@ -516,6 +518,11 @@ impl<T, S: Semaphore> Drop for Rx<T, S> {
                 tx: &self.inner.tx,
                 sem: &self.inner.semaphore,
             };
+
+            // When Rx is dropped, there is nothing for a task to poll anymore.
+            // This means we can drop our waker to potentially free up resources.
+            // Do so before draining the channel where panics may occur.
+            self.inner.rx_waker.take_waker();
 
             guard.drain();
         });

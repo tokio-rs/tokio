@@ -52,13 +52,6 @@ pub(crate) struct Inner<T: 'static> {
     /// Only updated by producer thread but read by many threads.
     tail: AtomicUnsignedShort,
 
-    /// When a task is scheduled from a worker, it is stored in this slot. The
-    /// worker will check this slot for a task **before** checking the run
-    /// queue. This effectively results in the **last** scheduled task to be run
-    /// next (LIFO). This is an optimization for improving locality which
-    /// benefits message passing patterns and helps to reduce latency.
-    lifo: task::AtomicNotified<T>,
-
     /// Elements
     buffer: Box<[UnsafeCell<MaybeUninit<task::Notified<T>>>; LOCAL_QUEUE_CAPACITY]>,
 }
@@ -90,17 +83,12 @@ fn make_fixed_size<T>(buffer: Box<[T]>) -> Box<[T; LOCAL_QUEUE_CAPACITY]> {
 
 /// Create a new local run-queue
 pub(crate) fn local<T: 'static>() -> (Steal<T>, Local<T>) {
-    let mut buffer = Vec::with_capacity(LOCAL_QUEUE_CAPACITY);
-
-    for _ in 0..LOCAL_QUEUE_CAPACITY {
-        buffer.push(UnsafeCell::new(MaybeUninit::uninit()));
-    }
+    let buffer = std::iter::repeat_with(|| UnsafeCell::new(MaybeUninit::uninit()));
 
     let inner = Arc::new(Inner {
         head: AtomicUnsignedLong::new(0),
         tail: AtomicUnsignedShort::new(0),
-        lifo: task::AtomicNotified::empty(),
-        buffer: make_fixed_size(buffer.into_boxed_slice()),
+        buffer: make_fixed_size(buffer.take(LOCAL_QUEUE_CAPACITY).collect()),
     });
 
     let local = Local {
@@ -116,10 +104,9 @@ impl<T> Local<T> {
     /// Returns the number of entries in the queue
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.inner.head.load(Acquire));
-        let lifo = self.inner.lifo.is_some() as usize;
         // safety: this is the **only** thread that updates this cell.
         let tail = unsafe { self.inner.tail.unsync_load() };
-        len(head, tail) + lifo
+        len(head, tail)
     }
 
     /// How many tasks can be pushed into the queue
@@ -410,19 +397,6 @@ impl<T> Local<T> {
 
         Some(self.inner.buffer[idx].with(|ptr| unsafe { ptr::read(ptr).assume_init() }))
     }
-
-    /// Pushes a task to the LIFO slot, returning the task previously in the
-    /// LIFO slot (if there was one).
-    pub(crate) fn push_lifo(&self, task: task::Notified<T>) -> Option<task::Notified<T>> {
-        self.inner.lifo.swap(Some(task))
-    }
-
-    /// Pops the task currently held in the LIFO slot, if there is one;
-    /// otherwise, returns `None`.
-    pub(crate) fn pop_lifo(&self) -> Option<task::Notified<T>> {
-        // LIFO-suction!
-        self.inner.lifo.take()
-    }
 }
 
 impl<T> Steal<T> {
@@ -430,8 +404,7 @@ impl<T> Steal<T> {
     pub(crate) fn len(&self) -> usize {
         let (_, head) = unpack(self.0.head.load(Acquire));
         let tail = self.0.tail.load(Acquire);
-        let lifo = self.0.lifo.is_some() as usize;
-        len(head, tail) + lifo
+        len(head, tail)
     }
 
     /// Return true if the queue is empty,
@@ -466,14 +439,8 @@ impl<T> Steal<T> {
         let mut n = self.steal_into2(dst, dst_tail);
 
         if n == 0 {
-            // If no tasks were stolen, let's see if there's one in the LIFO
-            // slot.
-            let lifo = self.0.lifo.take();
-            if lifo.is_some() {
-                dst_stats.incr_steal_count(1);
-                dst_stats.incr_steal_operations();
-            }
-            return lifo;
+            // No tasks were stolen
+            return None;
         }
 
         dst_stats.incr_steal_count(n as u16);
@@ -605,7 +572,6 @@ impl<T> Drop for Local<T> {
     fn drop(&mut self) {
         if !std::thread::panicking() {
             assert!(self.pop().is_none(), "queue not empty");
-            assert!(self.pop_lifo().is_none(), "LIFO slot not empty");
         }
     }
 }

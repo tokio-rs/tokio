@@ -1,12 +1,10 @@
-use super::{Entry, EntryHandle, WakeQueueEntry};
-use crate::util::linked_list;
-
-type EntryList = linked_list::LinkedList<WakeQueueEntry, Entry>;
+use super::{EntryHandle, WakeQueueEntry};
+use crate::util::linked_list::LinkedList;
 
 /// A queue of entries that need to be woken up.
 #[derive(Debug)]
 pub(crate) struct WakeQueue {
-    list: EntryList,
+    list: LinkedList<WakeQueueEntry>,
 }
 
 impl Drop for WakeQueue {
@@ -21,7 +19,7 @@ impl Drop for WakeQueue {
 impl WakeQueue {
     pub(crate) fn new() -> Self {
         Self {
-            list: EntryList::new(),
+            list: LinkedList::new(),
         }
     }
 
@@ -33,7 +31,7 @@ impl WakeQueue {
     ///
     /// Behavior is undefined if any of the following conditions are violated:
     ///
-    /// - [`Entry::extra_pointers`] of `hdl` must not being used.
+    /// - `Entry::extra_pointers` of `hdl` must not being used.
     pub(crate) unsafe fn push_front(&mut self, hdl: EntryHandle) {
         self.list.push_front(hdl);
     }

@@ -25,7 +25,6 @@
 use tokio::io::copy_bidirectional;
 use tokio::net::{TcpListener, TcpStream};
 
-use futures::FutureExt;
 use std::env;
 use std::error::Error;
 
@@ -44,16 +43,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind(listen_addr).await?;
 
     while let Ok((mut inbound, _)) = listener.accept().await {
-        let mut outbound = TcpStream::connect(server_addr.clone()).await?;
+        let server_addr = server_addr.clone();
 
         tokio::spawn(async move {
-            copy_bidirectional(&mut inbound, &mut outbound)
-                .map(|r| {
-                    if let Err(e) = r {
-                        println!("Failed to transfer; error={e}");
-                    }
-                })
-                .await
+            let mut outbound = match TcpStream::connect(server_addr).await {
+                Ok(outbound) => outbound,
+                Err(e) => {
+                    println!("Failed to connect; error={e}");
+                    return;
+                }
+            };
+
+            if let Err(e) = copy_bidirectional(&mut inbound, &mut outbound).await {
+                println!("Failed to transfer; error={e}");
+            }
         });
     }
 

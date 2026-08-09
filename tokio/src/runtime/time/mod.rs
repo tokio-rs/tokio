@@ -8,7 +8,7 @@
 
 mod entry;
 pub(crate) use entry::TimerEntry;
-use entry::{EntryList, TimerHandle, TimerShared, MAX_SAFE_MILLIS_DURATION};
+use entry::{TimerHandle, TimerShared, MAX_SAFE_MILLIS_DURATION};
 
 mod handle;
 pub(crate) use self::handle::Handle;
@@ -425,8 +425,7 @@ impl Handle {
                     Ok(when) => {
                         if lock
                             .next_wake
-                            .map(|next_wake| when < next_wake.get())
-                            .unwrap_or(true)
+                            .map_or(true, |next_wake| when < next_wake.get())
                         {
                             unpark.unpark();
                         }

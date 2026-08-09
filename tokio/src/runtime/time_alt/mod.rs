@@ -5,8 +5,7 @@ pub(crate) mod cancellation_queue;
 
 mod entry;
 pub(crate) use entry::Handle as EntryHandle;
-use entry::{CancellationQueueEntry, RegistrationQueueEntry, WakeQueueEntry};
-use entry::{Entry, EntryList};
+use entry::{CancellationQueueEntry, Entry, RegistrationQueueEntry, WakeQueueEntry};
 
 mod registration_queue;
 pub(crate) use registration_queue::RegistrationQueue;

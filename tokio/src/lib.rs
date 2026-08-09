@@ -354,6 +354,7 @@
 //! Some feature flags are only available when specifying the `tokio_unstable` flag:
 //!
 //! - `tracing`: Enables tracing events.
+//! - `schedule-latency`: Allows measurement of task scheduling latencies.
 //! - `io-uring`: Enables `io-uring` (Linux only).
 //! - `taskdump`: Enables `taskdump` (Linux only).
 //!
@@ -488,13 +489,27 @@ compile_error!("The `taskdump` feature requires `--cfg tokio_unstable`.");
     not(doc),
     not(all(
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+        any(
+            target_arch = "aarch64",
+            target_arch = "x86",
+            target_arch = "x86_64",
+            target_arch = "s390x"
+        )
     ))
 ))]
 compile_error!(
     "The `taskdump` feature is only currently supported on \
-linux, on `aarch64`, `x86` and `x86_64`."
+linux, on `aarch64`, `x86`, `x86_64` and `s390x`."
 );
+
+#[cfg(all(not(tokio_unstable), feature = "schedule-latency"))]
+compile_error!("The `schedule-latency` feature requires `--cfg tokio_unstable`.");
+
+#[cfg(all(
+    feature = "schedule-latency",
+    not(all(target_pointer_width = "64", target_has_atomic = "64"))
+))]
+compile_error!("The `schedule-latency` feature is only currently supported on 64-bit targets.");
 
 // Includes re-exports used by macros.
 //
@@ -574,14 +589,14 @@ mod trace {
     cfg_not_taskdump! {
         #[inline(always)]
         #[allow(dead_code)]
-        pub(crate) fn trace_leaf(_: &mut std::task::Context<'_>) -> std::task::Poll<()> {
+        pub(crate) fn trace_leaf() -> std::task::Poll<()> {
             std::task::Poll::Ready(())
         }
     }
 
     #[cfg_attr(not(feature = "sync"), allow(dead_code))]
     pub(crate) async fn async_trace_leaf() {
-        std::future::poll_fn(trace_leaf).await
+        std::future::poll_fn(|_cx| trace_leaf()).await
     }
 }
 

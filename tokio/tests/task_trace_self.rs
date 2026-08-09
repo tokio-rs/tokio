@@ -3,7 +3,12 @@
     tokio_unstable,
     feature = "taskdump",
     target_os = "linux",
-    any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+    any(
+        target_arch = "aarch64",
+        target_arch = "x86",
+        target_arch = "x86_64",
+        target_arch = "s390x"
+    )
 ))]
 
 use std::future::Future;
@@ -61,6 +66,10 @@ impl<F: Future> Future for PrettyFuture<F> {
             let (res, trace) = tokio::runtime::dump::Trace::capture(|| this.f.as_mut().poll(cx));
             this.logs.lock().unwrap().push(trace);
             *this.t_last = State::Alerted;
+            // `Trace::capture` does not reschedule the task. Wake the task
+            // ourselves so the wrapped future gets polled again and can make
+            // progress now that tracing has captured its state.
+            cx.waker().wake_by_ref();
             return res;
         }
         this.f.poll(cx)
@@ -138,7 +147,7 @@ fn trace_leaf_for_test(meta: &TraceMeta, log: &mut Vec<Vec<String>>) {
     for frame in bt.frames() {
         for symbol in frame.symbols() {
             if let Some(name) = symbol.name() {
-                names.push(strip_symbol_hash(&format!("{name}")).to_owned());
+                names.push(strip_symbol_hash(&format!("{name:#}")).to_owned());
             }
         }
     }
@@ -184,21 +193,16 @@ impl<F: Future> Future for TaskDump<F> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<F::Output> {
         let mut this = self.project();
 
-        // Poll the future with a real waker. if it returns Ready, exit immediately
-        match this.f.as_mut().poll(cx) {
-            Poll::Ready(result) => return Poll::Ready(result),
-            Poll::Pending => {}
+        // if the future is ready, exit immediately
+        if let Poll::Ready(result) = this.f.as_mut().poll(cx) {
+            return Poll::Ready(result);
         };
 
+        // if is pending, trace its location:
         let mut logs = Vec::new();
 
-        // Tracing poll with a noop waker. If the future is at a yield
-        // point, trace_leaf fires our callback and returns Pending. We discard
-        // the result — this poll is purely for capturing the backtrace.
-        let noop = futures::task::noop_waker();
-        let mut noop_cx = Context::from_waker(&noop);
         let trace_poll = trace_with(
-            || this.f.as_mut().poll(&mut noop_cx),
+            || this.f.as_mut().poll(cx),
             |meta| trace_leaf_for_test(meta, &mut logs),
         );
         // trace should always produce poll pending

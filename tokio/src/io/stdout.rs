@@ -15,6 +15,45 @@ cfg_io_std! {
     /// to occur as a single write, so multiple threads writing data with
     /// [`write_all`] may result in interleaved output.
     ///
+    /// # Warning
+    ///
+    /// Each call to [`stdout()`] creates a **new** handle with its own
+    /// internal state. Writes through different handles are not
+    /// coordinated, so creating a new handle in a loop can cause output
+    /// to appear out of order:
+    ///
+    /// ```no_run
+    /// # use tokio::io::{self, AsyncWriteExt};
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// // WRONG: creates a new handle each iteration
+    /// for i in 0..10 {
+    ///     let mut out = io::stdout();
+    ///     out.write_all(b"data").await?;
+    ///     out.write_all(b"\n").await?;
+    ///     // out is dropped here; its last write may still be
+    ///     // running when the next iteration starts
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// To preserve order, create one handle outside the loop and
+    /// reuse it:
+    ///
+    /// ```no_run
+    /// # use tokio::io::{self, AsyncWriteExt};
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let mut out = io::stdout();
+    /// for i in 0..10 {
+    ///     out.write_all(b"data").await?;
+    ///     out.write_all(b"\n").await?;
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// Created by the [`stdout`] function.
     ///
     /// [`stdout`]: stdout()

@@ -1,12 +1,10 @@
-use super::{Entry, EntryHandle, RegistrationQueueEntry};
-use crate::util::linked_list;
-
-type EntryList = linked_list::LinkedList<RegistrationQueueEntry, Entry>;
+use super::{EntryHandle, RegistrationQueueEntry};
+use crate::util::linked_list::LinkedList;
 
 /// A queue of entries that need to be registered in the timer wheel.
 #[derive(Debug)]
 pub(crate) struct RegistrationQueue {
-    list: EntryList,
+    list: LinkedList<RegistrationQueueEntry>,
 }
 
 impl Drop for RegistrationQueue {
@@ -21,7 +19,7 @@ impl Drop for RegistrationQueue {
 impl RegistrationQueue {
     pub(crate) fn new() -> Self {
         Self {
-            list: EntryList::new(),
+            list: LinkedList::new(),
         }
     }
 
@@ -29,7 +27,7 @@ impl RegistrationQueue {
     ///
     /// Behavior is undefined if any of the following conditions are violated:
     ///
-    /// - [`Entry::extra_pointers`] of `hdl` must not being used.
+    /// - `Entry::extra_pointers` of `hdl` must not being used.
     pub(crate) unsafe fn push_front(&mut self, hdl: EntryHandle) {
         self.list.push_front(hdl);
     }

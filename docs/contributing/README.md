@@ -8,7 +8,8 @@ It should be considered a map to help you navigate the process.
 If you are unsure where to begin, use the following guides:
 
 - Want to report or triage a bug? Start with [Contributing in Issues](contributing-in-issues.md).
-- Looking for something to work on? Filter issues by [`E-help-wanted`](https://github.com/tokio-rs/tokio/labels/E-help-wanted).
+- Looking for something to work on? Check the open [`issues`](https://github.com/tokio-rs/tokio/issues)
+(some might be in progress or still under discussion, so leave a comment before starting the work).
 - Planning to submit a PR? Read [Pull Requests](pull-requests.md) for the full workflow and required checks.
 - Want to understand what the labels on issues mean? See [Keeping track of issues and PRs](keeping-track-of-issues-and-prs.md).
 - Interested in code review? See [Reviewing Pull Requests](reviewing-pull-requests.md).
@@ -21,8 +22,9 @@ If you are unsure where to begin, use the following guides:
     - [Triaging a Bug Report](contributing-in-issues.md#triaging-a-bug-report)
     - [Resolving a Bug Report](contributing-in-issues.md#resolving-a-bug-report)
 - [Pull Requests](pull-requests.md)
+    - [Step-by-Step Contribution Workflow](pull-requests.md#step-by-step-contribution-workflow)
     - [Cargo Commands](pull-requests.md#cargo-commands)
-    - [Performing spellcheck on tokio codebase](pull-requests.md#performing-spellcheck-on-tokio-codebase)
+    - [Performing spellcheck on Tokio codebase](pull-requests.md#performing-spellcheck-on-tokio-codebase)
     - [Tests](pull-requests.md#tests)
         - [Integration tests](pull-requests.md#integration-tests)
         - [Fuzz tests](pull-requests.md#fuzz-tests)

@@ -3,6 +3,7 @@ use crate::Stream;
 use core::fmt;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -59,5 +60,14 @@ where
         let upper = upper.map(|x| x.saturating_sub(self.remaining));
 
         (lower, upper)
+    }
+}
+
+impl<St> FusedStream for Skip<St>
+where
+    St: FusedStream,
+{
+    fn is_terminated(&self) -> bool {
+        self.stream.is_terminated()
     }
 }

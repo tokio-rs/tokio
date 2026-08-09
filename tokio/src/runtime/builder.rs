@@ -138,6 +138,15 @@ pub struct Builder {
     /// Configures the task poll count histogram
     pub(super) metrics_poll_count_histogram: HistogramBuilder,
 
+    /// When true, enables task schedule latency instrumentation.
+    pub(super) track_task_schedule_latency: bool,
+
+    /// When true, enables the task schedule latency histogram.
+    pub(super) metrics_schedule_latency_histogram_enabled: bool,
+
+    /// Configures the task schedule latency histogram.
+    pub(super) metrics_schedule_latency_histogram: HistogramBuilder,
+
     #[cfg(tokio_unstable)]
     pub(super) unhandled_panic: UnhandledPanic,
 
@@ -334,6 +343,12 @@ impl Builder {
             metrics_poll_count_histogram_enable: false,
 
             metrics_poll_count_histogram: HistogramBuilder::default(),
+
+            track_task_schedule_latency: false,
+
+            metrics_schedule_latency_histogram_enabled: false,
+
+            metrics_schedule_latency_histogram: HistogramBuilder::default(),
 
             disable_lifo_slot: false,
 
@@ -904,6 +919,9 @@ impl Builder {
     /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback being
     /// invoked immediately.
     ///
+    /// When task schedule latency tracking is enabled, the latency is available
+    /// from `TaskMeta::schedule_latency`.
+    ///
     /// **Note**: This is an [unstable API][unstable]. The public API of this type
     /// may break in 1.x releases. See [the documentation on unstable
     /// features][unstable] for details.
@@ -950,6 +968,9 @@ impl Builder {
     /// `f` is called within the Tokio context, so functions like
     /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback being
     /// invoked immediately.
+    ///
+    /// When task schedule latency tracking is enabled, the latency is available
+    /// from `TaskMeta::schedule_latency`.
     ///
     /// **Note**: This is an [unstable API][unstable]. The public API of this type
     /// may break in 1.x releases. See [the documentation on unstable
@@ -1059,6 +1080,11 @@ impl Builder {
     /// });
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the I/O driver or other OS resources required by the
+    /// runtime cannot be initialized.
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_runtime(),
@@ -1090,8 +1116,12 @@ impl Builder {
     ///     println!("Hello from the Tokio runtime");
     /// });
     /// ```
-    #[allow(unused_variables, unreachable_patterns)]
-    pub fn build_local(&mut self, options: LocalOptions) -> io::Result<LocalRuntime> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the I/O driver or other OS resources required by the
+    /// runtime cannot be initialized.
+    pub fn build_local(&mut self, _options: LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
             #[cfg(feature = "rt-multi-thread")]
@@ -1298,21 +1328,22 @@ impl Builder {
         /// scheduled task being polled first.
         ///
         /// To implement this heuristic, each worker thread has a slot which
-        /// holds the task that should be polled next. In earlier versions of
-        /// Tokio, this slot could not be stolen by other worker threads, which
-        /// can result in lower total throughput when tasks tend to have longer
-        /// poll times.
+        /// holds the task that should be polled next. However, this slot cannot
+        /// be stolen by other worker threads, which can result in lower total
+        /// throughput when tasks tend to have longer poll times.
         ///
         /// This configuration option will disable this heuristic resulting in
-        /// all scheduled tasks being pushed into the worker-local queue. This
-        /// was intended as a workaround for the LIFO slot not being stealable.
-        /// As of Tokio 1.51, tasks can be stolen from the LIFO slot. In a
-        /// future version, this option may be deprecated.
+        /// all scheduled tasks being pushed into the worker-local queue, which
+        /// is stealable.
+        ///
+        /// Consider trying this option when the task "scheduled" time is high
+        /// but the runtime is underutilized. Use [tokio-rs/tokio-metrics] to
+        /// collect this data.
         ///
         /// # Unstable
         ///
-        /// This configuration option was considered a workaround for the LIFO
-        /// slot not being stealable. Since this is no longer the case, we will
+        /// This configuration option is considered a workaround for the LIFO
+        /// slot not being stealable. When the slot becomes stealable, we will
         /// revisit whether or not this option is necessary. See
         /// issue [tokio-rs/tokio#4941].
         ///
@@ -1708,6 +1739,9 @@ impl Builder {
                 enable_eager_driver_handoff: false,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                track_task_schedule_latency: self.track_task_schedule_latency,
+                metrics_schedule_latency_histogram: self
+                    .metrics_schedule_latency_histogram_builder(),
             },
             local_tid,
             self.name.clone(),
@@ -1723,6 +1757,14 @@ impl Builder {
     fn metrics_poll_count_histogram_builder(&self) -> Option<HistogramBuilder> {
         if self.metrics_poll_count_histogram_enable {
             Some(self.metrics_poll_count_histogram.clone())
+        } else {
+            None
+        }
+    }
+
+    fn metrics_schedule_latency_histogram_builder(&self) -> Option<HistogramBuilder> {
+        if self.metrics_schedule_latency_histogram_enabled {
+            Some(self.metrics_schedule_latency_histogram.clone())
         } else {
             None
         }
@@ -1848,6 +1890,180 @@ cfg_test_util! {
     }
 }
 
+cfg_schedule_latency! {
+    impl Builder {
+        /// Enables tracking task schedule latency.
+        ///
+        /// Task schedule latency is measured from a task's most recent
+        /// transition to the scheduled state until immediately before it is
+        /// polled. Waking a task that is already scheduled does not reset the
+        /// measurement. Once enabled, the latency is available to task poll
+        /// hooks through [`TaskMeta::schedule_latency`].
+        ///
+        /// Task schedule latencies are not tracked by default as doing so
+        /// requires calling [`Instant::now()`] when a task is scheduled and
+        /// when it is polled, which could add measurable overhead.
+        ///
+        /// The [`enable_metrics_schedule_latency_histogram`] method also
+        /// enables tracking and records the latencies in a histogram.
+        ///
+        /// **This feature is only supported on 64-bit targets.**
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # use tokio::runtime;
+        /// let runtime = runtime::Builder::new_current_thread()
+        ///     .track_task_schedule_latency()
+        ///     .on_before_task_poll(|meta| {
+        ///         if let Some(latency) = meta.schedule_latency() {
+        ///             println!("task schedule latency: {latency:?}");
+        ///         }
+        ///     })
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        ///
+        /// [`TaskMeta::schedule_latency`]: crate::runtime::TaskMeta::schedule_latency
+        /// [`Instant::now()`]: std::time::Instant::now
+        /// [`enable_metrics_schedule_latency_histogram`]: Builder::enable_metrics_schedule_latency_histogram
+        pub fn track_task_schedule_latency(&mut self) -> &mut Self {
+            self.track_task_schedule_latency = true;
+            self
+        }
+
+        /// Enables tracking the distribution of task schedule latencies. Task
+        /// schedule latency is the time between when a task is scheduled for
+        /// execution and when it is polled.
+        ///
+        /// **This feature is only supported on 64-bit targets.**
+        ///
+        /// Task schedule latencies are not instrumented by default as doing
+        /// so requires calling [`Instant::now()`] when a task is scheduled
+        /// and when it is polled, which could add measurable overhead. Use
+        /// the [`Handle::metrics()`] to access the metrics data.
+        ///
+        /// By default, a linear histogram with 10 buckets each 100 microseconds wide will be used.
+        /// This has an extremely low memory footprint, but may not provide enough granularity. For
+        /// better granularity with low memory usage, use [`metrics_schedule_latency_histogram_configuration()`]
+        /// to select [`LogHistogram`] instead.
+        ///
+        /// On the multi-thread runtime, each task polled from the LIFO slot is
+        /// recorded as a separate schedule-latency sample. Task poll hooks
+        /// receive the same per-task latency through [`TaskMeta::schedule_latency`].
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_schedule_latency_histogram()
+        ///     .build()
+        ///     .unwrap();
+        /// # // Test default values here
+        /// # fn us(n: u64) -> std::time::Duration { std::time::Duration::from_micros(n) }
+        /// # let m = rt.handle().metrics();
+        /// # assert_eq!(m.schedule_latency_histogram_num_buckets(), 10);
+        /// # assert_eq!(m.schedule_latency_histogram_bucket_range(0), us(0)..us(100));
+        /// # assert_eq!(m.schedule_latency_histogram_bucket_range(1), us(100)..us(200));
+        /// # }
+        /// ```
+        ///
+        /// [`Handle::metrics()`]: crate::runtime::Handle::metrics
+        /// [`Instant::now()`]: std::time::Instant::now
+        /// [`LogHistogram`]: crate::runtime::LogHistogram
+        /// [`metrics_schedule_latency_histogram_configuration()`]: Builder::metrics_schedule_latency_histogram_configuration
+        pub fn enable_metrics_schedule_latency_histogram(&mut self) -> &mut Self {
+            self.track_task_schedule_latency = true;
+            self.metrics_schedule_latency_histogram_enabled = true;
+            self
+        }
+
+        /// Configure the histogram for tracking task schedule latencies.
+        ///
+        /// Tracking of task schedule latencies must be enabled with
+        /// [`enable_metrics_schedule_latency_histogram()`] for this function
+        /// to have any effect.
+        ///
+        /// By default, a linear histogram with 10 buckets each 100 microseconds wide will be used.
+        /// This has an extremely low memory footprint, but may not provide enough granularity. For
+        /// better granularity with low memory usage, use [`LogHistogram`] instead.
+        ///
+        /// # Examples
+        /// Configure a [`LogHistogram`] with [default configuration]:
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// use tokio::runtime;
+        /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_schedule_latency_histogram()
+        ///     .metrics_schedule_latency_histogram_configuration(
+        ///         HistogramConfiguration::log(LogHistogram::default())
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// # }
+        /// ```
+        ///
+        /// Configure a linear histogram with 100 buckets, each 10μs wide
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// use tokio::runtime;
+        /// use std::time::Duration;
+        /// use tokio::runtime::HistogramConfiguration;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_schedule_latency_histogram()
+        ///     .metrics_schedule_latency_histogram_configuration(
+        ///         HistogramConfiguration::linear(Duration::from_micros(10), 100)
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// # }
+        /// ```
+        ///
+        /// Configure a [`LogHistogram`] with the following settings:
+        /// - Measure times from 100ns to 120s
+        /// - Max error of 0.1
+        /// - No more than 1024 buckets
+        /// ```
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
+        /// use std::time::Duration;
+        /// use tokio::runtime;
+        /// use tokio::runtime::{HistogramConfiguration, LogHistogram};
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_metrics_schedule_latency_histogram()
+        ///     .metrics_schedule_latency_histogram_configuration(
+        ///         HistogramConfiguration::log(LogHistogram::builder()
+        ///             .max_value(Duration::from_secs(120))
+        ///             .min_value(Duration::from_nanos(100))
+        ///             .max_error(0.1)
+        ///             .max_buckets(1024)
+        ///             .expect("configuration uses 488 buckets")
+        ///         )
+        ///     )
+        ///     .build()
+        ///     .unwrap();
+        /// # }
+        /// ```
+        ///
+        /// [`LogHistogram`]: crate::runtime::LogHistogram
+        /// [`enable_metrics_schedule_latency_histogram()`]: Builder::enable_metrics_schedule_latency_histogram
+        pub fn metrics_schedule_latency_histogram_configuration(&mut self, configuration: HistogramConfiguration) -> &mut Self {
+            self.metrics_schedule_latency_histogram.histogram_type = configuration.inner;
+            self
+        }
+    }
+}
+
 cfg_rt_multi_thread! {
     impl Builder {
         fn build_threaded_runtime(&mut self) -> io::Result<Runtime> {
@@ -1891,6 +2107,8 @@ cfg_rt_multi_thread! {
                     enable_eager_driver_handoff: self.enable_eager_driver_handoff,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                    track_task_schedule_latency: self.track_task_schedule_latency,
+                    metrics_schedule_latency_histogram: self.metrics_schedule_latency_histogram_builder(),
                 },
                 self.timer_flavor,
                 self.name.clone(),

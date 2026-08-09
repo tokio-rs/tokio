@@ -13,6 +13,11 @@ pub use mpsc_bounded::ReceiverStream;
 mod mpsc_unbounded;
 pub use mpsc_unbounded::UnboundedReceiverStream;
 
+cfg_rt! {
+    mod task;
+    pub use task::JoinSetStream;
+}
+
 cfg_sync! {
     mod broadcast;
     pub use broadcast::BroadcastStream;

@@ -70,6 +70,9 @@ const IDLE: usize = 0;
 const WAKE: usize = 1;
 const SLEEP: usize = 2;
 
+/// Default maximum number of poll iterations in [`Spawn::poll_until_idle`].
+const POLL_UNTIL_IDLE_MAX_ITERATIONS: usize = 150;
+
 impl<T> Spawn<T> {
     /// Consumes `self` returning the inner value
     pub fn into_inner(self) -> T
@@ -122,6 +125,43 @@ impl<T: Future> Spawn<T> {
     pub fn poll(&mut self) -> Poll<T::Output> {
         let fut = self.future.as_mut();
         self.task.enter(|cx| fut.poll(cx))
+    }
+
+    /// Polls the future until it is idle.
+    ///
+    /// A future is considered idle when it either completes, or returns
+    /// [`Poll::Pending`] without a pending wake notification.
+    ///
+    /// Unlike [`poll`](Self::poll), this method keeps polling while the future
+    /// returns [`Poll::Pending`] but has received a wake notification, advancing
+    /// the future as far as possible without waiting for external events.
+    ///
+    /// Polling is bounded to avoid infinite loops when a future wakes without
+    /// making progress.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the iteration limit is exceeded.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use tokio_test::task;
+    ///
+    /// let mut task = task::spawn(async { 42 });
+    ///
+    /// assert!(task.poll_until_idle().is_ready());
+    /// ```
+    pub fn poll_until_idle(&mut self) -> Poll<T::Output> {
+        for _ in 0..POLL_UNTIL_IDLE_MAX_ITERATIONS {
+            let result = self.poll();
+            if result.is_ready() || !self.is_woken() {
+                return result;
+            }
+        }
+        panic!(
+            "poll_until_idle exceeded {POLL_UNTIL_IDLE_MAX_ITERATIONS} iterations; future may be waking without making progress"
+        );
     }
 }
 

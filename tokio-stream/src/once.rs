@@ -1,6 +1,5 @@
-use crate::{Iter, Stream};
+use crate::Stream;
 
-use core::option;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
@@ -8,7 +7,7 @@ use core::task::{Context, Poll};
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 pub struct Once<T> {
-    iter: Iter<option::IntoIter<T>>,
+    value: Option<T>,
 }
 
 impl<I> Unpin for Once<I> {}
@@ -34,19 +33,30 @@ impl<I> Unpin for Once<I> {}
 /// # }
 /// ```
 pub fn once<T>(value: T) -> Once<T> {
-    Once {
-        iter: crate::iter(Some(value)),
-    }
+    Once { value: Some(value) }
 }
 
 impl<T> Stream for Once<T> {
     type Item = T;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
-        Pin::new(&mut self.iter).poll_next(cx)
+    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<T>> {
+        #[cfg(feature = "rt")]
+        {
+            use tokio::task::coop;
+
+            let coop = std::task::ready!(coop::poll_proceed(_cx));
+
+            coop.made_progress();
+        }
+
+        Poll::Ready(self.value.take())
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.iter.size_hint()
+        if self.value.is_some() {
+            (1, Some(1))
+        } else {
+            (0, Some(0))
+        }
     }
 }

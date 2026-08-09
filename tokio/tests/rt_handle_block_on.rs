@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(miri)))]
+#![cfg(feature = "full")]
 
 // All io tests that deal with shutdown is currently ignored because there are known bugs in with
 // shutting down the io driver while concurrently registering new resources. See
@@ -241,7 +241,6 @@ rt_test! {
     // ==== net ======
 
     #[test]
-    #[cfg_attr(miri, ignore)] // No `socket` in miri.
     fn tcp_listener_bind() {
         let rt = rt();
         let _enter = rt.enter();
@@ -292,7 +291,7 @@ rt_test! {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore)] // No `socket` in miri.
+    #[cfg_attr(miri, ignore)] // No UDP sockets in miri.
     fn udp_socket_bind() {
         let rt = rt();
         let _enter = rt.enter();
@@ -453,7 +452,7 @@ rt_test! {
 #[cfg(not(target_os = "wasi"))]
 multi_threaded_rt_test! {
     #[cfg(unix)]
-    #[cfg_attr(miri, ignore)] // No `socket` in miri.
+    #[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
     #[test]
     fn unix_listener_bind() {
         let rt = rt();

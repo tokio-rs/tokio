@@ -52,6 +52,7 @@ impl Registration {
 
     /// Clears resource level readiness represented by the specified `ReadyEvent`
     async fn clear_readiness(&self, ready_event: ReadyEvent);
+}
 ```
 
 A new registration is created for a `T: mio::Evented` and a `interest`. This

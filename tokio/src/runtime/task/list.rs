@@ -9,8 +9,8 @@
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, SpawnLocation, Task};
-use crate::util::linked_list::{Link, LinkedList};
-use crate::util::sharded_list;
+use crate::util::linked_list::LinkedList;
+use crate::util::sharded_list::ShardedList;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use std::marker::PhantomData;
@@ -56,12 +56,10 @@ cfg_not_has_atomic_u64! {
 }
 
 pub(crate) struct OwnedTasks<S: 'static> {
-    list: List<S>,
+    list: ShardedList<Task<S>>,
     pub(crate) id: NonZeroU64,
     closed: AtomicBool,
 }
-
-type List<S> = sharded_list::ShardedList<Task<S>, <Task<S> as Link>::Target>;
 
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
@@ -70,7 +68,7 @@ pub(crate) struct LocalOwnedTasks<S: 'static> {
 }
 
 struct OwnedTasksInner<S: 'static> {
-    list: LinkedList<Task<S>, <Task<S> as Link>::Target>,
+    list: LinkedList<Task<S>>,
     closed: bool,
 }
 
@@ -78,7 +76,7 @@ impl<S: 'static> OwnedTasks<S> {
     pub(crate) fn new(num_cores: usize) -> Self {
         let shard_size = Self::gen_shared_list_size(num_cores);
         Self {
-            list: List::new(shard_size),
+            list: ShardedList::new(shard_size),
             closed: AtomicBool::new(false),
             id: get_next_id(),
         }

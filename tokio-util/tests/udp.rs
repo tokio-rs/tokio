@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(not(target_os = "wasi"))] // Wasi doesn't support UDP
-#![cfg(not(miri))] // No `socket` in Miri.
+#![cfg(not(miri))] // No UDP sockets in Miri.
 #![cfg(not(loom))] // No udp / UdpFramed in loom
 
 use tokio::net::UdpSocket;

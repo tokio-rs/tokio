@@ -1,13 +1,11 @@
 #![warn(rust_2018_idioms)]
 // WASIp1 doesn't support bind
-// No `socket` on miri.
 #![cfg(all(
     feature = "net",
     feature = "macros",
     feature = "rt",
     feature = "io-util",
     not(all(target_os = "wasi", target_env = "p1")),
-    not(miri)
 ))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
@@ -24,7 +22,7 @@ use std::time::Duration;
 
 #[tokio::test]
 #[cfg(not(target_os = "wasi"))] // WASI does not yet support `SO_LINGER`
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
+#[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
 #[expect(deprecated)] // set_linger is deprecated
 async fn set_linger() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -44,13 +42,8 @@ async fn set_linger() {
 }
 
 #[tokio::test]
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/734"
-)]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn try_read_write() {
-    const DATA: &[u8] = b"this is some data to write to the socket";
+    const DATA: &[u8] = &[2u8; 4000];
 
     // Create listener
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -235,7 +228,6 @@ macro_rules! assert_not_writable_by_polling {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn poll_read_ready() {
     let (mut client, mut server) = create_pair().await;
 
@@ -259,7 +251,6 @@ async fn poll_read_ready() {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn poll_write_ready() {
     let (mut client, server) = create_pair().await;
 
@@ -312,14 +303,9 @@ fn write_until_pending(stream: &mut TcpStream) -> usize {
     total
 }
 
-// This test is temporarily disabled on WASI due to
-// https://github.com/bytecodealliance/wasmtime/issues/13040.  We can re-enable
-// it once that issue is fixed and the fix is included in a Wasmtime release.
-#[cfg_attr(target_os = "wasi", ignore)]
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn try_read_buf() {
-    const DATA: &[u8] = b"this is some data to write to the socket";
+    const DATA: &[u8] = &[2u8; 4000];
 
     // Create listener
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -405,11 +391,6 @@ async fn try_read_buf() {
 
 // read_closed is a best effort event, so test only for no false positives.
 #[tokio::test]
-#[cfg_attr(
-    target_os = "wasi",
-    ignore = "temporarily disabled for WASI pending https://github.com/WebAssembly/wasi-libc/pull/732"
-)]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn read_closed() {
     let (client, mut server) = create_pair().await;
 
@@ -425,7 +406,6 @@ async fn read_closed() {
 
 // write_closed is a best effort event, so test only for no false positives.
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
 async fn write_closed() {
     let (mut client, mut server) = create_pair().await;
 

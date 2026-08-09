@@ -95,6 +95,11 @@ macro_rules! doc {
         /// describes whether they are cancel safe.  The lists in this section are not
         /// exhaustive.
         ///
+        /// Cancellation safety describes what happens when a future is dropped
+        /// before it completes. Whether something is cancellation safe depends on
+        /// the behavior of the future passed to `select!`, which may come from an
+        /// async method, an async expression, or another future-producing operation.
+        ///
         /// The following methods are cancellation safe:
         ///
         ///  * [`tokio::sync::mpsc::Receiver::recv`](crate::sync::mpsc::Receiver::recv)

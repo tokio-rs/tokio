@@ -3,6 +3,7 @@ use crate::Stream;
 use core::fmt;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -69,5 +70,15 @@ where
         }
 
         (lower, upper)
+    }
+}
+
+impl<St, F> FusedStream for SkipWhile<St, F>
+where
+    St: FusedStream,
+    F: FnMut(&St::Item) -> bool,
+{
+    fn is_terminated(&self) -> bool {
+        self.stream.is_terminated()
     }
 }

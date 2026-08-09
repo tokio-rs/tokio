@@ -84,7 +84,7 @@ cfg_io_util! {
 
 
     // used by `BufReader` and `BufWriter`
-    // https://github.com/rust-lang/rust/blob/master/library/std/src/sys_common/io.rs#L1
+    // https://github.com/rust-lang/rust/blob/main/library/std/src/sys/io/mod.rs#L72
     const DEFAULT_BUF_SIZE: usize = 8 * 1024;
 
     cfg_coop! {

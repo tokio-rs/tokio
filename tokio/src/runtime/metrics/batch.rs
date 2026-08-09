@@ -4,6 +4,7 @@ cfg_unstable_metrics! {
     use crate::runtime::metrics::HistogramBatch;
 }
 
+use crate::runtime::metrics::ScheduleLatencyContext;
 use std::sync::atomic::Ordering::Relaxed;
 use std::time::{Duration, Instant};
 
@@ -53,6 +54,9 @@ pub(crate) struct MetricsBatch {
     #[cfg(tokio_unstable)]
     /// If `Some`, tracks poll times in nanoseconds
     poll_timer: Option<PollTimer>,
+
+    #[cfg(feature = "schedule-latency")]
+    schedule_latencies: Option<HistogramBatch>,
 }
 
 cfg_unstable_metrics! {
@@ -95,6 +99,14 @@ impl MetricsBatch {
                             poll_started_at: now,
                         })
                 });
+                // Schedule latencies cannot be tracked if `Instant::now()` is unavailable
+                #[cfg(feature = "schedule-latency")]
+                let schedule_latencies = maybe_now.and_then(|_| {
+                    worker_metrics
+                        .schedule_latency_histogram
+                        .as_ref()
+                        .map(HistogramBatch::from_histogram)
+                });
                 MetricsBatch {
                     park_count: 0,
                     park_unpark_count: 0,
@@ -108,6 +120,8 @@ impl MetricsBatch {
                     busy_duration_total: 0,
                     processing_scheduled_tasks_started_at: maybe_now,
                     poll_timer,
+                    #[cfg(feature = "schedule-latency")]
+                    schedule_latencies,
                 }
             }
         }
@@ -154,6 +168,12 @@ impl MetricsBatch {
                 if let Some(poll_timer) = &self.poll_timer {
                     let dst = worker.poll_count_histogram.as_ref().unwrap();
                     poll_timer.poll_counts.submit(dst);
+                }
+
+                #[cfg(feature = "schedule-latency")]
+                if let Some(schedule_latencies) = &self.schedule_latencies {
+                    let dst = worker.schedule_latency_histogram.as_ref().unwrap();
+                    schedule_latencies.submit(dst);
                 }
             }
         }
@@ -206,17 +226,95 @@ impl MetricsBatch {
     cfg_metrics_variant! {
         stable: {
             /// Start polling an individual task
-            pub(crate) fn start_poll(&mut self) {}
+            pub(crate) fn start_poll(
+                &mut self,
+                _schedule_latency_context: Option<ScheduleLatencyContext>,
+            ) -> Option<Duration> {
+                None
+            }
         },
         unstable: {
             /// Start polling an individual task
-            pub(crate) fn start_poll(&mut self) {
+            ///
+            /// # Arguments
+            ///
+            /// `schedule_latency_context` is used to calculate task schedule latency.
+            pub(crate) fn start_poll(
+                &mut self,
+                schedule_latency_context: Option<ScheduleLatencyContext>,
+            ) -> Option<Duration> {
                 self.poll_count += 1;
-                if let Some(poll_timer) = &mut self.poll_timer {
-                    poll_timer.poll_started_at = Instant::now();
+                let poll_started_at = self.poll_timer.as_mut().map(|poll_timer| {
+                    let now = Instant::now();
+                    poll_timer.poll_started_at = now;
+                    now
+                });
+
+                #[cfg(feature = "schedule-latency")]
+                {
+                    self.record_schedule_latency_at(schedule_latency_context, poll_started_at)
+                }
+
+                #[cfg(not(feature = "schedule-latency"))]
+                {
+                    let _ = (poll_started_at, schedule_latency_context);
+                    None
                 }
             }
         }
+    }
+
+    cfg_metrics_variant! {
+        stable: {
+            /// Record the schedule latency of an additional task polled as part
+            /// of the current poll operation.
+            #[cfg(feature = "rt-multi-thread")]
+            pub(crate) fn record_schedule_latency(
+                &mut self,
+                _schedule_latency_context: Option<ScheduleLatencyContext>,
+            ) -> Option<Duration> {
+                None
+            }
+        },
+        unstable: {
+            /// Record the schedule latency of an additional task polled as part
+            /// of the current poll operation.
+            #[cfg(feature = "rt-multi-thread")]
+            pub(crate) fn record_schedule_latency(
+                &mut self,
+                schedule_latency_context: Option<ScheduleLatencyContext>,
+            ) -> Option<Duration> {
+                #[cfg(feature = "schedule-latency")]
+                {
+                    self.record_schedule_latency_at(schedule_latency_context, None)
+                }
+
+                #[cfg(not(feature = "schedule-latency"))]
+                {
+                    let _ = schedule_latency_context;
+                    None
+                }
+            }
+        }
+    }
+
+    #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
+    fn record_schedule_latency_at(
+        &mut self,
+        schedule_latency_context: Option<ScheduleLatencyContext>,
+        poll_started_at: Option<Instant>,
+    ) -> Option<Duration> {
+        let task_schedule_latency = schedule_latency_context.and_then(|schedule_latency_context| {
+            poll_started_at
+                .or_else(now)
+                .map(|now| Duration::from_nanos(schedule_latency_context.elapsed_nanos(now)))
+        });
+        if let (Some(task_schedule_latency), Some(schedule_latencies)) =
+            (task_schedule_latency, &mut self.schedule_latencies)
+        {
+            schedule_latencies.measure(duration_as_u64(task_schedule_latency), 1);
+        }
+        task_schedule_latency
     }
 
     cfg_metrics_variant! {

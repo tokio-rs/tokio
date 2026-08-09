@@ -8,6 +8,7 @@ use core::task::{Context, Poll};
 #[must_use = "streams do nothing unless polled"]
 pub struct Iter<I> {
     iter: I,
+    #[cfg(not(feature = "rt"))]
     yield_amt: usize,
 }
 
@@ -36,6 +37,7 @@ where
 {
     Iter {
         iter: i.into_iter(),
+        #[cfg(not(feature = "rt"))]
         yield_amt: 0,
     }
 }
@@ -47,17 +49,33 @@ where
     type Item = I::Item;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<I::Item>> {
-        // TODO: add coop back
-        if self.yield_amt >= 32 {
-            self.yield_amt = 0;
+        #[cfg(feature = "rt")]
+        {
+            use tokio::task::coop;
 
-            cx.waker().wake_by_ref();
+            let coop = std::task::ready!(coop::poll_proceed(cx));
+            let item = self.iter.next();
 
-            Poll::Pending
-        } else {
-            self.yield_amt += 1;
+            coop.made_progress();
 
-            Poll::Ready(self.iter.next())
+            Poll::Ready(item)
+        }
+
+        #[cfg(not(feature = "rt"))]
+        {
+            if self.yield_amt >= 32 {
+                self.yield_amt = 0;
+
+                cx.waker().wake_by_ref();
+
+                Poll::Pending
+            } else {
+                let item = self.iter.next();
+
+                self.yield_amt += 1;
+
+                Poll::Ready(item)
+            }
         }
     }
 

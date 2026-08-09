@@ -202,6 +202,27 @@ async fn reset_entry() {
     assert!(entry.is_none())
 }
 
+#[tokio::test]
+async fn reset_to_past_wakes_pending_queue() {
+    time::pause();
+
+    let mut queue = task::spawn(DelayQueue::new());
+    let key = queue.insert("foo", ms(10_000));
+
+    assert_pending!(poll!(queue));
+    assert!(!queue.is_woken());
+
+    queue.reset_at(&key, Instant::now() - ms(100));
+
+    assert!(queue.is_woken());
+
+    let entry = assert_ready_some!(poll!(queue));
+    assert_eq!(*entry.get_ref(), "foo");
+
+    let entry = assert_ready!(poll!(queue));
+    assert!(entry.is_none());
+}
+
 // Reproduces tokio-rs/tokio#849.
 #[tokio::test]
 async fn reset_much_later() {
@@ -889,6 +910,20 @@ async fn wake_after_remove_last() {
     assert_pending!(poll!(queue));
 
     queue.remove(&key);
+
+    assert!(queue.is_woken());
+    assert!(assert_ready!(poll!(queue)).is_none());
+}
+
+#[tokio::test(start_paused = true)]
+async fn wake_after_clear() {
+    let mut queue = task::spawn(DelayQueue::new());
+    queue.insert("foo", ms(1000));
+
+    assert_pending!(poll!(queue));
+    assert!(!queue.is_woken());
+
+    queue.clear();
 
     assert!(queue.is_woken());
     assert!(assert_ready!(poll!(queue)).is_none());

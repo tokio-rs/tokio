@@ -94,7 +94,9 @@ where
         if !*me.done_first {
             let rem = buf.remaining();
             ready!(me.first.poll_read(cx, buf))?;
-            if buf.remaining() == rem {
+            // A read that fills nothing only indicates EOF if the buffer
+            // had capacity to begin with.
+            if buf.remaining() == rem && rem != 0 {
                 *me.done_first = true;
             } else {
                 return Poll::Ready(Ok(()));

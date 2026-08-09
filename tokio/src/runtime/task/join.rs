@@ -28,9 +28,9 @@ cfg_rt! {
     ///
     /// # Cancel safety
     ///
-    /// The `&mut JoinHandle<T>` type is cancel safe. If it is used as the event
-    /// in a `tokio::select!` statement and some other branch completes first,
-    /// then it is guaranteed that the output of the task is not lost.
+    /// Awaiting a `&mut JoinHandle<T>` is cancel safe. If it is used as a
+    /// branch in `tokio::select!` and another branch completes first, then it
+    /// is guaranteed that the output of the task is not lost.
     ///
     /// If a `JoinHandle` is dropped, then the task continues running in the
     /// background and its return value is lost.
@@ -325,7 +325,7 @@ impl<T> Future for JoinHandle<T> {
     type Output = super::Result<T>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         let mut ret = Poll::Pending;
 
         // Keep track of task budget

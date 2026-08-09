@@ -674,13 +674,9 @@ fn worker_local_queue_depth() {
             });
 
             // Bump the next-run spawn
-            let nop = tokio::spawn(async {});
+            tokio::spawn(async {});
 
-            // Wait until we're sure the other worker is blocked.
             rx1.recv().unwrap();
-            // Make sure the no-op task has terminated so that it doesn't end up
-            // in the LIFO slot and throw off our counts.
-            let _ = nop.await;
 
             // Spawn some tasks
             for _ in 0..100 {
@@ -802,6 +798,106 @@ fn io_driver_ready_count() {
     let _stream = rt.block_on(async move { stream.await.unwrap() });
 
     assert_eq!(metrics.io_driver_ready_count(), 1);
+}
+
+#[cfg(feature = "schedule-latency")]
+#[test]
+fn schedule_latency_counts() {
+    const N: u64 = 50;
+    let rts = [
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .enable_metrics_schedule_latency_histogram()
+            .metrics_schedule_latency_histogram_configuration(HistogramConfiguration::linear(
+                Duration::from_millis(50),
+                3,
+            ))
+            .build()
+            .unwrap(),
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .enable_metrics_schedule_latency_histogram()
+            .metrics_schedule_latency_histogram_configuration(HistogramConfiguration::linear(
+                Duration::from_millis(50),
+                3,
+            ))
+            .build()
+            .unwrap(),
+    ];
+
+    for rt in rts {
+        let metrics = rt.metrics();
+        rt.block_on(async {
+            for _ in 0..N {
+                tokio::spawn(async {}).await.unwrap();
+            }
+        });
+        drop(rt);
+
+        let num_workers = metrics.num_workers();
+        let num_buckets = metrics.schedule_latency_histogram_num_buckets();
+
+        assert!(metrics.schedule_latency_histogram_enabled());
+        assert_eq!(num_buckets, 3);
+
+        let n = (0..num_workers)
+            .flat_map(|i| (0..num_buckets).map(move |j| (i, j)))
+            .map(|(worker, bucket)| metrics.schedule_latency_histogram_bucket_count(worker, bucket))
+            .sum();
+        assert_eq!(N, n);
+    }
+}
+
+#[cfg(feature = "schedule-latency")]
+#[test]
+fn schedule_latency_lifo_polls_are_recorded_individually() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_metrics_schedule_latency_histogram()
+        .enable_metrics_poll_time_histogram()
+        .metrics_schedule_latency_histogram_configuration(HistogramConfiguration::linear(
+            Duration::from_millis(10),
+            3,
+        ))
+        .build()
+        .unwrap();
+    let metrics = rt.metrics();
+
+    rt.block_on(async {
+        tokio::spawn(async {
+            drop(tokio::spawn(async {}));
+            wait_for_elapsed(Duration::from_millis(50));
+        })
+        .await
+        .unwrap();
+    });
+    drop(rt);
+
+    let bucket_counts = (0..metrics.schedule_latency_histogram_num_buckets())
+        .map(|bucket| metrics.schedule_latency_histogram_bucket_count(0, bucket))
+        .collect::<Vec<_>>();
+
+    assert_eq!(bucket_counts.iter().sum::<u64>(), 2);
+    assert!(bucket_counts.last().is_some_and(|count| *count >= 1));
+
+    assert_eq!(metrics.worker_poll_count(0), 1);
+    let poll_time_samples = (0..metrics.poll_time_histogram_num_buckets())
+        .map(|bucket| metrics.poll_time_histogram_bucket_count(0, bucket))
+        .sum::<u64>();
+    assert_eq!(poll_time_samples, 1);
+}
+
+#[cfg(feature = "schedule-latency")]
+fn wait_for_elapsed(duration: Duration) {
+    let start = std::time::Instant::now();
+    loop {
+        let elapsed = start.elapsed();
+        if elapsed >= duration {
+            return;
+        }
+        std::thread::sleep(duration - elapsed);
+    }
 }
 
 async fn try_spawn_stealable_task() -> Result<(), mpsc::RecvTimeoutError> {

@@ -107,12 +107,10 @@ pub(crate) struct ScheduledIo {
     waiters: Mutex<Waiters>,
 }
 
-type WaitList = LinkedList<Waiter, <Waiter as linked_list::Link>::Target>;
-
 #[derive(Debug, Default)]
 struct Waiters {
     /// List of all current waiters.
-    list: WaitList,
+    list: LinkedList<Waiter>,
 
     /// Waker used for `AsyncRead`.
     reader: Option<Waker>,
@@ -202,7 +200,7 @@ impl ScheduledIo {
     /// the current value, returning the previous readiness value.
     ///
     /// # Arguments
-    /// - `tick`: whether setting the tick or trying to clear readiness for a
+    /// - `tick_op`: whether setting the tick or trying to clear readiness for a
     ///   specific tick.
     /// - `f`: a closure returning a new readiness value given the previous
     ///   readiness.

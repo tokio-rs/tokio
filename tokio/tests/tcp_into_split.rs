@@ -1,6 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support multithreading or peeking
-                                                                   // No `socket` on miri.
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support multithreading or peeking
 
 use std::io::{Error, ErrorKind, Result};
 use std::io::{Read, Write};

@@ -1,13 +1,11 @@
 #![warn(rust_2018_idioms)]
 // WASIp1 doesn't support bind
-// No `socket` on miri.
 #![cfg(all(
     feature = "net",
     feature = "macros",
     feature = "rt",
     feature = "io-util",
     not(all(target_os = "wasi", target_env = "p1")),
-    not(miri)
 ))]
 
 use std::io::Read;

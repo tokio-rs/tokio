@@ -3,6 +3,7 @@ use crate::Stream;
 use core::fmt;
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -48,13 +49,7 @@ where
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if !*self.as_mut().project().done {
             self.as_mut().project().stream.poll_next(cx).map(|ready| {
-                let ready = ready.and_then(|item| {
-                    if !(self.as_mut().project().predicate)(&item) {
-                        None
-                    } else {
-                        Some(item)
-                    }
-                });
+                let ready = ready.filter(self.as_mut().project().predicate);
 
                 if ready.is_none() {
                     *self.as_mut().project().done = true;
@@ -75,5 +70,15 @@ where
         let (_, upper) = self.stream.size_hint();
 
         (0, upper)
+    }
+}
+
+impl<St, F> FusedStream for TakeWhile<St, F>
+where
+    St: Stream,
+    F: FnMut(&St::Item) -> bool,
+{
+    fn is_terminated(&self) -> bool {
+        self.done
     }
 }

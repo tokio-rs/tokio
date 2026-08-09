@@ -146,7 +146,7 @@ impl Registration {
         cx: &mut Context<'_>,
         direction: Direction,
     ) -> Poll<io::Result<ReadyEvent>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
         let ev = ready!(self.shared.poll_readiness(cx, direction));

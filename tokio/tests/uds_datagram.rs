@@ -21,7 +21,7 @@ async fn echo_server(socket: UnixDatagram) -> io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
+#[cfg_attr(miri, ignore)] // No Unix domain sockets on miri.
 async fn echo() -> io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
@@ -46,7 +46,7 @@ async fn echo() -> io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
+#[cfg_attr(miri, ignore)] // No Unix domain sockets on miri.
 async fn echo_from() -> io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
@@ -119,7 +119,7 @@ async fn try_send_recv_never_block() -> io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
+#[cfg_attr(miri, ignore)] // No Unix domain sockets on miri.
 async fn split() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("split.sock");
@@ -144,7 +144,7 @@ async fn split() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
+#[cfg_attr(miri, ignore)] // No Unix domain sockets on miri.
 async fn send_to_recv_from_poll() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let sender_path = dir.path().join("sender.sock");
@@ -166,7 +166,7 @@ async fn send_to_recv_from_poll() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
+#[cfg_attr(miri, ignore)] // No Unix domain sockets on miri.
 async fn send_recv_poll() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let sender_path = dir.path().join("sender.sock");
@@ -190,7 +190,7 @@ async fn send_recv_poll() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
+#[cfg_attr(miri, ignore)] // No Unix domain sockets on miri.
 async fn try_send_to_recv_from() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
@@ -238,7 +238,7 @@ async fn try_send_to_recv_from() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
+#[cfg_attr(miri, ignore)] // No Unix domain sockets on miri.
 async fn try_recv_buf_from() -> std::io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
@@ -286,7 +286,7 @@ async fn try_recv_buf_from() -> std::io::Result<()> {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` on miri.
+#[cfg_attr(miri, ignore)] // No Unix domain sockets on miri.
 async fn recv_buf_from() -> std::io::Result<()> {
     let tmp = tempfile::tempdir()?;
 

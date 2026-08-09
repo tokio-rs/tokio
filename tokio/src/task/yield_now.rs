@@ -38,7 +38,7 @@ use std::task::{ready, Poll};
 pub async fn yield_now() {
     let mut yielded = false;
     poll_fn(|cx| {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         if yielded {
             return Poll::Ready(());
@@ -46,6 +46,12 @@ pub async fn yield_now() {
 
         yielded = true;
 
+        // Don't wake the task immediately, as that would push it right back
+        // onto the run queue and it could be polled again before other tasks
+        // or the IO/timer driver get a chance to run. Instead, hand the waker
+        // to the scheduler, which wakes deferred tasks only after it has run
+        // out of ready tasks and polled the driver. When polled from outside
+        // a Tokio runtime, the waker is woken immediately.
         context::defer(cx.waker());
 
         Poll::Pending

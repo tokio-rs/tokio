@@ -86,6 +86,11 @@ impl LocalRuntime {
     /// // Use the runtime...
     /// ```
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the I/O driver or other OS resources required by the
+    /// runtime cannot be initialized.
+    ///
     /// [mod]: crate::runtime
     /// [runtime builder]: crate::runtime::Builder
     pub fn new() -> std::io::Result<LocalRuntime> {
@@ -234,7 +239,12 @@ impl LocalRuntime {
             feature = "taskdump",
             feature = "rt",
             target_os = "linux",
-            any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+            any(
+                target_arch = "aarch64",
+                target_arch = "x86",
+                target_arch = "x86_64",
+                target_arch = "s390x"
+            )
         ))]
         let future = crate::runtime::task::trace::Trace::root(future);
 

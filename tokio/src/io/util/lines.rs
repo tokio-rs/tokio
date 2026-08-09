@@ -49,7 +49,7 @@ where
     ///
     /// # Cancel safety
     ///
-    /// This method is cancellation safe.
+    /// This method is cancel safe.
     ///
     /// # Examples
     ///

@@ -519,6 +519,110 @@ async fn recv_close_gets_none_reserved() {
     assert!(rx.recv().await.is_none());
 }
 
+#[test]
+fn failed_reserve_many_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(2);
+
+    // Hold one of the two slots so the reservation can only take the other one
+    // and has to queue for the second.
+    let permit = tx.try_reserve().unwrap();
+
+    let mut reserve = tokio_test::task::spawn(tx.reserve_many(2));
+    assert_pending!(reserve.poll());
+
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+
+    // One slot is still outstanding, so the channel is not idle and the
+    // receiver must not be woken yet.
+    drop(permit);
+    assert!(!recv.is_woken());
+
+    // The reservation fails on the closed channel and returns the slot it had
+    // already acquired, leaving the channel idle. The receiver must be woken.
+    assert_ready_err!(reserve.poll());
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn cancelled_reserve_many_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(2);
+
+    let permit = tx.try_reserve().unwrap();
+
+    let mut reserve = tokio_test::task::spawn(tx.reserve_many(2));
+    assert_pending!(reserve.poll());
+
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+
+    drop(permit);
+    assert!(!recv.is_woken());
+
+    // Cancelling the reservation returns the slot it had already acquired,
+    // leaving the channel idle. The receiver must be woken.
+    drop(reserve);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn failed_reserve_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(1);
+
+    // Hold the only slot so the reservation below has to queue.
+    let permit = tx.try_reserve().unwrap();
+
+    let mut reserve = tokio_test::task::spawn(tx.reserve());
+    assert_pending!(reserve.poll());
+
+    // Returning the slot assigns it to the queued reservation, which is woken
+    // but not yet polled, so the channel stays non-idle.
+    drop(permit);
+    assert!(reserve.is_woken());
+
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+
+    // The reservation fails on the closed channel despite holding the
+    // assigned slot; returning it leaves the channel idle. The receiver must
+    // be woken.
+    assert_ready_err!(reserve.poll());
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn cancelled_reserve_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(1);
+
+    let permit = tx.try_reserve().unwrap();
+
+    let mut reserve = tokio_test::task::spawn(tx.reserve());
+    assert_pending!(reserve.poll());
+
+    drop(permit);
+    assert!(reserve.is_woken());
+
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+
+    // Cancelling the reservation returns the slot it was assigned, leaving
+    // the channel idle. The receiver must be woken.
+    drop(reserve);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
 #[maybe_tokio_test]
 async fn tx_close_gets_none() {
     let (_, mut rx) = mpsc::channel::<i32>(10);
@@ -788,6 +892,91 @@ async fn drop_permit_iterator_releases_permits() {
     }
 }
 
+#[test]
+fn dropping_last_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permit);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn dropping_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permit);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn dropping_last_permit_iterator_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permits = tx.try_reserve_many(1).unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    drop(permits);
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn sending_last_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    permit.send(());
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn sending_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    permit.send(());
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+}
+
+#[test]
+fn releasing_last_owned_permit_wakes_closed_receiver() {
+    let (tx, mut rx) = mpsc::channel::<()>(100);
+
+    let permit = tx.try_reserve_owned().unwrap();
+    rx.close();
+
+    let mut recv = tokio_test::task::spawn(rx.recv());
+    assert_pending!(recv.poll());
+    let inert_sender = permit.release();
+    assert!(recv.is_woken());
+    assert_ready!(recv.poll());
+    drop(inert_sender);
+}
+
 #[maybe_tokio_test]
 async fn dropping_rx_closes_channel() {
     let (tx, rx) = mpsc::channel(100);
@@ -996,6 +1185,19 @@ fn try_recv_after_receiver_close() {
 
     assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
     rx.close();
+    assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
+}
+
+#[test]
+fn try_recv_after_receiver_close_with_permit() {
+    let (tx, mut rx) = mpsc::channel::<()>(5);
+
+    let permit = tx.try_reserve().unwrap();
+
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    rx.close();
+    assert_eq!(Err(TryRecvError::Empty), rx.try_recv());
+    drop(permit);
     assert_eq!(Err(TryRecvError::Disconnected), rx.try_recv());
 }
 
@@ -1531,6 +1733,40 @@ fn drop_all_elements_during_panic() {
 
     drop(tx);
     // `mpsc::Chan`'s drop is called, freeing the `Block` memory allocation.
+}
+
+/// A task's wakers keep its memory allocation alive. This test ensures
+/// `mpsc::channel` releases the rx waker immediately upon drop to potentially
+/// free up resources.
+#[test]
+fn release_waker_on_rx_drop() {
+    use std::task::{Context, Wake, Waker};
+
+    struct DummyWaker;
+    impl Wake for DummyWaker {
+        fn wake(self: Arc<Self>) {}
+    }
+
+    // Create a dummy Arc<impl Wake> to count waker references
+    let dummy = Arc::new(DummyWaker);
+    let waker = Waker::from(dummy.clone());
+    let mut cx = Context::from_waker(&waker);
+
+    // Baseline: 2 references (`dummy` and `waker`)
+    assert_eq!(Arc::strong_count(&dummy), 2);
+
+    // Register `waker` in rx
+    let (_tx, mut rx) = mpsc::channel::<()>(1);
+    assert_pending!(rx.poll_recv(&mut cx));
+    assert_eq!(Arc::strong_count(&dummy), 3);
+
+    // Drop rx, releasing the stored waker
+    drop(rx);
+    assert_eq!(
+        Arc::strong_count(&dummy),
+        2,
+        "dropping rx did not drop its waker",
+    );
 }
 
 fn is_debug<T: fmt::Debug>(_: &T) {}

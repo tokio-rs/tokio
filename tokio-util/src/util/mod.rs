@@ -1,4 +1,6 @@
 mod maybe_dangling;
+#[cfg(feature = "codec")]
+pub(crate) mod memchr;
 #[cfg(any(feature = "io", feature = "codec"))]
 mod poll_buf;
 

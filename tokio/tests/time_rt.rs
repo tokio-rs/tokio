@@ -164,3 +164,38 @@ fn timeout_value() {
         });
     }
 }
+
+#[test]
+#[cfg(feature = "test-util")]
+fn tickspace() {
+    use futures::task::noop_waker_ref;
+    use std::future::Future as _;
+    use std::task::Context;
+    use std::thread;
+    use tokio_test::assert_pending;
+
+    let rt = || {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .start_paused(true)
+            .build()
+            .unwrap()
+    };
+
+    let rt_past = rt();
+    thread::sleep(Duration::from_millis(1));
+    let rt = rt();
+
+    let _guard = rt_past.enter();
+    let mut sleep = std::pin::pin!(sleep(Duration::from_millis(1)));
+    assert_pending!(sleep
+        .as_mut()
+        .poll(&mut Context::from_waker(noop_waker_ref())));
+
+    let deadline = sleep.deadline();
+    rt.block_on(async { sleep.as_mut().reset(deadline + Duration::from_millis(1)) });
+
+    let now = Instant::now();
+    rt_past.block_on(sleep);
+    assert_eq!(now.elapsed(), Duration::from_millis(2));
+}

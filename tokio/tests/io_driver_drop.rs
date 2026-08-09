@@ -6,7 +6,6 @@ use tokio::runtime;
 use tokio_test::{assert_err, assert_pending, assert_ready, task};
 
 #[test]
-#[cfg_attr(miri, ignore)] // No `socket` in miri.
 fn tcp_doesnt_block() {
     let rt = rt();
 
@@ -29,7 +28,6 @@ fn tcp_doesnt_block() {
 }
 
 #[test]
-#[cfg_attr(miri, ignore)] // No `socket` in miri.
 fn drop_wakes() {
     let rt = rt();
 
