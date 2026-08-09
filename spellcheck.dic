@@ -1,4 +1,4 @@
-324
+330
 &
 +
 <
@@ -106,6 +106,8 @@ dns
 DNS
 DoS
 dwOpenMode
+Emscripten
+Emscripten's
 endian
 enqueue
 enqueued
@@ -160,6 +162,8 @@ IP
 IPv4
 IPv6
 iteratively
+JS
+JSPI
 Kotlin's
 latencies
 Lauck
@@ -264,6 +268,7 @@ subfield
 suboptimal
 subprocess
 superset
+suspendable
 symlink
 symlinks
 sys
@@ -320,6 +325,7 @@ Wakers
 wakeup
 wakeups
 WASI
+Wasm
 watchOS
 workstealing
 ZST

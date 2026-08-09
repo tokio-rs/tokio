@@ -1,5 +1,15 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))]
+#![cfg(any(
+    all(feature = "full", not(target_os = "wasi")),
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 #![cfg(panic = "unwind")]
 
 use std::{error::Error, sync::Arc};
