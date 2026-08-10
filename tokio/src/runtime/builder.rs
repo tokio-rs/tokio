@@ -139,6 +139,9 @@ pub struct Builder {
     pub(super) metrics_poll_count_histogram: HistogramBuilder,
 
     /// When true, enables task schedule latency instrumentation.
+    pub(super) track_task_schedule_latency: bool,
+
+    /// When true, enables the task schedule latency histogram.
     pub(super) metrics_schedule_latency_histogram_enabled: bool,
 
     /// Configures the task schedule latency histogram.
@@ -152,6 +155,9 @@ pub struct Builder {
     /// Whether or not to enable eager hand-off for the I/O and time drivers (in
     /// `tokio_unstable`).
     enable_eager_driver_handoff: bool,
+
+    /// When true, the blocking pool uses the sharded queue implementation.
+    pub(super) sharded_blocking_queue: bool,
 }
 
 cfg_unstable! {
@@ -239,6 +245,16 @@ cfg_unstable! {
 }
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
+
+/// The default for the `sharded_blocking_queue` option: enabled iff the
+/// `TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE` environment variable is set to a
+/// value other than `0`.
+fn sharded_blocking_queue_default() -> bool {
+    match std::env::var_os("TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE") {
+        Some(value) => !value.is_empty() && value != "0",
+        None => false,
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(crate) enum Kind {
@@ -341,6 +357,8 @@ impl Builder {
 
             metrics_poll_count_histogram: HistogramBuilder::default(),
 
+            track_task_schedule_latency: false,
+
             metrics_schedule_latency_histogram_enabled: false,
 
             metrics_schedule_latency_histogram: HistogramBuilder::default(),
@@ -351,6 +369,8 @@ impl Builder {
 
             // Eager driver handoff is disabled by default.
             enable_eager_driver_handoff: false,
+
+            sharded_blocking_queue: sharded_blocking_queue_default(),
         }
     }
 
@@ -462,6 +482,47 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
     pub fn enable_eager_driver_handoff(&mut self) -> &mut Self {
         self.enable_eager_driver_handoff = true;
+        self
+    }
+
+    /// Enables the sharded `spawn_blocking` queue, which is disabled by
+    /// default.
+    ///
+    /// By default, the blocking pool's task queue is protected by a single
+    /// mutex, which can become a point of contention when many threads spawn
+    /// blocking tasks concurrently. When this option is enabled, tasks are
+    /// instead distributed across several independently-locked queue shards.
+    ///
+    /// The sharded queue can also be enabled by setting the
+    /// `TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE` environment variable to any
+    /// value other than `0`.
+    ///
+    /// [Click here to share your experience with the sharded queue](https://github.com/tokio-rs/tokio/issues/8067)
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The sharded
+    /// `spawn_blocking` queue is an experimental feature that may be removed
+    /// or become the default behavior in 1.x releases. See
+    /// [the documentation on unstable features][unstable] for details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///   .enable_sharded_blocking_queue()
+    ///   .build()
+    ///   .unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [unstable]: crate#unstable-features
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn enable_sharded_blocking_queue(&mut self) -> &mut Self {
+        self.sharded_blocking_queue = true;
         self
     }
 
@@ -914,6 +975,9 @@ impl Builder {
     /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback being
     /// invoked immediately.
     ///
+    /// When task schedule latency tracking is enabled, the latency is available
+    /// from `TaskMeta::schedule_latency`.
+    ///
     /// **Note**: This is an [unstable API][unstable]. The public API of this type
     /// may break in 1.x releases. See [the documentation on unstable
     /// features][unstable] for details.
@@ -960,6 +1024,9 @@ impl Builder {
     /// `f` is called within the Tokio context, so functions like
     /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback being
     /// invoked immediately.
+    ///
+    /// When task schedule latency tracking is enabled, the latency is available
+    /// from `TaskMeta::schedule_latency`.
     ///
     /// **Note**: This is an [unstable API][unstable]. The public API of this type
     /// may break in 1.x releases. See [the documentation on unstable
@@ -1728,6 +1795,7 @@ impl Builder {
                 enable_eager_driver_handoff: false,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                track_task_schedule_latency: self.track_task_schedule_latency,
                 metrics_schedule_latency_histogram: self
                     .metrics_schedule_latency_histogram_builder(),
             },
@@ -1880,6 +1948,46 @@ cfg_test_util! {
 
 cfg_schedule_latency! {
     impl Builder {
+        /// Enables tracking task schedule latency.
+        ///
+        /// Task schedule latency is measured from a task's most recent
+        /// transition to the scheduled state until immediately before it is
+        /// polled. Waking a task that is already scheduled does not reset the
+        /// measurement. Once enabled, the latency is available to task poll
+        /// hooks through [`TaskMeta::schedule_latency`].
+        ///
+        /// Task schedule latencies are not tracked by default as doing so
+        /// requires calling [`Instant::now()`] when a task is scheduled and
+        /// when it is polled, which could add measurable overhead.
+        ///
+        /// The [`enable_metrics_schedule_latency_histogram`] method also
+        /// enables tracking and records the latencies in a histogram.
+        ///
+        /// **This feature is only supported on 64-bit targets.**
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # use tokio::runtime;
+        /// let runtime = runtime::Builder::new_current_thread()
+        ///     .track_task_schedule_latency()
+        ///     .on_before_task_poll(|meta| {
+        ///         if let Some(latency) = meta.schedule_latency() {
+        ///             println!("task schedule latency: {latency:?}");
+        ///         }
+        ///     })
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        ///
+        /// [`TaskMeta::schedule_latency`]: crate::runtime::TaskMeta::schedule_latency
+        /// [`Instant::now()`]: std::time::Instant::now
+        /// [`enable_metrics_schedule_latency_histogram`]: Builder::enable_metrics_schedule_latency_histogram
+        pub fn track_task_schedule_latency(&mut self) -> &mut Self {
+            self.track_task_schedule_latency = true;
+            self
+        }
+
         /// Enables tracking the distribution of task schedule latencies. Task
         /// schedule latency is the time between when a task is scheduled for
         /// execution and when it is polled.
@@ -1895,6 +2003,10 @@ cfg_schedule_latency! {
         /// This has an extremely low memory footprint, but may not provide enough granularity. For
         /// better granularity with low memory usage, use [`metrics_schedule_latency_histogram_configuration()`]
         /// to select [`LogHistogram`] instead.
+        ///
+        /// On the multi-thread runtime, each task polled from the LIFO slot is
+        /// recorded as a separate schedule-latency sample. Task poll hooks
+        /// receive the same per-task latency through [`TaskMeta::schedule_latency`].
         ///
         /// # Examples
         ///
@@ -1921,6 +2033,7 @@ cfg_schedule_latency! {
         /// [`LogHistogram`]: crate::runtime::LogHistogram
         /// [`metrics_schedule_latency_histogram_configuration()`]: Builder::metrics_schedule_latency_histogram_configuration
         pub fn enable_metrics_schedule_latency_histogram(&mut self) -> &mut Self {
+            self.track_task_schedule_latency = true;
             self.metrics_schedule_latency_histogram_enabled = true;
             self
         }
@@ -2050,6 +2163,7 @@ cfg_rt_multi_thread! {
                     enable_eager_driver_handoff: self.enable_eager_driver_handoff,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                    track_task_schedule_latency: self.track_task_schedule_latency,
                     metrics_schedule_latency_histogram: self.metrics_schedule_latency_histogram_builder(),
                 },
                 self.timer_flavor,

@@ -20,12 +20,3 @@ impl ScheduleLatencyInstant {
 pub(crate) struct ScheduleLatencyContext {
     _private: (),
 }
-
-impl ScheduleLatencyContext {
-    // This method is referenced (but never called) when the `schedule-latency`
-    // feature is disabled and `tokio_unstable` is enabled.
-    #[allow(dead_code)]
-    pub(crate) fn elapsed_nanos(&self, _now: Instant) -> u64 {
-        unimplemented!("This should never be called because prepare() always returns None")
-    }
-}

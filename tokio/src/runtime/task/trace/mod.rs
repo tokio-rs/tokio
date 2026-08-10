@@ -147,7 +147,9 @@ impl Context {
     pub(crate) fn is_tracing() -> bool {
         // SAFETY: This call can only access the trace_leaf_fn field, so it cannot break the trace
         // frame linked list.
-        unsafe { Self::try_with_current(|ctx| ctx.trace_leaf_fn.get().is_some()).unwrap_or(false) }
+        unsafe {
+            Self::try_with_current(|ctx| ctx.trace_leaf_fn.get().is_some()).unwrap_or_default()
+        }
     }
 }
 
