@@ -1092,7 +1092,7 @@ impl Semaphore {
     ///
     /// The semaphore must be wrapped in an [`Arc`] to call this method.
     /// If the semaphore has been closed, this returns an [`AcquireError`].
-    /// Otherwise, this returns a [`OwnedSemaphorePermit`] representing the
+    /// Otherwise, this returns an [`OwnedSemaphorePermit`] representing the
     /// acquired permits.
     ///
     /// This method is the blocking equivalent of [`acquire_many_owned`].
