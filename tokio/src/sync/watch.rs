@@ -363,7 +363,8 @@ struct Shared<T> {
     /// Tracks the number of `WeakSender` instances.
     ///
     /// Weak senders are not part of `ref_count_tx`, so they do not keep the
-    /// channel open.
+    /// channel open. This counter only backs `Sender::weak_sender_count` and
+    /// `WeakSender::weak_sender_count`; it has no effect on the channel logic.
     ref_count_weak_tx: AtomicUsize,
 
     /// Notifies waiting receivers that the value changed.
