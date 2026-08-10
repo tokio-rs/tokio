@@ -372,7 +372,11 @@ impl Mock {
         }
     }
 
-    /// Pull the next handle action when the current queue has no matching Write.
+    /// Pull the next already-available handle action when the current queue has
+    /// no matching Write.
+    ///
+    /// Only actions that are ready now are accepted. If the handle has nothing
+    /// queued yet, or is closed, the write is unexpected and this panics.
     ///
     /// See <https://github.com/tokio-rs/tokio/issues/8329>.
     fn poll_next_action_for_write(&mut self, cx: &mut task::Context<'_>) -> Poll<()> {
@@ -381,8 +385,7 @@ impl Mock {
                 self.inner.actions.push_back(action);
                 Poll::Ready(())
             }
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(None) => {
+            Poll::Pending | Poll::Ready(None) => {
                 panic!("unexpected write {}", self.pmsg());
             }
         }

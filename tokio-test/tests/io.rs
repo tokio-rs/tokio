@@ -207,23 +207,19 @@ async fn write_drains_interleaved_handle_read_before_write() {
 }
 
 #[test]
-fn write_with_handle_after_pending() {
+#[should_panic(expected = "unexpected write")]
+fn write_before_handle_action_panics() {
     use tokio_test::task;
 
-    let (mock, mut handle) = Builder::new().build_with_handle();
+    // Actions must already be queued; waiting for a later handle write is not
+    // supported.
+    let (mock, _handle) = Builder::new().build_with_handle();
     let mut write = task::spawn(async move {
         let mut mock = mock;
         mock.write_all(b"hello ").await
     });
 
-    assert!(
-        write.poll().is_pending(),
-        "write should wait for a handle action"
-    );
-
-    handle.write(b"hello ");
-
-    assert!(matches!(write.poll(), std::task::Poll::Ready(Ok(()))));
+    let _ = write.poll();
 }
 
 #[tokio::test]
