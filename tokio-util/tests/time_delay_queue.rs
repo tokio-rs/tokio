@@ -915,6 +915,20 @@ async fn wake_after_remove_last() {
     assert!(assert_ready!(poll!(queue)).is_none());
 }
 
+#[tokio::test(start_paused = true)]
+async fn wake_after_clear() {
+    let mut queue = task::spawn(DelayQueue::new());
+    queue.insert("foo", ms(1000));
+
+    assert_pending!(poll!(queue));
+    assert!(!queue.is_woken());
+
+    queue.clear();
+
+    assert!(queue.is_woken());
+    assert!(assert_ready!(poll!(queue)).is_none());
+}
+
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }

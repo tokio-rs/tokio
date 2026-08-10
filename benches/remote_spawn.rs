@@ -84,9 +84,7 @@ fn remote_spawn_contention(c: &mut Criterion) {
 }
 
 fn parallelism_levels() -> Vec<usize> {
-    let max_parallelism = std::thread::available_parallelism()
-        .map(|p| p.get())
-        .unwrap_or(1);
+    let max_parallelism = std::thread::available_parallelism().map_or(1, |p| p.get());
 
     [1, 2, 4, 8, 16, 32, 64]
         .into_iter()

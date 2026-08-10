@@ -1,6 +1,8 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
+use futures::FutureExt;
+use std::io::IoSlice;
 use tokio::io::{duplex, AsyncReadExt, AsyncWriteExt};
 
 #[tokio::test]
@@ -99,6 +101,38 @@ async fn max_write_size() {
 
     // drop b only after task t1 finishes writing
     drop(b);
+}
+
+#[tokio::test]
+async fn zero_length_operations() {
+    let (mut reader, _peer) = duplex(1);
+    assert!(matches!(reader.read(&mut []).now_or_never(), Some(Ok(0))));
+
+    let (mut writer, _peer) = duplex(1);
+    writer.write_all(b"x").await.unwrap();
+    assert!(matches!(writer.write(&[]).now_or_never(), Some(Ok(0))));
+
+    let (mut writer, _peer) = duplex(1);
+    writer.write_all(b"x").await.unwrap();
+    let bufs = [IoSlice::new(&[]), IoSlice::new(&[])];
+    assert!(matches!(
+        writer.write_vectored(&bufs).now_or_never(),
+        Some(Ok(0))
+    ));
+}
+
+#[tokio::test]
+async fn zero_length_writes_to_closed_stream() {
+    let (mut writer, peer) = duplex(1);
+    drop(peer);
+    let err = writer.write(&[]).await.unwrap_err();
+    assert_eq!(err.kind(), std::io::ErrorKind::BrokenPipe);
+
+    let (mut writer, peer) = duplex(1);
+    drop(peer);
+    let bufs = [IoSlice::new(&[]), IoSlice::new(&[])];
+    let err = writer.write_vectored(&bufs).await.unwrap_err();
+    assert_eq!(err.kind(), std::io::ErrorKind::BrokenPipe);
 }
 
 #[tokio::test]

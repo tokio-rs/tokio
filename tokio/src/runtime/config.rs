@@ -48,7 +48,11 @@ pub(crate) struct Config {
     /// How to build poll time histograms
     pub(crate) metrics_poll_count_histogram: Option<crate::runtime::HistogramBuilder>,
 
+    /// Whether to track task schedule latency.
+    pub(crate) track_task_schedule_latency: bool,
+
     /// How to build schedule latency histograms
+    #[cfg_attr(not(feature = "schedule-latency"), allow(dead_code))]
     pub(crate) metrics_schedule_latency_histogram: Option<crate::runtime::HistogramBuilder>,
 
     #[cfg(tokio_unstable)]

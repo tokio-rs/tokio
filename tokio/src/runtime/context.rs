@@ -127,7 +127,7 @@ tokio_thread_local! {
     }
 }
 
-#[cfg(any(feature = "macros", all(feature = "sync", feature = "rt")))]
+#[cfg(any(feature = "macros", feature = "rt"))]
 pub(crate) fn thread_rng_n(n: u32) -> u32 {
     CONTEXT.with(|ctx| {
         let mut rng = ctx.rng.get().unwrap_or_else(FastRand::new);
@@ -158,11 +158,11 @@ cfg_rt! {
     }
 
     pub(crate) fn set_current_task_id(id: Option<Id>) -> Option<Id> {
-        CONTEXT.try_with(|ctx| ctx.current_task_id.replace(id)).unwrap_or(None)
+        CONTEXT.try_with(|ctx| ctx.current_task_id.replace(id)).unwrap_or_default()
     }
 
     pub(crate) fn current_task_id() -> Option<Id> {
-        CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or(None)
+        CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or_default()
     }
 
     #[cfg(tokio_unstable)]
