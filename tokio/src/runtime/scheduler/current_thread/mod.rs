@@ -106,7 +106,7 @@ struct Shared {
     /// Startup time of this scheduler.
     ///
     /// This instant is used as the basis of task `scheduled_at` measurements.
-    started_at: Option<Instant>,
+    schedule_latency_start: Option<Instant>,
 }
 
 /// Thread-local context.
@@ -152,10 +152,7 @@ impl CurrentThread {
             .global_queue_interval
             .unwrap_or(DEFAULT_GLOBAL_QUEUE_INTERVAL);
 
-        let started_at = config
-            .metrics_schedule_latency_histogram
-            .as_ref()
-            .map(|_| Instant::now());
+        let schedule_latency_start = config.track_task_schedule_latency.then(Instant::now);
 
         let handle = Arc::new(Handle {
             name,
@@ -174,7 +171,7 @@ impl CurrentThread {
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),
                 worker_metrics,
-                started_at,
+                schedule_latency_start,
             },
             driver: driver_handle,
             blocking_spawner,
@@ -382,13 +379,13 @@ impl Context {
     /// Execute the closure with the given scheduler core stored in the
     /// thread-local context.
     fn run_task(&self, task: LocalNotified<Arc<Handle>>, mut core: Box<Core>) -> Box<Core> {
-        #[cfg(tokio_unstable)]
-        let task_meta = task.task_meta();
+        let schedule_latency_context = task
+            .get_scheduled_at()
+            .prepare(self.handle.shared.schedule_latency_start);
+        let _task_schedule_latency = core.metrics.start_poll(schedule_latency_context);
 
-        core.metrics.start_poll(
-            task.get_scheduled_at()
-                .prepare(self.handle.shared.started_at),
-        );
+        #[cfg(tokio_unstable)]
+        let task_meta = task.task_meta(_task_schedule_latency);
 
         let (mut c, ()) = self.enter(core, || {
             crate::task::coop::budget(|| {
@@ -517,6 +514,8 @@ impl Handle {
         me.task_hooks.spawn(&TaskMeta {
             id,
             spawned_at,
+            #[cfg(feature = "schedule-latency")]
+            schedule_latency: None,
             _phantom: Default::default(),
         });
 
@@ -555,6 +554,8 @@ impl Handle {
         me.task_hooks.spawn(&TaskMeta {
             id,
             spawned_at,
+            #[cfg(feature = "schedule-latency")]
+            schedule_latency: None,
             _phantom: Default::default(),
         });
 
@@ -709,13 +710,10 @@ impl Schedule for Arc<Handle> {
     fn schedule(&self, task: task::Notified<Self>) {
         use scheduler::Context::CurrentThread;
 
-        if self
-            .shared
-            .config
-            .metrics_schedule_latency_histogram
-            .is_some()
-        {
-            task.set_scheduled_at(ScheduleLatencyInstant::new(self.shared.started_at));
+        if self.shared.schedule_latency_start.is_some() {
+            task.set_scheduled_at(ScheduleLatencyInstant::new(
+                self.shared.schedule_latency_start,
+            ));
         }
 
         context::with_scheduler(|maybe_cx| match maybe_cx {

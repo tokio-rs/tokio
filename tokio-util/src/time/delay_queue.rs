@@ -580,12 +580,7 @@ impl<T> DelayQueue<T> {
     /// current task for wakeup if the value is not yet available, and returning
     /// `None` if the queue is exhausted.
     pub fn poll_expired(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Expired<T>>> {
-        if !self
-            .waker
-            .as_ref()
-            .map(|w| w.will_wake(cx.waker()))
-            .unwrap_or(false)
-        {
+        if !self.waker.as_ref().is_some_and(|w| w.will_wake(cx.waker())) {
             self.waker = Some(cx.waker().clone());
         }
 
@@ -1036,10 +1031,18 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     pub fn clear(&mut self) {
+        let had_entries = !self.slab.is_empty();
+
         self.slab.clear();
         self.expired = Stack::default();
         self.wheel = Wheel::new();
         self.delay = None;
+
+        if had_entries {
+            if let Some(waker) = self.waker.take() {
+                waker.wake();
+            }
+        }
     }
 
     /// Returns the number of elements the queue can hold without reallocating.
