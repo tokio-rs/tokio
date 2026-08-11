@@ -360,13 +360,6 @@ struct Shared<T> {
     /// Tracks the number of `Sender` instances.
     ref_count_tx: AtomicUsize,
 
-    /// Tracks the number of `WeakSender` instances.
-    ///
-    /// Weak senders are not part of `ref_count_tx`, so they do not keep the
-    /// channel open. This counter only backs `Sender::weak_sender_count` and
-    /// `WeakSender::weak_sender_count`; it has no effect on the channel logic.
-    ref_count_weak_tx: AtomicUsize,
-
     /// Notifies waiting receivers that the value changed.
     notify_rx: big_notify::BigNotify,
 
@@ -615,7 +608,6 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
         state: AtomicState::new(),
         ref_count_rx: AtomicUsize::new(1),
         ref_count_tx: AtomicUsize::new(1),
-        ref_count_weak_tx: AtomicUsize::new(0),
         notify_rx: big_notify::BigNotify::new(),
         notify_tx: Notify::new(),
     });
@@ -1497,36 +1489,6 @@ impl<T> Sender<T> {
         self.shared.ref_count_tx.load(Relaxed)
     }
 
-    /// Returns the number of weak senders that currently exist.
-    ///
-    /// Weak senders are created with [`Sender::downgrade`] and are not counted
-    /// by [`Sender::sender_count`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::sync::watch;
-    ///
-    /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() {
-    /// let (tx, rx) = watch::channel("hello");
-    ///
-    /// assert_eq!(0, tx.weak_sender_count());
-    ///
-    /// let tx_weak = tx.downgrade();
-    ///
-    /// assert_eq!(1, tx.weak_sender_count());
-    /// assert_eq!(1, tx.sender_count());
-    ///
-    /// drop(tx_weak);
-    ///
-    /// assert_eq!(0, tx.weak_sender_count());
-    /// # }
-    /// ```
-    pub fn weak_sender_count(&self) -> usize {
-        self.shared.ref_count_weak_tx.load(Relaxed)
-    }
-
     /// Creates a [`WeakSender`] handle to this channel that does not hold the
     /// sending half open.
     ///
@@ -1558,8 +1520,6 @@ impl<T> Sender<T> {
     /// ```
     #[must_use = "Downgrade creates a WeakSender without destroying the original non-weak sender."]
     pub fn downgrade(&self) -> WeakSender<T> {
-        self.shared.ref_count_weak_tx.fetch_add(1, Relaxed);
-
         WeakSender {
             shared: self.shared.clone(),
         }
@@ -1666,29 +1626,6 @@ impl<T> WeakSender<T> {
         self.shared.ref_count_tx.load(Relaxed)
     }
 
-    /// Returns the number of weak senders that currently exist.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use tokio::sync::watch;
-    ///
-    /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() {
-    /// let (tx, _rx) = watch::channel("hello");
-    /// let tx_weak = tx.downgrade();
-    ///
-    /// assert_eq!(1, tx_weak.weak_sender_count());
-    ///
-    /// let tx_weak2 = tx_weak.clone();
-    ///
-    /// assert_eq!(2, tx_weak2.weak_sender_count());
-    /// # }
-    /// ```
-    pub fn weak_sender_count(&self) -> usize {
-        self.shared.ref_count_weak_tx.load(Relaxed)
-    }
-
     /// Returns `true` if weak senders belong to the same channel.
     ///
     /// # Examples
@@ -1709,17 +1646,9 @@ impl<T> WeakSender<T> {
 
 impl<T> Clone for WeakSender<T> {
     fn clone(&self) -> Self {
-        self.shared.ref_count_weak_tx.fetch_add(1, Relaxed);
-
         Self {
             shared: self.shared.clone(),
         }
-    }
-}
-
-impl<T> Drop for WeakSender<T> {
-    fn drop(&mut self) {
-        self.shared.ref_count_weak_tx.fetch_sub(1, AcqRel);
     }
 }
 

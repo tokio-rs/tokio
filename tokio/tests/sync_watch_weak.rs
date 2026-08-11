@@ -98,38 +98,26 @@ fn upgrade_downgrade_round_trip() {
 
     assert!(tx_weak.same_channel(&tx_weak2));
     assert_eq!(2, tx.sender_count());
-    assert_eq!(2, tx.weak_sender_count());
 
     assert!(tx_weak2.upgrade().is_some());
 }
 
 #[test]
-fn sender_and_weak_sender_counts() {
+fn sender_count_via_weak_sender() {
     let (tx, _rx) = watch::channel("one");
     assert_eq!(1, tx.sender_count());
-    assert_eq!(0, tx.weak_sender_count());
 
     let tx_weak = tx.downgrade();
-    assert_eq!(1, tx.sender_count());
-    assert_eq!(1, tx.weak_sender_count());
     assert_eq!(1, tx_weak.sender_count());
-    assert_eq!(1, tx_weak.weak_sender_count());
-
-    let tx_weak2 = tx_weak.clone();
-    assert_eq!(2, tx.weak_sender_count());
 
     let tx2 = tx.clone();
     assert_eq!(2, tx_weak.sender_count());
-
-    drop(tx_weak2);
-    assert_eq!(1, tx.weak_sender_count());
 
     drop(tx2);
     assert_eq!(1, tx_weak.sender_count());
 
     drop(tx);
     assert_eq!(0, tx_weak.sender_count());
-    assert_eq!(1, tx_weak.weak_sender_count());
 }
 
 #[test]
@@ -143,7 +131,6 @@ fn dropping_a_weak_sender_leaves_the_channel_open() {
 
     // Only weak senders went away, so the channel is untouched.
     assert_eq!(1, tx.sender_count());
-    assert_eq!(0, tx.weak_sender_count());
     assert!(rx.has_changed().is_ok());
 
     tx.send("two").unwrap();
