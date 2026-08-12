@@ -47,8 +47,8 @@ use std::sync::Arc;
 ///
 /// Note: Calling `wake` on wakers happens after changing the state of the
 /// semaphore in a non-atomic manner. This means that a task that is woken
-/// may observe the state change, but another concurrent task may not yet
-/// see it.
+/// may observe the state change, even if the waker has not yet been
+/// woken.
 ///
 /// [`acquire`]: Semaphore::acquire
 /// [`acquire_many`]: Semaphore::acquire_many
