@@ -77,6 +77,16 @@ impl Driver {
 }
 
 impl Handle {
+    #[cfg(feature = "time")]
+    pub(crate) fn has_time_driver(&self) -> bool {
+        self.time.is_some()
+    }
+
+    #[cfg(not(feature = "time"))]
+    pub(crate) const fn has_time_driver(&self) -> bool {
+        false
+    }
+
     pub(crate) fn unpark(&self) {
         #[cfg(feature = "time")]
         if let Some(handle) = &self.time {

@@ -466,6 +466,36 @@ impl Handle {
         }
     }
 
+    /// Returns whether the runtime has a time driver enabled.
+    ///
+    /// A time driver is enabled by calling [`Builder::enable_time`] or
+    /// [`Builder::enable_all`] before building the runtime. Use this method to
+    /// check whether the runtime was configured with a time driver before
+    /// creating a timer, such as with `tokio::time::timeout`.
+    ///
+    /// This method only reports the runtime's configuration. It does not
+    /// indicate whether the runtime is still running, and remains `true` after
+    /// shutdown if the time driver was enabled.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Builder;
+    ///
+    /// let runtime = Builder::new_current_thread()
+    ///     .enable_time()
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// assert!(runtime.handle().has_time_driver());
+    /// ```
+    ///
+    /// [`Builder::enable_time`]: crate::runtime::Builder::enable_time
+    /// [`Builder::enable_all`]: crate::runtime::Builder::enable_all
+    pub fn has_time_driver(&self) -> bool {
+        self.inner.has_time_driver()
+    }
+
     /// Returns the [`Id`] of the current `Runtime`.
     ///
     /// # Examples

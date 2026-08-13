@@ -65,6 +65,10 @@ impl Handle {
             Handle::Disabled => unreachable!(),
         }
     }
+
+    pub(crate) fn has_time_driver(&self) -> bool {
+        self.driver().has_time_driver()
+    }
 }
 
 cfg_rt! {
