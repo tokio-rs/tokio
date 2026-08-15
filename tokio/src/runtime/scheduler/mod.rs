@@ -66,7 +66,7 @@ impl Handle {
         }
     }
 
-    #[cfg_attr(not(feature = "full"), allow(dead_code))]
+    #[cfg_attr(not(feature = "rt"), allow(dead_code))]
     pub(crate) fn has_time_driver(&self) -> bool {
         self.driver().has_time_driver()
     }

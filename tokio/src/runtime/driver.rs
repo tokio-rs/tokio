@@ -77,11 +77,6 @@ impl Driver {
 }
 
 impl Handle {
-    #[cfg(feature = "time")]
-    pub(crate) fn has_time_driver(&self) -> bool {
-        self.time.is_some()
-    }
-
     #[cfg(not(feature = "time"))]
     pub(crate) const fn has_time_driver(&self) -> bool {
         false
@@ -115,6 +110,10 @@ impl Handle {
     }
 
     cfg_time! {
+        pub(crate) fn has_time_driver(&self) -> bool {
+            self.time.is_some()
+        }
+
         /// Returns a reference to the time driver handle.
         ///
         /// Panics if no time driver is present.
