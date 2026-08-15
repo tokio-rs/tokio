@@ -70,6 +70,28 @@ fn has_time_driver_is_true_when_enabled() {
 
 #[cfg(feature = "time")]
 #[test]
+fn has_time_driver_reports_the_current_runtime() {
+    assert!(tokio::runtime::Handle::try_current().is_err());
+
+    let disabled = Builder::new_current_thread().build().unwrap();
+    let enabled = Builder::new_current_thread().enable_time().build().unwrap();
+
+    let disabled_guard = disabled.enter();
+    assert!(!tokio::runtime::Handle::current().has_time_driver());
+
+    {
+        let enabled_guard = enabled.enter();
+        assert!(tokio::runtime::Handle::current().has_time_driver());
+        drop(enabled_guard);
+    }
+
+    assert!(!tokio::runtime::Handle::current().has_time_driver());
+    drop(disabled_guard);
+    assert!(tokio::runtime::Handle::try_current().is_err());
+}
+
+#[cfg(feature = "time")]
+#[test]
 fn has_time_driver_can_guard_timeout_creation() {
     let runtime = Builder::new_current_thread().build().unwrap();
     let handle = runtime.handle().clone();
