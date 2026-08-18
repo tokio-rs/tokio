@@ -241,7 +241,8 @@ impl BarrierWaitResult {
     }
 }
 
-#[cfg(test)]
+// Requires OS threads, which are unavailable on wasm targets.
+#[cfg(all(test, not(target_family = "wasm")))]
 mod tests {
     use super::Barrier;
     use std::sync::Arc;
