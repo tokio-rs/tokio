@@ -1228,7 +1228,7 @@ impl Core {
     ///
     /// Returns true if the transition happened, false if there is work to do first.
     fn transition_to_parked(&mut self, worker: &Worker) -> bool {
-        // Workers should not park if they have work to do
+        // Workers should not park if they have work to do or are about to be traced
         if self.has_tasks() || self.is_traced {
             return false;
         }
@@ -1256,11 +1256,8 @@ impl Core {
     /// Returns `true` if the transition happened.
     fn transition_from_parked(&mut self, worker: &Worker) -> bool {
         // If a task is in the lifo slot/run queue, then we must unpark regardless of
-        // being notified. The same applies when this worker has been woken to be
-        // traced for a task dump: a dump unparks the worker threads directly,
-        // without going through `Idle`, so the worker performs that transition
-        // itself here. Otherwise it is counted as a sleeper a second time when it
-        // parks again after tracing.
+        // being notified. Same when woken to be traced: a dump unparks worker
+        // threads without going through `Idle`, so the worker does it here.
         if self.has_tasks() || self.is_traced {
             // When a worker wakes, it should only transition to the "searching"
             // state when the wake originates from another worker *or* a new task
