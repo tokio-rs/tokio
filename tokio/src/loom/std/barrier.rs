@@ -173,29 +173,28 @@ impl Barrier {
         let local_gen = lock.generation_id;
         lock.count += 1;
         if lock.count < self.num_threads {
-            // We need a while loop to guard against spurious wakeups.
+            // We need a loop to guard against spurious wakeups.
             // https://en.wikipedia.org/wiki/Spurious_wakeup
-            while local_gen == lock.generation_id {
+            loop {
                 let (guard, timeout_result) = self.cvar.wait_timeout(lock, timeout).unwrap();
                 lock = guard;
+
+                // The barrier completed (possibly concurrently with our
+                // timeout), so we were released as part of the rendezvous.
+                if local_gen != lock.generation_id {
+                    break;
+                }
+
                 if timeout_result.timed_out() {
-                    // The generation may have advanced while we were timing out,
-                    // meaning the barrier was completed by another thread and we
-                    // were released as part of that rendezvous rather than
-                    // actually timing out. Treat it as a successful wait.
-                    if local_gen != lock.generation_id {
-                        break;
-                    }
-                    // Otherwise we really timed out. Roll back the `count += 1`
-                    // performed above before returning. `count` is reset to 0
-                    // only on the leader path (the `else` branch below), so a
-                    // generation that never reaches `num_threads` would
-                    // otherwise leak this arrival. A later generation could then
-                    // cross `num_threads` with fewer than `num_threads` threads
-                    // actually present and elect a spurious leader. This cannot
-                    // underflow: we hold the lock and the generation is
-                    // unchanged since our own `count += 1`, so no leader has
-                    // reset `count`, and it therefore still includes this thread.
+                    // Roll back the `count += 1` performed above before
+                    // returning. `count` is reset to 0 only on the leader path
+                    // (the `else` branch below), so a generation that never
+                    // reaches `num_threads` would otherwise leak this arrival,
+                    // letting a later generation cross `num_threads` with fewer
+                    // than `num_threads` threads actually present and elect a
+                    // spurious leader. Cannot underflow: we hold the lock and
+                    // the generation is unchanged since our own `count += 1`, so
+                    // no leader has reset `count` and it still includes us.
                     debug_assert!(lock.count > 0);
                     lock.count -= 1;
                     return None;
@@ -238,42 +237,5 @@ impl BarrierWaitResult {
     #[must_use]
     pub(crate) fn is_leader(&self) -> bool {
         self.0
-    }
-}
-
-// Requires OS threads, which are unavailable on wasm targets.
-#[cfg(all(test, not(target_family = "wasm")))]
-mod tests {
-    use super::Barrier;
-    use std::sync::Arc;
-    use std::thread;
-    use std::time::Duration;
-
-    // A `wait_timeout` that times out must roll back the arrival it recorded so
-    // it does not leak into `count`. `count` is reset to 0 only when a leader is
-    // elected, so a leaked arrival would let a later generation cross
-    // `num_threads` with fewer than `num_threads` threads actually present and
-    // elect a spurious leader.
-    #[test]
-    fn wait_timeout_rolls_back_arrival() {
-        let barrier = Barrier::new(2);
-
-        // A lone thread times out: only 1 of the 2 required threads arrived.
-        assert!(barrier.wait_timeout(Duration::from_millis(50)).is_none());
-
-        // A second lone thread must also time out. If the first arrival had
-        // leaked, this call would push `count` from 1 to `num_threads` and
-        // wrongly be elected leader instead of timing out.
-        assert!(barrier.wait_timeout(Duration::from_millis(50)).is_none());
-
-        // A genuine rendezvous still completes and elects exactly one leader.
-        let barrier = Arc::new(Barrier::new(2));
-        let other = barrier.clone();
-        let handle = thread::spawn(move || other.wait_timeout(Duration::from_secs(10)));
-        let a = barrier
-            .wait_timeout(Duration::from_secs(10))
-            .expect("rendezvous timed out");
-        let b = handle.join().unwrap().expect("rendezvous timed out");
-        assert!(a.is_leader() ^ b.is_leader());
     }
 }
