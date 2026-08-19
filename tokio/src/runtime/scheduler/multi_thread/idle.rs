@@ -92,6 +92,10 @@ impl Idle {
         // Acquire the lock
         let mut lock = shared.synced.lock();
 
+        // A worker that is already tracked as a sleeper would be counted twice,
+        // which corrupts `num_unparked` and the sleeper list.
+        debug_assert!(!lock.idle.sleepers.contains(&worker));
+
         // Decrement the number of unparked threads
         let ret = State::dec_num_unparked(&self.state, is_searching);
 
@@ -194,6 +198,7 @@ impl State {
         }
 
         let prev = State(cell.fetch_sub(dec, SeqCst));
+        debug_assert!(prev.num_unparked() > 0, "{prev:?}");
         is_searching && prev.num_searching() == 1
     }
 
