@@ -113,8 +113,12 @@ impl UringContext {
                     return Ok(());
                 }
 
-                // If the submission queue is full, we dispatch completions and try again.
-                Err(ref e) if e.raw_os_error() == Some(libc::EBUSY) => {
+                // If the submission queue is full, or the kernel is out of resources,
+                // we dispatch completions and try again.
+                Err(ref e)
+                    if e.raw_os_error() == Some(libc::EBUSY)
+                        || e.raw_os_error() == Some(libc::EAGAIN) =>
+                {
                     self.dispatch_completions();
                 }
                 // For other errors, we currently return the error as is.
@@ -259,7 +263,11 @@ impl Handle {
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> io::Result<usize> {
+    pub(crate) unsafe fn register_op(
+        &self,
+        entry: Entry,
+        waker: Waker,
+    ) -> Result<usize, (io::Error, Option<usize>)> {
         assert!(self.uring_probe.initialized());
 
         // Uring is initialized.
@@ -269,19 +277,26 @@ impl Handle {
         let index = ctx.ops.insert(Lifecycle::Waiting(waker));
         let entry = entry.user_data(index as u64);
 
-        let submit_or_remove = |ctx: &mut UringContext| -> io::Result<()> {
-            if let Err(e) = ctx.submit() {
-                // Submission failed, remove the entry from the slab and return the error
-                ctx.remove_op(index);
-                return Err(e);
-            }
-            Ok(())
-        };
+        let submit_or_err =
+            |ctx: &mut UringContext, queued: bool| -> Result<(), (io::Error, Option<usize>)> {
+                if let Err(e) = ctx.submit() {
+                    if !queued {
+                        // SQE is not in the ring. Safe to remove the tracking data.
+                        ctx.remove_op(index);
+                        return Err((e, None));
+                    } else {
+                        // SQE IS in the ring. We must NOT remove the op.
+                        // Return the index so the caller knows to quarantine the memory.
+                        return Err((e, Some(index)));
+                    }
+                }
+                Ok(())
+            };
 
         // SAFETY: entry is valid for the entire duration of the operation
         while unsafe { ctx.ring_mut().submission().push(&entry).is_err() } {
             // If the submission queue is full, flush it to the kernel
-            submit_or_remove(ctx)?;
+            submit_or_err(ctx, false)?;
         }
 
         // Ensure that the completion queue is not full before submitting the entry.
@@ -289,8 +304,7 @@ impl Handle {
             ctx.dispatch_completions();
         }
 
-        // Note: For now, we submit the entry immediately without utilizing batching.
-        submit_or_remove(ctx)?;
+        submit_or_err(ctx, true)?;
 
         Ok(index)
     }
