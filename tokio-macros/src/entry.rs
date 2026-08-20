@@ -506,7 +506,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
 
     let body_ident = quote! { body };
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
-    let last_block = quote_spanned! {last_stmt_end_span=>
+    let native_last_block = quote_spanned! {last_stmt_end_span=>
 
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return, clippy::unwrap_in_result)]
         {
@@ -519,6 +519,15 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
                 .block_on(#body_ident);
         }
 
+    };
+
+    let last_block = match config.flavor {
+        RuntimeFlavor::Threaded => quote! {
+            #crate_path::__tokio_unsupported_multi_thread_on_emscripten! {
+                #native_last_block
+            }
+        },
+        _ => native_last_block,
     };
 
     let body = input.body();
