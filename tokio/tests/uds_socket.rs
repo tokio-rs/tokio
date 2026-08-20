@@ -119,3 +119,43 @@ async fn assert_usage() -> std::io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
+async fn set_permissions_applies_on_bind() -> io::Result<()> {
+    use std::fs::Permissions;
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let sock_path = dir.path().join("permissions.sock");
+
+    let socket = UnixSocket::new_stream()?;
+    socket.set_permissions(Permissions::from_mode(0o600))?;
+    socket.bind(&sock_path)?;
+
+    let mode = std::fs::metadata(&sock_path)?.permissions().mode();
+    assert_eq!(mode & 0o777, 0o600);
+
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
+async fn set_permissions_after_bind_fails() -> io::Result<()> {
+    use std::fs::Permissions;
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let sock_path = dir.path().join("permissions.sock");
+
+    let socket = UnixSocket::new_stream()?;
+    socket.bind(&sock_path)?;
+
+    assert!(socket
+        .set_permissions(Permissions::from_mode(0o600))
+        .is_err());
+
+    Ok(())
+}
