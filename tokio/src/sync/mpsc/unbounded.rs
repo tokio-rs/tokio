@@ -173,13 +173,20 @@ impl<T> UnboundedReceiver<T> {
     /// Receives the next values for this receiver and extends `buffer`.
     ///
     /// This method extends `buffer` by no more than a fixed number of values
-    /// as specified by `limit`. If `limit` is zero, the function returns
-    /// immediately with `0`. The return value is the number of values added to
-    /// `buffer`.
+    /// as specified by `limit`. If `limit` is zero, the function immediately
+    /// returns `0`. The return value is the number of values added to `buffer`.
     ///
-    /// For `limit > 0`, if there are no messages in the channel's queue,
-    /// but the channel has not yet been closed, this method will sleep
-    /// until a message is sent or the channel is closed.
+    /// For `limit > 0`: If there are no messages in the channels' queue initially,
+    /// `recv_many` will sleep until a first message is received. After that, it will
+    ///
+    /// * Return when the number of received messages reaches `limit`.
+    /// * Return earlier when the channel is closed or no further messages area
+    /// available in the channel at the time. In these cases,
+    /// the number of received messages can be lower than `limit`.
+    ///
+    /// Note that if [`close`] is called, but there are still outstanding [`Permits`]
+    /// from before it was closed, the channel is not considered closed by
+    /// `recv_many` until the permits are released.
     ///
     /// For non-zero values of `limit`, this method will never return `0` unless
     /// the channel has been closed and there are no remaining messages in the
@@ -197,6 +204,7 @@ impl<T> UnboundedReceiver<T> {
     /// channel.
     ///
     /// [`close`]: Self::close
+    /// [`Permits`]: struct@crate::sync::mpsc::Permit
     ///
     /// # Examples
     ///
