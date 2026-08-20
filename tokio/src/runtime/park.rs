@@ -98,7 +98,8 @@ impl Inner {
                 // `NOTIFIED` in the `compare_exchange` above. We must perform an
                 // acquire operation that synchronizes with that `unpark` to observe
                 // any writes it made before the call to unpark. To do that we must
-                // read from the write it made to `state`.
+                // read from the write it made to `state`. The `swap` uses `SeqCst`,
+                // which has acquire semantics.
                 let old = self.state.swap(EMPTY, SeqCst);
                 debug_assert_eq!(old, NOTIFIED, "park state changed unexpectedly");
 
@@ -177,9 +178,10 @@ impl Inner {
     fn unpark(&self) {
         // To ensure the unparked thread will observe any writes we made before
         // this call, we must perform a release operation that `park` can
-        // synchronize with. To do that we must write `NOTIFIED` even if `state`
-        // is already `NOTIFIED`. That is why this must be a swap rather than a
-        // compare-and-swap that returns if it reads `NOTIFIED` on failure.
+        // synchronize with. The `swap` uses `SeqCst`, which has release
+        // semantics. To do that we must write `NOTIFIED` even if `state`
+        // is already `NOTIFIED`. That is why this must be a swap rather than
+        // a compare-and-swap that returns if it reads `NOTIFIED` on failure.
         match self.state.swap(NOTIFIED, SeqCst) {
             EMPTY => return,    // no one was waiting
             NOTIFIED => return, // already unparked
