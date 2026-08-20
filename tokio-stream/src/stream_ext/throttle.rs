@@ -1,7 +1,7 @@
 //! Slow down a stream by enforcing a delay between items.
 
 use crate::Stream;
-use tokio::time::{Duration, Instant, Sleep};
+use tokio::time::{sleep, Duration, Sleep};
 
 use std::future::Future;
 use std::pin::Pin;
@@ -14,7 +14,7 @@ where
     T: Stream,
 {
     Throttle {
-        delay: tokio::time::sleep_until(Instant::now() + duration),
+        delay: sleep(duration),
         duration,
         has_delayed: true,
         stream,
@@ -81,7 +81,7 @@ impl<T: Stream> Stream for Throttle<T> {
 
         if value.is_some() {
             if !is_zero(dur) {
-                me.delay.reset(Instant::now() + dur);
+                me.delay.set(sleep(dur));
             }
 
             *me.has_delayed = false;
