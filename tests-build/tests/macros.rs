@@ -18,6 +18,12 @@ fn compile_fail_full() {
     #[cfg(feature = "full")]
     t.pass("tests/pass/use_builder_outer.rs");
 
+    #[cfg(any(feature = "full", feature = "rt"))]
+    t.pass("tests/pass/macros_select_cfg.rs");
+
+    #[cfg(any(feature = "full", feature = "rt"))]
+    t.compile_fail("tests/fail/macros_select_cfg_invalid.rs");
+
     #[cfg(feature = "full")]
     t.compile_fail("tests/fail/macros_invalid_input.rs");
 
