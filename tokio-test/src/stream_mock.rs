@@ -132,7 +132,9 @@ impl<T: Unpin> Stream for StreamMock<T> {
                 Action::Next(item) => Poll::Ready(Some(item)),
                 Action::Wait(duration) => {
                     // Set up a sleep future and schedule this future to be polled again for it.
-                    self.sleep = Some(Box::pin(sleep_until(Instant::now() + duration)));
+                    self.sleep = Some(Box::pin(sleep_until(
+                        Instant::now().checked_add(duration).unwrap(),
+                    )));
                     cx.waker().wake_by_ref();
 
                     Poll::Pending
