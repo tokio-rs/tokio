@@ -141,6 +141,16 @@
 //! The value in the channel will not be dropped until all senders and all
 //! receivers have been dropped.
 //!
+//! Dropping every [`Sender`] disconnects the receivers, which is the condition
+//! [`Receiver::changed()`] reports as [`RecvError`](error::RecvError). Note that
+//! this is the mirror image of [`Sender::is_closed`] above, which reports that
+//! every [`Receiver`] is gone; the two conditions are independent.
+//!
+//! A [`WeakSender`], created with [`Sender::downgrade`], does not hold the
+//! sending half open: once the last [`Sender`] is dropped the receivers are
+//! disconnected even if weak senders remain, and [`WeakSender::upgrade`] then
+//! returns `None`.
+//!
 //! # Thread safety
 //!
 //! Both [`Sender`] and [`Receiver`] are thread safe. They can be moved to other
@@ -166,7 +176,7 @@ use crate::sync::notify::Notify;
 use crate::task::coop::cooperative;
 
 use crate::loom::sync::atomic::AtomicUsize;
-use crate::loom::sync::atomic::Ordering::{AcqRel, Relaxed};
+use crate::loom::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed};
 use crate::loom::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 use std::mem;
@@ -212,6 +222,47 @@ impl<T: Default> Default for Sender<T> {
     fn default() -> Self {
         Self::new(T::default())
     }
+}
+
+/// A sender that does not hold the sending half of the channel open.
+///
+/// A `WeakSender` is created with [`Sender::downgrade`]. It does not count
+/// towards the RAII semantics of the channel: once every [`Sender`] has been
+/// dropped the receivers are disconnected even if `WeakSender` instances
+/// remain, so [`Receiver::changed`] resolves with a [`RecvError`] and the value
+/// can no longer be modified.
+///
+/// To send values, a `WeakSender` must first be converted back into a [`Sender`]
+/// with [`WeakSender::upgrade`], which returns `None` once the last [`Sender`]
+/// is gone.
+///
+/// A `WeakSender` does keep the channel *allocated*: as with any other handle,
+/// the value is only dropped once every sender, weak or not, and every
+/// [`Receiver`] is gone.
+///
+/// [`RecvError`]: error::RecvError
+///
+/// # Examples
+///
+/// ```
+/// use tokio::sync::watch;
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, _rx) = watch::channel("hello");
+/// let tx_weak = tx.downgrade();
+///
+/// // Upgrading succeeds because `tx` is still around.
+/// assert!(tx_weak.upgrade().is_some());
+///
+/// // Dropping the last `Sender` closes the channel, and upgrading fails.
+/// drop(tx);
+/// assert!(tx_weak.upgrade().is_none());
+/// # }
+/// ```
+#[derive(Debug)]
+pub struct WeakSender<T> {
+    shared: Arc<Shared<T>>,
 }
 
 /// Returns a reference to the inner value.
@@ -1438,6 +1489,42 @@ impl<T> Sender<T> {
         self.shared.ref_count_tx.load(Relaxed)
     }
 
+    /// Creates a [`WeakSender`] handle to this channel that does not hold the
+    /// sending half open.
+    ///
+    /// This `Sender` is left untouched and still holds the sending half open;
+    /// the `WeakSender` is an additional handle. Once every `Sender` has been
+    /// dropped the receivers are disconnected even if weak senders remain, and
+    /// [`WeakSender::upgrade`] then returns `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = watch::channel("hello");
+    /// let tx_weak = tx.downgrade();
+    ///
+    /// // The weak sender can send by upgrading first.
+    /// tx_weak.upgrade().unwrap().send("goodbye").unwrap();
+    /// assert!(rx.changed().await.is_ok());
+    /// assert_eq!(*rx.borrow_and_update(), "goodbye");
+    ///
+    /// // The weak sender alone does not keep the channel open.
+    /// drop(tx);
+    /// assert!(rx.changed().await.is_err());
+    /// assert!(tx_weak.upgrade().is_none());
+    /// # }
+    /// ```
+    #[must_use = "Downgrade creates a WeakSender without destroying the original non-weak sender."]
+    pub fn downgrade(&self) -> WeakSender<T> {
+        WeakSender {
+            shared: self.shared.clone(),
+        }
+    }
+
     /// Returns `true` if senders belong to the same channel.
     ///
     /// # Examples
@@ -1460,6 +1547,107 @@ impl<T> Drop for Sender<T> {
         if self.shared.ref_count_tx.fetch_sub(1, AcqRel) == 1 {
             self.shared.state.set_closed();
             self.shared.notify_rx.notify_waiters();
+        }
+    }
+}
+
+// ===== impl WeakSender =====
+
+impl<T> WeakSender<T> {
+    /// Tries to convert this `WeakSender` into a [`Sender`].
+    ///
+    /// This succeeds while at least one [`Sender`] still exists, and fails with
+    /// `None` once they have all been dropped, since dropping the last one
+    /// disconnects the receivers for good.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, _rx) = watch::channel("hello");
+    /// let tx_weak = tx.downgrade();
+    ///
+    /// let tx2 = tx_weak.upgrade().unwrap();
+    /// assert_eq!(2, tx2.sender_count());
+    ///
+    /// drop(tx);
+    /// drop(tx2);
+    ///
+    /// assert!(tx_weak.upgrade().is_none());
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn upgrade(&self) -> Option<Sender<T>> {
+        // Only a non-zero sender count may be incremented: dropping the last
+        // `Sender` sets the CLOSED bit permanently, so an upgrade that observed
+        // a count of zero must not resurrect the sending half.
+        //
+        // The orderings mirror `broadcast::WeakSender::upgrade`: the increment
+        // itself only needs the counter to be atomic, while a failed attempt
+        // acquires the decrement that took the count to zero.
+        self.shared
+            .ref_count_tx
+            .fetch_update(Relaxed, Acquire, |ref_count_tx| {
+                (ref_count_tx != 0).then_some(ref_count_tx + 1)
+            })
+            .ok()
+            .map(|_| Sender {
+                shared: self.shared.clone(),
+            })
+    }
+
+    /// Returns the number of senders that currently exist.
+    ///
+    /// This counts [`Sender`] instances only. A return value of `0` means the
+    /// receivers have been disconnected and [`WeakSender::upgrade`] returns
+    /// `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, _rx) = watch::channel("hello");
+    /// let tx_weak = tx.downgrade();
+    ///
+    /// assert_eq!(1, tx_weak.sender_count());
+    ///
+    /// drop(tx);
+    ///
+    /// assert_eq!(0, tx_weak.sender_count());
+    /// # }
+    /// ```
+    pub fn sender_count(&self) -> usize {
+        self.shared.ref_count_tx.load(Relaxed)
+    }
+
+    /// Returns `true` if weak senders belong to the same channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let (tx, _rx) = tokio::sync::watch::channel(true);
+    /// let tx_weak = tx.downgrade();
+    /// let tx_weak2 = tx.downgrade();
+    /// assert!(tx_weak.same_channel(&tx_weak2));
+    ///
+    /// let (tx2, _rx2) = tokio::sync::watch::channel(true);
+    /// assert!(!tx_weak.same_channel(&tx2.downgrade()));
+    /// ```
+    pub fn same_channel(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.shared, &other.shared)
+    }
+}
+
+impl<T> Clone for WeakSender<T> {
+    fn clone(&self) -> Self {
+        Self {
+            shared: self.shared.clone(),
         }
     }
 }
