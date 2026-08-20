@@ -116,7 +116,7 @@ impl<L: ShardedListItem> ShardedList<L> {
         self.len() == 0
     }
 
-    /// Gets the shard size of this `SharedList`.
+    /// Gets the shard size of this `ShardedList`.
     ///
     /// Used to help us to decide the parameter `shard_id` of the `pop_back` method.
     pub(crate) fn shard_size(&self) -> usize {
