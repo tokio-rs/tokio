@@ -95,6 +95,12 @@ impl Handle {
         }
     }
 
+    cfg_io_uring! {
+        pub(crate) fn try_io(&self) -> Option<&crate::runtime::io::Handle> {
+            self.io.as_ref()
+        }
+    }
+
     cfg_signal_internal_and_unix! {
         #[track_caller]
         pub(crate) fn signal(&self) -> &crate::runtime::signal::Handle {
