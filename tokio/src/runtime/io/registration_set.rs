@@ -92,13 +92,7 @@ impl RegistrationSet {
         // this is the shutdown operation. In theory, shutdowns should be
         // "clean" with no outstanding I/O resources. Even if it is slow, we
         // aren't optimizing for shutdown.
-        let mut ret = vec![];
-
-        while let Some(io) = synced.registrations.pop_back() {
-            ret.push(io);
-        }
-
-        ret
+        synced.registrations.drain_back().collect::<Vec<_>>()
     }
 
     pub(super) fn release(&self, synced: &mut Synced) {

@@ -250,7 +250,7 @@ impl Semaphore {
         // permit counter is closed, but the wait list is not.
         self.permits.fetch_or(Self::CLOSED, Release);
         waiters.closed = true;
-        while let Some(mut waiter) = waiters.queue.pop_back() {
+        for mut waiter in waiters.queue.drain_back() {
             let waker = unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) };
             if let Some(waker) = waker {
                 waker.wake();
