@@ -308,32 +308,39 @@ impl Handle {
             now = lock.wheel.elapsed();
         }
 
-        while let Some(entry) = lock.wheel.poll(now) {
-            debug_assert!(unsafe { entry.is_pending() });
+        loop {
+            while waker_list.can_push() {
+                match lock.wheel.poll(now) {
+                    Some(entry) => {
+                        debug_assert!(unsafe { entry.is_pending() });
 
-            // SAFETY: We hold the driver lock, and just removed the entry from any linked lists.
-            if let Some(waker) = unsafe { entry.fire(Ok(())) } {
-                waker_list.push(waker);
-
-                if !waker_list.can_push() {
-                    // Wake a batch of wakers. To avoid deadlock, we must do this with the lock temporarily dropped.
-                    drop(lock);
-
-                    waker_list.wake_all();
-
-                    lock = self.inner.lock();
+                        // SAFETY: We hold the driver lock, and just removed the entry from any
+                        // linked lists.
+                        if let Some(waker) = unsafe { entry.fire(Ok(())) } {
+                            waker_list.push(waker);
+                        }
+                    }
+                    None => break,
                 }
             }
+
+            if waker_list.can_push() {
+                lock.next_wake = lock
+                    .wheel
+                    .poll_at()
+                    .map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
+            }
+
+            let can_push = waker_list.can_push();
+            // Prevent deadlock.
+            drop(lock);
+
+            waker_list.wake_all();
+            if can_push {
+                break;
+            }
+            lock = self.inner.lock();
         }
-
-        lock.next_wake = lock
-            .wheel
-            .poll_at()
-            .map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
-
-        drop(lock);
-
-        waker_list.wake_all();
     }
 
     #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
