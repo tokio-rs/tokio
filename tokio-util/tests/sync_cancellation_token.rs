@@ -613,3 +613,144 @@ fn different_cancellation_tokens_have_different_hash() {
     token2.hash(&mut state2);
     assert_ne!(state1.finish(), state2.finish());
 }
+
+// Verifies that `is_cancelled` provides a happens-before relationship with the
+// `cancel` that flipped it: data written before `cancel()` must be observable
+// after `is_cancelled()` returns `true`.
+#[cfg(not(target_family = "wasm"))] // requires `std::thread::spawn`
+#[test]
+fn is_cancelled_publishes_writes_from_cancel() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use std::thread;
+
+    const ITERATIONS: usize = 200;
+
+    for _ in 0..ITERATIONS {
+        let token = CancellationToken::new();
+        let data = Arc::new(AtomicUsize::new(0));
+
+        let writer_token = token.clone();
+        let writer_data = data.clone();
+        let writer = thread::spawn(move || {
+            // The write is Relaxed; publication is provided entirely by the
+            // cancellation token. If `is_cancelled` failed to synchronise with
+            // `cancel`, the reader could see `is_cancelled() == true` but
+            // still observe a value of `0` here.
+            writer_data.store(42, Ordering::Relaxed);
+            writer_token.cancel();
+        });
+
+        // Spin on the lock-free fast path until we observe the cancellation.
+        while !token.is_cancelled() {
+            std::hint::spin_loop();
+        }
+        assert_eq!(data.load(Ordering::Relaxed), 42);
+
+        writer.join().unwrap();
+    }
+}
+
+// Stresses many concurrent readers against `cancel` and `child_token` to
+// verify the lock-free `is_cancelled()` path remains correct under
+// contention. With the previous mutex-based implementation, all readers
+// would serialise; this test mostly exists as a regression guard for the
+// fast path.
+#[cfg(not(target_family = "wasm"))] // requires `std::thread::spawn`
+#[test]
+fn is_cancelled_concurrent_readers() {
+    use std::sync::Arc;
+    use std::thread;
+
+    const READERS: usize = 8;
+    const SPINS: usize = 50_000;
+
+    let token = Arc::new(CancellationToken::new());
+
+    let readers: Vec<_> = (0..READERS)
+        .map(|_| {
+            let token = token.clone();
+            thread::spawn(move || {
+                let mut observed_cancelled = false;
+                for _ in 0..SPINS {
+                    if token.is_cancelled() {
+                        observed_cancelled = true;
+                        break;
+                    }
+                    std::hint::spin_loop();
+                }
+                // Wait until cancellation actually happens.
+                while !token.is_cancelled() {
+                    std::hint::spin_loop();
+                }
+                observed_cancelled
+            })
+        })
+        .collect();
+
+    // Also create and drop children concurrently to exercise the tree paths
+    // that take the mutex.
+    let token_for_children = token.clone();
+    let children_thread = thread::spawn(move || {
+        for _ in 0..100 {
+            let _c = token_for_children.child_token();
+        }
+    });
+
+    token.cancel();
+    children_thread.join().unwrap();
+
+    for handle in readers {
+        // We don't assert *whether* the reader observed cancellation inside
+        // the spin loop (it's racy) — only that the join succeeds without
+        // deadlock and the final `is_cancelled` check returned true.
+        handle.join().unwrap();
+    }
+
+    assert!(token.is_cancelled());
+}
+
+// Regression test for the lost-wakeup scenario described in #7775's fix
+// discussion: a `cancelled()` future created before `cancel()` runs in
+// another thread must always complete. This exercises the `WaitForCancellationFuture`
+// poll path under racy conditions; with insufficient ordering between
+// `is_cancelled` and `cancel`, the future could deadlock waiting for a
+// `Notified` that was never woken.
+#[cfg(not(target_family = "wasm"))] // requires `std::thread::spawn`
+#[test]
+fn cancelled_future_completes_under_race() {
+    use std::sync::Arc;
+    use std::thread;
+    use std::time::Duration;
+
+    const ITERATIONS: usize = 200;
+
+    for _ in 0..ITERATIONS {
+        let token = Arc::new(CancellationToken::new());
+
+        let cancel_token = token.clone();
+        let canceller = thread::spawn(move || {
+            // Yield so the awaiter has a chance to call `cancelled()` and
+            // start polling. The race we want to provoke is `cancel()`
+            // happening right around the awaiter's first `is_cancelled`
+            // check inside `poll`.
+            thread::yield_now();
+            cancel_token.cancel();
+        });
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            // Bound the wait so a regression manifests as a test failure
+            // instead of hanging the suite.
+            tokio::time::timeout(Duration::from_secs(5), token.cancelled())
+                .await
+                .expect("cancelled() future must complete");
+        });
+
+        canceller.join().unwrap();
+        assert!(token.is_cancelled());
+    }
+}
