@@ -533,12 +533,16 @@ impl OpenOptions {
             ))]
             Kind::Uring(opts) => {
                 let handle = crate::runtime::Handle::current();
-                let driver_handle = handle.inner.driver().io();
+                let use_uring = match handle.inner.driver().try_io() {
+                    Some(driver_handle) => {
+                        driver_handle
+                            .check_and_init(io_uring::opcode::OpenAt::CODE)
+                            .await?
+                    }
+                    None => false,
+                };
 
-                if driver_handle
-                    .check_and_init(io_uring::opcode::OpenAt::CODE)
-                    .await?
-                {
+                if use_uring {
                     Op::open(path, opts)?.await
                 } else {
                     let opts = opts.clone().into();
