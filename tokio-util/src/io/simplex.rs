@@ -291,6 +291,10 @@ impl AsyncWrite for Sender {
             return Poll::Ready(Err(IoError::new(IoErrorKind::BrokenPipe, CLOSED_ERROR_MSG)));
         }
 
+        if bufs.iter().all(|buf| buf.is_empty()) {
+            return Poll::Ready(Ok(0));
+        }
+
         let free = inner
             .backpressure_boundary
             .checked_sub(inner.buf.len())

@@ -1,3 +1,9 @@
+# 2.7.2 (July 29th, 2026)
+
+- macros: upgrade syn to v3 ([#8304])
+
+[#8304]: https://github.com/tokio-rs/tokio/pull/8304
+
 # 2.7.1 (July 17th, 2026)
 
 - macros: clarify `tokio::main` expansion ([#8193])

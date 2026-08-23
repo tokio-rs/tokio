@@ -69,9 +69,10 @@ pub(crate) use self::impl_aix::get_peer_cred;
 
 #[cfg(any(
     target_os = "espidf",
+    target_os = "fuchsia",
+    target_os = "hurd",
     target_os = "nuttx",
-    target_os = "vita",
-    target_os = "hurd"
+    target_os = "vita"
 ))]
 pub(crate) use self::impl_noproc::get_peer_cred;
 
@@ -400,9 +401,10 @@ pub(crate) mod impl_aix {
 
 #[cfg(any(
     target_os = "espidf",
+    target_os = "fuchsia",
+    target_os = "hurd",
     target_os = "nuttx",
-    target_os = "vita",
-    target_os = "hurd"
+    target_os = "vita"
 ))]
 pub(crate) mod impl_noproc {
     use crate::net::unix::UnixStream;

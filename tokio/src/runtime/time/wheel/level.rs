@@ -36,7 +36,7 @@ pub(crate) struct Expiration {
 /// Level multiplier.
 ///
 /// Being a power of 2 is very important.
-const LEVEL_MULT: usize = 64;
+const LEVEL_MULT: usize = 1 << super::BITS_PER_LEVEL;
 
 impl Level {
     pub(crate) fn new(level: usize) -> Level {
@@ -161,16 +161,16 @@ fn occupied_bit(slot: usize) -> u64 {
 }
 
 fn slot_range(level: usize) -> u64 {
-    LEVEL_MULT.pow(level as u32) as u64
+    1 << (super::BITS_PER_LEVEL * level)
 }
 
 fn level_range(level: usize) -> u64 {
-    LEVEL_MULT as u64 * slot_range(level)
+    1 << (super::BITS_PER_LEVEL * (level + 1))
 }
 
 /// Converts a duration (milliseconds) and a level to a slot position.
 fn slot_for(duration: u64, level: usize) -> usize {
-    ((duration >> (level * 6)) % LEVEL_MULT as u64) as usize
+    ((duration >> (level * super::BITS_PER_LEVEL)) % LEVEL_MULT as u64) as usize
 }
 
 #[cfg(all(test, not(loom)))]
