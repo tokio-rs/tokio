@@ -352,6 +352,43 @@ async fn reset_at_bigger_than_interval() {
     check_interval_poll!(i, start, 1701);
 }
 
+// Regression test for overflow when computing deadlines far in the
+// future: `reset`, `reset_after`, and every missed-tick behavior
+// should saturate like `sleep` does, rather than panic.
+#[tokio::test(start_paused = true)]
+async fn reset_saturates_instead_of_panicking() {
+    let start = Instant::now();
+    time::advance(ms(1)).await;
+
+    let mut i = task::spawn(time::interval_at(start, ms(300)));
+    check_interval_poll!(i, start, 0);
+    i.reset_after(Duration::MAX);
+    time::advance(ms(1000)).await;
+    check_interval_poll!(i, start);
+
+    let mut i = task::spawn(time::interval_at(start, Duration::MAX));
+    check_interval_poll!(i, start, 0);
+    i.reset();
+    time::advance(ms(1000)).await;
+    check_interval_poll!(i, start);
+
+    // The first poll of each interval is already 1ms late thanks to
+    // the advance above, entering the missed-tick path with a period
+    // that overflows any deadline. The advance after the first tick
+    // shows that no further tick ever becomes ready.
+    for behavior in [
+        MissedTickBehavior::Burst,
+        MissedTickBehavior::Delay,
+        MissedTickBehavior::Skip,
+    ] {
+        let mut i = task::spawn(time::interval_at(start, Duration::MAX));
+        i.set_missed_tick_behavior(behavior);
+        check_interval_poll!(i, start, 0);
+        time::advance(ms(1000)).await;
+        check_interval_poll!(i, start);
+    }
+}
+
 fn poll_next(interval: &mut task::Spawn<time::Interval>) -> Poll<Instant> {
     interval.enter(|cx, mut interval| interval.poll_tick(cx))
 }

@@ -334,24 +334,27 @@ impl MissedTickBehavior {
     /// If a tick is missed, this method is called to determine when the next tick should happen.
     fn next_timeout(&self, timeout: Instant, now: Instant, period: Duration) -> Instant {
         match self {
-            Self::Burst => timeout + period,
-            Self::Delay => now + period,
+            Self::Burst => timeout
+                .checked_add(period)
+                .unwrap_or_else(Instant::far_future),
+            Self::Delay => now.checked_add(period).unwrap_or_else(Instant::far_future),
             Self::Skip => {
-                now + period
-                    - Duration::from_nanos(
-                        ((now - timeout).as_nanos() % period.as_nanos())
-                            .try_into()
-                            // This operation is practically guaranteed not to
-                            // fail, as in order for it to fail, `period` would
-                            // have to be longer than `now - timeout`, and both
-                            // would have to be longer than 584 years.
-                            //
-                            // If it did fail, there's not a good way to pass
-                            // the error along to the user, so we just panic.
-                            .expect(
-                                "too much time has elapsed since the interval was supposed to tick",
-                            ),
-                    )
+                let skip = Duration::from_nanos(
+                    ((now - timeout).as_nanos() % period.as_nanos())
+                        .try_into()
+                        // This operation is practically guaranteed not to
+                        // fail, as in order for it to fail, `period` would
+                        // have to be longer than `now - timeout`, and both
+                        // would have to be longer than 584 years.
+                        //
+                        // If it did fail, there's not a good way to pass
+                        // the error along to the user, so we just panic.
+                        .expect(
+                            "too much time has elapsed since the interval was supposed to tick",
+                        ),
+                );
+                now.checked_add(period - skip)
+                    .unwrap_or_else(Instant::far_future)
             }
         }
     }
@@ -492,7 +495,8 @@ impl Interval {
     ///
     /// This method ignores [`MissedTickBehavior`] strategy.
     ///
-    /// This is equivalent to calling `reset_at(Instant::now() + period)`.
+    /// This is equivalent to calling `reset_at(Instant::now() + period)`,
+    /// except that it saturates to a far-future instant on overflow.
     ///
     /// # Examples
     ///
@@ -517,7 +521,11 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset(&mut self) {
-        self.delay.as_mut().reset(Instant::now() + self.period);
+        self.delay.as_mut().reset(
+            Instant::now()
+                .checked_add(self.period)
+                .unwrap_or_else(Instant::far_future),
+        );
     }
 
     /// Resets the interval immediately.
@@ -556,7 +564,8 @@ impl Interval {
     ///
     /// This method ignores [`MissedTickBehavior`] strategy.
     ///
-    /// This is equivalent to calling `reset_at(Instant::now() + after)`.
+    /// This is equivalent to calling `reset_at(Instant::now() + after)`,
+    /// except that it saturates to a far-future instant on overflow.
     ///
     /// # Examples
     ///
@@ -582,7 +591,11 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset_after(&mut self, after: Duration) {
-        self.delay.as_mut().reset(Instant::now() + after);
+        self.delay.as_mut().reset(
+            Instant::now()
+                .checked_add(after)
+                .unwrap_or_else(Instant::far_future),
+        );
     }
 
     /// Resets the interval to a [`crate::time::Instant`] deadline.
