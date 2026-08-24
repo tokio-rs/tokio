@@ -168,6 +168,18 @@ async fn skip() {
     check_interval_poll!(i, start, 1800);
 }
 
+#[tokio::test]
+async fn reset_doesnt_panic_max_duration() {
+    let mut interval = time::interval(Duration::MAX);
+    interval.reset();
+}
+
+#[tokio::test]
+async fn reset_after_doesnt_panic_max_duration() {
+    let mut interval = time::interval(ms(1));
+    interval.reset_after(Duration::MAX);
+}
+
 #[tokio::test(start_paused = true)]
 async fn reset() {
     let start = Instant::now();
