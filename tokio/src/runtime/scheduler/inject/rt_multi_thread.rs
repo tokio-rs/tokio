@@ -1,34 +1,18 @@
-use super::{Shared, Synced};
+use super::{Inject, Pop};
 
-use crate::runtime::scheduler::Lock;
 use crate::runtime::task;
 
 use std::sync::atomic::Ordering::Release;
 
-impl<'a> Lock<Synced> for &'a mut Synced {
-    type Handle = &'a mut Synced;
-
-    fn lock(self) -> Self::Handle {
-        self
+impl<T: 'static> Inject<T> {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.shared.is_empty()
     }
-}
 
-impl AsMut<Synced> for Synced {
-    fn as_mut(&mut self) -> &mut Synced {
-        self
-    }
-}
-
-impl<T: 'static> Shared<T> {
     /// Pushes several values into the queue.
-    ///
-    /// # Safety
-    ///
-    /// Must be called with the same `Synced` instance returned by `Inject::new`
     #[inline]
-    pub(crate) unsafe fn push_batch<L, I>(&self, shared: L, mut iter: I)
+    pub(crate) fn push_batch<I>(&self, mut iter: I)
     where
-        L: Lock<Synced>,
         I: Iterator<Item = task::Notified<T>>,
     {
         let first = match iter.next() {
@@ -55,42 +39,32 @@ impl<T: 'static> Shared<T> {
 
         // Now that the tasks are linked together, insert them into the
         // linked list.
-        //
-        // Safety: exactly the same safety requirements as `push_batch` method.
-        unsafe {
-            self.push_batch_inner(shared, first, prev, counter);
-        }
+        self.push_batch_inner(first, prev, counter);
     }
 
     /// Inserts several tasks that have been linked together into the queue.
     ///
     /// The provided head and tail may be the same task. In this case, a
     /// single task is inserted.
-    ///
-    /// # Safety
-    ///
-    /// Must be called with the same `Synced` instance returned by `Inject::new`
     #[inline]
-    unsafe fn push_batch_inner<L>(
-        &self,
-        shared: L,
-        batch_head: task::RawTask,
-        batch_tail: task::RawTask,
-        num: usize,
-    ) where
-        L: Lock<Synced>,
-    {
+    fn push_batch_inner(&self, batch_head: task::RawTask, batch_tail: task::RawTask, num: usize) {
         debug_assert!(unsafe { batch_tail.get_queue_next().is_none() });
 
-        let mut synced = shared.lock();
+        let mut synced = self.synced.lock();
 
-        if synced.as_mut().is_closed {
+        if synced.is_closed {
+            // Drop the lock before dropping the tasks: dropping a task can
+            // run arbitrary user `Drop` code, which may reentrantly acquire
+            // this lock by scheduling a task.
             drop(synced);
 
             let mut curr = Some(batch_head);
 
             while let Some(task) = curr {
-                // Safety: exactly the same safety requirements as `push_batch_inner`.
+                // safety: `push_batch` took ownership of each task's
+                // `Notified` and linked the batch through the tasks'
+                // `queue_next` fields; reconstituting the `Notified` here
+                // transfers that ownership back.
                 curr = unsafe { task.get_queue_next() };
 
                 let _ = unsafe { task::Notified::<T>::from_raw(task) };
@@ -98,8 +72,6 @@ impl<T: 'static> Shared<T> {
 
             return;
         }
-
-        let synced = synced.as_mut();
 
         if let Some(tail) = synced.tail {
             unsafe {
@@ -115,8 +87,29 @@ impl<T: 'static> Shared<T> {
         //
         // safety: All updates to the len atomic are guarded by the mutex. As
         // such, a non-atomic load followed by a store is safe.
-        let len = unsafe { self.len.unsync_load() };
+        let len = unsafe { self.shared.len.unsync_load() };
 
-        self.len.store(len + num, Release);
+        self.shared.len.store(len + num, Release);
+    }
+
+    /// Pops up to `n` values from the queue, passing an iterator over them to
+    /// `f`. The queue lock is held while `f` runs, so any values `f` does not
+    /// consume are removed from the queue and dropped before the lock is
+    /// released.
+    pub(crate) fn pop_n<R>(&self, n: usize, f: impl FnOnce(Pop<'_, T>) -> R) -> R {
+        let mut synced = self.synced.lock();
+        // safety: passing correct `Synced`
+        f(unsafe { self.shared.pop_n(&mut synced, n) })
+    }
+
+    /// Pops every task from the queue into `dst`, holding the queue lock for
+    /// the entire drain so it is atomic with respect to concurrent pushes.
+    #[cfg(feature = "taskdump")]
+    pub(crate) fn drain_into(&self, dst: &mut Vec<task::Notified<T>>) {
+        let mut synced = self.synced.lock();
+        // safety: passing correct `Synced`
+        while let Some(task) = unsafe { self.shared.pop(&mut synced) } {
+            dst.push(task);
+        }
     }
 }

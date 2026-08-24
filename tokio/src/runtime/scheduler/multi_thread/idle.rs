@@ -151,6 +151,9 @@ impl Idle {
     }
 
     fn notify_should_wakeup(&self) -> bool {
+        // This must be a `SeqCst` RMW rather than a load: it is what makes
+        // the caller's preceding inject-queue push visible to a parking
+        // worker's subsequent unlocked queue-emptiness check.
         let state = State(self.state.fetch_add(0, SeqCst));
         state.num_searching() == 0 && state.num_unparked() < self.num_workers
     }
