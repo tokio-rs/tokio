@@ -1827,7 +1827,7 @@ impl Builder {
     }
 }
 
-cfg_io_driver! {
+cfg_rt! {
     impl Builder {
         /// Enables the I/O driver.
         ///
