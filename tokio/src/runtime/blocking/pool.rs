@@ -182,7 +182,13 @@ pub(crate) struct Task {
 
 #[derive(PartialEq, Eq)]
 pub(crate) enum Mandatory {
-    #[cfg_attr(any(not(feature = "fs"), all(target_os = "emscripten", not(target_feature = "atomics"))), allow(dead_code))]
+    #[cfg_attr(
+        any(
+            not(feature = "fs"),
+            all(target_os = "emscripten", not(target_feature = "atomics"))
+        ),
+        allow(dead_code)
+    )]
     Mandatory,
     NonMandatory,
 }
