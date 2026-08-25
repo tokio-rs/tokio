@@ -1839,7 +1839,7 @@ cfg_rt! {
         /// ```
         /// use tokio::runtime;
         ///
-        /// let rt = runtime::Builder::new_multi_thread()
+        /// let rt = runtime::Builder::new_current_thread()
         ///     .enable_io()
         ///     .build()
         ///     .unwrap();
