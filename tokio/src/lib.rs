@@ -448,8 +448,10 @@
 //!
 //! The `wasm32-unknown-emscripten` target supports the single-threaded runtime
 //! with the `rt`, `time`, `sync`, `macros`, `fs`, `io-util`, `io-std`, and
-//! `test-util` features. The `net`, `process`, `signal`, and `rt-multi-thread`
-//! features are not supported.
+//! `test-util` features. The `rt-multi-thread` feature is additionally
+//! supported when building with Emscripten pthreads (`-pthread`, with
+//! `-sPROXY_TO_PTHREAD` so the main thread may block). The `net`, `process`,
+//! and `signal` features are not supported.
 //!
 //! ## Unstable `WASM` support
 //!
@@ -488,16 +490,9 @@ compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.
 
 #[cfg(all(
     target_os = "emscripten",
-    any(
-        feature = "net",
-        feature = "process",
-        feature = "rt-multi-thread",
-        feature = "signal"
-    )
+    any(feature = "net", feature = "process", feature = "signal")
 ))]
-compile_error!(
-    "Features net,process,rt-multi-thread,signal are not supported on wasm32-unknown-emscripten."
-);
+compile_error!("Features net,process,signal are not supported on wasm32-unknown-emscripten.");
 
 #[cfg(all(not(tokio_unstable), feature = "io-uring"))]
 compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");
