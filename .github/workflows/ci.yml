@@ -19,6 +19,8 @@ env:
   rust_nightly: nightly-2025-10-12
   # Pin a specific miri version
   rust_miri_nightly: nightly-2026-06-29
+  rust_emscripten_nightly: nightly-2026-08-17
+  emsdk_version: '6.0.8'
   rust_clippy: '1.88'
   # When updating this, also update:
   # - README.md
@@ -1208,7 +1210,7 @@ jobs:
       - name: Install Emscripten
         uses: mymindstorm/setup-emsdk@v14
         with:
-          version: 'latest'
+          version: ${{ env.emsdk_version }}
 
       - uses: actions/setup-node@v4
         with:
@@ -1234,15 +1236,15 @@ jobs:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
           RUSTFLAGS: "-Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
 
-      - name: Install Rust ${{ env.rust_nightly }}
+      - name: Install Rust ${{ env.rust_emscripten_nightly }}
         uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: ${{ env.rust_nightly }}
+          toolchain: ${{ env.rust_emscripten_nightly }}
           targets: wasm32-unknown-emscripten
           components: rust-src
 
       - name: Test tokio multi-thread runtime for emscripten (pthread proxy)
-        run: cargo +${{ env.rust_nightly }} test -Zbuild-std=std,panic_abort -p tokio --target wasm32-unknown-emscripten --features "rt,rt-multi-thread,time,sync,macros" --test rt_multi_thread_emscripten
+        run: cargo +${{ env.rust_emscripten_nightly }} test -Zbuild-std=std,panic_abort -p tokio --target wasm32-unknown-emscripten --features "rt,rt-multi-thread,time,sync,macros" --test rt_multi_thread_emscripten
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
