@@ -486,8 +486,18 @@ compile_error! {
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
-#[cfg(all(target_os = "emscripten", feature = "process"))]
-compile_error!("The `process` feature is not supported on wasm32-unknown-emscripten.");
+#[cfg(all(
+    target_os = "emscripten",
+    any(
+        feature = "net",
+        feature = "process",
+        feature = "rt-multi-thread",
+        feature = "signal"
+    )
+))]
+compile_error!(
+    "Features net,process,rt-multi-thread,signal are not supported on wasm32-unknown-emscripten."
+);
 
 #[cfg(all(not(tokio_unstable), feature = "io-uring"))]
 compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");

@@ -1231,7 +1231,7 @@ jobs:
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
-          RUSTFLAGS: "-C link-args=-sALLOW_MEMORY_GROWTH=1 -C link-args=-sEXIT_RUNTIME=1 -C link-args=-sSTACK_SIZE=1048576"
+          RUSTFLAGS: "-Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
 
   check-external-types:
     name: check-external-types (${{ matrix.os }})
