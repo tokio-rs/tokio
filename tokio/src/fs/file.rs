@@ -52,6 +52,35 @@ cfg_io_uring! {
 /// in-memory buffer. See the [`sync_all`] method for telling the OS to write
 /// the data to disk.
 ///
+/// # Errors while writing
+///
+/// Writes are buffered and performed in the background, so a write that
+/// appears to succeed may fail later. When it does, `File` behaves like
+/// [`BufWriter`]: the bytes that could not be written are kept, and the error
+/// is reported by every operation until a [`flush`] retries them successfully.
+///
+/// Reads, writes and seeks never retry: while data is pending they report the
+/// error and leave the bytes alone, because any of them would otherwise
+/// discard the data or move the cursor out from under it.
+///
+/// [`flush`] retries. So do [`set_len`], [`sync_all`], [`sync_data`],
+/// [`try_clone`] and [`into_std`], which flush first — they fail only if the
+/// retry itself fails.
+///
+/// This means a failed write is not lost if the cause is recoverable: freeing
+/// disk space and calling [`flush`] again writes the retained data.
+///
+/// Retained data is *not* written when the `File` is dropped, and is discarded
+/// by [`into_std`] and [`try_into_std`]. Call [`flush`] and check its result
+/// before doing any of those if the data matters.
+///
+/// [`BufWriter`]: std::io::BufWriter
+/// [`set_len`]: fn@crate::fs::File::set_len
+/// [`sync_data`]: fn@crate::fs::File::sync_data
+/// [`try_clone`]: fn@crate::fs::File::try_clone
+/// [`into_std`]: fn@crate::fs::File::into_std
+/// [`try_into_std`]: fn@crate::fs::File::try_into_std
+///
 /// Reading and writing to a `File` is usually done using the convenience
 /// methods found on the [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
 ///
@@ -104,7 +133,22 @@ struct Inner {
     /// Errors from writes/flushes are returned in write/flush calls. If a write
     /// error is observed while performing a read, it is saved until the next
     /// write / flush call.
+    ///
+    /// While `unflushed_write` is set, this error is reported by every
+    /// operation but is *not* cleared, because the data it refers to is still
+    /// buffered and has not reached the file yet. It is cleared only when a
+    /// flush finally succeeds, or when the retained data is explicitly
+    /// discarded.
     last_write_err: Option<io::ErrorKind>,
+
+    /// Set when a write failed and the bytes it could not write are still held
+    /// in the `Buf` inside `State::Idle`.
+    ///
+    /// This distinguishes a non-empty idle buffer holding *unwritten write
+    /// data* from one holding *unconsumed read-ahead*, which is the only thing
+    /// a non-empty idle buffer could mean before. Every path that would
+    /// otherwise discard the buffer or seek relative to it has to check this.
+    unflushed_write: bool,
 
     pos: u64,
 }
@@ -285,6 +329,7 @@ impl File {
             inner: Mutex::new(Inner {
                 state: State::Idle(Some(Buf::with_capacity(0))),
                 last_write_err: None,
+                unflushed_write: false,
                 pos: 0,
             }),
             max_buf_size: DEFAULT_MAX_BUF_SIZE,
@@ -316,7 +361,13 @@ impl File {
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn sync_all(&self) -> io::Result<()> {
         let mut inner = self.inner.lock().await;
-        inner.complete_inflight().await;
+        inner.complete_inflight(&self.std).await;
+
+        // Reporting success here while a failed write is still buffered would
+        // claim data reached the disk when it never reached the file.
+        if let Some(e) = inner.take_pending_write_err() {
+            return Err(e);
+        }
 
         let std = self.std.clone();
         asyncify(move || std.sync_all()).await
@@ -351,7 +402,12 @@ impl File {
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn sync_data(&self) -> io::Result<()> {
         let mut inner = self.inner.lock().await;
-        inner.complete_inflight().await;
+        inner.complete_inflight(&self.std).await;
+
+        // See `sync_all`.
+        if let Some(e) = inner.take_pending_write_err() {
+            return Err(e);
+        }
 
         let std = self.std.clone();
         asyncify(move || std.sync_data()).await
@@ -389,7 +445,17 @@ impl File {
     /// [`AsyncWriteExt`]: trait@crate::io::AsyncWriteExt
     pub async fn set_len(&self, size: u64) -> io::Result<()> {
         let mut inner = self.inner.lock().await;
-        inner.complete_inflight().await;
+        inner.complete_inflight(&self.std).await;
+
+        // `complete_inflight` swallows a write error into `last_write_err`.
+        // If the data behind it is still buffered, truncating now would
+        // silently drop it.
+        if inner.unflushed_write {
+            let e = inner
+                .last_write_err
+                .expect("unflushed_write implies a stored write error");
+            return Err(e.into());
+        }
 
         let mut buf = match inner.state {
             State::Idle(ref mut buf_cell) => buf_cell.take().unwrap(),
@@ -474,7 +540,7 @@ impl File {
     /// # }
     /// ```
     pub async fn try_clone(&self) -> io::Result<File> {
-        self.inner.lock().await.complete_inflight().await;
+        self.inner.lock().await.complete_inflight(&self.std).await;
         let std = self.std.clone();
         let std_file = asyncify(move || std.try_clone()).await?;
         let mut file = File::from_std(std_file);
@@ -499,7 +565,9 @@ impl File {
     /// # }
     /// ```
     pub async fn into_std(mut self) -> StdFile {
-        self.inner.get_mut().complete_inflight().await;
+        let std = self.std.clone();
+        self.inner.get_mut().complete_inflight(&std).await;
+        drop(std);
         Arc::try_unwrap(self.std).expect("Arc::try_unwrap failed")
     }
 
@@ -611,6 +679,17 @@ impl AsyncRead for File {
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
+        // Unwritten data from a failed write is still buffered. Reading would
+        // either hand those bytes back as file contents or discard them, so
+        // report the error instead and leave the data alone until it is
+        // flushed.
+        if inner.unflushed_write {
+            let e = inner
+                .last_write_err
+                .expect("unflushed_write implies a stored write error");
+            return Poll::Ready(Err(e.into()));
+        }
+
         loop {
             match inner.state {
                 State::Idle(ref mut buf_cell) => {
@@ -653,9 +732,14 @@ impl AsyncRead for File {
                             continue;
                         }
                         Operation::Write(Err(e)) => {
-                            assert!(inner.last_write_err.is_none());
                             inner.last_write_err = Some(e.kind());
+                            // `buf` still holds the bytes that could not be
+                            // written. Falling through to the next iteration
+                            // would hand them to the reader as file contents,
+                            // so stop here and let a flush retry them.
+                            inner.unflushed_write = !buf.is_empty();
                             inner.state = State::Idle(Some(buf));
+                            return Poll::Ready(Err(e));
                         }
                         Operation::Seek(result) => {
                             assert!(buf.is_empty());
@@ -676,6 +760,16 @@ impl AsyncSeek for File {
     fn start_seek(self: Pin<&mut Self>, mut pos: SeekFrom) -> io::Result<()> {
         let me = self.get_mut();
         let inner = me.inner.get_mut();
+
+        // Seeking would `discard_read` the unwritten bytes of a failed write,
+        // or move the cursor out from under them. Refuse until they are
+        // flushed.
+        if inner.unflushed_write {
+            let e = inner
+                .last_write_err
+                .expect("unflushed_write implies a stored write error");
+            return Err(e.into());
+        }
 
         match inner.state {
             State::Busy(_) => Err(io::Error::new(
@@ -709,6 +803,18 @@ impl AsyncSeek for File {
         ready!(crate::trace::trace_leaf());
         let inner = self.inner.get_mut();
 
+        // `Seek::poll` drives this before `start_seek`, so it is the first
+        // place an outside seek reaches. Without this guard the retained bytes
+        // of a failed write would be discarded by `start_seek` below.
+        if inner.unflushed_write {
+            if let State::Idle(_) = inner.state {
+                let e = inner
+                    .last_write_err
+                    .expect("unflushed_write implies a stored write error");
+                return Poll::Ready(Err(e.into()));
+            }
+        }
+
         loop {
             match inner.state {
                 State::Idle(_) => return Poll::Ready(Ok(inner.pos)),
@@ -717,17 +823,27 @@ impl AsyncSeek for File {
                     if res.is_err() {
                         // Restore a valid Idle state before returning the error.
                         inner.state = State::Idle(Some(Buf::with_capacity(0)));
+                        inner.unflushed_write = false;
+                        inner.last_write_err = None;
                     }
                     let (op, buf) = res?;
+                    let retained = !buf.is_empty();
                     inner.state = State::Idle(Some(buf));
 
                     match op {
                         Operation::Read(_) => {}
                         Operation::Write(Err(e)) => {
-                            assert!(inner.last_write_err.is_none());
+                            // The bytes this write could not write are still in
+                            // the buffer just parked in `State::Idle`. Falling
+                            // through would let `start_seek` discard them.
                             inner.last_write_err = Some(e.kind());
+                            inner.unflushed_write = retained;
+                            return Poll::Ready(Err(e));
                         }
-                        Operation::Write(_) => {}
+                        Operation::Write(Ok(())) => {
+                            inner.unflushed_write = false;
+                            inner.last_write_err = None;
+                        }
                         Operation::Seek(res) => {
                             if let Ok(pos) = res {
                                 inner.pos = pos;
@@ -751,6 +867,13 @@ impl AsyncWrite for File {
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
+        // While a failed write's bytes are still buffered, accepting more data
+        // would either overwrite them or reorder them behind the new data.
+        // Report the error and keep it until a flush resolves it.
+        if let Some(e) = inner.take_pending_write_err() {
+            return Poll::Ready(Err(e));
+        }
+
         if let Some(e) = inner.last_write_err.take() {
             return Poll::Ready(Err(e.into()));
         }
@@ -771,9 +894,22 @@ impl AsyncWrite for File {
 
                     let res = spawn_mandatory_blocking(move || {
                         let res = if let Some(seek) = seek {
-                            (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
+                            match (&*std).seek(seek) {
+                                Ok(_) => buf.write_all_to(&mut &*std),
+                                Err(e) => {
+                                    // The rewind that this write had to be
+                                    // paired with failed, so nothing was
+                                    // written and the cursor is not where the
+                                    // data belongs. `poll_flush` retries a
+                                    // bare write with no seek, which would put
+                                    // the bytes at the wrong offset, so drop
+                                    // them rather than misplace them.
+                                    buf.discard_read();
+                                    Err(e)
+                                }
+                            }
                         } else {
-                            buf.write_to(&mut &*std)
+                            buf.write_all_to(&mut &*std)
                         };
 
                         (Operation::Write(res), buf)
@@ -797,6 +933,7 @@ impl AsyncWrite for File {
                         inner.state = State::Idle(Some(Buf::with_capacity(0)));
                     }
                     let (op, buf) = res?;
+                    let buf_is_empty = buf.is_empty();
                     inner.state = State::Idle(Some(buf));
 
                     match op {
@@ -808,8 +945,14 @@ impl AsyncWrite for File {
                         }
                         Operation::Write(res) => {
                             // If the previous write was successful, continue.
-                            // Otherwise, error.
-                            res?;
+                            // Otherwise, error. The buffer just returned to
+                            // `State::Idle` still holds whatever could not be
+                            // written, so flag it for the next flush.
+                            if let Err(e) = res {
+                                inner.unflushed_write = !buf_is_empty;
+                                inner.last_write_err = Some(e.kind());
+                                return Poll::Ready(Err(e));
+                            }
                             continue;
                         }
                         Operation::Seek(_) => {
@@ -831,6 +974,13 @@ impl AsyncWrite for File {
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
+        // While a failed write's bytes are still buffered, accepting more data
+        // would either overwrite them or reorder them behind the new data.
+        // Report the error and keep it until a flush resolves it.
+        if let Some(e) = inner.take_pending_write_err() {
+            return Poll::Ready(Err(e));
+        }
+
         if let Some(e) = inner.last_write_err.take() {
             return Poll::Ready(Err(e.into()));
         }
@@ -851,9 +1001,22 @@ impl AsyncWrite for File {
 
                     let res = spawn_mandatory_blocking(move || {
                         let res = if let Some(seek) = seek {
-                            (&*std).seek(seek).and_then(|_| buf.write_to(&mut &*std))
+                            match (&*std).seek(seek) {
+                                Ok(_) => buf.write_all_to(&mut &*std),
+                                Err(e) => {
+                                    // The rewind that this write had to be
+                                    // paired with failed, so nothing was
+                                    // written and the cursor is not where the
+                                    // data belongs. `poll_flush` retries a
+                                    // bare write with no seek, which would put
+                                    // the bytes at the wrong offset, so drop
+                                    // them rather than misplace them.
+                                    buf.discard_read();
+                                    Err(e)
+                                }
+                            }
                         } else {
-                            buf.write_to(&mut &*std)
+                            buf.write_all_to(&mut &*std)
                         };
 
                         (Operation::Write(res), buf)
@@ -877,6 +1040,7 @@ impl AsyncWrite for File {
                         inner.state = State::Idle(Some(Buf::with_capacity(0)));
                     }
                     let (op, buf) = res?;
+                    let buf_is_empty = buf.is_empty();
                     inner.state = State::Idle(Some(buf));
 
                     match op {
@@ -888,8 +1052,14 @@ impl AsyncWrite for File {
                         }
                         Operation::Write(res) => {
                             // If the previous write was successful, continue.
-                            // Otherwise, error.
-                            res?;
+                            // Otherwise, error. The buffer just returned to
+                            // `State::Idle` still holds whatever could not be
+                            // written, so flag it for the next flush.
+                            if let Err(e) = res {
+                                inner.unflushed_write = !buf_is_empty;
+                                inner.last_write_err = Some(e.kind());
+                                return Poll::Ready(Err(e));
+                            }
                             continue;
                         }
                         Operation::Seek(_) => {
@@ -906,10 +1076,11 @@ impl AsyncWrite for File {
         true
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         ready!(crate::trace::trace_leaf());
-        let inner = self.inner.get_mut();
-        inner.poll_flush(cx)
+        let me = self.get_mut();
+        let std = &me.std;
+        me.inner.get_mut().poll_flush(cx, std)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
@@ -1118,15 +1289,27 @@ impl Inner {
         })
     }
 
-    async fn complete_inflight(&mut self) {
-        use std::future::poll_fn;
-
-        poll_fn(|cx| self.poll_complete_inflight(cx)).await;
+    /// Returns the stored write error if unwritten data is still buffered.
+    ///
+    /// The error is reported but neither it nor the data is cleared: the bytes
+    /// are still pending and a later `flush` may yet write them.
+    fn take_pending_write_err(&mut self) -> Option<io::Error> {
+        if self.unflushed_write {
+            self.last_write_err.map(Into::into)
+        } else {
+            None
+        }
     }
 
-    fn poll_complete_inflight(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+    async fn complete_inflight(&mut self, std: &Arc<StdFile>) {
+        use std::future::poll_fn;
+
+        poll_fn(|cx| self.poll_complete_inflight(cx, std)).await;
+    }
+
+    fn poll_complete_inflight(&mut self, cx: &mut Context<'_>, std: &Arc<StdFile>) -> Poll<()> {
         ready!(crate::trace::trace_leaf());
-        match self.poll_flush(cx) {
+        match self.poll_flush(cx, std) {
             Poll::Ready(Err(e)) => {
                 self.last_write_err = Some(e.kind());
                 Poll::Ready(())
@@ -1136,9 +1319,44 @@ impl Inner {
         }
     }
 
-    fn poll_flush(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        if let Some(e) = self.last_write_err.take() {
-            return Poll::Ready(Err(e.into()));
+    fn poll_flush(
+        &mut self,
+        cx: &mut Context<'_>,
+        std: &Arc<StdFile>,
+    ) -> Poll<Result<(), io::Error>> {
+        // A stored error whose data is *not* still buffered is reported once
+        // and cleared, as before. When `unflushed_write` is set the data is
+        // still here, so the error is kept until the retry below resolves it.
+        if !self.unflushed_write {
+            if let Some(e) = self.last_write_err.take() {
+                return Poll::Ready(Err(e.into()));
+            }
+        }
+
+        // If a previous write failed, its unwritten bytes are still in the
+        // buffer. Retry them now; this is the only place that happens.
+        if self.unflushed_write {
+            if let State::Idle(ref mut buf_cell) = self.state {
+                let mut buf = buf_cell.take().unwrap();
+                let std = std.clone();
+
+                let res = spawn_mandatory_blocking(move || {
+                    let res = buf.write_all_to(&mut &*std);
+                    (Operation::Write(res), buf)
+                })
+                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "background task failed"));
+
+                if res.is_err() {
+                    // Restore a valid Idle state before returning the error.
+                    // The retained data cannot be recovered, so stop claiming
+                    // that it is still pending.
+                    self.state = State::Idle(Some(Buf::with_capacity(0)));
+                    self.unflushed_write = false;
+                    self.last_write_err = None;
+                }
+
+                self.state = State::Busy(res?);
+            }
         }
 
         let (op, buf) = match self.state {
@@ -1148,17 +1366,30 @@ impl Inner {
                 if res.is_err() {
                     // Restore a valid Idle state before returning the error.
                     self.state = State::Idle(Some(Buf::with_capacity(0)));
+                    self.unflushed_write = false;
+                    self.last_write_err = None;
                 }
                 res?
             }
         };
 
-        // The buffer is not used here
         self.state = State::Idle(Some(buf));
 
         match op {
             Operation::Read(_) => Poll::Ready(Ok(())),
-            Operation::Write(res) => Poll::Ready(res),
+            Operation::Write(Ok(())) => {
+                // Everything reached the file.
+                self.unflushed_write = false;
+                self.last_write_err = None;
+                Poll::Ready(Ok(()))
+            }
+            Operation::Write(Err(e)) => {
+                // The bytes that could not be written are still in the buffer
+                // that was just returned to `State::Idle`.
+                self.unflushed_write = true;
+                self.last_write_err = Some(e.kind());
+                Poll::Ready(Err(e))
+            }
             Operation::Seek(_) => Poll::Ready(Ok(())),
         }
     }
