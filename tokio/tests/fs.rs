@@ -1,5 +1,13 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support file operations
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "fs"
+    )
+))]
 
 use tokio::fs;
 use tokio_test::assert_ok;
@@ -16,6 +24,10 @@ async fn path_read_write() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "emscripten libc does not implement dup()/try_clone()"
+)]
 async fn try_clone_should_preserve_max_buf_size() {
     let buf_size = 128;
     let temp = tempdir();

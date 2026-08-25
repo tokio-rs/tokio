@@ -1227,7 +1227,7 @@ jobs:
           RUSTFLAGS: ""
 
       - name: Test tokio for emscripten
-        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,io-util,test-util" --tests
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util" --tests
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
