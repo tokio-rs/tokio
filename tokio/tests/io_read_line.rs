@@ -2,6 +2,7 @@
 #![cfg(feature = "full")]
 
 use std::io::ErrorKind;
+use std::str::Utf8Error;
 use tokio::io::{AsyncBufReadExt, BufReader, Error};
 use tokio_test::{assert_ok, io::Builder};
 
@@ -69,7 +70,8 @@ async fn read_line_invalid_utf8() {
     let mut line = "Foo".to_string();
     let err = read.read_line(&mut line).await.expect_err("Should fail");
     assert_eq!(err.kind(), ErrorKind::InvalidData);
-    assert_eq!(err.to_string(), "stream did not contain valid UTF-8");
+    let utf8 = err.into_inner().unwrap().downcast::<Utf8Error>().unwrap();
+    assert_eq!(utf8.valid_up_to(), 12);
     assert_eq!(line.as_str(), "Foo");
 }
 
