@@ -1,5 +1,8 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support panic recovery
+#![cfg(any(
+    all(feature = "full", not(target_os = "wasi")), // Wasi does not support panic recovery
+    all(target_os = "emscripten", feature = "io-util")
+))]
 #![cfg(panic = "unwind")]
 
 use std::task::{Context, Poll};
@@ -42,7 +45,7 @@ impl AsyncWrite for RW {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "emscripten")))]
 mod unix {
     use std::os::unix::prelude::{AsRawFd, RawFd};
 
@@ -132,7 +135,7 @@ fn unsplit_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "emscripten")))]
 fn async_fd_new_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::io::unix::AsyncFd;
     use tokio::runtime::Builder;
@@ -154,7 +157,7 @@ fn async_fd_new_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "emscripten")))]
 fn async_fd_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::io::unix::AsyncFd;
     use tokio::io::Interest;
@@ -177,7 +180,7 @@ fn async_fd_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "emscripten")))]
 fn async_fd_try_new_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::io::unix::AsyncFd;
     use tokio::runtime::Builder;
@@ -199,7 +202,7 @@ fn async_fd_try_new_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "emscripten")))]
 fn async_fd_try_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::io::unix::AsyncFd;
     use tokio::io::Interest;
