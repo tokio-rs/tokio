@@ -733,15 +733,6 @@ macro_rules! cfg_not_wasip1 {
     }
 }
 
-macro_rules! cfg_is_wasm_not_wasi {
-    ($($item:item)*) => {
-        $(
-            #[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
-            $item
-        )*
-    }
-}
-
 /// Use this macro to provide two different implementations of the same API — one for stable
 /// builds and one for unstable builds.
 macro_rules! cfg_metrics_variant {
