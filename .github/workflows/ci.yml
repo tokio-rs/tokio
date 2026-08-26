@@ -515,7 +515,7 @@ jobs:
           package: tokio
           release-type: minor
       - name: Check semver for rest of the workspace
-        if: ${{ !startsWith(github.event.pull_request.base.ref, 'tokio-1.') }}
+        if: ${{ !startsWith(github.event.pull_request.base.ref, 'tokio-1.') && !startsWith(github.ref_name, 'tokio-1.') }}
         uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           rust-toolchain: ${{ env.rust_stable }}
