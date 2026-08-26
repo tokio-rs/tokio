@@ -398,6 +398,7 @@ macro_rules! cfg_process {
             #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
             #[cfg(not(loom))]
             #[cfg(not(target_os = "wasi"))]
+            #[cfg(not(target_os = "emscripten"))]
             $item
         )*
     }
@@ -405,16 +406,29 @@ macro_rules! cfg_process {
 
 macro_rules! cfg_process_driver {
     ($($item:item)*) => {
-        #[cfg(unix)]
-        #[cfg(not(loom))]
-        cfg_process! { $($item)* }
+        $(
+            #[cfg(all(
+                unix,
+                not(loom),
+                feature = "process",
+                not(target_os = "wasi"),
+                not(target_os = "emscripten"),
+            ))]
+            $item
+        )*
     }
 }
 
 macro_rules! cfg_not_process_driver {
     ($($item:item)*) => {
         $(
-            #[cfg(not(all(unix, not(loom), feature = "process")))]
+            #[cfg(not(all(
+                unix,
+                not(loom),
+                feature = "process",
+                not(target_os = "wasi"),
+                not(target_os = "emscripten"),
+            )))]
             $item
         )*
     }
@@ -427,6 +441,7 @@ macro_rules! cfg_signal {
             #[cfg_attr(docsrs, doc(cfg(feature = "signal")))]
             #[cfg(not(loom))]
             #[cfg(not(target_os = "wasi"))]
+            #[cfg(not(target_os = "emscripten"))]
             $item
         )*
     }
@@ -437,6 +452,7 @@ macro_rules! cfg_signal_internal {
         $(
             #[cfg(any(feature = "signal", all(unix, feature = "process")))]
             #[cfg(not(loom))]
+            #[cfg(not(target_os = "emscripten"))]
             $item
         )*
     }
@@ -449,10 +465,15 @@ macro_rules! cfg_signal_internal_and_unix {
     }
 }
 
-macro_rules! cfg_not_signal_internal {
+macro_rules! cfg_not_signal_internal_and_unix {
     ($($item:item)*) => {
         $(
-            #[cfg(any(loom, not(unix), not(any(feature = "signal", all(unix, feature = "process")))))]
+            #[cfg(not(all(
+                unix,
+                any(feature = "signal", all(unix, feature = "process")),
+                not(loom),
+                not(target_os = "emscripten"),
+            )))]
             $item
         )*
     }
@@ -707,15 +728,6 @@ macro_rules! cfg_not_wasip1 {
     ($($item:item)*) => {
         $(
             #[cfg(not(all(target_os = "wasi", target_env = "p1")))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_is_wasm_not_wasi {
-    ($($item:item)*) => {
-        $(
-            #[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
             $item
         )*
     }

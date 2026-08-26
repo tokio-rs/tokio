@@ -1,5 +1,15 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 
 use std::mem;
 use std::sync::atomic::{AtomicU32, Ordering};

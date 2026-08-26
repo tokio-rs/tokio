@@ -1,16 +1,29 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support panic recovery
+#![cfg(any(
+    all(feature = "full", not(target_os = "wasi")),
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "time",
+        feature = "sync",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 
+#[cfg(not(target_family = "wasm"))]
 use std::sync::Arc;
+#[cfg(not(target_family = "wasm"))]
 use std::thread::sleep;
+#[cfg(not(target_family = "wasm"))]
 use tokio::time::Duration;
 
 use tokio::runtime::Builder;
 
-#[cfg(panic = "unwind")]
+#[cfg(all(panic = "unwind", not(target_family = "wasm")))]
 struct PanicOnDrop;
 
-#[cfg(panic = "unwind")]
+#[cfg(all(panic = "unwind", not(target_family = "wasm")))]
 impl Drop for PanicOnDrop {
     fn drop(&mut self) {
         panic!("Well what did you expect would happen...");
@@ -19,6 +32,7 @@ impl Drop for PanicOnDrop {
 
 /// Checks that a suspended task can be aborted without panicking as reported in
 /// issue #3157: <https://github.com/tokio-rs/tokio/issues/3157>.
+#[cfg(not(target_family = "wasm"))]
 #[test]
 fn test_abort_without_panic_3157() {
     let rt = Builder::new_multi_thread()
@@ -41,6 +55,7 @@ fn test_abort_without_panic_3157() {
 /// Checks that a suspended task can be aborted inside of a current_thread
 /// executor without panicking as reported in issue #3662:
 /// <https://github.com/tokio-rs/tokio/issues/3662>.
+#[cfg(not(target_family = "wasm"))]
 #[test]
 fn test_abort_without_panic_3662() {
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -104,6 +119,7 @@ fn test_abort_without_panic_3662() {
 /// Checks that a suspended LocalSet task can be aborted from a remote thread
 /// without panicking and without running the tasks destructor on the wrong thread.
 /// <https://github.com/tokio-rs/tokio/issues/3929>
+#[cfg(not(target_family = "wasm"))]
 #[test]
 fn remote_abort_local_set_3929() {
     struct DropCheck {
@@ -147,6 +163,7 @@ fn remote_abort_local_set_3929() {
 
 /// Checks that a suspended task can be aborted even if the `JoinHandle` is immediately dropped.
 /// issue #3964: <https://github.com/tokio-rs/tokio/issues/3964>.
+#[cfg(not(target_family = "wasm"))]
 #[test]
 fn test_abort_wakes_task_3964() {
     let rt = Builder::new_current_thread().enable_time().build().unwrap();
@@ -177,8 +194,8 @@ fn test_abort_wakes_task_3964() {
 
 /// Checks that aborting a task whose destructor panics does not allow the
 /// panic to escape the task.
+#[cfg(all(panic = "unwind", not(target_family = "wasm")))]
 #[test]
-#[cfg(panic = "unwind")]
 fn test_abort_task_that_panics_on_drop_contained() {
     let rt = Builder::new_current_thread().enable_time().build().unwrap();
 
@@ -201,8 +218,8 @@ fn test_abort_task_that_panics_on_drop_contained() {
 }
 
 /// Checks that aborting a task whose destructor panics has the expected result.
+#[cfg(all(panic = "unwind", not(target_family = "wasm")))]
 #[test]
-#[cfg(panic = "unwind")]
 fn test_abort_task_that_panics_on_drop_returned() {
     let rt = Builder::new_current_thread().enable_time().build().unwrap();
 

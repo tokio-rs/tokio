@@ -506,7 +506,7 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
 
     let body_ident = quote! { body };
     // This explicit `return` is intentional. See tokio-rs/tokio#4636
-    let last_block = quote_spanned! {last_stmt_end_span=>
+    let native_last_block = quote_spanned! {last_stmt_end_span=>
 
         #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return, clippy::unwrap_in_result)]
         {
@@ -521,6 +521,58 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
 
     };
 
+    let output_type = match &input.sig.output {
+        // For functions with no return value syn doesn't print anything,
+        // but that doesn't work as `Output` for our boxed `Future`, so
+        // default to `()` (the same type as the function output).
+        syn::ReturnType::Default => quote! { () },
+        syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
+    };
+    let raw_body = input.body();
+    // JSPI is enabled for the module, but suspending imports are valid only
+    // from a promising-wrapped activation. The guard marks libtest's known
+    // promising activation so its `block_on` may suspend; other entries fail
+    // at the park leaf instead of trapping in the engine.
+    let emscripten_test_block = quote_spanned! {last_stmt_end_span=>
+        #[allow(clippy::expect_used, clippy::diverging_sub_expression, clippy::needless_return, clippy::unwrap_in_result)]
+        {
+            let _suspend_guard = if #crate_path::runtime::jspi_enabled() {
+                ::core::option::Option::Some(#crate_path::runtime::SuspendGuard::new())
+            } else {
+                ::core::option::Option::None
+            };
+
+            let body = async #raw_body;
+            #crate_path::pin!(body);
+            let body: ::core::pin::Pin<&mut dyn ::core::future::Future<Output = #output_type>> = body;
+
+            // Inner block: keep the `use` from shadowing names in the
+            // user body, which shares this scope.
+            let rt = {
+                #use_builder
+
+                #rt
+                    .enable_all()
+                    .#build
+                    .expect("Failed building the Runtime")
+            };
+            return rt.block_on(body);
+        }
+    };
+
+    // The `multi_thread` flavor keeps the native block on emscripten: pthread
+    // builds run it as on native, without the JSPI suspension guard.
+    let last_block = match config.flavor {
+        RuntimeFlavor::Threaded => native_last_block,
+        _ if is_test => quote! {
+            #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
+            #native_last_block
+            #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+            #emscripten_test_block
+        },
+        _ => native_last_block,
+    };
+
     let body = input.body();
 
     // For test functions pin the body to the stack and use `Pin<&mut dyn
@@ -532,18 +584,15 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
     //
     // We don't do this for the main function as it should only be used once so
     // there will be no benefit.
-    let output_type = match &input.sig.output {
-        // For functions with no return value syn doesn't print anything,
-        // but that doesn't work as `Output` for our boxed `Future`, so
-        // default to `()` (the same type as the function output).
-        syn::ReturnType::Default => quote! { () },
-        syn::ReturnType::Type(_, ret_type) => quote! { #ret_type },
-    };
-
     let body = if is_test {
+        // On Emscripten the body construction lives inside the capture-free
+        // closure (see `emscripten_test_block`).
         quote! {
+            #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
             let body = async #body;
+            #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
             #crate_path::pin!(body);
+            #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
             let body: ::core::pin::Pin<&mut dyn ::core::future::Future<Output = #output_type>> = body;
         }
     } else {
