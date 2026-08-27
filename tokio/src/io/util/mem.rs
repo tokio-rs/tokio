@@ -100,6 +100,10 @@ pub struct SimplexStream {
 ///
 /// The `max_buf_size` argument is the maximum amount of bytes that can be
 /// written to a side before the write returns `Poll::Pending`.
+///
+/// # Panics
+///
+/// This function panics if `max_buf_size` is 0.
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub fn duplex(max_buf_size: usize) -> (DuplexStream, DuplexStream) {
     let one = Arc::new(Mutex::new(SimplexStream::new_unsplit(max_buf_size)));
@@ -207,6 +211,10 @@ impl Drop for DuplexStream {
 /// # Ok(())
 /// # }
 /// ```
+///
+/// # Panics
+///
+/// This function panics if `max_buf_size` is 0.
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub fn simplex(max_buf_size: usize) -> (ReadHalf<SimplexStream>, WriteHalf<SimplexStream>) {
     split(SimplexStream::new_unsplit(max_buf_size))
@@ -218,8 +226,15 @@ impl SimplexStream {
     ///
     /// The `max_buf_size` argument is the maximum amount of bytes that can be
     /// written to a buffer before it returns `Poll::Pending`.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `max_buf_size` is 0. A zero-capacity buffer
+    /// cannot make progress: every write would wait for free space that a read
+    /// can never create, so any write would deadlock.
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub fn new_unsplit(max_buf_size: usize) -> SimplexStream {
+        assert!(max_buf_size > 0, "`max_buf_size` must be greater than 0");
         SimplexStream {
             buffer: BytesMut::new(),
             is_closed: false,
