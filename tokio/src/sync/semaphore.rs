@@ -1232,7 +1232,10 @@ impl<'a> SemaphorePermit<'a> {
             std::ptr::eq(self.sem, other.sem),
             "merging permits from different semaphore instances"
         );
-        self.permits += other.permits;
+        self.permits = self
+            .permits
+            .checked_add(other.permits)
+            .expect("overflow while merging semaphore permits");
         other.permits = 0;
     }
 
@@ -1339,7 +1342,10 @@ impl OwnedSemaphorePermit {
             Arc::ptr_eq(&self.sem, &other.sem),
             "merging permits from different semaphore instances"
         );
-        self.permits += other.permits;
+        self.permits = self
+            .permits
+            .checked_add(other.permits)
+            .expect("overflow while merging semaphore permits");
         other.permits = 0;
     }
 
