@@ -143,6 +143,18 @@ fn merge_unrelated_permits() {
 }
 
 #[test]
+#[cfg(not(target_family = "wasm"))] // No stack unwinding on wasm targets
+#[should_panic]
+fn merge_overflow() {
+    // Two permits each holding up to u32::MAX can sum past the limit when merged,
+    // which must panic instead of silently wrapping and losing permits.
+    let sem = Arc::new(Semaphore::new(u32::MAX as usize * 2));
+    let mut p1 = sem.try_acquire_many(u32::MAX).unwrap();
+    let p2 = sem.try_acquire_many(u32::MAX).unwrap();
+    p1.merge(p2);
+}
+
+#[test]
 fn split() {
     let sem = Semaphore::new(5);
     let mut p1 = sem.try_acquire_many(3).unwrap();
