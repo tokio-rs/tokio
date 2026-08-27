@@ -3,25 +3,7 @@
 
 use futures::FutureExt;
 use std::io::IoSlice;
-use tokio::io::{duplex, simplex, AsyncReadExt, AsyncWriteExt, SimplexStream};
-
-#[test]
-#[should_panic = "must be greater than 0"]
-fn duplex_zero_capacity_panics() {
-    let _ = duplex(0);
-}
-
-#[test]
-#[should_panic = "must be greater than 0"]
-fn simplex_zero_capacity_panics() {
-    let _ = simplex(0);
-}
-
-#[test]
-#[should_panic = "must be greater than 0"]
-fn new_unsplit_zero_capacity_panics() {
-    let _ = SimplexStream::new_unsplit(0);
-}
+use tokio::io::{duplex, AsyncReadExt, AsyncWriteExt};
 
 #[tokio::test]
 async fn ping_pong() {

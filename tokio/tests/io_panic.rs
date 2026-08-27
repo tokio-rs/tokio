@@ -4,7 +4,7 @@
 
 use std::task::{Context, Poll};
 use std::{error::Error, pin::Pin};
-use tokio::io::{self, split, AsyncRead, AsyncWrite, ReadBuf};
+use tokio::io::{self, duplex, simplex, split, AsyncRead, AsyncWrite, ReadBuf, SimplexStream};
 
 mod support {
     pub mod panic;
@@ -123,6 +123,42 @@ fn unsplit_panic_caller() -> Result<(), Box<dyn Error>> {
         let (r1, _w1) = split(RW);
         let (_r2, w2) = split(RW);
         r1.unsplit(w2);
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn duplex_zero_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = duplex(0);
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn simplex_zero_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = simplex(0);
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn new_unsplit_zero_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = SimplexStream::new_unsplit(0);
     });
 
     // The panic location should be in this file
