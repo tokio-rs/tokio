@@ -753,8 +753,8 @@ macro_rules! cfg_io_uring {
 macro_rules! cfg_schedule_latency {
     ($($item:item)*) => {
         $(
-            #[cfg(feature = "schedule-latency")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "schedule-latency")))]
+            #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
+            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "schedule-latency"))))]
             $item
         )*
     };
@@ -763,7 +763,7 @@ macro_rules! cfg_schedule_latency {
 macro_rules! cfg_not_schedule_latency {
     ($($item:item)*) => {
         $(
-            #[cfg(not(feature = "schedule-latency"))]
+            #[cfg(not(all(tokio_unstable, feature = "schedule-latency")))]
             $item
         )*
     }
