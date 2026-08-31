@@ -38,10 +38,7 @@ impl<T: 'static> Shared<T> {
     }
 
     // Kind of annoying to have to include the cfg here
-    #[cfg(any(
-        all(tokio_unstable, feature = "taskdump"),
-        feature = "rt-multi-thread"
-    ))]
+    #[cfg(any(all(tokio_unstable, feature = "taskdump"), feature = "rt-multi-thread"))]
     pub(crate) fn is_closed(&self, synced: &Synced) -> bool {
         synced.is_closed
     }
