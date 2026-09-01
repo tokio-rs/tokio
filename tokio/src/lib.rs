@@ -424,8 +424,14 @@
 //!
 //! ## `WASM` support
 //!
-//! Tokio has some limited support for the `WASM` platform. Without the
-//! `tokio_unstable` flag, the following features are supported:
+//! Tokio has some limited support for Wasm platforms.
+//!
+//! All Wasm targets are still experimental, and may be subject to breaking
+//! changes.
+//!
+//! ### `wasm32-unknown-unknown` support
+//!
+//! The `wasm32-unknown-unknown` target supports the following features:
 //!
 //!  * `sync`
 //!  * `macros`
@@ -434,15 +440,24 @@
 //!  * `time`
 //!
 //! Enabling any other feature (including `full`) will cause a compilation
-//! failure.
+//! failure. The timing functions will panic, as this target does not support
+//! timers.
 //!
-//! The `time` module will only work on `WASM` platforms that have support for
-//! timers (e.g. wasm32-wasi). The timing functions will panic if used on a `WASM`
-//! platform that does not support timers.
-//!
-//! Note also that if the runtime becomes indefinitely idle, it will panic
-//! immediately instead of blocking forever. On platforms that don't support
+//! Note that if the runtime becomes indefinitely idle, it will panic
+//! immediately instead of blocking forever. As this platform doesn't support
 //! time, this means that the runtime can never be idle in any way.
+//!
+//! ### `WASI` support
+//!
+//! The `wasm32-wasip1` and `wasm32-wasip2` targets support the same features
+//! as `wasm32-unknown-unknown`, along with working timers.
+//!
+//! Under the `tokio_unstable` flag, these targets support the use
+//! of `tokio::net`. On `wasm32-wasip1`, not all methods are available on the
+//! networking types as this target does not support the creation of new
+//! sockets from within `WASM`. Because of this, sockets must currently be
+//! created via the `FromRawFd` trait on `wasm32-wasip1`. The `wasm32-wasip2`
+//! target does not have this limitation.
 //!
 //! ### Emscripten support
 //!
@@ -452,17 +467,6 @@
 //! supported when building with Emscripten pthreads (`-pthread`, with
 //! `-sPROXY_TO_PTHREAD` so the main thread may block). The `net`, `process`,
 //! and `signal` features are not supported.
-//!
-//! ## Unstable `WASM` support
-//!
-//! Tokio also has unstable support for some additional `WASM` features. This
-//! requires the use of the `tokio_unstable` flag.
-//!
-//! Using this flag enables the use of `tokio::net` on the wasm32-wasi target.
-//! However, not all methods are available on the networking types as `WASI`
-//! currently does not support the creation of new sockets from within `WASM`.
-//! Because of this, sockets must currently be created via the `FromRawFd`
-//! trait.
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.
