@@ -951,7 +951,7 @@ impl<T> DelayQueue<T> {
     pub fn peek(&self) -> Option<Key> {
         use self::wheel::Stack;
 
-        self.expired.peek().or_else(|| self.wheel.peek())
+        self.expired.peek().or_else(|| self.wheel.peek(&self.slab))
     }
 
     /// Returns the next time to poll as determined by the wheel.
@@ -1258,6 +1258,26 @@ impl<T> wheel::Stack for Stack<T> {
 
     fn peek(&self) -> Option<Self::Owned> {
         self.head
+    }
+
+    fn peek_earliest(&self, store: &Self::Store) -> Option<Self::Owned> {
+        let mut curr = self.head;
+        let mut earliest: Option<(Key, u64)> = None;
+
+        while let Some(key) = curr {
+            let data = &store[key];
+
+            match earliest {
+                // Keep the first entry seen on a tie so that this agrees with
+                // `pop` when every entry in the slot shares a deadline.
+                Some((_, when)) if data.when >= when => {}
+                _ => earliest = Some((key, data.when)),
+            }
+
+            curr = data.next;
+        }
+
+        earliest.map(|(key, _)| key)
     }
 
     #[track_caller]

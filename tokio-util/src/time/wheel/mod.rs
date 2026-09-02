@@ -140,9 +140,9 @@ where
     }
 
     /// Next key that will expire
-    pub(crate) fn peek(&self) -> Option<T::Owned> {
+    pub(crate) fn peek(&self, store: &T::Store) -> Option<T::Owned> {
         self.next_expiration()
-            .and_then(|expiration| self.peek_entry(&expiration))
+            .and_then(|expiration| self.peek_entry(&expiration, store))
     }
 
     /// Advances the timer up to the instant represented by `now`.
@@ -250,8 +250,8 @@ where
         self.levels[expiration.level].pop_entry_slot(expiration.slot, store)
     }
 
-    fn peek_entry(&self, expiration: &Expiration) -> Option<T::Owned> {
-        self.levels[expiration.level].peek_entry_slot(expiration.slot)
+    fn peek_entry(&self, expiration: &Expiration, store: &T::Store) -> Option<T::Owned> {
+        self.levels[expiration.level].peek_entry_slot(expiration.slot, store)
     }
 
     fn level_for(&self, when: u64) -> usize {
