@@ -1243,12 +1243,12 @@ jobs:
           targets: wasm32-unknown-emscripten
           components: rust-src
 
-      - name: Test tokio multi-thread runtime for emscripten (pthread proxy)
+      - name: Test tokio multi-thread runtime for emscripten (pthreads)
         run: cargo +${{ env.rust_emscripten_nightly }} test -Zbuild-std=std,panic_abort -p tokio --target wasm32-unknown-emscripten --features "rt,rt-multi-thread,time,sync,macros" --test rt_multi_thread_emscripten
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
-          RUSTFLAGS: "-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals -Clink-args=-pthread -Clink-args=-sPTHREAD_POOL_SIZE=8 -Clink-args=-sPROXY_TO_PTHREAD -Clink-args=-sINITIAL_MEMORY=134217728 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
+          RUSTFLAGS: "-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals -Clink-args=-pthread -Clink-args=-sPTHREAD_POOL_SIZE=8 -Clink-args=-sINITIAL_MEMORY=134217728 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
 
   check-external-types:
     name: check-external-types (${{ matrix.os }})

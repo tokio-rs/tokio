@@ -464,9 +464,8 @@
 //! The `wasm32-unknown-emscripten` target supports the single-threaded runtime
 //! with the `rt`, `time`, `sync`, `macros`, `fs`, `io-util`, `io-std`, and
 //! `test-util` features. The `rt-multi-thread` feature is additionally
-//! supported when building with Emscripten pthreads (`-pthread`, with
-//! `-sPROXY_TO_PTHREAD` so the main thread may block). The `net`, `process`,
-//! and `signal` features are not supported.
+//! supported when building with Emscripten pthreads (`-pthread`). The `net`,
+//! `process`, and `signal` features are not supported.
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.

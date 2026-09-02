@@ -6,7 +6,7 @@
 ))]
 
 //! Multi-thread runtime tests for `wasm32-unknown-emscripten` built with
-//! pthreads (`-pthread` and `-sPROXY_TO_PTHREAD`).
+//! pthreads (`-pthread`).
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Barrier};
