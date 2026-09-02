@@ -426,12 +426,9 @@
 //!
 //! Tokio has some limited support for Wasm platforms.
 //!
-//! All Wasm targets are still experimental, and may be subject to breaking
-//! changes.
-//!
-//! ### `wasm32-unknown-unknown` support
-//!
-//! The `wasm32-unknown-unknown` target supports the following features:
+//! Many of Tokio's feature flags are restricted on Wasm, and unsupported
+//! combinations of feature flags will fail to build. However, all Wasm targets
+//! can be built with the following features:
 //!
 //!  * `sync`
 //!  * `macros`
@@ -440,17 +437,30 @@
 //!  * `time`
 //!
 //! Enabling any other feature (including `full`) will cause a compilation
-//! failure. The timing functions will panic, as this target does not support
-//! timers.
+//! failure. Furthermore, some operations available under these feature flags
+//! may panic if they are unsupported. For example:
 //!
-//! Note that if the runtime becomes indefinitely idle, it will panic
-//! immediately instead of blocking forever. As this platform doesn't support
-//! time, this means that the runtime can never be idle in any way.
+//! * Using timers will panic on wasm targets that do not support blocking the
+//!   thread.
+//! * If the runtime becomes indefinitely idle (e.g., the program triggers a
+//!   deadlock), then this will panic on most Wasm targets.
+//! * Operations such as `spawn_blocking` that involve spawning threads will
+//!   panic on Wasm targets that do not support threads.
+//!
+//! All Wasm targets are still experimental, and breaking behavior changes can
+//! occur in an effort to make Tokio use native Wasm operations. For instance,
+//! the behavior of timers could be changed from panicking or blocking the
+//! thread to starting a JavaScript timer. As another example, the
+//! `spawn_blocking` method could be changed from starting a new thread to
+//! creating a new cooperatively scheduled context of execution, if the Wasm
+//! target supports such contexts. As a third example, the `#[tokio::main]` or
+//! `#[tokio::test]` macros could be changed to work better with the Wasm
+//! environment.
 //!
 //! ### `WASI` support
 //!
-//! The `wasm32-wasip1` and `wasm32-wasip2` targets support the same features
-//! as `wasm32-unknown-unknown`, along with working timers.
+//! The `wasm32-wasip1` and `wasm32-wasip2` targets support the above features.
+//! Timers work correctly as blocking the thread is supported.
 //!
 //! Under the `tokio_unstable` flag, these targets support the use
 //! of `tokio::net`. On `wasm32-wasip1`, not all methods are available on the
