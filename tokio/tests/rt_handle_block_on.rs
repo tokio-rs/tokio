@@ -291,6 +291,7 @@ rt_test! {
             .unwrap();
     }
 
+    #[cfg_attr(miri, ignore)] // No UDP sockets in miri.
     #[test]
     fn udp_stream_bind_after_shutdown() {
         let rt = rt();
@@ -309,6 +310,7 @@ rt_test! {
         );
     }
 
+    #[cfg_attr(miri, ignore)] // No UDP sockets in miri.
     #[test]
     fn udp_stream_bind_before_shutdown() {
         let rt = rt();
@@ -327,6 +329,7 @@ rt_test! {
         );
     }
 
+    #[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
     #[cfg(unix)]
     #[test]
     fn unix_listener_bind_after_shutdown() {
@@ -347,6 +350,7 @@ rt_test! {
         );
     }
 
+    #[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
     #[cfg(unix)]
     #[test]
     fn unix_listener_shutdown_after_bind() {
@@ -370,6 +374,7 @@ rt_test! {
         );
     }
 
+    #[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
     #[cfg(unix)]
     #[test]
     fn unix_listener_shutdown_after_accept() {
