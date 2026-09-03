@@ -779,15 +779,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: "cargo check"
         run: |
+          # `cargo check -p tokio --all-features` must pass without `tokio_unstable`;
+          # unstable Cargo features must be inert unless `tokio_unstable` is also enabled.
           if [[ "${{ github.event.pull_request.base.ref }}" =~ ^tokio-1\..* ]]; then
             # Only check `tokio` crate as the PR is backporting to an earlier tokio release.
 
-            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
+            cargo check -p tokio --all-features
           else
             # Check all crates in the workspace
 
-            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
-            # Other crates doesn't have unstable features, so we can use --all-features.
+            cargo check -p tokio --all-features
             cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features
           fi
 
