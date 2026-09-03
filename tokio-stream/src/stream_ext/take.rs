@@ -32,6 +32,32 @@ impl<St> Take<St> {
     pub(super) fn new(stream: St, remaining: usize) -> Self {
         Self { stream, remaining }
     }
+
+    /// Returns a reference to the inner stream.
+    pub fn get_ref(&self) -> &St {
+        &self.stream
+    }
+
+    /// Returns a mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_mut(&mut self) -> &mut St {
+        &mut self.stream
+    }
+
+    /// Returns a pinned mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut St> {
+        self.project().stream
+    }
+
+    /// Consumes this combinator and returns the inner stream.
+    ///
+    /// This may discard intermediate combinator state.
+    pub fn into_inner(self) -> St {
+        self.stream
+    }
 }
 
 impl<St> Stream for Take<St>

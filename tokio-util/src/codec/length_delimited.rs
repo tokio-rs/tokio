@@ -493,8 +493,12 @@ impl LengthDelimitedCodec {
     /// words, if a frame is currently in process of being decoded with a frame
     /// size greater than `val` but less than the max frame length in effect
     /// before calling this function, then the frame will be allowed.
+    ///
+    /// If `val` is larger than what the length field can represent, it is
+    /// clipped to the maximum representable value.
     pub fn set_max_frame_length(&mut self, val: usize) {
         self.builder.max_frame_length(val);
+        self.builder.adjust_max_frame_len();
     }
 
     fn decode_head(&mut self, src: &mut BytesMut) -> io::Result<Option<usize>> {
@@ -599,10 +603,10 @@ impl Decoder for LengthDelimitedCodec {
     }
 }
 
-impl Encoder<Bytes> for LengthDelimitedCodec {
+impl Encoder<&[u8]> for LengthDelimitedCodec {
     type Error = io::Error;
 
-    fn encode(&mut self, data: Bytes, dst: &mut BytesMut) -> Result<(), io::Error> {
+    fn encode(&mut self, data: &[u8], dst: &mut BytesMut) -> Result<(), io::Error> {
         let n = data.len();
 
         if n > self.builder.max_frame_len {
@@ -627,8 +631,8 @@ impl Encoder<Bytes> for LengthDelimitedCodec {
         })?;
 
         // Reserve capacity in the destination buffer to fit the frame and
-        // length field (plus adjustment).
-        dst.reserve(self.builder.length_field_len + n);
+        // length field.
+        dst.reserve(self.builder.length_field_len + data.len());
 
         if self.builder.length_field_is_big_endian {
             dst.put_uint(n as u64, self.builder.length_field_len);
@@ -637,9 +641,17 @@ impl Encoder<Bytes> for LengthDelimitedCodec {
         }
 
         // Write the frame to the buffer
-        dst.extend_from_slice(&data[..]);
+        dst.extend_from_slice(data);
 
         Ok(())
+    }
+}
+
+impl Encoder<Bytes> for LengthDelimitedCodec {
+    type Error = io::Error;
+
+    fn encode(&mut self, data: Bytes, dst: &mut BytesMut) -> Result<(), io::Error> {
+        Encoder::<&[u8]>::encode(self, data.as_ref(), dst)
     }
 }
 
@@ -675,18 +687,21 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
     /// use tokio_util::codec::LengthDelimitedCodec;
+    /// use tokio_stream::StreamExt;
     ///
-    /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// LengthDelimitedCodec::builder()
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let io: &[u8] = b"\x00\x0bhello world";
+    /// let mut reader = LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
     ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
-    ///     .num_skip(0)
     ///     .new_read(io);
+    ///
+    /// let frame = reader.next().await.unwrap().unwrap();
+    /// assert_eq!(&frame[..], b"hello world");
     /// # }
-    /// # pub fn main() {}
     /// ```
     pub fn new() -> Builder {
         Builder {
@@ -949,14 +964,20 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// use tokio_util::codec::LengthDelimitedCodec;
+    /// use bytes::{Bytes, BytesMut};
+    /// use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
+    ///
     /// # pub fn main() {
-    /// LengthDelimitedCodec::builder()
+    /// let mut codec = LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
     ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
-    ///     .num_skip(0)
     ///     .new_codec();
+    ///
+    /// let mut buf = BytesMut::new();
+    /// codec.encode(Bytes::from_static(b"hello world"), &mut buf).unwrap();
+    /// let frame = codec.decode(&mut buf).unwrap().unwrap();
+    /// assert_eq!(&frame[..], b"hello world");
     /// # }
     /// ```
     pub fn new_codec(&self) -> LengthDelimitedCodec {
@@ -975,18 +996,21 @@ impl Builder {
     /// # Examples
     ///
     /// ```
-    /// # use tokio::io::AsyncRead;
     /// use tokio_util::codec::LengthDelimitedCodec;
+    /// use tokio_stream::StreamExt;
     ///
-    /// # fn bind_read<T: AsyncRead>(io: T) {
-    /// LengthDelimitedCodec::builder()
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let io: &[u8] = b"\x00\x0bhello world";
+    /// let mut reader = LengthDelimitedCodec::builder()
     ///     .length_field_offset(0)
     ///     .length_field_type::<u16>()
     ///     .length_adjustment(0)
-    ///     .num_skip(0)
     ///     .new_read(io);
+    ///
+    /// let frame = reader.next().await.unwrap().unwrap();
+    /// assert_eq!(&frame[..], b"hello world");
     /// # }
-    /// # pub fn main() {}
     /// ```
     pub fn new_read<T>(&self, upstream: T) -> FramedRead<T, LengthDelimitedCodec>
     where
@@ -1040,7 +1064,7 @@ impl Builder {
 
     fn num_head_bytes(&self) -> usize {
         let num = self.length_field_offset + self.length_field_len;
-        cmp::max(num, self.num_skip.unwrap_or(0))
+        cmp::max(num, self.num_skip.unwrap_or_default())
     }
 
     fn get_num_skip(&self) -> usize {
@@ -1049,16 +1073,25 @@ impl Builder {
     }
 
     fn adjust_max_frame_len(&mut self) {
-        // Calculate the maximum number that can be represented using `length_field_len` bytes.
-        let max_number = match 1u64.checked_shl((8 * self.length_field_len) as u32) {
+        let max_allowed_len = self.max_allowed_frame_len();
+
+        if self.max_frame_len > max_allowed_len {
+            self.max_frame_len = max_allowed_len;
+        }
+    }
+
+    fn max_allowed_frame_len(&self) -> usize {
+        let max_allowed_len = self
+            .max_length_field_value()
+            .saturating_add_signed(self.length_adjustment as i64);
+
+        usize::try_from(max_allowed_len).unwrap_or(usize::MAX)
+    }
+
+    fn max_length_field_value(&self) -> u64 {
+        match 1u64.checked_shl((8 * self.length_field_len) as u32) {
             Some(shl) => shl - 1,
             None => u64::MAX,
-        };
-
-        let max_allowed_len = max_number.saturating_add_signed(self.length_adjustment as i64);
-
-        if self.max_frame_len as u64 > max_allowed_len {
-            self.max_frame_len = usize::try_from(max_allowed_len).unwrap_or(usize::MAX);
         }
     }
 }

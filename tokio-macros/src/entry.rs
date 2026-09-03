@@ -453,13 +453,13 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         (start, end)
     };
 
-    let crate_path = config
-        .crate_name
-        .map(ToTokens::into_token_stream)
-        .unwrap_or_else(|| {
+    let crate_path = config.crate_name.map_or_else(
+        || {
             Ident::new("tokio", Span::call_site().located_at(last_stmt_start_span))
                 .into_token_stream()
-        });
+        },
+        ToTokens::into_token_stream,
+    );
 
     let use_builder = quote_spanned! {Span::call_site().located_at(last_stmt_start_span)=>
         use #crate_path::runtime::Builder;

@@ -16,7 +16,7 @@ use std::marker::PhantomPinned;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::sync::atomic::Ordering::{self, Acquire, Relaxed, Release, SeqCst};
+use std::sync::atomic::Ordering::{self, AcqRel, Acquire, Relaxed, Release};
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
@@ -464,7 +464,7 @@ fn inc_num_notify_waiters_calls(data: usize) -> usize {
 }
 
 fn atomic_inc_num_notify_waiters_calls(data: &AtomicUsize) {
-    data.fetch_add(1 << NOTIFY_WAITERS_SHIFT, SeqCst);
+    data.fetch_add(1 << NOTIFY_WAITERS_SHIFT, AcqRel);
 }
 
 impl Notify {
@@ -562,7 +562,7 @@ impl Notify {
     pub fn notified(&self) -> Notified<'_> {
         // we load the number of times notify_waiters
         // was called and store that in the future.
-        let state = self.state.load(SeqCst);
+        let state = self.state.load(Acquire);
         Notified {
             notify: self,
             state: State::Init,
@@ -610,7 +610,7 @@ impl Notify {
     pub fn notified_owned(self: Arc<Self>) -> OwnedNotified {
         // we load the number of times notify_waiters
         // was called and store that in the future.
-        let state = self.state.load(SeqCst);
+        let state = self.state.load(Acquire);
         OwnedNotified {
             notify: self,
             state: State::Init,
@@ -673,7 +673,7 @@ impl Notify {
 
     fn notify_with_strategy(&self, strategy: NotifyOneStrategy) {
         // Load the current state
-        let mut curr = self.state.load(SeqCst);
+        let mut curr = self.state.load(Acquire);
 
         // If the state is `EMPTY`, transition to `NOTIFIED` and return.
         while let EMPTY | NOTIFIED = get_state(curr) {
@@ -681,7 +681,7 @@ impl Notify {
             // happens-before synchronization must happen between this atomic
             // operation and a task calling `notified().await`.
             let new = set_state(curr, NOTIFIED);
-            let res = self.state.compare_exchange(curr, new, SeqCst, SeqCst);
+            let res = self.state.compare_exchange(curr, new, AcqRel, Acquire);
 
             match res {
                 // No waiters, no further work to do
@@ -697,7 +697,7 @@ impl Notify {
 
         // The state must be reloaded while the lock is held. The state may only
         // transition out of WAITING while the lock is held.
-        curr = self.state.load(SeqCst);
+        curr = self.state.load(Acquire);
 
         if let Some(waker) = notify_locked(&mut waiters, &self.state, curr, strategy) {
             drop(waiters);
@@ -756,7 +756,7 @@ impl Notify {
         // Increment the number of times this method was called
         // and transition to empty.
         let new_state = set_state(inc_num_notify_waiters_calls(curr), EMPTY);
-        self.state.store(new_state, SeqCst);
+        self.state.store(new_state, Release);
 
         // It is critical for `GuardedLinkedList` safety that the guard node is
         // pinned in memory and is not dropped until the guarded list is dropped.
@@ -819,7 +819,7 @@ impl Notify {
 
         // The state must be loaded while the lock is held. The state may only
         // transition out of WAITING while the lock is held.
-        let current_state = self.state.load(SeqCst);
+        let current_state = self.state.load(Acquire);
 
         NotifyGuard {
             guarded_notify: self,
@@ -846,14 +846,14 @@ fn notify_locked(
 ) -> Option<Waker> {
     match get_state(curr) {
         EMPTY | NOTIFIED => {
-            let res = state.compare_exchange(curr, set_state(curr, NOTIFIED), SeqCst, SeqCst);
+            let res = state.compare_exchange(curr, set_state(curr, NOTIFIED), AcqRel, Acquire);
 
             match res {
                 Ok(_) => None,
                 Err(actual) => {
                     let actual_state = get_state(actual);
                     assert!(actual_state == EMPTY || actual_state == NOTIFIED);
-                    state.store(set_state(actual, NOTIFIED), SeqCst);
+                    state.store(set_state(actual, NOTIFIED), Release);
                     None
                 }
             }
@@ -885,7 +885,7 @@ fn notify_locked(
                 // must be transitioned to `EMPTY`. As transitioning
                 // **from** `WAITING` requires the lock to be held, a
                 // `store` is sufficient.
-                state.store(set_state(curr, EMPTY), SeqCst);
+                state.store(set_state(curr, EMPTY), Release);
             }
             waker
         }
@@ -1113,7 +1113,7 @@ impl NotifiedProject<'_> {
         'outer_loop: loop {
             match *state {
                 State::Init => {
-                    let curr = notify.state.load(SeqCst);
+                    let curr = notify.state.load(Acquire);
 
                     // Check if `notify_waiters` was called before attempting to acquire
                     // the `NOTIFIED` state. If a broadcast occurred, we will be woken by it,
@@ -1127,8 +1127,8 @@ impl NotifiedProject<'_> {
                     let res = notify.state.compare_exchange(
                         set_state(curr, NOTIFIED),
                         set_state(curr, EMPTY),
-                        SeqCst,
-                        SeqCst,
+                        AcqRel,
+                        Acquire,
                     );
 
                     if res.is_ok() {
@@ -1146,7 +1146,7 @@ impl NotifiedProject<'_> {
                     let mut waiters = notify.waiters.lock();
 
                     // Reload the state with the lock held
-                    let mut curr = notify.state.load(SeqCst);
+                    let mut curr = notify.state.load(Acquire);
 
                     // if notify_waiters has been called after the future
                     // was created, then we are done
@@ -1163,8 +1163,8 @@ impl NotifiedProject<'_> {
                                 let res = notify.state.compare_exchange(
                                     set_state(curr, EMPTY),
                                     set_state(curr, WAITING),
-                                    SeqCst,
-                                    SeqCst,
+                                    AcqRel,
+                                    Acquire,
                                 );
 
                                 if let Err(actual) = res {
@@ -1180,8 +1180,8 @@ impl NotifiedProject<'_> {
                                 let res = notify.state.compare_exchange(
                                     set_state(curr, NOTIFIED),
                                     set_state(curr, EMPTY),
-                                    SeqCst,
-                                    SeqCst,
+                                    AcqRel,
+                                    Acquire,
                                 );
 
                                 match res {
@@ -1264,7 +1264,7 @@ impl NotifiedProject<'_> {
                     }
 
                     // Load the state with the lock held.
-                    let curr = notify.state.load(SeqCst);
+                    let curr = notify.state.load(Acquire);
 
                     if get_num_notify_waiters_calls(curr) != *notify_waiters_calls {
                         // Before we add a waiter to the list we check if these numbers are
@@ -1339,7 +1339,7 @@ impl NotifiedProject<'_> {
         // longer stored in the linked list.
         if matches!(*state, State::Waiting) {
             let mut waiters = notify.waiters.lock();
-            let mut notify_state = notify.state.load(SeqCst);
+            let mut notify_state = notify.state.load(Acquire);
 
             // We hold the lock, so this field is not concurrently accessed by
             // `notify_*` functions and we can use the relaxed ordering.
@@ -1354,7 +1354,7 @@ impl NotifiedProject<'_> {
 
             if waiters.is_empty() && get_state(notify_state) == WAITING {
                 notify_state = set_state(notify_state, EMPTY);
-                notify.state.store(notify_state, SeqCst);
+                notify.state.store(notify_state, Release);
             }
 
             // See if the node was notified but not received. In this case, if

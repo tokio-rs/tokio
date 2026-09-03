@@ -114,10 +114,21 @@ impl Stats {
         }
     }
 
-    pub(crate) fn start_poll(&mut self, task_scheduled_at: Option<ScheduleLatencyContext>) {
-        self.batch.start_poll(task_scheduled_at);
+    pub(crate) fn start_poll(
+        &mut self,
+        schedule_latency_context: Option<ScheduleLatencyContext>,
+    ) -> Option<Duration> {
+        let task_schedule_latency = self.batch.start_poll(schedule_latency_context);
 
         self.tasks_polled_in_batch += 1;
+        task_schedule_latency
+    }
+
+    pub(crate) fn record_schedule_latency(
+        &mut self,
+        schedule_latency_context: Option<ScheduleLatencyContext>,
+    ) -> Option<Duration> {
+        self.batch.record_schedule_latency(schedule_latency_context)
     }
 
     pub(crate) fn end_poll(&mut self) {
