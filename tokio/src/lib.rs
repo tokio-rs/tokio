@@ -440,7 +440,7 @@
 //! failure. Furthermore, some operations available under these feature flags
 //! may panic if they are unsupported. For example:
 //!
-//! * Using timers will panic on wasm targets that do not support blocking the
+//! * Using timers will panic on Wasm targets that do not support blocking the
 //!   thread.
 //! * If the runtime becomes indefinitely idle (e.g., the program triggers a
 //!   deadlock), then this will panic on most Wasm targets.
