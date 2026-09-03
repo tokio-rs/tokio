@@ -8,7 +8,7 @@
 
 use futures::future;
 use std::error::Error;
-#[cfg(not(target_os = "emscripten"))]
+#[cfg(feature = "rt-multi-thread")]
 use tokio::runtime::Builder;
 use tokio::runtime::{Handle, Runtime};
 
@@ -52,7 +52,7 @@ fn into_panic_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(not(target_os = "emscripten"))] // no rt-multi-thread
+#[cfg(feature = "rt-multi-thread")]
 fn builder_worker_threads_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = Builder::new_multi_thread().worker_threads(0).build();
@@ -65,7 +65,7 @@ fn builder_worker_threads_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(not(target_os = "emscripten"))] // no rt-multi-thread
+#[cfg(feature = "rt-multi-thread")]
 fn builder_max_blocking_threads_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = Builder::new_multi_thread().max_blocking_threads(0).build();
@@ -78,7 +78,7 @@ fn builder_max_blocking_threads_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(not(target_os = "emscripten"))] // no rt-multi-thread
+#[cfg(feature = "rt-multi-thread")]
 fn builder_global_queue_interval_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = Builder::new_multi_thread().global_queue_interval(0).build();
@@ -91,7 +91,7 @@ fn builder_global_queue_interval_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(not(target_os = "emscripten"))] // no rt-multi-thread
+#[cfg(feature = "rt-multi-thread")]
 fn builder_event_interval_interval_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = Builder::new_multi_thread().event_interval(0).build();
@@ -104,7 +104,7 @@ fn builder_event_interval_interval_panic_caller() -> Result<(), Box<dyn Error>> 
 }
 
 #[test]
-#[cfg(not(target_os = "emscripten"))] // no rt-multi-thread
+#[cfg(feature = "rt-multi-thread")]
 fn builder_name_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = Builder::new_multi_thread().name(" ").build();

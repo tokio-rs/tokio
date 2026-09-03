@@ -1,5 +1,5 @@
 #![cfg(any(
-    feature = "full",
+    all(feature = "full", not(target_os = "wasi")), // Wasi doesn't support threads
     all(target_os = "emscripten", feature = "rt", feature = "macros")
 ))]
 

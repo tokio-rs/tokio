@@ -10,9 +10,7 @@
 ))]
 #![cfg(not(miri))] // Too slow on miri.
 
-#[cfg(not(target_os = "emscripten"))]
 use rand::SeedableRng;
-#[cfg(not(target_os = "emscripten"))]
 use rand::{rngs::StdRng, Rng};
 use tokio::time::{self, Duration, Instant, Sleep};
 use tokio_test::{assert_elapsed, assert_pending, assert_ready, assert_ready_eq, task};
@@ -58,10 +56,6 @@ async fn pause_time_in_spawn_threads() {
     assert_err!(t.await);
 }
 
-// `#[tokio::main]` returning a value isn't supported on emscripten: the
-// worker entry can only signal completion, not marshal a return value back
-// across the worker boundary.
-#[cfg(not(target_os = "emscripten"))]
 #[test]
 fn paused_time_is_deterministic() {
     let run_1 = paused_time_stress_run();
@@ -70,7 +64,6 @@ fn paused_time_is_deterministic() {
     assert_eq!(run_1, run_2);
 }
 
-#[cfg(not(target_os = "emscripten"))]
 #[tokio::main(flavor = "current_thread", start_paused = true)]
 async fn paused_time_stress_run() -> Vec<Duration> {
     let mut rng = StdRng::seed_from_u64(1);

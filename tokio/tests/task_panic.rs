@@ -9,7 +9,7 @@ use futures::future;
 use std::error::Error;
 use tokio::runtime::Builder;
 use tokio::task;
-#[cfg(not(target_os = "emscripten"))]
+#[cfg(feature = "rt-multi-thread")]
 use tokio::task::block_in_place;
 
 mod support {
@@ -18,7 +18,7 @@ mod support {
 use support::panic::test_panic;
 
 #[test]
-#[cfg(not(target_os = "emscripten"))] // no rt-multi-thread
+#[cfg(feature = "rt-multi-thread")]
 fn block_in_place_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let rt = Builder::new_current_thread().enable_all().build().unwrap();

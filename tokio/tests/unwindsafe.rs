@@ -17,7 +17,7 @@ fn join_handle_is_unwind_safe() {
 }
 
 #[test]
-#[cfg(any(not(target_os = "emscripten"), feature = "net"))]
+#[cfg(feature = "net")]
 fn net_types_are_unwind_safe() {
     is_unwind_safe::<tokio::net::TcpListener>();
     is_unwind_safe::<tokio::net::TcpSocket>();
@@ -26,10 +26,8 @@ fn net_types_are_unwind_safe() {
 }
 
 #[test]
-#[cfg(all(unix, any(not(target_os = "emscripten"), feature = "net")))]
+#[cfg(all(unix, feature = "net"))]
 fn unix_net_types_are_unwind_safe() {
-    // No datagram `AF_UNIX` on emscripten's node backend.
-    #[cfg(not(target_os = "emscripten"))]
     is_unwind_safe::<tokio::net::UnixDatagram>();
     is_unwind_safe::<tokio::net::UnixListener>();
     is_unwind_safe::<tokio::net::UnixStream>();

@@ -508,6 +508,15 @@ compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.
 compile_error!("Features net,process,signal are not supported on wasm32-unknown-emscripten.");
 
 #[cfg(all(
+    target_os = "emscripten",
+    feature = "rt-multi-thread",
+    not(target_feature = "atomics")
+))]
+compile_error!(
+    "The `rt-multi-thread` feature on wasm32-unknown-emscripten requires pthreads support (build with `-pthread`)."
+);
+
+#[cfg(all(
     tokio_unstable,
     feature = "taskdump",
     not(doc),

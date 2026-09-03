@@ -1,6 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(any(
-    feature = "full",
+    all(feature = "full", not(target_os = "wasi")), // Wasi does not support file operations
     all(
         target_os = "emscripten",
         feature = "rt",

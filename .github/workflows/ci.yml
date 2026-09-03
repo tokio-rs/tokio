@@ -1224,17 +1224,15 @@ jobs:
           tool: cargo-hack
 
       - name: Check tokio feature matrix for emscripten
-        run: cargo hack check -p tokio --each-feature --exclude-features full,net,process,signal,io-uring,taskdump,schedule-latency --target wasm32-unknown-emscripten
+        run: cargo hack check -p tokio --each-feature --exclude-features full,net,process,signal,rt-multi-thread,io-uring,taskdump,schedule-latency --target wasm32-unknown-emscripten
         working-directory: tokio
-        env:
-          RUSTFLAGS: ""
 
       - name: Test tokio for emscripten
         run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util" --tests
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
-          RUSTFLAGS: "-Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
+          RUSTFLAGS: "-Dwarnings -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
 
       - name: Install Rust ${{ env.rust_emscripten_nightly }}
         uses: dtolnay/rust-toolchain@nightly
@@ -1248,7 +1246,7 @@ jobs:
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
-          RUSTFLAGS: "-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals -Clink-args=-pthread -Clink-args=-sPTHREAD_POOL_SIZE=8 -Clink-args=-sINITIAL_MEMORY=134217728 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
+          RUSTFLAGS: "-Dwarnings -Ctarget-feature=+atomics,+bulk-memory,+mutable-globals -Clink-args=-pthread -Clink-args=-sPTHREAD_POOL_SIZE=8 -Clink-args=-sINITIAL_MEMORY=134217728 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
 
   check-external-types:
     name: check-external-types (${{ matrix.os }})
