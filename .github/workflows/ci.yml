@@ -1155,7 +1155,7 @@ jobs:
           toolchain: ${{ env.rust_nightly }}
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz
+        run: cargo install --locked cargo-fuzz --version 0.13.1
       - name: Check /tokio/
         run: cargo fuzz check --all-features
         working-directory: tokio
