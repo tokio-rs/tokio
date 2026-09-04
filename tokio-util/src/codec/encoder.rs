@@ -20,6 +20,15 @@ pub trait Encoder<Item> {
     /// The `dst` provided is an internal buffer of the [`FramedWrite`] instance and
     /// will be written out when possible.
     ///
+    /// # Buffer management
+    ///
+    /// The buffer is reused across calls and may retain its allocation after a
+    /// large frame is written. If the encoder replaces `dst` to reclaim that
+    /// allocation, it must preserve any queued data. The [`Decoder::decode`]
+    /// buffer management guidance shows how to replace a buffer while preserving
+    /// its contents.
+    ///
     /// [`FramedWrite`]: crate::codec::FramedWrite
+    /// [`Decoder::decode`]: crate::codec::Decoder::decode
     fn encode(&mut self, item: Item, dst: &mut BytesMut) -> Result<(), Self::Error>;
 }

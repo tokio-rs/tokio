@@ -119,6 +119,31 @@ pub trait Decoder {
     /// }
     /// ```
     ///
+    /// `BytesMut::clear` and `BytesMut::truncate` preserve the buffer's
+    /// existing capacity. Other methods that remove data do not necessarily
+    /// release the backing allocation either. If a rare large frame causes the
+    /// buffer to retain too much memory, the decoder can replace it after
+    /// consuming that frame. Any unconsumed bytes must be copied into the
+    /// replacement:
+    ///
+    /// ```
+    /// use bytes::BytesMut;
+    ///
+    /// fn reclaim_buffer(src: &mut BytesMut) {
+    ///     *src = BytesMut::from(&src[..]);
+    /// }
+    ///
+    /// let mut src = BytesMut::with_capacity(1024);
+    /// src.extend_from_slice(b"next frame");
+    /// reclaim_buffer(&mut src);
+    /// assert_eq!(&src[..], b"next frame");
+    /// ```
+    ///
+    /// Replacing the buffer copies the unconsumed bytes and may cause more
+    /// allocations, so it should be done only when retaining the existing
+    /// allocation is undesirable. The old allocation remains alive until all
+    /// other values that share it are dropped.
+    ///
     /// An optimal buffer management strategy minimizes reallocations and
     /// over-allocations.
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error>;
