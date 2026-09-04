@@ -452,12 +452,14 @@ impl Spawner {
         (handle, spawned)
     }
 
-    pub(crate) fn inc_scheduler_threads(&self) {
-        self.inner.scheduler_threads.increment();
-    }
+    cfg_rt_multi_thread! {
+        pub(crate) fn inc_scheduler_threads(&self) {
+            self.inner.scheduler_threads.increment();
+        }
 
-    pub(crate) fn dec_scheduler_threads(&self) {
-        self.inner.scheduler_threads.decrement();
+        pub(crate) fn dec_scheduler_threads(&self) {
+            self.inner.scheduler_threads.decrement();
+        }
     }
 
     fn num_blocking_threads(&self) -> usize {
