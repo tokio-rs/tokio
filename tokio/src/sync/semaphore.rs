@@ -441,7 +441,7 @@ pub struct Semaphore {
 #[derive(Debug)]
 pub struct SemaphorePermit<'a> {
     sem: &'a Semaphore,
-    permits: u32,
+    permits: usize,
 }
 
 /// An owned permit from the semaphore.
@@ -454,7 +454,7 @@ pub struct SemaphorePermit<'a> {
 #[derive(Debug)]
 pub struct OwnedSemaphorePermit {
     sem: Arc<Semaphore>,
-    permits: u32,
+    permits: usize,
 }
 
 #[test]
@@ -674,7 +674,7 @@ impl Semaphore {
 
         Ok(SemaphorePermit {
             sem: self,
-            permits: n,
+            permits: n as usize,
         })
     }
 
@@ -745,7 +745,7 @@ impl Semaphore {
         match self.ll_sem.try_acquire(n as usize) {
             Ok(()) => Ok(SemaphorePermit {
                 sem: self,
-                permits: n,
+                permits: n as usize,
             }),
             Err(e) => Err(e),
         }
@@ -872,7 +872,7 @@ impl Semaphore {
         inner.await?;
         Ok(OwnedSemaphorePermit {
             sem: self,
-            permits: n,
+            permits: n as usize,
         })
     }
 
@@ -954,7 +954,7 @@ impl Semaphore {
         match self.ll_sem.try_acquire(n as usize) {
             Ok(()) => Ok(OwnedSemaphorePermit {
                 sem: self,
-                permits: n,
+                permits: n as usize,
             }),
             Err(e) => Err(e),
         }
@@ -1063,7 +1063,10 @@ impl<'a> SemaphorePermit<'a> {
             std::ptr::eq(self.sem, other.sem),
             "merging permits from different semaphore instances"
         );
-        self.permits += other.permits;
+        self.permits = self
+            .permits
+            .checked_add(other.permits)
+            .expect("number of permits overflowed");
         other.permits = 0;
     }
 
@@ -1086,8 +1089,6 @@ impl<'a> SemaphorePermit<'a> {
     /// assert_eq!(p2.num_permits(), 1);
     /// ```
     pub fn split(&mut self, n: usize) -> Option<Self> {
-        let n = u32::try_from(n).ok()?;
-
         if n > self.permits {
             return None;
         }
@@ -1102,7 +1103,7 @@ impl<'a> SemaphorePermit<'a> {
 
     /// Returns the number of permits held by `self`.
     pub fn num_permits(&self) -> usize {
-        self.permits as usize
+        self.permits
     }
 }
 
@@ -1170,7 +1171,10 @@ impl OwnedSemaphorePermit {
             Arc::ptr_eq(&self.sem, &other.sem),
             "merging permits from different semaphore instances"
         );
-        self.permits += other.permits;
+        self.permits = self
+            .permits
+            .checked_add(other.permits)
+            .expect("number of permits overflowed");
         other.permits = 0;
     }
 
@@ -1197,8 +1201,6 @@ impl OwnedSemaphorePermit {
     /// assert_eq!(p2.num_permits(), 1);
     /// ```
     pub fn split(&mut self, n: usize) -> Option<Self> {
-        let n = u32::try_from(n).ok()?;
-
         if n > self.permits {
             return None;
         }
@@ -1218,18 +1220,18 @@ impl OwnedSemaphorePermit {
 
     /// Returns the number of permits held by `self`.
     pub fn num_permits(&self) -> usize {
-        self.permits as usize
+        self.permits
     }
 }
 
 impl Drop for SemaphorePermit<'_> {
     fn drop(&mut self) {
-        self.sem.add_permits(self.permits as usize);
+        self.sem.add_permits(self.permits);
     }
 }
 
 impl Drop for OwnedSemaphorePermit {
     fn drop(&mut self) {
-        self.sem.add_permits(self.permits as usize);
+        self.sem.add_permits(self.permits);
     }
 }
