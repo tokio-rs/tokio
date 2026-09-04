@@ -93,6 +93,9 @@ struct Inner {
     // Maximum number of threads.
     thread_cap: usize,
 
+    // Number of runtime scheduler workers counted in `num_threads`.
+    scheduler_threads: MetricAtomicUsize,
+
     // Customizable wait timeout.
     keep_alive: Duration,
 
@@ -265,7 +268,11 @@ cfg_fs! {
 // ===== impl BlockingPool =====
 
 impl BlockingPool {
-    pub(crate) fn new(builder: &Builder, thread_cap: usize) -> BlockingPool {
+    pub(crate) fn new(
+        builder: &Builder,
+        thread_cap: usize,
+        scheduler_threads: usize,
+    ) -> BlockingPool {
         let (shutdown_tx, shutdown_rx) = shutdown::channel();
         let keep_alive = builder.keep_alive.unwrap_or(KEEP_ALIVE);
 
@@ -292,6 +299,7 @@ impl BlockingPool {
                     after_start: builder.after_start.clone(),
                     before_stop: builder.before_stop.clone(),
                     thread_cap,
+                    scheduler_threads: MetricAtomicUsize::new(scheduler_threads),
                     keep_alive,
                     metrics: SpawnerMetrics::default(),
                 }),
@@ -444,6 +452,21 @@ impl Spawner {
         (handle, spawned)
     }
 
+    pub(crate) fn inc_scheduler_threads(&self) {
+        self.inner.scheduler_threads.increment();
+    }
+
+    pub(crate) fn dec_scheduler_threads(&self) {
+        self.inner.scheduler_threads.decrement();
+    }
+
+    fn num_blocking_threads(&self) -> usize {
+        self.inner
+            .metrics
+            .num_threads()
+            .saturating_sub(self.inner.scheduler_threads.load(Ordering::Relaxed))
+    }
+
     fn spawn_task(&self, task: Task, rt: &Handle) -> Result<(), SpawnError> {
         // The `on_no_idle` closure runs under the same lock as the queue
         // push, exactly like the pre-refactor code that called
@@ -453,7 +476,7 @@ impl Spawner {
             .spawn_task(task, &self.inner.metrics, |thread_mgmt_state| {
                 // No threads are able to process the task.
 
-                if self.inner.metrics.num_threads() == self.inner.thread_cap {
+                if self.num_blocking_threads() == self.inner.thread_cap {
                     // At max number of threads
                     return Ok(());
                 }
@@ -472,7 +495,8 @@ impl Spawner {
                         }
                         Err(ref e)
                             if is_temporary_os_thread_error(e)
-                                && self.inner.metrics.num_threads() > 0 =>
+                                && self.inner.metrics.num_threads()
+                                    > self.inner.scheduler_threads.load(Ordering::Relaxed) =>
                         {
                             // OS temporarily failed to spawn a new thread.
                             // The task will be picked up eventually by a currently

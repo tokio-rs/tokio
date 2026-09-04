@@ -1759,7 +1759,7 @@ impl Builder {
         let (driver, driver_handle) = driver::Driver::new(cfg)?;
 
         // Blocking pool
-        let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
+        let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads, 0);
         let blocking_spawner = blocking_pool.spawner().clone();
 
         // Generate a rng seed for this runtime.
@@ -2133,7 +2133,7 @@ cfg_rt_multi_thread! {
 
             // Create the blocking pool
             let blocking_pool =
-                blocking::create_blocking_pool(self, self.max_blocking_threads + worker_threads);
+                blocking::create_blocking_pool(self, self.max_blocking_threads + worker_threads, worker_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             // Generate a rng seed for this runtime.
