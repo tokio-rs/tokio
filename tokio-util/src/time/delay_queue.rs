@@ -1261,23 +1261,24 @@ impl<T> wheel::Stack for Stack<T> {
     }
 
     fn peek_earliest(&self, store: &Self::Store) -> Option<Self::Owned> {
-        let mut curr = self.head;
-        let mut earliest: Option<(Key, u64)> = None;
+        let head = self.head?;
+        let mut earliest = (head, store[head].when);
+        let mut curr = store[head].next;
 
         while let Some(key) = curr {
             let data = &store[key];
 
-            match earliest {
-                // Keep the first entry seen on a tie so that this agrees with
-                // `pop` when every entry in the slot shares a deadline.
-                Some((_, when)) if data.when >= when => {}
-                _ => earliest = Some((key, data.when)),
+            // The comparison is strict so that the first entry seen wins a tie,
+            // which agrees with `pop` when every entry in the slot shares a
+            // deadline.
+            if data.when < earliest.1 {
+                earliest = (key, data.when);
             }
 
             curr = data.next;
         }
 
-        earliest.map(|(key, _)| key)
+        Some(earliest.0)
     }
 
     #[track_caller]
