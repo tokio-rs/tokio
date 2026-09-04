@@ -255,11 +255,7 @@ rt_test! {
             .block_on(net::TcpListener::bind("127.0.0.1:0"))
             .unwrap_err();
 
-        assert_eq!(err.kind(), std::io::ErrorKind::Other);
-        assert_eq!(
-            err.get_ref().unwrap().to_string(),
-            "A Tokio 1.x context was found, but it is being shutdown.",
-        );
+        assert!(tokio::runtime::is_rt_shutdown_err(&err));
     }
 
     #[test]
@@ -273,11 +269,7 @@ rt_test! {
 
         let err = Handle::current().block_on(bind_future).unwrap_err();
 
-        assert_eq!(err.kind(), std::io::ErrorKind::Other);
-        assert_eq!(
-            err.get_ref().unwrap().to_string(),
-            "A Tokio 1.x context was found, but it is being shutdown.",
-        );
+        assert!(tokio::runtime::is_rt_shutdown_err(&err));
     }
 
     #[test]
@@ -303,11 +295,7 @@ rt_test! {
             .block_on(net::UdpSocket::bind("127.0.0.1:0"))
             .unwrap_err();
 
-        assert_eq!(err.kind(), std::io::ErrorKind::Other);
-        assert_eq!(
-            err.get_ref().unwrap().to_string(),
-            "A Tokio 1.x context was found, but it is being shutdown.",
-        );
+        assert!(tokio::runtime::is_rt_shutdown_err(&err));
     }
 
     #[cfg_attr(miri, ignore)] // No UDP sockets in miri.
@@ -322,11 +310,7 @@ rt_test! {
 
         let err = Handle::current().block_on(bind_future).unwrap_err();
 
-        assert_eq!(err.kind(), std::io::ErrorKind::Other);
-        assert_eq!(
-            err.get_ref().unwrap().to_string(),
-            "A Tokio 1.x context was found, but it is being shutdown.",
-        );
+        assert!(tokio::runtime::is_rt_shutdown_err(&err));
     }
 
     #[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
@@ -343,11 +327,7 @@ rt_test! {
 
         let err = net::UnixListener::bind(path).unwrap_err();
 
-        assert_eq!(err.kind(), std::io::ErrorKind::Other);
-        assert_eq!(
-            err.get_ref().unwrap().to_string(),
-            "A Tokio 1.x context was found, but it is being shutdown.",
-        );
+        assert!(tokio::runtime::is_rt_shutdown_err(&err));
     }
 
     #[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
@@ -367,11 +347,7 @@ rt_test! {
         // this should not timeout but fail immediately since the runtime has been shutdown
         let err = Handle::current().block_on(listener.accept()).unwrap_err();
 
-        assert_eq!(err.kind(), std::io::ErrorKind::Other);
-        assert_eq!(
-            err.get_ref().unwrap().to_string(),
-            "A Tokio 1.x context was found, but it is being shutdown.",
-        );
+        assert!(tokio::runtime::is_rt_shutdown_err(&err));
     }
 
     #[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
@@ -393,11 +369,7 @@ rt_test! {
         // this should not timeout but fail immediately since the runtime has been shutdown
         let err = Handle::current().block_on(accept_future).unwrap_err();
 
-        assert_eq!(err.kind(), std::io::ErrorKind::Other);
-        assert_eq!(
-            err.get_ref().unwrap().to_string(),
-            "A Tokio 1.x context was found, but it is being shutdown.",
-        );
+        assert!(tokio::runtime::is_rt_shutdown_err(&err));
     }
 
     // ==== nesting ======
