@@ -162,3 +162,21 @@ async fn stress_test() {
     let _p5 = sem.clone().try_acquire_owned().unwrap();
     assert!(sem.try_acquire_owned().is_err());
 }
+
+#[test]
+#[cfg(target_pointer_width = "64")]
+fn merge_many_permits_owned() {
+    let sem = Arc::new(Semaphore::new(6_000_000_000));
+    let mut a = sem.clone().try_acquire_many_owned(3_000_000_000).unwrap();
+    let b = sem.clone().try_acquire_many_owned(3_000_000_000).unwrap();
+    assert_eq!(a.num_permits(), 3_000_000_000);
+    assert_eq!(b.num_permits(), 3_000_000_000);
+    assert_eq!(sem.available_permits(), 0);
+
+    a.merge(b);
+    assert_eq!(a.num_permits(), 6_000_000_000);
+    assert_eq!(sem.available_permits(), 0);
+
+    drop(a);
+    assert_eq!(sem.available_permits(), 6_000_000_000);
+}
