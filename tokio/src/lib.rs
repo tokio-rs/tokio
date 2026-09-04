@@ -478,13 +478,8 @@ compile_error! {
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
-#[cfg(all(not(tokio_unstable), feature = "io-uring"))]
-compile_error!("The `io-uring` feature requires `--cfg tokio_unstable`.");
-
-#[cfg(all(not(tokio_unstable), feature = "taskdump"))]
-compile_error!("The `taskdump` feature requires `--cfg tokio_unstable`.");
-
 #[cfg(all(
+    tokio_unstable,
     feature = "taskdump",
     not(doc),
     not(all(
@@ -502,10 +497,8 @@ compile_error!(
 linux, on `aarch64`, `x86`, `x86_64` and `s390x`."
 );
 
-#[cfg(all(not(tokio_unstable), feature = "schedule-latency"))]
-compile_error!("The `schedule-latency` feature requires `--cfg tokio_unstable`.");
-
 #[cfg(all(
+    tokio_unstable,
     feature = "schedule-latency",
     not(all(target_pointer_width = "64", target_has_atomic = "64"))
 ))]
