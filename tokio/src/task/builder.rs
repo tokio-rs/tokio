@@ -4,7 +4,7 @@ use crate::{
     task::{JoinHandle, LocalSet},
     util::trace::SpawnMeta,
 };
-use std::{future::Future, io, mem};
+use std::{future::Future, io, mem, pin::Pin};
 
 /// Factory which is used to configure the properties of a new task.
 ///
@@ -91,7 +91,8 @@ impl<'a> Builder<'a> {
     {
         let fut_size = mem::size_of::<Fut>();
         Ok(if AutoBox::<Fut>::SHOULD_BOX {
-            super::spawn::spawn_inner(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            let future: Pin<Box<dyn Future<Output = Fut::Output> + Send>> = Box::pin(future);
+            super::spawn::spawn_inner(future, SpawnMeta::new(self.name, fut_size))
         } else {
             super::spawn::spawn_inner(future, SpawnMeta::new(self.name, fut_size))
         })
@@ -112,7 +113,8 @@ impl<'a> Builder<'a> {
     {
         let fut_size = mem::size_of::<Fut>();
         Ok(if AutoBox::<Fut>::SHOULD_BOX {
-            handle.spawn_named(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            let future: Pin<Box<dyn Future<Output = Fut::Output> + Send>> = Box::pin(future);
+            handle.spawn_named(future, SpawnMeta::new(self.name, fut_size))
         } else {
             handle.spawn_named(future, SpawnMeta::new(self.name, fut_size))
         })
@@ -143,7 +145,8 @@ impl<'a> Builder<'a> {
     {
         let fut_size = mem::size_of::<Fut>();
         Ok(if AutoBox::<Fut>::SHOULD_BOX {
-            super::local::spawn_local_inner(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            let future: Pin<Box<dyn Future<Output = Fut::Output>>> = Box::pin(future);
+            super::local::spawn_local_inner(future, SpawnMeta::new(self.name, fut_size))
         } else {
             super::local::spawn_local_inner(future, SpawnMeta::new(self.name, fut_size))
         })
@@ -168,7 +171,8 @@ impl<'a> Builder<'a> {
     {
         let fut_size = mem::size_of::<Fut>();
         Ok(if AutoBox::<Fut>::SHOULD_BOX {
-            local_set.spawn_named(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            let future: Pin<Box<dyn Future<Output = Fut::Output>>> = Box::pin(future);
+            local_set.spawn_named(future, SpawnMeta::new(self.name, fut_size))
         } else {
             local_set.spawn_named(future, SpawnMeta::new(self.name, fut_size))
         })
@@ -214,8 +218,9 @@ impl<'a> Builder<'a> {
         use crate::runtime::Mandatory;
         let fn_size = mem::size_of::<Function>();
         let (join_handle, spawn_result) = if AutoBox::<Function>::SHOULD_BOX {
+            let function: Box<dyn FnOnce() -> Output + Send> = Box::new(function);
             handle.inner.blocking_spawner().spawn_blocking_inner(
-                Box::new(function),
+                function,
                 Mandatory::NonMandatory,
                 SpawnMeta::new(self.name, fn_size),
                 handle,

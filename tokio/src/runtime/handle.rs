@@ -21,6 +21,7 @@ use crate::util::trace::SpawnMeta;
 
 use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
 use std::{error, fmt, mem};
 
 /// Runtime context guard.
@@ -201,7 +202,8 @@ impl Handle {
     {
         let fut_size = mem::size_of::<F>();
         if AutoBox::<F>::SHOULD_BOX {
-            self.spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+            let future: Pin<Box<dyn Future<Output = F::Output> + Send>> = Box::pin(future);
+            self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
         } else {
             self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
         }
@@ -342,7 +344,8 @@ impl Handle {
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let fut_size = mem::size_of::<F>();
         if AutoBox::<F>::SHOULD_BOX {
-            self.block_on_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+            let future: Pin<Box<dyn Future<Output = F::Output> + '_>> = Box::pin(future);
+            self.block_on_inner(future, SpawnMeta::new_unnamed(fut_size))
         } else {
             self.block_on_inner(future, SpawnMeta::new_unnamed(fut_size))
         }

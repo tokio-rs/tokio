@@ -398,7 +398,8 @@ cfg_rt! {
     {
         let fut_size = std::mem::size_of::<F>();
         if AutoBox::<F>::SHOULD_BOX {
-            spawn_local_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+            let future: Pin<Box<dyn Future<Output = F::Output>>> = Box::pin(future);
+            spawn_local_inner(future, SpawnMeta::new_unnamed(fut_size))
         } else {
             spawn_local_inner(future, SpawnMeta::new_unnamed(fut_size))
         }
@@ -595,7 +596,8 @@ impl LocalSet {
     {
         let fut_size = mem::size_of::<F>();
         if AutoBox::<F>::SHOULD_BOX {
-            self.spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+            let future: Pin<Box<dyn Future<Output = F::Output>>> = Box::pin(future);
+            self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
         } else {
             self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
         }

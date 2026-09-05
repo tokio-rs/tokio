@@ -371,8 +371,9 @@ impl Spawner {
     {
         let fn_size = std::mem::size_of::<F>();
         let (join_handle, spawn_result) = if AutoBox::<F>::SHOULD_BOX {
+            let func: Box<dyn FnOnce() -> R + Send> = Box::new(func);
             self.spawn_blocking_inner(
-                Box::new(func),
+                func,
                 Mandatory::NonMandatory,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
@@ -410,8 +411,9 @@ impl Spawner {
         {
             let fn_size = std::mem::size_of::<F>();
             let (join_handle, spawn_result) = if AutoBox::<F>::SHOULD_BOX {
+                let func: Box<dyn FnOnce() -> R + Send> = Box::new(func);
                 self.spawn_blocking_inner(
-                    Box::new(func),
+                    func,
                     Mandatory::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,

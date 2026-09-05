@@ -5,7 +5,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(tokio_unstable, feature = "tracing", target_has_atomic = "64"))]
 
-use std::{mem, time::Duration};
+use std::{future::Future, mem, pin::Pin, time::Duration};
 
 use tokio::task;
 use tracing_mock::{expect, span::NewSpan, subscriber};
@@ -164,11 +164,9 @@ fn task_big_spawn_sizes_recorded() {
             big::<20_000>()
         };
 
-        fn boxed_size<T>(_: &T) -> usize {
-            mem::size_of::<Box<T>>()
-        }
+        // Futures above the threshold are spawned as `Pin<Box<dyn Future + Send>>`.
         let size = mem::size_of_val(&future) as u64;
-        let boxed_size = boxed_size(&future);
+        let boxed_size = mem::size_of::<Pin<Box<dyn Future<Output = ()> + Send>>>();
 
         let task_span = expect::span()
             .named("runtime.spawn")

@@ -9,6 +9,7 @@ use crate::util::trace::SpawnMeta;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::mem;
+use std::pin::Pin;
 use std::time::Duration;
 
 /// A local Tokio runtime.
@@ -159,7 +160,8 @@ impl LocalRuntime {
         // safety: spawn_local can only be called from `LocalRuntime`, which this is
         unsafe {
             if AutoBox::<F>::SHOULD_BOX {
-                self.handle.spawn_local_named(Box::pin(future), meta)
+                let future: Pin<Box<dyn Future<Output = F::Output>>> = Box::pin(future);
+                self.handle.spawn_local_named(future, meta)
             } else {
                 self.handle.spawn_local_named(future, meta)
             }
@@ -226,7 +228,8 @@ impl LocalRuntime {
         let meta = SpawnMeta::new_unnamed(fut_size);
 
         if AutoBox::<F>::SHOULD_BOX {
-            self.block_on_inner(Box::pin(future), meta)
+            let future: Pin<Box<dyn Future<Output = F::Output> + '_>> = Box::pin(future);
+            self.block_on_inner(future, meta)
         } else {
             self.block_on_inner(future, meta)
         }
