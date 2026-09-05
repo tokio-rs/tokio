@@ -10,6 +10,7 @@
 ))]
 
 use std::io;
+use std::str::Utf8Error;
 use tokio::io::AsyncReadExt;
 use tokio_test::assert_ok;
 use tokio_test::io::Builder;
@@ -32,8 +33,11 @@ async fn to_string_does_not_truncate_on_utf8_error() {
 
     match AsyncReadExt::read_to_string(&mut data.as_slice(), &mut s).await {
         Ok(len) => panic!("Should fail: {len} bytes."),
-        Err(err) if err.to_string() == "stream did not contain valid UTF-8" => {}
-        Err(err) => panic!("Fail: {err}."),
+        Err(err) => {
+            assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+            let utf8 = err.into_inner().unwrap().downcast::<Utf8Error>().unwrap();
+            assert_eq!(utf8.valid_up_to(), 3);
+        }
     }
 
     assert_eq!(s, "abc");
