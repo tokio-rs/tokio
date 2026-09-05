@@ -117,6 +117,14 @@ impl UringContext {
                 Err(ref e) if e.raw_os_error() == Some(libc::EBUSY) => {
                     self.dispatch_completions();
                 }
+                // EAGAIN means the kernel ran out of resources; drain completions
+                // and retry, same as EBUSY. Otherwise, the SQE remains queued in
+                // the kernel ring while we remove_op() and drop the associated data,
+                // leading to a use-after-free when the kernel eventually executes
+                // the stale SQE.
+                Err(ref e) if e.raw_os_error() == Some(libc::EAGAIN) => {
+                    self.dispatch_completions();
+                }
                 // For other errors, we currently return the error as is.
                 Err(e) => {
                     return Err(e);
