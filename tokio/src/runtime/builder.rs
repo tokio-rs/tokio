@@ -1825,48 +1825,44 @@ impl Builder {
             None
         }
     }
-}
 
-cfg_io_driver! {
-    impl Builder {
-        /// Enables the I/O driver.
-        ///
-        /// Doing this enables using net, process, signal, and some I/O types on
-        /// the runtime.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime;
-        ///
-        /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_io()
-        ///     .build()
-        ///     .unwrap();
-        /// ```
-        pub fn enable_io(&mut self) -> &mut Self {
-            self.enable_io = true;
-            self
-        }
+    /// Enables the I/O driver.
+    ///
+    /// Doing this enables using net, process, signal, and some I/O types on
+    /// the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .enable_io()
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    pub fn enable_io(&mut self) -> &mut Self {
+        self.enable_io = true;
+        self
+    }
 
-        /// Enables the I/O driver and configures the max number of events to be
-        /// processed per tick.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime;
-        ///
-        /// let rt = runtime::Builder::new_current_thread()
-        ///     .enable_io()
-        ///     .max_io_events_per_tick(1024)
-        ///     .build()
-        ///     .unwrap();
-        /// ```
-        pub fn max_io_events_per_tick(&mut self, capacity: usize) -> &mut Self {
-            self.nevents = capacity;
-            self
-        }
+    /// Enables the I/O driver and configures the max number of events to be
+    /// processed per tick.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .enable_io()
+    ///     .max_io_events_per_tick(1024)
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    pub fn max_io_events_per_tick(&mut self, capacity: usize) -> &mut Self {
+        self.nevents = capacity;
+        self
     }
 }
 
