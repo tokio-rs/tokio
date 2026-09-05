@@ -505,12 +505,7 @@ fn maybe_move_runtime() -> Result<(bool, bool), &'static str> {
         // Once the blocking task is done executing, we will attempt to
         // steal the core back.
         let worker = cx.worker.clone();
-        let spawner = worker.handle.blocking_spawner.clone();
-        spawner.inc_scheduler_threads();
-        runtime::spawn_blocking(move || {
-            run(worker);
-            spawner.dec_scheduler_threads();
-        });
+        runtime::spawn_blocking(move || run(worker));
         Ok(())
     })?;
     Ok((had_entered, take_core))
@@ -519,12 +514,7 @@ fn maybe_move_runtime() -> Result<(bool, bool), &'static str> {
 impl Launch {
     pub(crate) fn launch(mut self) {
         for worker in self.0.drain(..) {
-            let spawner = worker.handle.blocking_spawner.clone();
-            spawner.inc_scheduler_threads();
-            runtime::spawn_blocking(move || {
-                run(worker);
-                spawner.dec_scheduler_threads();
-            });
+            runtime::spawn_blocking(move || run(worker));
         }
     }
 }
