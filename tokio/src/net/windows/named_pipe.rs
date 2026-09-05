@@ -133,6 +133,30 @@ impl NamedPipeServer {
         })
     }
 
+    /// Converts the server into an [`OwnedHandle`], deregistering it from the
+    /// tokio runtime.
+    ///
+    /// This is the named-pipe equivalent of [`TcpStream::into_std`] — since
+    /// named pipes have no `std` counterpart, this returns an `OwnedHandle`
+    /// instead. The caller takes ownership of the underlying OS handle and
+    /// is responsible for closing it.
+    ///
+    /// # Errors
+    ///
+    /// This errors if called outside of a [Tokio Runtime], or in a runtime that
+    /// has not [enabled I/O], or if any OS-specific I/O errors occur.
+    ///
+    /// [Tokio Runtime]: crate::runtime::Runtime
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
+    /// [`TcpStream::into_std`]: crate::net::TcpStream::into_std
+    pub fn into_owned_handle(self) -> io::Result<crate::os::windows::io::OwnedHandle> {
+        use std::os::windows::io::{FromRawHandle, IntoRawHandle};
+        self.io
+            .into_inner()
+            .map(IntoRawHandle::into_raw_handle)
+            .map(|raw_handle| unsafe { crate::os::windows::io::OwnedHandle::from_raw_handle(raw_handle) })
+    }
+
     /// Retrieves information about the named pipe the server is associated
     /// with.
     ///
@@ -1004,6 +1028,30 @@ impl NamedPipeClient {
         Ok(Self {
             io: PollEvented::new(named_pipe)?,
         })
+    }
+
+    /// Converts the client into an [`OwnedHandle`], deregistering it from the
+    /// tokio runtime.
+    ///
+    /// This is the named-pipe equivalent of [`TcpStream::into_std`] — since
+    /// named pipes have no `std` counterpart, this returns an `OwnedHandle`
+    /// instead. The caller takes ownership of the underlying OS handle and
+    /// is responsible for closing it.
+    ///
+    /// # Errors
+    ///
+    /// This errors if called outside of a [Tokio Runtime], or in a runtime that
+    /// has not [enabled I/O], or if any OS-specific I/O errors occur.
+    ///
+    /// [Tokio Runtime]: crate::runtime::Runtime
+    /// [enabled I/O]: crate::runtime::Builder::enable_io
+    /// [`TcpStream::into_std`]: crate::net::TcpStream::into_std
+    pub fn into_owned_handle(self) -> io::Result<crate::os::windows::io::OwnedHandle> {
+        use std::os::windows::io::{FromRawHandle, IntoRawHandle};
+        self.io
+            .into_inner()
+            .map(IntoRawHandle::into_raw_handle)
+            .map(|raw_handle| unsafe { crate::os::windows::io::OwnedHandle::from_raw_handle(raw_handle) })
     }
 
     /// Retrieves information about the named pipe the client is associated
