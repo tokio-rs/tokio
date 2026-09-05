@@ -363,12 +363,17 @@ impl<T: Future> Future for Root<T> {
     }
 }
 
-/// Trace and poll all tasks of the `current_thread` runtime.
-pub(in crate::runtime) fn trace_current_thread(
-    owned: &OwnedTasks<Arc<current_thread::Handle>>,
+/// Drain the local and injection queues of the `current_thread` runtime
+/// without polling any tasks.
+///
+/// The scheduler core borrow must be released before any task is polled by
+/// [`trace_owned`]: a task polled during tracing may wake another task, and
+/// `Schedule::schedule` would then re-borrow the core and panic with "RefCell
+/// already borrowed".
+pub(in crate::runtime) fn drain_current_thread(
     local: &mut VecDeque<Notified<Arc<current_thread::Handle>>>,
     injection: &Inject<Arc<current_thread::Handle>>,
-) -> Vec<(Id, Trace)> {
+) -> Vec<Notified<Arc<current_thread::Handle>>> {
     // clear the local and injection queues
 
     let mut dequeued = Vec::new();
@@ -381,8 +386,7 @@ pub(in crate::runtime) fn trace_current_thread(
         dequeued.push(task);
     }
 
-    // precondition: We have drained the tasks from the injection queue.
-    trace_owned(owned, dequeued)
+    dequeued
 }
 
 cfg_rt_multi_thread! {
@@ -430,7 +434,7 @@ cfg_rt_multi_thread! {
 ///
 /// This helper presumes exclusive access to each task. The tasks must not exist
 /// in any other queue.
-fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -> Vec<(Id, Trace)> {
+pub(in crate::runtime) fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -> Vec<(Id, Trace)> {
     let mut tasks = dequeued;
     // Notify and trace all un-notified tasks. The dequeued tasks are already
     // notified and so do not need to be re-notified.
