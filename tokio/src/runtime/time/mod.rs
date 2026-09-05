@@ -131,6 +131,12 @@ struct InnerState {
     /// The earliest time at which we promise to wake up without unparking.
     next_wake: Option<NonZeroU64>,
 
+    /// Whether the driver may be blocked in `park`.
+    ///
+    /// This is set while preparing to park, before releasing the timer lock, so
+    /// timer registration cannot race with the transition into the I/O driver.
+    driver_parked: bool,
+
     /// Timer wheel.
     wheel: wheel::Wheel,
 }
@@ -150,6 +156,7 @@ impl Driver {
             inner: Inner::Traditional {
                 state: Mutex::new(InnerState {
                     next_wake: None,
+                    driver_parked: false,
                     wheel: wheel::Wheel::new(),
                 }),
                 is_shutdown: AtomicBool::new(false),
@@ -219,8 +226,16 @@ impl Driver {
         let next_wake = lock.wheel.next_expiration_time();
         lock.next_wake =
             next_wake.map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
+        lock.driver_parked = !limit.is_some_and(|duration| duration.is_zero());
+        #[cfg(all(test, not(loom), not(target_os = "wasi")))]
+        let driver_parked = lock.driver_parked;
 
         drop(lock);
+
+        #[cfg(all(test, not(loom), not(target_os = "wasi")))]
+        if driver_parked {
+            test_hooks::before_park();
+        }
 
         match next_wake {
             Some(when) => {
@@ -297,6 +312,11 @@ impl Handle {
         let mut waker_list = WakeList::new();
 
         let mut lock = self.inner.lock();
+
+        // The driver has returned from `park`, so timer registrations no longer
+        // need to interrupt the I/O driver. The timer lock makes this transition
+        // atomic with registrations racing with the end of `park`.
+        lock.driver_parked = false;
 
         if now < lock.wheel.elapsed() {
             // Time went backwards! This normally shouldn't happen as the Rust language
@@ -400,6 +420,7 @@ impl Handle {
         unpark: &IoHandle,
         new_tick: u64,
         entry: NonNull<TimerShared>,
+        current_thread: bool,
     ) {
         let waker = unsafe {
             let mut lock = self.inner.lock();
@@ -423,9 +444,10 @@ impl Handle {
                 // the timer entry.
                 match unsafe { lock.wheel.insert(entry) } {
                     Ok(when) => {
-                        if lock
-                            .next_wake
-                            .map_or(true, |next_wake| when < next_wake.get())
+                        if (!current_thread || lock.driver_parked)
+                            && lock
+                                .next_wake
+                                .map_or(true, |next_wake| when < next_wake.get())
                         {
                             unpark.unpark();
                         }
@@ -485,6 +507,28 @@ impl Inner {
 impl fmt::Debug for Inner {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Inner").finish()
+    }
+}
+
+#[cfg(all(test, not(loom), not(target_os = "wasi")))]
+mod test_hooks {
+    use std::cell::RefCell;
+
+    thread_local! {
+        static BEFORE_PARK: RefCell<Option<Box<dyn FnOnce()>>> = RefCell::new(None);
+    }
+
+    pub(super) fn set_before_park(hook: impl FnOnce() + 'static) {
+        BEFORE_PARK.with(|slot| {
+            assert!(slot.borrow_mut().replace(Box::new(hook)).is_none());
+        });
+    }
+
+    pub(super) fn before_park() {
+        let hook = BEFORE_PARK.with(|slot| slot.borrow_mut().take());
+        if let Some(hook) = hook {
+            hook();
+        }
     }
 }
 

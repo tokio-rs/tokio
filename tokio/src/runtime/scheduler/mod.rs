@@ -65,6 +65,20 @@ impl Handle {
             Handle::Disabled => unreachable!(),
         }
     }
+
+    #[cfg(feature = "time")]
+    pub(crate) fn is_current_thread(&self) -> bool {
+        match self {
+            #[cfg(feature = "rt")]
+            Handle::CurrentThread(_) => true,
+
+            #[cfg(feature = "rt-multi-thread")]
+            Handle::MultiThread(_) => false,
+
+            #[cfg(not(feature = "rt"))]
+            Handle::Disabled => unreachable!(),
+        }
+    }
 }
 
 cfg_rt! {
