@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(target_os = "linux", feature = "full", not(miri)))]
+#![cfg(all(target_os = "linux", feature = "full", not(miri), panic = "unwind",))]
 
 use std::panic::{self, AssertUnwindSafe};
 use std::time::Duration;
