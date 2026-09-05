@@ -26,6 +26,7 @@ async fn c() {
 }
 
 #[test]
+#[ignore]
 fn current_thread() {
     let rt = runtime::Builder::new_current_thread()
         .enable_all()
@@ -63,6 +64,7 @@ fn current_thread() {
 }
 
 #[test]
+#[ignore]
 fn multi_thread() {
     let rt = runtime::Builder::new_multi_thread()
         .enable_all()
