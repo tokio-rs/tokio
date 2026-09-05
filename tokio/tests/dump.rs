@@ -202,3 +202,69 @@ fn notified_during_tracing() {
         );
     });
 }
+
+/// Regression test for an arrival leak in the task-dump barrier's
+/// `wait_timeout` (`loom::std::barrier`).
+///
+/// When a worker is wedged and never reaches the dump barrier, the healthy
+/// workers repeatedly time out waiting for it. If a timed-out arrival is not
+/// rolled back, `count` (reset to zero only when a leader is elected) leaks,
+/// and a later barrier round crosses `num_threads` with fewer than
+/// `num_threads` workers actually present. That elects a spurious leader which
+/// traces tasks without the exclusive access the barrier guarantees, un-setting
+/// the notified bit of a task another worker is about to run and panicking that
+/// worker via `assert!(next.is_notified())` — the same assert as #6051.
+///
+/// This drives that scenario and ensures the runtime survives. In a debug build
+/// the panic aborts the whole process via the worker's abort-on-panic guard, so
+/// this test crashes without the fix and passes with it.
+#[test]
+fn wedged_worker_during_tracing() {
+    let rt = runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(4)
+        .build()
+        .unwrap();
+
+    // Permanently occupy one worker so only 3 of the 4 workers ever reach the
+    // dump barrier — the condition that leaks `count` without the fix.
+    rt.spawn(async {
+        loop {
+            std::hint::spin_loop();
+        }
+    });
+
+    // Keep the remaining workers continuously polling tasks, each burning a
+    // little CPU before yielding, to widen the window in which a spurious leader
+    // would trace a task another worker is actively polling.
+    for _ in 0..12 {
+        rt.spawn(async {
+            loop {
+                let deadline = std::time::Instant::now() + std::time::Duration::from_micros(20);
+                while std::time::Instant::now() < deadline {
+                    std::hint::spin_loop();
+                }
+                tokio::task::yield_now().await;
+            }
+        });
+    }
+
+    // Continuously request dumps. With a permanently wedged worker a dump never
+    // completes, so this future is expected never to resolve.
+    let handle = rt.handle().clone();
+    rt.spawn(async move {
+        loop {
+            let _ = handle.dump().await;
+        }
+    });
+
+    // Bound the test on the *test thread's* wall clock rather than a runtime
+    // timer: the busy workers above would starve an in-runtime timer, and the
+    // point is only to give the buggy spurious-leader race time to fire (it
+    // aborts a worker within a fraction of a second without the fix).
+    std::thread::sleep(std::time::Duration::from_secs(5));
+
+    // Tear down without joining the wedged worker, which never returns:
+    // `shutdown_background` is `shutdown_timeout(0)`, so it skips all joins.
+    rt.shutdown_background();
+}
