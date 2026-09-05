@@ -251,7 +251,7 @@ cfg_signal_internal_and_unix! {
     }
 }
 
-cfg_not_signal_internal! {
+cfg_not_signal_internal_and_unix! {
     pub(crate) type SignalHandle = ();
 
     cfg_io_driver! {

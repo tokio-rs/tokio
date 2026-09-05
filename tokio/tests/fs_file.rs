@@ -1,5 +1,17 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
+#![cfg(all(
+    any(
+        feature = "full",
+        all(
+            target_os = "emscripten",
+            feature = "fs",
+            feature = "macros",
+            feature = "rt",
+            feature = "io-util"
+        )
+    ),
+    not(target_os = "wasi")
+))] // WASI does not support all fs operations
 
 use futures::future::FutureExt;
 use std::io::prelude::*;
@@ -99,6 +111,10 @@ async fn rewind_seek_position() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "inline-fs shim does not insert cooperative yield points"
+)]
 async fn coop() {
     let mut tempfile = tempfile();
     tempfile.write_all(HELLO).unwrap();
@@ -124,6 +140,10 @@ async fn coop() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "emscripten libc does not implement dup()/try_clone()"
+)]
 async fn write_to_clone() {
     let tempfile = tempfile();
 

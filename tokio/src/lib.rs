@@ -424,8 +424,11 @@
 //!
 //! ## `WASM` support
 //!
-//! Tokio has some limited support for the `WASM` platform. Without the
-//! `tokio_unstable` flag, the following features are supported:
+//! Tokio has some limited support for Wasm platforms.
+//!
+//! Many of Tokio's feature flags are restricted on Wasm, and unsupported
+//! combinations of feature flags will fail to build. However, all Wasm targets
+//! can be built with the following features:
 //!
 //!  * `sync`
 //!  * `macros`
@@ -434,26 +437,45 @@
 //!  * `time`
 //!
 //! Enabling any other feature (including `full`) will cause a compilation
-//! failure.
+//! failure. Furthermore, some operations available under these feature flags
+//! may panic if they are unsupported. For example:
 //!
-//! The `time` module will only work on `WASM` platforms that have support for
-//! timers (e.g. wasm32-wasi). The timing functions will panic if used on a `WASM`
-//! platform that does not support timers.
+//! * Using timers will panic on Wasm targets that do not support blocking the
+//!   thread.
+//! * If the runtime becomes indefinitely idle (e.g., the program triggers a
+//!   deadlock), then this will panic on most Wasm targets.
+//! * Operations such as `spawn_blocking` that involve spawning threads will
+//!   panic on Wasm targets that do not support threads.
 //!
-//! Note also that if the runtime becomes indefinitely idle, it will panic
-//! immediately instead of blocking forever. On platforms that don't support
-//! time, this means that the runtime can never be idle in any way.
+//! All Wasm targets are still experimental, and breaking behavior changes can
+//! occur in an effort to make Tokio use native Wasm operations. For instance,
+//! the behavior of timers could be changed from panicking or blocking the
+//! thread to starting a JavaScript timer. As another example, the
+//! `spawn_blocking` method could be changed from starting a new thread to
+//! creating a new cooperatively scheduled context of execution, if the Wasm
+//! target supports such contexts. As a third example, the `#[tokio::main]` or
+//! `#[tokio::test]` macros could be changed to work better with the Wasm
+//! environment.
 //!
-//! ## Unstable `WASM` support
+//! ### `WASI` support
 //!
-//! Tokio also has unstable support for some additional `WASM` features. This
-//! requires the use of the `tokio_unstable` flag.
+//! The `wasm32-wasip1` and `wasm32-wasip2` targets support the above features.
+//! Timers work correctly as blocking the thread is supported.
 //!
-//! Using this flag enables the use of `tokio::net` on the wasm32-wasi target.
-//! However, not all methods are available on the networking types as `WASI`
-//! currently does not support the creation of new sockets from within `WASM`.
-//! Because of this, sockets must currently be created via the `FromRawFd`
-//! trait.
+//! Under the `tokio_unstable` flag, these targets support the use
+//! of `tokio::net`. On `wasm32-wasip1`, not all methods are available on the
+//! networking types as this target does not support the creation of new
+//! sockets from within `WASM`. Because of this, sockets must currently be
+//! created via the `FromRawFd` trait on `wasm32-wasip1`. The `wasm32-wasip2`
+//! target does not have this limitation.
+//!
+//! ### Emscripten support
+//!
+//! The `wasm32-unknown-emscripten` target supports the single-threaded runtime
+//! with the `rt`, `time`, `sync`, `macros`, `fs`, `io-util`, `io-std`, and
+//! `test-util` features. The `rt-multi-thread` feature is additionally
+//! supported when building with Emscripten pthreads (`-pthread`). The `net`,
+//! `process`, and `signal` features are not supported.
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.
@@ -467,6 +489,7 @@ compile_error! {
 #[cfg(all(
     not(tokio_unstable),
     target_family = "wasm",
+    not(target_os = "emscripten"),
     any(
         feature = "fs",
         feature = "io-std",
@@ -477,6 +500,21 @@ compile_error! {
     )
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
+
+#[cfg(all(
+    target_os = "emscripten",
+    any(feature = "net", feature = "process", feature = "signal")
+))]
+compile_error!("Features net,process,signal are not supported on wasm32-unknown-emscripten.");
+
+#[cfg(all(
+    target_os = "emscripten",
+    feature = "rt-multi-thread",
+    not(target_feature = "atomics")
+))]
+compile_error!(
+    "The `rt-multi-thread` feature on wasm32-unknown-emscripten requires pthreads support (build with `-pthread`)."
+);
 
 #[cfg(all(
     tokio_unstable,

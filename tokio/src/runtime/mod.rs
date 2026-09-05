@@ -550,6 +550,11 @@ cfg_rt! {
     }
 
     cfg_fs! {
+        // Non-pthread emscripten uses the inline shim in `crate::blocking`.
+        #[cfg_attr(
+            all(target_os = "emscripten", not(target_feature = "atomics")),
+            allow(unused_imports)
+        )]
         pub(crate) use blocking::spawn_mandatory_blocking;
     }
 

@@ -492,7 +492,7 @@ unsafe impl<T> linked_list::Link for ListEntry<T> {
     }
 }
 
-#[cfg(all(test, not(loom)))]
+#[cfg(all(test, not(loom), not(target_os = "emscripten")))]
 mod tests {
     use crate::runtime::Builder;
     use crate::task::JoinSet;
