@@ -63,8 +63,15 @@ impl Driver {
         // safe as each dup is registered with separate reactors **and** we
         // only expect at least one dup to receive the notification.
 
+        let globals = globals();
+
+        // If this process was forked from a process that already used Tokio,
+        // the self-pipe inherited from the parent must be replaced before it
+        // is registered with this runtime's reactor.
+        globals.reinit_after_fork_if_needed()?;
+
         // Manually drop as we don't actually own this instance of UnixStream.
-        let receiver_fd = globals().receiver.as_raw_fd();
+        let receiver_fd = globals.receiver.as_raw_fd();
 
         // safety: there is nothing unsafe about this, but the `from_raw_fd` fn is marked as unsafe.
         let original =
