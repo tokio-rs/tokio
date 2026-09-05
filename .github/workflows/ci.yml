@@ -1135,7 +1135,9 @@ jobs:
       - name: Install cargo-nextest, wasmtime
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,wasmtime-cli
+          # Wasmtime v47.0.0 or later should work, but we stick with a known,
+          # specific version to avoid surprises:
+          tool: cargo-nextest,wasmtime-cli@47.0.2
 
       - uses: Swatinem/rust-cache@v2
 
