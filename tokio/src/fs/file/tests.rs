@@ -614,13 +614,6 @@ fn write_read_write_err() {
         .once()
         .in_sequence(&mut seq)
         .returning(|_| Err(io::ErrorKind::Other.into()));
-    file.expect_inner_read()
-        .once()
-        .in_sequence(&mut seq)
-        .returning(|buf| {
-            buf[0..HELLO.len()].copy_from_slice(HELLO);
-            Ok(HELLO.len())
-        });
 
     let mut file = File::from_std(file);
 
@@ -629,13 +622,15 @@ fn write_read_write_err() {
 
     pool::run_one();
 
+    // The bytes the failed write could not write are still buffered. Issuing
+    // a read here would either hand them back as file contents or discard
+    // them, so the read reports the pending write error instead and no read
+    // reaches the file.
     let mut buf = [0; 1024];
     let mut t = task::spawn(file.read(&mut buf));
+    assert_ready_err!(t.poll());
 
-    assert_pending!(t.poll());
-
-    pool::run_one();
-
+    // The error is still pending, because the data still is.
     let mut t = task::spawn(file.write(FOO));
     assert_ready_err!(t.poll());
 }
@@ -644,17 +639,11 @@ fn write_read_write_err() {
 fn write_read_flush_err() {
     let mut file = MockFile::default();
     let mut seq = Sequence::new();
+    // Two writes: the original, and the retry that `flush` issues.
     file.expect_inner_write()
-        .once()
+        .times(2)
         .in_sequence(&mut seq)
         .returning(|_| Err(io::ErrorKind::Other.into()));
-    file.expect_inner_read()
-        .once()
-        .in_sequence(&mut seq)
-        .returning(|buf| {
-            buf[0..HELLO.len()].copy_from_slice(HELLO);
-            Ok(HELLO.len())
-        });
 
     let mut file = File::from_std(file);
 
@@ -663,14 +652,19 @@ fn write_read_flush_err() {
 
     pool::run_one();
 
+    // As in `write_read_write_err`, the read reports the pending write error
+    // rather than touching the retained bytes.
     let mut buf = [0; 1024];
     let mut t = task::spawn(file.read(&mut buf));
+    assert_ready_err!(t.poll());
 
+    // `flush` is the one operation that retries the write, so it dispatches a
+    // second write to the file and reports its failure.
+    let mut t = task::spawn(file.flush());
     assert_pending!(t.poll());
 
     pool::run_one();
 
-    let mut t = task::spawn(file.flush());
     assert_ready_err!(t.poll());
 }
 
@@ -682,11 +676,6 @@ fn write_seek_write_err() {
         .once()
         .in_sequence(&mut seq)
         .returning(|_| Err(io::ErrorKind::Other.into()));
-    file.expect_inner_seek()
-        .once()
-        .with(eq(SeekFrom::Start(0)))
-        .in_sequence(&mut seq)
-        .returning(|_| Ok(0));
 
     let mut file = File::from_std(file);
 
@@ -695,12 +684,13 @@ fn write_seek_write_err() {
 
     pool::run_one();
 
+    // Seeking would discard the bytes the failed write left behind, and move
+    // the cursor out from under them. It reports the pending error instead and
+    // never reaches the file.
     {
         let mut t = task::spawn(file.seek(SeekFrom::Start(0)));
-        assert_pending!(t.poll());
+        assert_ready_err!(t.poll());
     }
-
-    pool::run_one();
 
     let mut t = task::spawn(file.write(FOO));
     assert_ready_err!(t.poll());
@@ -710,15 +700,11 @@ fn write_seek_write_err() {
 fn write_seek_flush_err() {
     let mut file = MockFile::default();
     let mut seq = Sequence::new();
+    // The original write, and the retry that `flush` issues.
     file.expect_inner_write()
-        .once()
+        .times(2)
         .in_sequence(&mut seq)
         .returning(|_| Err(io::ErrorKind::Other.into()));
-    file.expect_inner_seek()
-        .once()
-        .with(eq(SeekFrom::Start(0)))
-        .in_sequence(&mut seq)
-        .returning(|_| Ok(0));
 
     let mut file = File::from_std(file);
 
@@ -727,14 +713,17 @@ fn write_seek_flush_err() {
 
     pool::run_one();
 
+    // As above: the seek reports the pending error and leaves the data alone.
     {
         let mut t = task::spawn(file.seek(SeekFrom::Start(0)));
-        assert_pending!(t.poll());
+        assert_ready_err!(t.poll());
     }
 
-    pool::run_one();
-
+    // `flush` is the only operation that retries, so it dispatches a second
+    // write and reports its failure.
     let mut t = task::spawn(file.flush());
+    assert_pending!(t.poll());
+    pool::run_one();
     assert_ready_err!(t.poll());
 }
 
@@ -974,5 +963,174 @@ fn busy_file_seek_error() {
     pool::run_one();
 
     let mut t = task::spawn(file.seek(SeekFrom::Start(0)));
+    assert_ready_err!(t.poll());
+}
+
+#[test]
+fn write_err_retains_data_for_next_flush() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    // First write fails outright.
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    // `flush` retries it, and this time the whole payload lands.
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .withf(|buf| buf == HELLO)
+        .returning(|buf| Ok(buf.len()));
+
+    let mut file = File::from_std(file);
+
+    let mut t = task::spawn(file.write(HELLO));
+    assert_ready_ok!(t.poll());
+
+    pool::run_one();
+
+    // The failure is reported, with the data still buffered. The write task
+    // has already run, so this resolves immediately.
+    let mut t = task::spawn(file.flush());
+    assert_ready_err!(t.poll());
+
+    // Retrying the flush writes the retained bytes instead of silently
+    // dropping them. Before this behaviour existed, the buffer had already
+    // been cleared and this flush returned `Ok(())` having written nothing.
+    let mut t = task::spawn(file.flush());
+    assert_pending!(t.poll());
+    pool::run_one();
+    assert_ready_ok!(t.poll());
+}
+
+#[test]
+fn write_err_flush_twice_reports_err_twice() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .times(3)
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+
+    let mut file = File::from_std(file);
+
+    let mut t = task::spawn(file.write(HELLO));
+    assert_ready_ok!(t.poll());
+    pool::run_one();
+
+    // `BufWriter<std::fs::File>` reports the error on every flush while the
+    // data is still unwritten. Tokio used to report it once and then return
+    // `Ok(())`, having thrown the data away.
+    let mut t = task::spawn(file.flush());
+    assert_ready_err!(t.poll());
+
+    // Each later flush retries the retained bytes and reports the failure
+    // again, rather than claiming success.
+    for _ in 0..2 {
+        let mut t = task::spawn(file.flush());
+        assert_pending!(t.poll());
+        pool::run_one();
+        assert_ready_err!(t.poll());
+    }
+}
+
+#[test]
+fn write_partial_then_err_retries_only_remainder() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    // Write half the payload, then fail.
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(HELLO.len() / 2));
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    // The retry must resume from where the partial write stopped, not from
+    // the start, and must not resend the bytes that already landed.
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .withf(|buf| buf == &HELLO[HELLO.len() / 2..])
+        .returning(|buf| Ok(buf.len()));
+
+    let mut file = File::from_std(file);
+
+    let mut t = task::spawn(file.write(HELLO));
+    assert_ready_ok!(t.poll());
+    pool::run_one();
+
+    let mut t = task::spawn(file.flush());
+    assert_ready_err!(t.poll());
+
+    let mut t = task::spawn(file.flush());
+    assert_pending!(t.poll());
+    pool::run_one();
+    assert_ready_ok!(t.poll());
+}
+
+#[test]
+fn write_err_then_seek_retains_data_for_flush() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    // The retry that `flush` dispatches after the seek was refused.
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .withf(|buf| buf == HELLO)
+        .returning(|buf| Ok(buf.len()));
+
+    let mut file = File::from_std(file);
+
+    let mut t = task::spawn(file.write(HELLO));
+    assert_ready_ok!(t.poll());
+
+    pool::run_one();
+
+    // `Seek::poll` drives `poll_complete` before `start_seek`, so this is the
+    // first place an outside seek reaches. It must not consume the retained
+    // bytes: `start_seek` would `discard_read` them and rewind the cursor by
+    // their length.
+    {
+        let mut t = task::spawn(file.seek(SeekFrom::Start(0)));
+        assert_ready_err!(t.poll());
+    }
+
+    // The data survived the seek, so flushing still writes it.
+    let mut t = task::spawn(file.flush());
+    assert_pending!(t.poll());
+    pool::run_one();
+    assert_ready_ok!(t.poll());
+}
+
+#[test]
+fn write_err_observed_by_seek_is_not_readable_as_file_contents() {
+    let mut file = MockFile::default();
+    // No `expect_inner_read`: no read may reach the file, because the only
+    // buffered bytes are the ones the failed write could not write. Handing
+    // them back would report data as file contents that the file never held.
+    file.expect_inner_write()
+        .once()
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+
+    let mut file = File::from_std(file);
+
+    let mut t = task::spawn(file.write(HELLO));
+    assert_ready_ok!(t.poll());
+
+    pool::run_one();
+
+    {
+        let mut t = task::spawn(file.seek(SeekFrom::Start(0)));
+        assert_ready_err!(t.poll());
+    }
+
+    let mut buf = [0; 1024];
+    let mut t = task::spawn(file.read(&mut buf));
     assert_ready_err!(t.poll());
 }
