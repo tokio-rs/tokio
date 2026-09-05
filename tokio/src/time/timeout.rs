@@ -6,7 +6,7 @@
 
 use crate::{
     task::coop,
-    time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
+    time::{error::Elapsed, safe_delay, Duration, Instant, Sleep},
     util::trace,
 };
 
@@ -87,13 +87,8 @@ pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F::IntoFuture>
 where
     F: IntoFuture,
 {
-    let location = trace::caller_location();
-
-    let deadline = Instant::now().checked_add(duration);
-    let delay = match deadline {
-        Some(deadline) => Sleep::new_timeout(deadline, location),
-        None => Sleep::far_future(location),
-    };
+    let deadline = Instant::now() + safe_delay(duration);
+    let delay = Sleep::new_timeout(deadline, trace::caller_location());
     Timeout::new_with_delay(future.into_future(), delay)
 }
 
@@ -165,7 +160,7 @@ pub fn timeout_at<F>(deadline: Instant, future: F) -> Timeout<F::IntoFuture>
 where
     F: IntoFuture,
 {
-    let delay = sleep_until(deadline);
+    let delay = Sleep::new_timeout(deadline, trace::caller_location());
     Timeout::new_with_delay(future.into_future(), delay)
 }
 
