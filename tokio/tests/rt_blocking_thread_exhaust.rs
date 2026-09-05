@@ -28,10 +28,10 @@ fn spawn_blocking_with_only_scheduler_workers() {
 
     rt.block_on(async { sleep(Duration::from_millis(300)).await });
 
-    let threads = std::fs::read_dir("/proc/self/task").unwrap().count() as u64;
+    let threads = std::fs::read_dir("/proc/self/task").unwrap().count();
     let lim = libc::rlimit {
-        rlim_cur: threads,
-        rlim_max: threads,
+        rlim_cur: threads as libc::rlim_t,
+        rlim_max: threads as libc::rlim_t,
     };
     assert_eq!(unsafe { libc::setrlimit(libc::RLIMIT_NPROC, &lim) }, 0);
 
