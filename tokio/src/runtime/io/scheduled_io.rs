@@ -252,37 +252,33 @@ impl ScheduledIo {
             }
         }
 
-        'outer: loop {
+        loop {
             let mut iter = waiters.list.drain_filter(|w| ready.satisfies(w.interest));
 
             while wakers.can_push() {
                 match iter.next() {
-                    Some(waiter) => {
-                        let waiter = unsafe { &mut *waiter.as_ptr() };
+                    Some(mut waiter) => {
+                        let waiter = unsafe { waiter.as_mut() };
 
                         if let Some(waker) = waiter.waker.take() {
                             waiter.is_ready = true;
                             wakers.push(waker);
                         }
                     }
-                    None => {
-                        break 'outer;
-                    }
+                    None => break,
                 }
             }
 
+            let can_push = wakers.can_push();
+            // Prevent deadlock.
             drop(waiters);
 
             wakers.wake_all();
-
-            // Acquire the lock again.
+            if can_push {
+                break;
+            }
             waiters = self.waiters.lock();
         }
-
-        // Release the lock before notifying
-        drop(waiters);
-
-        wakers.wake_all();
     }
 
     pub(super) fn ready_event(&self, interest: Interest) -> ReadyEvent {
