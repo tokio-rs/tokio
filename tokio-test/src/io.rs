@@ -323,7 +323,7 @@ impl Inner {
                             self.waiting = None;
                         }
                     } else {
-                        self.waiting = Some(Instant::now() + *dur);
+                        self.waiting = Some(Instant::now().checked_add(*dur).unwrap());
                         break;
                     }
                 }
@@ -376,7 +376,7 @@ impl AsyncRead for Mock {
             match self.inner.read(buf) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
-                        let until = Instant::now() + rem;
+                        let until = Instant::now().checked_add(rem).unwrap();
                         self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
                     } else {
                         self.inner.read_wait = Some(cx.waker().clone());
@@ -435,7 +435,7 @@ impl AsyncWrite for Mock {
             match self.inner.write(buf) {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     if let Some(rem) = self.inner.remaining_wait() {
-                        let until = Instant::now() + rem;
+                        let until = Instant::now().checked_add(rem).unwrap();
                         self.inner.sleep = Some(Box::pin(time::sleep_until(until)));
                     } else {
                         // A race condition (TOCTOU) can occur if the

@@ -19,7 +19,9 @@ fn async_fn() {
 
 #[test]
 fn test_sleep() {
-    let deadline = Instant::now() + Duration::from_millis(100);
+    let deadline = Instant::now()
+        .checked_add(Duration::from_millis(100))
+        .unwrap();
 
     block_on(async {
         sleep_until(deadline).await;

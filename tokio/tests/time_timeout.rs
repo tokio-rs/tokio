@@ -21,7 +21,10 @@ async fn simultaneous_deadline_future_completion() {
 #[tokio::test]
 async fn completed_future_past_deadline() {
     // Wrap it with a deadline
-    let mut fut = task::spawn(timeout_at(Instant::now() - ms(1000), async {}));
+    let mut fut = task::spawn(timeout_at(
+        Instant::now().checked_sub(ms(1000)).unwrap(),
+        async {},
+    ));
 
     // Ready!
     assert_ready_ok!(fut.poll());
@@ -35,7 +38,7 @@ async fn future_and_deadline_in_future() {
     let (tx, rx) = oneshot::channel();
 
     // Wrap it with a deadline
-    let mut fut = task::spawn(timeout_at(Instant::now() + ms(100), rx));
+    let mut fut = task::spawn(timeout_at(Instant::now().checked_add(ms(100)).unwrap(), rx));
 
     assert_pending!(fut.poll());
 
@@ -123,7 +126,10 @@ async fn deadline_future_elapses() {
     time::pause();
 
     // Wrap it with a deadline
-    let mut fut = task::spawn(timeout_at(Instant::now() + ms(300), pending::<()>()));
+    let mut fut = task::spawn(timeout_at(
+        Instant::now().checked_add(ms(300)).unwrap(),
+        pending::<()>(),
+    ));
 
     assert_pending!(fut.poll());
 

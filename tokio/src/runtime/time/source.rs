@@ -16,7 +16,7 @@ impl TimeSource {
 
     pub(crate) fn deadline_to_tick(&self, t: Instant) -> u64 {
         // Round up to the end of a ms
-        self.instant_to_tick(t + Duration::from_nanos(999_999))
+        self.instant_to_tick(t.saturating_add(Duration::from_nanos(999_999)))
     }
 
     pub(crate) fn instant_to_tick(&self, t: Instant) -> u64 {
