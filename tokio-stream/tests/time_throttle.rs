@@ -26,3 +26,10 @@ async fn usage() {
 
     assert_ready!(stream.poll_next());
 }
+
+#[tokio::test]
+async fn duration_max_does_not_overflow() {
+    let mut stream = task::spawn(futures::stream::iter([1]).throttle(Duration::MAX));
+
+    assert_ready_eq!(stream.poll_next(), Some(1));
+}
