@@ -72,7 +72,7 @@ pub(crate) struct Handle {
 
 #[derive(Debug)]
 pub(crate) struct ReadyEvent {
-    pub(super) tick: u8,
+    pub(super) tick: u16,
     pub(crate) ready: Ready,
     pub(super) is_shutdown: bool,
 }
@@ -97,7 +97,7 @@ pub(super) enum Direction {
 
 pub(super) enum Tick {
     Set,
-    Clear(u8),
+    Clear(u16),
 }
 
 const TOKEN_WAKEUP: mio::Token = mio::Token(0);

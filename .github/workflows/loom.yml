@@ -28,6 +28,13 @@ jobs:
     # base_ref is null when it's not a pull request
     if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-blocking') || (github.base_ref == null))
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Run the blocking pool loom tests against both `spawn_blocking`
+        # queue implementations.
+        include:
+          - sharded_blocking_queue: "0"
+          - sharded_blocking_queue: "1"
     steps:
       - uses: actions/checkout@v7
       - name: Install Rust ${{ env.rust_stable }}
@@ -38,6 +45,8 @@ jobs:
       - name: run tests
         run: cargo test --lib --release --features full -- --nocapture loom_blocking
         working-directory: tokio
+        env:
+          TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE: ${{ matrix.sharded_blocking_queue }}
 
   loom-sync:
     name: loom tokio::sync

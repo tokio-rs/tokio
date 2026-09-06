@@ -532,7 +532,7 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 ///
 /// # Panics
 ///
-/// This will panic if `capacity` is equal to `0`.
+/// This will panic if `capacity` is equal to `0` or exceeds `usize::MAX / 2`.
 ///
 /// This pre-allocates space for `capacity` messages. Allocation failure may result in a panic or
 /// [an allocation error](std::alloc::handle_alloc_error).

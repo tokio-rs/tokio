@@ -36,7 +36,7 @@ impl<T: 'static> Inject<T> {
     }
 
     // Kind of annoying to have to include the cfg here
-    #[cfg(feature = "taskdump")]
+    #[cfg(all(tokio_unstable, feature = "taskdump"))]
     pub(crate) fn is_closed(&self) -> bool {
         let synced = self.synced.lock();
         self.shared.is_closed(&synced)

@@ -37,6 +37,32 @@ impl<St, F> TakeWhile<St, F> {
             done: false,
         }
     }
+
+    /// Returns a reference to the inner stream.
+    pub fn get_ref(&self) -> &St {
+        &self.stream
+    }
+
+    /// Returns a mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_mut(&mut self) -> &mut St {
+        &mut self.stream
+    }
+
+    /// Returns a pinned mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut St> {
+        self.project().stream
+    }
+
+    /// Consumes this combinator and returns the inner stream.
+    ///
+    /// This may discard intermediate combinator state.
+    pub fn into_inner(self) -> St {
+        self.stream
+    }
 }
 
 impl<St, F> Stream for TakeWhile<St, F>

@@ -1,5 +1,14 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "sync",
+        feature = "macros",
+        feature = "time"
+    )
+))]
 
 use futures::future::{pending, FutureExt};
 use std::panic;
@@ -433,6 +442,7 @@ mod spawn_local {
         set.spawn_local(async {});
     }
 
+    #[cfg(not(target_family = "wasm"))]
     #[tokio::test(flavor = "multi_thread")]
     #[should_panic(
         expected = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"

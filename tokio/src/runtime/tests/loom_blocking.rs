@@ -132,6 +132,56 @@ fn spawn_blocking_then_shutdown() {
     });
 }
 
+/// Regression-style test for the class of bug behind
+/// <https://github.com/tokio-rs/tokio/issues/8056>: a `spawn_blocking` while
+/// the pool is at its thread cap must not be stranded when it races with the
+/// only worker transitioning between busy and idle.
+#[test]
+fn spawn_blocking_at_thread_cap_runs() {
+    loom::model(|| {
+        let rt = crate::runtime::Builder::new_current_thread()
+            .max_blocking_threads(1)
+            .thread_keep_alive(Duration::from_secs(7200)) // don't let the thread exit on its own
+            .build()
+            .unwrap();
+        let rt_hdl = rt.handle().clone();
+
+        // Spawn a worker thread and wait for its task to finish, so the
+        // worker is somewhere between running a task and parking idle.
+        let jh0 = rt_hdl.spawn_blocking(|| {});
+        loom::future::block_on(jh0).unwrap();
+
+        // The pool is now at its thread cap, so this task can only run if
+        // the existing worker picks it up; if the spawn is lost, this
+        // deadlocks.
+        let jh1 = rt_hdl.spawn_blocking(|| {});
+        loom::future::block_on(jh1).unwrap();
+
+        drop(rt);
+    });
+}
+
+/// A `spawn_blocking` racing runtime shutdown must never strand the task:
+/// its `JoinHandle` must resolve (the task ran or was cancelled) no matter
+/// how the spawn interleaves with shutdown's drain.
+#[test]
+fn spawn_blocking_racing_shutdown_resolves() {
+    loom::model(|| {
+        let rt = crate::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let handle = rt.handle().clone();
+
+        let spawner = loom::thread::spawn(move || handle.spawn_blocking(|| {}));
+
+        drop(rt);
+
+        let jh = spawner.join().unwrap();
+        // This deadlocks (which loom detects) if the task was lost.
+        let _ = loom::future::block_on(jh);
+    });
+}
+
 fn mk_runtime(num_threads: usize) -> Runtime {
     runtime::Builder::new_multi_thread()
         .worker_threads(num_threads)
