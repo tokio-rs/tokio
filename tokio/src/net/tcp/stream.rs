@@ -118,21 +118,48 @@ impl TcpStream {
         pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
             let addrs = to_socket_addrs(addr).await?;
 
-            let mut last_err = None;
+            let mut first_err: Option<io::Error> = None;
+            let mut last_err: Option<io::Error> = None;
 
             for addr in addrs {
                 match TcpStream::connect_addr(addr).await {
                     Ok(stream) => return Ok(stream),
-                    Err(e) => last_err = Some(e),
+                    Err(e) => {
+                        if first_err.is_none() {
+                            first_err = Some(e);
+                        } else {
+                            last_err = Some(e);
+                        }
+                    }
                 }
             }
 
-            Err(last_err.unwrap_or_else(|| {
-                io::Error::new(
+            Err(match (first_err, last_err) {
+                (None, None) => io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "could not resolve to any address",
-                )
-            }))
+                ),
+                (Some(e), None) => e,
+                (None, Some(e)) => e,
+                (Some(first), Some(last)) => {
+                    // Fix for https://github.com/tokio-rs/tokio/issues/7708:
+                    // if the last error is just "no IPv6 available" hide it and
+                    // return the first (real) error instead.
+                    if Self::is_addr_not_available(&last)
+                        && !Self::is_addr_not_available(&first)
+                    {
+                        first
+                    } else {
+                        last
+                    }
+                }
+            })
+        }
+
+        fn is_addr_not_available(e: &io::Error) -> bool {
+            e.kind() == io::ErrorKind::AddrNotAvailable
+                || e.raw_os_error() == Some(99) // EADDRNOTAVAIL on Linux
+                || e.raw_os_error() == Some(10049) // WSAEADDRNOTAVAIL on Windows
         }
 
         /// Establishes a connection to the specified `addr`.
