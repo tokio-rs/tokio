@@ -30,7 +30,7 @@ use std::task::{self, ready, Poll};
 ///
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() {
-/// sleep_until(Instant::now() + Duration::from_millis(100)).await;
+/// sleep_until(Instant::now().checked_add(Duration::from_millis(100)).unwrap()).await;
 /// println!("100 ms have elapsed");
 /// # }
 /// ```
@@ -125,7 +125,7 @@ pub fn sleep(duration: Duration) -> Sleep {
 
     match Instant::now().checked_add(duration) {
         Some(deadline) => Sleep::new_timeout(deadline, location),
-        None => Sleep::new_timeout(Instant::far_future(), location),
+        None => Sleep::new_timeout(Instant::max(), location),
     }
 }
 
@@ -164,7 +164,8 @@ pin_project! {
     ///     tokio::select! {
     ///         () = &mut sleep => {
     ///             println!("timer elapsed");
-    ///             sleep.as_mut().reset(Instant::now() + Duration::from_millis(50));
+    ///             sleep.as_mut()
+    ///                 .reset(Instant::now().checked_add(Duration::from_millis(50)).unwrap());
     ///         },
     ///     }
     /// }
@@ -297,7 +298,7 @@ impl Sleep {
     }
 
     pub(crate) fn far_future(location: Option<&'static Location<'static>>) -> Sleep {
-        Self::new_timeout(Instant::far_future(), location)
+        Self::new_timeout(Instant::max(), location)
     }
 
     /// Returns the instant at which the future will complete.
@@ -334,7 +335,7 @@ impl Sleep {
     /// let sleep = tokio::time::sleep(Duration::from_millis(10));
     /// tokio::pin!(sleep);
     ///
-    /// sleep.as_mut().reset(Instant::now() + Duration::from_millis(20));
+    /// sleep.as_mut().reset(Instant::now().checked_add(Duration::from_millis(20)).unwrap());
     /// # }
     /// ```
     ///

@@ -114,7 +114,9 @@ fn delay_queue_insert_at_panic_caller() -> Result<(), Box<dyn Error>> {
             //let st = std::time::Instant::from(SystemTime::UNIX_EPOCH);
             let _k = queue.insert_at(
                 "1",
-                Instant::now() + Duration::from_millis(MAX_DURATION_MS + 1),
+                Instant::now()
+                    .checked_add(Duration::from_millis(MAX_DURATION_MS + 1))
+                    .unwrap(),
             );
         });
     });
@@ -171,7 +173,9 @@ fn delay_queue_reset_at_panic_caller() -> Result<(), Box<dyn Error>> {
             let key = queue.insert_at("1", Instant::now());
             queue.reset_at(
                 &key,
-                Instant::now() + Duration::from_millis(MAX_DURATION_MS + 1),
+                Instant::now()
+                    .checked_add(Duration::from_millis(MAX_DURATION_MS + 1))
+                    .unwrap(),
             );
         });
     });

@@ -85,7 +85,7 @@ async fn advance_after_poll() {
 
     let start = Instant::now();
 
-    let mut sleep = task::spawn(time::sleep_until(start + ms(300)));
+    let mut sleep = task::spawn(time::sleep_until(start.checked_add(ms(300)).unwrap()));
 
     assert_pending!(sleep.poll());
 
@@ -103,7 +103,7 @@ async fn sleep_no_poll() {
     // TODO: Skip this
     time::advance(ms(1)).await;
 
-    let mut sleep = task::spawn(time::sleep_until(start + ms(300)));
+    let mut sleep = task::spawn(time::sleep_until(start.checked_add(ms(300)).unwrap()));
 
     let before = Instant::now();
     time::advance(ms(100)).await;
@@ -164,7 +164,7 @@ async fn sleep_same_task() {
     // TODO: Skip this
     time::advance(ms(1)).await;
 
-    let sleep = Box::pin(time::sleep_until(start + ms(300)));
+    let sleep = Box::pin(time::sleep_until(start.checked_add(ms(300)).unwrap()));
 
     Tester {
         sleep,
@@ -182,7 +182,7 @@ async fn sleep_same_task_no_poll() {
     // TODO: Skip this
     time::advance(ms(1)).await;
 
-    let sleep = Box::pin(time::sleep_until(start + ms(300)));
+    let sleep = Box::pin(time::sleep_until(start.checked_add(ms(300)).unwrap()));
 
     Tester {
         sleep,
@@ -213,20 +213,20 @@ async fn interval() {
     let before = Instant::now();
     time::advance(ms(200)).await;
     assert_elapsed!(before, ms(200));
-    assert_ready_eq!(poll_next(&mut i), start + ms(300));
+    assert_ready_eq!(poll_next(&mut i), start.checked_add(ms(300)).unwrap());
     assert_pending!(poll_next(&mut i));
 
     let before = Instant::now();
     time::advance(ms(400)).await;
     assert_elapsed!(before, ms(400));
-    assert_ready_eq!(poll_next(&mut i), start + ms(600));
+    assert_ready_eq!(poll_next(&mut i), start.checked_add(ms(600)).unwrap());
     assert_pending!(poll_next(&mut i));
 
     let before = Instant::now();
     time::advance(ms(500)).await;
     assert_elapsed!(before, ms(500));
-    assert_ready_eq!(poll_next(&mut i), start + ms(900));
-    assert_ready_eq!(poll_next(&mut i), start + ms(1200));
+    assert_ready_eq!(poll_next(&mut i), start.checked_add(ms(900)).unwrap());
+    assert_ready_eq!(poll_next(&mut i), start.checked_add(ms(1200)).unwrap());
     assert_pending!(poll_next(&mut i));
 }
 
@@ -268,7 +268,9 @@ async fn regression_3710_with_submillis_advance() {
 
     time::advance(Duration::from_millis(1)).await;
 
-    let mut sleep = task::spawn(time::sleep_until(start + Duration::from_secs(60)));
+    let mut sleep = task::spawn(time::sleep_until(
+        start.checked_add(Duration::from_secs(60)).unwrap(),
+    ));
 
     assert_pending!(sleep.poll());
 

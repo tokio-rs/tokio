@@ -14,7 +14,7 @@ where
     T: Stream,
 {
     Throttle {
-        delay: tokio::time::sleep_until(Instant::now() + duration),
+        delay: tokio::time::sleep_until(Instant::now().saturating_add(duration)),
         duration,
         has_delayed: true,
         stream,
@@ -81,7 +81,7 @@ impl<T: Stream> Stream for Throttle<T> {
 
         if value.is_some() {
             if !is_zero(dur) {
-                me.delay.reset(Instant::now() + dur);
+                me.delay.reset(Instant::now().saturating_add(dur));
             }
 
             *me.has_delayed = false;

@@ -29,7 +29,7 @@ pub struct Elapsed(());
 
 impl<S: Stream> Timeout<S> {
     pub(super) fn new(stream: S, duration: Duration) -> Self {
-        let next = Instant::now() + duration;
+        let next = Instant::now().saturating_add(duration);
         let deadline = tokio::time::sleep_until(next);
 
         Timeout {
@@ -50,7 +50,7 @@ impl<S: Stream> Stream for Timeout<S> {
         match me.stream.poll_next(cx) {
             Poll::Ready(v) => {
                 if v.is_some() {
-                    let next = Instant::now() + *me.duration;
+                    let next = Instant::now().saturating_add(*me.duration);
                     me.deadline.reset(next);
                     *me.poll_deadline = true;
                 }

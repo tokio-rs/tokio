@@ -137,7 +137,7 @@ where
 ///
 /// // Wrap the future with a `Timeout` set to expire 10 milliseconds into the
 /// // future.
-/// if let Err(_) = timeout_at(Instant::now() + Duration::from_millis(10), rx).await {
+/// if let Err(_) = timeout_at(Instant::now().checked_add(Duration::from_millis(10)).unwrap(), rx).await {
 ///     println!("did not receive value within 10 ms");
 /// }
 /// # }

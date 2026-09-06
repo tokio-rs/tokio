@@ -61,7 +61,9 @@ fn timer_with_threaded_runtime() {
         let (tx, rx) = mpsc::channel();
 
         rt.spawn(async move {
-            let when = Instant::now() + Duration::from_millis(10);
+            let when = Instant::now()
+                .checked_add(Duration::from_millis(10))
+                .unwrap();
 
             sleep_until(when).await;
             assert!(Instant::now() >= when);
@@ -81,7 +83,9 @@ fn timer_with_threaded_runtime() {
         let (tx, rx) = mpsc::channel();
 
         rt.block_on(async move {
-            let when = Instant::now() + Duration::from_millis(10);
+            let when = Instant::now()
+                .checked_add(Duration::from_millis(10))
+                .unwrap();
 
             sleep_until(when).await;
             assert!(Instant::now() >= when);
@@ -101,7 +105,9 @@ fn timer_with_current_thread_scheduler() {
     let (tx, rx) = mpsc::channel();
 
     rt.block_on(async move {
-        let when = Instant::now() + Duration::from_millis(10);
+        let when = Instant::now()
+            .checked_add(Duration::from_millis(10))
+            .unwrap();
 
         sleep_until(when).await;
         assert!(Instant::now() >= when);
@@ -138,7 +144,9 @@ fn starving() {
 
     for rt in rt_combinations() {
         rt.block_on(async {
-            let when = Instant::now() + Duration::from_millis(10);
+            let when = Instant::now()
+                .checked_add(Duration::from_millis(10))
+                .unwrap();
             let starve = Starve(Box::pin(sleep_until(when)), 0);
 
             starve.await;
@@ -160,7 +168,7 @@ fn timeout_value() {
 
             let res = timeout(dur, rx).await;
             assert!(res.is_err());
-            assert!(Instant::now() >= now + dur);
+            assert!(Instant::now() >= now.checked_add(dur).unwrap());
         });
     }
 }

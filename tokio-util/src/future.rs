@@ -45,7 +45,7 @@ pub trait FutureExt: Future {
         ///
         /// # async fn dox() {
         /// let (_tx, rx) = oneshot::channel::<()>();
-        /// let deadline = Instant::now() + Duration::from_millis(10);
+        /// let deadline = Instant::now().checked_add(Duration::from_millis(10)).unwrap();
         ///
         /// let res = rx.timeout_at(deadline).await;
         /// assert!(res.is_err());
