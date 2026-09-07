@@ -39,15 +39,29 @@ impl<T: 'static> Inject<T> {
 
         // Now that the tasks are linked together, insert them into the
         // linked list.
-        self.push_batch_inner(first, prev, counter);
+        //
+        // safety: the batch was linked just above from `Notified`s this
+        // function took ownership of, satisfying both obligations.
+        unsafe { self.push_batch_inner(first, prev, counter) };
     }
 
     /// Inserts several tasks that have been linked together into the queue.
     ///
     /// The provided head and tail may be the same task. In this case, a
     /// single task is inserted.
+    ///
+    /// # Safety
+    ///
+    /// The caller must own the `Notified` for each of the `num` tasks, and
+    /// the tasks must be linked from `batch_head` to `batch_tail` through
+    /// their `queue_next` fields, with `batch_tail`'s `queue_next` unset.
     #[inline]
-    fn push_batch_inner(&self, batch_head: task::RawTask, batch_tail: task::RawTask, num: usize) {
+    unsafe fn push_batch_inner(
+        &self,
+        batch_head: task::RawTask,
+        batch_tail: task::RawTask,
+        num: usize,
+    ) {
         debug_assert!(unsafe { batch_tail.get_queue_next().is_none() });
 
         let mut synced = self.synced.lock();
@@ -61,10 +75,9 @@ impl<T: 'static> Inject<T> {
             let mut curr = Some(batch_head);
 
             while let Some(task) = curr {
-                // safety: `push_batch` took ownership of each task's
-                // `Notified` and linked the batch through the tasks'
-                // `queue_next` fields; reconstituting the `Notified` here
-                // transfers that ownership back.
+                // safety: per this function's contract, the caller owns each
+                // task's `Notified` and linked the batch through `queue_next`;
+                // reconstituting the `Notified` here takes that ownership.
                 curr = unsafe { task.get_queue_next() };
 
                 let _ = unsafe { task::Notified::<T>::from_raw(task) };
