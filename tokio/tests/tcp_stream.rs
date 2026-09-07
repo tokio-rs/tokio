@@ -372,12 +372,7 @@ async fn try_read_buf() {
 
     #[cfg(not(target_os = "wasi"))] // WASI does not yet support `POLLHUP` or `POLLRDHUP`
     {
-        let mut count = 0;
         loop {
-            count += 1;
-            if count > 100 {
-                panic!("loop 4")
-            }
             let ready = server.ready(Interest::READABLE).await.unwrap();
 
             if ready.is_read_closed() {

@@ -496,7 +496,7 @@ cfg_coop! {
 mod test {
     use super::*;
 
-    #[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+    #[cfg(all(target_family = "wasm", target_os = "unknown"))]
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     fn get() -> Budget {

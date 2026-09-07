@@ -1,5 +1,17 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
+#![cfg(all(
+    any(
+        feature = "full",
+        all(
+            target_os = "emscripten",
+            feature = "fs",
+            feature = "macros",
+            feature = "rt",
+            feature = "io-util"
+        )
+    ),
+    not(target_os = "wasi")
+))] // WASI does not support all fs operations
 
 use tokio::fs;
 
@@ -8,6 +20,7 @@ use tempfile::tempdir;
 
 #[tokio::test]
 #[cfg_attr(miri, ignore)] // No `linkat` in miri.
+#[cfg_attr(target_os = "emscripten", ignore = "MEMFS rejects link() with EMLINK")]
 async fn test_hard_link() {
     let dir = tempdir().unwrap();
     let src = dir.path().join("src.txt");
@@ -63,6 +76,7 @@ async fn test_symlink() {
 
 #[tokio::test]
 #[cfg_attr(miri, ignore)] // No `linkat` in miri.
+#[cfg_attr(target_os = "emscripten", ignore = "MEMFS rejects link() with EMLINK")]
 async fn test_hard_link_error_source_not_found() {
     let dir = tempdir().unwrap();
     let src = dir.path().join("nonexistent.txt");
@@ -72,6 +86,7 @@ async fn test_hard_link_error_source_not_found() {
     assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
 }
 
+// On emscripten MEMFS reports EEXIST before its unconditional link() EMLINK.
 #[tokio::test]
 #[cfg_attr(miri, ignore)] // No `linkat` in miri.
 async fn test_hard_link_error_destination_already_exists() {
@@ -92,6 +107,7 @@ async fn test_hard_link_error_destination_already_exists() {
 
 #[tokio::test]
 #[cfg_attr(miri, ignore)] // No `linkat` in miri.
+#[cfg_attr(target_os = "emscripten", ignore = "MEMFS rejects link() with EMLINK")]
 async fn test_hard_link_error_source_is_directory() {
     let dir = tempdir().unwrap();
     let src_dir = dir.path().join("src_directory");
