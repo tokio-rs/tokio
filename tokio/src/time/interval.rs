@@ -650,7 +650,7 @@ mod tests {
             MissedTickBehavior::Delay,
             MissedTickBehavior::Skip,
         ] {
-            let next = behavior.next_timeout(timeout, now, Duration::MAX);
+            let next = behavior.next_timeout(timeout, now, safe_delay(Duration::MAX));
             assert!(next > now);
         }
     }
