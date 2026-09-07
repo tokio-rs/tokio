@@ -452,7 +452,7 @@ impl Spawner {
         (handle, spawned)
     }
 
-    fn num_blocking_threads(&self) -> usize {
+    pub(crate) fn num_blocking_threads(&self) -> usize {
         self.inner
             .metrics
             .num_threads()
@@ -530,10 +530,6 @@ impl Spawner {
 
 cfg_unstable_metrics! {
     impl Spawner {
-        pub(crate) fn num_threads(&self) -> usize {
-            self.inner.metrics.num_threads()
-        }
-
         pub(crate) fn num_idle_threads(&self) -> usize {
             self.inner.metrics.num_idle_threads()
         }
