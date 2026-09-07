@@ -11,17 +11,10 @@ fn zero_busy_tick_panics() {
     tokio::runtime::Builder::new_multi_thread().max_io_events_per_busy_tick(0);
 }
 
-#[test]
-fn busy_workers_still_get_every_event() {
-    // Every worker always has a task, so it polls the driver only at its
-    // maintenance tick, and each poll takes one event. The events each poll
-    // leaves in the kernel must still reach their tasks.
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .max_io_events_per_busy_tick(1)
-        .enable_all()
-        .build()
-        .unwrap();
+// Every worker always has a task, so it polls the driver only at its
+// maintenance tick, and each poll takes one event. The events each poll
+// leaves in the kernel must still reach their tasks.
+fn busy_runtime_gets_every_event(rt: tokio::runtime::Runtime) {
     for _ in 0..8 {
         rt.spawn(async {
             loop {
@@ -63,4 +56,25 @@ fn busy_workers_still_get_every_event() {
             .await
             .expect("echo round trips did not finish");
     });
+}
+
+#[test]
+fn multi_thread_busy_tick() {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .max_io_events_per_busy_tick(1)
+        .enable_all()
+        .build()
+        .unwrap();
+    busy_runtime_gets_every_event(rt);
+}
+
+#[test]
+fn current_thread_busy_tick() {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .max_io_events_per_busy_tick(1)
+        .enable_all()
+        .build()
+        .unwrap();
+    busy_runtime_gets_every_event(rt);
 }

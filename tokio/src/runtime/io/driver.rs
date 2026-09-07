@@ -29,9 +29,8 @@ pub(crate) struct Driver {
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
 
-    /// Smaller buffer for zero-timeout polls. A worker makes one while it
-    /// still has tasks, or when a timer has already expired. Set by
-    /// `Builder::max_io_events_per_busy_tick`.
+    /// Buffer for polls that do not wait, if
+    /// `Builder::max_io_events_per_busy_tick` is set.
     events_busy: Option<mio::Events>,
 
     /// The system event queue.
@@ -119,7 +118,7 @@ fn _assert_kinds() {
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub(crate) fn new(nevents: usize) -> io::Result<(Driver, Handle)> {
+    pub(crate) fn new(nevents: usize, nevents_busy: Option<usize>) -> io::Result<(Driver, Handle)> {
         let poll = mio::Poll::new()?;
         #[cfg(not(target_os = "wasi"))]
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
@@ -128,7 +127,7 @@ impl Driver {
         let driver = Driver {
             signal_ready: false,
             events: mio::Events::with_capacity(nevents),
-            events_busy: None,
+            events_busy: nevents_busy.map(mio::Events::with_capacity),
             poll,
         };
 
@@ -162,12 +161,6 @@ impl Driver {
         Ok((driver, handle))
     }
 
-    pub(crate) fn set_max_events_busy(&mut self, nevents: Option<usize>) {
-        self.events_busy = nevents
-            .filter(|&n| n < self.events.capacity())
-            .map(mio::Events::with_capacity);
-    }
-
     pub(crate) fn park(&mut self, rt_handle: &driver::Handle) {
         let handle = rt_handle.io();
         self.turn(handle, None);
@@ -193,7 +186,7 @@ impl Driver {
 
         handle.release_pending_registrations();
 
-        // A poll that does not wait takes the smaller batch. Events it leaves
+        // A poll that does not wait takes the busy batch. Events it leaves
         // behind stay queued in the kernel, so the next poll returns them.
         let events = match (&mut self.events_busy, max_wait) {
             (Some(busy), Some(wait)) if wait.is_zero() => busy,

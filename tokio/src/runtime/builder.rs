@@ -1198,10 +1198,7 @@ impl Builder {
             enable_time: self.enable_time,
             start_paused: self.start_paused,
             nevents: self.nevents,
-            // Only the multi-thread runtime has local queues to overflow.
-            nevents_busy: self
-                .nevents_busy
-                .filter(|_| !matches!(self.kind, Kind::CurrentThread)),
+            nevents_busy: self.nevents_busy,
             timer_flavor: self.timer_flavor,
         }
     }
@@ -1858,6 +1855,11 @@ cfg_io_driver! {
         /// Enables the I/O driver and configures the max number of events to be
         /// processed per tick.
         ///
+        /// To take a smaller batch on polls that do not wait, see
+        /// [`max_io_events_per_busy_tick`].
+        ///
+        /// [`max_io_events_per_busy_tick`]: Builder::max_io_events_per_busy_tick
+        ///
         /// # Examples
         ///
         /// ```
@@ -1888,11 +1890,11 @@ cfg_io_driver! {
         /// includes a park with a timer that has already expired, because the
         /// worker runs that timer's task next.
         ///
-        /// The local queue holds 256 tasks, so set `max_io_events_per_tick`
-        /// to at most 256 as well, with room for the tasks those tasks wake.
+        /// A multi-thread worker's local queue holds 256 tasks, so set
+        /// `max_io_events_per_tick` to at most 256 as well, with room for the
+        /// tasks those tasks wake.
         ///
-        /// The default is `max_io_events_per_tick`. Only the multi-thread
-        /// runtime uses this option.
+        /// The default is to use the same value as [`max_io_events_per_tick`].
         ///
         /// [`event_interval`]: Builder::event_interval
         /// [`max_io_events_per_tick`]: Builder::max_io_events_per_tick
