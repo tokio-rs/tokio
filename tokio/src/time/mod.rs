@@ -84,6 +84,12 @@
 //! [`interval`]: crate::time::interval()
 //! [`sleep`]: sleep()
 
+fn safe_delay(duration: Duration) -> Duration {
+    // Roughly 30 years from now.
+    // 1000 years overflows on macOS, 100 years overflows on FreeBSD.
+    duration.min(Duration::from_secs(86400 * 365 * 30))
+}
+
 mod clock;
 pub(crate) use self::clock::Clock;
 cfg_test_util! {
