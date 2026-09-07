@@ -61,7 +61,7 @@ use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
     idle, park, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
-use crate::runtime::scheduler::{inject, Defer, Lock};
+use crate::runtime::scheduler::{Defer, Inject};
 use crate::runtime::task::OwnedTasks;
 use crate::runtime::{
     blocking, driver, scheduler, task, Config, SchedulerMetrics, TimerFlavor, WorkerMetrics,
@@ -174,7 +174,7 @@ pub(crate) struct Shared {
     /// Global task queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
-    pub(super) inject: inject::Shared<Arc<Handle>>,
+    pub(super) inject: Inject<Arc<Handle>>,
 
     /// Coordinates idle workers
     idle: Idle,
@@ -220,13 +220,16 @@ pub(crate) struct Synced {
     /// Synchronized state for `Idle`.
     pub(super) idle: idle::Synced,
 
-    /// Synchronized state for `Inject`.
-    pub(crate) inject: inject::Synced,
-
     #[cfg(all(tokio_unstable, feature = "time"))]
     /// Timers pending to be registered.
     /// This is used to register a timer but the [`Core`]
     /// is not available in the current thread.
+    ///
+    /// This must stay under the same mutex as `idle`: a parking worker drains
+    /// it (via `try_lock`) only after publishing its parked state under this
+    /// lock, and `notify_if_work_pending` does not check for pending timers,
+    /// so sharing the lock with the parking transition is what prevents a
+    /// timer push from being stranded while every worker sleeps.
     inject_timers: Vec<time_alt::EntryHandle>,
 }
 
@@ -316,7 +319,6 @@ pub(super) fn create(
     }
 
     let (idle, idle_synced) = Idle::new(size);
-    let (inject, inject_synced) = inject::Shared::new();
     let schedule_latency_start = config.track_task_schedule_latency.then(Instant::now);
 
     let remotes_len = remotes.len();
@@ -325,12 +327,11 @@ pub(super) fn create(
         task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
-            inject,
+            inject: Inject::new(),
             idle,
             owned: OwnedTasks::new(size),
             synced: Mutex::new(Synced {
                 idle: idle_synced,
-                inject: inject_synced,
                 #[cfg(all(tokio_unstable, feature = "time"))]
                 inject_timers: Vec::new(),
             }),
@@ -1141,17 +1142,15 @@ impl Core {
             // and not pushed onto the local queue.
             let n = usize::max(1, n);
 
-            let mut synced = worker.handle.shared.synced.lock();
-            // safety: passing in the correct `inject::Synced`.
-            let mut tasks = unsafe { worker.inject().pop_n(&mut synced.inject, n) };
+            worker.inject().pop_n(n, |mut tasks| {
+                // Pop the first task to return immediately
+                let ret = tasks.next();
 
-            // Pop the first task to return immediately
-            let ret = tasks.next();
+                // Push the rest of the on the run queue
+                self.run_queue.push_back(tasks);
 
-            // Push the rest of the on the run queue
-            self.run_queue.push_back(tasks);
-
-            ret
+                ret
+            })
         }
     }
 
@@ -1291,8 +1290,7 @@ impl Core {
 
         if !self.is_shutdown {
             // Check if the scheduler has been shutdown
-            let synced = worker.handle.shared.synced.lock();
-            self.is_shutdown = worker.inject().is_closed(&synced.inject);
+            self.is_shutdown = worker.inject().is_closed();
         }
 
         if !self.is_traced {
@@ -1344,7 +1342,7 @@ impl Core {
 
 impl Worker {
     /// Returns a reference to the scheduler's injection queue.
-    fn inject(&self) -> &inject::Shared<Arc<Handle>> {
+    fn inject(&self) -> &Inject<Arc<Handle>> {
         &self.handle.shared.inject
     }
 }
@@ -1417,23 +1415,13 @@ impl Handle {
     }
 
     fn next_remote_task(&self) -> Option<Notified> {
-        if self.shared.inject.is_empty() {
-            return None;
-        }
-
-        let mut synced = self.shared.synced.lock();
-        // safety: passing in correct `idle::Synced`
-        unsafe { self.shared.inject.pop(&mut synced.inject) }
+        self.shared.inject.pop()
     }
 
     fn push_remote_task(&self, task: Notified) {
         self.shared.scheduler_metrics.inc_remote_schedule_count();
 
-        let mut synced = self.shared.synced.lock();
-        // safety: passing in correct `idle::Synced`
-        unsafe {
-            self.shared.inject.push(&mut synced.inject, task);
-        }
+        self.shared.inject.push(task);
     }
 
     #[cfg(all(tokio_unstable, feature = "time"))]
@@ -1458,11 +1446,7 @@ impl Handle {
     }
 
     pub(super) fn close(&self) {
-        if self
-            .shared
-            .inject
-            .close(&mut self.shared.synced.lock().inject)
-        {
+        if self.shared.inject.close() {
             self.notify_all();
         }
     }
@@ -1558,29 +1542,7 @@ impl Overflow<Arc<Handle>> for Handle {
     where
         I: Iterator<Item = task::Notified<Arc<Handle>>>,
     {
-        unsafe {
-            self.shared.inject.push_batch(self, iter);
-        }
-    }
-}
-
-pub(crate) struct InjectGuard<'a> {
-    lock: crate::loom::sync::MutexGuard<'a, Synced>,
-}
-
-impl<'a> AsMut<inject::Synced> for InjectGuard<'a> {
-    fn as_mut(&mut self) -> &mut inject::Synced {
-        &mut self.lock.inject
-    }
-}
-
-impl<'a> Lock<inject::Synced> for &'a Handle {
-    type Handle = InjectGuard<'a>;
-
-    fn lock(self) -> Self::Handle {
-        InjectGuard {
-            lock: self.shared.synced.lock(),
-        }
+        self.shared.inject.push_batch(iter);
     }
 }
 
