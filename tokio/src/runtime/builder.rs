@@ -1852,8 +1852,7 @@ cfg_io_driver! {
             self
         }
 
-        /// Enables the I/O driver and configures the max number of events to be
-        /// processed per tick.
+        /// Sets the max number of I/O events processed per tick.
         ///
         /// To take a smaller batch on polls that do not wait, see
         /// [`max_io_events_per_busy_tick`].
