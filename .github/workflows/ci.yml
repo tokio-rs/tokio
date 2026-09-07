@@ -1126,10 +1126,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust 1.98
+      - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: '1.98'
+          toolchain: ${{ env.rust_stable }}
           targets: wasm32-wasip2
 
       - name: Install cargo-nextest, wasmtime
