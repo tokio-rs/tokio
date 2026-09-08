@@ -102,7 +102,7 @@ impl Handle {
         pub(crate) fn signal(&self) -> &crate::runtime::signal::Handle {
             self.signal
                 .as_ref()
-                .expect("there is no signal driver running, must be called from the context of Tokio runtime")
+                .expect("A Tokio 1.x context was found, but IO is disabled. Call `enable_io` on the runtime builder to enable IO.")
         }
     }
 
@@ -253,7 +253,7 @@ cfg_signal_internal_and_unix! {
     }
 }
 
-cfg_not_signal_internal! {
+cfg_not_signal_internal_and_unix! {
     pub(crate) type SignalHandle = ();
 
     cfg_io_driver! {

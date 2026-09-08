@@ -1762,7 +1762,7 @@ impl Builder {
         let (driver, driver_handle) = driver::Driver::new(cfg)?;
 
         // Blocking pool
-        let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
+        let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads, 0);
         let blocking_spawner = blocking_pool.spawner().clone();
 
         // Generate a rng seed for this runtime.
@@ -1828,98 +1828,94 @@ impl Builder {
             None
         }
     }
-}
 
-cfg_io_driver! {
-    impl Builder {
-        /// Enables the I/O driver.
-        ///
-        /// Doing this enables using net, process, signal, and some I/O types on
-        /// the runtime.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime;
-        ///
-        /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_io()
-        ///     .build()
-        ///     .unwrap();
-        /// ```
-        pub fn enable_io(&mut self) -> &mut Self {
-            self.enable_io = true;
-            self
-        }
+    /// Enables the I/O driver.
+    ///
+    /// Doing this enables using net, process, signal, and some I/O types on
+    /// the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .enable_io()
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    pub fn enable_io(&mut self) -> &mut Self {
+        self.enable_io = true;
+        self
+    }
 
-        /// Sets the max number of I/O events processed per tick.
-        ///
-        /// To take a smaller batch on polls that do not wait, see
-        /// [`max_io_events_per_busy_tick`].
-        ///
-        /// [`max_io_events_per_busy_tick`]: Builder::max_io_events_per_busy_tick
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime;
-        ///
-        /// let rt = runtime::Builder::new_current_thread()
-        ///     .enable_io()
-        ///     .max_io_events_per_tick(1024)
-        ///     .build()
-        ///     .unwrap();
-        /// ```
-        pub fn max_io_events_per_tick(&mut self, capacity: usize) -> &mut Self {
-            self.nevents = capacity;
-            self
-        }
+    /// Sets the max number of I/O events processed per tick.
+    ///
+    /// To take a smaller batch on polls that do not wait, see
+    /// [`max_io_events_per_busy_tick`].
+    ///
+    /// [`max_io_events_per_busy_tick`]: Builder::max_io_events_per_busy_tick
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .enable_io()
+    ///     .max_io_events_per_tick(1024)
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    pub fn max_io_events_per_tick(&mut self, capacity: usize) -> &mut Self {
+        self.nevents = capacity;
+        self
+    }
 
-        /// Sets the max number of I/O events a worker processes when it polls
-        /// the driver while it still has tasks to run.
-        ///
-        /// A busy worker polls the driver every [`event_interval`] tasks, and
-        /// every task that poll wakes goes to its local queue. A large batch
-        /// overflows that queue, and under sustained overload the overflow
-        /// grows until requests time out. A small busy batch leaves the rest
-        /// in the kernel. An idle worker still takes up to
-        /// [`max_io_events_per_tick`] events.
-        ///
-        /// The runtime treats any poll that does not wait as busy. That
-        /// includes a park with a timer that has already expired, because the
-        /// worker runs that timer's task next.
-        ///
-        /// A multi-thread worker's local queue holds 256 tasks, so set
-        /// `max_io_events_per_tick` to at most 256 as well, with room for the
-        /// tasks those tasks wake.
-        ///
-        /// The default is to use the same value as [`max_io_events_per_tick`].
-        ///
-        /// [`event_interval`]: Builder::event_interval
-        /// [`max_io_events_per_tick`]: Builder::max_io_events_per_tick
-        ///
-        /// # Panics
-        ///
-        /// Panics if `capacity` is zero.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime;
-        ///
-        /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_io()
-        ///     .max_io_events_per_tick(128)
-        ///     .max_io_events_per_busy_tick(8)
-        ///     .build()
-        ///     .unwrap();
-        /// ```
-        #[track_caller]
-        pub fn max_io_events_per_busy_tick(&mut self, capacity: usize) -> &mut Self {
-            assert!(capacity > 0, "max_io_events_per_busy_tick must be non-zero");
-            self.nevents_busy = Some(capacity);
-            self
-        }
+    /// Sets the max number of I/O events a worker processes when it polls
+    /// the driver while it still has tasks to run.
+    ///
+    /// A busy worker polls the driver every [`event_interval`] tasks, and
+    /// every task that poll wakes goes to its local queue. A large batch
+    /// overflows that queue, and under sustained overload the overflow
+    /// grows until requests time out. A small busy batch leaves the rest
+    /// in the kernel. An idle worker still takes up to
+    /// [`max_io_events_per_tick`] events.
+    ///
+    /// The runtime treats any poll that does not wait as busy. That
+    /// includes a park with a timer that has already expired, because the
+    /// worker runs that timer's task next.
+    ///
+    /// A multi-thread worker's local queue holds 256 tasks, so set
+    /// `max_io_events_per_tick` to at most 256 as well, with room for the
+    /// tasks those tasks wake.
+    ///
+    /// The default is to use the same value as [`max_io_events_per_tick`].
+    ///
+    /// [`event_interval`]: Builder::event_interval
+    /// [`max_io_events_per_tick`]: Builder::max_io_events_per_tick
+    ///
+    /// # Panics
+    ///
+    /// Panics if `capacity` is zero.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///     .enable_io()
+    ///     .max_io_events_per_tick(128)
+    ///     .max_io_events_per_busy_tick(8)
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    #[track_caller]
+    pub fn max_io_events_per_busy_tick(&mut self, capacity: usize) -> &mut Self {
+        assert!(capacity > 0, "max_io_events_per_busy_tick must be non-zero");
+        self.nevents_busy = Some(capacity);
+        self
     }
 }
 
@@ -2186,7 +2182,7 @@ cfg_rt_multi_thread! {
 
             // Create the blocking pool
             let blocking_pool =
-                blocking::create_blocking_pool(self, self.max_blocking_threads + worker_threads);
+                blocking::create_blocking_pool(self, self.max_blocking_threads + worker_threads, worker_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             // Generate a rng seed for this runtime.

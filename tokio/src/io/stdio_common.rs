@@ -108,6 +108,7 @@ where
 
 #[cfg(test)]
 #[cfg(not(loom))]
+#[cfg(not(target_os = "emscripten"))]
 mod tests {
     use crate::io::blocking::DEFAULT_MAX_BUF_SIZE;
     use crate::io::AsyncWriteExt;
