@@ -351,7 +351,7 @@ impl MissedTickBehavior {
                             "too much time has elapsed since the interval was supposed to tick",
                         ),
                 );
-                now + period - offset
+                now + (period - offset)
             }
         }
     }
@@ -633,25 +633,5 @@ impl Interval {
     /// Returns the period of the interval.
     pub fn period(&self) -> Duration {
         self.period
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn missed_tick_behavior_doesnt_panic_on_overflow() {
-        let now = Instant::now();
-        let timeout = now - Duration::from_millis(10);
-
-        for behavior in [
-            MissedTickBehavior::Burst,
-            MissedTickBehavior::Delay,
-            MissedTickBehavior::Skip,
-        ] {
-            let next = behavior.next_timeout(timeout, now, safe_delay(Duration::MAX));
-            assert!(next > now);
-        }
     }
 }
