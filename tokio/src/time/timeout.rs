@@ -87,7 +87,8 @@ pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F::IntoFuture>
 where
     F: IntoFuture,
 {
-    #[allow(clippy::manual_map, reason = "preserve #[track_caller]")]
+    // Closures don't preserve `#[track_caller]`.
+    #[allow(clippy::manual_map)]
     Timeout {
         value: future.into_future(),
         delay: match Instant::now().checked_add(duration) {
