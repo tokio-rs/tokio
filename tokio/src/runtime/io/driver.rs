@@ -354,3 +354,33 @@ impl Direction {
         }
     }
 }
+
+#[cfg(all(test, unix, feature = "net", not(loom), not(miri)))]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn busy_turn_takes_busy_batch() {
+        let (mut driver, handle) = Driver::new(16, Some(2)).unwrap();
+        let mut sources = Vec::new();
+        for _ in 0..5 {
+            let (mut rx, mut tx) = mio::net::UnixStream::pair().unwrap();
+            tx.write_all(b"x").unwrap();
+            let reg = handle.add_source(&mut rx, Interest::READABLE).unwrap();
+            sources.push((rx, tx, reg));
+        }
+
+        // A poll that does not wait takes the busy batch.
+        driver.turn(&handle, Some(Duration::ZERO));
+        assert_eq!(driver.events_busy.as_ref().unwrap().iter().count(), 2);
+
+        // The rest stays queued for the next poll, which takes the main batch.
+        driver.turn(&handle, Some(Duration::from_millis(100)));
+        assert_eq!(driver.events.iter().count(), 3);
+
+        for (mut rx, _tx, reg) in sources {
+            handle.deregister_source(&reg, &mut rx).unwrap();
+        }
+    }
+}

@@ -11,9 +11,8 @@ fn zero_busy_tick_panics() {
     tokio::runtime::Builder::new_multi_thread().max_io_events_per_busy_tick(0);
 }
 
-// Every worker always has a task, so it polls the driver only at its
-// maintenance tick, and each poll takes one event. The events each poll
-// leaves in the kernel must still reach their tasks.
+// Liveness check: the runtime always has runnable tasks, so its I/O polls do
+// not wait and each takes one event. Echo traffic must still complete.
 fn busy_runtime_gets_every_event(rt: tokio::runtime::Runtime) {
     for _ in 0..8 {
         rt.spawn(async {
@@ -60,8 +59,9 @@ fn busy_runtime_gets_every_event(rt: tokio::runtime::Runtime) {
 
 #[test]
 fn multi_thread_busy_tick() {
+    // One worker, so the spinning tasks keep it from ever parking.
     let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
+        .worker_threads(1)
         .max_io_events_per_busy_tick(1)
         .enable_all()
         .build()
