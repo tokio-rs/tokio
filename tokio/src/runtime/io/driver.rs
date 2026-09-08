@@ -382,5 +382,6 @@ mod tests {
         for (mut rx, _tx, reg) in sources {
             handle.deregister_source(&reg, &mut rx).unwrap();
         }
+        handle.release_pending_registrations();
     }
 }

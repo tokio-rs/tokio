@@ -1904,7 +1904,7 @@ impl Builder {
     /// ```
     /// use tokio::runtime;
     ///
-    /// let rt = runtime::Builder::new_multi_thread()
+    /// let rt = runtime::Builder::new_current_thread()
     ///     .enable_io()
     ///     .max_io_events_per_tick(128)
     ///     .max_io_events_per_busy_tick(8)
