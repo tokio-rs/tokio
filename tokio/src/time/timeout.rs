@@ -87,11 +87,13 @@ pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F::IntoFuture>
 where
     F: IntoFuture,
 {
+    #[allow(clippy::manual_map, reason = "preserve #[track_caller]")]
     Timeout {
         value: future.into_future(),
-        delay: Instant::now()
-            .checked_add(duration)
-            .map(|deadline| Sleep::new_timeout(deadline, trace::caller_location())),
+        delay: match Instant::now().checked_add(duration) {
+            Some(deadline) => Some(Sleep::new_timeout(deadline, trace::caller_location())),
+            None => None,
+        },
     }
 }
 
