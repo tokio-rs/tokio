@@ -8,8 +8,8 @@
 use tokio::sync;
 use tracing_mock::{expect, subscriber};
 
-#[tokio::test]
-async fn test_barrier_creates_span() {
+#[test]
+fn test_barrier_creates_span() {
     let barrier_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::barrier");
@@ -43,8 +43,8 @@ async fn test_barrier_creates_span() {
     handle.assert_finished();
 }
 
-#[tokio::test]
-async fn test_mutex_creates_span() {
+#[test]
+fn test_mutex_creates_span() {
     let mutex_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::mutex");
@@ -87,8 +87,8 @@ async fn test_mutex_creates_span() {
     handle.assert_finished();
 }
 
-#[tokio::test]
-async fn test_oneshot_creates_span() {
+#[test]
+fn test_oneshot_creates_span() {
     let oneshot_span_id = expect::id();
     let oneshot_span = expect::span()
         .with_id(oneshot_span_id.clone())
@@ -186,8 +186,8 @@ async fn test_oneshot_creates_span() {
     handle.assert_finished();
 }
 
-#[tokio::test]
-async fn test_rwlock_creates_span() {
+#[test]
+fn test_rwlock_creates_span() {
     let rwlock_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::rwlock");
@@ -242,8 +242,8 @@ async fn test_rwlock_creates_span() {
     handle.assert_finished();
 }
 
-#[tokio::test]
-async fn test_semaphore_creates_span() {
+#[test]
+fn test_semaphore_creates_span() {
     let semaphore_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::semaphore");

@@ -1,4 +1,4 @@
-#![cfg(not(target_os = "wasi"))]
+#![cfg(all(not(target_os = "wasi"), not(target_os = "emscripten")))]
 
 use std::{task::Context, time::Duration};
 

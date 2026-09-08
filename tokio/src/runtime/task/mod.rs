@@ -454,7 +454,7 @@ impl<S: 'static> Task<S> {
         crate::runtime::TaskMeta {
             id: self.id(),
             spawned_at: self.spawned_at().into(),
-            #[cfg(feature = "schedule-latency")]
+            #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
             schedule_latency: _schedule_latency,
             _phantom: PhantomData,
         }
